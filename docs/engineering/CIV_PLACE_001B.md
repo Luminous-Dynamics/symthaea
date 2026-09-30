@@ -153,7 +153,9 @@ The oracle requires:
 
 ## DKG / epistemic boundary
 
-A DKG claim, attestation, or confidence value can be part of the lineage used to build a qualified projection.
+A DKG claim, attestation, confidence value, or Holochain validation-receipt count can be part of the lineage used to build a qualified projection.
+
+Holochain's own documentation describes validation receipts as a rough, short-term DHT-availability signal rather than an accurate measure of current availability. They therefore cannot be promoted into Current, IndependentWitnessed, or Authorized by count alone.
 
 It cannot by itself create:
 
