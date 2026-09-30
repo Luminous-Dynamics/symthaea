@@ -273,6 +273,20 @@ mod tests {
     }
 
     #[test]
+    fn mutated_candidate_provenance_family_is_rejected() {
+        let (mut groups, receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "q", 5),
+            vec![candidate("claim:x", 0.7, "family:a")],
+        );
+        groups[0].representations[0].provenance.provenance_family = Some("family:other".into());
+        let verified = receipt.verify().unwrap();
+        assert_eq!(
+            EvidenceView::from_verified_retrieval(&groups, &verified),
+            Err(EvidenceViewError::ReceiptMismatch)
+        );
+    }
+
+    #[test]
     fn mismatched_provenance_family_set_is_rejected() {
         let (groups, mut receipt) = retrieve(
             &MemoryRetrievalRequest::historical("f:1", "q", 5),
