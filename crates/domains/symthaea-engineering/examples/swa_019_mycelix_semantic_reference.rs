@@ -627,6 +627,18 @@ mod tests {
     }
 
     #[test]
+    fn changing_slice_relationship_changes_projection_digest() {
+        let baseline = envelope();
+        let baseline_digest = baseline.source_content_digest.clone();
+        let mut changed = baseline.clone();
+        changed.evidence_binding.prediction_ref.object_version = Some("prediction@v2");
+        changed.source_content_digest = content_digest(&changed);
+        assert_ne!(baseline_digest, changed.source_content_digest);
+        assert_eq!(validate(&changed), ValidationOutcome::Valid);
+        assert_ne!(baseline.source_content_digest, content_digest(&changed));
+    }
+
+    #[test]
     fn canonical_payload_excludes_self_referential_digest() {
         let payload = content_binding_payload(&envelope());
         let json = serde_json::to_string(&payload).unwrap();
