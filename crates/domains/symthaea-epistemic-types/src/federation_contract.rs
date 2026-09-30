@@ -9,6 +9,26 @@ use crate::{sha256_hex, CanonicalAdmissionReceipt, ProvenanceRelation, Provenanc
 
 pub const FEDERATED_CLAIM_SCHEMA_VERSION: u16 = 1;
 
+/// A typed dependency identity exposed to a federation adapter.
+///
+/// Keeping the dependency kind explicit prevents a plain string from losing
+/// semantic information when the same identifier happens to be reused across
+/// namespaces. Resolution remains the adapter's responsibility; this type does
+/// not perform I/O or encode Holochain/DHT behavior.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+pub enum FederationDependency {
+    Frontier(String),
+    Derivation(String),
+}
+
+impl FederationDependency {
+    pub fn reference(&self) -> &str {
+        match self {
+            Self::Frontier(reference) | Self::Derivation(reference) => reference,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FederatedClaim {
     pub schema_version: u16,
@@ -211,22 +231,42 @@ impl FederatedClaim {
         Ok(())
     }
 
-    /// Stable, substrate-neutral dependency references an adapter must resolve or
-    /// otherwise account for before accepting this envelope. The method deliberately
-    /// returns identifiers only; it performs no I/O and makes no assumptions about
+    /// Stable, typed dependency identities an adapter must resolve or otherwise
+    /// account for before accepting this envelope. The method deliberately returns
+    /// identifiers only; it performs no I/O and makes no assumptions about
     /// Holochain/DHT semantics.
-    pub fn dependency_refs(&self) -> Vec<String> {
-        let mut refs = Vec::new();
+    ///
+    /// The admission event and provenance snapshot digest are intentionally not
+    /// classified as resolution dependencies here: they are admission/binding
+    /// identities. An adapter may authenticate or verify those bindings separately.
+    pub fn dependency_bindings(&self) -> Vec<FederationDependency> {
+        let mut dependencies = Vec::new();
         if let Some(frontier) = &self.frontier_ref {
-            refs.push(frontier.clone());
+            dependencies.push(FederationDependency::Frontier(frontier.clone()));
         }
         if let Some(frontier) = &self.admission_receipt.frontier_ref {
-            refs.push(frontier.clone());
+            dependencies.push(FederationDependency::Frontier(frontier.clone()));
         }
-        refs.extend(self.derivation_refs.iter().cloned());
-        refs.sort();
-        refs.dedup();
-        refs
+        dependencies.extend(
+            self.derivation_refs
+                .iter()
+                .cloned()
+                .map(FederationDependency::Derivation),
+        );
+        dependencies.sort();
+        dependencies.dedup();
+        dependencies
+    }
+
+    /// Compatibility projection for adapters that only need raw identifiers.
+    /// Prefer dependency_bindings() when the dependency kind matters.
+    pub fn dependency_refs(&self) -> Vec<String> {
+        self.dependency_bindings()
+            .into_iter()
+            .map(|dependency| dependency.reference().to_owned())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect()
     }
 
     /// The canonical representation identity is also the idempotency key for a
@@ -624,6 +664,25 @@ mod adversarial_contract_tests {
                 "{name} should be structurally rejected"
             );
         }
+    }
+
+    #[test]
+    fn dependency_bindings_preserve_kind_and_are_sorted_deduplicated() {
+        let mut claim = claim();
+        claim.derivation_refs.push("frontier:1".into());
+        claim.derivation_refs.push("derivation:z".into());
+        claim.derivation_refs.push("derivation:a".into());
+        assert_eq!(
+            claim.dependency_bindings(),
+            vec![
+                FederationDependency::Derivation("derivation:a".into()),
+                FederationDependency::Derivation("derivation:b".into()),
+                FederationDependency::Derivation("derivation:z".into()),
+                FederationDependency::Derivation("frontier:1".into()),
+                FederationDependency::Frontier("frontier:1".into()),
+                FederationDependency::Frontier("frontier:1".into()),
+            ]
+        );
     }
 
     #[test]
