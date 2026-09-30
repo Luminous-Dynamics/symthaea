@@ -255,7 +255,7 @@ impl SliceBoundaryCertificate {
             && self.graph_digest.len() == 64
             && self.graph_digest.chars().all(|c| c.is_ascii_hexdigit())
             && self.schema == PROVENANCE_SLICE_BOUNDARY_SCHEMA
-            && self.root == self.root
+            && !self.root.is_empty()
             && self.graph_revision == PROVENANCE_GRAPH_REVISION
             && self.traversal_policy == PROVENANCE_SLICE_TRAVERSAL_POLICY
 
