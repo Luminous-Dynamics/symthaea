@@ -813,6 +813,7 @@ mod tests {
         TerrainSample {
             latitude_rad: 0.0,
             longitude_rad: 0.0,
+            sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,
             elevation_m: Some(1200.0),
             elevation_uncertainty_m: Some(5.0),
             vertical_datum: TerrainVerticalDatum::AreoidRelative,
@@ -823,6 +824,10 @@ mod tests {
                 source_id: "test-fixture".into(),
                 source_revision: "v1".into(),
                 coordinate_reference: "areocentric-east-positive".into(),
+                content_digests: vec![
+                    ("detached-label".into(), "SHA-256".into(), "a".repeat(64)),
+                    ("raster-image".into(), "SHA-256".into(), "b".repeat(64)),
+                ],
             },
         }
     }
