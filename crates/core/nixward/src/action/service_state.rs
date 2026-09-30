@@ -58,6 +58,60 @@ impl NixServiceOperationCapabilitiesV1 {
 }
 
 
+/// Closed evidence for unit-file enablement state.
+///
+/// This is intentionally separate from lifecycle capability facts: systemd
+/// treats enable/disable as unit-file configuration operations, not as
+/// start/stop/reload lifecycle capabilities. The value is observational only
+/// and remains bound to the exact pre-state from which it was derived.
+#[derive(Debug, PartialEq, Eq)]
+pub struct NixServiceEnablementEvidenceV1 {
+    unit: String,
+    unit_file_state: ServiceUnitFileStateV1,
+    pre_state_digest: String,
+}
+
+impl NixServiceEnablementEvidenceV1 {
+    pub fn from_observed_state(
+        state: &NixServiceObservedStateV1,
+    ) -> Result<Self, NixServiceStateErrorV1> {
+        let pre_state_digest = state.digest()?;
+        Ok(Self {
+            unit: state.unit().to_string(),
+            unit_file_state: state.unit_file_state(),
+            pre_state_digest,
+        })
+    }
+
+    pub fn unit(&self) -> &str { &self.unit }
+    pub fn unit_file_state(&self) -> ServiceUnitFileStateV1 { self.unit_file_state }
+    pub fn pre_state_digest(&self) -> &str { &self.pre_state_digest }
+
+    pub fn validate_shape(&self) -> Result<(), NixServiceStateErrorV1> {
+        let canonical = canonical_service_unit(self.unit.clone())?;
+        if canonical != self.unit {
+            return Err(NixServiceStateErrorV1::NonCanonicalServiceUnit);
+        }
+        if self.pre_state_digest.len() != 64
+            || !self.pre_state_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(NixServiceStateErrorV1::InvalidPreStateDigest);
+        }
+        Ok(())
+    }
+
+    pub fn digest(&self) -> Result<String, NixServiceStateErrorV1> {
+        self.validate_shape()?;
+        let mut hasher = Hasher::new();
+        hasher.update(b"nixward-service-enablement-evidence-v1");
+        write_len_prefixed(&mut hasher, self.unit.as_bytes());
+        hasher.update(&[self.unit_file_state.discriminant()]);
+        write_len_prefixed(&mut hasher, self.pre_state_digest.as_bytes());
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+}
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ServiceActiveStateV1 {
     Active,
