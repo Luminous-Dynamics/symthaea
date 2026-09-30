@@ -258,6 +258,15 @@ jobs:
         observed = parse_workflow(wf)["contract"]
         assert observed["trigger"] == {"event": "workflow_run", "types": ["completed"], "workflows": ["Trusted upstream"]}
         original = wf.read_text(encoding="utf-8")
+        missing_permissions = original.replace("permissions:\n  contents: read\n", "")
+        wf.write_text(missing_permissions, encoding="utf-8")
+        try:
+            parse_workflow(wf)
+        except InventoryError:
+            pass
+        else:
+            raise AssertionError("privileged workflow without explicit permissions must fail closed")
+        wf.write_text(original, encoding="utf-8")
         for malformed in (
             original.replace("    types:\n      - completed\n", ""),
             original.replace("      - Trusted upstream\n", ""),
