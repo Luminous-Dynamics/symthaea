@@ -42,18 +42,6 @@ pub enum AtomicAdmissionOutcome<E> {
     StorageError(E),
 }
 
-/// A successful semantic admission receipt.
-///
-/// The committed version is the linearization witness for this in-memory
-/// optimistic store: the receipt is only returned after compare-and-swap
-/// reports success. Replay carries the original semantic result instead of
-/// recomputing a new result.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AdmissionReceipt {
-    pub result: SemanticResult,
-    pub committed_version: u64,
-}
-
 fn classify_non_admit<E>(outcome: AdmissionOutcome, version: u64) -> AtomicAdmissionOutcome<E> {
     match outcome {
         AdmissionOutcome::Replay { existing_result } =>
