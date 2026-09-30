@@ -102,6 +102,9 @@ pub mod trajectory_evidence;
 /// Feature-neutral resource admissibility contract.
 pub mod resource_evidence;
 
+/// Feature-neutral measured performance evidence contract.
+pub mod performance_evidence;
+
 /// HDC dimensionality configuration for runtime selection
 ///
 /// Supports both predefined tiers and custom arbitrary dimensions.
