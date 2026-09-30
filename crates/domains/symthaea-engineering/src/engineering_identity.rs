@@ -51,7 +51,7 @@ impl EngineeringObjectId {
             }
         }
         if self.content_digest.len() != 64
-            || !self.content_digest.bytes().all(|b| b.is_ascii_hexdigit())
+            || !self.content_digest.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
         {
             return Err(IdentityError::InvalidDigest);
         }
@@ -141,6 +141,15 @@ mod tests {
         let id = sample();
         assert_eq!(id.content_digest, DIGEST);
         assert_ne!(id.content_digest, id.identity_digest());
+    }
+
+    #[test]
+    fn non_lowercase_digest_is_rejected() {
+        let digest = "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789";
+        assert_eq!(
+            EngineeringObjectId::new("mycelix", "runtime", "x", "1", digest).unwrap_err(),
+            IdentityError::InvalidDigest
+        );
     }
 
     #[test]
