@@ -316,6 +316,14 @@ impl ProcessingActivity {
         {
             return Err(ObservationValidationError::InvalidProcessingActivity);
         }
+        let mut input_ids = HashSet::with_capacity(self.input_observation_ids.len());
+        if self.input_observation_ids.iter().any(|id| !input_ids.insert(id)) {
+            return Err(ObservationValidationError::DuplicateActivityInput);
+        }
+        let mut output_ids = HashSet::with_capacity(self.output_observation_ids.len());
+        if self.output_observation_ids.iter().any(|id| !output_ids.insert(id)) {
+            return Err(ObservationValidationError::DuplicateActivityOutput);
+        }
         Ok(())
     }
     
@@ -690,6 +698,10 @@ pub enum ObservationValidationError {
     InvalidParentObservation,
     #[error("processing activity has invalid identifiers, fingerprints, or time bounds")]
     InvalidProcessingActivity,
+    #[error("processing activity input observations must be unique")]
+    DuplicateActivityInput,
+    #[error("processing activity output observations must be unique")]
+    DuplicateActivityOutput,
     #[error("processing activity execution fingerprint must be 64 hexadecimal characters")]
     InvalidExecutionFingerprint,
     #[error("processing activity execution fingerprint does not match its canonical execution envelope")]
@@ -1213,6 +1225,48 @@ mod tests {
             derivations: Vec::new(),
         };
         assert_eq!(activity.validate(), Err(ObservationValidationError::InvalidExecutionFingerprint));
+    }
+
+    #[test]
+    fn processing_activity_rejects_duplicate_input_ids() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into(), "input".into()],
+            output_observation_ids: vec!["output".into()],
+            derivations: Vec::new(),
+        };
+        assert_eq!(
+            activity.validate(),
+            Err(ObservationValidationError::DuplicateActivityInput)
+        );
+    }
+
+    #[test]
+    fn processing_activity_rejects_duplicate_output_ids() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into(), "output".into()],
+            derivations: Vec::new(),
+        };
+        assert_eq!(
+            activity.validate(),
+            Err(ObservationValidationError::DuplicateActivityOutput)
+        );
     }
 
     #[test]
