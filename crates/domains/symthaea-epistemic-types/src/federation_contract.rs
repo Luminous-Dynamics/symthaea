@@ -5,7 +5,7 @@
 //! semantics. It describes what a federation adapter must carry and structurally
 //! validate when transporting an explicitly admitted claim.
 
-use crate::{CanonicalAdmissionReceipt, ProvenanceRelation, ProvenanceRelationKind};
+use crate::{CanonicalAdmissionReceipt, ProvenanceRelation, ProvenanceRelationKind, ProvenanceValidationReport};
 
 pub const FEDERATED_CLAIM_SCHEMA_VERSION: u16 = 1;
 
@@ -20,6 +20,7 @@ pub struct FederatedClaim {
     pub source_event: Option<String>,
     pub frontier_ref: Option<String>,
     pub provenance_snapshot_digest: String,
+    pub provenance_validation: ProvenanceValidationReport,
     pub admission_receipt: CanonicalAdmissionReceipt,
     pub epistemic_state: Option<String>,
     pub claim_ceiling: Option<String>,
@@ -36,6 +37,7 @@ impl FederatedClaim {
         author: impl Into<String>,
         statement_ref: impl Into<String>,
         provenance_snapshot_digest: impl Into<String>,
+        provenance_validation: ProvenanceValidationReport,
         admission_receipt: CanonicalAdmissionReceipt,
     ) -> Result<Self, &'static str> {
         let claim = Self {
@@ -48,6 +50,7 @@ impl FederatedClaim {
             source_event: None,
             frontier_ref: admission_receipt.frontier_ref.clone(),
             provenance_snapshot_digest: provenance_snapshot_digest.into(),
+            provenance_validation,
             admission_receipt,
             epistemic_state: None,
             claim_ceiling: None,
@@ -86,6 +89,15 @@ impl FederatedClaim {
             }
         }
 
+        if !self.provenance_validation.conforms {
+            return Err("federated claim provenance validation does not conform");
+        }
+        if self.provenance_validation.snapshot_digest != self.provenance_snapshot_digest {
+            return Err("claim snapshot digest must match validation report");
+        }
+        if !self.admission_receipt.binds_validation(&self.provenance_validation) {
+            return Err("admission receipt must bind claim validation report");
+        }
         if self.admission_receipt.provenance_snapshot_digest != self.provenance_snapshot_digest {
             return Err("claim snapshot digest must match admission receipt");
         }
@@ -109,6 +121,7 @@ impl FederatedClaim {
     ) -> bool {
         self.admission_receipt.binds_validation(validation)
             && self.provenance_snapshot_digest == validation.snapshot_digest
+            && self.provenance_validation == *validation
     }
 }
 
@@ -144,6 +157,7 @@ mod tests {
             "author:1",
             "statement:1",
             r.provenance_snapshot_digest.clone(),
+            validation,
             r,
         ).unwrap();
         assert_eq!(claim.schema_version, FEDERATED_CLAIM_SCHEMA_VERSION);
@@ -154,10 +168,11 @@ mod tests {
     #[test]
     fn federated_claim_rejects_snapshot_mismatch() {
         let r = receipt();
+        let validation = ProvenanceValidationReport::from_relations(&[]);
         assert_eq!(
             FederatedClaim::new(
                 "claim:1", "canonical:1", "family:1", "author:1", "statement:1",
-                "wrong-digest", r,
+                "wrong-digest", validation, r,
             ).unwrap_err(),
             "claim snapshot digest must match admission receipt"
         );
@@ -167,10 +182,11 @@ mod tests {
     fn federated_claim_rejects_frontier_mismatch() {
         let mut r = receipt();
         r.frontier_ref = Some("frontier:other".into());
+        let validation = ProvenanceValidationReport::from_relations(&[]);
         assert_eq!(
             FederatedClaim::new(
                 "claim:1", "canonical:1", "family:1", "author:1", "statement:1",
-                r.provenance_snapshot_digest.clone(), r,
+                r.provenance_snapshot_digest.clone(), validation, r,
             ).unwrap_err(),
             "claim frontier must match admission receipt"
         );
