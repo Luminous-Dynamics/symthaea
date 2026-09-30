@@ -5,7 +5,7 @@
 //! semantics. It describes what a federation adapter must carry and structurally
 //! validate when transporting an explicitly admitted claim.
 
-use crate::{CanonicalAdmissionReceipt, ProvenanceRelation, ProvenanceRelationKind, ProvenanceValidationReport};
+use crate::{sha256_hex, CanonicalAdmissionReceipt, ProvenanceRelation, ProvenanceRelationKind, ProvenanceValidationReport, ProvenanceView};
 
 pub const FEDERATED_CLAIM_SCHEMA_VERSION: u16 = 1;
 
@@ -65,6 +65,67 @@ impl FederatedClaim {
     /// Structural contract only. It does not establish truth, reliability, authorship
     /// cryptography, or scientific validity; those belong to the federation adapter
     /// and/or higher-level epistemic assessment.
+    /// Deterministic digest of the complete federated envelope. This is an identity
+    /// for the exported representation, not a truth or authority signal.
+    pub fn canonical_digest(&self) -> String {
+        fn field(bytes: &mut Vec<u8>, label: &str, value: Option<&str>) {
+            bytes.extend_from_slice(&(label.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(label.as_bytes());
+            match value {
+                Some(value) => {
+                    bytes.push(1);
+                    bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+                    bytes.extend_from_slice(value.as_bytes());
+                }
+                None => bytes.push(0),
+            }
+        }
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea:federated-claim:v1\\0");
+        bytes.extend_from_slice(&self.schema_version.to_be_bytes());
+        field(&mut bytes, "claim_identity", Some(&self.claim_identity));
+        field(&mut bytes, "canonical_identity", Some(&self.canonical_identity));
+        field(&mut bytes, "provenance_family", Some(&self.provenance_family));
+        field(&mut bytes, "author", Some(&self.author));
+        field(&mut bytes, "statement_ref", Some(&self.statement_ref));
+        field(&mut bytes, "source_event", self.source_event.as_deref());
+        field(&mut bytes, "frontier_ref", self.frontier_ref.as_deref());
+        field(&mut bytes, "provenance_snapshot_digest", Some(&self.provenance_snapshot_digest));
+        field(&mut bytes, "validator_version", Some(&self.provenance_validation.validator_version));
+        bytes.extend_from_slice(&self.provenance_validation.snapshot_schema_version.to_be_bytes());
+        bytes.extend_from_slice(&(self.provenance_validation.relation_count as u64).to_be_bytes());
+        bytes.push(self.provenance_validation.conforms as u8);
+        field(&mut bytes, "admission_event", Some(&self.admission_receipt.admission_event));
+        field(&mut bytes, "receipt_validator_version", Some(&self.admission_receipt.validator_version));
+        bytes.extend_from_slice(&self.admission_receipt.snapshot_schema_version.to_be_bytes());
+        field(&mut bytes, "epistemic_state", self.epistemic_state.as_deref());
+        field(&mut bytes, "claim_ceiling", self.claim_ceiling.as_deref());
+        field(&mut bytes, "model_ref", self.model_ref.as_deref());
+
+        let mut derivation_refs = self.derivation_refs.clone();
+        derivation_refs.sort();
+        bytes.extend_from_slice(&(derivation_refs.len() as u64).to_be_bytes());
+        for reference in derivation_refs {
+            field(&mut bytes, "derivation_ref", Some(&reference));
+        }
+
+        let mut relations = self.relations.clone();
+        relations.sort_by(|a, b| {
+            (&a.source_memory_id, &a.target_memory_id, a.kind.stable_code(), &a.created_at)
+                .cmp(&(&b.source_memory_id, &b.target_memory_id, b.kind.stable_code(), &b.created_at))
+        });
+        bytes.extend_from_slice(&(relations.len() as u64).to_be_bytes());
+        for relation in relations {
+            field(&mut bytes, "relation_source", Some(&relation.source_memory_id));
+            field(&mut bytes, "relation_target", Some(&relation.target_memory_id));
+            field(&mut bytes, "relation_kind", Some(relation.kind.stable_code()));
+            field(&mut bytes, "relation_created_at", Some(&relation.created_at));
+        }
+
+        sha256_hex(&bytes)
+    }
+
     pub fn validate_structure(&self) -> Result<(), &'static str> {
         if self.schema_version != FEDERATED_CLAIM_SCHEMA_VERSION {
             return Err("unsupported federated claim schema version");
@@ -92,8 +153,17 @@ impl FederatedClaim {
         if !self.provenance_validation.conforms {
             return Err("federated claim provenance validation does not conform");
         }
+        if !self.provenance_validation.violations.is_empty() {
+            return Err("conforming federated claim cannot contain validation violations");
+        }
+        if self.provenance_validation.relation_count != self.relations.len() {
+            return Err("claim relation count must match validation report");
+        }
         if self.provenance_validation.snapshot_digest != self.provenance_snapshot_digest {
             return Err("claim snapshot digest must match validation report");
+        }
+        if ProvenanceView::from_relations(&self.relations, self.provenance_validation.clone()).is_err() {
+            return Err("claim relations must match validation snapshot");
         }
         if !self.admission_receipt.binds_validation(&self.provenance_validation) {
             return Err("admission receipt must bind claim validation report");
@@ -138,11 +208,11 @@ mod tests {
             created_at: "cycle:2".into(),
         };
         let validation = ProvenanceValidationReport::from_relations(&[relation]);
-        CanonicalAdmissionReceipt::new(
+        let receipt = CanonicalAdmissionReceipt::new(
             "admission:event-1",
             Some("frontier:1".into()),
-            validation.snapshot_digest,
-            validation.validator_version,
+            validation.snapshot_digest.clone(),
+            validation.validator_version.clone(),
             validation.snapshot_schema_version,
         ).unwrap();
         (receipt, validation)
@@ -164,6 +234,7 @@ mod tests {
         assert_eq!(claim.schema_version, FEDERATED_CLAIM_SCHEMA_VERSION);
         assert_eq!(claim.frontier_ref.as_deref(), Some("frontier:1"));
         assert!(claim.validate_structure().is_ok());
+        assert!(!claim.canonical_digest().is_empty());
     }
 
     #[test]
@@ -189,6 +260,78 @@ mod tests {
                 r.provenance_snapshot_digest.clone(), validation, r,
             ).unwrap_err(),
             "claim frontier must match admission receipt"
+        );
+    }
+}
+
+
+#[cfg(test)]
+mod digest_tests {
+    use super::*;
+
+    fn base_claim() -> FederatedClaim {
+        let relation_a = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let relation_b = ProvenanceRelation {
+            source_memory_id: "claim".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::Corroborates,
+            created_at: "cycle:3".into(),
+        };
+        let relations = vec![relation_b, relation_a];
+        let validation = ProvenanceValidationReport::from_relations(&relations);
+        let receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            Some("frontier:1".into()),
+            validation.snapshot_digest.clone(),
+            validation.validator_version.clone(),
+            validation.snapshot_schema_version,
+        ).unwrap();
+        let mut claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            validation.snapshot_digest.clone(),
+            validation,
+            receipt,
+        ).unwrap();
+        claim.derivation_refs = vec!["derivation:b".into(), "derivation:a".into()];
+        claim.relations = relations;
+        claim
+    }
+
+    #[test]
+    fn canonical_digest_is_order_independent_for_sets() {
+        let mut a = base_claim();
+        let mut b = a.clone();
+        b.derivation_refs.reverse();
+        b.relations.reverse();
+        assert_eq!(a.canonical_digest(), b.canonical_digest());
+        assert!(a.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn canonical_digest_changes_when_claim_content_changes() {
+        let a = base_claim();
+        let mut b = a.clone();
+        b.author = "author:2".into();
+        assert_ne!(a.canonical_digest(), b.canonical_digest());
+    }
+
+    #[test]
+    fn validation_rejects_relation_snapshot_drift() {
+        let a = base_claim();
+        let mut b = a.clone();
+        b.relations.clear();
+        assert_eq!(
+            b.validate_structure().unwrap_err(),
+            "claim relation count must match validation report"
         );
     }
 }
