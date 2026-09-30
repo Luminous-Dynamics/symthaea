@@ -457,6 +457,7 @@ fn evidence_binding_digest_from_slice(
         slice_ref: binding.slice_ref.object_id.to_string(),
         claim_ref: binding.claim_ref.object_id.to_string(),
         slice_revision: binding.slice_revision.to_string(),
+        boundary: slice.boundary,
         nodes,
         edges,
     }
@@ -874,6 +875,7 @@ mod tests {
             slice_ref: binding.slice_ref.object_id.to_string(),
             claim_ref: binding.claim_ref.object_id.to_string(),
             slice_revision: binding.slice_revision.to_string(),
+            boundary: slice.boundary,
             nodes: slice.nodes.iter().map(|n| canonical_node(n, forward.reference_for(n.id).unwrap())).collect(),
             edges: slice.edges.iter().map(|e| CanonicalEdgeRef {
                 from: forward.reference_for(e.from).unwrap().object_id.into(),
@@ -885,6 +887,7 @@ mod tests {
             slice_ref: binding.slice_ref.object_id.to_string(),
             claim_ref: binding.claim_ref.object_id.to_string(),
             slice_revision: binding.slice_revision.to_string(),
+            boundary: slice.boundary,
             nodes: slice.nodes.iter().map(|n| canonical_node(n, reverse.reference_for(n.id).unwrap())).collect(),
             edges: slice.edges.iter().map(|e| CanonicalEdgeRef {
                 from: reverse.reference_for(e.from).unwrap().object_id.into(),
