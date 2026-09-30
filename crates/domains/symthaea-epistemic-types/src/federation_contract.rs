@@ -265,8 +265,12 @@ mod tests {
             "family:1",
             "author:1",
             "statement:1",
-            r.provenance_snapshot_digest.clone(),
-            validation,
+            ProvenanceView::from_relations(&[ProvenanceRelation {
+                source_memory_id: "derived".into(),
+                target_memory_id: "source".into(),
+                kind: ProvenanceRelationKind::DerivedFrom,
+                created_at: "cycle:2".into(),
+            }], validation).unwrap(),
             r,
         ).unwrap();
         claim.frontier_ref = Some("frontier:other".into());
