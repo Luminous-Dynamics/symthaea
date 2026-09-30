@@ -442,7 +442,7 @@ impl Observation {
 }
 
 /// Directed relationship between two observations in the evidence graph.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ObservationRelationKind {
     /// The source observation provides positive evidence for the target.
     Supports,
@@ -459,7 +459,7 @@ pub enum ObservationRelationKind {
 }
 
 /// Auditable edge between observations.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EvidenceIndependence {
     /// The observations have no declared shared upstream source.
     Independent,
@@ -629,8 +629,17 @@ impl ObservationGraph {
             }
         }
 
+        let mut relation_edges = HashSet::with_capacity(self.relations.len());
         for relation in &self.relations {
             relation.validate()?;
+            if !relation_edges.insert((
+                relation.source_observation_id.as_str(),
+                relation.target_observation_id.as_str(),
+                relation.kind,
+                &relation.independence,
+            )) {
+                return Err(ObservationValidationError::DuplicateObservationRelation);
+            }
             if !by_id.contains_key(relation.source_observation_id.as_str()) {
                 return Err(ObservationValidationError::MissingRelationEndpoint(
                     relation.source_observation_id.clone(),
@@ -735,6 +744,8 @@ pub enum ObservationValidationError {
     MissingParentObservation(String),
     #[error("observation parent lineage contains a cycle")]
     LineageCycle,
+    #[error("relation edge is duplicated within the closed graph")]
+    DuplicateObservationRelation,
     #[error("relation endpoint is not present in the closed graph: {0}")]
     MissingRelationEndpoint(String),
 }
@@ -1349,6 +1360,26 @@ mod tests {
         assert_eq!(
             graph.validate(),
             Err(ObservationValidationError::LineageCycle)
+        );
+    }
+
+    #[test]
+    fn graph_rejects_duplicate_relation() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        let relation = ObservationRelation {
+            source_observation_id: "obs-001".into(),
+            target_observation_id: "obs-002".into(),
+            kind: ObservationRelationKind::Supports,
+            independence: EvidenceIndependence::Unknown,
+        };
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![relation.clone(), relation],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::DuplicateObservationRelation)
         );
     }
 
