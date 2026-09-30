@@ -9,6 +9,7 @@
 
 mod api;
 mod app;
+mod presentation;
 
 fn main() {
     leptos::mount::mount_to_body(app::App);
