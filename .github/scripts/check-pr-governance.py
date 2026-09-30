@@ -769,6 +769,24 @@ def self_test() -> None:
         "src/safety/agent.rs",
         "src/safety/copied.rs",
     ]
+
+    # Privileged-governance roots are ordinary Class A authority surfaces:
+    # deletion, rename, copy, and type-change records must remain visible.
+    protected_inventory_roots = (
+        ".github/scripts/check-privileged-workflow-inventory.py",
+        ".github/governance-privileged-workflow-inventory-v1.json",
+        "docs/compliance/adr/ADR-005-privileged-workflow-inventory.md",
+        ".github/workflows/workflow-syntax.yml",
+    )
+    for protected_path in protected_inventory_roots:
+        assert protected_path in parse_name_status(f"D\t{protected_path}\n")
+        assert protected_path in parse_name_status(
+            f"R100\t{protected_path}\t{protected_path}.moved\n"
+        )
+        assert protected_path in parse_name_status(
+            f"C100\t{protected_path}\t{protected_path}.copy\n"
+        )
+        assert protected_path in parse_name_status(f"T\t{protected_path}\n")
     assert approved_subject("emergency-safety(root): coordinated", {"safety", "governance"})
     assert not approved_subject("safety(root): coordinated", {"safety", "governance"})
     assert not approved_subject("governance(root): coordinated", {"safety", "governance"})
