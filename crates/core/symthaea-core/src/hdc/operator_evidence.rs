@@ -353,8 +353,8 @@ mod tests {
         records.push(records[2].clone());
 
         let summary = qualify_operator_matrix(&records);
-        assert_eq!(summary.expected_records, 25);
-        assert_eq!(summary.observed_records, 24);
+        assert_eq!(summary.expected_records, 45);
+        assert_eq!(summary.observed_records, 44);
         assert_eq!(summary.failed_records, 1);
         assert_eq!(summary.duplicate_records, 1);
         assert_eq!(summary.missing_records, 1);
