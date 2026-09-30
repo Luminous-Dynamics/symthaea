@@ -37,6 +37,15 @@ def canonical_bytes(receipt):
     out.extend(struct.pack(">I", len(bindings)))
     for identity, digest in bindings:
         out.extend(put_string(identity)); out.extend(put_string(digest))
+    projection_bindings = sorted(tuple(pair) for pair in receipt["selected_projection_identity_digests"])
+    if len(projection_bindings) != len(set(projection_bindings)):
+        raise ValueError("duplicate projection identity binding")
+    if any(not digest for _, digest in projection_bindings):
+        raise ValueError("empty projection identity digest")
+    if any(identity not in selected for identity, _ in projection_bindings):
+        raise ValueError("unselected projection identity")
+    out.extend(struct.pack(">I", len(projection_bindings)))
+    for identity, digest in projection_bindings: out.extend(put_string(identity)); out.extend(put_string(digest))
     excluded = sorted(receipt["excluded"], key=lambda x: (x["canonical_identity"], x["reason"]))
     excluded_keys = [(x["canonical_identity"], x["reason"]) for x in excluded]
     if len(excluded_keys) != len(set(excluded_keys)):
