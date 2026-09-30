@@ -447,8 +447,7 @@ impl Observation {
 
 /// Directed relationship between two observations in the evidence graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ObservationRelationKind {
-    /// The source observation provides positive evidence for the target.
+pub enum ObservationRelationKind {    /// The source observation provides positive evidence for the target.
     Supports,
     /// The source observation provides evidence against the target.
     Contradicts,
@@ -465,14 +464,42 @@ pub enum ObservationRelationKind {
 /// Auditable edge between observations.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EvidenceIndependence {
-    /// The observations have no declared shared upstream source.
+    /// The producer declares no known shared upstream source.
+    ///
+    /// This is an assertion, not a verification result. Consumers must not
+    /// treat it as independently established evidence without an explicit
+    /// verification step.
     Independent,
+    /// A verifier established that no shared upstream was found in the
+    /// provenance evidence available to it.
+    ///
+    /// This does not assert substantive truth or metaphysical independence;
+    /// it records a bounded provenance-verification result.
+    VerifiedIndependent,
     /// The observations share an upstream source, platform, or processing chain.
     SharedUpstream,
     /// The source observation is computationally derived from the target lineage.
     Derived,
     /// Independence has not been established.
     Unknown,
+}
+
+impl EvidenceIndependence {
+    /// Returns true when independence is asserted or explicitly verified.
+    pub const fn is_independent(&self) -> bool {
+        matches!(self, Self::Independent | Self::VerifiedIndependent)
+    }
+
+    /// Returns true only when a verifier explicitly established independence
+    /// from the available provenance evidence.
+    pub const fn is_verified_independent(&self) -> bool {
+        matches!(self, Self::VerifiedIndependent)
+    }
+
+    /// Returns true when the edge is known not to be independent.
+    pub const fn is_known_non_independent(&self) -> bool {
+        matches!(self, Self::SharedUpstream | Self::Derived)
+    }
 }
 
 /// Auditable edge between observations.
@@ -897,8 +924,7 @@ mod tests {
             source_observation_id: "obs-1".into(),
             target_observation_id: "obs-1".into(),
             kind: ObservationRelationKind::Corroborates,
-            independence: EvidenceIndependence::Independent,
-        };
+            independence: EvidenceIndependence::Independent,        };
         assert_eq!(
             relation.validate(),
             Err(ObservationValidationError::SelfRelation)
@@ -1347,8 +1373,7 @@ mod tests {
         assert_eq!(
             activity.validate(),
             Err(ObservationValidationError::InvalidProcessingActivity)
-        );
-    }
+        );    }
 
     #[test]
     fn graph_rejects_missing_parent() {
@@ -1395,6 +1420,32 @@ mod tests {
         assert_eq!(
             graph.validate(),
             Err(ObservationValidationError::LineageCycle)
+        );
+    }
+
+    #[test]
+    fn declared_independence_is_not_verified() {
+        assert!(EvidenceIndependence::Independent.is_independent());
+        assert!(!EvidenceIndependence::Independent.is_verified_independent());
+    }
+
+    #[test]
+    fn verified_independence_is_explicit() {
+        assert!(EvidenceIndependence::VerifiedIndependent.is_independent());
+        assert!(EvidenceIndependence::VerifiedIndependent.is_verified_independent());
+    }
+
+    #[test]
+    fn derived_relation_rejects_verified_independence() {
+        let relation = ObservationRelation {
+            source_observation_id: "derived".into(),
+            target_observation_id: "source".into(),
+            kind: ObservationRelationKind::DerivedFrom,
+            independence: EvidenceIndependence::VerifiedIndependent,
+        };
+        assert_eq!(
+            relation.validate(),
+            Err(ObservationValidationError::DerivedRelationIndependenceMismatch)
         );
     }
 
