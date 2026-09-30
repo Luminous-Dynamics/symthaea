@@ -256,3 +256,27 @@ The resulting flow is:
 The revalidation frontier is intentionally analogous to a build dependency graph: an upstream change propagates only to evidence that actually depends on that revision. This should eventually allow Sol Atlas to answer **which evidence must be regenerated, why, and which evidence remains applicable** without rewriting historical provenance.
 
 This is compatible with W3C PROV's distinction between entities, activities, agents, revisions, invalidation, and derivation. PROV explicitly treats revisions as new entities and supports provenance chains rather than mutable histories. See the W3C PROV Model Primer and PROV ontology.
+
+## Dependency closure — SWA-007
+
+SWA-006 exposed a subtle failure mode: reporting only the first changed dependency loses information when several upstream entities change simultaneously.
+
+SWA-007 therefore makes the **complete dependency delta** explicit and associates each evidence dimension with its own dependency closure.
+
+A change is propagated only when it intersects the evidence's declared closure.
+
+Examples:
+
+- a solver revision can stale comfort/energy evidence that depends on solver output;
+- the same solver revision need not stale an independently established resilience evidence record that does not depend on the solver;
+- a context-of-use revision affects applicability evidence;
+- a parameter revision affects evidence that actually depends on the parameter set;
+- incomplete provenance produces `Unknown`, never `Valid`.
+
+This gives the revalidation frontier a more precise meaning:
+
+`current dependency delta ∩ evidence dependency closure = affected evidence`
+
+The system consequently preserves both **completeness** and **minimality**: all changed dependencies remain visible, while unrelated changes do not create unnecessary revalidation work.
+
+This is also closer to the provenance semantics of W3C PROV, where derivation expresses how a generated entity depends on prior entities and revision/invalidation are explicit provenance relations rather than implicit mutable state.
