@@ -111,14 +111,14 @@ mod tests {
 
     #[test]
     fn disconnected_state_is_explicit() {
-        let state = CognitiveState::from_observation(false, false, 0.8, 0.2, 0.2, 0.7);
+        let state = CognitiveState::from_observation(false, false, 0.8, 0.2, 0.7);
         assert_eq!(state.presence, PresenceState::Disconnected);
-        assert_eq!(state.mode, CognitiveMode::Uncertain);
+        assert_eq!(state.mode, CognitiveMode::Exploring);
     }
 
     #[test]
-    fn high_prediction_error_maps_to_exploration() {
-        let state = CognitiveState::from_observation(true, false, 0.6, 0.8, 0.3, 0.5);
+    fn low_confidence_maps_to_exploration() {
+        let state = CognitiveState::from_observation(true, false, 0.6, 0.3, 0.4);
         assert_eq!(state.presence, PresenceState::Available);
         assert_eq!(state.mode, CognitiveMode::Uncertain);
     }
