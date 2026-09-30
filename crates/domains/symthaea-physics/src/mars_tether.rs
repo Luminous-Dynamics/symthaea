@@ -353,6 +353,107 @@ impl TerrainProvenance {
     }
 }
 
+/// Identity of one authenticated scientific artifact.
+///
+/// This is intentionally storage-agnostic: it describes what was consumed,
+/// not where the bytes happen to be stored. Archive/product identity and byte
+/// identity are kept separate so a PDS LIDVID, for example, cannot substitute
+/// for a cryptographic digest.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerrainArtifactIdentity {
+    pub logical_file: String,
+    pub source_id: String,
+    pub source_revision: String,
+    pub coordinate_reference: String,
+    pub algorithm: String,
+    pub digest: String,
+}
+
+impl TerrainArtifactIdentity {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.logical_file.trim().is_empty() {
+            return Err("artifact logical file must be non-empty".into());
+        }
+        if self.source_id.trim().is_empty() {
+            return Err(format!(
+                "artifact {} source id must be non-empty",
+                self.logical_file
+            ));
+        }
+        if self.source_revision.trim().is_empty() {
+            return Err(format!(
+                "artifact {} source revision must be non-empty",
+                self.logical_file
+            ));
+        }
+        if self.coordinate_reference.trim().is_empty() {
+            return Err(format!(
+                "artifact {} coordinate reference must be non-empty",
+                self.logical_file
+            ));
+        }
+        if self.algorithm.trim().is_empty() {
+            return Err(format!(
+                "artifact {} algorithm must be non-empty",
+                self.logical_file
+            ));
+        }
+        if self.digest.trim().is_empty() {
+            return Err(format!(
+                "artifact {} digest must be non-empty",
+                self.logical_file
+            ));
+        }
+        if self.algorithm.eq_ignore_ascii_case("SHA-256")
+            && (self.digest.len() != 64
+                || !self.digest.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        {
+            return Err(format!(
+                "artifact {} has an invalid SHA-256 digest",
+                self.logical_file
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Explicit composition of independently authenticated artifacts.
+///
+/// A composition is ordered deterministically by logical artifact name and
+/// rejects contradictory identities instead of allowing one artifact's
+/// metadata to overwrite another's.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerrainArtifactComposition {
+    pub artifacts: Vec<TerrainArtifactIdentity>,
+}
+
+impl TerrainArtifactComposition {
+    pub fn from_artifacts(
+        mut artifacts: Vec<TerrainArtifactIdentity>,
+    ) -> Result<Self, String> {
+        for artifact in &artifacts {
+            artifact.validate()?;
+        }
+        artifacts.sort_by(|a, b| a.logical_file.cmp(&b.logical_file));
+        for pair in artifacts.windows(2) {
+            if pair[0].logical_file == pair[1].logical_file
+                && pair[0] != pair[1]
+            {
+                return Err(format!(
+                    "conflicting artifact identities for logical file {}",
+                    pair[0].logical_file
+                ));
+            }
+        }
+        artifacts.dedup();
+        Ok(Self { artifacts })
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        Self::from_artifacts(self.artifacts.clone()).map(|_| ())
+    }
+}
+
 /// Immutable input identity for a reproducible tether-engineering run.
 ///
 /// The caller supplies the model/constants/configuration revisions because
