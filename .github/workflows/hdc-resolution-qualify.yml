@@ -7,9 +7,12 @@ on:
       - "crates/core/symthaea-core/src/hdc/resolution_budget.rs"
       - "crates/core/symthaea-core/src/hdc/simd_continuous.rs"
       - "crates/core/symthaea-core/src/hdc/operator_evidence.rs"
+      - "crates/core/symthaea-core/src/hdc/operator_evidence_contract.rs"
+      - "crates/core/symthaea-core/src/hdc/trajectory_evidence.rs"
       - "crates/core/symthaea-core/examples/hdc_operator_evidence.rs"
       - "crates/core/symthaea-core/benches/simd_continuous.rs"
       - "docs/research/HDC_RESOLUTION_EXTENSIBILITY.md"
+      - "docs/research/HDC_LTC_RESOLUTION_TRAJECTORY_MATRIX.md"
       - "rust-toolchain.toml"
       - ".github/workflows/hdc-resolution-qualify.yml"
   workflow_dispatch:
@@ -67,6 +70,8 @@ jobs:
             crates/core/symthaea-core/src/hdc/resolution_budget.rs \
             crates/core/symthaea-core/src/hdc/simd_continuous.rs \
             crates/core/symthaea-core/src/hdc/operator_evidence.rs \
+            crates/core/symthaea-core/src/hdc/operator_evidence_contract.rs \
+            crates/core/symthaea-core/src/hdc/trajectory_evidence.rs \
             crates/core/symthaea-core/examples/hdc_operator_evidence.rs \
             crates/core/symthaea-core/benches/simd_continuous.rs
 
@@ -76,6 +81,8 @@ jobs:
           cargo test -p symthaea-core --lib resolution_budget
           cargo test -p symthaea-core --lib simd_continuous --features simd
           cargo test -p symthaea-core --lib operator_evidence --features simd
+          cargo test -p symthaea-core --lib operator_evidence_contract
+          cargo test -p symthaea-core --lib trajectory_evidence
 
       - name: Focused strict Clippy
         run: |
@@ -161,6 +168,7 @@ jobs:
           resolution_budget=focused-tests
           simd_operator_conformance=focused-tests
           operator_evidence_json=generated
+          trajectory_operator_gate=focused-tests
           simd_benchmark=compile-only
           benchmark_execution=not-claimed
           production_default_changed=false
