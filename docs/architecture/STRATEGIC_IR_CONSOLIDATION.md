@@ -406,6 +406,12 @@ The verifier therefore maintains a history-to-information-set map while checking
 
 This is aligned with the OpenSpiel information-state contract: action-observation history is intended to be sufficient to reconstruct information state, and consistency requires the equality/inequality structure of AOH to agree with information-state identity. See the OpenSpiel API documentation for the formal contract.
 
+### 2026-09-30 focused action-availability validation
+
+The extensive-form boundary now exposes a genuinely focused validate_action_availability() check rather than delegating to the full structural validator. It verifies that each decision node's transition actions exactly match the canonical legal-action set declared by its DecisionState, independent of serialization order, while still rejecting empty or duplicate action lists.
+
+This keeps action availability as structural decision context rather than silently feeding it into the player-local information encoder. The semantic encoder remains a function of (player, player-local action-observation history), while the information structure guarantees that all members of one information set expose the same legal-action vocabulary. OpenSpiel likewise exposes legal actions separately from information-state/observation APIs. citeturn0search0turn0search3
+
 ## 2026-09-30 extensive-form identity hardening
 
 The finite extensive-form boundary now treats player identity as part of validation rather than an implicit convention.
