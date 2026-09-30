@@ -405,3 +405,32 @@ claim -> complete provenance slice -> canonical replay manifest -> deterministic
 This also gives Sol Atlas a concrete answer to **“can this claim actually be reproduced from the evidence we say supports it?”** rather than treating provenance as descriptive metadata alone. W3C PROV explicitly includes reproducibility and versioning among the provenance requirements it supports, and its bundle model permits provenance to be independently established and linked across provenance boundaries. ASME's VVUQ lifecycle guidance likewise places verification, validation, and uncertainty work inside the model lifecycle rather than treating a validation result as permanently detached from model evolution.
 
 The next seam is **counterevidence witnesses**: supporting, qualifying, and contradicting claims should each be independently replayable from their own complete provenance slices, allowing the system to preserve disagreement without collapsing it into a single confidence value.
+
+
+## Counterevidence witnesses — SWA-012
+
+SWA-011 made a single claim replayable. SWA-012 makes disagreement replayable as well.
+
+A `CounterevidenceRecord` links independently identified reproducibility witnesses to a claim using three explicit relations:
+
+- **Supports** — the witness supplies evidence in favor of the claim;
+- **Qualifies** — the witness narrows or conditions the claim without asserting that it is false;
+- **Contradicts** — the witness supplies evidence against the claim.
+
+The fixture preserves every witness identity and deliberately does not resolve conflicts into a score or winner. A contradiction therefore yields `Contested`, while support plus qualification yields `Qualified`. Qualification alone does not become support, and absence of evidence remains `Unsupported`.
+
+This is a useful distinction for Sol Atlas because a claim can now carry multiple independently replayable epistemic paths:
+
+claim -> support witness
+claim -> qualification witness
+claim -> contradiction witness
+
+Each witness can point back to its own complete provenance slice and dependency frontier. A later model revision can therefore invalidate one branch without silently deleting the historical fact that another branch contradicted it.
+
+This is consistent with the W3C provenance model's emphasis on validity and consistency checking: PROV defines constraints over provenance histories and provides normalization/equivalence machinery so provenance can be checked rather than merely stored. The provenance overview also explicitly lists reproducibility, versioning, procedures, and derivation as core provenance requirements. citeturn0search1turn0search5
+
+The architectural progression is now:
+
+claim -> provenance slice -> completeness certificate -> replay witness -> support/qualification/contradiction set
+
+The next seam is **provenance integrity validation**: rather than merely constructing these structures, the fixture should reject impossible histories such as duplicate witness identities, missing upstream nodes, contradictory dependency identities, or derivation cycles. That moves the system from provenance storage toward provenance verification.
