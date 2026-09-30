@@ -79,12 +79,18 @@ impl CognitiveState {
         confidence: f64,
         prediction_error: f64,
     ) -> Self {
+        let telemetry_valid = coherence.is_finite()
+            && thermodynamic_load.is_finite()
+            && confidence.is_finite()
+            && prediction_error.is_finite();
         let presence = if !connected {
             PresenceState::Disconnected
+        } else if !telemetry_valid {
+            // Invalid measurements remain visible as degraded even during a
+            // request; processing must not mask broken telemetry.
+            PresenceState::Degraded
         } else if processing {
             PresenceState::Processing
-        } else if !coherence.is_finite() || !thermodynamic_load.is_finite() {
-            PresenceState::Degraded
         } else {
             PresenceState::Available
         };
@@ -288,6 +294,7 @@ mod tests {
             f64::NEG_INFINITY,
             f64::NAN,
         );
+        assert_eq!(value.presence, PresenceState::Degraded);
         assert_eq!(value.coherence, 0.0);
         assert_eq!(value.thermodynamic_load, 0.0);
         assert_eq!(value.confidence, 0.0);
