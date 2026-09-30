@@ -10,6 +10,7 @@
 //! making either external standard a dependency of the cognitive core.
 
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 /// Sensor modality at the observation boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -374,6 +375,91 @@ impl ObservationRelation {
             return Err(ObservationValidationError::DerivedRelationIndependenceMismatch);
         }
         Ok(())
+    }
+}
+
+/// A closed-world observation graph with validated lineage and evidence edges.
+///
+/// Local observation validation remains open-world: a single observation may refer to
+/// parents that are stored elsewhere. This graph validator is deliberately stricter and
+/// treats the supplied observation set as complete, so missing parents and relation
+/// endpoints are rejected rather than silently interpreted as unknown.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ObservationGraph {
+    pub observations: Vec<Observation>,
+    pub relations: Vec<ObservationRelation>,
+}
+
+impl ObservationGraph {
+    pub fn validate(&self) -> Result<(), ObservationValidationError> {
+        let mut by_id = HashMap::with_capacity(self.observations.len());
+        for observation in &self.observations {
+            observation.validate()?;
+            if by_id.insert(observation.id.as_str(), observation).is_some() {
+                return Err(ObservationValidationError::DuplicateObservationId);
+            }
+        }
+
+        let mut lineage_children: HashMap<&str, Vec<&str>> = HashMap::new();
+        for observation in &self.observations {
+            for parent_id in &observation.provenance.parent_observation_ids {
+                if !by_id.contains_key(parent_id.as_str()) {
+                    return Err(ObservationValidationError::MissingParentObservation(
+                        parent_id.clone(),
+                    ));
+                }
+                lineage_children
+                    .entry(parent_id.as_str())
+                    .or_default()
+                    .push(observation.id.as_str());
+            }
+        }
+
+        let mut visiting = HashSet::new();
+        let mut visited = HashSet::new();
+        for id in by_id.keys().copied() {
+            if !visited.contains(id) && Self::visit_lineage(id, &lineage_children, &mut visiting, &mut visited) {
+                return Err(ObservationValidationError::LineageCycle);
+            }
+        }
+
+        for relation in &self.relations {
+            relation.validate()?;
+            if !by_id.contains_key(relation.source_observation_id.as_str()) {
+                return Err(ObservationValidationError::MissingRelationEndpoint(
+                    relation.source_observation_id.clone(),
+                ));
+            }
+            if !by_id.contains_key(relation.target_observation_id.as_str()) {
+                return Err(ObservationValidationError::MissingRelationEndpoint(
+                    relation.target_observation_id.clone(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn visit_lineage<'a>(
+        id: &'a str,
+        children: &HashMap<&'a str, Vec<&'a str>>,
+        visiting: &mut HashSet<&'a str>,
+        visited: &mut HashSet<&'a str>,
+    ) -> bool {
+        if !visiting.insert(id) {
+            return true;
+        }
+        if let Some(next) = children.get(id) {
+            for child in next {
+                if !visited.contains(child)
+                    && Self::visit_lineage(child, children, visiting, visited)
+                {
+                    return true;
+                }
+            }
+        }
+        visiting.remove(id);
+        visited.insert(id);
+        false
     }
 }
 
