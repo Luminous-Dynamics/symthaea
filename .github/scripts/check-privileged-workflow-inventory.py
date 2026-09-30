@@ -89,12 +89,16 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                 else:
                     vals = [nt[2:].strip().strip("'\"") for ni, nt in nested if ni == 6 and nt.startswith("- ")]
                 events[event][key] = vals
-            elif key not in {"branches", "branches-ignore", "paths", "paths-ignore"}:
+            elif event in PRIVILEGED_EVENTS or key not in {"branches", "branches-ignore", "paths", "paths-ignore"}:
                 raise InventoryError(f"{path}: unsupported trigger field for {event}: {key}")
 
     privileged = [e for e in events if e in PRIVILEGED_EVENTS]
     if not privileged:
         return {"path": path.as_posix(), "privileged": False}
+    if len(privileged) != 1:
+        raise InventoryError(
+            f"{path}: v1 requires one privileged trigger per workflow; found {sorted(privileged)}"
+        )
     for raw in lines:
         stripped = raw.strip()
         if stripped.startswith(("&", "*", "<<:")):
