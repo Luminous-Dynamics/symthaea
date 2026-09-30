@@ -225,6 +225,24 @@ def parse_workflow(path: Path) -> dict[str, Any]:
             "actions/download-artifact@" in raw.strip()
             for raw in lines
         )
+        if download_artifact:
+            download_lines = [raw.strip() for raw in lines if "actions/download-artifact@" in raw.strip()]
+            if not any("with:" in raw for raw in lines):
+                raise InventoryError(f"{path}: artifact-consuming workflow_run must declare structured download configuration")
+            artifact_provenance_fragments = (
+                "run.id",
+                "run.run_attempt",
+                "artifact",
+            )
+            missing_artifact_provenance = [
+                fragment for fragment in artifact_provenance_fragments
+                if fragment not in source
+            ]
+            if missing_artifact_provenance:
+                raise InventoryError(
+                    f"{path}: artifact-consuming workflow_run must bind artifact access to runtime provenance: "
+                    f"{missing_artifact_provenance}"
+                )
         cache_write = any(
             re.search(r"(^|\s)cache-mode:\s*(write|write-only)\s*$", raw.strip())
             for raw in lines
@@ -308,6 +326,14 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
                         mismatches.append(f"{path}: provenance_binding missing {missing_provenance}")
                 if observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and not dataflow.get("artifacts_consumed"):
                     mismatches.append(f"{path}: artifact download is present but artifacts_consumed is false")
+                if dataflow.get("artifacts_consumed"):
+                    artifact_names = dataflow.get("artifact_names")
+                    if not isinstance(artifact_names, list) or not artifact_names or not all(isinstance(name, str) and name.strip() for name in artifact_names):
+                        mismatches.append(f"{path}: artifact-consuming workflow_run requires a non-empty exact artifact_names allowlist")
+                    if dataflow.get("artifact_extraction") in {None, "", "none"}:
+                        mismatches.append(f"{path}: artifact-consuming workflow_run requires explicit artifact_extraction handling")
+                    if dataflow.get("artifact_execution") is not False:
+                        mismatches.append(f"{path}: artifact_execution must be false for the current fail-closed v1 contract")
                 if not observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and dataflow.get("artifacts_consumed"):
                     mismatches.append(f"{path}: artifacts_consumed is true but no download-artifact action is present")
                 if observed_contract["cross_workflow_dataflow_observed"]["explicit_cache_write_override_present"] and dataflow.get("cache_influence") != "explicit_write_override":
