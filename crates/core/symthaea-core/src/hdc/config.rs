@@ -38,10 +38,20 @@
 //!
 //! | Tier | Dimension | Memory/Vec | Use Case |
 //! |------|-----------|------------|----------|
+//! | Micro | 1,024 | 4 KB | Minimal continuous-HV research |
+//! | Tiny | 2,048 | 8 KB | Constrained inference / STT boundary |
 //! | Compact | 4,096 | 16 KB | Embedded, mobile |
+//! | Rest | 8,192 | 32 KB | Low-power background processing |
 //! | Standard | 16,384 | 64 KB | General use |
-//! | Extended | 32,768 | 128 KB | High precision |
-//! | Ultra | 65,536 | 256 KB | Maximum capacity |
+//! | Extended | 32,768 | 128 KB | Higher-capacity semantic spaces |
+//! | Ultra | 65,536 | 256 KB | Maximum predefined capacity |
+//!
+//! The lower tiers are primarily continuous-HV configurations. BinaryHV remains
+//! fixed at its established 16,384-bit representation; dimension configurability
+//! does not silently imply binary-HV compatibility at every tier.
+//!
+//! Tier parameters are explicit research starting points, not claims that a
+//! particular dimension or sparsity is universally optimal.
 
 use std::sync::OnceLock;
 
@@ -73,6 +83,24 @@ pub struct HdcConfig {
 }
 
 impl HdcConfig {
+    /// Micro configuration: 1,024 dimensions
+    ///
+    /// Primarily for low-memory continuous-HV experiments and dimensionality sweeps.
+    pub const MICRO: Self = Self {
+        dimension: 1_024,
+        num_levels: 4,
+        sparse_density: 0.5,
+    };
+
+    /// Tiny configuration: 2,048 dimensions
+    ///
+    /// Useful for constrained inference and the STT/interoperability boundary.
+    pub const TINY: Self = Self {
+        dimension: 2_048,
+        num_levels: 8,
+        sparse_density: 0.25,
+    };
+
     /// Compact configuration: 4,096 dimensions
     ///
     /// Use for:
@@ -84,6 +112,15 @@ impl HdcConfig {
         dimension: 4_096,
         num_levels: 8,
         sparse_density: 0.2,
+    };
+
+    /// Rest configuration: 8,192 dimensions
+    ///
+    /// Use for low-power background processing and memory consolidation.
+    pub const REST: Self = Self {
+        dimension: 8_192,
+        num_levels: 16,
+        sparse_density: 0.15,
     };
 
     /// Standard configuration: 16,384 dimensions (default)
@@ -147,7 +184,10 @@ impl HdcConfig {
         self.dimension * 4 // f32 = 4 bytes
     }
 
-    /// Get memory usage per binary vector in bytes
+    /// Get the packed-bit memory estimate for a binary representation at this dimension.
+    ///
+    /// This is representation accounting only; it does not change BinaryHV's
+    /// established fixed 16,384-bit layout.
     pub const fn memory_per_binary_vec(&self) -> usize {
         self.dimension / 8 // 8 bits per byte
     }
@@ -166,7 +206,10 @@ impl HdcConfig {
     /// Create configuration for a specific tier by name
     pub fn from_tier(tier: &str) -> Option<Self> {
         match tier.to_lowercase().as_str() {
+            "micro" | "1k" => Some(Self::MICRO),
+            "tiny" | "2k" => Some(Self::TINY),
             "compact" | "4k" => Some(Self::COMPACT),
+            "rest" | "8k" => Some(Self::REST),
             "standard" | "16k" | "default" => Some(Self::STANDARD),
             "extended" | "32k" => Some(Self::EXTENDED),
             "ultra" | "64k" => Some(Self::ULTRA),
@@ -177,7 +220,10 @@ impl HdcConfig {
     /// Get tier name for this configuration
     pub fn tier_name(&self) -> &'static str {
         match self.dimension {
+            1_024 => "micro",
+            2_048 => "tiny",
             4_096 => "compact",
+            8_192 => "rest",
             16_384 => "standard",
             32_768 => "extended",
             65_536 => "ultra",
@@ -335,7 +381,10 @@ mod tests {
 
     #[test]
     fn test_config_constants() {
+        assert_eq!(HdcConfig::MICRO.dimension, 1_024);
+        assert_eq!(HdcConfig::TINY.dimension, 2_048);
         assert_eq!(HdcConfig::COMPACT.dimension, 4_096);
+        assert_eq!(HdcConfig::REST.dimension, 8_192);
         assert_eq!(HdcConfig::STANDARD.dimension, 16_384);
         assert_eq!(HdcConfig::EXTENDED.dimension, 32_768);
         assert_eq!(HdcConfig::ULTRA.dimension, 65_536);
@@ -343,8 +392,11 @@ mod tests {
 
     #[test]
     fn test_power_of_two() {
-        assert!(HdcConfig::STANDARD.is_power_of_two());
+        assert!(HdcConfig::MICRO.is_power_of_two());
+        assert!(HdcConfig::TINY.is_power_of_two());
         assert!(HdcConfig::COMPACT.is_power_of_two());
+        assert!(HdcConfig::REST.is_power_of_two());
+        assert!(HdcConfig::STANDARD.is_power_of_two());
         assert!(!HdcConfig::custom(10_000, 16, 0.1).is_power_of_two());
     }
 
@@ -371,6 +423,10 @@ mod tests {
 
     #[test]
     fn test_from_tier() {
+        assert_eq!(HdcConfig::from_tier("1k"), Some(HdcConfig::MICRO));
+        assert_eq!(HdcConfig::from_tier("2k"), Some(HdcConfig::TINY));
+        assert_eq!(HdcConfig::from_tier("4k"), Some(HdcConfig::COMPACT));
+        assert_eq!(HdcConfig::from_tier("8k"), Some(HdcConfig::REST));
         assert_eq!(HdcConfig::from_tier("standard"), Some(HdcConfig::STANDARD));
         assert_eq!(HdcConfig::from_tier("16k"), Some(HdcConfig::STANDARD));
         assert_eq!(HdcConfig::from_tier("invalid"), None);
@@ -388,6 +444,38 @@ mod tests {
     fn test_default_config() {
         let config = HdcConfig::default();
         assert_eq!(config.dimension, 16_384);
+    }
+
+    #[test]
+    fn test_dimension_ladder_is_monotonic() {
+        let ladder = [
+            HdcConfig::MICRO,
+            HdcConfig::TINY,
+            HdcConfig::COMPACT,
+            HdcConfig::REST,
+            HdcConfig::STANDARD,
+            HdcConfig::EXTENDED,
+            HdcConfig::ULTRA,
+        ];
+        assert!(ladder.windows(2).all(|pair| pair[0].dimension < pair[1].dimension));
+        assert!(ladder.iter().all(HdcConfig::is_power_of_two));
+    }
+
+    #[test]
+    fn test_memory_scales_linearly_with_dimension() {
+        let ladder = [
+            HdcConfig::MICRO,
+            HdcConfig::TINY,
+            HdcConfig::COMPACT,
+            HdcConfig::REST,
+            HdcConfig::STANDARD,
+            HdcConfig::EXTENDED,
+            HdcConfig::ULTRA,
+        ];
+        for pair in ladder.windows(2) {
+            assert_eq!(pair[1].memory_per_continuous_vec(), pair[0].memory_per_continuous_vec() * 2);
+            assert_eq!(pair[1].memory_per_binary_vec(), pair[0].memory_per_binary_vec() * 2);
+        }
     }
 
     #[test]

@@ -17,23 +17,23 @@ pub const EVIDENCE_SCHEMA_VERSION: u32 = OPERATOR_EVIDENCE_SCHEMA_VERSION;
 pub const DEFAULT_SEED_A: u64 = 42;
 pub const DEFAULT_SEED_B: u64 = 43;
 
-const EXTENDED_DIMS: &[usize] = &[16_384, 32_768, 65_536, 131_072, 262_144];
+const QUALIFICATION_DIMS: &[usize] = &[1_024, 2_048, 4_096, 8_192, 16_384, 32_768, 65_536, 131_072, 262_144];
 const TOLERANCE_SCALAR: f64 = 1e-4;
 const TOLERANCE_VECTOR: f64 = 1e-5;
 
 pub use super::operator_evidence_contract::{OperatorEvidenceRecord, OperatorEvidenceSummary};
 
-/// Generate the deterministic operator matrix used by the >64K evidence gate.
+/// Generate the deterministic operator matrix spanning the canonical 1K..64K ladder and exploratory 128K/256K tiers.
 ///
 /// The returned records are suitable for JSON serialization and downstream
 /// trajectory qualification. A failed record is retained rather than filtered
 /// out, so evidence consumers cannot mistake "missing" for "qualified".
 pub fn generate_extended_resolution_evidence() -> Vec<OperatorEvidenceRecord> {
-    let mut records = Vec::with_capacity(EXTENDED_DIMS.len() * 5);
+    let mut records = Vec::with_capacity(QUALIFICATION_DIMS.len() * 5);
 
-    for &raw_dim in EXTENDED_DIMS {
+    for &raw_dim in QUALIFICATION_DIMS {
         let dim = HdcResolution::new(raw_dim)
-            .expect("extended evidence dimensions must be valid power-of-two resolutions")
+            .expect("qualification evidence dimensions must be valid power-of-two resolutions")
             .dimensions();
         let a = deterministic_vec(dim, DEFAULT_SEED_A);
         let b = deterministic_vec(dim, DEFAULT_SEED_B);
@@ -104,7 +104,7 @@ pub fn generate_extended_resolution_evidence() -> Vec<OperatorEvidenceRecord> {
 pub fn qualify_operator_matrix(records: &[OperatorEvidenceRecord]) -> OperatorEvidenceSummary {
     use std::collections::HashSet;
 
-    let expected = EXTENDED_DIMS.len() * 5;
+    let expected = QUALIFICATION_DIMS.len() * 5;
     let mut seen = HashSet::with_capacity(records.len());
     let mut qualified_records = 0;
     let mut failed_records = 0;
@@ -287,7 +287,7 @@ mod tests {
     #[test]
     fn evidence_matrix_has_stable_shape_and_schema() {
         let records = generate_extended_resolution_evidence();
-        assert_eq!(records.len(), EXTENDED_DIMS.len() * 5);
+        assert_eq!(records.len(), QUALIFICATION_DIMS.len() * 5);
         assert!(records
             .iter()
             .all(|record| record.schema_version == EVIDENCE_SCHEMA_VERSION));
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn evidence_covers_every_operator_at_every_resolution() {
-        for &dim in EXTENDED_DIMS {
+        for &dim in QUALIFICATION_DIMS {
             let ops: Vec<_> = generate_extended_resolution_evidence()
                 .into_iter()
                 .filter(|record| record.resolution == dim)
@@ -322,9 +322,9 @@ mod tests {
             summary,
             OperatorEvidenceSummary {
                 schema_version: EVIDENCE_SCHEMA_VERSION,
-                expected_records: 25,
-                observed_records: 25,
-                qualified_records: 25,
+                expected_records: 45,
+                observed_records: 45,
+                qualified_records: 45,
                 failed_records: 0,
                 missing_records: 0,
                 duplicate_records: 0,
@@ -338,8 +338,8 @@ mod tests {
         let mut records = generate_extended_resolution_evidence();
         records.pop();
         let summary = qualify_operator_matrix(&records);
-        assert_eq!(summary.expected_records, 25);
-        assert_eq!(summary.observed_records, 24);
+        assert_eq!(summary.expected_records, 45);
+        assert_eq!(summary.observed_records, 44);
         assert_eq!(summary.missing_records, 1);
         assert!(!summary.qualified);
     }
@@ -353,8 +353,8 @@ mod tests {
         records.push(records[2].clone());
 
         let summary = qualify_operator_matrix(&records);
-        assert_eq!(summary.expected_records, 25);
-        assert_eq!(summary.observed_records, 24);
+        assert_eq!(summary.expected_records, 45);
+        assert_eq!(summary.observed_records, 44);
         assert_eq!(summary.failed_records, 1);
         assert_eq!(summary.duplicate_records, 1);
         assert_eq!(summary.missing_records, 1);
@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn resolution_metadata_is_consistent_with_evidence_ladder() {
-        for &dim in EXTENDED_DIMS {
+        for &dim in QUALIFICATION_DIMS {
             let resolution = HdcResolution::new(dim).expect("matrix dimension must be valid");
             assert!(resolution.is_canonical() || resolution.is_exploratory());
         }

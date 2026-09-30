@@ -50,7 +50,7 @@ Moving a tier from exploratory to canonical requires evidence across:
 4. deterministic conversion and round-trip behavior;
 5. resident working-set and allocation cost;
 6. scalar/SIMD numerical conformance;
-   The current SIMD qualification matrix exercises 16K, 32K, 64K, 128K, and 256K for dot, bind, bundle, norm, and similarity against scalar reference semantics.
+   The current SIMD qualification matrix exercises the full 1K, 2K, 4K, 8K, 16K, 32K, 64K, 128K, and 256K ladder for dot, bind, bundle, norm, and similarity against scalar reference semantics.
 7. throughput and logical byte traffic;
 8. task quality per byte and, where telemetry is available, per joule.
 
@@ -58,7 +58,7 @@ The controller should therefore optimize minimum sufficient resolution rather th
 
 ## Why this matters now
 
-The current HDC-LTC trajectory work treats 1K..64K as the controlled matrix. This change makes 128K and 256K possible without changing that evidence boundary, so the next experiment can measure whether extra dimensionality buys enough quality to justify its working-set cost.
+The current HDC-LTC trajectory work treats 1K..64K as the controlled canonical matrix, while 128K and 256K remain exploratory. The operator-conformance gate now exercises both classes, so the next experiment can measure whether extra dimensionality buys enough task quality to justify its working-set cost.
 
 As a reference point, current accelerator hardware can hold substantially larger working sets; AMD lists 192 GB HBM3 and 5.3 TB/s peak bandwidth for MI300X. Hardware capacity therefore does not by itself establish that larger HDC vectors are useful—the relevant question remains quality and cost per operation. 
 
@@ -77,8 +77,8 @@ schema in `hdc/operator_evidence.rs`. Each record contains:
 - tolerance and qualification status;
 - declared logical bytes for the operation.
 
-The current matrix covers dot, bind, bundle, norm, and similarity at 16K, 32K,
-64K, 128K, and 256K. Vector-valued operations retain both a deterministic
+The current matrix covers dot, bind, bundle, norm, and similarity across 1K, 2K,
+4K, 8K, 16K, 32K, 64K, 128K, and 256K. Vector-valued operations retain both a deterministic
 checksum and maximum element-wise error so a checksum collision cannot by itself
 qualify an implementation.
 
@@ -92,7 +92,7 @@ The emitted evidence is still **operator conformance**, not benchmark evidence.
 Logical bytes are accounting metadata, not measured cache traffic, DRAM traffic,
 or energy. Throughput claims remain gated on an actual benchmark run with
 declared hardware/toolchain provenance; `cargo bench --no-run` remains
-compile-only. citeturn0search0
+compile-only.
 
 ## Resource admissibility is a separate contract
 
