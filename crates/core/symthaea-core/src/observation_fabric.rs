@@ -500,9 +500,28 @@ impl ObservationGraph {
                     }
                 }
                 for output_id in &activity.output_observation_ids {
-                    if !by_id.contains_key(output_id.as_str()) {
-                        return Err(ObservationValidationError::MissingActivityOutput(output_id.clone()));
+                    let output = by_id.get(output_id.as_str()).expect("checked above");
+                    if output
+                        .provenance
+                        .processing_activity
+                        .as_ref()
+                        .is_none_or(|producer| producer.activity_id != activity.activity_id)
+                    {
+                        return Err(ObservationValidationError::ActivityOutputMissingProducer(
+                            output_id.clone(),
+                        ));
                     }
+                }
+                if !activity.input_observation_ids.iter().all(|input_id| {
+                    observation
+                        .provenance
+                        .parent_observation_ids
+                        .iter()
+                        .any(|parent_id| parent_id == input_id)
+                }) {
+                    return Err(ObservationValidationError::ActivityInputMissingParent(
+                        observation.id.clone(),
+                    ));
                 }
                 if !activity.output_observation_ids.iter().any(|id| id == &observation.id) {
                     return Err(ObservationValidationError::ActivityOutputMissingSelf(
@@ -591,6 +610,10 @@ pub enum ObservationValidationError {
     ExecutionFingerprintMismatch,
     #[error("processing activity execution fingerprint is required for verification")]
     MissingExecutionFingerprint,
+    #[error("processing activity output does not identify the activity as its producer: {0}")]
+    ActivityOutputMissingProducer(String),
+    #[error("processing activity input is not represented in the output observation's parent lineage: {0}")]
+    ActivityInputMissingParent(String),
     #[error("processing activity input observation is not present in the closed graph: {0}")]
     MissingActivityInput(String),
     #[error("processing activity output observation is not present in the closed graph: {0}")]
@@ -964,6 +987,50 @@ mod tests {
         assert_eq!(
             graph.validate(),
             Err(ObservationValidationError::MissingRelationEndpoint("missing".into()))
+        );
+    }
+
+    #[test]
+    fn graph_accepts_activity_output_with_matching_producer() {
+        let mut input = fixture();
+        input.id = "input".into();
+        let mut output = fixture();
+        output.id = "output".into();
+        output.provenance.parent_observation_ids = vec!["input".into()];
+        output.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into()],
+        });
+        let graph = ObservationGraph { observations: vec![input, output], relations: vec![] };
+        assert!(graph.validate().is_ok());
+    }
+
+    #[test]
+    fn graph_rejects_activity_input_missing_parent_lineage() {
+        let mut output = fixture();
+        output.id = "output".into();
+        output.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into()],
+        });
+        let graph = ObservationGraph { observations: vec![output], relations: vec![] };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::MissingActivityInput("input".into()))
         );
     }
 
