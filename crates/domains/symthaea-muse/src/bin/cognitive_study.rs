@@ -1893,8 +1893,9 @@ fn require_len(args: &[String], expected: usize) -> Result<(), Box<dyn Error>> {
 fn read_json<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T, Box<dyn Error>> {
     let path = path.as_ref();
     let bytes = std::fs::read(path)?;
-    match admit::<T>(&bytes, AdmissionLimits::default()) {
-        BoundaryResult::Accepted { document, .. } => Ok(document),
+    match admit(&bytes, AdmissionLimits::default()) {
+        BoundaryResult::Accepted { document, .. } => serde_json::from_str::<T>(&document)
+            .map_err(|error| invalid_input(format!("{}: schema deserialization failed: {error}", path.display()))),
         BoundaryResult::Rejected { reason, .. } => {
             let detail = match reason {
                 RejectionReason::ResourceLimit => "resource limit",
