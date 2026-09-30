@@ -681,7 +681,7 @@ impl ObservationGraph {
         let target_ancestors = Self::ancestor_ids(target_observation_id, &by_id)?;
         if let Some(shared_ancestor) = source_ancestors
             .intersection(&target_ancestors)
-            .next()
+            .min()
         {
             return Ok(assessment(
                 EvidenceIndependence::SharedUpstream,
@@ -717,7 +717,7 @@ impl ObservationGraph {
             .collect::<HashSet<_>>();
         if let Some(shared_activity) = source_activities
             .intersection(&target_activities)
-            .next()
+            .min()
         {
             return Ok(assessment(
                 EvidenceIndependence::SharedUpstream,
