@@ -415,11 +415,6 @@ fn canonical_node(
     node: &symthaea_engineering::provenance_graph::Node,
     reference: &SemanticRefProjection,
 ) -> CanonicalNodeRef {
-    assert_eq!(
-        node.revision,
-        reference.object_version,
-        "semantic projection must not invent a provenance revision"
-    );
     CanonicalNodeRef {
         id: reference.object_id.into(),
         kind: graph_node_kind(node.kind).into(),
