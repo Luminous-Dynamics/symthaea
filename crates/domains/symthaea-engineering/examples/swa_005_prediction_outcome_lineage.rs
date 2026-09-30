@@ -138,6 +138,7 @@ fn simulate(
 }
 
 fn predict(
+    model_id: &'static str,
     initial: ZoneState,
     low: ZoneParameters,
     high: ZoneParameters,
@@ -149,7 +150,7 @@ fn predict(
     let (comfort_high, energy_high) = simulate(initial, high, intervention, outdoor_c, hours);
 
     PredictionInterval {
-        model_id: "swa-005-rc-v1",
+        model_id,
         intervention_id: intervention.id,
         comfort_min: comfort_low.min(comfort_high),
         comfort_max: comfort_low.max(comfort_high),
@@ -194,6 +195,7 @@ fn calibrate_internal_gain(
     current: ZoneParameters,
     observed: SyntheticOutcome,
     predicted: PredictionInterval,
+    residual_id: &'static str,
     calibration_activity_id: &'static str,
 ) -> (ZoneParameters, CalibrationActivity) {
     let predicted_energy_mid =
@@ -209,7 +211,7 @@ fn calibrate_internal_gain(
         CalibrationActivity {
             activity_id: calibration_activity_id,
             source_model_id: predicted.model_id,
-            source_residual_id: "residual-swa-005-calibration-001",
+            source_residual_id: residual_id,
             from_parameter_set: "predictor-parameter-set-v1",
             to_parameter_set: "predictor-parameter-set-v2",
             parameter_adjustment: adjustment,
@@ -267,7 +269,7 @@ fn main() {
 
     // Training data are used to create v2. They are not reused as the
     // validation scenario.
-    let prediction_v1 = predict(initial, predictor_low, predictor_high, intervention, 35.0, 8);
+    let prediction_v1 = predict("swa-005-rc-v1", initial, predictor_low, predictor_high, intervention, 35.0, 8);
     let training_outcome =
         synthetic_world(initial, training_world, intervention, 35.0, 8);
     let training_residual = residual(prediction_v1, training_outcome);
@@ -305,6 +307,7 @@ fn main() {
         initial_calibration_params,
         training_outcome,
         prediction_v1,
+        "residual-swa-005-training",
         "calibration-swa-005-001",
     );
     let revision = ModelRevision {
@@ -324,6 +327,7 @@ fn main() {
     // The holdout is a new world state/scenario, never used by calibration.
     // v2 is evaluated against it without rewriting v1 or the training residual.
     let prediction_v2 = predict(
+        "swa-005-rc-v2",
         initial,
         calibrated_params,
         calibrated_params,
@@ -334,11 +338,7 @@ fn main() {
     let holdout_outcome = synthetic_world(initial, holdout_world, intervention, 30.0, 8);
     let holdout_residual = residual(prediction_v2, holdout_outcome);
 
-    assert_eq!(prediction_v2.model_id, "swa-005-rc-v1");
-    // The lab fixture's predictor function is intentionally unchanged; the
-    // revision identity is carried by ModelRevision until the shared model API
-    // is introduced.
-    assert_eq!(revision.model_id, "swa-005-rc-v2");
+    assert_eq!(prediction_v2.model_id, revision.model_id);
     assert_eq!(holdout_residual.intervention_id, intervention.id);
     assert!(holdout_residual.comfort_error.is_finite());
     assert!(holdout_residual.energy_error_kwh.is_finite());
@@ -379,7 +379,7 @@ mod tests {
             id: "zone-a-reversible-hvac",
             hvac_capacity_kw: 2.0,
         };
-        let prediction = predict(initial, low, high, intervention, 35.0, 8);
+        let prediction = predict("swa-005-rc-v1", initial, low, high, intervention, 35.0, 8);
         let outcome = synthetic_world(initial, world, intervention, 35.0, 8);
         let residual = residual(prediction, outcome);
         (prediction, outcome, residual)
@@ -424,11 +424,11 @@ mod tests {
             comfort_band_c: 2.0,
         };
         let (calibrated, activity) =
-            calibrate_internal_gain(params, outcome, prediction, "calibration-test-001");
+            calibrate_internal_gain(params, outcome, prediction, "residual-test-001", "calibration-test-001");
 
         assert_ne!(calibrated.internal_gain_kw, params.internal_gain_kw);
         assert_eq!(prediction.model_id, "swa-005-rc-v1");
-        assert_eq!(activity.source_residual_id, "residual-swa-005-calibration-001");
+        assert_eq!(activity.source_residual_id, "residual-test-001");
         assert_eq!(activity.source_model_id, prediction.model_id);
         assert!(residual.energy_error_kwh.is_finite());
     }
@@ -447,9 +447,11 @@ mod tests {
             params,
             training_outcome,
             prediction_v1,
+            "residual-training-holdout-001",
             "calibration-holdout-001",
         );
         let holdout_prediction = predict(
+            "swa-005-rc-v2",
             ZoneState { indoor_c: 21.0 },
             calibrated,
             calibrated,
