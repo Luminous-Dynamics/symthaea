@@ -105,6 +105,9 @@ pub mod resource_evidence;
 /// Feature-neutral measured performance evidence contract.
 pub mod performance_evidence;
 
+/// Feature-neutral measured task-quality evidence contract.
+pub mod task_quality_evidence;
+
 /// HDC dimensionality configuration for runtime selection
 ///
 /// Supports both predefined tiers and custom arbitrary dimensions.
