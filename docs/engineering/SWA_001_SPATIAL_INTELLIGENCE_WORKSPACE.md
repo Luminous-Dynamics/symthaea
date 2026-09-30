@@ -848,3 +848,21 @@ The semantic reference object IDs for the provenance-bound nodes now deliberatel
 The registry is still an interoperability mapping, not a second provenance graph. Topology, node kinds, revisions, and edge relationships remain owned by provenance_graph; the registry only establishes the one-to-one projection needed to serialize that authoritative slice.
 
 The hardening is aligned with Holochain's validation model: validation inputs should be deterministic and addressable, and incomplete dependencies should remain unresolved rather than being implicitly accepted.
+
+## SWA-028 — validated provenance slice boundary
+
+SWA-027 closed the provenance-to-semantic mapping boundary. SWA-028 moves the validation invariant one layer earlier: ProvenanceGraph::slice() now validates the complete graph before traversal.
+
+A caller can no longer obtain a ProvenanceSlice from a graph containing duplicate node identities, duplicate edges, invalid node/revision identities, or dangling edge endpoints.
+
+The slice API is therefore explicitly fallible:
+
+- invalid graph -> typed ProvenanceGraphError;
+- missing root -> typed MissingRoot;
+- valid graph + valid root -> deterministic ProvenanceSlice.
+
+This is deliberately stronger than relying on every caller to invoke validate() first. The authoritative graph itself now owns the invariant that every exported slice came from a structurally valid graph.
+
+This follows the same architectural direction as deterministic distributed validation: a definitive invalid result should not be silently converted into an empty/default object, while unavailable or incomplete dependencies should remain distinguishable from validity. Holochain's current validation documentation likewise emphasizes deterministic outcomes and explicit unresolved dependencies.
+
+The important distinction remains: SWA-028 is an in-process Rust fixture boundary, not a Holochain validation callback. It adopts the deterministic/fail-closed shape without claiming equivalent network-level authority.
