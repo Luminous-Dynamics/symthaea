@@ -223,17 +223,10 @@ impl ExtensiveGame {
                     }
                 }
             }
-            for (i, observation) in observations.iter().enumerate() {
-                if observations[..i]
-                    .iter()
-                    .any(|prior| prior.scope == observation.scope)
-                {
-                    return Err(ExtensiveGameError::DuplicateObservationScope {
-                        state: *state,
-                        scope: observation.scope,
-                    });
-                }
-            }
+            // Multiple observation events may share a scope. The vector order is
+            // semantic: each emitted token contributes an event to the ordered
+            // action-observation history. Public/private scope determines delivery,
+            // while ObservationId determines the event payload.
         }
 
         // Every information-bearing decision state must have exactly one
@@ -819,7 +812,6 @@ pub enum ExtensiveGameError {
         error: VisibilityValidationError,
     },
     ObservationStateMissing(DecisionStateId),
-    DuplicateObservationScope { state: DecisionStateId, scope: ObservationScope },
     InformationEncodingMismatch { state: DecisionStateId, expected: crate::strategic_context::InformationSetId, actual: crate::strategic_context::InformationSetId },
     InformationHistoryMapsToMultipleInformationSets {
         player: PlayerId,
@@ -1398,6 +1390,82 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn multiple_observations_same_scope_preserve_order() {
+        let history = vec![
+            HistoryEvent::Observation {
+                state: DecisionStateId(0),
+                scope: ObservationScope::Public,
+                observation: ObservationId(10),
+            },
+            HistoryEvent::Observation {
+                state: DecisionStateId(0),
+                scope: ObservationScope::Public,
+                observation: ObservationId(11),
+            },
+            HistoryEvent::Observation {
+                state: DecisionStateId(0),
+                scope: ObservationScope::Private(PlayerId(0)),
+                observation: ObservationId(12),
+            },
+            HistoryEvent::Observation {
+                state: DecisionStateId(0),
+                scope: ObservationScope::Private(PlayerId(0)),
+                observation: ObservationId(13),
+            },
+        ];
+
+        assert_eq!(
+            project_player_history(PlayerId(0), &history),
+            vec![
+                PlayerHistoryEvent::Observation { observation: ObservationId(10) },
+                PlayerHistoryEvent::Observation { observation: ObservationId(11) },
+                PlayerHistoryEvent::Observation { observation: ObservationId(12) },
+                PlayerHistoryEvent::Observation { observation: ObservationId(13) },
+            ]
+        );
+        assert_eq!(
+            project_player_history(PlayerId(1), &history),
+            vec![
+                PlayerHistoryEvent::Observation { observation: ObservationId(10) },
+                PlayerHistoryEvent::Observation { observation: ObservationId(11) },
+            ]
+        );
+    }
+
+    #[test]
+    fn observation_order_is_semantic() {
+        let first = vec![
+            HistoryEvent::Observation {
+                state: DecisionStateId(0),
+                scope: ObservationScope::Public,
+                observation: ObservationId(20),
+            },
+            HistoryEvent::Observation {
+                state: DecisionStateId(0),
+                scope: ObservationScope::Public,
+                observation: ObservationId(21),
+            },
+        ];
+        let second = vec![
+            HistoryEvent::Observation {
+                state: DecisionStateId(0),
+                scope: ObservationScope::Public,
+                observation: ObservationId(21),
+            },
+            HistoryEvent::Observation {
+                state: DecisionStateId(0),
+                scope: ObservationScope::Public,
+                observation: ObservationId(20),
+            },
+        ];
+
+        assert_ne!(
+            project_player_history(PlayerId(0), &first),
+            project_player_history(PlayerId(0), &second)
+        );
     }
 
     #[test]
