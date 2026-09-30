@@ -7,6 +7,8 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 pub const PROFILE: &str = "CIV-PLACE-001B";
 pub const SCHEMA_VERSION: &str = "civ-place-001b-v1";
 
+pub mod sol_atlas;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DependencyEdgeV1 {
     pub id: String,
@@ -25,9 +27,15 @@ pub struct ProjectionV1 { pub id: String, pub completeness: String, pub contradi
 pub struct ServiceQuestionV1 {
     pub id: String,
     pub currentness_required: bool,
+    #[serde(default = "default_dependency_discovery")]
+    pub dependency_discovery: String,
     pub included_dependency_classes: Vec<String>,
     pub required_dependency_classes: Vec<String>,
     pub root: String,
+}
+
+fn default_dependency_discovery() -> String {
+    "Complete".into()
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndependenceWitnessV1 {
@@ -165,7 +173,12 @@ pub fn evaluate_service(service: &ServiceQuestionV1, nodes: &BTreeMap<String,Nod
     let optional = closure.edges.iter().filter(|id|!required.contains(*id)).cloned().collect::<BTreeSet<_>>();
     let required_sources = required.iter().filter_map(|id|by_id.get(id.as_str())).map(|d|d.source.as_str()).collect::<BTreeSet<_>>();
     let optional_sources = optional.iter().filter_map(|id|by_id.get(id.as_str())).map(|d|d.source.as_str()).collect::<BTreeSet<_>>();
-    let mut reasons=BTreeSet::new(); let mut blocked=false; let mut conflicted=false; let mut unavailable=false; let mut degraded=false; let mut currentness=BTreeSet::new();
+    let mut reasons=BTreeSet::new(); let mut blocked=false; let mut conflicted=false; let mut unavailable=false; let mut degraded=false; let mut unresolved=false; let mut currentness=BTreeSet::new();
+
+    if service.dependency_discovery != "Complete" {
+        unresolved = true;
+        reasons.insert(format!("DependencyDiscovery:{}", service.dependency_discovery));
+    }
 
     for id in &closure.nodes {
         let node=nodes.get(id).ok_or_else(||KernelError::MissingNode(id.clone()))?;
@@ -186,13 +199,18 @@ pub fn evaluate_service(service: &ServiceQuestionV1, nodes: &BTreeMap<String,Nod
         }
     }
     if closure.bounded { blocked=true; reasons.insert("ClosureBoundExceeded".into()); }
-    let status=if conflicted{"Conflicted"}else if blocked{"Blocked"}else if unavailable{"Unavailable"}else if degraded{"DegradedService"}else{"FullService"};
+    let status=if conflicted{"Conflicted"}else if blocked{"Blocked"}else if unavailable{"Unavailable"}else if unresolved{"UnresolvedDependencies"}else if degraded{"DegradedService"}else{"FullService"};
     Ok(PlaceEvaluationV1{service:service.id.clone(),status:status.into(),closure,currentness:currentness.into_iter().collect(),reasons:reasons.into_iter().collect()})
 }
 
 pub fn evaluate_fixture(f:&FixtureV1)->Result<BTreeMap<String,PlaceEvaluationV1>,KernelError>{
     if f.profile!=PROFILE || f.schema_version!=SCHEMA_VERSION { return Err(KernelError::InvalidFixture("profile/schema mismatch".into())); }
     let nodes=f.nodes.iter().cloned().map(|n|(n.id.clone(),n)).collect::<BTreeMap<_,_>>();
+    for d in &f.dependencies {
+        if !nodes.contains_key(&d.source) || !nodes.contains_key(&d.target) {
+            return Err(KernelError::InvalidFixture(format!("dependency {} references a missing node", d.id)));
+        }
+    }
     let projections=f.projections.iter().cloned().map(|p|(p.id.clone(),p)).collect::<BTreeMap<_,_>>();
     f.services.iter().map(|s|evaluate_service(s,&nodes,&f.dependencies,&projections).map(|e|(s.id.clone(),e))).collect()
 }
@@ -233,6 +251,19 @@ mod tests {
         assert_eq!(e["svc:block-a:electric"].status,"FullService");
         assert_eq!(e["svc:block-a:electric"].closure.common_mode_groups,vec!["cm:feeder-001","cm:transformer-001"]);
     }
+    #[test] fn incomplete_dependency_discovery_is_not_promoted() {
+        let mut f=fixture();
+        f.services[0].dependency_discovery="Partial".into();
+        let e=evaluate_fixture(&f).unwrap();
+        assert_eq!(e["svc:block-a:electric"].status,"FullService");
+        assert_eq!(e["svc:block-a:electric"].reasons.len(), 0);
+        let mut block_service=f.services.iter_mut().find(|s| s.id=="svc:block-a:electric").unwrap();
+        block_service.dependency_discovery="Partial".into();
+        let e=evaluate_fixture(&f).unwrap();
+        assert_eq!(e["svc:block-a:electric"].status,"UnresolvedDependencies");
+        assert!(e["svc:block-a:electric"].reasons.iter().any(|r| r=="DependencyDiscovery:Partial"));
+    }
+
     #[test] fn dependency_order_is_invariant(){
         let f=fixture();let mut r=f.clone();r.dependencies.reverse();
         assert_eq!(evaluate_fixture(&f).unwrap(),evaluate_fixture(&r).unwrap());

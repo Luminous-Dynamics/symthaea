@@ -1,0 +1,29 @@
+name: CIV-PLACE-001D Sol Atlas adapter
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-civ-place/**"
+      - "docs/engineering/fixtures/sol-atlas-place-001d.json"
+      - "scripts/diff_sol_atlas_place_001d.py"
+      - ".github/workflows/civ-place-001d.yml"
+  push:
+    branches:
+      - "agency/civ-place-001d-sol-atlas-adapter-v0.1"
+
+permissions:
+  contents: read
+
+jobs:
+  adapter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Test CIV-PLACE kernel and adapter
+        run: cargo test -p symthaea-civ-place
+      - name: Differential qualification
+        run: python3 scripts/diff_sol_atlas_place_001d.py

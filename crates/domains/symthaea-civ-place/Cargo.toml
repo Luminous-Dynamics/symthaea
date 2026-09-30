@@ -13,3 +13,7 @@ sha2 = { workspace = true }
 [[bin]]
 name = "civ-place-001b-oracle"
 path = "src/bin/civ_place_001b_oracle.rs"
+
+[[bin]]
+name = "sol-atlas-place-001d-oracle"
+path = "src/bin/sol_atlas_place_001d_oracle.rs"

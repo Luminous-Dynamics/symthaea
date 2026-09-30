@@ -1,0 +1,306 @@
+{
+  "profile": "SOL-PLACE-001D",
+  "plan": {
+    "schema_version": "place-plan-v1",
+    "plan_id": "place-001d-demo",
+    "version": 1,
+    "site": {
+      "canonical_id": "site-001",
+      "external_refs": [
+        {
+          "namespace": "overture",
+          "external_id": "site-demo-001"
+        }
+      ]
+    },
+    "geometry_revision": "geom:place-r3",
+    "coordinate_reference_system": "EPSG:4326",
+    "source_snapshots": [
+      {
+        "id": "src:overture-buildings",
+        "provider": "Overture",
+        "profile": "buildings",
+        "release": "2026-09-23.1"
+      },
+      {
+        "id": "src:site-context",
+        "provider": "synthetic",
+        "profile": "place-demo",
+        "release": "2026-09-30"
+      }
+    ],
+    "intent": {
+      "statement": "Eight climate-adaptive courtyard homes sharing explicit neighborhood services.",
+      "non_goals": [
+        "permit",
+        "construction",
+        "actuation"
+      ]
+    },
+    "elements": [
+      {
+        "id": "site-001",
+        "kind": "Site",
+        "parent_id": null,
+        "geometry_ref": "geom:site-r3",
+        "external_refs": []
+      },
+      {
+        "id": "neighborhood-001",
+        "kind": "Neighborhood",
+        "parent_id": "site-001",
+        "geometry_ref": "geom:neighborhood-r3",
+        "external_refs": []
+      },
+      {
+        "id": "block-a",
+        "kind": "Block",
+        "parent_id": "neighborhood-001",
+        "geometry_ref": "geom:block-a-r3",
+        "external_refs": []
+      },
+      {
+        "id": "home-01",
+        "kind": "Home",
+        "parent_id": "block-a",
+        "geometry_ref": "geom:home-01-r1",
+        "external_refs": []
+      },
+      {
+        "id": "home-02",
+        "kind": "Home",
+        "parent_id": "block-a",
+        "geometry_ref": "geom:home-02-r1",
+        "external_refs": []
+      },
+      {
+        "id": "home-03",
+        "kind": "Home",
+        "parent_id": "block-a",
+        "geometry_ref": "geom:home-03-r1",
+        "external_refs": []
+      },
+      {
+        "id": "home-04",
+        "kind": "Home",
+        "parent_id": "block-a",
+        "geometry_ref": "geom:home-04-r1",
+        "external_refs": []
+      },
+      {
+        "id": "home-05",
+        "kind": "Home",
+        "parent_id": "block-a",
+        "geometry_ref": "geom:home-05-r1",
+        "external_refs": []
+      },
+      {
+        "id": "home-06",
+        "kind": "Home",
+        "parent_id": "block-a",
+        "geometry_ref": "geom:home-06-r1",
+        "external_refs": []
+      },
+      {
+        "id": "home-07",
+        "kind": "Home",
+        "parent_id": "block-a",
+        "geometry_ref": "geom:home-07-r1",
+        "external_refs": []
+      },
+      {
+        "id": "home-08",
+        "kind": "Home",
+        "parent_id": "block-a",
+        "geometry_ref": "geom:home-08-r1",
+        "external_refs": []
+      },
+      {
+        "id": "service:transformer-t4",
+        "kind": "ServiceNode",
+        "parent_id": "block-a",
+        "geometry_ref": null,
+        "external_refs": []
+      },
+      {
+        "id": "service:water-w2",
+        "kind": "ServiceNode",
+        "parent_id": "block-a",
+        "geometry_ref": null,
+        "external_refs": []
+      }
+    ],
+    "dependencies": [
+      {
+        "id": "dep:home-01:transformer",
+        "from_id": "home-01",
+        "to_id": "service:transformer-t4",
+        "service": "Electricity",
+        "required": true,
+        "common_mode_group": "cm:transformer-t4"
+      },
+      {
+        "id": "dep:home-01:water",
+        "from_id": "home-01",
+        "to_id": "service:water-w2",
+        "service": "Water",
+        "required": true,
+        "common_mode_group": "cm:water-w2"
+      },
+      {
+        "id": "dep:home-02:transformer",
+        "from_id": "home-02",
+        "to_id": "service:transformer-t4",
+        "service": "Electricity",
+        "required": true,
+        "common_mode_group": "cm:transformer-t4"
+      },
+      {
+        "id": "dep:home-02:water",
+        "from_id": "home-02",
+        "to_id": "service:water-w2",
+        "service": "Water",
+        "required": true,
+        "common_mode_group": "cm:water-w2"
+      },
+      {
+        "id": "dep:home-03:transformer",
+        "from_id": "home-03",
+        "to_id": "service:transformer-t4",
+        "service": "Electricity",
+        "required": true,
+        "common_mode_group": "cm:transformer-t4"
+      },
+      {
+        "id": "dep:home-03:water",
+        "from_id": "home-03",
+        "to_id": "service:water-w2",
+        "service": "Water",
+        "required": true,
+        "common_mode_group": "cm:water-w2"
+      },
+      {
+        "id": "dep:home-04:transformer",
+        "from_id": "home-04",
+        "to_id": "service:transformer-t4",
+        "service": "Electricity",
+        "required": true,
+        "common_mode_group": "cm:transformer-t4"
+      },
+      {
+        "id": "dep:home-04:water",
+        "from_id": "home-04",
+        "to_id": "service:water-w2",
+        "service": "Water",
+        "required": true,
+        "common_mode_group": "cm:water-w2"
+      },
+      {
+        "id": "dep:home-05:transformer",
+        "from_id": "home-05",
+        "to_id": "service:transformer-t4",
+        "service": "Electricity",
+        "required": true,
+        "common_mode_group": "cm:transformer-t4"
+      },
+      {
+        "id": "dep:home-05:water",
+        "from_id": "home-05",
+        "to_id": "service:water-w2",
+        "service": "Water",
+        "required": true,
+        "common_mode_group": "cm:water-w2"
+      },
+      {
+        "id": "dep:home-06:transformer",
+        "from_id": "home-06",
+        "to_id": "service:transformer-t4",
+        "service": "Electricity",
+        "required": true,
+        "common_mode_group": "cm:transformer-t4"
+      },
+      {
+        "id": "dep:home-06:water",
+        "from_id": "home-06",
+        "to_id": "service:water-w2",
+        "service": "Water",
+        "required": true,
+        "common_mode_group": "cm:water-w2"
+      },
+      {
+        "id": "dep:home-07:transformer",
+        "from_id": "home-07",
+        "to_id": "service:transformer-t4",
+        "service": "Electricity",
+        "required": true,
+        "common_mode_group": "cm:transformer-t4"
+      },
+      {
+        "id": "dep:home-07:water",
+        "from_id": "home-07",
+        "to_id": "service:water-w2",
+        "service": "Water",
+        "required": true,
+        "common_mode_group": "cm:water-w2"
+      },
+      {
+        "id": "dep:home-08:transformer",
+        "from_id": "home-08",
+        "to_id": "service:transformer-t4",
+        "service": "Electricity",
+        "required": true,
+        "common_mode_group": "cm:transformer-t4"
+      },
+      {
+        "id": "dep:home-08:water",
+        "from_id": "home-08",
+        "to_id": "service:water-w2",
+        "service": "Water",
+        "required": true,
+        "common_mode_group": "cm:water-w2"
+      },
+      {
+        "id": "dep:block-a:transformer",
+        "from_id": "block-a",
+        "to_id": "service:transformer-t4",
+        "service": "Electricity",
+        "required": true,
+        "common_mode_group": "cm:transformer-t4"
+      }
+    ],
+    "assumptions": [
+      {
+        "id": "assume:transformer-capacity",
+        "statement": "Transformer capacity is a declared scenario input.",
+        "status": "Scenario",
+        "source_ref": null
+      }
+    ],
+    "review_state": "Draft",
+    "claim_ceiling": "ScenarioOnly"
+  },
+  "node_bindings": [
+    {"element_id":"site-001","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"neighborhood-001","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"block-a","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"home-01","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"home-02","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"home-03","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"home-04","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"home-05","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"home-06","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"home-07","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"home-08","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"service:transformer-t4","currentness":"Current","projection":"proj:nominal","state":"Available"},
+    {"element_id":"service:water-w2","currentness":"Current","projection":"proj:nominal","state":"Available"}
+  ],
+  "projections": [
+    {"id":"proj:nominal","completeness":"Complete","contradiction":"None","convergence":"Converged"}
+  ],
+  "services": [
+    {"id":"svc:home-01:electric","root_element_id":"home-01","currentness_required":true,"dependency_discovery":"Complete","included_dependency_classes":["Electricity"],"required_dependency_classes":["Electricity"]},
+    {"id":"svc:block-a:electric","root_element_id":"block-a","currentness_required":true,"dependency_discovery":"Complete","included_dependency_classes":["Electricity"],"required_dependency_classes":["Electricity"]},
+    {"id":"svc:home-01:water","root_element_id":"home-01","currentness_required":true,"dependency_discovery":"Complete","included_dependency_classes":["Water"],"required_dependency_classes":["Water"]}
+  ],
+  "independence_witnesses": []
+}
