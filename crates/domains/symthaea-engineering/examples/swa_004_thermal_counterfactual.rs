@@ -40,6 +40,12 @@ fn step(
     dt_hours: f64,
 ) -> ZoneState {
     assert!(dt_hours > 0.0 && dt_hours.is_finite());
+    assert!(params.thermal_mass_kwh_per_c.is_finite() && params.thermal_mass_kwh_per_c > 0.0);
+    assert!(params.envelope_u_kw_per_c.is_finite() && params.envelope_u_kw_per_c >= 0.0);
+    assert!(params.internal_gain_kw.is_finite());
+    assert!(params.setpoint_c.is_finite() && params.comfort_band_c.is_finite() && params.comfort_band_c > 0.0);
+    assert!(intervention.hvac_capacity_kw.is_finite() && intervention.hvac_capacity_kw >= 0.0);
+    assert!(state.indoor_c.is_finite() && outdoor_c.is_finite());
     let hvac = ((params.setpoint_c - state.indoor_c)
         * params.thermal_mass_kwh_per_c
         / dt_hours)
@@ -54,6 +60,8 @@ fn step(
 }
 
 fn comfort(temp_c: f64, setpoint_c: f64, band_c: f64) -> f64 {
+    assert!(temp_c.is_finite() && setpoint_c.is_finite());
+    assert!(band_c.is_finite() && band_c > 0.0);
     (1.0 - (temp_c - setpoint_c).abs() / band_c).clamp(0.0, 1.0)
 }
 
@@ -113,7 +121,6 @@ fn main() {
         thermal_mass_kwh_per_c: 10.0,
         envelope_u_kw_per_c: 0.26,
         internal_gain_kw: 0.50,
-        hvac_max_kw: 2.0,
         setpoint_c: 21.0,
         comfort_band_c: 2.0,
     };
