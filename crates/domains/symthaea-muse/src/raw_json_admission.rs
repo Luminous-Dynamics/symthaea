@@ -52,33 +52,6 @@ impl Default for AdmissionLimits {
 }
 
 #[derive(Debug)]
-struct GateError(RejectionReason);
-
-impl std::fmt::Display for GateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.0)
-    }
-}
-
-impl std::error::Error for GateError {}
-
-impl de::Error for GateError {
-    fn custom<T: fmt::Display>(msg: T) -> Self {
-        let message = msg.to_string();
-        let reason = if message.contains("duplicate decoded object member name") {
-            RejectionReason::DuplicateDecodedName
-        } else if message.contains("unicode scalar") {
-            RejectionReason::UnicodeScalarPolicy
-        } else if message.contains("maximum JSON nesting depth") {
-            RejectionReason::ResourceLimit
-        } else {
-            RejectionReason::InvalidJson
-        };
-        Self(reason)
-    }
-}
-
-#[derive(Debug)]
 struct GateState {
     limits: AdmissionLimits,
     depth: usize,
@@ -110,46 +83,14 @@ impl<'de> Visitor<'de> for GateVisitor<'_> {
         formatter.write_str("any valid JSON value")
     }
 
-    fn visit_bool<E>(self, _: bool) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_i64<E>(self, _: i64) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_u64<E>(self, _: u64) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_f64<E>(self, _: f64) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<(), E>
-    where
-        E: de::Error,
-    {
-        if value.chars().any(|c| c.is_surrogate()) {
-            return Err(E::custom("unicode scalar policy rejects surrogate"));
-        }
-        Ok(())
-    }
-
-    fn visit_string<E>(self, value: String) -> Result<(), E>
-    where
-        E: de::Error,
-    {
-        self.visit_str::<E>(&value)
-    }
-
-    fn visit_none<E>(self) -> Result<(), E> {
-        Ok(())
-    }
-
-    fn visit_unit<E>(self) -> Result<(), E> {
-        Ok(())
-    }
+    fn visit_bool<E>(self, _: bool) -> Result<(), E> { Ok(()) }
+    fn visit_i64<E>(self, _: i64) -> Result<(), E> { Ok(()) }
+    fn visit_u64<E>(self, _: u64) -> Result<(), E> { Ok(()) }
+    fn visit_f64<E>(self, _: f64) -> Result<(), E> { Ok(()) }
+    fn visit_str<E>(self, _: &str) -> Result<(), E> { Ok(()) }
+    fn visit_string<E>(self, _: String) -> Result<(), E> { Ok(()) }
+    fn visit_none<E>(self) -> Result<(), E> { Ok(()) }
+    fn visit_unit<E>(self) -> Result<(), E> { Ok(()) }
 
     fn visit_some<D>(self, deserializer: D) -> Result<(), D::Error>
     where
@@ -179,9 +120,7 @@ impl<'de> Visitor<'de> for GateVisitor<'_> {
         let mut names = BTreeSet::<String>::new();
         while let Some(name) = access.next_key::<String>()? {
             if !names.insert(name) {
-                return Err(de::Error::custom(
-                    "duplicate decoded object member name",
-                ));
+                return Err(de::Error::custom("duplicate decoded object member name"));
             }
             access.next_value_seed(GateSeed { state: self.state })?;
         }
@@ -209,6 +148,19 @@ fn raw_sha256(bytes: &[u8]) -> String {
     hasher.update(bytes);
     let digest = hasher.finalize();
     format!("{digest:x}")
+}
+
+fn classify_gate_error(error: &serde_json::Error) -> RejectionReason {
+    let message = error.to_string();
+    if message.contains("duplicate decoded object member name") {
+        RejectionReason::DuplicateDecodedName
+    } else if message.contains("maximum JSON nesting depth exceeded") {
+        RejectionReason::ResourceLimit
+    } else if message.contains("surrogate") {
+        RejectionReason::UnicodeScalarPolicy
+    } else {
+        RejectionReason::InvalidJson
+    }
 }
 
 /// Admit exact raw JSON bytes before materializing the requested Rust type.
@@ -247,15 +199,14 @@ pub fn admit<T: DeserializeOwned>(
 
     let mut gate_state = GateState { limits, depth: 0 };
     let mut gate = serde_json::Deserializer::from_str(text);
-    if GateSeed {
+    if let Err(error) = GateSeed {
         state: &mut gate_state,
     }
     .deserialize(&mut gate)
-    .is_err()
     {
         return BoundaryResult::Rejected {
             raw_sha256,
-            reason: RejectionReason::InvalidJson,
+            reason: classify_gate_error(&error),
         };
     }
 
@@ -305,10 +256,7 @@ mod tests {
         let input = b"\xEF\xBB\xBF{}";
         assert!(matches!(
             admit_value(input),
-            BoundaryResult::Rejected {
-                reason: RejectionReason::BomForbidden,
-                ..
-            }
+            BoundaryResult::Rejected { reason: RejectionReason::BomForbidden, .. }
         ));
     }
 
@@ -322,10 +270,7 @@ mod tests {
         ] {
             assert!(matches!(
                 admit_value(input),
-                BoundaryResult::Rejected {
-                    reason: RejectionReason::InvalidUtf8,
-                    ..
-                }
+                BoundaryResult::Rejected { reason: RejectionReason::InvalidUtf8, .. }
             ));
         }
     }
@@ -338,10 +283,7 @@ mod tests {
         ] {
             assert!(matches!(
                 admit_value(input),
-                BoundaryResult::Rejected {
-                    reason: RejectionReason::DuplicateDecodedName,
-                    ..
-                }
+                BoundaryResult::Rejected { reason: RejectionReason::DuplicateDecodedName, .. }
             ));
         }
     }
@@ -350,10 +292,7 @@ mod tests {
     fn rejects_trailing_data() {
         assert!(matches!(
             admit_value(br#"{} {}"#),
-            BoundaryResult::Rejected {
-                reason: RejectionReason::TrailingData,
-                ..
-            }
+            BoundaryResult::Rejected { reason: RejectionReason::TrailingData, .. }
         ));
     }
 
@@ -361,10 +300,7 @@ mod tests {
     fn rejects_invalid_utf8_before_parser() {
         assert!(matches!(
             admit_value(b"{\xC0\xAF}"),
-            BoundaryResult::Rejected {
-                reason: RejectionReason::InvalidUtf8,
-                ..
-            }
+            BoundaryResult::Rejected { reason: RejectionReason::InvalidUtf8, .. }
         ));
     }
 
@@ -372,7 +308,7 @@ mod tests {
     fn rejects_lone_surrogate_escape() {
         assert!(matches!(
             admit_value(br#"{"x":"\uDEAD"}"#),
-            BoundaryResult::Rejected { .. }
+            BoundaryResult::Rejected { reason: RejectionReason::UnicodeScalarPolicy, .. }
         ));
     }
 
@@ -385,27 +321,19 @@ mod tests {
         };
         assert!(matches!(
             admit::<serde_json::Value>(input, limits),
-            BoundaryResult::Rejected {
-                reason: RejectionReason::ResourceLimit,
-                ..
-            }
+            BoundaryResult::Rejected { reason: RejectionReason::ResourceLimit, .. }
         ));
     }
 
     #[test]
     fn rejection_does_not_materialize_schema_value() {
         #[derive(Debug, Deserialize)]
-        struct Marker {
-            marker: String,
-        }
+        struct Marker { marker: String }
 
         let result = admit::<Marker>(br#"{"marker":1,"marker":2}"#, AdmissionLimits::default());
         assert!(matches!(
             result,
-            BoundaryResult::Rejected {
-                reason: RejectionReason::DuplicateDecodedName,
-                ..
-            }
+            BoundaryResult::Rejected { reason: RejectionReason::DuplicateDecodedName, .. }
         ));
     }
 }
