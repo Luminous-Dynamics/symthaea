@@ -7,7 +7,7 @@
 
 use crate::{
     try_retrieve, MemoryRetrievalCandidate, MemoryRetrievalRequest, MemoryRetrievalReceipt,
-    ReceiptVerificationError, RetrievalRequestError, RetrievedMemory, VerifiedRetrievalReceipt,
+    ReceiptVerificationError, RetrievalRequestError, RetrievedMemory, ReplayTargetRef, RefValidationError, VerifiedRetrievalReceipt,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,7 +20,7 @@ pub struct RetrievalExecutionProfile {
     /// a replay target; it does not by itself prove byte-for-byte reproducibility.
     /// The value is stored without a `snapshot:` prefix; the receipt encoding adds
     /// that namespace exactly once.
-    pub snapshot_ref: Option<String>,
+    pub snapshot_ref: Option<ReplayTargetRef>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +30,7 @@ pub enum RetrievalProfileError {
     EmptyFrontierSemanticsVersion,
     EmptyNormalizationVersion,
     EmptySnapshotRef,
+    InvalidSnapshotRef(RefValidationError),
 }
 
 impl RetrievalExecutionProfile {
@@ -72,6 +73,8 @@ impl RetrievalExecutionProfile {
         if snapshot_ref.trim().is_empty() {
             return Err(RetrievalProfileError::EmptySnapshotRef);
         }
+        let snapshot_ref = ReplayTargetRef::new(snapshot_ref)
+            .map_err(RetrievalProfileError::InvalidSnapshotRef)?;
         self.snapshot_ref = Some(snapshot_ref);
         Ok(self)
     }
@@ -84,7 +87,7 @@ impl RetrievalExecutionProfile {
             format!("normalization:{}", self.normalization_version),
         ];
         if let Some(snapshot_ref) = &self.snapshot_ref {
-            versions.push(format!("snapshot:{}", snapshot_ref));
+            versions.push(format!("snapshot:{}", snapshot_ref.as_str()));
         }
         versions
     }
