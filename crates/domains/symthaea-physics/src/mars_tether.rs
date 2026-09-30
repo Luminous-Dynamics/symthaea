@@ -271,16 +271,37 @@ pub struct TetherExperimentProvenance {
 }
 
 impl TetherExperimentProvenance {
-    /// A run is reproducibly attributable only when its configuration,
-    /// model/constants revisions, and both primary MOLA artifacts are pinned.
+    /// Require every identity component needed to reproduce a count-gated
+    /// MOLA terrain observation. Errors identify the first missing gate so a
+    /// caller can surface an actionable audit failure instead of a bare bool.
+    pub fn require_reproducibly_pinned(&self) -> Result<(), String> {
+        if self.experiment_id.trim().is_empty() {
+            return Err("experiment id must be non-empty".into());
+        }
+        if self.model_revision.trim().is_empty() {
+            return Err("model revision must be non-empty".into());
+        }
+        if self.constants_revision.trim().is_empty() {
+            return Err("constants revision must be non-empty".into());
+        }
+        if self.configuration_sha256.len() != 64
+            || !self.configuration_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err("configuration must be a 64-character hexadecimal SHA-256 digest".into());
+        }
+        for logical_file in [
+            "detached-label",
+            "raster-image",
+            "counts-label",
+            "counts-raster",
+        ] {
+            self.terrain.require_sha256(logical_file)?;
+        }
+        Ok(())
+    }
+
     pub fn is_reproducibly_pinned(&self) -> bool {
-        !self.experiment_id.is_empty()
-            && !self.model_revision.is_empty()
-            && !self.constants_revision.is_empty()
-            && self.configuration_sha256.len() == 64
-            && self.configuration_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
-            && self.terrain.has_sha256("detached-label")
-            && self.terrain.has_sha256("raster-image")
+        self.require_reproducibly_pinned().is_ok()
     }
 }
 
@@ -735,6 +756,8 @@ mod tests {
             content_digests: vec![
                 ("detached-label".into(), "SHA-256".into(), "a".repeat(64)),
                 ("raster-image".into(), "SHA-256".into(), "b".repeat(64)),
+                ("counts-label".into(), "SHA-256".into(), "d".repeat(64)),
+                ("counts-raster".into(), "SHA-256".into(), "e".repeat(64)),
             ],
         };
         let pinned = TetherExperimentProvenance {
@@ -745,10 +768,35 @@ mod tests {
             terrain: terrain.clone(),
         };
         assert!(pinned.is_reproducibly_pinned());
+        assert!(pinned.require_reproducibly_pinned().is_ok());
 
         let mut unpinned = pinned;
         unpinned.configuration_sha256 = "not-pinned".into();
         assert!(!unpinned.is_reproducibly_pinned());
+        assert!(unpinned.require_reproducibly_pinned().is_err());
+    }
+
+    #[test]
+    fn experiment_identity_requires_count_artifacts() {
+        let terrain = TerrainProvenance {
+            source_id: "mola".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "areocentric-east-positive".into(),
+            content_digests: vec![
+                ("detached-label".into(), "SHA-256".into(), "a".repeat(64)),
+                ("raster-image".into(), "SHA-256".into(), "b".repeat(64)),
+            ],
+        };
+        let provenance = TetherExperimentProvenance {
+            experiment_id: "valles-tether-t0".into(),
+            model_revision: "model-v1".into(),
+            constants_revision: "mars-reference-v1".into(),
+            configuration_sha256: "c".repeat(64),
+            terrain,
+        };
+        assert!(!provenance.is_reproducibly_pinned());
+        let error = provenance.require_reproducibly_pinned().unwrap_err();
+        assert!(error.contains("counts-label"));
     }
 
     #[test]
