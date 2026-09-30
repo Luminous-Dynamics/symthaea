@@ -556,6 +556,37 @@ jobs:
         else:
             raise AssertionError("stale inventory must fail closed")
 
+        artifact_base = wf.read_text(encoding="utf-8")
+        artifact_expr = "${" + "{ github.event.workflow_run.id }}"
+        artifact_step = (
+            "      - uses: actions/download-artifact@0123456789abcdef0123456789abcdef01234567\\n"
+            "        with:\\n"
+            "          name: trusted-receipt-" + artifact_expr + "-" + "${" + "{ github.event.workflow_run.run_attempt }}\\n"
+            "          run-id: " + artifact_expr + "\\n"
+        )
+        artifact_valid = artifact_base.replace(
+            "      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567",
+            artifact_step + "      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567",
+            1,
+        )
+        wf.write_text(artifact_valid, encoding="utf-8")
+        assert parse_workflow(wf)["privileged"] is True
+        wrong_run = artifact_step.replace(
+            "run-id: " + artifact_expr,
+            "run-id: ${" + "{ github.run_id }}",
+        )
+        wf.write_text(artifact_base.replace(
+            "      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567",
+            wrong_run + "      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567",
+            1,
+        ), encoding="utf-8")
+        try:
+            parse_workflow(wf)
+        except InventoryError as exc:
+            assert "triggering workflow_run id" in str(exc)
+        else:
+            raise AssertionError("artifact retrieval bound to consumer run must fail closed")
+        wf.write_text(artifact_base, encoding="utf-8")
         cache_write = original.replace(
             "permissions:\n  contents: read\n",
             "permissions:\n  contents: read\ncache-mode: write\n",
