@@ -52,7 +52,7 @@ pub const QUERIES_PER_CLASS: usize = 4;
 pub const NOISE_WEIGHT: f32 = 0.20;
 pub const PROTOTYPE_WEIGHT: f32 = 0.80;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DimensionTaskSpec {
     pub schema_version: u32,
     pub dimensions: &'static [usize],
