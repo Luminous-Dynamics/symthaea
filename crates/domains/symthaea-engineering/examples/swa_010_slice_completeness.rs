@@ -1,32 +1,14 @@
-//! SWA-010: provenance-slice completeness and minimality.
+//! SWA-010: claim-specific completeness over an authoritative provenance slice.
 //!
-//! SWA-009 computes a reachable provenance slice. SWA-010 adds an explicit
-//! completeness certificate: a slice is not sufficient merely because it is
-//! reachable; it must contain every dependency required by the claim closure,
-//! and it must not contain unrelated dependency kinds.
+//! SWA-028 moved structural traversal completeness into ProvenanceSlice itself.
+//! This example therefore checks semantic completeness only: whether the
+//! selected claim kind has all required dependency kinds. It does not rebuild
+//! graph topology or issue a second traversal certificate.
 
-use serde::Serialize;
 use std::collections::BTreeSet;
+use symthaea_engineering::provenance_graph::{reference_graph, NodeKind, ProvenanceSlice};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-enum NodeKind {
-    Claim,
-    Evidence,
-    Prediction,
-    Model,
-    Parameters,
-    Scenario,
-    Dataset,
-    ContextOfUse,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-struct Node {
-    id: &'static str,
-    kind: NodeKind,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ClaimKind {
     PredictionValidated,
     ApplicabilitySupported,
@@ -51,18 +33,18 @@ impl ClaimKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct CompletenessCertificate {
     complete: bool,
     missing: Vec<NodeKind>,
-    unrelated: Vec<NodeKind>,
 }
 
-fn certify(
-    claim_kind: ClaimKind,
-    slice: &[Node],
-) -> CompletenessCertificate {
-    let actual = slice.iter().map(|node| node.kind).collect::<BTreeSet<_>>();
+fn certify(claim_kind: ClaimKind, slice: &ProvenanceSlice) -> CompletenessCertificate {
+    let actual = slice
+        .dependency_frontier()
+        .into_iter()
+        .map(|node| node.kind)
+        .collect::<BTreeSet<_>>();
     let required = claim_kind
         .required_dependencies()
         .iter()
@@ -75,47 +57,26 @@ fn certify(
         .collect::<Vec<_>>();
     missing.sort();
 
-    let allowed = required
-        .union(&BTreeSet::from([NodeKind::Claim, NodeKind::Evidence, NodeKind::Prediction]))
-        .copied()
-        .collect::<BTreeSet<_>>();
-
-    let mut unrelated = actual
-        .difference(&allowed)
-        .copied()
-        .collect::<Vec<_>>();
-    unrelated.sort();
-
     CompletenessCertificate {
-        complete: missing.is_empty() && unrelated.is_empty(),
+        complete: slice.boundary.is_complete() && missing.is_empty(),
         missing,
-        unrelated,
     }
 }
 
-fn reference_slice() -> Vec<Node> {
-    vec![
-        Node { id: "claim-001", kind: NodeKind::Claim },
-        Node { id: "validation-001", kind: NodeKind::Evidence },
-        Node { id: "prediction-001", kind: NodeKind::Prediction },
-        Node { id: "model-001", kind: NodeKind::Model },
-        Node { id: "parameters-001", kind: NodeKind::Parameters },
-        Node { id: "scenario-001", kind: NodeKind::Scenario },
-        Node { id: "dataset-001", kind: NodeKind::Dataset },
-    ]
+fn reference_slice() -> ProvenanceSlice {
+    reference_graph()
+        .slice("claim-001")
+        .expect("authoritative reference graph is valid")
 }
 
 fn main() {
-    let certificate = certify(ClaimKind::PredictionValidated, &reference_slice());
+    let slice = reference_slice();
+    assert!(slice.boundary.is_complete());
+
+    let certificate = certify(ClaimKind::PredictionValidated, &slice);
 
     assert!(certificate.complete);
     assert!(certificate.missing.is_empty());
-    assert!(certificate.unrelated.is_empty());
-
-    println!(
-        "{}",
-        serde_json::to_string(&certificate).expect("certificate serializes")
-    );
 }
 
 #[cfg(test)]
@@ -124,57 +85,49 @@ mod tests {
 
     #[test]
     fn complete_slice_is_accepted() {
-        let result = certify(ClaimKind::PredictionValidated, &reference_slice());
+        let slice = reference_slice();
+        let result = certify(ClaimKind::PredictionValidated, &slice);
+
         assert!(result.complete);
+        assert!(slice.boundary.is_complete());
     }
 
     #[test]
-    fn missing_dependency_is_rejected() {
-        let mut slice = reference_slice();
-        slice.retain(|node| node.kind != NodeKind::Parameters);
+    fn missing_semantic_dependency_is_rejected() {
+        let slice = reference_slice();
+        let filtered = ProvenanceSlice {
+            nodes: slice
+                .nodes
+                .iter()
+                .copied()
+                .filter(|node| node.kind != NodeKind::Parameters)
+                .collect(),
+            ..slice.clone()
+        };
 
-        let result = certify(ClaimKind::PredictionValidated, &slice);
+        let result = certify(ClaimKind::PredictionValidated, &filtered);
 
         assert!(!result.complete);
         assert_eq!(result.missing, vec![NodeKind::Parameters]);
     }
 
     #[test]
-    fn unrelated_dependency_is_rejected() {
-        let mut slice = reference_slice();
-        slice.push(Node {
-            id: "unrelated-context",
-            kind: NodeKind::ContextOfUse,
-        });
-
-        let result = certify(ClaimKind::PredictionValidated, &slice);
-
-        assert!(!result.complete);
-        assert_eq!(result.unrelated, vec![NodeKind::ContextOfUse]);
-    }
-
-    #[test]
     fn applicability_claim_requires_context() {
-        let mut slice = reference_slice();
-        slice.push(Node {
-            id: "context-001",
-            kind: NodeKind::ContextOfUse,
-        });
-
+        let slice = reference_slice();
         let result = certify(ClaimKind::ApplicabilitySupported, &slice);
 
         assert!(result.complete);
     }
 
     #[test]
-    fn certificate_is_deterministic() {
-        let first = certify(ClaimKind::PredictionValidated, &reference_slice());
-        let second = certify(ClaimKind::PredictionValidated, &reference_slice());
+    fn structural_boundary_is_part_of_slice() {
+        let slice = reference_slice();
 
-        assert_eq!(first, second);
-        assert_eq!(
-            serde_json::to_string(&first).expect("first serializes"),
-            serde_json::to_string(&second).expect("second serializes")
-        );
+        assert_eq!(slice.boundary.root, "claim-001");
+        assert_eq!(slice.boundary.graph_node_count, 9);
+        assert_eq!(slice.boundary.graph_edge_count, 7);
+        assert_eq!(slice.boundary.slice_node_count, 8);
+        assert_eq!(slice.boundary.slice_edge_count, 7);
+        assert!(slice.boundary.frontier_exhausted);
     }
 }
