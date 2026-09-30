@@ -533,6 +533,8 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
                         mismatches.append(f"{path}: artifact_consumption_mode differs from observed artifact handling")
                     if observed_contract["cross_workflow_dataflow_observed"].get("artifact_execution_evidence"):
                         mismatches.append(f"{path}: downloaded artifact execution evidence must be empty")
+                    if observed_contract["cross_workflow_dataflow_observed"].get("artifact_indirect_sink_evidence"):
+                        mismatches.append(f"{path}: downloaded artifact indirect-sink evidence must be empty")
                     if observed_contract["cross_workflow_dataflow_observed"].get("artifact_action_sink_evidence"):
                         mismatches.append(f"{path}: downloaded artifact action-sink evidence must be empty")
                 if not observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and dataflow.get("artifacts_consumed"):
@@ -706,6 +708,19 @@ jobs:
             pass
         else:
             raise AssertionError("passing downloaded artifact into another action must fail closed")
+        runner_temp_expr = "$" + "{{ runner.temp }}"
+        for indirect in (
+            artifact_valid + "      - run: ARTIFACT_DIR='" + runner_temp_expr + "/trusted-receipt'\n      - run: bash \"$ARTIFACT_DIR/script.sh\"\n",
+            artifact_valid + "      - run: export ARTIFACT_DIR='" + runner_temp_expr + "/trusted-receipt'\n      - run: source \"$ARTIFACT_DIR/env.sh\"\n",
+            artifact_valid + "      - run: ARTIFACT_DIR='" + runner_temp_expr + "/trusted-receipt'\n      - run: find \"$ARTIFACT_DIR\" -type f -exec sh {} \\;\n",
+        ):
+            wf.write_text(indirect, encoding="utf-8")
+            try:
+                parse_workflow(wf)
+            except InventoryError:
+                pass
+            else:
+                raise AssertionError("indirect artifact execution must fail closed")
         for malicious in (
             artifact_valid + "      - run: bash \${{ runner.temp }}/trusted-receipt/script.sh\n",
             artifact_valid + "      - run: source \${{ runner.temp }}/trusted-receipt/env.sh\n",
