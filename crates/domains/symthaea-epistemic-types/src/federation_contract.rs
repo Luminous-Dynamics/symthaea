@@ -188,6 +188,18 @@ impl FederatedClaim {
         if self.admission_receipt.frontier_ref != self.frontier_ref {
             return Err("claim frontier must match admission receipt");
         }
+        // `derivation_refs` is a set at the wire-contract level: ordering is
+        // canonicalized for digesting, while duplicate references are rejected rather
+        // than silently changing the representation identity.
+        let unique_derivations: std::collections::HashSet<&str> =
+            self.derivation_refs.iter().map(String::as_str).collect();
+        if unique_derivations.len() != self.derivation_refs.len() {
+            return Err("derivation references must be unique");
+        }
+        if self.derivation_refs.iter().any(|reference| reference.trim().is_empty()) {
+            return Err("derivation references must be non-empty");
+        }
+
         for relation in &self.relations {
             relation.validate()?;
             if relation.kind == ProvenanceRelationKind::RepresentationOf
@@ -455,3 +467,148 @@ mod digest_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod adversarial_contract_tests {
+    use super::*;
+
+    fn claim() -> FederatedClaim {
+        super::digest_tests::base_claim()
+    }
+
+    #[test]
+    fn digest_changes_for_every_digest_bearing_scalar_field() {
+        let cases: &[(&str, fn(&mut FederatedClaim))] = &[
+            ("schema_version", |c| c.schema_version = 2),
+            ("claim_identity", |c| c.claim_identity.push_str(":changed")),
+            ("canonical_identity", |c| c.canonical_identity.push_str(":changed")),
+            ("provenance_family", |c| c.provenance_family.push_str(":changed")),
+            ("author", |c| c.author.push_str(":changed")),
+            ("statement_ref", |c| c.statement_ref.push_str(":changed")),
+            ("source_event", |c| c.source_event = Some("event:changed".into())),
+            ("frontier_ref", |c| c.frontier_ref = Some("frontier:changed".into())),
+            ("provenance_snapshot_digest", |c| c.provenance_snapshot_digest.push('x')),
+            ("validator_version", |c| c.provenance_validation.validator_version.push('x')),
+            ("snapshot_schema_version", |c| c.provenance_validation.snapshot_schema_version += 1),
+            ("relation_count", |c| c.provenance_validation.relation_count += 1),
+            ("conforms", |c| c.provenance_validation.conforms = false),
+            ("admission_event", |c| c.admission_receipt.admission_event.push_str(":changed")),
+            ("receipt_frontier_ref", |c| c.admission_receipt.frontier_ref = Some("frontier:changed".into())),
+            ("receipt_provenance_snapshot_digest", |c| c.admission_receipt.provenance_snapshot_digest.push('x')),
+            ("receipt_validator_version", |c| c.admission_receipt.validator_version.push('x')),
+            ("receipt_snapshot_schema_version", |c| c.admission_receipt.snapshot_schema_version += 1),
+            ("epistemic_state", |c| c.epistemic_state = Some("Observed".into())),
+            ("claim_ceiling", |c| c.claim_ceiling = Some("source-scoped".into())),
+            ("model_ref", |c| c.model_ref = Some("model:changed".into())),
+        ];
+
+        for (name, mutate) in cases {
+            let mut changed = claim();
+            let original = changed.canonical_digest();
+            mutate(&mut changed);
+            assert_ne!(
+                changed.canonical_digest(),
+                original,
+                "digest must cover {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn digest_changes_for_derivation_membership_and_relation_membership() {
+        let base = claim();
+        let original = base.canonical_digest();
+
+        let mut derivation = base.clone();
+        derivation.derivation_refs.push("derivation:c".into());
+        assert_ne!(derivation.canonical_digest(), original);
+
+        let mut relation = base.clone();
+        relation.relations[0].created_at = "cycle:99".into();
+        assert_ne!(relation.canonical_digest(), original);
+    }
+
+    #[test]
+    fn derivation_refs_have_set_semantics_and_reject_duplicates() {
+        let mut reordered = claim();
+        reordered.derivation_refs.reverse();
+        assert_eq!(reordered.canonical_digest(), claim().canonical_digest());
+        assert!(reordered.validate_structure().is_ok());
+
+        let mut duplicate = claim();
+        duplicate.derivation_refs.push(duplicate.derivation_refs[0].clone());
+        assert_eq!(
+            duplicate.validate_structure().unwrap_err(),
+            "derivation references must be unique"
+        );
+    }
+
+    #[test]
+    fn derivation_refs_reject_empty_members() {
+        let mut claim = claim();
+        claim.derivation_refs.push("   ".into());
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "derivation references must be non-empty"
+        );
+    }
+
+    #[test]
+    fn future_federated_schema_version_is_rejected_explicitly() {
+        let mut claim = claim();
+        claim.schema_version = FEDERATED_CLAIM_SCHEMA_VERSION + 1;
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "unsupported federated claim schema version"
+        );
+    }
+
+    #[test]
+    fn mutation_matrix_distinguishes_invalid_from_representation_only_changes() {
+        // These mutations alter the canonical representation, but only some remain
+        // structurally valid. The substrate-neutral layer must reject malformed state
+        // rather than silently accepting a different envelope.
+        let valid: &[(&str, fn(&mut FederatedClaim))] = &[
+            ("author", |c| c.author.push_str(":changed")),
+            ("source_event", |c| c.source_event = Some("event:changed".into())),
+            ("epistemic_state", |c| c.epistemic_state = Some("Observed".into())),
+            ("claim_ceiling", |c| c.claim_ceiling = Some("source-scoped".into())),
+            ("model_ref", |c| c.model_ref = Some("model:changed".into())),
+        ];
+        for (name, mutate) in valid {
+            let mut changed = claim();
+            mutate(&mut changed);
+            assert!(
+                changed.validate_structure().is_ok(),
+                "{name} should remain structurally valid"
+            );
+        }
+
+        let invalid: &[(&str, fn(&mut FederatedClaim))] = &[
+            ("schema_version", |c| c.schema_version += 1),
+            ("relation_count", |c| c.provenance_validation.relation_count += 1),
+            ("conforms", |c| c.provenance_validation.conforms = false),
+            ("snapshot", |c| c.provenance_snapshot_digest.push('x')),
+            ("receipt_snapshot", |c| c.admission_receipt.provenance_snapshot_digest.push('x')),
+        ];
+        for (name, mutate) in invalid {
+            let mut changed = claim();
+            mutate(&mut changed);
+            assert!(
+                changed.validate_structure().is_err(),
+                "{name} should be structurally rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn structural_layer_does_not_claim_authorship_authenticity() {
+        let mut claim = claim();
+        claim.admission_receipt.admission_event = "admission:event-forged".into();
+        // The representation changes, but the substrate-neutral structural contract
+        // cannot determine whether the admission event was genuinely authored.
+        assert!(claim.validate_structure().is_ok());
+        assert_ne!(claim.canonical_digest(), claim().canonical_digest());
+    }
+}
+
