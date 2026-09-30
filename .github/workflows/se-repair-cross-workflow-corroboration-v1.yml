@@ -116,8 +116,6 @@ jobs:
           test "$(jq -r '.observation_class' "$index")" = "reproduced"
           test "$(jq -r '.authority_class' "$index")" = "cross_artifact_execution_evidence_only"
 
-          printf '%s\n' verified > upstream-contract-verified.txt
-
           test "$(jq -r '.artifacts.primary.name' "$index")" = "se001q-repair-primary-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}"
           test "$(jq -r '.artifacts.replay.name' "$index")" = "se001q-repair-replay-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}"
           test "$(jq -r '.artifacts.delta.name' "$index")" = "se001q-repair-delta-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}"
@@ -125,6 +123,8 @@ jobs:
           jq -r '.artifacts.primary.digest' "$index" > primary-digest.txt
           jq -r '.artifacts.replay.digest' "$index" > replay-digest.txt
           jq -r '.artifacts.delta.digest' "$index" > delta-digest.txt
+
+          printf '%s\n' verified > upstream-contract-verified.txt
 
       - name: Verify upstream artifact bindings independently
         env:
