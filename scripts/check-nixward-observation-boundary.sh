@@ -37,7 +37,7 @@ AUTHORITY_FILES=(
 )
 
 DIAGNOSTIC_IDENTIFIERS='\b(ServiceStatus|UnitInfo|SystemdObserver)\b'
-SYSTEMCTL_PATTERN='\bsystemctl\b'
+SYSTEMCTL_PATTERN='(?:Command|process::Command)::new\\(\\s*[\"\\x27]systemctl[\"\\x27]'
 
 scan_diagnostic_boundary() {
   local file="$1"
