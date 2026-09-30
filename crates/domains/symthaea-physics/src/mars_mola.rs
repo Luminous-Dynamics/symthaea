@@ -180,7 +180,7 @@ impl MolaMegdrProduct {
         }
         let (line, sample) = self.metadata.cell_for(latitude_deg, longitude_deg)?;
         let count = counts.read_count(line, sample)?;
-        let provenance = self.provenance_with_counts(counts);
+        let provenance = self.provenance_with_counts(counts)?;
         if count == 0 {
             return Ok(self.missing_sample(latitude_deg, longitude_deg, provenance));
         }
@@ -205,13 +205,10 @@ impl MolaMegdrProduct {
         })
     }
 
-    fn provenance_with_counts(&self, counts: &Self) -> TerrainProvenance {
-        let mut provenance = self.provenance.clone();
-        provenance.content_digests.extend([
-            ("counts-label".into(), "SHA-256".into(), counts.label_sha256.clone()),
-            ("counts-raster".into(), "SHA-256".into(), counts.image_sha256.clone()),
-        ]);
-        provenance
+    fn provenance_with_counts(&self, counts: &Self) -> Result<TerrainProvenance, MolaError> {
+        self.provenance
+            .merged_with(&counts.provenance)
+            .map_err(MolaError::InvalidMetadata)
     }
 
     fn missing_sample(
