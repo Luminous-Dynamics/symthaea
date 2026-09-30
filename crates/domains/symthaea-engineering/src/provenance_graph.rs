@@ -54,6 +54,7 @@ pub enum ProvenanceGraphError {
     DuplicateNodeId,
     DuplicateEdge,
     MissingEdgeEndpoint,
+    InvalidNodeIdentity,
 }
 
 impl ProvenanceGraph {
@@ -64,6 +65,14 @@ impl ProvenanceGraph {
     pub fn validate(&self) -> Result<(), ProvenanceGraphError> {
         let mut node_ids = BTreeSet::new();
         for node in &self.nodes {
+            if node.id.is_empty() || node.id.trim() != node.id || node.id.chars().any(char::is_control) {
+                return Err(ProvenanceGraphError::InvalidNodeIdentity);
+            }
+            if let Some(revision) = node.revision {
+                if revision.is_empty() || revision.trim() != revision || revision.chars().any(char::is_control) {
+                    return Err(ProvenanceGraphError::InvalidNodeIdentity);
+                }
+            }
             if !node_ids.insert(node.id) {
                 return Err(ProvenanceGraphError::DuplicateNodeId);
             }
@@ -189,6 +198,13 @@ pub fn reference_graph() -> ProvenanceGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invalid_node_identity_is_rejected() {
+        let mut graph = reference_graph();
+        graph.nodes[0].revision = Some("bad\nrevision");
+        assert_eq!(graph.validate(), Err(ProvenanceGraphError::InvalidNodeIdentity));
+    }
 
     #[test]
     fn reference_graph_is_well_formed() {
