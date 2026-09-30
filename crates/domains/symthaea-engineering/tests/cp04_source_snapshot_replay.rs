@@ -79,7 +79,6 @@ fn reconstruct(snapshot: &SourceSnapshot) -> ScientificLineageGraph {
             .expect("source snapshot relation target exists")
             .clone();
         let relation_kind_value = relation_kind(&relation.edge_type);
-        let relation_digest = relation.relation_digest.clone();
         let relation_source_digest = relation.source_identity_digest.clone();
         let relation_target_digest = relation.target_identity_digest.clone();
         let relation_edge_type = relation.edge_type.clone();
