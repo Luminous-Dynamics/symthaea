@@ -63,6 +63,57 @@ struct Residual {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+enum DiscrepancyKind {
+    CoveredByPredictionInterval,
+    ParameterResidual,
+    ModelFormOrUnexplained,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+struct ValidationEvidence {
+    validation_id: &'static str,
+    model_id: &'static str,
+    intervention_id: &'static str,
+    scenario_id: &'static str,
+    comfort_error: f64,
+    energy_error_kwh: f64,
+    comfort_covered: bool,
+    energy_covered: bool,
+    discrepancy: DiscrepancyKind,
+    is_authorization: bool,
+}
+
+fn validate_holdout(
+    validation_id: &'static str,
+    scenario_id: &'static str,
+    prediction: PredictionInterval,
+    outcome: SyntheticOutcome,
+) -> ValidationEvidence {
+    let residual = residual(prediction, outcome);
+    let comfort_covered = !residual.comfort_outside_interval;
+    let energy_covered = !residual.energy_outside_interval;
+
+    let discrepancy = if comfort_covered && energy_covered {
+        DiscrepancyKind::CoveredByPredictionInterval
+    } else {
+        DiscrepancyKind::ModelFormOrUnexplained
+    };
+
+    ValidationEvidence {
+        validation_id,
+        model_id: prediction.model_id,
+        intervention_id: prediction.intervention_id,
+        scenario_id,
+        comfort_error: residual.comfort_error,
+        energy_error_kwh: residual.energy_error_kwh,
+        comfort_covered,
+        energy_covered,
+        discrepancy,
+        is_authorization: false,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 struct CalibrationActivity {
     activity_id: &'static str,
     source_model_id: &'static str,
@@ -336,11 +387,20 @@ fn main() {
     );
     let holdout_outcome = synthetic_world(initial, holdout_world, intervention, 30.0, 8);
     let holdout_residual = residual(prediction_v2, holdout_outcome);
+    let validation = validate_holdout(
+        "validation-swa-005-v2-holdout",
+        "scenario-holdout-30c",
+        prediction_v2,
+        holdout_outcome,
+    );
 
     assert_eq!(prediction_v2.model_id, revision.model_id);
     assert_eq!(holdout_residual.intervention_id, intervention.id);
     assert!(holdout_residual.comfort_error.is_finite());
     assert!(holdout_residual.energy_error_kwh.is_finite());
+    assert_eq!(validation.model_id, revision.model_id);
+    assert_eq!(validation.scenario_id, "scenario-holdout-30c");
+    assert!(!validation.is_authorization);
 
     // Historical evidence remains immutable after calibration.
     assert_eq!(training_residual.prediction_model_id, prediction_v1.model_id);
@@ -506,6 +566,64 @@ mod tests {
         assert_eq!(training_residual.prediction_model_id, prediction_v1.model_id);
         assert_ne!(training_outcome.energy_kwh, holdout_outcome.energy_kwh);
         assert!(holdout_residual.energy_error_kwh.is_finite());
+    }
+
+    #[test]
+    fn holdout_validation_is_typed_evidence_not_authorization() {
+        let (prediction, _, _) = fixture();
+        let outcome = synthetic_world(
+            ZoneState { indoor_c: 21.0 },
+            ZoneParameters {
+                thermal_mass_kwh_per_c: 9.0,
+                envelope_u_kw_per_c: 0.23,
+                internal_gain_kw: 0.47,
+                setpoint_c: 21.0,
+                comfort_band_c: 2.0,
+            },
+            Intervention {
+                id: "zone-a-reversible-hvac",
+                hvac_capacity_kw: 2.0,
+            },
+            30.0,
+            8,
+        );
+        let evidence =
+            validate_holdout("validation-test-001", "holdout-test-001", prediction, outcome);
+
+        assert_eq!(evidence.model_id, prediction.model_id);
+        assert_eq!(evidence.intervention_id, prediction.intervention_id);
+        assert_eq!(evidence.scenario_id, "holdout-test-001");
+        assert!(!evidence.is_authorization);
+        assert!(evidence.comfort_error.is_finite());
+        assert!(evidence.energy_error_kwh.is_finite());
+    }
+
+    #[test]
+    fn validation_replay_is_deterministic() {
+        let (prediction, _, _) = fixture();
+        let outcome = synthetic_world(
+            ZoneState { indoor_c: 21.0 },
+            ZoneParameters {
+                thermal_mass_kwh_per_c: 9.0,
+                envelope_u_kw_per_c: 0.23,
+                internal_gain_kw: 0.47,
+                setpoint_c: 21.0,
+                comfort_band_c: 2.0,
+            },
+            Intervention {
+                id: "zone-a-reversible-hvac",
+                hvac_capacity_kw: 2.0,
+            },
+            30.0,
+            8,
+        );
+        let a = validate_holdout("validation-test-002", "holdout-test-002", prediction, outcome);
+        let b = validate_holdout("validation-test-002", "holdout-test-002", prediction, outcome);
+        assert_eq!(a, b);
+        assert_eq!(
+            serde_json::to_string(&a).expect("serialize a"),
+            serde_json::to_string(&b).expect("serialize b")
+        );
     }
 
     #[test]
