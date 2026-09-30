@@ -252,6 +252,7 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
                     "artifact_extraction",
                     "artifact_execution",
                     "upstream_identity_checks",
+                    "provenance_binding",
                     "cache_influence",
                     "privileged_side_effects",
                 }
@@ -260,6 +261,22 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
                     mismatches.append(f"{path}: cross_workflow_dataflow missing {missing}")
                 if dataflow.get("upstream_workflow_names") != observed_contract["trigger"]["workflows"]:
                     mismatches.append(f"{path}: cross_workflow_dataflow upstream_workflow_names differs")
+                provenance = dataflow.get("provenance_binding")
+                if not isinstance(provenance, dict):
+                    mismatches.append(f"{path}: provenance_binding is required")
+                else:
+                    required_provenance = {
+                        "repository",
+                        "workflow_name",
+                        "head_branch",
+                        "head_sha",
+                        "conclusion",
+                        "run_identity",
+                        "pr_association",
+                    }
+                    missing_provenance = sorted(required_provenance - set(provenance))
+                    if missing_provenance:
+                        mismatches.append(f"{path}: provenance_binding missing {missing_provenance}")
                 if observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and not dataflow.get("artifacts_consumed"):
                     mismatches.append(f"{path}: artifact download is present but artifacts_consumed is false")
                 if not observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and dataflow.get("artifacts_consumed"):
@@ -332,6 +349,15 @@ jobs:
                 "artifact_extraction": "none",
                 "artifact_execution": False,
                 "upstream_identity_checks": ["configured_workflow_name", "head_branch", "head_sha", "conclusion"],
+                "provenance_binding": {
+                    "repository": "event_repository",
+                    "workflow_name": "configured_workflow_name",
+                    "head_branch": "main",
+                    "head_sha": "event_workflow_run.head_sha",
+                    "conclusion": "event_workflow_run.conclusion",
+                    "run_identity": "event_workflow_run.id+run_attempt",
+                    "pr_association": "not_required_for_current_main-only consumer",
+                },
                 "cache_influence": "none_observed",
                 "privileged_side_effects": ["none"],
             },
