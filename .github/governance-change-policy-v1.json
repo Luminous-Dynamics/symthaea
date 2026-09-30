@@ -1,17 +1,81 @@
 {
   "schema": "symthaea-pr-governance-change-policy-v1",
   "class_a_paths": [
-    {"match": "prefix", "path": "src/cognitive_loop/thresholds/", "authority": "safety"},
-    {"match": "exact", "path": "src/cognitive_loop/threshold_overrides.rs", "authority": "safety"},
-    {"match": "exact", "path": "crates/core/symthaea-types/src/threshold_overrides.rs", "authority": "safety"},
-    {"match": "exact", "path": "src/cognitive_loop/ethics_engine.rs", "authority": "safety"},
-    {"match": "exact", "path": "src/safety/agent.rs", "authority": "safety"},
-    {"match": "exact", "path": "scripts/cls_promote_candidate.sh", "authority": "safety"},
-    {"match": "exact", "path": "docs/compliance/GOVERNANCE_CHARTER.md", "authority": "governance"},
-    {"match": "exact", "path": ".github/governance-change-policy-v1.json", "authority": "governance"},
-    {"match": "exact", "path": ".github/scripts/check-pr-governance.py", "authority": "governance"},
-    {"match": "exact", "path": ".github/workflows/pr-governance.yml", "authority": "governance"},
-    {"match": "exact", "path": ".github/workflows/pr-governance-root.yml", "authority": "governance"}
+    {
+      "match": "prefix",
+      "path": "src/cognitive_loop/thresholds/",
+      "authority": "safety"
+    },
+    {
+      "match": "exact",
+      "path": "src/cognitive_loop/threshold_overrides.rs",
+      "authority": "safety"
+    },
+    {
+      "match": "exact",
+      "path": "crates/core/symthaea-types/src/threshold_overrides.rs",
+      "authority": "safety"
+    },
+    {
+      "match": "exact",
+      "path": "src/cognitive_loop/ethics_engine.rs",
+      "authority": "safety"
+    },
+    {
+      "match": "exact",
+      "path": "src/safety/agent.rs",
+      "authority": "safety"
+    },
+    {
+      "match": "exact",
+      "path": "scripts/cls_promote_candidate.sh",
+      "authority": "safety"
+    },
+    {
+      "match": "exact",
+      "path": "docs/compliance/GOVERNANCE_CHARTER.md",
+      "authority": "governance"
+    },
+    {
+      "match": "exact",
+      "path": ".github/governance-change-policy-v1.json",
+      "authority": "governance"
+    },
+    {
+      "match": "exact",
+      "path": ".github/scripts/check-pr-governance.py",
+      "authority": "governance"
+    },
+    {
+      "match": "exact",
+      "path": ".github/workflows/pr-governance.yml",
+      "authority": "governance"
+    },
+    {
+      "match": "exact",
+      "path": ".github/workflows/pr-governance-root.yml",
+      "authority": "governance"
+    },
+    {
+      "match": "exact",
+      "path": ".github/scripts/check-privileged-workflow-inventory.py",
+      "authority": "governance"
+    },
+    {
+      "match": "exact",
+      "path": ".github/governance-privileged-workflow-inventory-v1.json",
+      "authority": "governance"
+    },
+    {
+      "match": "exact",
+      "path": "docs/compliance/adr/ADR-005-privileged-workflow-inventory.md",
+      "authority": "governance"
+    },
+    {
+      "match": "exact",
+      "path": ".github/workflows/workflow-syntax.yml",
+      "authority": "governance"
+    }
   ],
   "class_b_policy_state": "deferred-pending-gov-policy-001",
   "class_b_paths": [],
@@ -19,8 +83,20 @@
     "docs/compliance/adr/"
   ],
   "class_a_prefix_policy": {
-    "safety": ["safety:", "safety(...):", "ethics:", "ethics(...):", "emergency-safety:", "emergency-safety(...):"],
-    "governance": ["governance:", "governance(...):", "emergency-safety:", "emergency-safety(...):"]
+    "safety": [
+      "safety:",
+      "safety(...):",
+      "ethics:",
+      "ethics(...):",
+      "emergency-safety:",
+      "emergency-safety(...):"
+    ],
+    "governance": [
+      "governance:",
+      "governance(...):",
+      "emergency-safety:",
+      "emergency-safety(...):"
+    ]
   },
   "required_adr_sections": [
     "### Scientific Basis",
@@ -34,6 +110,7 @@
     "Structural ADR presence does not establish scientific adequacy.",
     "Documented test evidence does not establish that tests executed successfully.",
     "This policy does not establish full-CI success or merge authorization.",
-    "Repository source code cannot attest that an external GitHub Actions event policy currently permits pull_request_target."
+    "Repository source code cannot attest that an external GitHub Actions event policy currently permits pull_request_target.",
+    "Privileged-workflow inventory coverage is structural evidence and does not attest runtime workflow execution, cache safety, artifact safety, or external Actions event-policy authorization."
   ]
 }
