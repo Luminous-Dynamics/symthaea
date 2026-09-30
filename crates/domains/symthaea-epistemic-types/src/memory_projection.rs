@@ -136,7 +136,19 @@ impl ProvenanceValidationReport {
                 .cmp(&(&b.source_memory_id, &b.target_memory_id, b.kind.stable_code(), &b.created_at))
         });
 
-        let bytes = serde_json::to_vec(&canonical).expect("provenance relations are serializable");
+        // Hash a version-independent canonical tuple representation rather than
+        // serde's enum encoding, so Rust variant renames cannot silently alter digests.
+        let canonical_fields: Vec<(&str, &str, &str, &str)> = canonical
+            .iter()
+            .map(|relation| (
+                relation.source_memory_id.as_str(),
+                relation.target_memory_id.as_str(),
+                relation.kind.stable_code(),
+                relation.created_at.as_str(),
+            ))
+            .collect();
+        let bytes = serde_json::to_vec(&canonical_fields)
+            .expect("canonical provenance fields are serializable");
         Self {
             validator_version: PROVENANCE_VALIDATOR_VERSION.to_owned(),
             snapshot_digest: sha256_hex(&bytes),
