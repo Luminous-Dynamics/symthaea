@@ -879,7 +879,7 @@ mod tests {
 
     #[test]
     fn rejects_missing_projection_offsets() {
-        let text = label().replace("LINE_PROJECTION_OFFSET = 2.5\\n", "");
+        let text = label().replace("LINE_PROJECTION_OFFSET = 2.5", "");
         let error = MolaMegdrMetadata::from_label(
             &parse_label(&text),
             "MEGT00N000HB",
