@@ -299,6 +299,10 @@ mod tests {
         assert_eq!(first, key.canonical_bytes());
         assert_eq!(key.identity_digest(), key.identity_digest());
         assert_eq!(key.identity_digest().len(), 64);
+        assert_eq!(
+            key.identity_digest(),
+            "8d27f12b15c02707e10f654d35b1ffd236ba6e22bc6028bcab279343bdc5c4f8"
+        );
         assert!(first.starts_with(EXPERIMENT_IDENTITY_DOMAIN));
         assert_eq!(
             u32::from_be_bytes(first[EXPERIMENT_IDENTITY_DOMAIN.len()..EXPERIMENT_IDENTITY_DOMAIN.len() + 4].try_into().unwrap()),
