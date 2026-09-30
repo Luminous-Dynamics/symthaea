@@ -9,7 +9,7 @@
 //! execute commands directly.
 
 use super::executor::{NixOSCommand, SafetyLevel};
-use super::service_state::NixServiceObservedStateV1;
+use super::service_state::{NixServiceObservedStateV1, NixServiceOperationCapabilitiesV1};
 use super::systemd_transport::observe_service_properties;
 
 /// Manages systemd services: start, stop, restart, enable, disable.
@@ -138,6 +138,23 @@ impl ServiceManager {
 
         let properties = observe_service_properties(&unit)?;
         NixServiceObservedStateV1::parse_systemd_properties(&unit, &properties)
+            .map_err(|error| std::io::Error::other(format!(
+                "invalid governed systemd observation for '{}': {error}",
+                unit
+            )))
+    }
+
+    /// Observe operation capability facts from the same atomic systemd
+    /// property projection as the governed pre-state.
+    ///
+    /// These facts describe systemd's current capability surface; they are
+    /// observational evidence only and never imply authorization.
+    pub fn observed_state_with_capabilities(
+        service: &str,
+    ) -> Result<(NixServiceObservedStateV1, NixServiceOperationCapabilitiesV1), std::io::Error> {
+        let unit = Self::normalize_name(service);
+        let properties = observe_service_properties(&unit)?;
+        NixServiceObservedStateV1::parse_systemd_observation(&unit, &properties)
             .map_err(|error| std::io::Error::other(format!(
                 "invalid governed systemd observation for '{}': {error}",
                 unit
