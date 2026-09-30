@@ -177,6 +177,10 @@ impl MolaMegdrProduct {
         }
         if a.product_version != b.product_version
             || a.product_creation_time != b.product_creation_time
+            || a.map_projection != b.map_projection
+            || a.coordinate_system_type != b.coordinate_system_type
+            || a.latitude_type != b.latitude_type
+            || a.longitude_direction != b.longitude_direction
             || a.resolution_pixels_per_degree != b.resolution_pixels_per_degree
             || a.lines != b.lines
             || a.samples != b.samples
@@ -827,6 +831,26 @@ mod tests {
         assert!(MolaMegdrProduct::open(&path, &img, "MEGT00N000HB", "pds4-v1").is_err());
         let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_file(img);
+    }
+
+    #[test]
+    fn rejects_mismatched_coordinate_registration() {
+        let topography = MolaMegdrMetadata::from_label(&parse_label(&label()), "MEGT00N000HB").unwrap();
+        for (field, replacement) in [
+            ("COORDINATE_SYSTEM_TYPE = BODY-FIXED ROTATING", "COORDINATE_SYSTEM_TYPE = INERTIAL"),
+            ("COORDINATE_SYSTEM_NAME = PLANETOCENTRIC", "COORDINATE_SYSTEM_NAME = PLANETOGRAPHIC"),
+            ("POSITIVE_LONGITUDE_DIRECTION = EAST", "POSITIVE_LONGITUDE_DIRECTION = WEST"),
+            ("MAP_PROJECTION_TYPE = SIMPLE CYLINDRICAL", "MAP_PROJECTION_TYPE = POLAR"),
+        ] {
+            let text = label()
+                .replace("MEGT00N000HB", "MEGC00N000HB")
+                .replace("MAP_TYPE = T", "MAP_TYPE = C")
+                .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8")
+                .replace(field, replacement);
+            let counts = MolaMegdrMetadata::from_label(&parse_label(&text), "MEGC00N000HB").unwrap_err();
+            assert!(matches!(counts, MolaError::InvalidMetadata(_) | MolaError::Unsupported(_)));
+        }
+        let _ = topography;
     }
 
     #[test]
