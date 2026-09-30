@@ -6,6 +6,7 @@
 //! remaining semantically comparable. Exact execution provenance stays in the
 //! source evidence records.
 
+use super::cost_quality_join::JoinIdentity;
 use super::performance_evidence::PerformanceEvidenceRecord;
 use super::resource_evidence::ResourceEvidenceRecord;
 use super::task_quality_evidence::TaskQualityEvidenceRecord;
@@ -116,18 +117,6 @@ pub fn derive_experiment_key(
         .validate()
         .map_err(|e| EvidenceIdentityError::InvalidResource(e.to_string()))?;
 
-    require_equal("task", &task_quality.identity.task, &task_quality.identity.task)?;
-    require_equal("scenario_set", &task_quality.identity.scenario_set, &task_quality.identity.scenario_set)?;
-    require_equal("scenario_revision", &task_quality.identity.scenario_revision, &task_quality.identity.scenario_revision)?;
-    require_equal("split", &task_quality.identity.split, &task_quality.identity.split)?;
-    require_equal("protocol", &task_quality.identity.protocol, &task_quality.identity.protocol)?;
-    require_equal("representation", &task_quality.identity.representation, &performance.identity.representation)?;
-    require_resolution("resolution", task_quality.identity.resolution, performance.identity.resolution)?;
-    require_resolution("resolution", task_quality.identity.resolution, resource.workload.resolution)?;
-    require_equal("model_revision", &task_quality.identity.model_revision, &task_quality.identity.model_revision)?;
-    require_equal("workload", &performance.identity.workload, &performance.identity.workload)?;
-    require_equal("benchmark", &performance.identity.benchmark, &performance.identity.benchmark)?;
-
     Ok(ExperimentKey {
         task: task_quality.identity.task.clone(),
         scenario_set: task_quality.identity.scenario_set.clone(),
@@ -140,6 +129,24 @@ pub fn derive_experiment_key(
         workload: performance.identity.workload.clone(),
         benchmark: performance.identity.benchmark.clone(),
     })
+}
+
+/// Verify a caller-supplied join identity against the key derived from source evidence.
+pub fn verify_join_identity(
+    key: &ExperimentKey,
+    declared: &JoinIdentity,
+) -> Result<(), EvidenceIdentityError> {
+    require_equal("task", &key.task, &declared.task)?;
+    require_equal("scenario_set", &key.scenario_set, &declared.scenario_set)?;
+    require_equal("scenario_revision", &key.scenario_revision, &declared.scenario_revision)?;
+    require_equal("split", &key.split, &declared.split)?;
+    require_equal("protocol", &key.protocol, &declared.protocol)?;
+    require_resolution("resolution", key.resolution, declared.resolution)?;
+    require_equal("representation", &key.representation, &declared.representation)?;
+    require_equal("model_revision", &key.model_revision, &declared.model_revision)?;
+    require_equal("workload", &key.workload, &declared.workload)?;
+    require_equal("benchmark", &key.benchmark, &declared.benchmark)?;
+    Ok(())
 }
 
 /// Verify that a qualified transition terminates at the experiment resolution.
@@ -204,14 +211,36 @@ mod tests {
     }
 
     #[test]
-    fn scenario_revision_mismatch_is_rejected() {
-        let mut t = task();
-        t.identity.scenario_revision = "sha256:other".into();
-        // The key is derived from task evidence, so a mismatched scenario must
-        // be rejected only when a second semantic source carries that identity.
-        let mut p = performance();
-        p.identity.resolution = 65_536;
-        assert!(matches!(derive_experiment_key(&t, &p, &resource()), Err(EvidenceIdentityError::Mismatch { field: "resolution", .. })));
+    fn declared_scenario_revision_mismatch_is_rejected() {
+        let key = derive_experiment_key(&task(), &performance(), &resource()).unwrap();
+        let mut declared = JoinIdentity {
+            task: key.task.clone(),
+            scenario_set: key.scenario_set.clone(),
+            scenario_revision: key.scenario_revision.clone(),
+            split: key.split.clone(),
+            protocol: key.protocol.clone(),
+            resolution: key.resolution,
+            representation: key.representation.clone(),
+            model_revision: key.model_revision.clone(),
+            workload: key.workload.clone(),
+            benchmark: key.benchmark.clone(),
+        };
+        declared.scenario_revision = "sha256:other".into();
+        assert!(matches!(verify_join_identity(&key, &declared), Err(EvidenceIdentityError::Mismatch { field: "scenario_revision", .. })));
+    }
+
+    #[test]
+    fn declared_model_revision_mismatch_is_rejected() {
+        let key = derive_experiment_key(&task(), &performance(), &resource()).unwrap();
+        let mut declared = JoinIdentity {
+            task: key.task.clone(), scenario_set: key.scenario_set.clone(), scenario_revision: key.scenario_revision.clone(),
+            split: key.split.clone(), protocol: key.protocol.clone(), resolution: key.resolution,
+            representation: key.representation.clone(), model_revision: "model-other".into(),
+            workload: key.workload.clone(), benchmark: key.benchmark.clone(),
+        };
+        assert!(matches!(verify_join_identity(&key, &declared), Err(EvidenceIdentityError::Mismatch { field: "model_revision", .. })));
+        declared.model_revision = key.model_revision.clone();
+        assert!(verify_join_identity(&key, &declared).is_ok());
     }
 
     #[test]
