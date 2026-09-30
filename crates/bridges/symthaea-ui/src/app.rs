@@ -213,11 +213,9 @@ pub fn App() -> impl IntoView {
         spawn_local(async move {
             let mut previous_state: Option<CognitiveState> = None;
             let event_sequence = Rc::new(Cell::new(0_u64));
-            let next_event_sequence = || {
-                let next = event_sequence.get().saturating_add(1);
-                event_sequence.set(next);
-                next
-            };
+            let telemetry_sequence = Rc::clone(&event_sequence);
+            let connected_sequence = Rc::clone(&event_sequence);
+            let disconnect_sequence = Rc::clone(&event_sequence);
             api::stream_telemetry(
                 &gw,
                 move |payload| {
@@ -234,7 +232,11 @@ pub fn App() -> impl IntoView {
                     if let Some(event) = event_between(
                         previous_state,
                         current_state,
-                        next_event_sequence(),
+                        {
+                            let next = telemetry_sequence.get().saturating_add(1);
+                            telemetry_sequence.set(next);
+                            next
+                        },
                         cycle,
                         v.surprise_triggered,
                         v.gwt_broadcast,
@@ -259,7 +261,8 @@ pub fn App() -> impl IntoView {
                 },
                 move || {
                     ws_connected.set(true);
-                    let sequence = next_event_sequence();
+                    let sequence = connected_sequence.get().saturating_add(1);
+                    connected_sequence.set(sequence);
                     events.update(|items| {
                         items.push(CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Connected, 0));
                         if items.len() > 32 {
@@ -270,7 +273,8 @@ pub fn App() -> impl IntoView {
             )
             .await;
             ws_connected.set(false);
-            let sequence = next_event_sequence();
+            let sequence = disconnect_sequence.get().saturating_add(1);
+            disconnect_sequence.set(sequence);
             let cycle = telemetry_count.get_untracked();
             events.update(|items| {
                 items.push(CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Disconnected, cycle));
