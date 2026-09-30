@@ -100,6 +100,12 @@ pub fn config_hash<T: fmt::Debug>(config: &T) -> String {
     format!("{:x}", hasher.finish())
 }
 
+/// Version identifier for the stable semantic configuration identity contract.
+///
+/// Persist this alongside [`stable_config_hash`] when an evidence record needs
+/// to declare which identity schema produced its digest.
+pub const STABLE_CONFIG_IDENTITY_SCHEMA: &str = "symthaea:stable-config-identity:v1";
+
 /// Stable semantic configuration identity.
 ///
 /// The input is first converted to a JSON value, object keys are recursively
@@ -339,7 +345,18 @@ pub fn enforce_integrity(declared: &HashMap<String, Expectation>, measured: &Evi
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunEvidence {
     pub run_id: RunId,
+    /// Legacy/local fingerprint retained for serialized compatibility.
     pub config_hash: String,
+    /// Stable semantic configuration identity, when the run was constructed
+    /// through [`RunEvidence::new_stable`]. Historical records deserialize as
+    /// `None` rather than receiving an invented identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_identity: Option<String>,
+    /// Schema/domain identifier for [`config_identity`]. Kept separate from
+    /// the digest so consumers cannot confuse an identity value with its
+    /// canonicalization contract.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_identity_schema: Option<String>,
     /// Declared expectations, human-readable (`BTreeMap` for deterministic
     /// ordering in exported JSON/logs).
     pub declared: BTreeMap<String, Expectation>,
@@ -367,11 +384,29 @@ impl RunEvidence {
         Self {
             run_id,
             config_hash: config_hash(config),
+            config_identity: None,
+            config_identity_schema: None,
             declared,
             measured,
             satisfied,
             violations,
         }
+    }
+
+    /// Build a `RunEvidence` record with the stable semantic configuration
+    /// identity contract while retaining the legacy fingerprint for backward
+    /// compatibility. This method is additive: old records remain readable,
+    /// and legacy `config_hash` is never silently reinterpreted.
+    pub fn new_stable<T: Serialize>(
+        run_id: RunId,
+        config: &T,
+        declared: BTreeMap<String, Expectation>,
+        measured: EvidenceCounters,
+    ) -> Self {
+        let mut evidence = Self::new(run_id, config, declared, measured);
+        evidence.config_identity = Some(stable_config_hash(config));
+        evidence.config_identity_schema = Some(STABLE_CONFIG_IDENTITY_SCHEMA.to_string());
+        evidence
     }
 
     /// Panic with the recorded violations' `Display` output if this run's
@@ -583,6 +618,58 @@ mod tests {
         assert_eq!(round_tripped.config_hash, evidence.config_hash);
         assert_eq!(round_tripped.satisfied, evidence.satisfied);
         assert_eq!(round_tripped.measured, evidence.measured);
+    }
+
+
+    #[test]
+    fn run_evidence_stable_identity_is_explicit_and_versioned() {
+        let mut declared = BTreeMap::new();
+        declared.insert("hdc_ltc_predict".to_string(), Expectation::MustBePositive);
+        let mut measured = EvidenceCounters::new();
+        measured.record("hdc_ltc_predict", 1.0);
+
+        let config = serde_json::json!({
+            "mode": "HdcLtc",
+            "seed": 42,
+            "nested": {"z": 2, "a": 1}
+        });
+        let evidence = RunEvidence::new_stable(
+            RunId::new("stable-identity-run"),
+            &config,
+            declared,
+            measured,
+        );
+
+        assert_eq!(
+            evidence.config_identity_schema.as_deref(),
+            Some(STABLE_CONFIG_IDENTITY_SCHEMA)
+        );
+        assert_eq!(
+            evidence.config_identity.as_deref(),
+            Some(stable_config_hash(&config).as_str())
+        );
+        assert!(!evidence.config_hash.is_empty());
+    }
+
+    #[test]
+    fn run_evidence_legacy_json_deserializes_without_inventing_identity() {
+        let legacy = r#"{
+            "run_id":"legacy-run",
+            "config_hash":"legacy-fingerprint",
+            "declared":{},
+            "measured":{},
+            "satisfied":true,
+            "violations":[]
+        }"#;
+
+        let evidence: RunEvidence = serde_json::from_str(legacy).expect("legacy JSON must read");
+        assert_eq!(evidence.config_hash, "legacy-fingerprint");
+        assert!(evidence.config_identity.is_none());
+        assert!(evidence.config_identity_schema.is_none());
+
+        let reserialized = serde_json::to_string(&evidence).expect("legacy JSON must reserialize");
+        assert!(!reserialized.contains("config_identity"));
+        assert!(!reserialized.contains("config_identity_schema"));
     }
 
     #[test]
