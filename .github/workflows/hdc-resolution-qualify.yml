@@ -85,6 +85,27 @@ jobs:
       - name: Emit machine-readable operator evidence
         run: cargo run -p symthaea-core --example hdc_operator_evidence --features simd > operator-evidence.json
 
+      - name: Validate operator evidence artifact
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          records = json.loads(Path("operator-evidence.json").read_text())
+          expected_dims = {16384, 32768, 65536, 131072, 262144}
+          expected_ops = {"dot", "bind", "bundle", "norm", "similarity"}
+
+          assert len(records) == 25, len(records)
+          assert {r["resolution"] for r in records} == expected_dims
+          assert {r["operation"] for r in records} == expected_ops
+          assert {r["schema_version"] for r in records} == {1}
+          assert {r["representation"] for r in records} == {"continuous_f32"}
+          assert all(r["qualification_status"] == "qualified" for r in records)
+          assert all(r["logical_bytes"] > 0 for r in records)
+          assert all(r["seed_a"] == 42 and r["seed_b"] == 43 for r in records)
+          PY
+          sha256sum operator-evidence.json | tee operator-evidence.sha256
+
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
 
@@ -123,3 +144,4 @@ jobs:
             hdc-resolution-qualification.txt
             toolchain.txt
             operator-evidence.json
+            operator-evidence.sha256
