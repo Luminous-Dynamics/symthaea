@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 pub const PROVENANCE_GRAPH_REVISION: &str = "sol-atlas-reference-graph@v1";
 pub const PROVENANCE_SLICE_TRAVERSAL_POLICY: &str = "outgoing-reachability-bfs@v1";
+pub const PROVENANCE_SLICE_BOUNDARY_SCHEMA: &str = "sol-atlas/provenance-slice-boundary/v1";
 const PROVENANCE_GRAPH_ENCODING_VERSION: &[u8] = b"symthaea:provenance-graph:v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -182,6 +183,7 @@ impl ProvenanceGraph {
 
         let boundary = SliceBoundaryCertificate {
             root,
+            schema: PROVENANCE_SLICE_BOUNDARY_SCHEMA,
             graph_revision: PROVENANCE_GRAPH_REVISION,
             graph_digest: self.identity_digest(),
             traversal_policy: PROVENANCE_SLICE_TRAVERSAL_POLICY,
@@ -215,6 +217,8 @@ pub struct ProvenanceSlice {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SliceBoundaryCertificate {
     pub root: &'static str,
+    /// Versioned schema describing what this certificate means.
+    pub schema: &'static str,
     /// Versioned identity of the authoritative graph representation.
     pub graph_revision: &'static str,
     pub graph_digest: String,
@@ -250,6 +254,8 @@ impl SliceBoundaryCertificate {
         self.frontier_exhausted
             && self.graph_digest.len() == 64
             && self.graph_digest.chars().all(|c| c.is_ascii_hexdigit())
+            && self.schema == PROVENANCE_SLICE_BOUNDARY_SCHEMA
+            && self.root == self.root
             && self.graph_revision == PROVENANCE_GRAPH_REVISION
             && self.traversal_policy == PROVENANCE_SLICE_TRAVERSAL_POLICY
 
