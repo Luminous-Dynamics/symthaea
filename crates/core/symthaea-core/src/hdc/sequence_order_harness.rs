@@ -278,6 +278,13 @@ fn run_cell(
         .map(|(position, item)| permute(item, position))
         .collect();
     let sequence = bundle(&permuted);
+    let reversed_permuted: Vec<ContinuousHV> = items
+        .iter()
+        .rev()
+        .enumerate()
+        .map(|(position, item)| permute(item, position))
+        .collect();
+    let reversed_sequence = bundle(&reversed_permuted);
 
     let mut correct = 0u64;
     let mut margin_sum = 0.0f64;
@@ -316,11 +323,12 @@ fn run_cell(
             margin_sum += f64::from(best - second);
 
             let wrong_order_probe = permute(
-                &sequence,
-                resolution - ((sequence_length - 1 - position) % resolution),
+                &reversed_sequence,
+                resolution - (position % resolution),
             );
             let wrong_order_similarity = query.similarity(&wrong_order_probe);
-            order_discrimination_sum += f64::from(query.similarity(&probe) - wrong_order_similarity);
+            order_discrimination_sum +=
+                f64::from(query.similarity(&probe) - wrong_order_similarity);
         }
     }
 
