@@ -232,6 +232,30 @@ pub struct TerrainProvenance {
     pub content_digests: Vec<(String, String, String)>,
 }
 
+impl TerrainProvenance {
+    /// Returns true only when the provenance carries a valid SHA-256 digest
+    /// for the named logical source artifact.
+    pub fn has_sha256(&self, logical_file: &str) -> bool {
+        self.content_digests.iter().any(|(name, algorithm, digest)| {
+            name == logical_file
+                && algorithm.eq_ignore_ascii_case("SHA-256")
+                && digest.len() == 64
+                && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
+    }
+
+    /// Require cryptographic identity for a named source artifact.
+    pub fn require_sha256(&self, logical_file: &str) -> Result<(), String> {
+        if self.has_sha256(logical_file) {
+            Ok(())
+        } else {
+            Err(format!(
+                "missing valid SHA-256 provenance for {logical_file}"
+            ))
+        }
+    }
+}
+
 /// Quality state for a terrain sample.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TerrainQuality {
@@ -672,6 +696,24 @@ mod tests {
                 coordinate_reference: "areocentric-east-positive".into(),
             },
         }
+    }
+
+    #[test]
+    fn provenance_sha256_gate_is_fail_closed() {
+        let provenance = TerrainProvenance {
+            source_id: "fixture".into(),
+            source_revision: "v1".into(),
+            coordinate_reference: "areocentric-east-positive".into(),
+            content_digests: vec![
+                ("label".into(), "sha-256".into(), "a".repeat(64)),
+                ("raster".into(), "SHA-256".into(), "not-a-digest".into()),
+            ],
+        };
+        assert!(provenance.has_sha256("label"));
+        assert!(!provenance.has_sha256("raster"));
+        assert!(provenance.require_sha256("label").is_ok());
+        assert!(provenance.require_sha256("raster").is_err());
+        assert!(provenance.require_sha256("counts").is_err());
     }
 
     #[test]
