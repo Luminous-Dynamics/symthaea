@@ -11,6 +11,7 @@ macro_rules! define_ref {
             pub fn new(value: impl Into<String>) -> Result<Self, RefValidationError> {
                 let value = value.into();
                 if value.is_empty() { return Err(RefValidationError::Empty); }
+                if value.trim().is_empty() { return Err(RefValidationError::WhitespaceOnly); }
                 if value.chars().any(char::is_control) { return Err(RefValidationError::ControlCharacter); }
                 Ok(Self(value))
             }
@@ -35,12 +36,13 @@ macro_rules! define_ref {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RefValidationError { Empty, ControlCharacter }
+pub enum RefValidationError { Empty, WhitespaceOnly, ControlCharacter }
 
 impl fmt::Display for RefValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Empty => write!(f, "reference must not be empty"),
+            Self::WhitespaceOnly => write!(f, "reference must not be whitespace-only"),
             Self::ControlCharacter => write!(f, "reference must not contain control characters"),
         }
     }
@@ -49,6 +51,8 @@ impl fmt::Display for RefValidationError {
 impl std::error::Error for RefValidationError {}
 
 define_ref!(CanonicalArtifactRef);
+define_ref!(ReplayTargetRef);
+define_ref!(SnapshotManifestDigest);
 define_ref!(StatementRef);
 define_ref!(ProvenanceFamilyRef);
 define_ref!(FrontierRef);
@@ -66,6 +70,11 @@ mod tests {
     #[test]
     fn rejects_empty_values() {
         assert_eq!(CanonicalArtifactRef::try_from("").unwrap_err(), RefValidationError::Empty);
+    }
+
+    #[test]
+    fn rejects_whitespace_only_values() {
+        assert_eq!(FrontierRef::try_from(" \t\n").unwrap_err(), RefValidationError::WhitespaceOnly);
     }
 
     #[test]
