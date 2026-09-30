@@ -32,18 +32,18 @@ def _block(lines: list[str], start: int) -> tuple[list[tuple[int, str]], int]:
     return out, i
 
 def _reject_yaml_meta(value: str, context: str) -> None:
-    if re.search(r"(^|\\s)[&*][A-Za-z0-9_.-]+", value) or re.search(r"(^|\\s)!!?[A-Za-z0-9_.-]+", value):
+    if re.search(r"(^|\s)[&*][A-Za-z0-9_.-]+", value) or re.search(r"(^|\s)!!?[A-Za-z0-9_.-]+", value):
         raise InventoryError(f"{context}: YAML anchors, aliases, or tags are unsupported")
-    if re.search(r"(^|\\s)<<\\s*:", value):
+    if re.search(r"(^|\s)<<\s*:", value):
         raise InventoryError(f"{context}: YAML merge-key syntax is unsupported")
 
 ARTIFACT_EXECUTION_PATTERNS = (
-    re.compile(r"\b(?:bash|sh|zsh|fish|dash|ksh|pwsh|powershell|python(?:3)?|node|ruby|perl|php|lua)\\s+[^#\\n]*?(?:\\$RUNNER_TEMP|runner\.temp)"),
-    re.compile(r"\b(?:source|\\.)\\s+[^#\\n]*?(?:\\$RUNNER_TEMP|runner\.temp)"),
-    re.compile(r"\b(?:cargo|rustc|make|cmake|ninja|nix-build|nix\\s+build|npm|pnpm|yarn|pip|pip3|gem|bundle|go\\s+run)\\b[^#\\n]*?(?:\\$RUNNER_TEMP|runner\.temp)"),
-    re.compile(r"\bchmod\\s+[^#\\n]*(?:\\$RUNNER_TEMP|runner\.temp)"),
-    re.compile(r"\b(?:cp|mv|install)\\s+[^#\\n]*(?:\\$RUNNER_TEMP|runner\.temp)[^#\\n]*(?:\\$GITHUB_WORKSPACE|\\$PATH|/usr/local/bin|/usr/bin|/bin)"),
-    re.compile(r"(?:\\$RUNNER_TEMP|runner\.temp)[^#\\n]*?(?:\\$GITHUB_WORKSPACE|\\$PATH|/usr/local/bin|/usr/bin|/bin)"),
+    re.compile(r"\b(?:bash|sh|zsh|fish|dash|ksh|pwsh|powershell|python(?:3)?|node|ruby|perl|php|lua)\s+[^#\n]*?(?:\$RUNNER_TEMP|runner\.temp)"),
+    re.compile(r"\b(?:source|\.)\s+[^#\n]*?(?:\$RUNNER_TEMP|runner\.temp)"),
+    re.compile(r"\b(?:cargo|rustc|make|cmake|ninja|nix-build|nix\s+build|npm|pnpm|yarn|pip|pip3|gem|bundle|go\s+run)\\b[^#\n]*?(?:\$RUNNER_TEMP|runner\.temp)"),
+    re.compile(r"\bchmod\s+[^#\n]*(?:\$RUNNER_TEMP|runner\.temp)"),
+    re.compile(r"\b(?:cp|mv|install)\s+[^#\n]*(?:\$RUNNER_TEMP|runner\.temp)[^#\n]*(?:\$GITHUB_WORKSPACE|\$PATH|/usr/local/bin|/usr/bin|/bin)"),
+    re.compile(r"(?:\$RUNNER_TEMP|runner\.temp)[^#\n]*?(?:\$GITHUB_WORKSPACE|\$PATH|/usr/local/bin|/usr/bin|/bin)"),
 )
 
 def _artifact_execution_evidence(lines: list[str], artifact_paths: list[str]) -> list[str]:
@@ -625,21 +625,21 @@ jobs:
             "        with:\n"
             "          name: trusted-receipt-" + artifact_expr + "-" + "${" + "{ github.event.workflow_run.run_attempt }}\n"
             "          run-id: " + artifact_expr + "\n"
-            "          path: \\${{ runner.temp }}/trusted-receipt\\n"
+            "          path: \${{ runner.temp }}/trusted-receipt\n"
         )
         artifact_valid = artifact_base.replace(
             "      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567",
             artifact_step + "      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567",
             1,
         )
-        wf.write_text(artifact_valid + "      - run: cat \\${{ runner.temp }}/trusted-receipt/receipt.json\\n", encoding="utf-8")
+        wf.write_text(artifact_valid + "      - run: cat \${{ runner.temp }}/trusted-receipt/receipt.json\n", encoding="utf-8")
         safe_artifact = parse_workflow(wf)["contract"]
         assert safe_artifact["cross_workflow_dataflow_observed"]["artifact_consumption_mode"] == "data_only"
         assert safe_artifact["cross_workflow_dataflow_observed"]["artifact_execution_evidence"] == []
         for malicious in (
-            artifact_valid + "      - run: bash \\${{ runner.temp }}/trusted-receipt/script.sh\\n",
-            artifact_valid + "      - run: source \\${{ runner.temp }}/trusted-receipt/env.sh\\n",
-            artifact_valid + "      - run: cp \\${{ runner.temp }}/trusted-receipt/bin $GITHUB_WORKSPACE/tool\\n",
+            artifact_valid + "      - run: bash \${{ runner.temp }}/trusted-receipt/script.sh\n",
+            artifact_valid + "      - run: source \${{ runner.temp }}/trusted-receipt/env.sh\n",
+            artifact_valid + "      - run: cp \${{ runner.temp }}/trusted-receipt/bin $GITHUB_WORKSPACE/tool\n",
         ):
             wf.write_text(malicious, encoding="utf-8")
             try:
