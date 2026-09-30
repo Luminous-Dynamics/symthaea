@@ -599,6 +599,66 @@ mod tests {
     }
 
     #[test]
+    fn attestation_statement_is_derived_from_envelope() {
+        let (task, performance, resource, trajectory) = evidence();
+        let key = derive_experiment_key(&task, &performance, &resource).unwrap();
+        let manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
+        let envelope = EvidenceManifestEnvelope::from_manifest(manifest);
+        let statement = EvidenceAttestationStatement::from_envelope(&envelope);
+        statement.validate_against_envelope(&envelope).unwrap();
+        assert_eq!(statement.references.len(), 4);
+        assert!(statement.statement_digest().starts_with("sha256:"));
+        assert_eq!(statement.statement_digest().len(), 71);
+        envelope
+            .validate(&task, &performance, &resource, &trajectory)
+            .unwrap();
+    }
+
+    #[test]
+    fn attestation_subject_mutation_fails_closed() {
+        let (task, performance, resource, trajectory) = evidence();
+        let key = derive_experiment_key(&task, &performance, &resource).unwrap();
+        let manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
+        let envelope = EvidenceManifestEnvelope::from_manifest(manifest);
+        let mut statement = EvidenceAttestationStatement::from_envelope(&envelope);
+        statement.subject_digest =
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".into();
+        assert!(matches!(
+            statement.validate_against_envelope(&envelope),
+            Err(EvidenceAttestationError::SubjectMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn attestation_reference_mutation_fails_closed() {
+        let (task, performance, resource, trajectory) = evidence();
+        let key = derive_experiment_key(&task, &performance, &resource).unwrap();
+        let manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
+        let envelope = EvidenceManifestEnvelope::from_manifest(manifest);
+        let mut statement = EvidenceAttestationStatement::from_envelope(&envelope);
+        statement.references[2].artifact_id = "tampered".into();
+        assert!(matches!(
+            statement.validate_against_envelope(&envelope),
+            Err(EvidenceAttestationError::InvalidReference(_))
+        ));
+    }
+
+    #[test]
+    fn attestation_digest_changes_when_claim_changes() {
+        let (task, performance, resource, trajectory) = evidence();
+        let key = derive_experiment_key(&task, &performance, &resource).unwrap();
+        let manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
+        let envelope = EvidenceManifestEnvelope::from_manifest(manifest);
+        let mut statement = EvidenceAttestationStatement::from_envelope(&envelope);
+        let original = statement.statement_digest();
+        statement.references[0].artifact_id = "trajectory-v2".into();
+        assert_ne!(original, statement.statement_digest());
+        assert!(envelope
+            .validate(&task, &performance, &resource, &trajectory)
+            .is_ok());
+    }
+
+    #[test]
     fn semantic_source_change_invalidates_declared_manifest_identity() {
         let (mut task, performance, resource, trajectory) = evidence();
         let original_key = derive_experiment_key(&task, &performance, &resource).unwrap();
