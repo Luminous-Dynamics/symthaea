@@ -177,6 +177,18 @@ mod tests {
     }
 
     #[test]
+    fn byte_size_overflow_is_reported() {
+        let resolution = HdcResolution::new(1usize << (usize::BITS - 1)).unwrap();
+        assert_eq!(
+            resolution.checked_bytes(usize::MAX),
+            Err(ResolutionError::ByteSizeOverflow {
+                dimensions: resolution.dimensions(),
+                element_size: usize::MAX,
+            })
+        );
+    }
+
+    #[test]
     fn extended_memory_sizes_are_exact() {
         let d64 = HdcResolution::new(65_536).unwrap();
         let d128 = HdcResolution::new(131_072).unwrap();
