@@ -252,22 +252,43 @@ mod tests {
     #[test]
     fn every_result_field_is_witnessed() {
         let state = admitted_state();
-        let base = canonical_state_bytes(&state).unwrap();
-        let key = ObservationKey {
-            namespace: "test".into(),
-            observation_id: Uuid::from_u128(2),
+        let (delivery, observation) = fixture();
+        let mut second_delivery = delivery.clone();
+        second_delivery.logical_delivery_id = Uuid::from_u128(99);
+        second_delivery.payload = b"second-delivery".to_vec();
+        let mut second_observation = observation.clone();
+        second_observation.key = ObservationKey {
+            namespace: "other".into(),
+            observation_id: Uuid::from_u128(98),
         };
+        let AdmissionOutcome::Admitted { next_state, .. } = crate::semantic_admission::decide(
+            &state,
+            &second_delivery,
+            &second_observation,
+            AdmissionPolicy {
+                allow_new_observation: true,
+                ..AdmissionPolicy::default()
+            },
+            100,
+        ) else {
+            panic!("second admission should succeed");
+        };
+        let state = next_state;
+        let base = canonical_state_bytes(&state).unwrap();
+        let key = observation.key;
 
         let mut changed = state.clone();
-        changed.results.get_mut(&key).unwrap().logical_delivery_id = Uuid::from_u128(99);
+        changed.results.get_mut(&key).unwrap().logical_delivery_id =
+            second_delivery.logical_delivery_id;
         assert_ne!(base, canonical_state_bytes(&changed).unwrap());
 
         let mut changed = state.clone();
-        changed.results.get_mut(&key).unwrap().observation.namespace = "other".into();
+        changed.results.get_mut(&key).unwrap().observation = second_observation.key.clone();
         assert_ne!(base, canonical_state_bytes(&changed).unwrap());
 
         let mut changed = state.clone();
-        changed.results.get_mut(&key).unwrap().observation.observation_id = Uuid::from_u128(99);
+        changed.results.get_mut(&key).unwrap().observation.observation_id =
+            second_observation.key.observation_id;
         assert_ne!(base, canonical_state_bytes(&changed).unwrap());
     }
 
