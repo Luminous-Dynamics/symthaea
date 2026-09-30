@@ -34,6 +34,7 @@ pub enum AtomicAdmissionOutcome<E> {
     Conflict { outcome: AdmissionOutcome, observed_version: u64 },
     Expired { outcome: AdmissionOutcome, observed_version: u64 },
     CapacityExceeded { outcome: AdmissionOutcome, observed_version: u64 },
+    ConcurrentConflict { observed_version: u64 },
     StorageError(E),
 }
 
@@ -89,12 +90,7 @@ pub fn admit_atomically<S: SemanticCommitStore>(
         }
     }
 
-    AtomicAdmissionOutcome::Conflict {
-        outcome: AdmissionOutcome::Conflict {
-            identity_kind: crate::semantic_admission::ConflictKind::DeliveryContract,
-        },
-        observed_version: u64::MAX,
-    }
+    AtomicAdmissionOutcome::ConcurrentConflict { observed_version: u64::MAX }
 }
 
 #[cfg(test)]
@@ -137,6 +133,8 @@ mod tests {
                         Ok(true)
                     }
                     Ok(false) => {
+                        // Simulate a concurrent winner publishing the candidate.
+                        self.state = next;
                         self.version += 1;
                         Ok(false)
                     }
@@ -210,7 +208,7 @@ mod tests {
     }
 
     #[test]
-    fn cas_collision_reloads_and_then_admits_current_state() {
+    fn cas_collision_reloads_and_then_replays_the_concurrent_winner() {
         let (delivery, observation) = fixture();
         let mut store = TestStore {
             cas_results: VecDeque::from([Ok(false), Ok(true)]),
@@ -221,10 +219,10 @@ mod tests {
         );
         assert!(matches!(
             result,
-            AtomicAdmissionOutcome::Admitted { committed_version: 2, .. }
+            AtomicAdmissionOutcome::Replay { observed_version: 1, .. }
         ));
         assert_eq!(store.loads, 2);
-        assert_eq!(store.version, 2);
+        assert_eq!(store.version, 1);
     }
 
     #[test]
