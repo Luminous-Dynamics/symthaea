@@ -1545,6 +1545,124 @@ mod tests {
     }
 
     #[test]
+    fn rejects_identical_local_histories_in_distinct_information_sets() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(1),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(0),
+                            next: DecisionStateId(1),
+                            visibility: EventVisibility::ActorOnly,
+                        },
+                        Transition {
+                            action: ActionId(1),
+                            next: DecisionStateId(2),
+                            visibility: EventVisibility::ActorOnly,
+                        },
+                    ],
+                },
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(1),
+                    player: PlayerId(0),
+                    actions: vec![Transition {
+                        action: ActionId(2),
+                        next: DecisionStateId(3),
+                        visibility: EventVisibility::Public,
+                    }],
+                },
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(2),
+                    player: PlayerId(0),
+                    actions: vec![Transition {
+                        action: ActionId(2),
+                        next: DecisionStateId(4),
+                        visibility: EventVisibility::Public,
+                    }],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(3),
+                    payoffs: vec![1.0, 0.0],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(4),
+                    payoffs: vec![0.0, 1.0],
+                },
+            ],
+            information: InformationStructure {
+                decision_states: vec![
+                    DecisionState {
+                        state: DecisionStateId(0),
+                        player: PlayerId(1),
+                        information_set: InformationSetId(1),
+                        legal_actions: vec![ActionId(0), ActionId(1)],
+                    },
+                    DecisionState {
+                        state: DecisionStateId(1),
+                        player: PlayerId(0),
+                        information_set: InformationSetId(0),
+                        legal_actions: vec![ActionId(2)],
+                    },
+                    DecisionState {
+                        state: DecisionStateId(2),
+                        player: PlayerId(0),
+                        information_set: InformationSetId(2),
+                        legal_actions: vec![ActionId(2)],
+                    },
+                ],
+                information_sets: vec![
+                    InformationSet {
+                        id: InformationSetId(1),
+                        player: PlayerId(1),
+                        members: vec![DecisionStateId(0)],
+                    },
+                    InformationSet {
+                        id: InformationSetId(0),
+                        player: PlayerId(0),
+                        members: vec![DecisionStateId(1)],
+                    },
+                    InformationSet {
+                        id: InformationSetId(2),
+                        player: PlayerId(0),
+                        members: vec![DecisionStateId(2)],
+                    },
+                ],
+            },
+            observations: HashMap::new(),
+        };
+
+        assert!(matches!(
+            game.verify_information_history_consistency(),
+            Ok(())
+        ));
+
+        struct Encoder;
+
+        impl InformationEncoder for Encoder {
+            fn encode(
+                &self,
+                _player: PlayerId,
+                _history: &[PlayerHistoryEvent],
+            ) -> Result<InformationSetId, InformationEncodingError> {
+                Ok(InformationSetId(0))
+            }
+        }
+
+        assert!(matches!(
+            game.verify_information_encoder(&Encoder),
+            Err(ExtensiveGameError::InformationHistoryMapsToMultipleInformationSets {
+                player: PlayerId(0),
+                state: DecisionStateId(2),
+                expected: InformationSetId(0),
+                actual: InformationSetId(2),
+            })
+        ));
+    }
+
+    #[test]
     fn verifies_semantic_information_encoder() {
         struct Encoder;
 
