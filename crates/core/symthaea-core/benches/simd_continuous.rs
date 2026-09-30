@@ -134,7 +134,7 @@ fn bench_dot_product(c: &mut Criterion) {
 fn bench_bind(c: &mut Criterion) {
     let mut group = c.benchmark_group("bind");
 
-    for dim in [1024, 4096, HDC_DIM, 32768, 131072, 262144] {
+    for dim in benchmark_dims() {
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
         group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (3 * dim * std::mem::size_of::<f32>()) as u64 });
@@ -289,11 +289,11 @@ fn bench_continuous_hv_integration(c: &mut Criterion) {
 // =============================================================================
 
 fn bench_speedup_summary(c: &mut Criterion) {
-    let mut group = c.benchmark_group("speedup_summary_16K");
+    let mut group = c.benchmark_group("comparison_summary_16K");
     group.sample_size(100);
 
-    let a = random_vec(HDC_DIM, 42);
-    let b = random_vec(HDC_DIM, 43);
+    let a = random_vec(16_384, 42);
+    let b = random_vec(16_384, 43);
 
     // Dot product
     group.bench_function("dot_scalar", |bench| {
