@@ -92,7 +92,7 @@ impl ProvenanceGraph {
     }
 
 
-    pub fn slice(&self, root: &'static str) -> Option<ProvenanceSlice> {
+    pub fn slice(&self, root: &'static str) -> Result<ProvenanceSlice, ProvenanceGraphError> {
         if !self.nodes.iter().any(|node| node.id == root) {
             return None;
         }
