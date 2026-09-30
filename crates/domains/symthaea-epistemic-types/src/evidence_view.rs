@@ -156,7 +156,8 @@ impl EvidenceView {
             return Err(EvidenceViewError::ReceiptMismatch);
         }
         let mut derived_families = groups.iter()
-            .flat_map(|group| group.provenance_families.iter().cloned())
+            .flat_map(|group| group.representations.iter()
+                .filter_map(|candidate| candidate.provenance.provenance_identity().map(str::to_owned)))
             .collect::<Vec<_>>();
         derived_families.sort();
         derived_families.dedup();
