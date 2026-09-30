@@ -247,3 +247,12 @@ This makes the PDS MEGDR product distinction actionable in code: adapters must d
 ### Terrain sample admissibility
 
 The core sample validator also checks that areocentric latitude lies within [-90°, +90°], optional slope lies within [0°, 90°], and provenance identifiers (source, revision, coordinate reference) are non-empty. These are syntactic admissibility checks only; they do not prove that a product label is truthful, that the grid registration is correct, or that a coordinate transform is valid. Dataset adapters remain responsible for validating those claims against source metadata.
+
+
+## MOLA raster adapter: projection and record-layout hardening
+
+The MOLA adapter now treats the projection metadata as part of the georeferencing contract rather than incidental label text. In addition to SIMPLE CYLINDRICAL, planetocentric latitude, east-positive longitude, and explicit line/sample projection offsets, the label must declare `COORDINATE_SYSTEM_TYPE = "BODY-FIXED ROTATING"` and `MAP_PROJECTION_ROTATION = 0.0`, matching the authoritative MOLA EGDR SIS global example. Companion topography/count products must match the projection center and offsets as well as grid dimensions and geographic bounds.
+
+The raster reader also validates that the declared sample payload fits inside each fixed-length record. Sixteen-bit count decoding follows the declared integer byte order instead of assuming big-endian encoding. These checks are deliberately fail-closed: a malformed label or inconsistent companion cannot silently shift registration or reinterpret bytes.
+
+The remaining high-value gate is **product-byte evidence**, not another inferred projection formula. NASA/PDS documents the MOLA MEGDR 128-ppd tiled archive and the 00N270 tile containing the Valles Marineris longitude band, but the exact Valles label bytes still need to be pinned and hashed before changing the current longitude transform. Generic PDS projection equations and other planetary archives exhibit historical offset/sign convention differences, so the adapter should not substitute a generic equation for the actual MOLA product convention without an exact label-backed regression. Once the authoritative label and image/count bytes are available, the next evidence gate is: content hashes -> exact metadata snapshot -> known-cell byte fixtures -> topography/count registration tests -> coordinate sweep across tile boundaries.
