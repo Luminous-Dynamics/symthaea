@@ -34,8 +34,26 @@ pub struct ExecutionProvenance {
 pub struct Measurement {
     pub sample_count: u64,
     pub warmup_count: u64,
+    /// Number of benchmark-body invocations represented by the measured interval.
+    ///
+    /// This is deliberately distinct from Criterion's statistical sample count:
+    /// one statistical sample may contain many benchmark-body iterations.
+    pub iterations: u64,
+    /// Number of logical workload items processed by one benchmark-body invocation.
+    ///
+    /// This is workload semantics, not a claim about physical memory traffic.
+    pub batch_size: u64,
+    /// Logical bytes processed by one benchmark-body invocation.
+    ///
+    /// This makes the accounting convention explicit: total logical bytes are
+    /// derived as bytes_per_iteration * iterations.
+    pub logical_bytes_per_iteration: u64,
+    /// Total logical bytes across the measured interval.
+    ///
+    /// This is stored explicitly so serialized evidence can be independently
+    /// audited without reconstructing the value from surrounding metadata.
+    pub total_logical_bytes: u64,
     pub elapsed_seconds: f64,
-    pub logical_bytes: u64,
     pub throughput_bytes_per_second: Option<f64>,
     pub allocations: Option<u64>,
     pub peak_resident_bytes: Option<u64>,
@@ -60,6 +78,10 @@ pub enum PerformanceEvidenceError {
     ZeroSamples,
     InvalidElapsedSeconds,
     ThroughputMismatch,
+    IterationCountZero,
+    BatchSizeZero,
+    LogicalBytesOverflow,
+    LogicalBytesTotalMismatch,
     NonFiniteMeasurement(&'static str),
     NegativeMeasurement(&'static str),
     EmptyCommitSha,
@@ -75,7 +97,11 @@ impl std::fmt::Display for PerformanceEvidenceError {
             Self::InvalidResolution => write!(f, "benchmark resolution must be non-zero"),
             Self::ZeroSamples => write!(f, "benchmark sample count must be non-zero"),
             Self::InvalidElapsedSeconds => write!(f, "elapsed seconds must be finite and positive"),
-            Self::ThroughputMismatch => write!(f, "throughput does not match logical bytes / elapsed time"),
+            Self::ThroughputMismatch => write!(f, "throughput does not match total logical bytes / elapsed time"),
+            Self::IterationCountZero => write!(f, "measured iteration count must be non-zero"),
+            Self::BatchSizeZero => write!(f, "batch size must be non-zero"),
+            Self::LogicalBytesOverflow => write!(f, "logical byte accounting overflowed"),
+            Self::LogicalBytesTotalMismatch => write!(f, "total logical bytes do not match bytes-per-iteration * iterations"),
             Self::NonFiniteMeasurement(field) => write!(f, "measurement is non-finite: {field}"),
             Self::NegativeMeasurement(field) => write!(f, "measurement is negative: {field}"),
             Self::EmptyCommitSha => write!(f, "commit SHA is empty"),
@@ -128,6 +154,19 @@ impl PerformanceEvidenceRecord {
         if m.sample_count == 0 {
             return Err(PerformanceEvidenceError::ZeroSamples);
         }
+        if m.iterations == 0 {
+            return Err(PerformanceEvidenceError::IterationCountZero);
+        }
+        if m.batch_size == 0 {
+            return Err(PerformanceEvidenceError::BatchSizeZero);
+        }
+        let expected_total = m
+            .logical_bytes_per_iteration
+            .checked_mul(m.iterations)
+            .ok_or(PerformanceEvidenceError::LogicalBytesOverflow)?;
+        if m.total_logical_bytes != expected_total {
+            return Err(PerformanceEvidenceError::LogicalBytesTotalMismatch);
+        }
         if !m.elapsed_seconds.is_finite() || m.elapsed_seconds <= 0.0 {
             return Err(PerformanceEvidenceError::InvalidElapsedSeconds);
         }
@@ -135,7 +174,7 @@ impl PerformanceEvidenceRecord {
             if !throughput.is_finite() || throughput < 0.0 {
                 return Err(PerformanceEvidenceError::NonFiniteMeasurement("throughput"));
             }
-            let expected = m.logical_bytes as f64 / m.elapsed_seconds;
+            let expected = m.total_logical_bytes as f64 / m.elapsed_seconds;
             if (throughput - expected).abs() > expected.max(1.0) * 1e-9 {
                 return Err(PerformanceEvidenceError::ThroughputMismatch);
             }
@@ -165,7 +204,9 @@ mod tests {
 
     fn record() -> PerformanceEvidenceRecord {
         let elapsed = 0.25;
-        let bytes = 2 * 131_072 * 4;
+        let bytes_per_iteration = 2 * 131_072 * 4;
+        let iterations = 100;
+        let total_bytes = bytes_per_iteration * iterations;
         PerformanceEvidenceRecord {
             schema_version: PERFORMANCE_EVIDENCE_SCHEMA_VERSION,
             identity: BenchmarkIdentity {
@@ -189,9 +230,12 @@ mod tests {
             measurement: Measurement {
                 sample_count: 100,
                 warmup_count: 10,
+                iterations,
+                batch_size: 2,
+                logical_bytes_per_iteration: bytes_per_iteration,
+                total_logical_bytes: total_bytes,
                 elapsed_seconds: elapsed,
-                logical_bytes: bytes,
-                throughput_bytes_per_second: Some(bytes as f64 / elapsed),
+                throughput_bytes_per_second: Some(total_bytes as f64 / elapsed),
                 allocations: Some(0),
                 peak_resident_bytes: Some(2 * 1024 * 1024),
                 physical_memory_bytes: None,
@@ -226,7 +270,46 @@ mod tests {
     }
 
     #[test]
-    fn provenance_is_required() {
+    fn total_logical_bytes_are_derived_from_iteration_accounting() {
+        let r = record();
+        assert_eq!(
+            r.measurement.total_logical_bytes,
+            r.measurement.logical_bytes_per_iteration * r.measurement.iterations
+        );
+    }
+
+    #[test]
+    fn inconsistent_total_logical_bytes_fails_closed() {
+        let mut r = record();
+        r.measurement.total_logical_bytes -= 1;
+        assert!(matches!(
+            r.validate(),
+            Err(PerformanceEvidenceError::LogicalBytesTotalMismatch)
+        ));
+    }
+
+    #[test]
+    fn iteration_overflow_fails_closed() {
+        let mut r = record();
+        r.measurement.iterations = u64::MAX;
+        assert!(matches!(
+            r.validate(),
+            Err(PerformanceEvidenceError::LogicalBytesOverflow)
+        ));
+    }
+
+    #[test]
+    fn zero_batch_size_fails_closed() {
+        let mut r = record();
+        r.measurement.batch_size = 0;
+        assert!(matches!(
+            r.validate(),
+            Err(PerformanceEvidenceError::BatchSizeZero)
+        ));
+    }
+
+    #[test]
+    fn provenance_is_required {
         let mut r = record();
         r.provenance.hardware.clear();
         assert!(matches!(r.validate(), Err(PerformanceEvidenceError::EmptyProvenance("hardware"))));
