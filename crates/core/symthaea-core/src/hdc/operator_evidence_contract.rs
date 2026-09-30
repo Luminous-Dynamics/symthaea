@@ -206,6 +206,14 @@ mod tests {
     }
 
     #[test]
+    fn sha256_implementation_matches_known_empty_message_vector() {
+        assert_eq!(
+            sha256_hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
     fn digest_round_trip_verifies_exact_bytes() {
         let bytes = artifact_bytes();
         let digest = sha256_hex(&bytes);
