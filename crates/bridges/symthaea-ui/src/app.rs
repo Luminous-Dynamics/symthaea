@@ -172,12 +172,11 @@ pub fn App() -> impl IntoView {
     // Pauses the presentation of the event stream, not the daemon itself.
     // Incoming telemetry continues so resuming returns to current truth.
     let timeline_paused = RwSignal::new(false);
-    let semantic_announcement = RwSignal::new(String::new());
-    let last_semantic_key = RwSignal::new(String::new());
 
-    // Announce only meaningful semantic transitions. Continuous telemetry
-    // must not become a screen-reader interrupt stream.
-    Effect::new(move |_| {
+    // This is a derived semantic value, not another mutable state machine.
+    // The memo only changes when presence/mode changes, so assistive
+    // technology is not fed the continuous telemetry stream.
+    let semantic_key = Memo::new(move |_| {
         let v = vitals.get();
         let state = CognitiveState::from_observation(
             ws_connected.get(),
@@ -187,15 +186,12 @@ pub fn App() -> impl IntoView {
             v.reasoning_confidence as f64,
             v.prediction_error as f64,
         );
-        let key = format!("{}:{}", state.presence.label(), state.mode.label());
-        if last_semantic_key.get_untracked() != key {
-            last_semantic_key.set(key);
-            semantic_announcement.set(format!(
-                "Symthaea is {} and {}.",
-                state.presence.label(),
-                state.mode.label()
-            ));
-        }
+        format!("{}:{}", state.presence.label(), state.mode.label())
+    });
+    let semantic_announcement = Memo::new(move |_| {
+        let key = semantic_key.get();
+        let (presence, mode) = key.split_once(':').unwrap_or(("unknown", "unknown"));
+        format!("Symthaea is {presence} and {mode}.")
     });
 
     // Projection exits (VISION_PROJECTION_REVIEW_2026-07-15.md P1.2): the
