@@ -2,18 +2,39 @@
 
 Status: proposed integration architecture
 
-This document records where workspace/environment intelligence belongs in the existing Symthaea stack. The goal is composition, not another parallel domain engine.
+This document records where workspace/environment intelligence belongs in the existing Symthaea/Mycelix stack. The goal is composition, not another parallel domain engine.
 
-## Existing substrate
+## Existing related work — important discovery
 
-The current repository already contains:
+This capability is more developed than the initial proposal suggested.
 
-- symthaea-fabrication-kernel::building for thermal load, structural stress, occupancy, comfort, and energy consumption across multi-scale horizons.
-- symthaea-digital-twin for auditable engineered-system twin state and telemetry primitives.
-- engineering simulation bridges and safety/evidence abstractions.
-- spatial cognition benchmarks for spatial relations, landmarks, perspective taking, and path updating.
+### Symthaea substrate
+
+The repository already contains:
+
+- `symthaea-fabrication-kernel::building` for thermal load, structural stress, occupancy, comfort, and energy consumption across multi-scale horizons.
+- `symthaea-digital-twin` for auditable engineered-system twin state and telemetry primitives.
+- `symthaea-engineering` as a composition facade combining digital twins, simulation, causal reasoning, formal safety, materials aging, memory, and the Global Workspace.
+- `symthaea-sim-bridge` for solver-agnostic FEA/CFD/multibody/circuit/process simulation.
+- spatial cognition and perception infrastructure.
 - resource-allocation and active-inference machinery.
 - institutional failure learning lineage for prediction -> outcome -> error -> revised constraint.
+
+The existing `TwinState` is already especially close to the required primitive: it stores identity, asset class, telemetry, prediction residuals, epistemic/aleatoric uncertainty, free-energy breakdown, health, and intervention candidates.
+
+### Mycelix substrate
+
+Mycelix already has an unusually direct environment/commons substrate:
+
+- `mycelix-workspace`: ecosystem orchestration, shared bridge infrastructure, SDKs, routing, migration, and hApp composition.
+- `mycelix-commons`: property, housing, maintenance, cooperative membership, community land trusts, governance, water, food, transport, mutual aid.
+- `mycelix-energy`: energy projects, investment/ownership transitions, grid production/consumption and peer-to-peer energy coordination.
+- `mycelix-hearth`: household/kinship coordination, shared resources, care, autonomy, rhythms and presence.
+- `mycelix-identity`: identity, recovery and assurance infrastructure.
+- `mycelix-attribution`: privacy-preserving usage receipts, attestations and stewardship lineage.
+- `mycelix-governance` and shared bridge infrastructure for authorized decisions and cross-cluster routing.
+
+Therefore SWA should **not** create new housing, energy, identity, commons, or governance stacks. It should connect these existing systems through a narrow evidence/decision boundary.
 
 ## Composition
 
@@ -69,6 +90,18 @@ The first adapter layer can introduce:
 - WorkspaceConstraintCandidate
 
 These should reference existing engineering, digital-twin, temporal-prediction, and IFL types where practical.
+
+## Boundary architecture
+
+**Symthaea owns inference and simulation:**
+
+observe -> represent -> predict -> simulate -> compare -> propose -> learn
+
+**Mycelix owns durable coordination context:**
+
+identity -> consent -> authorization context -> decision -> receipt -> contestability -> durable provenance
+
+A Mycelix receipt must never turn a Symthaea prediction into an observation or grant physical authority.
 
 ## Multi-objective discipline
 
@@ -132,5 +165,19 @@ G7: Mycelix receipt projection preserving complete lineage
 ## Implementation rule
 
 Prefer adapters around existing crates over a new physics or simulation engine. The workspace layer should become a composition boundary connecting physical models, cognitive inference, simulation, economic/resilience reasoning, and Mycelix durable coordination.
+
+## Immediate next implementation slice
+
+Build one deterministic fixture spanning a small building:
+
+1. a `BuildingTwin` supplies physical predictions and residuals;
+2. `symthaea-digital-twin::TwinState` supplies uncertainty/health/intervention context;
+3. an intervention candidate changes a zone-level configuration;
+4. a counterfactual evaluator compares at least comfort, energy, resilience, cost and reversibility independently;
+5. IFL records prediction -> outcome -> error -> constraint lineage;
+6. Mycelix records consent/authorization context and a durable decision receipt;
+7. replay proves that the same fixture produces the same decision evidence without requiring the same authority holder.
+
+This fixture should be the reference integration test before any real-world actuation work.
 
 Related: Symthaea issue #6624; Mycelix issue #3634.
