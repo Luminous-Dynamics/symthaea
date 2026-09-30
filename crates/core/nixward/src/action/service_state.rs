@@ -56,6 +56,10 @@ impl ServiceActiveStateV1 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ServiceLoadStateV1 { Loaded, Error, Masked }
+impl ServiceLoadStateV1 { pub fn parse(value: &str) -> Result<Self, NixServiceStateErrorV1> { match value { "loaded" => Ok(Self::Loaded), "error" => Ok(Self::Error), "masked" => Ok(Self::Masked), _ => Err(NixServiceStateErrorV1::UnknownLoadState) } } fn discriminant(self) -> u8 { match self { Self::Loaded=>0, Self::Error=>1, Self::Masked=>2 } } }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ServiceUnitFileStateV1 {
     Enabled,
     EnabledRuntime,
@@ -66,7 +70,6 @@ pub enum ServiceUnitFileStateV1 {
     Static,
     Disabled,
     Invalid,
-    Indirect,
 }
 
 impl ServiceUnitFileStateV1 {
@@ -81,7 +84,6 @@ impl ServiceUnitFileStateV1 {
             "static" => Ok(Self::Static),
             "disabled" => Ok(Self::Disabled),
             "invalid" => Ok(Self::Invalid),
-            "indirect" => Ok(Self::Indirect),
             _ => Err(NixServiceStateErrorV1::UnknownUnitFileState),
         }
     }
@@ -97,7 +99,6 @@ impl ServiceUnitFileStateV1 {
             Self::Static => 6,
             Self::Disabled => 7,
             Self::Invalid => 8,
-            Self::Indirect => 9,
         }
     }
 }
@@ -143,7 +144,7 @@ impl NixServiceObservedStateV1 {
         unit: impl Into<String>,
         properties: &str,
     ) -> Result<Self, NixServiceStateErrorV1> {
-        let mut active_state = None;
+        let mut observed_id = None;\n        let mut load_state = None;\n        let mut active_state = None;
         let mut sub_state = None;
         let mut unit_file_state = None;
 
@@ -170,7 +171,7 @@ impl NixServiceObservedStateV1 {
                 "UnitFileState" if unit_file_state.is_none() => {
                     unit_file_state = Some(ServiceUnitFileStateV1::parse(value)?);
                 }
-                "ActiveState" | "SubState" | "UnitFileState" => {
+                "Id" | "LoadState" | "ActiveState" | "SubState" | "UnitFileState" => {
                     return Err(NixServiceStateErrorV1::DuplicateProperty);
                 }
                 _ => return Err(NixServiceStateErrorV1::UnexpectedProperty),
@@ -189,7 +190,7 @@ impl NixServiceObservedStateV1 {
         &self.unit
     }
 
-    pub fn active_state(&self) -> ServiceActiveStateV1 {
+    pub fn load_state(&self) -> ServiceLoadStateV1 { self.load_state }\n\n    pub fn active_state(&self) -> ServiceActiveStateV1 {
         self.active_state
     }
 
@@ -223,7 +224,7 @@ impl NixServiceObservedStateV1 {
         let mut hasher = Hasher::new();
         hasher.update(SERVICE_STATE_DOMAIN_V1);
         write_len_prefixed(&mut hasher, self.unit.as_bytes());
-        hasher.update(&[self.active_state.discriminant()]);
+        hasher.update(&[self.load_state.discriminant()]);\n        hasher.update(&[self.active_state.discriminant()]);
         hasher.update(&[self.unit_file_state.discriminant()]);
         write_len_prefixed(&mut hasher, self.sub_state.as_bytes());
         Ok(hasher.finalize().to_hex().to_string())
@@ -252,11 +253,11 @@ fn write_len_prefixed(hasher: &mut Hasher, value: &[u8]) {
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum NixServiceStateErrorV1 {
     #[error("unknown systemd ActiveState")]
-    UnknownActiveState,
+    UnknownLoadState,\n    UnknownActiveState,
     #[error("unknown systemd UnitFileState")]
     UnknownUnitFileState,
     #[error("invalid service unit")]
-    InvalidServiceUnit,
+    InvalidServiceUnit,\n    IdentityMismatch,
     #[error("service unit is not in canonical form")]
     NonCanonicalServiceUnit,
     #[error("service SubState is empty")]
@@ -266,7 +267,7 @@ pub enum NixServiceStateErrorV1 {
     #[error("service SubState contains whitespace or control characters")]
     InvalidSubState,
     #[error("malformed systemd property line")]
-    MalformedPropertyLine,
+    MalformedPropertyLine,\n    MissingId,\n    MissingLoadState,
     #[error("duplicate required systemd property")]
     DuplicateProperty,
     #[error("unexpected systemd property")]
@@ -297,7 +298,7 @@ mod tests {
     fn parses_complete_systemd_observation() {
         let value = NixServiceObservedStateV1::parse_systemd_properties(
             "nginx",
-            "ActiveState=active\nSubState=running\nUnitFileState=enabled\n",
+            "Id=nginx.service\nLoadState=loaded\nActiveState=active\nSubState=running\nUnitFileState=enabled\n",
         ).unwrap();
         assert_eq!(value.unit(), "nginx.service");
         assert_eq!(value.active_state(), ServiceActiveStateV1::Active);
@@ -339,14 +340,14 @@ mod tests {
         assert_eq!(
             NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
-                "ActiveState=unknown\nSubState=running\nUnitFileState=enabled\n",
+                "Id=nginx.service\nLoadState=loaded\nActiveState=unknown\nSubState=running\nUnitFileState=enabled\n",
             ).unwrap_err(),
             NixServiceStateErrorV1::UnknownActiveState
         );
         assert_eq!(
             NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
-                "ActiveState=active\nSubState=running state\nUnitFileState=enabled\n",
+                "Id=nginx.service\nLoadState=loaded\nActiveState=active\nSubState=running state\nUnitFileState=enabled\n",
             ).unwrap_err(),
             NixServiceStateErrorV1::InvalidSubState
         );
@@ -367,7 +368,7 @@ mod tests {
         ).unwrap();
         let masked = NixServiceObservedStateV1::parse_systemd_properties(
             "nginx",
-            "ActiveState=inactive\nSubState=dead\nUnitFileState=masked\n",
+            "Id=nginx.service\nLoadState=loaded\nActiveState=inactive\nSubState=dead\nUnitFileState=masked\n",
         ).unwrap();
         assert_ne!(active.digest().unwrap(), masked.digest().unwrap());
     }
