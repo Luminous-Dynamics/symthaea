@@ -178,7 +178,14 @@ impl InformationStructure {
                         error,
                     }
                 })?;
-                if state.legal_actions != first.legal_actions {
+                // Legal-action ordering is representational, not semantic.
+                // Compare canonical sets so equivalent vocabularies cannot
+                // diverge merely because their source order differs.
+                let mut expected_actions = first.legal_actions.clone();
+                let mut actual_actions = state.legal_actions.clone();
+                expected_actions.sort_unstable();
+                actual_actions.sort_unstable();
+                if actual_actions != expected_actions {
                     return Err(InformationStructureError::InconsistentActionSet {
                         information_set: info_set.id,
                         expected: first.legal_actions.clone(),
@@ -353,9 +360,7 @@ impl Strategy {
             if points[..i].iter().any(|prior| prior.information_set == point.information_set) {
                 return Err(ContextError::DuplicateInformationSet(point.information_set));
             }
-            if point.legal_actions.is_empty() {
-                return Err(ContextError::NoLegalActions);
-            }
+            validate_legal_actions(&point.legal_actions)?;
             if !self.decisions.iter().any(|(set, _)| *set == point.information_set) {
                 return Err(ContextError::MissingDecision(point.information_set));
             }
@@ -590,6 +595,31 @@ mod tests {
         assert!(structure
             .validate_for_solver(cfr_like, Some(PerfectRecallEvidence::Verified))
             .is_ok());
+    }
+
+
+    #[test]
+    fn information_set_action_order_is_not_semantic() {
+        let mut structure = valid_information_structure();
+        structure.decision_states[1].legal_actions = vec![ActionId(1), ActionId(0)];
+        assert_eq!(structure.validate(), Ok(()));
+    }
+
+    #[test]
+    fn contingent_strategy_rejects_duplicate_point_actions() {
+        let points = vec![DecisionPoint {
+            player: PlayerId(0),
+            information_set: InformationSetId(7),
+            legal_actions: vec![ActionId(0), ActionId(0)],
+        }];
+        let strategy = Strategy {
+            player: PlayerId(0),
+            decisions: vec![(InformationSetId(7), ActionId(0))],
+        };
+        assert_eq!(
+            strategy.validate(&points),
+            Err(ContextError::DuplicateLegalAction(ActionId(0)))
+        );
     }
 
     #[test]
