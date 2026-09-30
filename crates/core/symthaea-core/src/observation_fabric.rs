@@ -1699,6 +1699,49 @@ mod tests {
     }
 
     #[test]
+    fn graph_detailed_independence_is_stable_across_observation_order() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph_a = ObservationGraph {
+            observations: vec![fixture(), second.clone()],
+            relations: vec![],
+        };
+        let graph_b = ObservationGraph {
+            observations: vec![second, fixture()],
+            relations: vec![],
+        };
+        let a = graph_a
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
+        let b = graph_b
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
+        assert_eq!(a.examined_observation_ids, b.examined_observation_ids);
+        assert_eq!(a.assessment_fingerprint, b.assessment_fingerprint);
+    }
+
+    #[test]
+    fn graph_detailed_independence_records_shared_sensor_basis() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        let assessment = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        }
+        .assess_independence_detailed("obs-001", "obs-002")
+        .expect("assessment");
+        assert_eq!(assessment.classification, EvidenceIndependence::SharedUpstream);
+        assert_eq!(
+            assessment.basis,
+            IndependenceBasis::SharedSensor {
+                sensor_id: "camera-1".into()
+            }
+        );
+        assert_eq!(assessment.assessment_fingerprint.len(), 64);
+    }
+
+    #[test]
     fn graph_detailed_independence_records_audit_basis() {
         let mut second = fixture();
         second.id = "obs-002".into();
