@@ -66,7 +66,7 @@ jobs:
           echo "manual" > upstream-conclusion.txt
 
       - name: Inspect upstream workflow metadata
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -86,7 +86,7 @@ jobs:
           test "$(jq -r '.run_attempt' upstream-run.json)" = "$UPSTREAM_ATTEMPT"
 
       - name: Download current repair evidence index
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -119,7 +119,7 @@ jobs:
           test -f current-index/se001q-repair-evidence-index.json
 
       - name: Download fixed historical oracle
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -307,6 +307,38 @@ jobs:
             "positive_invariants": [],
             "negative_invariants": [
               "upstream workflow did not complete successfully",
+              "no current repair execution evidence is promoted"
+            ]
+          }
+          EOF
+          python -m json.tool cross-generation-index.json >/dev/null
+
+      - name: Emit manual non-corroboration receipt
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          cat > cross-generation-index.json <<EOF
+          {
+            "schema": "se-repair-cross-generation-index-v1",
+            "repository": "${{ github.repository }}",
+            "corroborator_workflow": "${{ github.workflow }}",
+            "corroborator_workflow_sha": "${{ github.workflow_sha }}",
+            "corroborator_run_id": "${{ github.run_id }}",
+            "corroborator_run_attempt": "${{ github.run_attempt }}",
+            "upstream_workflow": "$EXPECTED_WORKFLOW",
+            "upstream_run_id": "manual",
+            "upstream_run_attempt": "manual",
+            "upstream_conclusion": "manual",
+            "historical_subject_sha": "$HISTORICAL_SUBJECT_SHA",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "observation_class": "observed",
+            "authority_class": "cross_generation_corroboration_only",
+            "corroboration_result": "NOT_CORROBORATED",
+            "qualification_state": "not_granted",
+            "positive_invariants": [],
+            "negative_invariants": [
+              "manual dispatch does not identify a completed repair execution run",
               "no current repair execution evidence is promoted"
             ]
           }
