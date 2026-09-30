@@ -1061,6 +1061,31 @@ mod tests {
     }
 
     #[test]
+    fn test_seeded_solve_is_reproducible() {
+        let dim = 256;
+        let mut network_a = ResonatorNetwork::new(dim).unwrap();
+        let mut network_b = ResonatorNetwork::new(dim).unwrap();
+
+        let a: Vec<f32> = (0..dim)
+            .map(|i| if i % 3 == 0 { 1.0 } else { -1.0 })
+            .collect();
+        let x_true: Vec<f32> = (0..dim)
+            .map(|i| if i % 5 == 0 { -1.0 } else { 1.0 })
+            .collect();
+        let b: Vec<f32> = a.iter().zip(x_true.iter()).map(|(ai, xi)| ai * xi).collect();
+
+        let constraint = Constraint::new(a, b);
+        let first = network_a.solve_seeded(std::slice::from_ref(&constraint), Some(32), 0x5EED);
+        let second = network_b.solve_seeded(std::slice::from_ref(&constraint), Some(32), 0x5EED);
+
+        assert_eq!(
+            first.unwrap().vector,
+            second.unwrap().vector,
+            "explicitly seeded resonator runs must reproduce exactly"
+        );
+    }
+
+    #[test]
     fn test_simple_constraint_solving() {
         let dim = 1000;
         let mut network = ResonatorNetwork::new(dim).unwrap();
