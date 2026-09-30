@@ -840,7 +840,9 @@ mod tests {
 
     #[test]
     fn delivery_is_retired_only_after_its_last_observation_is_collected() {
-        let (state, delivery, mut second) = admitted_state();
+        let (mut state, delivery, mut second) = admitted_state();
+        state.deliveries.get_mut(&delivery.logical_delivery_id).unwrap().expires_at_ms = 200;
+        let delivery = state.deliveries.get(&delivery.logical_delivery_id).unwrap().clone();
         second.key.observation_id = Uuid::from_u128(9_999);
         second.observed_at_ms = 100;
         let policy = AdmissionPolicy { allow_new_observation: true, retention_ms: 10, tombstone_retention_ms: 100, ..AdmissionPolicy::default() };
@@ -848,7 +850,7 @@ mod tests {
         let partially_collected = retire_expired(&next_state, policy, 101).expect("valid lifecycle transition");
         assert!(partially_collected.deliveries.contains_key(&delivery.logical_delivery_id));
         assert!(partially_collected.observations.contains_key(&second.key));
-        let fully_collected = retire_expired(&partially_collected, policy, 111).expect("valid lifecycle transition");
+        let fully_collected = retire_expired(&partially_collected, policy, 201).expect("valid lifecycle transition");
         assert!(!fully_collected.deliveries.contains_key(&delivery.logical_delivery_id));
         assert!(fully_collected.delivery_tombstones.contains_key(&delivery.logical_delivery_id));
         assert_eq!(validate_state(&fully_collected), Ok(()));
