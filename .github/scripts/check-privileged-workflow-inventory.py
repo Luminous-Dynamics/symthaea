@@ -122,7 +122,7 @@ def _artifact_step_output_sink_evidence(lines: list[str], artifact_paths: list[s
     evidence: list[str] = []
     current_step_id: str | None = None
     step_id_re = re.compile(r"^id:\s*([A-Za-z_][A-Za-z0-9_-]*)\s*$")
-    output_write_re = re.compile(r"^(?:printf|echo)\\b.*>>\\s*\\$GITHUB_OUTPUT\\b")
+    output_write_re = re.compile(r"^(?:printf|echo)\b.*>>\s*\$GITHUB_OUTPUT\b")
     output_name_re = re.compile(r"(?:^|[ '\" ])name=([A-Za-z_][A-Za-z0-9_-]*)")
     for raw in lines:
         stripped = raw.strip()
@@ -138,7 +138,7 @@ def _artifact_step_output_sink_evidence(lines: list[str], artifact_paths: list[s
                     output_refs.add("$" + "{{ steps.%s.outputs.%s }}" % (current_step_id, name_match.group(1)))
     if not output_refs:
         return []
-    sink_re = re.compile(r"\\b(?:bash|sh|zsh|fish|dash|ksh|pwsh|powershell|python(?:3)?|node|ruby|perl|php|lua|source|eval|xargs|find|tar|unzip)\\b")
+    sink_re = re.compile(r"\b(?:bash|sh|zsh|fish|dash|ksh|pwsh|powershell|python(?:3)?|node|ruby|perl|php|lua|source|eval|xargs|find|tar|unzip)\b")
     for raw in lines:
         stripped = raw.strip()
         if any(ref in stripped for ref in output_refs) and sink_re.search(stripped):
