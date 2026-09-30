@@ -199,3 +199,28 @@ Build one deterministic fixture spanning a small building:
 This fixture should be the reference integration test before any real-world actuation work.
 
 Related: Symthaea issue #6624; Mycelix issue #3634.
+
+## Calibration and model-history gate — SWA-005
+
+Calibration must produce a **new parameter/model revision**, never mutate the historical prediction that exposed the residual.
+
+The minimum lineage is:
+
+prediction(v1) -> observed/synthetic outcome -> residual(v1) -> calibration activity -> parameter set(v2) -> prediction(v2)
+
+The calibration activity must identify:
+
+- source model revision;
+- source residual;
+- previous parameter set;
+- new parameter set;
+- bounded parameter adjustment;
+- calibration activity identity.
+
+A revised model may improve future predictions, but it cannot rewrite the historical prediction, outcome, or residual.
+
+This also keeps model credibility concerns separate: verification asks whether the implementation behaves according to its mathematical specification; validation asks whether it represents the intended real-world system; uncertainty quantification describes sensitivity and uncertainty in inputs and outputs. ASME's VVUQ framework explicitly treats these as distinct concerns. See https://www.asme.org/codes-standards/publications-information/verification-validation-uncertainty.
+
+For digital twins, remaining discrepancy should not automatically be treated as parameter error. Model-form uncertainty can arise from abstraction and omitted physical processes, so a future calibration layer should be able to preserve residuals as unresolved/model-form discrepancy rather than forcing every residual into parameter updates. Recent digital-twin calibration research explicitly distinguishes model-form uncertainty from parameter uncertainty. See https://arxiv.org/abs/2609.10171.
+
+The current SWA-005 fixture is intentionally a deterministic laboratory fixture, not a claim of physical validation.
