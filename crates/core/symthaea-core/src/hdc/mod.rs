@@ -228,6 +228,30 @@ impl From<usize> for HdcDimensionality {
     }
 }
 
+#[cfg(test)]
+mod dimensionality_tests {
+    use super::HdcDimensionality;
+
+    #[test]
+    fn predefined_ladder_round_trips() {
+        let dimensions = [1_024usize, 2_048, 4_096, 8_192, 16_384, 32_768, 65_536];
+        for dim in dimensions {
+            let tier = HdcDimensionality::from_dimension(dim);
+            assert_eq!(tier.dimension(), dim);
+            assert!(tier.is_power_of_two());
+            assert!(tier.is_predefined());
+        }
+    }
+
+    #[test]
+    fn custom_dimension_remains_extensible() {
+        let tier = HdcDimensionality::Custom(131_072);
+        assert_eq!(tier.dimension(), 131_072);
+        assert!(tier.is_power_of_two());
+        assert!(!tier.is_predefined());
+    }
+}
+
 // =============================================================================
 // CENTRAL LTC CONFIGURATION - Liquid Time-Constant Network
 // =============================================================================
