@@ -311,8 +311,8 @@ fn main() {
     // The observed Mycelix commit is source provenance, not a semantic upgrade.
     assert_eq!(first.source_revision, OBSERVED_MYCELIX_INTEROP_COMMIT);
 
-    // A digest declaration is not silently promoted to a cryptographic
-    // commitment merely because the field is present.
+    // The digest is a real content commitment over the canonical projection
+    // payload, while remaining separate from authority and actuation.
     assert_eq!(first.digest_algorithm, "blake3-256");
     assert_eq!(first.source_content_digest, content_digest(&first));
     assert_eq!(first.source_content_digest.len(), 64);
@@ -429,7 +429,7 @@ mod tests {
     #[test]
     fn digest_binds_canonical_projection_payload() {
         let projection = envelope();
-        assert_eq!(projection.source_content_digest, content_digest());
+        assert_eq!(projection.source_content_digest, content_digest(&projection));
         assert_eq!(projection.digest_algorithm, "blake3-256");
         assert_eq!(projection.source_content_digest.len(), 64);
     }
