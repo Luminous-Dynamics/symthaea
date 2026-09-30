@@ -25,6 +25,10 @@
 //! assert_eq!(g.pure_nash_equilibria(), vec![(1, 1)]);
 //! ```
 
+pub mod strategic;
+pub mod strategic_context;
+pub mod extensive_form;
+
 /// A two-player normal-form game.
 #[derive(Debug, Clone)]
 pub struct Game {
