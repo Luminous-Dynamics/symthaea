@@ -10,6 +10,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/operator_evidence_contract.rs"
       - "crates/core/symthaea-core/src/hdc/trajectory_evidence.rs"
       - "crates/core/symthaea-core/src/hdc/resource_evidence.rs"
+      - "crates/core/symthaea-core/src/hdc/performance_evidence.rs"
       - "crates/core/symthaea-core/tests/hdc_ltc_operator_evidence_chain.rs"
       - "crates/core/symthaea-core/examples/hdc_operator_evidence.rs"
       - "crates/core/symthaea-core/benches/simd_continuous.rs"
@@ -86,6 +87,7 @@ jobs:
           cargo test -p symthaea-core --lib operator_evidence_contract
           cargo test -p symthaea-core --lib trajectory_evidence
           cargo test -p symthaea-core --lib resource_evidence
+          cargo test -p symthaea-core --lib performance_evidence
           cargo test -p symthaea-core --test hdc_ltc_operator_evidence_chain --features simd
 
       - name: Focused strict Clippy
