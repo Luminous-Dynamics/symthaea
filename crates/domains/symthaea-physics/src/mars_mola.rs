@@ -18,7 +18,7 @@ use std::path::Path;
 use sha2::{Digest, Sha256};
 
 use crate::mars_tether::{
-    TerrainArtifactComposition, TerrainProvenance, TerrainQuality, TerrainSample,
+    TerrainArtifactComposition, TerrainObservationIdentity, TerrainProvenance, TerrainQuality, TerrainSample,
     TerrainSamplingMethod,
     TerrainVerticalDatum,
 };
@@ -166,6 +166,8 @@ pub struct MolaMegdrProduct {
 pub struct MolaTerrainObservation {
     pub sample: TerrainSample,
     pub artifacts: TerrainArtifactComposition,
+    /// Canonical SHA-256 over artifact composition and the decoded observation record.
+    pub identity: TerrainObservationIdentity,
 }
 
 impl MolaMegdrProduct {
@@ -372,7 +374,9 @@ impl MolaMegdrProduct {
                 sample,
                 provenance,
             );
-            return Ok(MolaTerrainObservation { sample, artifacts });
+            let identity = TerrainObservationIdentity::from_sample(&artifacts, &sample)
+                .map_err(MolaError::InvalidMetadata)?;
+            return Ok(MolaTerrainObservation { sample, artifacts, identity });
         }
 
         let value = self.read_i16_from_snapshot(topography_snapshot, line, sample)? as f64;
@@ -384,7 +388,9 @@ impl MolaMegdrProduct {
                 sample,
                 provenance,
             );
-            return Ok(MolaTerrainObservation { sample, artifacts });
+            return let identity = TerrainObservationIdentity::from_sample(&artifacts, &sample)
+            .map_err(MolaError::InvalidMetadata)?;
+        Ok(MolaTerrainObservation { sample, artifacts, identity });
         }
 
         let elevation = value * self.metadata.pixel_scale + self.metadata.pixel_offset;
@@ -397,11 +403,13 @@ impl MolaMegdrProduct {
         let sample = TerrainSample {
             latitude_rad: latitude_deg.to_radians(),
             longitude_rad: normalize_lon(longitude_deg).to_radians(),
-            sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,            source_grid_cell: Some((line, sample)),
+            sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,
+            source_grid_cell: Some((line, sample)),
             elevation_m: Some(elevation),
             elevation_uncertainty_m: Some(elevation_uncertainty_m),
             vertical_datum: TerrainVerticalDatum::AreoidRelative,
-            slope_rad: None,            roughness_m: None,
+            slope_rad: None,
+            roughness_m: None,
             quality: TerrainQuality::Measured,
             provenance,
         };
