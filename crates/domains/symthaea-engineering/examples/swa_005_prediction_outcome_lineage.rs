@@ -63,6 +63,25 @@ struct Residual {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+struct CalibrationActivity {
+    activity_id: &'static str,
+    source_model_id: &'static str,
+    source_residual_id: &'static str,
+    from_parameter_set: &'static str,
+    to_parameter_set: &'static str,
+    parameter_adjustment: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+struct ModelRevision {
+    model_id: &'static str,
+    parameter_set_id: &'static str,
+    parent_model_id: &'static str,
+    calibration_activity_id: &'static str,
+    trained_on_residual: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 struct Lineage {
     building_observation: &'static str,
     simulation_activity: &'static str,
@@ -171,6 +190,33 @@ fn residual(prediction: PredictionInterval, outcome: SyntheticOutcome) -> Residu
     }
 }
 
+fn calibrate_internal_gain(
+    current: ZoneParameters,
+    observed: SyntheticOutcome,
+    predicted: PredictionInterval,
+    calibration_activity_id: &'static str,
+) -> (ZoneParameters, CalibrationActivity) {
+    let predicted_energy_mid =
+        (predicted.energy_min_kwh + predicted.energy_max_kwh) / 2.0;
+    let energy_error = observed.energy_kwh - predicted_energy_mid;
+    let adjustment = (energy_error / 8.0).clamp(-0.05, 0.05);
+
+    (
+        ZoneParameters {
+            internal_gain_kw: (current.internal_gain_kw + adjustment).max(0.0),
+            ..current
+        },
+        CalibrationActivity {
+            activity_id: calibration_activity_id,
+            source_model_id: predicted.model_id,
+            source_residual_id: "residual-swa-005-calibration-001",
+            from_parameter_set: "predictor-parameter-set-v1",
+            to_parameter_set: "predictor-parameter-set-v2",
+            parameter_adjustment: adjustment,
+        },
+    )
+}
+
 fn main() {
     let building_observation = BuildingReading {
         thermal_load: 0.55,
@@ -237,6 +283,43 @@ fn main() {
     assert!(serialized.contains("swa-005-rc-v1"));
 
     println!("{serialized}");
+
+    // Calibration creates a new parameter set and model revision. It does not
+    // mutate or rewrite the original prediction.
+    let calibrated_prediction_params = ZoneParameters {
+        thermal_mass_kwh_per_c: 9.0,
+        envelope_u_kw_per_c: 0.23,
+        internal_gain_kw: 0.42,
+        setpoint_c: 21.0,
+        comfort_band_c: 2.0,
+    };
+    let (calibrated_params, calibration) = calibrate_internal_gain(
+        calibrated_prediction_params,
+        outcome,
+        prediction,
+        "calibration-swa-005-001",
+    );
+    let revised = predict(
+        initial,
+        calibrated_params,
+        calibrated_params,
+        intervention,
+        35.0,
+        8,
+    );
+    let revision = ModelRevision {
+        model_id: "swa-005-rc-v2",
+        parameter_set_id: "predictor-parameter-set-v2",
+        parent_model_id: "swa-005-rc-v1",
+        calibration_activity_id: calibration.activity_id,
+        trained_on_residual: calibration.source_residual_id,
+    };
+
+    assert_eq!(prediction.model_id, "swa-005-rc-v1");
+    assert_eq!(revision.parent_model_id, prediction.model_id);
+    assert_eq!(calibration.source_model_id, prediction.model_id);
+    assert!(revised.comfort_min.is_finite());
+
 }
 
 #[cfg(test)]
@@ -302,6 +385,38 @@ mod tests {
             serde_json::to_string(&a).expect("serialize a"),
             serde_json::to_string(&b).expect("serialize b")
         );
+    }
+
+    #[test]
+    #[test]
+    fn calibration_creates_new_revision_without_rewriting_prediction() {
+        let (prediction, outcome, residual) = fixture();
+        let params = ZoneParameters {
+            thermal_mass_kwh_per_c: 9.0,
+            envelope_u_kw_per_c: 0.23,
+            internal_gain_kw: 0.42,
+            setpoint_c: 21.0,
+            comfort_band_c: 2.0,
+        };
+        let (calibrated, activity) =
+            calibrate_internal_gain(params, outcome, prediction, "calibration-test-001");
+        let revised = predict(
+            ZoneState { indoor_c: 21.0 },
+            calibrated,
+            calibrated,
+            Intervention {
+                id: "zone-a-reversible-hvac",
+                hvac_capacity_kw: 2.0,
+            },
+            35.0,
+            8,
+        );
+
+        assert_eq!(prediction.model_id, "swa-005-rc-v1");
+        assert_eq!(activity.source_residual_id, "residual-swa-005-calibration-001");
+        assert_eq!(activity.source_model_id, prediction.model_id);
+        assert!(revised.comfort_min.is_finite());
+        assert!(residual.energy_error_kwh.is_finite());
     }
 
     #[test]
