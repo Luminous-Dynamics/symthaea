@@ -86,6 +86,7 @@ pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus}
 pub use service_manager::{ServiceManager, ServiceStatus};
 pub use service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
 pub use service_state::{
+    NixServiceEnablementEvidenceV1,
     NixServiceOperationCapabilitiesV1,
     ServiceLoadStateV1,
     NixServiceObservedStateV1, NixServiceStateErrorV1, ServiceActiveStateV1,
