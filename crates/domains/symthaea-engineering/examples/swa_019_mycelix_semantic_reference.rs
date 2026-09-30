@@ -23,6 +23,65 @@ use serde::Serialize;
 const OBSERVED_MYCELIX_INTEROP_COMMIT: &str =
     "b55bc03d99d0e8c89201dca06a264d16d5e2efd6";
 
+const MAX_SCHEMA_NAMESPACE_BYTES: usize = 256;
+const MAX_SCHEMA_NAME_BYTES: usize = 128;
+const MAX_SCHEMA_VERSION_BYTES: usize = 128;
+const MAX_OBJECT_ID_BYTES: usize = 1024;
+const MAX_OBJECT_VERSION_BYTES: usize = 128;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReferenceValidationError {
+    Empty,
+    SurroundingWhitespace,
+    ControlCharacter,
+    TooLong,
+}
+
+fn validate_component(value: &str, max_bytes: usize) -> Result<(), ReferenceValidationError> {
+    if value.is_empty() {
+        return Err(ReferenceValidationError::Empty);
+    }
+    if value.trim() != value {
+        return Err(ReferenceValidationError::SurroundingWhitespace);
+    }
+    if value.chars().any(char::is_control) {
+        return Err(ReferenceValidationError::ControlCharacter);
+    }
+    if value.len() > max_bytes {
+        return Err(ReferenceValidationError::TooLong);
+    }
+    Ok(())
+}
+
+fn validate_schema_ref(schema: &SchemaRefProjection) -> Result<(), ReferenceValidationError> {
+    validate_component(schema.namespace, MAX_SCHEMA_NAMESPACE_BYTES)?;
+    validate_component(schema.name, MAX_SCHEMA_NAME_BYTES)?;
+    validate_component(schema.version, MAX_SCHEMA_VERSION_BYTES)
+}
+
+fn validate_semantic_ref(reference: &SemanticRefProjection) -> Result<(), ReferenceValidationError> {
+    validate_schema_ref(&reference.schema)?;
+    validate_component(reference.object_id, MAX_OBJECT_ID_BYTES)?;
+    if let Some(version) = reference.object_version {
+        validate_component(version, MAX_OBJECT_VERSION_BYTES)?;
+    }
+    Ok(())
+}
+
+fn validate_reference_fields(envelope: &MycelixProjectionEnvelope) -> Result<(), ReferenceValidationError> {
+    validate_schema_ref(&envelope.schema)?;
+    validate_semantic_ref(&envelope.source)?;
+    validate_semantic_ref(&envelope.target)?;
+    validate_semantic_ref(&envelope.author_ref)?;
+    if let Some(authority) = envelope.authority_ref.as_ref() {
+        validate_semantic_ref(authority)?;
+    }
+    for dependency in envelope.dependencies {
+        validate_semantic_ref(&dependency.semantic_ref)?;
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 struct SchemaRefProjection {
     namespace: &'static str,
@@ -150,6 +209,10 @@ fn envelope() -> MycelixProjectionEnvelope {
 }
 
 fn validate(envelope: &MycelixProjectionEnvelope) -> ValidationOutcome {
+    if validate_reference_fields(envelope).is_err() {
+        return ValidationOutcome::Invalid;
+    }
+
     if envelope.schema != SOL_ATLAS_SCHEMA {
         return ValidationOutcome::Invalid;
     }
@@ -204,6 +267,53 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[test]
+    fn reference_components_follow_mycelix_wire_safety_rules() {
+        let projection = envelope();
+        assert_eq!(validate_reference_fields(&projection), Ok(()));
+    }
+
+    #[test]
+    fn surrounding_whitespace_is_rejected_in_reference_components() {
+        let schema = SchemaRefProjection {
+            namespace: " mycelix.governance",
+            ..MYCELIX_GOVERNANCE_SCHEMA
+        };
+        assert_eq!(
+            validate_schema_ref(&schema),
+            Err(ReferenceValidationError::SurroundingWhitespace)
+        );
+    }
+
+    #[test]
+    fn control_characters_are_rejected_in_object_identity() {
+        let reference = SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: "evidence\n001",
+            object_version: None,
+        };
+        assert_eq!(
+            validate_semantic_ref(&reference),
+            Err(ReferenceValidationError::ControlCharacter)
+        );
+    }
+
+    #[test]
+    fn overlong_object_identity_is_rejected() {
+        let long_id = "x".repeat(MAX_OBJECT_ID_BYTES + 1);
+        let leaked: &'static str = Box::leak(long_id.into_boxed_str());
+        let reference = SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: leaked,
+            object_version: None,
+        };
+        assert_eq!(
+            validate_semantic_ref(&reference),
+            Err(ReferenceValidationError::TooLong)
+        );
+    }
 
     #[test]
     fn schema_identity_includes_namespace_name_and_version() {
