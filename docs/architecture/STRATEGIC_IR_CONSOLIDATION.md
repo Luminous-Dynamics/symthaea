@@ -372,6 +372,14 @@ This pass does not:
 The purpose is to establish the reasoning boundary first, then increase mathematical and computational sophistication without creating another parallel architecture.
 
 
+## 2026-09-30 ActionAvailability made explicit
+
+The action-availability boundary is now represented by a small typed ActionAvailability value object. It rejects empty/duplicate action sets, preserves source order for diagnostics and serialization, exposes membership queries, and provides an explicit set-semantic equivalence operation.
+
+This is deliberately additive rather than a premature rewrite of every existing Vec<ActionId> field. Existing structures retain their public representation while validation can progressively migrate toward the typed semantic contract.
+
+The distinction matters for the next phase: if two states have the same information history but different genuinely available actions, that difference cannot be treated as invisible merely because action ordering is normalized. The current information-set invariant therefore remains: members must have equivalent action vocabularies. A future state-dependent availability model must explicitly encode whatever observable/contextual fact makes those states distinguishable.
+
 ## 2026-09-30 action-vocabulary semantic hardening
 
 OpenSpiel treats legal actions as a state-level contract and documents that legal-action lists are ordered canonically, while the strategic meaning is the set of actions that can be selected. citeturn0search0turn0search3
