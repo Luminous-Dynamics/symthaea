@@ -63,6 +63,10 @@ Remaining risks:
 
 The embedded Governance Root validator self-test covers:
 
+- cross-surface weakening of the privileged detector;
+- omission of a privileged workflow from the inventory;
+- removal of privileged enforcement from Workflow Syntax;
+- coordinated weakening of detector, inventory, and Workflow Syntax;
 - protected policy-root removal;
 - detector/inventory/ADR/Workflow Syntax protected-root removal;
 - protected-root deletion/rename/copy state transitions;
