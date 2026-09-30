@@ -1,13 +1,8 @@
 //! SWA-008: claim-level provenance and contestability.
 //!
-//! A validation record is not itself a claim about the world. This fixture
-//! makes the next boundary executable:
-//! - claims name the exact evidence they rely on;
-//! - claim provenance has its own dependency closure;
-//! - support, contradiction, and qualification remain distinct;
-//! - missing provenance never becomes Valid;
-//! - historical claims are immutable;
-//! - a claim never becomes authorization.
+//! Claims name the exact evidence they rely on and the dependency closure that
+//! can make them stale. Support, contradiction, and qualification remain
+//! distinct. Missing provenance never becomes Valid, and claims never authorize.
 
 use serde::Serialize;
 
@@ -79,6 +74,33 @@ enum ClaimKind {
     ApplicabilitySupported,
 }
 
+impl ClaimKind {
+    fn closure(self) -> &'static [DependencyKind] {
+        match self {
+            Self::PredictionValidated => &[
+                DependencyKind::Model,
+                DependencyKind::Parameters,
+                DependencyKind::Solver,
+                DependencyKind::Scenario,
+                DependencyKind::Dataset,
+            ],
+            Self::UncertaintyCharacterized => &[
+                DependencyKind::Model,
+                DependencyKind::Parameters,
+                DependencyKind::Solver,
+                DependencyKind::Dataset,
+                DependencyKind::UncertaintyModel,
+            ],
+            Self::ApplicabilitySupported => &[
+                DependencyKind::Model,
+                DependencyKind::Scenario,
+                DependencyKind::Dataset,
+                DependencyKind::ContextOfUse,
+            ],
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 enum EvidenceRelation {
     Supports,
@@ -112,20 +134,15 @@ struct EvidenceClaim {
 
 fn status(claim: &EvidenceClaim, current: DependencyFingerprint) -> ClaimStatus {
     let mut changed = false;
-    for kind in [
-        DependencyKind::Model,
-        DependencyKind::Parameters,
-        DependencyKind::Solver,
-        DependencyKind::Scenario,
-        DependencyKind::Dataset,
-        DependencyKind::UncertaintyModel,
-        DependencyKind::ContextOfUse,
-    ] {
+
+    for &kind in claim.kind.closure() {
         let historical = claim.dependencies.get(kind);
         let now = current.get(kind);
+
         if historical.id != now.id || historical.kind != now.kind {
             return ClaimStatus::Unknown;
         }
+
         if historical.revision != now.revision {
             changed = true;
         }
@@ -151,7 +168,7 @@ fn status(claim: &EvidenceClaim, current: DependencyFingerprint) -> ClaimStatus 
 
 fn main() {
     let v1 = DependencyFingerprint::revision(1, 1, 1, 1, 1, 1, 1);
-    let current = DependencyFingerprint::revision(1, 1, 1, 1, 1, 2, 1);
+    let solver_only = DependencyFingerprint::revision(1, 1, 2, 1, 1, 1, 1);
 
     let validation = ValidationEvidence {
         id: "validation-001",
@@ -169,8 +186,15 @@ fn main() {
         is_authorization: false,
     };
 
-    assert_eq!(status(&claim, current), ClaimStatus::Stale);
+    assert_eq!(status(&claim, solver_only), ClaimStatus::Stale);
     assert!(!claim.is_authorization);
+
+    let resilience_like_applicability = EvidenceClaim {
+        id: "claim-002",
+        kind: ClaimKind::ApplicabilitySupported,
+        ..claim
+    };
+    assert_eq!(status(&resilience_like_applicability, solver_only), ClaimStatus::Valid);
 
     let contested = EvidenceClaim {
         evidence: &[
@@ -230,6 +254,16 @@ mod tests {
             ..claim()
         };
         assert_eq!(status(&value, value.dependencies), ClaimStatus::Valid);
+    }
+
+    #[test]
+    fn unrelated_dependency_change_does_not_stale_claim() {
+        let value = EvidenceClaim {
+            kind: ClaimKind::ApplicabilitySupported,
+            ..claim()
+        };
+        let current = DependencyFingerprint::revision(1, 1, 2, 1, 1, 1, 1);
+        assert_eq!(status(&value, current), ClaimStatus::Valid);
     }
 
     #[test]
