@@ -110,6 +110,8 @@ pub mod evidence_manifest;
 pub mod pareto_frontier;
 /// Deterministic synthetic task-quality/performance/resource sweep across HDC dimensions.
 pub mod dimension_task_harness;
+/// Deterministic paired noise-severity task family for HDC dimension research.
+pub mod noise_robustness_harness;
 
 /// HDC dimensionality configuration for runtime selection
 ///
