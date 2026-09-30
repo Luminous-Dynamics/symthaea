@@ -127,16 +127,16 @@ jobs:
           from pathlib import Path
 
           records = json.loads(Path("operator-evidence.json").read_text())
-          expected_dims = {16384, 32768, 65536, 131072, 262144}
+          expected_dims = {1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144}
           expected_ops = {"dot", "bind", "bundle", "norm", "similarity"}
 
-          assert len(records) == 25, len(records)
+          assert len(records) == 45, len(records)
           assert {r["resolution"] for r in records} == expected_dims
           assert {r["operation"] for r in records} == expected_ops
           assert {r["schema_version"] for r in records} == {1}
           assert {r["representation"] for r in records} == {"continuous_f32"}
           keys = [(r["resolution"], r["operation"]) for r in records]
-          assert len(set(keys)) == 25
+          assert len(set(keys)) == 45
           assert set(keys) == {
               (d, op) for d in expected_dims for op in expected_ops
           }
@@ -163,8 +163,8 @@ jobs:
               "workflow_event": "${{ github.event_name }}",
               "rust_toolchain": "1.96.0",
               "operator_evidence_sha256": digest,
-              "operator_evidence_records": 25,
-              "operator_evidence_dimensions": [16384, 32768, 65536, 131072, 262144],
+              "operator_evidence_records": 45,
+              "operator_evidence_dimensions": [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144],
               "operator_evidence_operations": ["dot", "bind", "bundle", "norm", "similarity"],
               "benchmark_execution": "not-claimed",
               "production_default_changed": False,
