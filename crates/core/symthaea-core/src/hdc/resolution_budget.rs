@@ -6,6 +6,35 @@
 
 use super::{HdcResolution, ResolutionError};
 
+/// A concrete resident workload to validate against a resource envelope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolutionWorkload {
+    pub resolution: HdcResolution,
+    pub element_size: usize,
+    pub resident_vectors: usize,
+}
+
+impl ResolutionWorkload {
+    pub const fn new(resolution: HdcResolution, element_size: usize, resident_vectors: usize) -> Self {
+        Self { resolution, element_size, resident_vectors }
+    }
+
+    pub const fn checked_bytes(self) -> Result<usize, BudgetError> {
+        let vector_bytes = match self.resolution.checked_bytes(self.element_size) {
+            Ok(bytes) => bytes,
+            Err(error) => return Err(BudgetError::Resolution(error)),
+        };
+        match vector_bytes.checked_mul(self.resident_vectors) {
+            Some(bytes) => Ok(bytes),
+            None => Err(BudgetError::WorkingSetOverflow {
+                vector_bytes,
+                resident_vectors: self.resident_vectors,
+            }),
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResolutionBudget {
     /// Maximum bytes permitted for one resident vector.
@@ -41,6 +70,36 @@ impl ResolutionBudget {
             return Err(BudgetError::VectorTooLarge {
                 required,
                 limit: self.max_vector_bytes,
+            });
+        }
+        Ok(required)
+    }
+
+    pub const fn check_workload(
+        self,
+        workload: ResolutionWorkload,
+    ) -> Result<usize, BudgetError> {
+        let vector_bytes = match workload.resolution.checked_bytes(workload.element_size) {
+            Ok(bytes) => bytes,
+            Err(error) => return Err(BudgetError::Resolution(error)),
+        };
+        if vector_bytes > self.max_vector_bytes {
+            return Err(BudgetError::VectorTooLarge {
+                required: vector_bytes,
+                limit: self.max_vector_bytes,
+            });
+        }
+        let required = match vector_bytes.checked_mul(workload.resident_vectors) {
+            Some(bytes) => bytes,
+            None => return Err(BudgetError::WorkingSetOverflow {
+                vector_bytes,
+                resident_vectors: workload.resident_vectors,
+            }),
+        };
+        if required > self.max_resident_bytes {
+            return Err(BudgetError::ResidentWorkingSetTooLarge {
+                required,
+                limit: self.max_resident_bytes,
             });
         }
         Ok(required)
@@ -104,6 +163,27 @@ impl ResolutionBudget {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn workload_contract_checks_vector_and_resident_limits() {
+        let budget = ResolutionBudget::new(512 * 1024, 2 * 1024 * 1024);
+        let workload = ResolutionWorkload::new(
+            HdcResolution::new(131_072).unwrap(),
+            4,
+            4,
+        );
+        assert_eq!(budget.check_workload(workload).unwrap(), 2 * 1024 * 1024);
+
+        let oversized = ResolutionWorkload::new(
+            HdcResolution::new(262_144).unwrap(),
+            4,
+            1,
+        );
+        assert!(matches!(
+            budget.check_workload(oversized),
+            Err(BudgetError::VectorTooLarge { .. })
+        ));
+    }
 
     #[test]
     fn separates_vector_and_working_set_limits() {
