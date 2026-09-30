@@ -1,0 +1,283 @@
+name: SE-REPAIR cross-workflow corroboration v1
+
+on:
+  workflow_run:
+    workflows:
+      - Systems Engineering SE-001Q Repair Execution v1
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: se-repair-cross-workflow-corroboration-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_WORKFLOW: Systems Engineering SE-001Q Repair Execution v1
+  EXPECTED_BRANCH: systems-engineering/se-001q-repair-execution-v1
+  FROZEN_SUBJECT_SHA: b7a26c24fc729d59932a635e284376c3941bc05d
+  EXPECTED_REPAIR_SHA: e79f8ff5d5ddd5b4ad8e134a585f7b61f742264b
+  HISTORICAL_SUBJECT_SHA: 47de7f2a306cffb66b5505786220590aa5f42e90
+  EXPECTED_BASE_REF: systems-engineering/se-001q-v1.4-frozen-base
+  EXPECTED_TOOLCHAIN: 1.96.0
+  EXPECTED_INDEX_ARTIFACT_PREFIX: se001q-repair-index-
+
+jobs:
+  corroborate:
+    name: Independent workflow-run corroboration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event.workflow_run.name == 'Systems Engineering SE-001Q Repair Execution v1' && github.event.workflow_run.head_branch == 'systems-engineering/se-001q-repair-execution-v1'
+    steps:
+      - name: Capture upstream run identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.event.workflow_run.name }}" = "$EXPECTED_WORKFLOW"
+          test "${{ github.event.workflow_run.head_branch }}" = "$EXPECTED_BRANCH"
+          printf '%s\n' "${{ github.event.workflow_run.id }}" > upstream-run-id.txt
+          printf '%s\n' "${{ github.event.workflow_run.run_attempt }}" > upstream-run-attempt.txt
+          printf '%s\n' "${{ github.event.workflow_run.head_sha }}" > upstream-head-sha.txt
+          printf '%s\n' "${{ github.event.workflow_run.conclusion }}" > upstream-conclusion.txt
+          printf '%s\n' "${{ github.event.workflow_run.event }}" > upstream-event.txt
+
+      - name: Locate exact upstream evidence index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id="${{ github.event.workflow_run.id }}"
+          api="https://api.github.com/repos/${{ github.repository }}/actions/runs/$run_id/artifacts?per_page=100"
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$api" > upstream-artifacts.json
+
+          index_name="${EXPECTED_INDEX_ARTIFACT_PREFIX}${run_id}-${{ github.event.workflow_run.run_attempt }}"
+          test "$(jq --arg n "$index_name" '[.artifacts[] | select(.name == $n)] | length')" = "1"
+
+          jq --arg n "$index_name" '.artifacts[] | select(.name == $n)' upstream-artifacts.json > upstream-index-artifact.json
+
+          test "$(jq -r '.expired' upstream-index-artifact.json)" = "false"
+          test "$(jq -r '.workflow_run.id' upstream-index-artifact.json)" = "$run_id"
+          test "$(jq -r '.name' upstream-index-artifact.json)" = "$index_name"
+          test "$(jq -r '.digest' upstream-index-artifact.json)" != "null"
+
+          jq -r '.id' upstream-index-artifact.json > upstream-index-artifact-id.txt
+          jq -r '.digest' upstream-index-artifact.json > upstream-index-artifact-digest.txt
+          jq -r '.archive_download_url' upstream-index-artifact.json > upstream-index-download-url.txt
+
+      - name: Download and verify upstream evidence index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$(cat upstream-index-download-url.txt)" \
+            -o upstream-index.zip
+
+          expected_digest="$(sed 's/^sha256://' upstream-index-artifact-digest.txt)"
+          actual_digest="$(sha256sum upstream-index.zip | awk '{print $1}')"
+          test "$actual_digest" = "$expected_digest"
+
+          mkdir upstream-index
+          unzip -q upstream-index.zip -d upstream-index
+          test -f upstream-index/se001q-repair-evidence-index.json
+          python -m json.tool upstream-index/se001q-repair-evidence-index.json >/dev/null
+
+      - name: Verify upstream execution evidence contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          index=upstream-index/se001q-repair-evidence-index.json
+
+          test "$(jq -r '.schema' "$index")" = "se-repair-evidence-index-v1"
+          test "$(jq -r '.repository' "$index")" = "${{ github.repository }}"
+          test "$(jq -r '.workflow' "$index")" = "$EXPECTED_WORKFLOW"
+          test "$(jq -r '.run_id' "$index")" = "${{ github.event.workflow_run.id }}"
+          test "$(jq -r '.run_attempt' "$index")" = "${{ github.event.workflow_run.run_attempt }}"
+          test "$(jq -r '.experiment_subject_sha' "$index")" = "$FROZEN_SUBJECT_SHA"
+          test "$(jq -r '.repair_sha' "$index")" = "$EXPECTED_REPAIR_SHA"
+          test "$(jq -r '.historical_subject_sha' "$index")" = "$HISTORICAL_SUBJECT_SHA"
+          test "$(jq -r '.experiment_subject_sha' "$index")" != "$HISTORICAL_SUBJECT_SHA"
+          test "$(jq -r '.base_ref' "$index")" = "$EXPECTED_BASE_REF"
+          test "$(jq -r '.base_sha' "$index")" = "$FROZEN_SUBJECT_SHA"
+          test "$(jq -r '.toolchain' "$index")" = "$EXPECTED_TOOLCHAIN"
+          test "$(jq -r '.qualification_state' "$index")" = "not_granted"
+          test "$(jq -r '.observation_class' "$index")" = "reproduced"
+          test "$(jq -r '.authority_class' "$index")" = "cross_artifact_execution_evidence_only"
+
+          test "$(jq -r '.artifacts.primary.name' "$index")" = "se001q-repair-primary-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}"
+          test "$(jq -r '.artifacts.replay.name' "$index")" = "se001q-repair-replay-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}"
+          test "$(jq -r '.artifacts.delta.name' "$index")" = "se001q-repair-delta-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}"
+
+          jq -r '.artifacts.primary.digest' "$index" > primary-digest.txt
+          jq -r '.artifacts.replay.digest' "$index" > replay-digest.txt
+          jq -r '.artifacts.delta.digest' "$index" > delta-digest.txt
+
+          printf '%s\n' verified > upstream-contract-verified.txt
+
+      - name: Verify upstream artifact bindings independently
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id="${{ github.event.workflow_run.id }}"
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/$run_id/artifacts?per_page=100" > artifacts.json
+
+          index=upstream-index/se001q-repair-evidence-index.json
+          for role in primary replay delta; do
+            artifact_id="$(jq -r ".artifacts.$role.id" "$index")"
+            artifact_name="$(jq -r ".artifacts.$role.name" "$index")"
+            artifact_digest="$(jq -r ".artifacts.$role.digest" "$index")"
+            test "$artifact_id" != "null"
+            test "$artifact_digest" != "null"
+            test "$(jq --arg id "$artifact_id" '[.artifacts[] | select(.id == ($id|tonumber))] | length' artifacts.json)" = "1"
+            test "$(jq --arg id "$artifact_id" -r '.artifacts[] | select(.id == ($id|tonumber)) | .name' artifacts.json)" = "$artifact_name"
+            test "$(jq --arg id "$artifact_id" -r '.artifacts[] | select(.id == ($id|tonumber)) | .digest' artifacts.json)" = "$artifact_digest"
+            test "$(jq --arg id "$artifact_id" -r '.artifacts[] | select(.id == ($id|tonumber)) | .expired' artifacts.json)" = "false"
+            test "$(jq --arg id "$artifact_id" -r '.artifacts[] | select(.id == ($id|tonumber)) | .workflow_run.id' artifacts.json)" = "$run_id"
+          done
+
+      - name: Verify upstream workflow provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          index=upstream-index/se001q-repair-evidence-index.json
+          upstream_workflow_sha="$(jq -r '.workflow_sha' "$index")"
+          upstream_workflow_ref="$(jq -r '.workflow_ref' "$index")"
+          test -n "$upstream_workflow_sha"
+          test "$upstream_workflow_sha" != "null"
+          test "$upstream_workflow_ref" != "null"
+
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "https://api.github.com/repos/${{ github.repository }}/commits/$upstream_workflow_sha" \
+            -o upstream-workflow-commit.json
+
+          test "$(jq -r '.sha' upstream-workflow-commit.json)" = "$upstream_workflow_sha"
+
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "https://api.github.com/repos/${{ github.repository }}/contents/.github/workflows/systems-engineering-se001q-repair-execution-v1.yml?ref=$upstream_workflow_sha" \
+            -o upstream-workflow.json
+
+          test "$(jq -r '.sha' upstream-workflow.json)" != "null"
+          test "$(jq -r '.sha' upstream-workflow.json)" != ""
+
+          printf '%s\n' "$upstream_workflow_sha" > upstream-workflow-sha.txt
+          printf '%s\n' "$upstream_workflow_ref" > upstream-workflow-ref.txt
+
+      - name: Emit independent corroboration receipt
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream_conclusion="$(cat upstream-conclusion.txt)"
+          upstream_run_id="$(cat upstream-run-id.txt)"
+          upstream_run_attempt="$(cat upstream-run-attempt.txt)"
+          index=upstream-index/se001q-repair-evidence-index.json
+
+          if [[ -f upstream-contract-verified.txt ]]; then
+            contract_status="verified"
+          else
+            contract_status="not_verified"
+          fi
+
+          if [[ "$upstream_conclusion" == "success" && "$contract_status" == "verified" ]]; then
+            corroboration_result="CORROBORATED_EXECUTION_EVIDENCE"
+            observation_class="reproduced"
+          else
+            corroboration_result="NOT_CORROBORATED"
+            observation_class="observed"
+          fi
+
+          touch upstream-index-artifact.json upstream-index-artifact-id.txt upstream-index-artifact-digest.txt
+          touch upstream-workflow-sha.txt upstream-workflow-ref.txt
+          touch primary-digest.txt replay-digest.txt delta-digest.txt
+
+          cat > se-repair-corroboration-index-v1.json <<EOF
+          {
+            "schema": "se-repair-corroboration-index-v1",
+            "repository": "${{ github.repository }}",
+            "verifier_workflow": "${{ github.workflow }}",
+            "verifier_workflow_sha": "${{ github.workflow_sha }}",
+            "verifier_workflow_ref": "${{ github.workflow_ref }}",
+            "verifier_run_id": "${{ github.run_id }}",
+            "verifier_run_attempt": "${{ github.run_attempt }}",
+            "upstream_workflow": "$EXPECTED_WORKFLOW",
+            "upstream_workflow_sha": "$(cat upstream-workflow-sha.txt 2>/dev/null || echo unknown)",
+            "upstream_workflow_ref": "$(cat upstream-workflow-ref.txt 2>/dev/null || echo unknown)",
+            "upstream_run_id": "$upstream_run_id",
+            "upstream_run_attempt": "$upstream_run_attempt",
+            "upstream_head_sha": "$(cat upstream-head-sha.txt)",
+            "upstream_head_branch": "${{ github.event.workflow_run.head_branch }}",
+            "upstream_event": "$(cat upstream-event.txt)",
+            "upstream_conclusion": "$upstream_conclusion",
+            "experiment_subject_sha": "$(jq -r '.experiment_subject_sha' "$index" 2>/dev/null || echo unknown)",
+            "repair_sha": "$(jq -r '.repair_sha' "$index" 2>/dev/null || echo unknown)",
+            "historical_subject_sha": "$(jq -r '.historical_subject_sha' "$index" 2>/dev/null || echo unknown)",
+            "base_ref": "$(jq -r '.base_ref' "$index" 2>/dev/null || echo unknown)",
+            "base_sha": "$(jq -r '.base_sha' "$index" 2>/dev/null || echo unknown)",
+            "toolchain": "$(jq -r '.toolchain' "$index" 2>/dev/null || echo unknown)",
+            "index_artifact": {
+              "id": "$(cat upstream-index-artifact-id.txt 2>/dev/null || echo unknown)",
+              "name": "$(jq -r '.name' upstream-index-artifact.json 2>/dev/null || echo unknown)",
+              "digest": "$(cat upstream-index-artifact-digest.txt 2>/dev/null || echo unknown)"
+            },
+            "artifact_digests": {
+              "primary": "$(cat primary-digest.txt 2>/dev/null || echo unknown)",
+              "replay": "$(cat replay-digest.txt 2>/dev/null || echo unknown)",
+              "delta": "$(cat delta-digest.txt 2>/dev/null || echo unknown)"
+            },
+            "contract_status": "$contract_status",
+            "corroboration_result": "$corroboration_result",
+            "observation_class": "$observation_class",
+            "authority_class": "cross_workflow_corroboration_only",
+            "qualification_state": "not_granted",
+            "negative_invariants": [
+              "historical subject SHA is oracle-only provenance",
+              "historical subject SHA cannot satisfy experiment identity",
+              "cross-workflow corroboration does not grant qualification authority",
+              "upstream and verifier runs are distinct workflow runs"
+            ]
+          }
+          EOF
+
+          python -m json.tool se-repair-corroboration-index-v1.json >/dev/null
+          cat se-repair-corroboration-index-v1.json
+
+      - name: Upload corroboration receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: se-repair-corroboration-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          path: |
+            se-repair-corroboration-index-v1.json
+            upstream-index-artifact.json
+            upstream-index-artifact-id.txt
+            upstream-index-artifact-digest.txt
+            upstream-workflow-sha.txt
+            upstream-workflow-ref.txt
+          if-no-files-found: error
+          retention-days: 90
