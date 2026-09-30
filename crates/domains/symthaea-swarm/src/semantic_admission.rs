@@ -481,7 +481,7 @@ mod tests {
 
     #[test]
     fn delivery_record_key_mismatch_is_rejected() {
-        let (delivery, observation) = fixture();
+        let (delivery, _) = fixture();
         let mut state = SemanticAdmissionState::default();
         let map_key = delivery.logical_delivery_id;
         let mut stored = delivery.clone();
@@ -490,10 +490,9 @@ mod tests {
         assert_eq!(
             validate_state(&state),
             Err(StateInvariant::DeliveryKeyMismatch {
-                logical_delivery_id: 55.into()
+                logical_delivery_id: Uuid::from_u128(55)
             })
         );
-        let _ = observation;
     }
 
     #[test]
