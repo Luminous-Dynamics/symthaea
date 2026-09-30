@@ -57,6 +57,10 @@ pub struct ExcludedMemory { pub canonical_identity: String, pub reason: Retrieva
 pub struct MemoryRetrievalReceipt {
     pub mode: RetrievalMode, pub frontier_ref: Option<String>, pub query: String, pub max_results: usize,
     pub selected: Vec<String>, pub selected_representation_digests: Vec<(String, String)>,
+    /// Binds each selected canonical identity to the projection identity exposed downstream.
+    /// Representation bytes alone are insufficient because the same bytes can be interpreted
+    /// under a different projection schema/profile/frontier.
+    pub selected_projection_identity_digests: Vec<(String, String)>,
     pub excluded: Vec<ExcludedMemory>, pub provenance_families: Vec<String>,
     pub retrieval_profile_versions: Vec<String>,
     pub receipt_digest: String,
@@ -76,6 +80,9 @@ pub enum ReceiptVerificationError {
     EmptyRetrievalProfileVersion,
     WhitespaceOnlyRetrievalProfileVersion,
     UnselectedRepresentationIdentity,
+    DuplicateProjectionIdentityBinding,
+    EmptyProjectionIdentityDigest,
+    UnselectedProjectionIdentity,
 }
 
 /// A receipt whose canonical digest and internal selection bindings were checked.
@@ -101,6 +108,19 @@ impl MemoryRetrievalReceipt {
         selected.dedup();
         if selected.len() != self.selected.len() {
             return Err(ReceiptVerificationError::DuplicateSelectedIdentity);
+        }
+        let mut projection_bindings = self.selected_projection_identity_digests.clone();
+        projection_bindings.sort();
+        for pair in &projection_bindings {
+            if pair.1.is_empty() {
+                return Err(ReceiptVerificationError::EmptyProjectionIdentityDigest);
+            }
+        }
+        if projection_bindings.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(ReceiptVerificationError::DuplicateProjectionIdentityBinding);
+        }
+        if projection_bindings.iter().any(|(identity, _)| !selected.contains(identity)) {
+            return Err(ReceiptVerificationError::UnselectedProjectionIdentity);
         }
         let mut bindings = self.selected_representation_digests.clone();
         bindings.sort();
@@ -153,6 +173,13 @@ impl MemoryRetrievalReceipt {
         bindings.sort();
         put_u32(&mut out, bindings.len())?;
         for (identity, digest) in bindings {
+            put_string(&mut out, &identity)?;
+            put_string(&mut out, &digest)?;
+        }
+        let mut projection_bindings = self.selected_projection_identity_digests.clone();
+        projection_bindings.sort();
+        put_u32(&mut out, projection_bindings.len())?;
+        for (identity, digest) in projection_bindings {
             put_string(&mut out, &identity)?;
             put_string(&mut out, &digest)?;
         }
@@ -294,6 +321,11 @@ fn retrieve_validated(
         max_results: request.max_results,
         selected,
         selected_representation_digests,
+        selected_projection_identity_digests: groups.iter()
+            .flat_map(|g| g.representations.iter().map(|candidate| {
+                (g.canonical_identity.clone(), candidate.projection.projection_identity_digest())
+            }))
+            .collect::<Vec<_>>(),
         excluded,
         provenance_families: families,
         retrieval_profile_versions: Vec::new(),
