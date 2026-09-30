@@ -540,23 +540,28 @@ fn image_data_record_offset(
         None => Ok(0),
         Some(pointer) => {
             let pointer = pointer.trim();
-            if pointer.starts_with('"') {
-                // Detached IMAGE files begin at byte zero; LABEL_RECORDS belongs
-                // to the label file and must not be applied to the companion IMG.
-                return Ok(0);
-            }
-            if pointer.to_ascii_lowercase().ends_with(".img") {
-                return Ok(0);
-            }
-            let records = pointer
-                .parse::<u32>()
-                .map_err(|_| MolaError::InvalidMetadata("invalid ^IMAGE pointer".into()))?;
-            if records == 0 {
+
+            // This adapter always receives a detached label and a separate IMG
+            // path. PDS3 permits a bare numeric ^IMAGE pointer for an attached
+            // label, but a detached label must identify the external file
+            // (optionally with an explicit record/byte offset). Treating a bare
+            // integer as an offset into the separate IMG would silently
+            // reinterpret an attached-label convention and can shift every
+            // sampled cell.
+            if pointer.parse::<f64>().is_ok() {
                 return Err(MolaError::InvalidMetadata(
-                    "^IMAGE record pointer must be positive".into(),
+                    "bare numeric ^IMAGE pointers are invalid for detached labels".into(),
                 ));
             }
-            Ok(records - 1)
+
+            if pointer.starts_with('"') || pointer.to_ascii_lowercase().ends_with(".img") {
+                // Detached IMAGE files begin at byte zero unless an explicit
+                // filename+offset tuple is supplied. MOLA MEGDR labels use the
+                // plain detached filename form.
+                return Ok(0);
+            }
+
+            Err(MolaError::InvalidMetadata("invalid ^IMAGE pointer".into()))
         }
     }
 }
@@ -995,75 +1000,16 @@ mod tests {
     }
 
     #[test]
-    fn accepts_positive_numeric_image_record_pointer_as_zero_based_offset() {
-        let text = format!("{}\n^IMAGE = 7", label());
-        let metadata = MolaMegdrMetadata::from_label(
-            &parse_label(&text),
-            "MEGT00N000HB",
-        )
-        .unwrap();
-        assert_eq!(metadata.line_offset, 6);
-    }
-
-    #[test]
-    fn numeric_image_pointer_is_applied_to_raster_reads() {
-        let mut path = std::env::temp_dir();
-        path.push(format!("mola_adapter_pointer_{}_label.lbl", std::process::id()));
-        let mut img = path.clone();
-        img.set_extension("img");
-
-        let text = format!(
-            "{}\n^IMAGE = 2",
-            label()
-                .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 179.9")
-                .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1")
-        );
-        std::fs::write(&path, text).unwrap();
-        let mut bytes = vec![0u8; 32];
-        bytes[18] = 0x03;
-        bytes[19] = 0xE8;
-        std::fs::write(&img, bytes).unwrap();
-
-        let product = MolaMegdrProduct::open(
-            &path,
-            &img,
-            "MEGT00N000HB",
-            "pds4-v1",
-        ).unwrap();
-        let mut count_path = path.clone();
-        count_path.set_file_name(format!(
-            "mola_adapter_pointer_count_{}_label.lbl",
-            std::process::id()
-        ));
-        let mut count_img = count_path.clone();
-        count_img.set_extension("img");
-        let count_label = label()
-            .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 179.9")
-            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1")
-            .replace("MEGT00N000HB", "MEGC00N000HB")
-            .replace("MAP_TYPE = T", "MAP_TYPE = C")
-            .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8")
-            + "\n^IMAGE = 2";
-        std::fs::write(&count_path, count_label).unwrap();
-        let mut count_bytes = vec![0u8; 32];
-        count_bytes[16] = 1;
-        std::fs::write(&count_img, count_bytes).unwrap();
-
-        let counts = MolaMegdrProduct::open(
-            &count_path,
-            &count_img,
-            "MEGC00N000HB",
-            "pds4-v1",
-        ).unwrap();
-        let sample = product
-            .sample_nearest_with_count(&counts, 0.0, 179.984375, 3.0)
-            .unwrap();
-        assert_eq!(sample.elevation_m, Some(1000.0));
-
-        let _ = std::fs::remove_file(path);
-        let _ = std::fs::remove_file(img);
-        let _ = std::fs::remove_file(count_path);
-        let _ = std::fs::remove_file(count_img);
+    fn rejects_bare_numeric_image_pointer_for_detached_label() {
+        for value in ["1", "7", "1.5", "-1", "0", "NaN"] {
+            let text = format!("{}\n^IMAGE = {}", label(), value);
+            let error = MolaMegdrMetadata::from_label(
+                &parse_label(&text),
+                "MEGT00N000HB",
+            )
+            .unwrap_err();
+            assert!(matches!(error, MolaError::InvalidMetadata(_)), "^IMAGE={value}");
+        }
     }
 
     #[test]
