@@ -37,6 +37,29 @@ def _reject_yaml_meta(value: str, context: str) -> None:
     if re.search(r"(^|\\s)<<\\s*:", value):
         raise InventoryError(f"{context}: YAML merge-key syntax is unsupported")
 
+ARTIFACT_EXECUTION_PATTERNS = (
+    re.compile(r"\\b(?:bash|sh|zsh|fish|dash|ksh|pwsh|powershell|python(?:3)?|node|ruby|perl|php|lua)\\s+[^#\\n]*?(?:\\$RUNNER_TEMP|runner\\.temp)"),
+    re.compile(r"\\b(?:source|\\.)\\s+[^#\\n]*?(?:\\$RUNNER_TEMP|runner\\.temp)"),
+    re.compile(r"\\b(?:cargo|rustc|make|cmake|ninja|nix-build|nix\\s+build|npm|pnpm|yarn|pip|pip3|gem|bundle|go\\s+run)\\b[^#\\n]*?(?:\\$RUNNER_TEMP|runner\\.temp)"),
+    re.compile(r"\\bchmod\\s+[^#\\n]*(?:\\$RUNNER_TEMP|runner\\.temp)"),
+    re.compile(r"\\b(?:cp|mv|install)\\s+[^#\\n]*(?:\\$RUNNER_TEMP|runner\\.temp)[^#\\n]*(?:\\$GITHUB_WORKSPACE|\\$PATH|/usr/local/bin|/usr/bin|/bin)"),
+    re.compile(r"(?:\\$RUNNER_TEMP|runner\\.temp)[^#\\n]*?(?:\\$GITHUB_WORKSPACE|\\$PATH|/usr/local/bin|/usr/bin|/bin)"),
+)
+
+def _artifact_execution_evidence(lines: list[str], artifact_paths: list[str]) -> list[str]:
+    if not artifact_paths:
+        return []
+    evidence: list[str] = []
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        for pattern in ARTIFACT_EXECUTION_PATTERNS:
+            if pattern.search(stripped):
+                evidence.append(stripped)
+                break
+    return sorted(set(evidence))
+
 def _parse_inline_list(value: str) -> list[str]:
     value = value.strip()
     if not (value.startswith("[") and value.endswith("]")):
@@ -192,6 +215,8 @@ def parse_workflow(path: Path) -> dict[str, Any]:
     }
     download_artifact = False
     artifact_names_observed: list[str] = []
+    artifact_paths_observed: list[str] = []
+    artifact_execution_evidence: list[str] = []
     cache_modes: list[str] = []
     if event == "workflow_run":
         contract["trigger"]["workflows"] = events[event]["workflows"]
@@ -284,6 +309,8 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                 artifact_path = with_values.get("path")
                 if artifact_name:
                     artifact_names_observed.append(artifact_name)
+                if artifact_path:
+                    artifact_paths_observed.append(artifact_path)
                 if not artifact_name:
                     raise InventoryError(f"{path}: workflow_run artifact access requires an exact 'name' input")
                 if not artifact_path:
@@ -303,6 +330,11 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                     raise InventoryError(f"{path}: broad artifact pattern access is unsupported in privileged v1")
                 if "artifact-ids" in with_values:
                     raise InventoryError(f"{path}: artifact-id access is unsupported in privileged v1; bind to exact name + run-id")
+            artifact_execution_evidence = _artifact_execution_evidence(lines, artifact_paths_observed)
+            if artifact_execution_evidence:
+                raise InventoryError(
+                    f"{path}: downloaded workflow_run artifacts must not be executed, interpreted, compiled, made executable, or copied into privileged executable/workspace paths: {artifact_execution_evidence}"
+                )
     for raw in lines:
         stripped = raw.strip()
         match = re.match(r"cache-mode:\s*(read|write|write-only|none)\s*$", stripped)
@@ -337,6 +369,9 @@ def parse_workflow(path: Path) -> dict[str, Any]:
     contract["cross_workflow_dataflow_observed"] = {
         "artifact_download_action_present": download_artifact,
         "artifact_names": sorted(set(artifact_names_observed)),
+        "artifact_extraction_paths": sorted(set(artifact_paths_observed)),
+        "artifact_execution_evidence": artifact_execution_evidence,
+        "artifact_consumption_mode": "data_only" if download_artifact else "none",
         "explicit_cache_write_override_present": explicit_cache_write,
     }
     return {"path": path.as_posix(), "privileged": True, "contract": contract}
@@ -432,6 +467,13 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
                         mismatches.append(f"{path}: artifact-consuming workflow_run requires explicit artifact_extraction handling")
                     if dataflow.get("artifact_execution") is not False:
                         mismatches.append(f"{path}: artifact_execution must be false for the current fail-closed v1 contract")
+                    observed_paths = observed_contract["cross_workflow_dataflow_observed"].get("artifact_extraction_paths", [])
+                    if dataflow.get("artifact_extraction_paths") != observed_paths:
+                        mismatches.append(f"{path}: artifact_extraction_paths differs from observed exact paths")
+                    if dataflow.get("artifact_consumption_mode") != observed_contract["cross_workflow_dataflow_observed"].get("artifact_consumption_mode"):
+                        mismatches.append(f"{path}: artifact_consumption_mode differs from observed artifact handling")
+                    if observed_contract["cross_workflow_dataflow_observed"].get("artifact_execution_evidence"):
+                        mismatches.append(f"{path}: downloaded artifact execution evidence must be empty")
                 if not observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and dataflow.get("artifacts_consumed"):
                     mismatches.append(f"{path}: artifacts_consumed is true but no download-artifact action is present")
                 if dataflow.get("cache_influence") != observed_contract["cache_influence"]:
@@ -590,8 +632,23 @@ jobs:
             artifact_step + "      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567",
             1,
         )
+        wf.write_text(artifact_valid + "      - run: cat \\${{ runner.temp }}/trusted-receipt/receipt.json\\n", encoding="utf-8")
+        safe_artifact = parse_workflow(wf)["contract"]
+        assert safe_artifact["cross_workflow_dataflow_observed"]["artifact_consumption_mode"] == "data_only"
+        assert safe_artifact["cross_workflow_dataflow_observed"]["artifact_execution_evidence"] == []
+        for malicious in (
+            artifact_valid + "      - run: bash \\${{ runner.temp }}/trusted-receipt/script.sh\\n",
+            artifact_valid + "      - run: source \\${{ runner.temp }}/trusted-receipt/env.sh\\n",
+            artifact_valid + "      - run: cp \\${{ runner.temp }}/trusted-receipt/bin $GITHUB_WORKSPACE/tool\\n",
+        ):
+            wf.write_text(malicious, encoding="utf-8")
+            try:
+                parse_workflow(wf)
+            except InventoryError:
+                pass
+            else:
+                raise AssertionError("downloaded artifact execution or privileged copy must fail closed")
         wf.write_text(artifact_valid, encoding="utf-8")
-        assert parse_workflow(wf)["privileged"] is True
         wrong_run = artifact_step.replace(
             "run-id: " + artifact_expr,
             "run-id: ${" + "{ github.run_id }}",
