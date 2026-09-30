@@ -392,6 +392,45 @@ mod tests {
     }
 
     #[test]
+    fn envelope_subject_is_independently_derived() {
+        let (task, performance, resource, trajectory) = evidence();
+        let key = derive_experiment_key(&task, &performance, &resource).unwrap();
+        let manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
+        let envelope = EvidenceManifestEnvelope::from_manifest(manifest);
+        assert!(envelope.subject_digest.starts_with("sha256:"));
+        assert_eq!(envelope.subject_digest.len(), 71);
+        envelope
+            .validate(&task, &performance, &resource, &trajectory)
+            .unwrap();
+    }
+
+    #[test]
+    fn envelope_subject_mismatch_fails_closed() {
+        let (task, performance, resource, trajectory) = evidence();
+        let key = derive_experiment_key(&task, &performance, &resource).unwrap();
+        let manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
+        let mut envelope = EvidenceManifestEnvelope::from_manifest(manifest);
+        envelope.subject_digest = "sha256:0000000000000000000000000000000000000000000000000000000000000000".into();
+        assert!(matches!(
+            envelope.validate(&task, &performance, &resource, &trajectory),
+            Err(EvidenceManifestEnvelopeError::SubjectMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn envelope_detects_manifest_mutation_after_subject_creation() {
+        let (task, performance, resource, trajectory) = evidence();
+        let key = derive_experiment_key(&task, &performance, &resource).unwrap();
+        let manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
+        let mut envelope = EvidenceManifestEnvelope::from_manifest(manifest);
+        envelope.manifest.join.performance.artifact_id = "performance-mutated".into();
+        assert!(matches!(
+            envelope.validate(&task, &performance, &resource, &trajectory),
+            Err(EvidenceManifestEnvelopeError::SubjectMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn semantic_source_change_invalidates_declared_manifest_identity() {
         let (mut task, performance, resource, trajectory) = evidence();
         let original_key = derive_experiment_key(&task, &performance, &resource).unwrap();
