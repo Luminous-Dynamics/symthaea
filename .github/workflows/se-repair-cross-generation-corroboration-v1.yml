@@ -12,7 +12,6 @@ on:
 
 permissions:
   actions: read
-  contents: read
 
 concurrency:
   group: se-repair-cross-generation-${{ github.event.workflow_run.id || github.run_id }}-${{ github.event.workflow_run.run_attempt || github.run_attempt }}
