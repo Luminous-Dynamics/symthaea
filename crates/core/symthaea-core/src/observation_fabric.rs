@@ -492,8 +492,24 @@ impl ObservationGraph {
             }
         }
 
+        let mut activity_fingerprints: HashMap<String, String> = HashMap::new();
+
         for observation in &self.observations {
             if let Some(activity) = &observation.provenance.processing_activity {
+                if activity.execution_fingerprint.is_some() {
+                    activity.verify_execution_fingerprint()?;
+                }
+                let computed_fingerprint = activity.compute_execution_fingerprint()?;
+                if let Some(previous) = activity_fingerprints.insert(
+                    activity.activity_id.clone(),
+                    computed_fingerprint.clone(),
+                ) {
+                    if previous != computed_fingerprint {
+                        return Err(ObservationValidationError::InconsistentProcessingActivity(
+                            activity.activity_id.clone(),
+                        ));
+                    }
+                }
                 for input_id in &activity.input_observation_ids {
                     if !by_id.contains_key(input_id.as_str()) {
                         return Err(ObservationValidationError::MissingActivityInput(input_id.clone()));
@@ -612,6 +628,7 @@ pub enum ObservationValidationError {
     MissingExecutionFingerprint,
     #[error("processing activity output does not identify the activity as its producer: {0}")]
     ActivityOutputMissingProducer(String),
+    InconsistentProcessingActivity(String),
     #[error("processing activity input is not represented in the output observation's parent lineage: {0}")]
     ActivityInputMissingParent(String),
     #[error("processing activity input observation is not present in the closed graph: {0}")]
