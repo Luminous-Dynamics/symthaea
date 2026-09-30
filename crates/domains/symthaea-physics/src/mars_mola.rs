@@ -152,6 +152,17 @@ pub struct MolaMegdrProduct {
     img_path: std::path::PathBuf,
 }
 
+/// A terrain observation sampled from verified topography/count snapshots.
+///
+/// The returned TerrainSample preserves the existing observation API while
+/// the accompanying artifact composition preserves independent product-local
+/// identities for the topography and observation-count inputs.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MolaTerrainObservation {
+    pub sample: TerrainSample,
+    pub artifacts: TerrainArtifactComposition,
+}
+
 impl MolaMegdrProduct {
     /// Open and validate a MOLA MEGDR PDS label against the raster.
     ///
@@ -306,6 +317,94 @@ impl MolaMegdrProduct {
         })
     }
 
+
+    /// Sample through caller-attested immutable raster snapshots.
+    ///
+    /// This is the reproducible sampling boundary: product metadata and
+    /// artifact identities come from validated products, while every raster
+    /// byte read comes from already-open verified snapshot handles. The method
+    /// never falls back to the mutable product path.
+    pub fn sample_nearest_with_count_from_snapshots(
+        &self,
+        counts: &Self,
+        topography_snapshot: &mut MolaRasterSnapshot,
+        counts_snapshot: &mut MolaRasterSnapshot,
+        latitude_deg: f64,
+        longitude_deg: f64,
+        elevation_uncertainty_m: f64,
+    ) -> Result<MolaTerrainObservation, MolaError> {
+        self.validate_companion(counts)?;
+        verify_sha256(
+            "topography snapshot",
+            topography_snapshot.sha256(),
+            &self.image_sha256,
+        )?;
+        verify_sha256(
+            "counts snapshot",
+            counts_snapshot.sha256(),
+            &counts.image_sha256,
+        )?;
+        if !elevation_uncertainty_m.is_finite() || elevation_uncertainty_m < 0.0 {
+            return Err(MolaError::InvalidMetadata(
+                "elevation uncertainty must be finite and non-negative".into(),
+            ));
+        }
+        if self.metadata.map_kind != 'T' {
+            return Err(MolaError::InvalidMetadata(
+                "sample source must be a topography map".into(),
+            ));
+        }
+        let (line, sample) = self.metadata.cell_for(latitude_deg, longitude_deg)?;
+        let count = self.read_count_from_snapshot(counts, counts_snapshot, line, sample)?;
+        let artifacts = self.artifact_composition_with_counts(counts)?;
+        let provenance = self.provenance_with_counts(counts)?;
+
+        if count == 0 {
+            let sample = self.missing_sample(
+                latitude_deg,
+                longitude_deg,
+                line,
+                sample,
+                provenance,
+            );
+            return Ok(MolaTerrainObservation { sample, artifacts });
+        }
+
+        let value = self.read_i16_from_snapshot(topography_snapshot, line, sample)? as f64;
+        if self.metadata.missing_value.is_some_and(|m| value == m) {
+            let sample = self.missing_sample(
+                latitude_deg,
+                longitude_deg,
+                line,
+                sample,
+                provenance,
+            );
+            return Ok(MolaTerrainObservation { sample, artifacts });
+        }
+
+        let elevation = value * self.metadata.pixel_scale + self.metadata.pixel_offset;
+        if !elevation.is_finite() {
+            return Err(MolaError::InvalidMetadata(
+                "decoded elevation is non-finite".into(),
+            ));
+        }
+
+        let sample = TerrainSample {
+            latitude_rad: latitude_deg.to_radians(),
+            longitude_rad: normalize_lon(longitude_deg).to_radians(),
+            sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,
+            source_grid_cell: Some((line, sample)),
+            elevation_m: Some(elevation),
+            elevation_uncertainty_m: Some(elevation_uncertainty_m),
+            vertical_datum: TerrainVerticalDatum::AreoidRelative,
+            slope_rad: None,
+            roughness_m: None,
+            quality: TerrainQuality::Measured,
+            provenance,
+        };
+        Ok(MolaTerrainObservation { sample, artifacts })
+    }
+
     fn provenance_with_counts(&self, counts: &Self) -> Result<TerrainProvenance, MolaError> {
         self.provenance
             .merged_with(&counts.provenance)
@@ -397,6 +496,42 @@ impl MolaMegdrProduct {
                 };
                 Ok(u32::from(value))
             }
+            _ => Err(MolaError::Unsupported(                "counts must be an 8-bit or 16-bit integer".into(),
+            )),
+        }
+    }
+
+
+    fn read_count_from_snapshot(
+        &self,
+        counts: &Self,
+        snapshot: &mut MolaRasterSnapshot,
+        line: u32,
+        sample: u32,
+    ) -> Result<u32, MolaError> {
+        if line >= counts.metadata.lines || sample >= counts.metadata.samples {
+            return Err(MolaError::OutOfBounds);
+        }
+        let bytes_per_sample = u64::from(counts.metadata.sample_bits / 8);
+        let byte_offset = counts.raster_byte_offset(line, sample, bytes_per_sample)?;
+        match counts.metadata.sample_bits {
+            8 => {
+                let mut b = [0u8; 1];
+                snapshot.read_exact_at(byte_offset, &mut b)?;
+                Ok(u32::from(b[0]))
+            }
+            16 => {
+                let mut b = [0u8; 2];
+                snapshot.read_exact_at(byte_offset, &mut b)?;
+                let value = match counts.metadata.sample_type.as_str() {
+                    "MSB_INTEGER" => u16::from_be_bytes(b),
+                    "LSB_INTEGER" => u16::from_le_bytes(b),
+                    other => return Err(MolaError::Unsupported(format!(
+                        "sample type {other} is not a supported count encoding"
+                    ))),
+                };
+                Ok(u32::from(value))
+            }
             _ => Err(MolaError::Unsupported(
                 "counts must be an 8-bit or 16-bit integer".into(),
             )),
@@ -432,6 +567,28 @@ impl MolaMegdrProduct {
             .checked_add(row_offset)
             .and_then(|offset| offset.checked_add(sample_offset))
             .ok_or_else(|| MolaError::InvalidMetadata("raster byte offset overflow".into()))
+    }
+
+
+    fn read_i16_from_snapshot(
+        &self,
+        snapshot: &mut MolaRasterSnapshot,
+        line: u32,
+        sample: u32,
+    ) -> Result<i16, MolaError> {
+        if line >= self.metadata.lines || sample >= self.metadata.samples {
+            return Err(MolaError::OutOfBounds);
+        }
+        let byte_offset = self.raster_byte_offset(line, sample, 2)?;
+        let mut bytes = [0u8; 2];
+        snapshot.read_exact_at(byte_offset, &mut bytes)?;
+        match self.metadata.sample_type.as_str() {
+            "MSB_INTEGER" => Ok(i16::from_be_bytes(bytes)),
+            "LSB_INTEGER" => Ok(i16::from_le_bytes(bytes)),
+            other => Err(MolaError::Unsupported(format!(
+                "sample type {other} is not a supported signed 16-bit integer"
+            ))),
+        }
     }
 
     fn read_i16(&self, line: u32, sample: u32) -> Result<i16, MolaError> {
@@ -797,8 +954,7 @@ fn verify_sha256(
         )));
     }
     if actual != expected {
-        return Err(MolaError::InvalidMetadata(format!(
-            "{kind} SHA-256 mismatch: expected {expected}, got {actual}"
+        return Err(MolaError::InvalidMetadata(format!(            "{kind} SHA-256 mismatch: expected {expected}, got {actual}"
         )));
     }
     Ok(())
@@ -1197,8 +1353,7 @@ mod tests {
     }
 
     #[test]
-    fn tiled_grid_rejects_coordinates_outside_declared_footprint() {
-        let text = label()
+    fn tiled_grid_rejects_coordinates_outside_declared_footprint() {        let text = label()
             .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 270.0")
             .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 360.0")
             .replace("MINIMUM_LATITUDE = -0.015625", "MINIMUM_LATITUDE = -44.0")
@@ -1597,8 +1752,7 @@ mod tests {
             ("TILE_ORIGIN_LONGITUDE", "1.0"),
         ] {
             let text = format!("{}\n{} = {}", label(), key, value);
-            let error =
-                MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap_err();
+            let error =                MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap_err();
             assert!(matches!(error, MolaError::InvalidMetadata(_)), "{key}={value}");
         }
     }
@@ -1850,6 +2004,83 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_sampling_uses_open_handles_and_preserves_composition() {
+        let pid = std::process::id();
+        let mut path = std::env::temp_dir();
+        path.push(format!("mola_snapshot_sample_{pid}_label.lbl"));
+        let mut img = path.clone();
+        img.set_extension("img");
+        std::fs::write(&path, label()).unwrap();
+
+        let mut topo_bytes = vec![0u8; 96];
+        topo_bytes[50] = 0x03;
+        topo_bytes[51] = 0xE8;
+        std::fs::write(&img, &topo_bytes).unwrap();
+        let product =
+            MolaMegdrProduct::open(&path, &img, "MEGT00N000HB", "pds4-v1").unwrap();
+
+        let mut count_path = path.clone();
+        count_path.set_file_name(format!("mola_snapshot_sample_{pid}_count_label.lbl"));
+        let mut count_img = count_path.clone();
+        count_img.set_extension("img");
+        let count_label = label()
+            .replace("MEGT00N000HB", "MEGC00N000HB")
+            .replace("MAP_TYPE = T", "MAP_TYPE = C")
+            .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8");
+        std::fs::write(&count_path, count_label).unwrap();
+        let mut count_bytes = vec![0u8; 96];
+        count_bytes[49] = 1;
+        std::fs::write(&count_img, &count_bytes).unwrap();
+        let counts =
+            MolaMegdrProduct::open(&count_path, &count_img, "MEGC00N000HB", "pds4-v1").unwrap();
+
+        let mut topography_snapshot = MolaRasterSnapshot::open(
+            &img,
+            &product.image_sha256,
+            MolaSnapshotStorage::CallerAttestedImmutable,
+        )
+        .unwrap();
+        let mut counts_snapshot = MolaRasterSnapshot::open(
+            &count_img,
+            &counts.image_sha256,
+            MolaSnapshotStorage::CallerAttestedImmutable,
+        )
+        .unwrap();
+
+        std::fs::write(&img, vec![0u8; 96]).unwrap();
+        std::fs::write(&count_img, vec![0u8; 96]).unwrap();
+
+        let observation = product
+            .sample_nearest_with_count_from_snapshots(
+                &counts,
+                &mut topography_snapshot,
+                &mut counts_snapshot,
+                0.0,
+                179.984375,
+                3.0,
+            )
+            .unwrap();
+        assert_eq!(observation.sample.elevation_m, Some(1000.0));
+        assert_eq!(observation.sample.source_grid_cell, Some((1, 1)));
+        assert_eq!(observation.artifacts.artifacts.len(), 4);
+        assert!(observation
+            .artifacts
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.source_id == "MEGT00N000HB"));
+        assert!(observation
+            .artifacts
+            .artifacts
+            .iter()
+            .any(|artifact| artifact.source_id == "MEGC00N000HB"));
+
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(img);
+        let _ = std::fs::remove_file(count_path);
+        let _ = std::fs::remove_file(count_img);
+    }
+
+    #[test]
     fn verified_snapshot_reads_from_open_handle() {
         let mut path = std::env::temp_dir();
         path.push(format!("mola_snapshot_{}_raster.img", std::process::id()));
@@ -1997,7 +2228,6 @@ mod tests {
         );
         assert!(sample.elevation_m.is_none());
         assert!(!sample.is_usable());
-
         let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_file(img);
         let _ = std::fs::remove_file(count_path);
