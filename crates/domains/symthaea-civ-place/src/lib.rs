@@ -7,6 +7,8 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 pub const PROFILE: &str = "CIV-PLACE-001B";
 pub const SCHEMA_VERSION: &str = "civ-place-001b-v1";
 
+pub mod sol_atlas;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DependencyEdgeV1 {
     pub id: String,
