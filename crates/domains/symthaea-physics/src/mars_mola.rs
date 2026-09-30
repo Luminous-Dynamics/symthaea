@@ -18,7 +18,8 @@ use std::path::Path;
 use sha2::{Digest, Sha256};
 
 use crate::mars_tether::{
-    TerrainProvenance, TerrainQuality, TerrainSample, TerrainVerticalDatum,
+    TerrainProvenance, TerrainQuality, TerrainSample, TerrainSamplingMethod,
+    TerrainVerticalDatum,
 };
 
 #[derive(Debug)]
@@ -195,6 +196,7 @@ impl MolaMegdrProduct {
         Ok(TerrainSample {
             latitude_rad: latitude_deg.to_radians(),
             longitude_rad: normalize_lon(longitude_deg).to_radians(),
+            sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,
             elevation_m: Some(elevation),
             elevation_uncertainty_m: Some(elevation_uncertainty_m),
             vertical_datum: TerrainVerticalDatum::AreoidRelative,
@@ -220,6 +222,7 @@ impl MolaMegdrProduct {
         TerrainSample {
             latitude_rad: latitude_deg.to_radians(),
             longitude_rad: normalize_lon(longitude_deg).to_radians(),
+            sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,
             elevation_m: None,
             elevation_uncertainty_m: None,
             vertical_datum: TerrainVerticalDatum::AreoidRelative,
