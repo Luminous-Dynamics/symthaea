@@ -101,15 +101,20 @@ pub fn verify_artifact_bytes(
         });
     }
 
-    let artifact: OperatorEvidenceArtifact =
+    let records: Vec<OperatorEvidenceRecord> =
         serde_json::from_slice(bytes).map_err(|error| OperatorEvidenceError::Json(error.to_string()))?;
-
-    if artifact.schema_version != OPERATOR_EVIDENCE_SCHEMA_VERSION {
-        return Err(OperatorEvidenceError::UnsupportedSchema(
-            artifact.schema_version,
-        ));
+    if let Some(record) = records.iter().find(|record| record.schema_version != OPERATOR_EVIDENCE_SCHEMA_VERSION) {
+        return Err(OperatorEvidenceError::UnsupportedSchema(record.schema_version));
     }
-    Ok(artifact)
+    Ok(OperatorEvidenceArtifact {
+        schema_version: OPERATOR_EVIDENCE_SCHEMA_VERSION,
+        representation: CONTINUOUS_F32_REPRESENTATION.to_owned(),
+        digest: OperatorEvidenceDigest {
+            algorithm: "sha256".to_owned(),
+            value: observed,
+        },
+        records,
+    })
 }
 
 fn validate_digest(value: &str) -> Result<(), OperatorEvidenceError> {
@@ -130,7 +135,7 @@ pub fn qualify_records(records: &[OperatorEvidenceRecord]) -> OperatorEvidenceSu
     let mut duplicate = 0;
 
     for record in records {
-        let key = (record.resolution, record.operation.as_str());
+        let key = (record.resolution, record.operation);
         if !seen.insert(key) {
             duplicate += 1;
         }
@@ -179,6 +184,16 @@ mod tests {
                         representation: CONTINUOUS_F32_REPRESENTATION,
                         resolution,
                         operation,
+                        seed_a: 42,
+                        seed_b: 43,
+                        scalar_reference: 0.0,
+                        simd_result: 0.0,
+                        abs_error: 0.0,
+                        relative_error: 0.0,
+                        max_abs_error: 0.0,
+                        max_relative_error: 0.0,
+                        tolerance: 1e-4,
+                        logical_bytes: 1,
                         qualification_status: QUALIFIED_STATUS,
                     },
                 )
@@ -187,16 +202,7 @@ mod tests {
     }
 
     fn artifact_bytes() -> Vec<u8> {
-        serde_json::to_vec(&OperatorEvidenceArtifact {
-            schema_version: OPERATOR_EVIDENCE_SCHEMA_VERSION,
-            representation: CONTINUOUS_F32_REPRESENTATION.to_owned(),
-            digest: OperatorEvidenceDigest {
-                algorithm: "sha256".to_owned(),
-                value: "external".to_owned(),
-            },
-            records: records(),
-        })
-        .expect("fixture serializes")
+        serde_json::to_vec(&records()).expect("fixture serializes")
     }
 
     #[test]
