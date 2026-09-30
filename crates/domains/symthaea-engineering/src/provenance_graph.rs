@@ -424,6 +424,17 @@ mod tests {
     }
 
     #[test]
+    fn wrong_boundary_schema_cannot_validate_against_authoritative_graph() {
+        let graph = reference_graph();
+        let mut slice = graph.slice("claim-001").expect("claim exists");
+        slice.boundary.schema = "sol-atlas/provenance-slice-boundary/v2";
+        assert_eq!(
+            graph.validate_slice(&slice),
+            Err(ProvenanceGraphError::SliceMismatch)
+        );
+    }
+
+    #[test]
     fn tampered_boundary_cannot_validate_against_authoritative_graph() {
         let graph = reference_graph();
         let mut slice = graph.slice("claim-001").expect("claim exists");
