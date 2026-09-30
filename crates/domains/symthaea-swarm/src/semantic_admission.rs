@@ -215,6 +215,8 @@ pub fn validate_state(state: &SemanticAdmissionState) -> Result<(), StateInvaria
 pub fn retire_expired(state: &SemanticAdmissionState, policy: AdmissionPolicy, now_ms: u64) -> Result<SemanticAdmissionState, StateInvariant> {
     validate_state(state)?;
     let mut next = state.clone();
+    next.delivery_tombstones.retain(|_, tombstone| now_ms < tombstone.reusable_at_ms);
+    next.observation_tombstones.retain(|_, tombstone| now_ms < tombstone.reusable_at_ms);
     let expired: Vec<_> = state.observations.iter().filter_map(|(key, observation)| (now_ms.saturating_sub(observation.observed_at_ms) > policy.retention_ms).then_some(key.clone())).collect();
     for key in expired {
         next.observations.remove(&key);
@@ -814,6 +816,16 @@ mod tests {
         assert!(next.observation_tombstones.contains_key(&observation.key));
         assert!(next.deliveries.contains_key(&delivery.logical_delivery_id));
         assert_eq!(validate_state(&next), Ok(()));
+    }
+
+    #[test]
+    fn lifecycle_gc_removes_expired_tombstones_after_horizon() {
+        let (state, _, observation) = admitted_state();
+        let policy = AdmissionPolicy { retention_ms: 10, tombstone_retention_ms: 100, ..AdmissionPolicy::default() };
+        let retired = retire_expired(&state, policy, 101).expect("valid lifecycle transition");
+        assert!(retired.observation_tombstones.contains_key(&observation.key));
+        let collected = retire_expired(&retired, policy, 201).expect("valid lifecycle transition");
+        assert!(!collected.observation_tombstones.contains_key(&observation.key));
     }
 
     #[test]
