@@ -881,7 +881,9 @@ def self_test() -> None:
         raise AssertionError("Class A change without changed ADR must fail closed")
     require_changed_adr(False, [])
 
-    history_topology_self_test()\n\n
+    history_topology_self_test()
+
+
     # Cross-surface adversarial matrix: weakening any single enforcement
     # surface, or all three together, must fail closed.
     detector_fixture = "\n".join(PRIVILEGED_DETECTOR_CONTRACT_MARKERS)
