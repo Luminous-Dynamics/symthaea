@@ -116,6 +116,9 @@ jobs:
             "repository": "${{ github.repository }}",
             "workflow": "${{ github.workflow }}",
             "workflow_sha": "${{ github.workflow_sha }}",
+            "workflow_ref": "${{ github.workflow_ref }}",
+            "trigger_sha": "${{ github.sha }}",
+            "trigger_ref": "${{ github.ref }}",
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "job": "${{ github.job }}",
@@ -244,6 +247,9 @@ jobs:
             "repository": "${{ github.repository }}",
             "workflow": "${{ github.workflow }}",
             "workflow_sha": "${{ github.workflow_sha }}",
+            "workflow_ref": "${{ github.workflow_ref }}",
+            "trigger_sha": "${{ github.sha }}",
+            "trigger_ref": "${{ github.ref }}",
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "job": "${{ github.job }}",
@@ -318,6 +324,9 @@ jobs:
             "repository": "${{ github.repository }}",
             "workflow": "${{ github.workflow }}",
             "workflow_sha": "${{ github.workflow_sha }}",
+            "workflow_ref": "${{ github.workflow_ref }}",
+            "trigger_sha": "${{ github.sha }}",
+            "trigger_ref": "${{ github.ref }}",
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "job": "${{ github.job }}",
@@ -414,6 +423,9 @@ jobs:
             test "$(jq -r '.repository' "$manifest")" = "${{ github.repository }}"
             test "$(jq -r '.workflow' "$manifest")" = "${{ github.workflow }}"
             test "$(jq -r '.workflow_sha' "$manifest")" = "${{ github.workflow_sha }}"
+            test "$(jq -r '.workflow_ref' "$manifest")" = "${{ github.workflow_ref }}"
+            test "$(jq -r '.trigger_sha' "$manifest")" = "${{ github.sha }}"
+            test "$(jq -r '.trigger_ref' "$manifest")" = "${{ github.ref }}"
             test "$(jq -r '.run_id' "$manifest")" = "${{ github.run_id }}"
             test "$(jq -r '.run_attempt' "$manifest")" = "${{ github.run_attempt }}"
             test "$(jq -r '.experiment_subject_sha' "$manifest")" = "$FROZEN_SUBJECT_SHA"
@@ -491,6 +503,9 @@ jobs:
             "repository": "${{ github.repository }}",
             "workflow": "${{ github.workflow }}",
             "workflow_sha": "${{ github.workflow_sha }}",
+            "workflow_ref": "${{ github.workflow_ref }}",
+            "trigger_sha": "${{ github.sha }}",
+            "trigger_ref": "${{ github.ref }}",
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
@@ -512,7 +527,7 @@ jobs:
               "all manifests share one experiment subject SHA",
               "all manifests share one repair SHA",
               "all manifests share one frozen base SHA",
-              "all manifests share one workflow SHA and run identity",
+              "all manifests share one workflow SHA, workflow ref, trigger identity, and run identity",
               "primary and replay share the same Cargo.lock SHA-256",
               "delta lock identity matches primary and replay",
               "all three artifacts belong to this workflow run and are unexpired",
@@ -547,6 +562,9 @@ jobs:
             "repository": "${{ github.repository }}",
             "workflow": "${{ github.workflow }}",
             "workflow_sha": "${{ github.workflow_sha }}",
+            "workflow_ref": "${{ github.workflow_ref }}",
+            "trigger_sha": "${{ github.sha }}",
+            "trigger_ref": "${{ github.ref }}",
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "job": "${{ github.job }}",
@@ -643,6 +661,9 @@ jobs:
             test "$(jq -r '.repository' "$manifest")" = "${{ github.repository }}"
             test "$(jq -r '.workflow' "$manifest")" = "${{ github.workflow }}"
             test "$(jq -r '.workflow_sha' "$manifest")" = "${{ github.workflow_sha }}"
+            test "$(jq -r '.workflow_ref' "$manifest")" = "${{ github.workflow_ref }}"
+            test "$(jq -r '.trigger_sha' "$manifest")" = "${{ github.sha }}"
+            test "$(jq -r '.trigger_ref' "$manifest")" = "${{ github.ref }}"
             test "$(jq -r '.run_id' "$manifest")" = "${{ github.run_id }}"
             test "$(jq -r '.run_attempt' "$manifest")" = "${{ github.run_attempt }}"
             test "$(jq -r '.experiment_subject_sha' "$manifest")" = "$FROZEN_SUBJECT_SHA"
@@ -720,6 +741,9 @@ jobs:
             "repository": "${{ github.repository }}",
             "workflow": "${{ github.workflow }}",
             "workflow_sha": "${{ github.workflow_sha }}",
+            "workflow_ref": "${{ github.workflow_ref }}",
+            "trigger_sha": "${{ github.sha }}",
+            "trigger_ref": "${{ github.ref }}",
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
@@ -741,7 +765,7 @@ jobs:
               "all manifests share one experiment subject SHA",
               "all manifests share one repair SHA",
               "all manifests share one frozen base SHA",
-              "all manifests share one workflow SHA and run identity",
+              "all manifests share one workflow SHA, workflow ref, trigger identity, and run identity",
               "primary and replay share the same Cargo.lock SHA-256",
               "delta lock identity matches primary and replay",
               "all three artifacts belong to this workflow run and are unexpired",
@@ -776,6 +800,9 @@ jobs:
             "repository": "${{ github.repository }}",
             "workflow": "${{ github.workflow }}",
             "workflow_sha": "${{ github.workflow_sha }}",
+            "workflow_ref": "${{ github.workflow_ref }}",
+            "trigger_sha": "${{ github.sha }}",
+            "trigger_ref": "${{ github.ref }}",
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "job": "${{ github.job }}",
@@ -872,6 +899,9 @@ jobs:
             test "$(jq -r '.repository' "$manifest")" = "${{ github.repository }}"
             test "$(jq -r '.workflow' "$manifest")" = "${{ github.workflow }}"
             test "$(jq -r '.workflow_sha' "$manifest")" = "${{ github.workflow_sha }}"
+            test "$(jq -r '.workflow_ref' "$manifest")" = "${{ github.workflow_ref }}"
+            test "$(jq -r '.trigger_sha' "$manifest")" = "${{ github.sha }}"
+            test "$(jq -r '.trigger_ref' "$manifest")" = "${{ github.ref }}"
             test "$(jq -r '.run_id' "$manifest")" = "${{ github.run_id }}"
             test "$(jq -r '.run_attempt' "$manifest")" = "${{ github.run_attempt }}"
             test "$(jq -r '.experiment_subject_sha' "$manifest")" = "$FROZEN_SUBJECT_SHA"
@@ -949,6 +979,9 @@ jobs:
             "repository": "${{ github.repository }}",
             "workflow": "${{ github.workflow }}",
             "workflow_sha": "${{ github.workflow_sha }}",
+            "workflow_ref": "${{ github.workflow_ref }}",
+            "trigger_sha": "${{ github.sha }}",
+            "trigger_ref": "${{ github.ref }}",
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
@@ -970,7 +1003,7 @@ jobs:
               "all manifests share one experiment subject SHA",
               "all manifests share one repair SHA",
               "all manifests share one frozen base SHA",
-              "all manifests share one workflow SHA and run identity",
+              "all manifests share one workflow SHA, workflow ref, trigger identity, and run identity",
               "primary and replay share the same Cargo.lock SHA-256",
               "delta lock identity matches primary and replay",
               "all three artifacts belong to this workflow run and are unexpired",
@@ -1005,6 +1038,9 @@ jobs:
             "repository": "${{ github.repository }}",
             "workflow": "${{ github.workflow }}",
             "workflow_sha": "${{ github.workflow_sha }}",
+            "workflow_ref": "${{ github.workflow_ref }}",
+            "trigger_sha": "${{ github.sha }}",
+            "trigger_ref": "${{ github.ref }}",
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "job": "${{ github.job }}",
@@ -1101,6 +1137,9 @@ jobs:
             test "$(jq -r '.repository' "$manifest")" = "${{ github.repository }}"
             test "$(jq -r '.workflow' "$manifest")" = "${{ github.workflow }}"
             test "$(jq -r '.workflow_sha' "$manifest")" = "${{ github.workflow_sha }}"
+            test "$(jq -r '.workflow_ref' "$manifest")" = "${{ github.workflow_ref }}"
+            test "$(jq -r '.trigger_sha' "$manifest")" = "${{ github.sha }}"
+            test "$(jq -r '.trigger_ref' "$manifest")" = "${{ github.ref }}"
             test "$(jq -r '.run_id' "$manifest")" = "${{ github.run_id }}"
             test "$(jq -r '.run_attempt' "$manifest")" = "${{ github.run_attempt }}"
             test "$(jq -r '.experiment_subject_sha' "$manifest")" = "$FROZEN_SUBJECT_SHA"
@@ -1178,6 +1217,9 @@ jobs:
             "repository": "${{ github.repository }}",
             "workflow": "${{ github.workflow }}",
             "workflow_sha": "${{ github.workflow_sha }}",
+            "workflow_ref": "${{ github.workflow_ref }}",
+            "trigger_sha": "${{ github.sha }}",
+            "trigger_ref": "${{ github.ref }}",
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
@@ -1199,7 +1241,7 @@ jobs:
               "all manifests share one experiment subject SHA",
               "all manifests share one repair SHA",
               "all manifests share one frozen base SHA",
-              "all manifests share one workflow SHA and run identity",
+              "all manifests share one workflow SHA, workflow ref, trigger identity, and run identity",
               "primary and replay share the same Cargo.lock SHA-256",
               "delta lock identity matches primary and replay",
               "all three artifacts belong to this workflow run and are unexpired",
