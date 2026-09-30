@@ -154,6 +154,21 @@ impl MolaMegdrProduct {
             .map_err(MolaError::InvalidMetadata)
     }
 
+    /// Compose this topography product with its observation-count companion
+    /// without collapsing either product's source identity. This is the
+    /// observation-level provenance primitive that the future snapshot-backed
+    /// sampler can carry forward without changing the TerrainSample API yet.
+    pub fn artifact_composition_with_counts(
+        &self,
+        counts: &Self,
+    ) -> Result<TerrainArtifactComposition, MolaError> {
+        self.validate_companion(counts)?;
+        let mut artifacts = self.artifact_identities()?.artifacts;
+        artifacts.extend(counts.artifact_identities()?.artifacts);
+        TerrainArtifactComposition::from_artifacts(artifacts)
+            .map_err(MolaError::InvalidMetadata)
+    }
+
     pub fn open_verified(
         label_path: impl AsRef<Path>,
         img_path: impl AsRef<Path>,
@@ -1800,6 +1815,10 @@ mod tests {
         assert_eq!(topography_artifacts.artifacts[0].source_id, "MEGT00N000HB");
         assert_eq!(counts_artifacts.artifacts[0].source_id, "MEGC00N000HB");
         assert_ne!(topography_artifacts, counts_artifacts);
+        let composition = topography.artifact_composition_with_counts(&counts).unwrap();
+        assert_eq!(composition.artifacts.len(), 4);
+        assert!(composition.artifacts.iter().any(|artifact| artifact.source_id == "MEGT00N000HB"));
+        assert!(composition.artifacts.iter().any(|artifact| artifact.source_id == "MEGC00N000HB"));
     }
 
     #[test]
