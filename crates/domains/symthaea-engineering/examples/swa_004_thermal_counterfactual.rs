@@ -15,7 +15,6 @@ struct ZoneParameters {
     thermal_mass_kwh_per_c: f64,
     envelope_u_kw_per_c: f64,
     internal_gain_kw: f64,
-    hvac_max_kw: f64,
     setpoint_c: f64,
     comfort_band_c: f64,
 }
@@ -107,7 +106,6 @@ fn main() {
         thermal_mass_kwh_per_c: 8.0,
         envelope_u_kw_per_c: 0.20,
         internal_gain_kw: 0.35,
-        hvac_max_kw: 2.0,
         setpoint_c: 21.0,
         comfort_band_c: 2.0,
     };
