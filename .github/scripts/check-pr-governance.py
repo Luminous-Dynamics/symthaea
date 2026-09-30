@@ -54,6 +54,10 @@ REQUIRED_CLASS_A_ROOTS = (
     ("exact", ".github/scripts/check-pr-governance.py", "governance"),
     ("exact", ".github/workflows/pr-governance.yml", "governance"),
     ("exact", ".github/workflows/pr-governance-root.yml", "governance"),
+    ("exact", ".github/scripts/check-privileged-workflow-inventory.py", "governance"),
+    ("exact", ".github/governance-privileged-workflow-inventory-v1.json", "governance"),
+    ("exact", "docs/compliance/adr/ADR-005-privileged-workflow-inventory.md", "governance"),
+    ("exact", ".github/workflows/workflow-syntax.yml", "governance"),
 )
 EXPECTED_ADR_PATH_PREFIXES = ("docs/compliance/adr/",)
 EXPECTED_PREFIX_POLICY = {
@@ -178,6 +182,10 @@ REQUIRED_ROOT_WORKFLOW_SNIPPETS = (
     'refs/pull/${PR_NUMBER}/head:refs/remotes/pr-governance/${PR_NUMBER}/head',
     'test "${fetched_head}" = "${PR_HEAD_SHA}"',
     "python3 .github/scripts/check-pr-governance.py",
+    "python3 .github/scripts/check-privileged-workflow-inventory.py",
+    ".github/governance-privileged-workflow-inventory-v1.json",
+    "docs/compliance/adr/ADR-005-privileged-workflow-inventory.md",
+    ".github/workflows/workflow-syntax.yml",
     "actions_event_policy_requirement=pull_request_target_must_be_explicitly_allowed",
     "actions_event_policy_attestation=not_established_by_repository_code",
 )
