@@ -36,8 +36,7 @@ impl FederatedClaim {
         provenance_family: impl Into<String>,
         author: impl Into<String>,
         statement_ref: impl Into<String>,
-        provenance_snapshot_digest: impl Into<String>,
-        provenance_validation: ProvenanceValidationReport,
+        provenance_view: ProvenanceView,
         admission_receipt: CanonicalAdmissionReceipt,
     ) -> Result<Self, &'static str> {
         let claim = Self {
@@ -49,15 +48,18 @@ impl FederatedClaim {
             statement_ref: statement_ref.into(),
             source_event: None,
             frontier_ref: admission_receipt.frontier_ref.clone(),
-            provenance_snapshot_digest: provenance_snapshot_digest.into(),
-            provenance_validation,
+            provenance_snapshot_digest: provenance_view.snapshot_digest.clone(),
+            provenance_validation: provenance_view.validation.clone(),
             admission_receipt,
             epistemic_state: None,
             claim_ceiling: None,
             model_ref: None,
             derivation_refs: Vec::new(),
-            relations: Vec::new(),
+            relations: provenance_view.relations.clone(),
         };
+        if !claim.admission_receipt.binds_validation(&provenance_view.validation) {
+            return Err("admission receipt must bind provenance view validation");
+        }
         claim.validate_structure()?;
         Ok(claim)
     }
@@ -227,8 +229,12 @@ mod tests {
             "family:1",
             "author:1",
             "statement:1",
-            r.provenance_snapshot_digest.clone(),
-            validation,
+            ProvenanceView::from_relations(&[ProvenanceRelation {
+                source_memory_id: "derived".into(),
+                target_memory_id: "source".into(),
+                kind: ProvenanceRelationKind::DerivedFrom,
+                created_at: "cycle:2".into(),
+            }], validation).unwrap(),
             r,
         ).unwrap();
         assert_eq!(claim.schema_version, FEDERATED_CLAIM_SCHEMA_VERSION);
@@ -244,7 +250,7 @@ mod tests {
         assert_eq!(
             FederatedClaim::new(
                 "claim:1", "canonical:1", "family:1", "author:1", "statement:1",
-                "wrong-digest", validation, r,
+                ProvenanceView::from_relations(&[], validation).unwrap(), r,
             ).unwrap_err(),
             "claim snapshot digest must match validation report"
         );
@@ -304,8 +310,7 @@ mod digest_tests {
             "family:1",
             "author:1",
             "statement:1",
-            validation.snapshot_digest.clone(),
-            validation,
+            ProvenanceView::from_relations(&relations, validation).unwrap(),
             receipt,
         ).unwrap();
         claim.derivation_refs = vec!["derivation:b".into(), "derivation:a".into()];
