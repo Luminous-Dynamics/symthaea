@@ -287,6 +287,19 @@ mod tests {
     }
 
     #[test]
+    fn uppercase_sha256_reference_fails_closed() {
+        let mut r = record();
+        r.performance.artifact_digest = "sha256:000000000000000000000000000000000000000000000000000000000000000A".to_owned();
+        assert!(matches!(
+            r.validate(),
+            Err(CostQualityJoinError::InvalidReference {
+                field: "performance",
+                reason: "artifact_digest must be sha256: followed by exactly 64 hexadecimal characters"
+            })
+        ));
+    }
+
+    #[test]
     fn wrong_reference_kind_fails_closed() {
         let mut r = record();
         r.task_quality.kind = "performance".to_owned();
