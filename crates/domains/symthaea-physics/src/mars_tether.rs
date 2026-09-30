@@ -244,6 +244,60 @@ impl TerrainProvenance {
         })
     }
 
+    /// Validate the provenance set as a deterministic, conflict-free artifact set.
+    ///
+    /// Logical artifact names are unique. Repeated identical identities are
+    /// harmless, while a repeated name with a different algorithm or digest
+    /// is rejected rather than silently accumulated.
+    pub fn validate_content_digests(&self) -> Result<(), String> {
+        for (index, (name, algorithm, digest)) in self.content_digests.iter().enumerate() {
+            if name.trim().is_empty() {
+                return Err(format!("content digest {index} has an empty logical file name"));
+            }
+            if algorithm.trim().is_empty() {
+                return Err(format!("content digest {index} has an empty algorithm"));
+            }
+            if digest.trim().is_empty() {
+                return Err(format!("content digest {index} has an empty digest"));
+            }
+            for (other_name, other_algorithm, other_digest) in self.content_digests.iter().skip(index + 1) {
+                if name == other_name
+                    && (algorithm != other_algorithm || digest != other_digest)
+                {
+                    return Err(format!(
+                        "conflicting provenance identities for logical file {name}"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Merge another provenance set without allowing ambiguous artifact identity.
+    /// Identical entries are deduplicated; conflicting identities fail closed.
+    pub fn merged_with(&self, other: &Self) -> Result<Self, String> {
+        self.validate_content_digests()?;
+        other.validate_content_digests()?;
+        let mut merged = self.clone();
+        for entry in &other.content_digests {
+            if let Some(existing) = merged
+                .content_digests
+                .iter()
+                .find(|(name, _, _)| name == &entry.0)
+            {
+                if existing.1 != entry.1 || existing.2 != entry.2 {
+                    return Err(format!(
+                        "conflicting provenance identities for logical file {}",
+                        entry.0
+                    ));
+                }
+            } else {
+                merged.content_digests.push(entry.clone());
+            }
+        }
+        Ok(merged)
+    }
+
     /// Require cryptographic identity for a named source artifact.
     pub fn require_sha256(&self, logical_file: &str) -> Result<(), String> {
         if self.has_sha256(logical_file) {
@@ -745,6 +799,33 @@ mod tests {
                 coordinate_reference: "areocentric-east-positive".into(),
             },
         }
+    }
+
+    #[test]
+    fn terrain_provenance_merge_deduplicates_and_rejects_conflicts() {
+        let base = TerrainProvenance {
+            source_id: "mola".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "ia2".into(),
+            content_digests: vec![("raster".into(), "SHA-256".into(), "a".repeat(64))],
+        };
+        let same = TerrainProvenance {
+            source_id: "mola".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "ia2".into(),
+            content_digests: vec![("raster".into(), "SHA-256".into(), "a".repeat(64))],
+        };
+        let merged = base.merged_with(&same).unwrap();
+        assert_eq!(merged.content_digests.len(), 1);
+
+        let conflict = TerrainProvenance {
+            source_id: "mola".into(),
+            source_revision: "v3".into(),
+            coordinate_reference: "ia2".into(),
+            content_digests: vec![("raster".into(), "SHA-256".into(), "b".repeat(64))],
+        };
+        let error = merged.merged_with(&conflict).unwrap_err();
+        assert!(error.contains("conflicting provenance identities"));
     }
 
     #[test]
