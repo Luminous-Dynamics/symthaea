@@ -113,6 +113,20 @@ jobs:
       - name: Crate registry integrity
         run: cargo run -q -p xtask -- crate-status
 
+  nixward-observation-boundary:
+    name: Nixward Observation Boundary
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+
+      # CROSS-015 is a source-boundary regression fence. It deliberately checks
+      # the protected authority modules rather than claiming that grep proves
+      # semantic authority correctness. Future effect-binding/adapter modules
+      # must be added to the script's explicit allowlist before use.
+      - name: Enforce governed observation boundary
+        run: bash scripts/check-nixward-observation-boundary.sh
+
   embodiment-safety-composition:
     name: Embodiment Safety Composition
     runs-on: ubuntu-latest
@@ -597,8 +611,7 @@ jobs:
           CARGO_TARGET_DIR: target/cognitive-hardening
         run: cargo test -p nixward --lib "mind::world_model"
 
-      - name: Phase 2.9-B — Episodic Memory Boundary Tests
-        env:
+      - name: Phase 2.9-B — Episodic Memory Boundary Tests        env:
           CARGO_TARGET_DIR: target/cognitive-hardening
         run: cargo test -p nixward --lib "mind::episodic_memory"
 
@@ -1197,8 +1210,7 @@ jobs:
               cargo check --features "$FEATURES"
               # Also compile the voice test surface: the gated integration
               # tests once bit-rotted invisibly (imports of deleted types)
-              # because feature legs were check-only and never built tests.
-              cargo check -p symthaea --features "$FEATURES" \
+              # because feature legs were check-only and never built tests.              cargo check -p symthaea --features "$FEATURES" \
                 --test voice_integration --test voice_pipeline_integration
               ;;
             *)
