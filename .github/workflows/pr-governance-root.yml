@@ -71,6 +71,20 @@ jobs:
           echo "validator_sha256=$(sha256sum .github/scripts/check-pr-governance.py | awk '{print $1}')"
           echo "policy_sha256=$(sha256sum .github/governance-change-policy-v1.json | awk '{print $1}')"
 
+      - name: Verify privileged governance enforcement source integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/scripts/check-privileged-workflow-inventory.py
+          test -f .github/governance-privileged-workflow-inventory-v1.json
+          test -f docs/compliance/adr/ADR-005-privileged-workflow-inventory.md
+          test -f .github/workflows/workflow-syntax.yml
+          python3 .github/scripts/check-privileged-workflow-inventory.py --self-test
+          python3 .github/scripts/check-privileged-workflow-inventory.py
+          python3 -m json.tool .github/governance-privileged-workflow-inventory-v1.json >/dev/null
+          echo "privileged_inventory_authority=TRUSTED_MAIN_BASE"
+          echo "privileged_inventory_execution_subject=TRUSTED_MAIN_BASE"
+
       - name: Enforce exact PR governance policy from trusted main code
         shell: bash
         env:
