@@ -112,6 +112,8 @@ pub mod pareto_frontier;
 pub mod dimension_task_harness;
 /// Deterministic paired noise-severity task family for HDC dimension research.
 pub mod noise_robustness_harness;
+/// Deterministic key/value associative-memory cleanup task family for HDC dimension research.
+pub mod associative_cleanup_harness;
 
 /// HDC dimensionality configuration for runtime selection
 ///
