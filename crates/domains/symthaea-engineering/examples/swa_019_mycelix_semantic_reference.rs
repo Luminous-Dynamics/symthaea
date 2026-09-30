@@ -21,6 +21,7 @@
 use blake3;
 use serde::Serialize;
 use symthaea_engineering::provenance_binding::{CanonicalEdgeRef, CanonicalNodeRef, EvidenceSliceManifest};
+use symthaea_engineering::provenance_graph::{reference_graph, EdgeKind};
 
 const OBSERVED_MYCELIX_INTEROP_COMMIT: &str =
     "b55bc03d99d0e8c89201dca06a264d16d5e2efd6";
@@ -336,31 +337,75 @@ fn evidence_binding_payload(binding: &EvidenceBinding) -> EvidenceBindingPayload
 }
 
 fn evidence_binding_digest(binding: &EvidenceBinding) -> String {
-    let manifest = EvidenceSliceManifest {
+    let slice = reference_graph()
+        .slice("claim-001")
+        .expect("authoritative reference claim exists");
+
+    let nodes = slice
+        .nodes
+        .iter()
+        .map(|node| {
+            canonical_node(
+                graph_reference(binding, node.id),
+                graph_node_kind(node.kind),
+            )
+        })
+        .collect();
+
+    let edges = slice
+        .edges
+        .iter()
+        .map(|edge| CanonicalEdgeRef {
+            from: graph_reference(binding, edge.from).object_id.into(),
+            to: graph_reference(binding, edge.to).object_id.into(),
+            kind: graph_edge_kind(edge.kind).into(),
+        })
+        .collect();
+
+    EvidenceSliceManifest {
         slice_ref: binding.slice_ref.object_id.to_string(),
         claim_ref: binding.claim_ref.object_id.to_string(),
         slice_revision: binding.slice_revision.to_string(),
-        nodes: vec![
-            canonical_node(&binding.claim_ref, "Claim"),
-            canonical_node(&binding.evidence_ref, "Evidence"),
-            canonical_node(&binding.prediction_ref, "Prediction"),
-            canonical_node(&binding.model_ref, "Model"),
-            canonical_node(&binding.parameters_ref, "Parameters"),
-            canonical_node(&binding.scenario_ref, "Scenario"),
-            canonical_node(&binding.dataset_ref, "Dataset"),
-            canonical_node(&binding.context_ref, "ContextOfUse"),
-        ],
-        edges: vec![
-            CanonicalEdgeRef { from: binding.claim_ref.object_id.into(), to: binding.evidence_ref.object_id.into(), kind: "SupportedBy".into() },
-            CanonicalEdgeRef { from: binding.evidence_ref.object_id.into(), to: binding.prediction_ref.object_id.into(), kind: "DerivedFrom".into() },
-            CanonicalEdgeRef { from: binding.evidence_ref.object_id.into(), to: binding.context_ref.object_id.into(), kind: "DerivedFrom".into() },
-            CanonicalEdgeRef { from: binding.prediction_ref.object_id.into(), to: binding.model_ref.object_id.into(), kind: "DerivedFrom".into() },
-            CanonicalEdgeRef { from: binding.prediction_ref.object_id.into(), to: binding.parameters_ref.object_id.into(), kind: "DerivedFrom".into() },
-            CanonicalEdgeRef { from: binding.prediction_ref.object_id.into(), to: binding.scenario_ref.object_id.into(), kind: "DerivedFrom".into() },
-            CanonicalEdgeRef { from: binding.evidence_ref.object_id.into(), to: binding.dataset_ref.object_id.into(), kind: "DerivedFrom".into() },
-        ],
-    };
-    manifest.digest()
+        nodes,
+        edges,
+    }
+    .digest()
+}
+
+fn graph_reference<'a>(binding: &'a EvidenceBinding, id: &str) -> &'a SemanticRefProjection {
+    match id {
+        "claim-001" => &binding.claim_ref,
+        "validation-001" => &binding.evidence_ref,
+        "prediction-001" => &binding.prediction_ref,
+        "model-001" => &binding.model_ref,
+        "parameters-001" => &binding.parameters_ref,
+        "scenario-001" => &binding.scenario_ref,
+        "dataset-001" => &binding.dataset_ref,
+        "context-001" => &binding.context_ref,
+        _ => panic!("authoritative provenance node is not bound: {id}"),
+    }
+}
+
+fn graph_node_kind(kind: symthaea_engineering::provenance_graph::NodeKind) -> &'static str {
+    match kind {
+        symthaea_engineering::provenance_graph::NodeKind::Claim => "Claim",
+        symthaea_engineering::provenance_graph::NodeKind::Evidence => "Evidence",
+        symthaea_engineering::provenance_graph::NodeKind::Prediction => "Prediction",
+        symthaea_engineering::provenance_graph::NodeKind::Model => "Model",
+        symthaea_engineering::provenance_graph::NodeKind::Parameters => "Parameters",
+        symthaea_engineering::provenance_graph::NodeKind::Scenario => "Scenario",
+        symthaea_engineering::provenance_graph::NodeKind::Dataset => "Dataset",
+        symthaea_engineering::provenance_graph::NodeKind::ContextOfUse => "ContextOfUse",
+    }
+}
+
+fn graph_edge_kind(kind: EdgeKind) -> &'static str {
+    match kind {
+        EdgeKind::DerivedFrom => "DerivedFrom",
+        EdgeKind::SupportedBy => "SupportedBy",
+        EdgeKind::QualifiedBy => "QualifiedBy",
+        EdgeKind::ContradictedBy => "ContradictedBy",
+    }
 }
 
 fn canonical_node(reference: &SemanticRefProjection, kind: &str) -> CanonicalNodeRef {
