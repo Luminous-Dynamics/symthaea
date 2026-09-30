@@ -21,6 +21,7 @@ use symthaea_core::hdc::{
 
 const DIMS: &[usize] = &[1_024, 2_048, 4_096, 8_192, 16_384, 32_768, 65_536];
 const TAIL_DIMS: &[usize] = &[1_003, 1_027, 4_099, 16_387];
+const EXTENDED_DIMS: &[usize] = &[131_072, 262_144];
 
 fn values(dim: usize, seed: u64) -> Vec<f32> {
     (0..dim)
@@ -125,6 +126,24 @@ fn simd_matches_scalar_across_adaptive_resolution_ladder() {
         assert_eq!(bundled.len(), dim);
         for (i, (&got, &want)) in bundled.iter().zip(&scalar_bundled).enumerate() {
             assert_close(got, want, 2e-5, 2e-5, &format!("bundle dim={dim} i={i}"));
+        }
+    }
+}
+
+#[test]
+fn simd_matches_scalar_at_extended_resolutions() {
+    for &dim in EXTENDED_DIMS {
+        let a = values(dim, 0x12800001);
+        let b = values(dim, 0x25600002);
+        assert_close(dot_product_simd(&a, &b), scalar_dot(&a, &b), 8e-3, 4e-5, "extended dot");
+        assert_close(norm_simd(&a), scalar_norm(&a), 8e-3, 4e-5, "extended norm");
+        assert_eq!(bind_simd(&a, &b), scalar_bind(&a, &b));
+        let hvs = [&a[..], &b[..]];
+        let weights = [0.7, 0.3];
+        let bundled = bundle_simd(&hvs, &weights);
+        let scalar_bundled = scalar_bundle(&hvs, &weights);
+        for (&got, &want) in bundled.iter().zip(&scalar_bundled) {
+            assert_close(got, want, 3e-5, 3e-5, "extended bundle");
         }
     }
 }
