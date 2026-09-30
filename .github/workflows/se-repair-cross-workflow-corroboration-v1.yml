@@ -195,9 +195,15 @@ jobs:
 
           if [[ "$upstream_conclusion" == "success" && "$contract_status" == "verified" ]]; then
             corroboration_result="CORROBORATED_EXECUTION_EVIDENCE"
+            observation_class="reproduced"
           else
             corroboration_result="NOT_CORROBORATED"
+            observation_class="observed"
           fi
+
+          touch upstream-index-artifact.json upstream-index-artifact-id.txt upstream-index-artifact-digest.txt
+          touch upstream-workflow-sha.txt upstream-workflow-ref.txt
+          touch primary-digest.txt replay-digest.txt delta-digest.txt
 
           cat > se-repair-corroboration-index-v1.json <<EOF
           {
@@ -235,7 +241,7 @@ jobs:
             },
             "contract_status": "$contract_status",
             "corroboration_result": "$corroboration_result",
-            "observation_class": "reproduced",
+            "observation_class": "$observation_class",
             "authority_class": "cross_workflow_corroboration_only",
             "qualification_state": "not_granted",
             "negative_invariants": [
