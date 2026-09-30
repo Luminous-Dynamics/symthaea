@@ -208,7 +208,8 @@ impl ExtensiveGame {
         }
 
         // Observation streams are semantic inputs to information encoding.
-        // They must be unambiguous for each observer at a concrete state.
+        // Private observer identities must be valid; repeated scopes are allowed
+        // because each vector element is a distinct ordered observation event.
         for (state, observations) in &self.observations {
             if self.node(*state).is_none() {
                 return Err(ExtensiveGameError::ObservationStateMissing(*state));
@@ -1433,6 +1434,74 @@ mod tests {
                 PlayerHistoryEvent::Observation { observation: ObservationId(11) },
             ]
         );
+    }
+
+    #[test]
+    fn encoder_receives_ordered_observation_stream() {
+        struct Encoder;
+
+        impl InformationEncoder for Encoder {
+            fn encode(
+                &self,
+                _player: PlayerId,
+                history: &[PlayerHistoryEvent],
+            ) -> Result<InformationSetId, InformationEncodingError> {
+                assert_eq!(
+                    history,
+                    &[
+                        PlayerHistoryEvent::Observation { observation: ObservationId(30) },
+                        PlayerHistoryEvent::Observation { observation: ObservationId(31) },
+                    ]
+                );
+                Ok(InformationSetId(0))
+            }
+        }
+
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(0),
+                            next: DecisionStateId(1),
+                            visibility: EventVisibility::Public,
+                        },
+                        Transition {
+                            action: ActionId(1),
+                            next: DecisionStateId(2),
+                            visibility: EventVisibility::Public,
+                        },
+                    ],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(1),
+                    payoffs: vec![1.0],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(2),
+                    payoffs: vec![0.0],
+                },
+            ],
+            information: info(),
+            observations: HashMap::from([(
+                DecisionStateId(0),
+                vec![
+                    Observation {
+                        scope: ObservationScope::Public,
+                        observation: ObservationId(30),
+                    },
+                    Observation {
+                        scope: ObservationScope::Public,
+                        observation: ObservationId(31),
+                    },
+                ],
+            )]),
+        };
+
+        assert_eq!(game.verify_information_encoder(&Encoder), Ok(()));
     }
 
     #[test]
