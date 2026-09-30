@@ -34,7 +34,7 @@ pub fn canonical_state_bytes(
     put_u16(&mut out, VERSION);
 
     let deliveries = sorted_deliveries(state);
-    put_u64(&mut out, deliveries.len());
+    put_u64(&mut out, u64::try_from(deliveries.len()).map_err(|_| CanonicalStateError::FieldTooLarge)?);
     for (id, delivery) in deliveries {
         put_uuid(&mut out, id);
         put_u16(&mut out, delivery.schema_version);
@@ -43,7 +43,7 @@ pub fn canonical_state_bytes(
     }
 
     let observations = sorted_observations(state);
-    put_u64(&mut out, observations.len());
+    put_u64(&mut out, u64::try_from(observations.len()).map_err(|_| CanonicalStateError::FieldTooLarge)?);
     for (key, observation) in observations {
         put_string(&mut out, &key.namespace)?;
         put_uuid(&mut out, key.observation_id);
@@ -53,7 +53,7 @@ pub fn canonical_state_bytes(
     }
 
     let results = sorted_results(state);
-    put_u64(&mut out, results.len());
+    put_u64(&mut out, u64::try_from(results.len()).map_err(|_| CanonicalStateError::FieldTooLarge)?);
     for (key, result) in results {
         put_string(&mut out, &key.namespace)?;
         put_uuid(&mut out, key.observation_id);
@@ -63,14 +63,14 @@ pub fn canonical_state_bytes(
     }
 
     let delivery_tombstones = sorted_delivery_tombstones(state);
-    put_u64(&mut out, delivery_tombstones.len());
+    put_u64(&mut out, u64::try_from(delivery_tombstones.len()).map_err(|_| CanonicalStateError::FieldTooLarge)?);
     for (id, tombstone) in delivery_tombstones {
         put_uuid(&mut out, id);
         put_tombstone(&mut out, tombstone);
     }
 
     let observation_tombstones = sorted_observation_tombstones(state);
-    put_u64(&mut out, observation_tombstones.len());
+    put_u64(&mut out, u64::try_from(observation_tombstones.len()).map_err(|_| CanonicalStateError::FieldTooLarge)?);
     for (key, tombstone) in observation_tombstones {
         put_string(&mut out, &key.namespace)?;
         put_uuid(&mut out, key.observation_id);
