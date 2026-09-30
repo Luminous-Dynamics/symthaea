@@ -43,7 +43,7 @@ The harness therefore tests associative cleanup while making its algebraic assum
 
 This is not a universal dimension recommendation, a production workload benchmark, or a proof that one associative-memory architecture dominates another. The task family remains separate from the direct-retrieval and noise-robustness families.
 
-The literature emphasizes that superposition memory capacity is coupled to vector width and stored-item count, while cleanup/codebooks are part of the retrieval mechanism. citeturn0search2
+The literature emphasizes that superposition memory capacity is coupled to vector width and stored-item count, while cleanup/codebooks are part of the retrieval mechanism. 
 
 ## Next layer
 
