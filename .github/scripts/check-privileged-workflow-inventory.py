@@ -46,6 +46,25 @@ ARTIFACT_EXECUTION_PATTERNS = (
     re.compile(r"(?:\$RUNNER_TEMP|runner\.temp)[^#\n]*?(?:\$GITHUB_WORKSPACE|\$PATH|/usr/local/bin|/usr/bin|/bin)"),
 )
 
+def _artifact_action_sink_evidence(lines: list[str], artifact_paths: list[str]) -> list[str]:
+    if not artifact_paths:
+        return []
+    evidence: list[str] = []
+    for index, raw in enumerate(lines):
+        stripped = raw.strip()
+        if not stripped.startswith("- uses:"):
+            continue
+        step_indent = _indent(raw)
+        end = index + 1
+        while end < len(lines) and (not lines[end].strip() or _indent(lines[end]) > step_indent):
+            end += 1
+        step_text = "\n".join(lines[index:end])
+        if "actions/download-artifact@" in step_text:
+            continue
+        if "runner.temp" in step_text or "$RUNNER_TEMP" in step_text:
+            evidence.append(stripped)
+    return sorted(set(evidence))
+
 def _artifact_execution_evidence(lines: list[str], artifact_paths: list[str]) -> list[str]:
     if not artifact_paths:
         return []
@@ -217,6 +236,7 @@ def parse_workflow(path: Path) -> dict[str, Any]:
     artifact_names_observed: list[str] = []
     artifact_paths_observed: list[str] = []
     artifact_execution_evidence: list[str] = []
+    artifact_action_sink_evidence: list[str] = []
     cache_modes: list[str] = []
     if event == "workflow_run":
         contract["trigger"]["workflows"] = events[event]["workflows"]
@@ -331,9 +351,10 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                 if "artifact-ids" in with_values:
                     raise InventoryError(f"{path}: artifact-id access is unsupported in privileged v1; bind to exact name + run-id")
             artifact_execution_evidence = _artifact_execution_evidence(lines, artifact_paths_observed)
-            if artifact_execution_evidence:
+            artifact_action_sink_evidence = _artifact_action_sink_evidence(lines, artifact_paths_observed)
+            if artifact_execution_evidence or artifact_action_sink_evidence:
                 raise InventoryError(
-                    f"{path}: downloaded workflow_run artifacts must not be executed, interpreted, compiled, made executable, or copied into privileged executable/workspace paths: {artifact_execution_evidence}"
+                    f"{path}: downloaded workflow_run artifacts must not cross an unreviewed execution or action-processing boundary: commands={artifact_execution_evidence}; actions={artifact_action_sink_evidence}"
                 )
     for raw in lines:
         stripped = raw.strip()
@@ -371,6 +392,7 @@ def parse_workflow(path: Path) -> dict[str, Any]:
         "artifact_names": sorted(set(artifact_names_observed)),
         "artifact_extraction_paths": sorted(set(artifact_paths_observed)),
         "artifact_execution_evidence": artifact_execution_evidence,
+        "artifact_action_sink_evidence": artifact_action_sink_evidence,
         "artifact_consumption_mode": "data_only" if download_artifact else "none",
         "explicit_cache_write_override_present": explicit_cache_write,
     }
@@ -474,6 +496,8 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
                         mismatches.append(f"{path}: artifact_consumption_mode differs from observed artifact handling")
                     if observed_contract["cross_workflow_dataflow_observed"].get("artifact_execution_evidence"):
                         mismatches.append(f"{path}: downloaded artifact execution evidence must be empty")
+                    if observed_contract["cross_workflow_dataflow_observed"].get("artifact_action_sink_evidence"):
+                        mismatches.append(f"{path}: downloaded artifact action-sink evidence must be empty")
                 if not observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and dataflow.get("artifacts_consumed"):
                     mismatches.append(f"{path}: artifacts_consumed is true but no download-artifact action is present")
                 if dataflow.get("cache_influence") != observed_contract["cache_influence"]:
@@ -636,6 +660,15 @@ jobs:
         safe_artifact = parse_workflow(wf)["contract"]
         assert safe_artifact["cross_workflow_dataflow_observed"]["artifact_consumption_mode"] == "data_only"
         assert safe_artifact["cross_workflow_dataflow_observed"]["artifact_execution_evidence"] == []
+        assert safe_artifact["cross_workflow_dataflow_observed"]["artifact_action_sink_evidence"] == []
+        action_sink = artifact_valid + "      - uses: example/action@0123456789abcdef0123456789abcdef01234567\\n        with:\\n          input: ${{ runner.temp }}/trusted-receipt/receipt.json\\n"
+        wf.write_text(action_sink, encoding="utf-8")
+        try:
+            parse_workflow(wf)
+        except InventoryError:
+            pass
+        else:
+            raise AssertionError("passing downloaded artifact into another action must fail closed")
         for malicious in (
             artifact_valid + "      - run: bash \${{ runner.temp }}/trusted-receipt/script.sh\n",
             artifact_valid + "      - run: source \${{ runner.temp }}/trusted-receipt/env.sh\n",
