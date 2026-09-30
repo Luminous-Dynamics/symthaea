@@ -48,10 +48,6 @@ struct Vitals {
 }
 
 impl Vitals {
-    fn cycle(&self) -> u64 {
-        0
-    }
-
     /// `CycleMetadata`'s sub-structs (`consciousness`, `embodied`, `temporal`,
     /// `attention`, `memory`, `harmonics`, `ethics`, `neuromod`, ...) are ALL
     /// `#[serde(flatten)]`, so despite the nested Rust field access used
