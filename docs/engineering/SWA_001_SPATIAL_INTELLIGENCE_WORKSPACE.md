@@ -756,3 +756,23 @@ The trust boundary is now:
 `authoritative provenance graph -> canonical evidence-slice manifest -> BLAKE3-256 commitment -> semantic Mycelix projection -> Mycelix validation/governance -> independently observed outcome`
 
 This also matches Holochain's validation model: validation should be deterministic, dependencies should be addressable, and unavailable dependencies should remain unresolved rather than becoming implicit approval. citeturn1search0turn1search2
+
+
+## Canonical encoding hardening — SWA-024
+
+SWA-024 hardens the byte-level identity beneath SWA-023.
+
+The evidence-slice commitment no longer depends on JSON serialization. The canonical byte representation is now explicitly versioned and length-delimited:
+
+- domain/version separator: `symthaea:evidence-slice:v1`;
+- length-prefixed scalar strings;
+- explicit presence markers for optional revisions;
+- canonicalized node and edge ordering;
+- explicit collection lengths;
+- BLAKE3-256 over those bytes.
+
+This removes an unnecessary dependency between the cryptographic identity and a presentation/wire serialization format. It also makes representation boundaries explicit: an absent revision and an explicitly empty revision are different byte sequences.
+
+BLAKE3 itself is unchanged; the improvement is the **input domain and framing** being committed. The BLAKE3 specification defines domain-separated modes and a fixed 256-bit default hash output; the fixture's own domain/version separator prevents unrelated Symthaea content from accidentally sharing this commitment namespace. citeturn0search4turn0search6
+
+This remains a content commitment, not a signature and not authorization. A production Mycelix adapter will still need the target system's accepted cryptographic/profile contract.
