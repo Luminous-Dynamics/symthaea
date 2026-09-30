@@ -434,3 +434,40 @@ The architectural progression is now:
 claim -> provenance slice -> completeness certificate -> replay witness -> support/qualification/contradiction set
 
 The next seam is **provenance integrity validation**: rather than merely constructing these structures, the fixture should reject impossible histories such as duplicate witness identities, missing upstream nodes, contradictory dependency identities, or derivation cycles. That moves the system from provenance storage toward provenance verification.
+
+
+## Provenance integrity validation — SWA-013
+
+SWA-012 established that disagreement can remain independently replayable. SWA-013 adds a stricter invariant: **the provenance graph itself must be structurally credible before its claims are consumed**.
+
+The fixture introduces a deterministic integrity validator that checks:
+
+- node identity uniqueness;
+- unresolved edge targets;
+- duplicate edges;
+- dependency-key revision conflicts;
+- self-derivation;
+- cycles in the `DerivedFrom` graph;
+- witness references that do not resolve to witness nodes;
+- claim completeness certificates that disagree with the validator's observed closure;
+- missing required claim dependencies.
+
+Normalization is deterministic: node identities are sorted and duplicate identities are never silently merged; edges are sorted by source, target, and relation. This means two syntactically different orderings of the same valid graph produce the same normalized representation.
+
+The validator intentionally distinguishes **structure from authority**. A graph can be structurally valid without authorizing an intervention, operating a building, or overriding a human decision. Likewise, a `Contradicts` edge is not treated as a derivation edge, so epistemic disagreement does not manufacture a causal cycle.
+
+The intended result is:
+
+`raw provenance -> normalized provenance -> integrity constraints -> Valid / Invalid`
+
+The validator is deliberately scoped to the SWA fixture rather than claiming to be a complete implementation of W3C PROV. That boundary matters. W3C PROV defines validity in terms of normalization plus uniqueness, ordering, type, and impossibility constraints, and explicitly notes that cyclic derivation can imply an impossible history. SWA-013 adopts the same engineering direction while implementing only the invariants required by this reference architecture. citeturn0search0turn0search4
+
+This changes the architecture from:
+
+`claim -> provenance slice -> completeness certificate -> replay witness -> support/qualification/contradiction set`
+
+to:
+
+`claim -> provenance slice -> completeness certificate -> integrity validation -> replay witness -> support/qualification/contradiction set`
+
+The next seam is **invalidation propagation**: when an upstream model, parameter, solver, dataset, or context revision changes, the system should deterministically propagate that dependency change to affected evidence, claims, replay witnesses, counterevidence branches, and decision contexts without mutating historical records.
