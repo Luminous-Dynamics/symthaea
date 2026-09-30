@@ -45,7 +45,10 @@
         "event": "pull_request_target",
         "repository_can_self_attest": false,
         "required_attestation": "effective enterprise/org/repository Actions policy explicitly permits this event for this workflow"
-      }
+      },
+      "cache_influence": "default_low_trust_read",
+      "cache_modes": [],
+      "local_reusable_workflow_calls": []
     },
     {
       "path": ".github/workflows/qual-mel-epi-001f-independent-receipt.yml",
@@ -121,11 +124,14 @@
           "run_identity": "run.id + run.run_attempt",
           "pr_association": "not_required_for_current_main-only consumer"
         },
-        "cache_influence": "none_observed",
+        "cache_influence": "default_low_trust_read",
         "privileged_side_effects": [
           "none"
         ]
-      }
+      },
+      "cache_influence": "default_low_trust_read",
+      "cache_modes": [],
+      "local_reusable_workflow_calls": []
     }
   ],
   "nonclaims": [
