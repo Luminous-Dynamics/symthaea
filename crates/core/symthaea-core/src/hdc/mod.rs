@@ -106,6 +106,7 @@ pub mod resource_evidence;
 pub mod performance_evidence;
 pub mod cost_quality_join;
 pub mod evidence_identity;
+pub mod evidence_manifest;
 pub mod pareto_frontier;
 
 /// HDC dimensionality configuration for runtime selection

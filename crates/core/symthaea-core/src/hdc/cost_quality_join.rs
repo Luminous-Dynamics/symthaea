@@ -156,6 +156,13 @@ impl CostQualityJoinRecord {
     }
 }
 
+fn is_sha256_digest(value: &str) -> bool {
+    let Some(hex) = value.strip_prefix("sha256:") else {
+        return false;
+    };
+    hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn validate_reference(
     reference: &EvidenceReference,
     field: &'static str,
@@ -180,10 +187,10 @@ fn validate_reference(
             reason: "artifact_digest is empty",
         });
     }
-    if !reference.artifact_digest.starts_with("sha256:") {
+    if !is_sha256_digest(&reference.artifact_digest) {
         return Err(CostQualityJoinError::InvalidReference {
             field,
-            reason: "artifact_digest must use sha256: prefix",
+            reason: "artifact_digest must be sha256: followed by exactly 64 hexadecimal characters",
         });
     }
     if reference.artifact_id.is_empty() {
@@ -208,7 +215,7 @@ mod tests {
         EvidenceReference {
             kind: kind.to_owned(),
             schema_version: 1,
-            artifact_digest: "sha256:fixture".to_owned(),
+            artifact_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
             artifact_id: format!("{kind}-fixture-v1"),
         }
     }
@@ -261,7 +268,33 @@ mod tests {
             r.validate(),
             Err(CostQualityJoinError::InvalidReference {
                 field: "resource",
-                reason: "artifact_digest must use sha256: prefix"
+                reason: "artifact_digest must be sha256: followed by exactly 64 hexadecimal characters"
+            })
+        ));
+    }
+
+    #[test]
+    fn malformed_sha256_reference_fails_closed() {
+        let mut r = record();
+        r.performance.artifact_digest = "sha256:short".to_owned();
+        assert!(matches!(
+            r.validate(),
+            Err(CostQualityJoinError::InvalidReference {
+                field: "performance",
+                reason: "artifact_digest must be sha256: followed by exactly 64 hexadecimal characters"
+            })
+        ));
+    }
+
+    #[test]
+    fn uppercase_sha256_reference_fails_closed() {
+        let mut r = record();
+        r.performance.artifact_digest = "sha256:000000000000000000000000000000000000000000000000000000000000000A".to_owned();
+        assert!(matches!(
+            r.validate(),
+            Err(CostQualityJoinError::InvalidReference {
+                field: "performance",
+                reason: "artifact_digest must be sha256: followed by exactly 64 hexadecimal characters"
             })
         ));
     }
