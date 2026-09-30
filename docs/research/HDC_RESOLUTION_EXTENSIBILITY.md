@@ -60,3 +60,35 @@ The controller should therefore optimize minimum sufficient resolution rather th
 The current HDC-LTC trajectory work treats 1K..64K as the controlled matrix. This change makes 128K and 256K possible without changing that evidence boundary, so the next experiment can measure whether extra dimensionality buys enough quality to justify its working-set cost.
 
 As a reference point, current accelerator hardware can hold substantially larger working sets; AMD lists 192 GB HBM3 and 5.3 TB/s peak bandwidth for MI300X. Hardware capacity therefore does not by itself establish that larger HDC vectors are useful—the relevant question remains quality and cost per operation. 
+
+
+## Resource admissibility is a separate contract
+
+`HdcResolution` answers whether a dimension is mathematically representable in
+the research space. It does **not** authorize an allocation or imply that the
+dimension is experimentally qualified.
+
+`ResolutionBudget` provides the next boundary:
+
+- per-vector byte ceiling;
+- resident working-set ceiling;
+- checked multiplication for resident-vector counts;
+- representation-aware f32 and binary sizing.
+
+This separation is deliberate:
+
+| Question | Contract |
+| --- | --- |
+| Is the dimension valid? | `HdcResolution` |
+| Has the dimension been empirically qualified? | canonical/exploratory/custom evidence class |
+| Can this workload fit the declared resource envelope? | `ResolutionBudget` |
+| Is the dimension preferable for a task? | future quality/cost evidence |
+
+Rust's checked integer multiplication returns `None` on overflow, which is the
+required behavior for converting an open resolution space into bounded working
+set accounting. citeturn0search0
+
+The budget is research infrastructure, not a production adaptive policy.
+Future adaptive selection should consume measured quality and cost evidence
+alongside such a resource envelope rather than treating a valid resolution as
+automatically admissible.
