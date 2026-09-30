@@ -61,7 +61,6 @@ jobs:
           index_name="${EXPECTED_INDEX_ARTIFACT_PREFIX}${run_id}-${{ github.event.workflow_run.run_attempt }}"
           test "$(jq --arg n "$index_name" '[.artifacts[] | select(.name == $n)] | length')" = "1"
 
-          jq --arg n "$index_name" '.artifacts[] | select(.name == $n)' upstream-index-artifact.json.tmp 2>/dev/null || true
           jq --arg n "$index_name" '.artifacts[] | select(.name == $n)' upstream-artifacts.json > upstream-index-artifact.json
 
           test "$(jq -r '.expired' upstream-index-artifact.json)" = "false"
@@ -174,7 +173,6 @@ jobs:
 
           test "$(jq -r '.sha' upstream-workflow.json)" != "null"
           test "$(jq -r '.sha' upstream-workflow.json)" != ""
-          test "$(jq -r '.sha' upstream-workflow.json)" = "$(git hash-object /dev/null 2>/dev/null || true)" || true
 
           printf '%s\n' "$upstream_workflow_sha" > upstream-workflow-sha.txt
           printf '%s\n' "$upstream_workflow_ref" > upstream-workflow-ref.txt
