@@ -394,6 +394,21 @@ pub struct TerrainArtifactIdentity {
 }
 
 impl TerrainArtifactIdentity {
+    /// Return the canonical identity used for composition and observation hashing.
+    ///
+    /// Algorithm identifiers are case-insensitive by contract, and SHA-256
+    /// hexadecimal digests are case-insensitive. Canonicalizing here keeps
+    /// equivalent producer spellings from becoming distinct artifact identities.
+    fn canonicalized(&self) -> Result<Self, String> {
+        self.validate()?;
+        let mut canonical = self.clone();
+        canonical.algorithm = self.algorithm.to_ascii_uppercase();
+        if canonical.algorithm == "SHA-256" {
+            canonical.digest = self.digest.to_ascii_lowercase();
+        }
+        Ok(canonical)
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.logical_file.trim().is_empty() {
             return Err("artifact logical file must be non-empty".into());
@@ -455,9 +470,10 @@ impl TerrainArtifactComposition {
     pub fn from_artifacts(
         mut artifacts: Vec<TerrainArtifactIdentity>,
     ) -> Result<Self, String> {
-        for artifact in &artifacts {
-            artifact.validate()?;
-        }
+        artifacts = artifacts
+            .into_iter()
+            .map(|artifact| artifact.canonicalized())
+            .collect::<Result<Vec<_>, _>>()?;
         artifacts.sort_by(|a, b| a.logical_file.cmp(&b.logical_file));
         for pair in artifacts.windows(2) {
             if pair[0].logical_file == pair[1].logical_file
@@ -1142,6 +1158,28 @@ mod tests {
             TerrainArtifactComposition::from_artifacts(vec![counts.clone(), topography.clone()])
                 .unwrap();
         assert_eq!(composition.artifacts, vec![counts, topography]);
+    }
+
+    #[test]
+    fn artifact_composition_canonicalizes_algorithm_and_sha256_case() {
+        let mut lower = TerrainArtifactIdentity {
+            logical_file: "raster-image".into(),
+            source_id: "mola".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "ia2".into(),
+            algorithm: "sha-256".into(),
+            digest: "A".repeat(64),
+        };
+        let mut upper = lower.clone();
+        upper.algorithm = "SHA-256".into();
+        upper.digest = "a".repeat(64);
+
+        let composition =
+            TerrainArtifactComposition::from_artifacts(vec![lower, upper]).unwrap();
+
+        assert_eq!(composition.artifacts.len(), 1);
+        assert_eq!(composition.artifacts[0].algorithm, "SHA-256");
+        assert_eq!(composition.artifacts[0].digest, "a".repeat(64));
     }
 
     #[test]
