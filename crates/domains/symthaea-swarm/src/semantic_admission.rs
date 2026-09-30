@@ -349,7 +349,7 @@ mod tests {
                 observation_id,
             },
             source_id: Uuid::from_u128(77),
-            observed_at_ms: 900,
+            observed_at_ms: 90,
             payload: b"alpha".to_vec(),
         };
         (delivery, observation)
