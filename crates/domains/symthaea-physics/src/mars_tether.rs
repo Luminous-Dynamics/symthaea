@@ -1067,6 +1067,74 @@ mod tests {
     }
 
     #[test]
+    fn artifact_composition_preserves_independent_source_identity() {
+        let topography = TerrainArtifactIdentity {
+            logical_file: "raster-image".into(),
+            source_id: "mola-topography".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "ia2".into(),
+            algorithm: "SHA-256".into(),
+            digest: "a".repeat(64),
+        };
+        let counts = TerrainArtifactIdentity {
+            logical_file: "counts-raster".into(),
+            source_id: "mola-counts".into(),
+            source_revision: "v7".into(),
+            coordinate_reference: "ia2".into(),
+            algorithm: "SHA-256".into(),
+            digest: "b".repeat(64),
+        };
+        let composition =
+            TerrainArtifactComposition::from_artifacts(vec![counts.clone(), topography.clone()])
+                .unwrap();
+        assert_eq!(composition.artifacts, vec![counts, topography]);
+    }
+
+    #[test]
+    fn artifact_composition_deduplicates_exact_identity_and_rejects_conflicts() {
+        let artifact = TerrainArtifactIdentity {
+            logical_file: "raster-image".into(),
+            source_id: "mola".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "ia2".into(),
+            algorithm: "SHA-256".into(),
+            digest: "a".repeat(64),
+        };
+        let duplicate = artifact.clone();
+        let mut conflicting = artifact.clone();
+        conflicting.digest = "b".repeat(64);
+
+        let deduped =
+            TerrainArtifactComposition::from_artifacts(vec![artifact.clone(), duplicate]).unwrap();
+        assert_eq!(deduped.artifacts, vec![artifact]);
+
+        let error =
+            TerrainArtifactComposition::from_artifacts(vec![artifact, conflicting]).unwrap_err();
+        assert!(error.contains("conflicting artifact identities"));
+    }
+
+    #[test]
+    fn legacy_provenance_projection_is_deterministic() {
+        let provenance = TerrainProvenance {
+            source_id: "mola".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "ia2".into(),
+            content_digests: vec![
+                ("counts-raster".into(), "SHA-256".into(), "b".repeat(64)),
+                ("raster-image".into(), "SHA-256".into(), "a".repeat(64)),
+            ],
+        };
+        let composition = provenance.artifact_identities().unwrap();
+        assert_eq!(composition.artifacts.len(), 2);
+        assert_eq!(composition.artifacts[0].logical_file, "counts-raster");
+        assert_eq!(composition.artifacts[1].logical_file, "raster-image");
+        assert!(composition
+            .artifacts
+            .iter()
+            .all(|artifact| artifact.source_id == "mola"));
+    }
+
+    #[test]
     fn tether_experiment_identity_requires_all_pinned_inputs() {
         let terrain = TerrainProvenance {
             source_id: "mola".into(),
