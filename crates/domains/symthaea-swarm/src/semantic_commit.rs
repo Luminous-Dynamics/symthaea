@@ -28,7 +28,11 @@ pub trait SemanticCommitStore {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AtomicAdmissionOutcome<E> {
-    Admitted { result: SemanticResult, committed_version: u64 },
+    Admitted {
+        result: SemanticResult,
+        /// Version immediately after the successful publication.
+        committed_version: u64,
+    },
     Replay { existing_result: SemanticResult, observed_version: u64 },
     Rejected { outcome: AdmissionOutcome, observed_version: u64 },
     Conflict { outcome: AdmissionOutcome, observed_version: u64 },
@@ -36,6 +40,18 @@ pub enum AtomicAdmissionOutcome<E> {
     CapacityExceeded { outcome: AdmissionOutcome, observed_version: u64 },
     ConcurrentConflict { observed_version: u64 },
     StorageError(E),
+}
+
+/// A successful semantic admission receipt.
+///
+/// The committed version is the linearization witness for this in-memory
+/// optimistic store: the receipt is only returned after compare-and-swap
+/// reports success. Replay carries the original semantic result instead of
+/// recomputing a new result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmissionReceipt {
+    pub result: SemanticResult,
+    pub committed_version: u64,
 }
 
 fn classify_non_admit<E>(outcome: AdmissionOutcome, version: u64) -> AtomicAdmissionOutcome<E> {
@@ -67,12 +83,15 @@ pub fn admit_atomically<S: SemanticCommitStore>(
     now_ms: u64,
     max_retries: usize,
 ) -> AtomicAdmissionOutcome<S::Error> {
+    let mut last_observed_version = None;
+
     for _attempt in 0..=max_retries {
         let loaded = match store.load() {
             Ok(value) => value,
             Err(error) => return AtomicAdmissionOutcome::StorageError(error),
         };
 
+        last_observed_version = Some(loaded.version);
         let outcome = decide(&loaded.state, delivery, observation, policy, now_ms);
 
         match outcome {
@@ -90,7 +109,9 @@ pub fn admit_atomically<S: SemanticCommitStore>(
         }
     }
 
-    AtomicAdmissionOutcome::ConcurrentConflict { observed_version: u64::MAX }
+    AtomicAdmissionOutcome::ConcurrentConflict {
+        observed_version: last_observed_version.unwrap_or(0),
+    }
 }
 
 #[cfg(test)]
@@ -223,6 +244,24 @@ mod tests {
         ));
         assert_eq!(store.loads, 2);
         assert_eq!(store.version, 1);
+    }
+
+    #[test]
+    fn retry_exhaustion_reports_last_loaded_version_not_sentinel() {
+        let (delivery, observation) = fixture();
+        let mut store = TestStore {
+            cas_results: VecDeque::from([Ok(false), Ok(false), Ok(false)]),
+            ..Default::default()
+        };
+        let result = admit_atomically(
+            &mut store, &delivery, &observation, AdmissionPolicy::default(), 100, 2
+        );
+        assert_eq!(
+            result,
+            AtomicAdmissionOutcome::ConcurrentConflict { observed_version: 3 }
+        );
+        assert_eq!(store.loads, 3);
+        assert_eq!(store.version, 3);
     }
 
     #[test]
