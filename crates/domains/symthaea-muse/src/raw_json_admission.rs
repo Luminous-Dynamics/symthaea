@@ -130,7 +130,7 @@ impl<'de> Visitor<'de> for GateVisitor<'_> {
 }
 
 impl GateVisitor<'_> {
-    fn enter<E: de::Error>(&self) -> Result<(), E> {
+    fn enter<E: de::Error>(&mut self) -> Result<(), E> {
         if self.state.depth >= self.state.limits.max_depth {
             return Err(E::custom("maximum JSON nesting depth exceeded"));
         }
@@ -138,7 +138,7 @@ impl GateVisitor<'_> {
         Ok(())
     }
 
-    fn leave(&self) {
+    fn leave(&mut self) {
         self.state.depth -= 1;
     }
 }
