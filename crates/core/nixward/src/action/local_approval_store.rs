@@ -24,7 +24,10 @@ use super::local_approval_submission::{
     LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1, LocalApprovalSubmissionV2,
     admit_verified_local_submission_v2,
 };
-use super::approver_evidence::VerifiedLocalUnixPeerCredentialV1;
+use super::approver_evidence::{
+    required_profile_accepts_evidence_v1, RequiredApprovalProfileV1,
+    VerifiedApproverEvidenceProfileV1, VerifiedLocalUnixPeerCredentialV1,
+};
 use super::temporal::{AuthoritativeEvaluationV1, UnixMillisV1};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -148,16 +151,14 @@ impl LocalApprovalRequestStoreV1 {
             Some(submission.request_id.as_str())
         );
 
-        Ok(ConsumedLocalApprovalDecisionV1 {
-            request_id: submission.request_id.clone(),
-            decision_evidence: decision,
-            projection_digest: removed.projection_digest,
-            required_approval_profile: removed.request.authority_profile_ref.clone(),
-            approver_evidence_ref: verified_peer.evidence_ref().clone(),
-            transport_instance_ref: verified_peer.audit_evidence().transport_instance_ref.clone(),
-            peer_observed_at_unix_ms: verified_peer.audit_evidence().observed_at_unix_ms,
-            consumed_at_unix_ms: evaluation.evaluated_at().as_u64(),
-        })
+        ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &removed.request,
+            decision,
+            removed.projection_digest,
+            verified_peer,
+            evaluation,
+        )?
+    })
     }
 
     /// Test-only legacy V1 admission, isolated from production callers.
@@ -191,16 +192,14 @@ impl LocalApprovalRequestStoreV1 {
             evaluation,
         )?;
         pending.remove(&submission.request_id);
-        Ok(ConsumedLocalApprovalDecisionV1 {
-            request_id: submission.request_id.clone(),
-            decision_evidence: decision,
-            projection_digest: record.projection_digest.clone(),
-            required_approval_profile: record.request.authority_profile_ref.clone(),
-            approver_evidence_ref: verified_peer.evidence_ref().clone(),
-            transport_instance_ref: verified_peer.audit_evidence().transport_instance_ref.clone(),
-            peer_observed_at_unix_ms: verified_peer.audit_evidence().observed_at_unix_ms,
-            consumed_at_unix_ms: evaluation.evaluated_at().as_u64(),
-        })
+        ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &record.request,
+            decision,
+            record.projection_digest.clone(),
+            verified_peer,
+            evaluation,
+        )?
+    })
     }
 
     pub fn pending_count(&self) -> Result<usize, LocalApprovalRequestStoreErrorV1> {
@@ -298,6 +297,81 @@ pub struct ConsumedLocalApprovalDecisionV1 {
 }
 
 impl ConsumedLocalApprovalDecisionV1 {
+    /// Final internal provenance-consistency seam for a consumed approval.
+    ///
+    /// All duplicated provenance fields are derived from the same live request,
+    /// admitted decision, verified peer, and authoritative evaluation.
+    fn from_admitted_parts(
+        request: &PendingNixApprovalRequestV1,
+        decision_evidence: LocalNixApprovalDecisionV1,
+        projection_digest: String,
+        verified_peer: &VerifiedLocalUnixPeerCredentialV1,
+        evaluation: AuthoritativeEvaluationV1,
+    ) -> Result<Self, LocalApprovalRequestStoreErrorV1> {
+        request.validate_shape()?;
+        validate_projection_digest_v1(&projection_digest)?;
+        decision_evidence.validate_shape()?;
+
+        if decision_evidence.request_id != request.request_id()? {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "request id",
+            ));
+        }
+        if decision_evidence.daemon_incarnation_id != request.daemon_incarnation_id {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "daemon incarnation",
+            ));
+        }
+        if decision_evidence.action_intent_digest != request.action_intent_digest {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "action intent digest",
+            ));
+        }
+
+        let required = RequiredApprovalProfileV1::parse_ref(&request.authority_profile_ref)?;
+        let evidence_profile =
+            VerifiedApproverEvidenceProfileV1::from_reference(verified_peer.evidence_ref())?;
+        if !required_profile_accepts_evidence_v1(required, evidence_profile) {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "required/evidence profile",
+            ));
+        }
+
+        let expected_approver_ref = format!(
+            "nixward-approver-evidence-v1:local-unix-peer-credential-v1:{}",
+            verified_peer.evidence_ref().evidence_digest
+        );
+        if decision_evidence.approver_ref != expected_approver_ref {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "approver evidence reference",
+            ));
+        }
+
+        let peer_observed_at = verified_peer.audit_evidence().observed_at_unix_ms;
+        let evaluated_at = evaluation.evaluated_at().as_u64();
+        if peer_observed_at > evaluated_at {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "peer observation time",
+            ));
+        }
+        if decision_evidence.decided_at_unix_ms > evaluated_at {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "decision time",
+            ));
+        }
+
+        Ok(Self {
+            request_id: decision_evidence.request_id.clone(),
+            decision_evidence,
+            projection_digest,
+            required_approval_profile: request.authority_profile_ref.clone(),
+            approver_evidence_ref: verified_peer.evidence_ref().clone(),
+            transport_instance_ref: verified_peer.audit_evidence().transport_instance_ref.clone(),
+            peer_observed_at_unix_ms: peer_observed_at,
+            consumed_at_unix_ms: evaluated_at,
+        })
+    }
+
     pub fn request_id(&self) -> &str {
         &self.request_id
     }
@@ -366,6 +440,8 @@ pub enum LocalApprovalRequestStoreErrorV1 {
     RequestNotPending,
     #[error("pending request disappeared while its consume mutex was held")]
     RequestDisappearedDuringConsume,
+    #[error("consumed approval provenance is internally inconsistent: {0}")]
+    ConsumedProvenanceMismatch(&'static str),
 }
 
 #[cfg(test)]
