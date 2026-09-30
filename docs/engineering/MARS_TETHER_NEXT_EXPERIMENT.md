@@ -288,7 +288,9 @@ This creates three deliberately distinct evidence states:
 2. **Content identity** — the exact label and raster byte streams receive recorded SHA-256 identities.
 3. **Pinned identity** — open_verified requires those identities to match an external expected manifest before use.
 
-The external manifest is intentionally not invented by the adapter. It should come from the archive/curation record or a separately controlled engineering artifact. NASA's current PDS4 model includes checksum manifests and file-level checksum metadata, making this separation consistent with the archive's provenance architecture.
+The external manifest is intentionally not invented by the adapter. It should come from the archive/curation record or a separately controlled engineering artifact.
+
+**Integrity limitation:** the current adapter computes the raster digest during `open()` / `open_verified()`, then performs later cell reads by reopening the path. A matching digest therefore identifies the bytes observed at open time; it does not prevent the file from being replaced or modified before a subsequent sample. Reproducible runs must keep the source files immutable for the product lifetime (for example, in a content-addressed, read-only staging area) until the adapter is changed to sample from a verified immutable snapshot or revalidate the exact sampled bytes against a stable file identity. A caller-supplied expected digest alone is not a filesystem immutability guarantee. NASA's current PDS4 model includes checksum manifests and file-level checksum metadata, making this separation consistent with the archive's provenance architecture.
 
 The remaining scientific gate is therefore not merely “can we read a MOLA file?” but “which exact archived byte artifacts are authorized inputs to this engineering run, and can the run reproduce that authorization later?”
 
