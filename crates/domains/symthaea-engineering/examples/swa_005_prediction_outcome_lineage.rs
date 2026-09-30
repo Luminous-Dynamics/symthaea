@@ -37,6 +37,7 @@ struct Intervention {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 struct PredictionInterval {
     model_id: &'static str,
+    parameter_set_id: &'static str,
     intervention_id: &'static str,
     comfort_min: f64,
     comfort_max: f64,
@@ -65,7 +66,6 @@ struct Residual {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 enum DiscrepancyKind {
     CoveredByPredictionInterval,
-    ParameterResidual,
     ModelFormOrUnexplained,
 }
 
@@ -73,6 +73,7 @@ enum DiscrepancyKind {
 struct ValidationEvidence {
     validation_id: &'static str,
     model_id: &'static str,
+    parameter_set_id: &'static str,
     intervention_id: &'static str,
     scenario_id: &'static str,
     comfort_error: f64,
@@ -102,6 +103,7 @@ fn validate_holdout(
     ValidationEvidence {
         validation_id,
         model_id: prediction.model_id,
+        parameter_set_id: prediction.parameter_set_id,
         intervention_id: prediction.intervention_id,
         scenario_id,
         comfort_error: residual.comfort_error,
@@ -190,6 +192,7 @@ fn simulate(
 
 fn predict(
     model_id: &'static str,
+    parameter_set_id: &'static str,
     initial: ZoneState,
     low: ZoneParameters,
     high: ZoneParameters,
@@ -202,6 +205,7 @@ fn predict(
 
     PredictionInterval {
         model_id,
+        parameter_set_id,
         intervention_id: intervention.id,
         comfort_min: comfort_low.min(comfort_high),
         comfort_max: comfort_low.max(comfort_high),
@@ -325,7 +329,7 @@ fn main() {
 
     // Training data are used to create v2. They are not reused as the
     // validation scenario.
-    let prediction_v1 = predict("swa-005-rc-v1", initial, predictor_low, predictor_high, intervention, 27.0, 8);
+    let prediction_v1 = predict("swa-005-rc-v1", "predictor-parameter-set-v1", initial, predictor_low, predictor_high, intervention, 27.0, 8);
     let training_outcome =
         synthetic_world(initial, training_world, intervention, 27.0, 8);
     let training_residual = residual(prediction_v1, training_outcome);
@@ -378,6 +382,7 @@ fn main() {
     // v2 is evaluated against it without rewriting v1 or the training residual.
     let prediction_v2 = predict(
         "swa-005-rc-v2",
+        "predictor-parameter-set-v2",
         initial,
         calibrated_low,
         calibrated_high,
@@ -399,6 +404,7 @@ fn main() {
     assert!(holdout_residual.comfort_error.is_finite());
     assert!(holdout_residual.energy_error_kwh.is_finite());
     assert_eq!(validation.model_id, revision.model_id);
+    assert_eq!(validation.parameter_set_id, revision.parameter_set_id);
     assert_eq!(validation.scenario_id, "scenario-holdout-30c");
     assert!(!validation.is_authorization);
 
@@ -438,7 +444,7 @@ mod tests {
             id: "zone-a-reversible-hvac",
             hvac_capacity_kw: 2.0,
         };
-        let prediction = predict("swa-005-rc-v1", initial, low, high, intervention, 27.0, 8);
+        let prediction = predict("swa-005-rc-v1", "predictor-parameter-set-v1", initial, low, high, intervention, 27.0, 8);
         let outcome = synthetic_world(initial, world, intervention, 27.0, 8);
         let residual = residual(prediction, outcome);
         (prediction, outcome, residual)
@@ -534,6 +540,7 @@ mod tests {
         );
         let holdout_prediction = predict(
             "swa-005-rc-v2",
+            "predictor-parameter-set-v2",
             ZoneState { indoor_c: 21.0 },
             calibrated_low,
             calibrated_high,
