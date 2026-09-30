@@ -88,6 +88,7 @@ jobs:
           rust_toolchain=1.96.0
           resolution_space=focused-tests
           resolution_budget=focused-tests
+          simd_operator_conformance=focused-tests
           simd_benchmark=compile-only
           benchmark_execution=not-claimed
           production_default_changed=false
