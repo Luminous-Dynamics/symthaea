@@ -809,7 +809,8 @@ mod tests {
             .replace("MAP_TYPE = T", "MAP_TYPE = C")
             .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8")
             .replace("PRODUCT_CREATION_TIME = 2003-03-21T00:00:00", "PRODUCT_CREATION_TIME = 2003-03-21T00:00:01")
-            .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 0.015626");
+            .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 0.015626")
+            .replace("CENTER_LONGITUDE = 180.0", "CENTER_LONGITUDE = 179.999");
         let counts = MolaMegdrMetadata::from_label(&parse_label(&count_label), "MEGC00N000HB").unwrap();
         let product = MolaMegdrProduct {
             metadata: topography,
