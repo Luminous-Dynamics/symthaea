@@ -99,6 +99,12 @@ impl FederatedClaim {
         bytes.extend_from_slice(&(self.provenance_validation.relation_count as u64).to_be_bytes());
         bytes.push(self.provenance_validation.conforms as u8);
         field(&mut bytes, "admission_event", Some(&self.admission_receipt.admission_event));
+        field(&mut bytes, "receipt_frontier_ref", self.admission_receipt.frontier_ref.as_deref());
+        field(
+            &mut bytes,
+            "receipt_provenance_snapshot_digest",
+            Some(&self.admission_receipt.provenance_snapshot_digest),
+        );
         field(&mut bytes, "receipt_validator_version", Some(&self.admission_receipt.validator_version));
         bytes.extend_from_slice(&self.admission_receipt.snapshot_schema_version.to_be_bytes());
         field(&mut bytes, "epistemic_state", self.epistemic_state.as_deref());
@@ -326,8 +332,17 @@ mod digest_tests {
     }
 
     #[test]
+    fn canonical_digest_has_a_stable_golden_vector() {
+        let claim = base_claim();
+        assert_eq!(
+            claim.canonical_digest(),
+            "3bb2d07d4fb897c836b9e65c551675560dc4a637e1206f12d8cc8f20bdc4cc96"
+        );
+    }
+
+    #[test]
     fn canonical_digest_is_order_independent_for_sets() {
-        let mut a = base_claim();
+        let a = base_claim();
         let mut b = a.clone();
         b.derivation_refs.reverse();
         b.relations.reverse();
@@ -341,6 +356,18 @@ mod digest_tests {
         let mut b = a.clone();
         b.author = "author:2".into();
         assert_ne!(a.canonical_digest(), b.canonical_digest());
+    }
+
+    #[test]
+    fn canonical_digest_covers_receipt_frontier_and_snapshot() {
+        let a = base_claim();
+        let mut frontier = a.clone();
+        frontier.admission_receipt.frontier_ref = Some("frontier:2".into());
+        assert_ne!(a.canonical_digest(), frontier.canonical_digest());
+
+        let mut snapshot = a.clone();
+        snapshot.admission_receipt.provenance_snapshot_digest = "snapshot:tampered".into();
+        assert_ne!(a.canonical_digest(), snapshot.canonical_digest());
     }
 
     #[test]
