@@ -159,6 +159,9 @@ impl CognitiveEventKind {
 /// It never contains private chain-of-thought.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CognitiveEvent {
+    /// Monotonic presentation identity, independent of daemon cycle numbers.
+    /// This keeps reconnects and repeated cycle values from colliding in the UI.
+    pub sequence: u64,
     pub kind: CognitiveEventKind,
     pub cycle: u64,
     pub coherence: f64,
@@ -167,8 +170,9 @@ pub struct CognitiveEvent {
 }
 
 impl CognitiveEvent {
-    pub fn lifecycle(kind: CognitiveEventKind, cycle: u64) -> Self {
+    pub fn lifecycle(sequence: u64, kind: CognitiveEventKind, cycle: u64) -> Self {
         Self {
+            sequence,
             kind,
             cycle,
             coherence: 0.0,
@@ -177,8 +181,14 @@ impl CognitiveEvent {
         }
     }
 
-    pub fn from_state(kind: CognitiveEventKind, cycle: u64, state: CognitiveState) -> Self {
+    pub fn from_state(
+        sequence: u64,
+        kind: CognitiveEventKind,
+        cycle: u64,
+        state: CognitiveState,
+    ) -> Self {
         Self {
+            sequence,
             kind,
             cycle,
             coherence: state.coherence,
@@ -195,6 +205,7 @@ impl CognitiveEvent {
 pub fn event_between(
     previous: Option<CognitiveState>,
     current: CognitiveState,
+    sequence: u64,
     cycle: u64,
     surprise: bool,
     gwt: bool,
@@ -225,7 +236,7 @@ pub fn event_between(
         return None;
     };
 
-    Some(CognitiveEvent::from_state(kind, cycle, current))
+    Some(CognitiveEvent::from_state(sequence, kind, cycle, current))
 }
 
 #[cfg(test)]
@@ -310,7 +321,7 @@ mod tests {
         let previous = state(true, false, 0.8, 0.3, 0.1);
         let current = state(true, true, 0.8, 0.3, 0.1);
         assert_eq!(
-            event_between(Some(previous), current, 42, true, true)
+            event_between(Some(previous), current, 1, 42, true, true)
                 .map(|event| event.kind),
             Some(CognitiveEventKind::ProcessingStarted)
         );
@@ -321,7 +332,7 @@ mod tests {
         let previous = state(true, false, 0.8, 0.3, 0.1);
         let current = state(true, false, 0.8, 0.1, 0.1);
         assert_eq!(
-            event_between(Some(previous), current, 42, false, false)
+            event_between(Some(previous), current, 2, 42, false, false)
                 .map(|event| event.kind),
             Some(CognitiveEventKind::EnteredRest)
         );
@@ -332,7 +343,7 @@ mod tests {
         let previous = state(true, false, 0.8, 0.3, 0.1);
         let current = state(true, false, 0.8, 0.3, 0.1);
         assert_eq!(
-            event_between(Some(previous), current, 42, true, false)
+            event_between(Some(previous), current, 3, 42, true, false)
                 .map(|event| event.kind),
             Some(CognitiveEventKind::SurpriseDetected)
         );
@@ -342,6 +353,27 @@ mod tests {
     fn quiet_cycle_creates_no_event() {
         let previous = state(true, false, 0.8, 0.3, 0.1);
         let current = state(true, false, 0.8, 0.3, 0.1);
-        assert!(event_between(Some(previous), current, 42, false, false).is_none());
+        assert!(event_between(Some(previous), current, 4, 42, false, false).is_none());
+    }
+}
+
+#[cfg(test)]
+mod identity_tests {
+    use super::*;
+
+    #[test]
+    fn event_identity_is_independent_of_cycle() {
+        let state = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.8, 0.1);
+        let first = CognitiveEvent::from_state(7, CognitiveEventKind::StateChanged, 12, state);
+        let second = CognitiveEvent::from_state(8, CognitiveEventKind::StateChanged, 12, state);
+        assert_ne!(first.sequence, second.sequence);
+        assert_eq!(first.cycle, second.cycle);
+    }
+
+    #[test]
+    fn lifecycle_event_retains_actual_cycle() {
+        let event = CognitiveEvent::lifecycle(9, CognitiveEventKind::Disconnected, 1234);
+        assert_eq!(event.sequence, 9);
+        assert_eq!(event.cycle, 1234);
     }
 }
