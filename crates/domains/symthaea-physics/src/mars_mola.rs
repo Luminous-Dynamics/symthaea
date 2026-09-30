@@ -397,8 +397,7 @@ impl MolaMegdrProduct {
         let sample = TerrainSample {
             latitude_rad: latitude_deg.to_radians(),
             longitude_rad: normalize_lon(longitude_deg).to_radians(),
-            sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,
-            source_grid_cell: Some((line, sample)),
+            sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,            source_grid_cell: Some((line, sample)),
             elevation_m: Some(elevation),
             elevation_uncertainty_m: Some(elevation_uncertainty_m),
             vertical_datum: TerrainVerticalDatum::AreoidRelative,
@@ -797,8 +796,7 @@ impl MolaMegdrMetadata {
             longitude_direction,
             center_latitude_deg,
             center_longitude_deg,
-            projection_rotation_deg,
-            longitude_min_deg,
+            projection_rotation_deg,            longitude_min_deg,
             longitude_max_deg,
             latitude_min_deg,
             latitude_max_deg,            line_offset,
@@ -1197,8 +1195,7 @@ fn parse_u16(
     let value = parse_number(&required(kv, key)?)?;
     if value < 0.0 || !value.is_finite() || value.fract() != 0.0 || value > u16::MAX as f64 {
         return Err(MolaError::InvalidMetadata(format!("invalid integer key {key}")));
-    }
-    Ok(value as u16)
+    }    Ok(value as u16)
 }
 
 fn parse_f64_default(
@@ -1597,8 +1594,7 @@ mod tests {
         assert_eq!(sample.quality, TerrainQuality::Measured);
         assert_eq!(sample.elevation_m, Some(1000.0));
         assert_eq!(sample.provenance.content_digests.len(), 4);
-        assert_eq!(sample.provenance.content_digests[0].0, "detached-label");
-        assert_eq!(sample.provenance.content_digests[1].0, "raster-image");
+        assert_eq!(sample.provenance.content_digests[0].0, "detached-label");        assert_eq!(sample.provenance.content_digests[1].0, "raster-image");
         assert_eq!(sample.provenance.content_digests[2].0, "counts-label");
         assert_eq!(sample.provenance.content_digests[3].0, "counts-raster");
         assert_eq!(sample.provenance.content_digests[2].2, counts.label_sha256);
@@ -1998,7 +1994,6 @@ mod tests {
         .unwrap_err();
         assert!(matches!(error, MolaError::InvalidMetadata(_)));
     }
-
     #[test]
     fn rejects_non_integral_integer_metadata() {
         let text = label().replace("LINES = 4", "LINES = 4.5");
@@ -2053,8 +2048,17 @@ mod tests {
         )
         .unwrap();
 
-        std::fs::write(&img, vec![0u8; 96]).unwrap();
-        std::fs::write(&count_img, vec![0u8; 96]).unwrap();
+        // Atomically replace the pathnames rather than truncating the
+        // original in place. The snapshots must continue to reference the
+        // originally verified inode/handle.
+        let mut replacement_img = img.clone();
+        replacement_img.set_extension("replacement.img");
+        std::fs::write(&replacement_img, vec![0u8; 96]).unwrap();
+        std::fs::rename(&replacement_img, &img).unwrap();
+        let mut replacement_count_img = count_img.clone();
+        replacement_count_img.set_extension("replacement.img");
+        std::fs::write(&replacement_count_img, vec![0u8; 96]).unwrap();
+        std::fs::rename(&replacement_count_img, &count_img).unwrap();
 
         let observation = product
             .sample_nearest_with_count_from_snapshots(
