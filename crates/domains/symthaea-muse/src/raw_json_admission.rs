@@ -5,7 +5,7 @@
 //! object member names must be unique, and only then is the requested schema
 //! type materialized.
 
-use serde::de::{self, DeserializeOwned, Deserializer, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, DeserializeOwned, DeserializeSeed, Deserializer, MapAccess, SeqAccess, Visitor};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt;
