@@ -179,8 +179,17 @@ impl ProvenanceGraph {
 
         for claim in self.nodes.iter().filter(|node| node.kind == NodeKind::Claim) {
             let required = required_dependencies(claim, &self.edges, &nodes_by_id);
+            let observed = reachable_kinds(&claim.id, &self.edges, &nodes_by_id);
+            let observed_required = observed
+                .intersection(&required)
+                .cloned()
+                .collect::<BTreeSet<_>>();
+
             if let Some(certificate) = self.certificates.iter().find(|c| c.claim_id == claim.id) {
-                if !certificate.is_truthful() {
+                if !certificate.is_truthful()
+                    || certificate.required != required
+                    || certificate.observed != observed_required
+                {
                     errors.insert(IntegrityError::CompletenessCertificateMismatch {
                         claim_id: claim.id.clone(),
                     });
@@ -191,7 +200,6 @@ impl ProvenanceGraph {
                 });
             }
 
-            let observed = reachable_kinds(&claim.id, &self.edges, &nodes_by_id);
             for dependency in required {
                 if !observed.contains(&dependency) {
                     errors.insert(IntegrityError::MissingRequiredDependency {
