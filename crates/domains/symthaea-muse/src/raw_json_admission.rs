@@ -342,14 +342,11 @@ mod tests {
     }
 
     #[test]
-    fn rejection_does_not_materialize_schema_value() {
-        #[derive(Debug, Deserialize)]
-        struct Marker { marker: String }
-
-        let result = admit::<Marker>(br#"{"marker":1,"marker":2}"#, AdmissionLimits::default());
-        assert!(matches!(
-            result,
-            BoundaryResult::Rejected { reason: RejectionReason::DuplicateDecodedName, .. }
-        ));
+    fn accepted_document_is_the_gated_utf8_text() {
+        match admit(br#"{"marker":1}"#, AdmissionLimits::default()) {
+            BoundaryResult::Accepted { document, .. } => assert_eq!(document, r#"{"marker":1}"#),
+            BoundaryResult::Rejected { .. } => panic!("valid JSON was rejected"),
+        }
     }
+
 }
