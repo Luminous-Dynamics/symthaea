@@ -407,6 +407,22 @@ mod tests {
         assert_ne!(a, b);
     }
 
+    #[test]
+    fn stable_config_hash_is_domain_separated() {
+        let value = serde_json::json!({"a": 1, "b": 2});
+        let mut canonical = Vec::new();
+        write_canonical_json(&value, &mut canonical);
+        let raw = blake3::hash(&canonical).to_hex().to_string();
+        assert_ne!(stable_config_hash(&value), raw);
+    }
+
+    #[test]
+    fn canonical_json_sorts_object_keys_recursively() {
+        let a = serde_json::json!({"outer": {"z": 1, "a": 2}, "first": [3, 4]});
+        let b = serde_json::json!({"first": [3, 4], "outer": {"a": 2, "z": 1}});
+        assert_eq!(stable_config_hash(&a), stable_config_hash(&b));
+    }
+
     /// Reproduces `TemporalStateMode::HdcLtc`'s requirement: the active
     /// mechanism's predict counter must be positive. A passing case.
     #[test]
