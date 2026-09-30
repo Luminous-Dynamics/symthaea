@@ -50,6 +50,7 @@ The system resonates to a fixed point that satisfies all constraints!
 */
 
 use anyhow::Result;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashMap;
 
 /// Resonator network for HDC constraint satisfaction
@@ -325,12 +326,27 @@ impl ResonatorNetwork {
         constraints: &[Constraint],
         max_iter: Option<usize>,
     ) -> Result<ResonatorSolution> {
+        self.solve_seeded(constraints, max_iter, rand::random::<u64>())
+    }
+
+    /// Solve with an explicit seed for deterministic research and evidence runs.
+    ///
+    /// The production `solve` path remains stochastic. This seeded entry point makes
+    /// initialization and exploratory noise reproducible without changing the
+    /// resonator dynamics themselves.
+    pub fn solve_seeded(
+        &mut self,
+        constraints: &[Constraint],
+        max_iter: Option<usize>,
+        seed: u64,
+    ) -> Result<ResonatorSolution> {
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
+        let mut rng = StdRng::seed_from_u64(seed);
         self.energy_history.clear();
 
         // Initialize estimate randomly
         let mut estimate: Vec<f32> = (0..self.dimension)
-            .map(|_| rand::random::<f32>() * 2.0 - 1.0)
+            .map(|_| rng.gen::<f32>() * 2.0 - 1.0)
             .collect();
         normalize(&mut estimate);
 
@@ -385,7 +401,7 @@ impl ResonatorNetwork {
             // Add noise for exploration
             if self.config.noise_scale > 0.0 {
                 for i in 0..self.dimension {
-                    velocity[i] += self.config.noise_scale * (rand::random::<f32>() * 2.0 - 1.0);
+                    velocity[i] += self.config.noise_scale * (rng.gen::<f32>() * 2.0 - 1.0);
                 }
             }
 
