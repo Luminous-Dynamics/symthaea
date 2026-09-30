@@ -73,7 +73,12 @@ impl MolaRasterSnapshot {
         let path = path.as_ref();
         let file = File::open(path)?;
         let byte_len = file.metadata()?.len();
-        let actual_sha256 = sha256_open_file(&file)?;
+        let (actual_sha256, hashed_len) = sha256_open_file(&file)?;
+        if hashed_len != byte_len {
+            return Err(MolaError::InvalidMetadata(
+                "raster changed size while being hashed".into(),
+            ));
+        }
         verify_sha256("raster snapshot", &actual_sha256, expected_sha256)?;
         Ok(Self {
             file,
@@ -397,8 +402,7 @@ impl MolaMegdrProduct {
             elevation_m: Some(elevation),
             elevation_uncertainty_m: Some(elevation_uncertainty_m),
             vertical_datum: TerrainVerticalDatum::AreoidRelative,
-            slope_rad: None,
-            roughness_m: None,
+            slope_rad: None,            roughness_m: None,
             quality: TerrainQuality::Measured,
             provenance,
         };
@@ -797,8 +801,7 @@ impl MolaMegdrMetadata {
             longitude_min_deg,
             longitude_max_deg,
             latitude_min_deg,
-            latitude_max_deg,
-            line_offset,
+            latitude_max_deg,            line_offset,
             image_byte_offset,
             sample_offset,
             line_projection_offset,
@@ -960,18 +963,24 @@ fn verify_sha256(
     Ok(())
 }
 
-fn sha256_open_file(file: &File) -> Result<String, MolaError> {
+fn sha256_open_file(file: &File) -> Result<(String, u64), MolaError> {
     let mut reader = file.try_clone()?;
     let mut hasher = Sha256::new();
+    let mut bytes_read = 0u64;
     let mut buffer = [0u8; 64 * 1024];
     loop {
         let read = reader.read(&mut buffer)?;
         if read == 0 {
             break;
         }
+        bytes_read = bytes_read
+            .checked_add(u64::try_from(read).map_err(|_| {
+                MolaError::InvalidMetadata("raster hash byte count overflow".into())
+            })?)
+            .ok_or_else(|| MolaError::InvalidMetadata("raster hash byte count overflow".into()))?;
         hasher.update(&buffer[..read]);
     }
-    Ok(sha256_hex(&hasher.finalize()))
+    Ok((sha256_hex(&hasher.finalize()), bytes_read))
 }
 
 fn sha256_file(path: &Path) -> Result<String, MolaError> {
@@ -1197,8 +1206,7 @@ fn parse_f64_default(
     key: &str,
     default: f64,
 ) -> Result<f64, MolaError> {
-    kv.get(key)
-        .map(|v| parse_number(v))
+    kv.get(key)        .map(|v| parse_number(v))
         .unwrap_or(Ok(default))
 }
 
@@ -1597,8 +1605,7 @@ mod tests {
         assert_eq!(sample.provenance.content_digests[3].2, counts.image_sha256);
 
         let _ = std::fs::remove_file(label_path);
-        let _ = std::fs::remove_file(topography_path);
-        let _ = std::fs::remove_file(counts_label_path);
+        let _ = std::fs::remove_file(topography_path);        let _ = std::fs::remove_file(counts_label_path);
         let _ = std::fs::remove_file(counts_path);
     }
 
@@ -1997,8 +2004,7 @@ mod tests {
         let text = label().replace("LINES = 4", "LINES = 4.5");
         let error = MolaMegdrMetadata::from_label(
             &parse_label(&text),
-            "MEGT00N000HB",
-        )
+            "MEGT00N000HB",        )
         .unwrap_err();
         assert!(matches!(error, MolaError::InvalidMetadata(_)));
     }
