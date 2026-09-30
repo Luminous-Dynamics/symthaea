@@ -46,6 +46,10 @@ pub enum AtomicAdmissionOutcome<E> {
 pub enum AtomicLifecycleOutcome<E> {
     Retired { committed_version: u64 },
     NoChange { observed_version: u64 },
+    InvalidState {
+        reason: crate::semantic_admission::StateInvariant,
+        observed_version: u64,
+    },
     ConcurrentConflict { observed_version: u64 },
     StorageError(E),
 }
@@ -68,7 +72,12 @@ pub fn retire_expired_atomically<S: SemanticCommitStore>(
         last_observed_version = Some(loaded.version);
         let next = match retire_expired(&loaded.state, policy, now_ms) {
             Ok(value) => value,
-            Err(_) => return AtomicLifecycleOutcome::NoChange { observed_version: loaded.version },
+            Err(reason) => {
+                return AtomicLifecycleOutcome::InvalidState {
+                    reason,
+                    observed_version: loaded.version,
+                };
+            }
         };
         if next == loaded.state {
             return AtomicLifecycleOutcome::NoChange { observed_version: loaded.version };
@@ -157,6 +166,11 @@ mod tests {
         version: u64,
         state: SemanticAdmissionState,
         cas_results: VecDeque<Result<bool, StoreError>>,
+        /// Optional state published by the simulated concurrent winner when a
+        /// queued CAS collision occurs. This lets lifecycle tests model a
+        /// genuinely different transition rather than merely publishing the
+        /// losing candidate.
+        cas_false_state: Option<SemanticAdmissionState>,
         loads: usize,
     }
 
@@ -182,8 +196,10 @@ mod tests {
                         Ok(true)
                     }
                     Ok(false) => {
-                        // Simulate a concurrent winner publishing the candidate.
-                        self.state = next;
+                        // Simulate a concurrent winner. When supplied, publish
+                        // a distinct state so the retry must actually re-run
+                        // the pure oracle against the winner's state.
+                        self.state = self.cas_false_state.take().unwrap_or(next);
                         self.version += 1;
                         Ok(false)
                     }
@@ -224,14 +240,124 @@ mod tests {
     #[test]
     fn lifecycle_gc_publishes_tombstones_atomically() {
         let (delivery, observation) = fixture();
-        let outcome = admit_atomically(&mut TestStore::default(), &delivery, &observation, AdmissionPolicy::default(), 100, 1);
-        let AtomicAdmissionOutcome::Admitted { .. } = outcome else { panic!("fixture admission should succeed"); };
         let mut store = TestStore::default();
         let _ = admit_atomically(&mut store, &delivery, &observation, AdmissionPolicy::default(), 100, 1);
         let policy = AdmissionPolicy { retention_ms: 10, tombstone_retention_ms: 100, ..AdmissionPolicy::default() };
         let outcome = retire_expired_atomically(&mut store, policy, 101, 1);
         assert!(matches!(outcome, AtomicLifecycleOutcome::Retired { committed_version: 2 }));
         assert!(store.state.observation_tombstones.contains_key(&observation.key));
+    }
+
+    #[test]
+    fn lifecycle_gc_invalid_state_fails_closed_without_publishing() {
+        let (delivery, _) = fixture();
+        let mut state = SemanticAdmissionState::default();
+        state.deliveries.insert(delivery.logical_delivery_id, delivery);
+        let mut store = TestStore { state, ..Default::default() };
+
+        let outcome = retire_expired_atomically(
+            &mut store,
+            AdmissionPolicy::default(),
+            100,
+            1,
+        );
+
+        assert!(matches!(
+            outcome,
+            AtomicLifecycleOutcome::InvalidState {
+                reason: crate::semantic_admission::StateInvariant::DeliveryMissingResult { .. },
+                observed_version: 0,
+            }
+        ));
+        assert_eq!(store.version, 0);
+    }
+
+    #[test]
+    fn lifecycle_gc_cas_collision_reloads_and_preserves_new_admission() {
+        let (delivery, observation) = fixture();
+        let mut concurrent = SemanticAdmissionState::default();
+        let AdmissionOutcome::Admitted { next_state, .. } = decide(
+            &concurrent,
+            &delivery,
+            &observation,
+            AdmissionPolicy::default(),
+            100,
+        ) else {
+            panic!("concurrent admission should succeed");
+        };
+        concurrent = next_state;
+
+        let mut expired_state = concurrent.clone();
+        expired_state.observations.get_mut(&observation.key).unwrap().observed_at_ms = 0;
+
+        let policy = AdmissionPolicy {
+            retention_ms: 10,
+            tombstone_retention_ms: 100,
+            ..AdmissionPolicy::default()
+        };
+        let mut store = TestStore {
+            state: expired_state,
+            cas_results: VecDeque::from([Ok(false)]),
+            cas_false_state: Some(concurrent.clone()),
+            ..Default::default()
+        };
+
+        let outcome = retire_expired_atomically(&mut store, policy, 101, 1);
+
+        assert!(matches!(outcome, AtomicLifecycleOutcome::Retired { committed_version: 2 }));
+        assert!(store.state.observations.contains_key(&observation.key));
+        assert!(!store.state.observation_tombstones.contains_key(&observation.key));
+        assert_eq!(store.loads, 2);
+        assert_eq!(store.version, 2);
+    }
+
+    #[test]
+    fn admission_losing_to_gc_reloads_and_observes_tombstone() {
+        let (delivery, observation) = fixture();
+        let policy = AdmissionPolicy {
+            retention_ms: 10,
+            tombstone_retention_ms: 100,
+            ..AdmissionPolicy::default()
+        };
+        let AdmissionOutcome::Admitted { next_state, .. } = decide(
+            &SemanticAdmissionState::default(),
+            &delivery,
+            &observation,
+            AdmissionPolicy::default(),
+            100,
+        ) else {
+            panic!("fixture admission should succeed");
+        };
+        let retired = retire_expired(&next_state, policy, 101).expect("valid GC transition");
+
+        let mut store = TestStore {
+            state: next_state,
+            cas_results: VecDeque::from([Ok(false)]),
+            cas_false_state: Some(retired),
+            ..Default::default()
+        };
+
+        let outcome = admit_atomically(
+            &mut store,
+            &delivery,
+            &observation,
+            policy,
+            101,
+            1,
+        );
+
+        assert!(matches!(
+            outcome,
+            AtomicAdmissionOutcome::Rejected {
+                outcome: AdmissionOutcome::Rejected {
+                    reason: crate::semantic_admission::RejectReason::ObservationTombstoned,
+                },
+                observed_version: 1,
+            }
+        ));
+        assert!(store.state.observation_tombstones.contains_key(&observation.key));
+        assert_eq!(store.version, 1);
+        assert_eq!(store.loads, 2);
     }
 
     #[test]
