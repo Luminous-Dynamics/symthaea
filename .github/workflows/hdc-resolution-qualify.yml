@@ -17,12 +17,14 @@ on:
       - "crates/core/symthaea-core/src/hdc/evidence_manifest.rs"
       - "crates/core/symthaea-core/src/hdc/config.rs"
       - "crates/core/symthaea-core/src/hdc/dimension_observatory.rs"
+      - "crates/core/symthaea-core/src/hdc/dimension_sweep.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/pareto_frontier.rs"
       - "crates/core/symthaea-core/tests/hdc_ltc_operator_evidence_chain.rs"
       - "crates/core/symthaea-core/examples/hdc_operator_evidence.rs"
       - "crates/core/symthaea-core/benches/simd_continuous.rs"
       - "docs/research/HDC_RESOLUTION_EXTENSIBILITY.md"
+      - "docs/research/HDC_DIMENSION_SWEEP.md"
       - "docs/research/HDC_LTC_RESOLUTION_TRAJECTORY_MATRIX.md"
       - "rust-toolchain.toml"
       - ".github/workflows/hdc-resolution-qualify.yml"
@@ -112,6 +114,7 @@ jobs:
           cargo test -p symthaea-core --lib evidence_manifest
           cargo test -p symthaea-core --lib config
           cargo test -p symthaea-core --lib dimension_observatory
+          cargo test -p symthaea-core --lib dimension_sweep
           cargo test -p symthaea-core --lib pareto_frontier
           cargo test -p symthaea-core --test hdc_ltc_operator_evidence_chain --features simd
 
@@ -177,6 +180,30 @@ jobs:
           )
           PY
 
+      - name: Emit deterministic dimension sweep evidence
+        run: cargo run -p symthaea-core --example hdc_dimension_sweep > dimension-sweep-evidence.json
+
+      - name: Validate dimension sweep evidence
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          evidence = json.loads(Path("dimension-sweep-evidence.json").read_text())
+          expected = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
+
+          assert evidence["schema_version"] == 1
+          assert evidence["sweep_identity"].startswith("sha256:")
+          assert len(evidence["sweep_identity"]) == 71
+          records = evidence["records"]
+          assert [r["dimension"] for r in records] == expected
+          assert all(r["samples"] == 32 for r in records)
+          assert all(0.0 <= r["mean_abs_cosine"] <= 1.0 for r in records)
+          assert all(0.0 <= r["max_abs_cosine"] <= 1.0 for r in records)
+          assert all(-1.0 <= r["mean_bundle_member_cosine"] <= 1.0 for r in records)
+          PY
+          sha256sum dimension-sweep-evidence.json | tee dimension-sweep-evidence.sha256
+
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
 
@@ -218,3 +245,5 @@ jobs:
             operator-evidence.json
             operator-evidence.sha256
             operator-evidence-provenance.json
+            dimension-sweep-evidence.json
+            dimension-sweep-evidence.sha256
