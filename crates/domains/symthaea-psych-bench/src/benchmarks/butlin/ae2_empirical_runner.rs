@@ -244,6 +244,13 @@ fn run_arm(
 #[derive(Debug, Clone)]
 pub struct Ae2EmpiricalRun {
     pub config_hash: String,
+    /// Schema governing `config_hash`; explicit so consumers cannot infer its
+    /// semantics merely from the legacy field name.
+    pub config_identity_schema: &'static str,
+    /// Historical field name retained for compatibility. In this deterministic
+    /// runner it identifies the fixed genesis/seed material, not a numeric RNG
+    /// seed; the value is a stable semantic identity rather than a claim of
+    /// multi-seed replication.
     pub seed_identity: String,
     pub target_lever_name: &'static str,
     pub sham_lever_name: &'static str,
@@ -644,16 +651,24 @@ pub fn run_ae2_empirical() -> Ae2EmpiricalRun {
     );
 
     // Canonical identity fingerprint, via the shared `symthaea-evidence-plane`
-    // `config_hash()` function instead of a locally hand-rolled
+    // stable identity contract instead of a locally hand-rolled
     // `DefaultHasher`-over-format! computation. No existing test asserts a
     // specific hash *value* (only presence/shape), so this is a safe
     // behavior-preserving substitution -- the fingerprint's exact bytes
     // change, but nothing depends on that.
     let config_hash = stable_config_hash(&(target_lever_name, sham_lever_name, functional_benchmark));
+    // The runner has one fixed genesis phrase rather than a numeric RNG seed.
+    // Give that material an explicit stable identity so `seed_identity` cannot
+    // be mistaken for evidence of replicated seed sampling.
+    let seed_identity = format!(
+        "genesis-blake3:v1:{}",
+        stable_config_hash(&"ablation-matrix-deterministic")
+    );
 
     Ae2EmpiricalRun {
         config_hash,
-        seed_identity: "ablation-matrix-deterministic".to_string(),
+        config_identity_schema: symthaea_evidence_plane::STABLE_CONFIG_IDENTITY_SCHEMA,
+        seed_identity,
         target_lever_name,
         sham_lever_name,
         functional_benchmark,
