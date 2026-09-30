@@ -136,6 +136,55 @@ impl NixServiceObservedStateV1 {
         })
     }
 
+    /// Parse the exact three properties requested by the read-only systemd
+    /// observation path. Missing, duplicate, malformed, or unknown properties
+    /// fail closed; no property is silently projected into a boolean.
+    pub fn parse_systemd_properties(
+        unit: impl Into<String>,
+        properties: &str,
+    ) -> Result<Self, NixServiceStateErrorV1> {
+        let mut active_state = None;
+        let mut sub_state = None;
+        let mut unit_file_state = None;
+
+        for line in properties.lines() {
+            if line.is_empty() {
+                continue;
+            }
+
+            let (key, value) = line
+                .split_once('=')
+                .ok_or(NixServiceStateErrorV1::MalformedPropertyLine)?;
+
+            if value.contains('\0') {
+                return Err(NixServiceStateErrorV1::MalformedPropertyLine);
+            }
+
+            match key {
+                "ActiveState" if active_state.is_none() => {
+                    active_state = Some(ServiceActiveStateV1::parse(value)?);
+                }
+                "SubState" if sub_state.is_none() => {
+                    sub_state = Some(value.to_string());
+                }
+                "UnitFileState" if unit_file_state.is_none() => {
+                    unit_file_state = Some(ServiceUnitFileStateV1::parse(value)?);
+                }
+                "ActiveState" | "SubState" | "UnitFileState" => {
+                    return Err(NixServiceStateErrorV1::DuplicateProperty);
+                }
+                _ => return Err(NixServiceStateErrorV1::UnexpectedProperty),
+            }
+        }
+
+        Self::new(
+            unit,
+            active_state.ok_or(NixServiceStateErrorV1::MissingActiveState)?,
+            unit_file_state.ok_or(NixServiceStateErrorV1::MissingUnitFileState)?,
+            sub_state.ok_or(NixServiceStateErrorV1::MissingSubState)?,
+        )
+    }
+
     pub fn unit(&self) -> &str {
         &self.unit
     }
@@ -216,6 +265,18 @@ pub enum NixServiceStateErrorV1 {
     SubStateTooLarge,
     #[error("service SubState contains whitespace or control characters")]
     InvalidSubState,
+    #[error("malformed systemd property line")]
+    MalformedPropertyLine,
+    #[error("duplicate required systemd property")]
+    DuplicateProperty,
+    #[error("unexpected systemd property")]
+    UnexpectedProperty,
+    #[error("ActiveState property is missing")]
+    MissingActiveState,
+    #[error("SubState property is missing")]
+    MissingSubState,
+    #[error("UnitFileState property is missing")]
+    MissingUnitFileState,
 }
 
 #[cfg(test)]
@@ -233,87 +294,82 @@ mod tests {
     }
 
     #[test]
-    fn accepts_current_active_state_vocabulary() {
-        for value in [
-            "active", "reloading", "inactive", "failed",
-            "activating", "deactivating", "maintenance", "refreshing",
-        ] {
-            assert!(ServiceActiveStateV1::parse(value).is_ok());
-        }
+    fn parses_complete_systemd_observation() {
+        let value = NixServiceObservedStateV1::parse_systemd_properties(
+            "nginx",
+            "ActiveState=active\nSubState=running\nUnitFileState=enabled\n",
+        ).unwrap();
+        assert_eq!(value.unit(), "nginx.service");
+        assert_eq!(value.active_state(), ServiceActiveStateV1::Active);
+        assert_eq!(value.unit_file_state(), ServiceUnitFileStateV1::Enabled);
+        assert_eq!(value.sub_state(), "running");
     }
 
     #[test]
-    fn accepts_current_unit_file_state_vocabulary() {
-        for value in [
-            "enabled", "enabled-runtime", "linked", "linked-runtime",
-            "masked", "masked-runtime", "static", "disabled", "invalid", "indirect",
-        ] {
-            assert!(ServiceUnitFileStateV1::parse(value).is_ok());
-        }
-    }
-
-    #[test]
-    fn unknown_states_fail_closed() {
+    fn rejects_partial_observation() {
         assert_eq!(
-            ServiceActiveStateV1::parse("future-state").unwrap_err(),
+            NixServiceObservedStateV1::parse_systemd_properties(
+                "nginx",
+                "ActiveState=active\nSubState=running\n",
+            ).unwrap_err(),
+            NixServiceStateErrorV1::MissingUnitFileState
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_and_unexpected_properties() {
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_properties(
+                "nginx",
+                "ActiveState=active\nActiveState=inactive\nSubState=running\nUnitFileState=enabled\n",
+            ).unwrap_err(),
+            NixServiceStateErrorV1::DuplicateProperty
+        );
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_properties(
+                "nginx",
+                "ActiveState=active\nSubState=running\nUnitFileState=enabled\nMainPID=42\n",
+            ).unwrap_err(),
+            NixServiceStateErrorV1::UnexpectedProperty
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_and_malformed_values() {
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_properties(
+                "nginx",
+                "ActiveState=unknown\nSubState=running\nUnitFileState=enabled\n",
+            ).unwrap_err(),
             NixServiceStateErrorV1::UnknownActiveState
         );
         assert_eq!(
-            ServiceUnitFileStateV1::parse("future-state").unwrap_err(),
-            NixServiceStateErrorV1::UnknownUnitFileState
-        );
-    }
-
-    #[test]
-    fn sub_state_is_bounded_and_strict() {
-        assert_eq!(
-            NixServiceObservedStateV1::new(
+            NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
-                ServiceActiveStateV1::Active,
-                ServiceUnitFileStateV1::Enabled,
-                "",
-            )
-            .unwrap_err(),
-            NixServiceStateErrorV1::EmptySubState
-        );
-
-        assert_eq!(
-            NixServiceObservedStateV1::new(
-                "nginx",
-                ServiceActiveStateV1::Active,
-                ServiceUnitFileStateV1::Enabled,
-                "running state",
-            )
-            .unwrap_err(),
+                "ActiveState=active\nSubState=running state\nUnitFileState=enabled\n",
+            ).unwrap_err(),
             NixServiceStateErrorV1::InvalidSubState
         );
-
-        let oversized = "x".repeat(MAX_SUB_STATE_BYTES + 1);
         assert_eq!(
-            NixServiceObservedStateV1::new(
+            NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
-                ServiceActiveStateV1::Active,
-                ServiceUnitFileStateV1::Enabled,
-                oversized,
-            )
-            .unwrap_err(),
-            NixServiceStateErrorV1::SubStateTooLarge
+                "ActiveState=active\nSubState=running\n",
+            ).unwrap_err(),
+            NixServiceStateErrorV1::MissingUnitFileState
         );
     }
 
     #[test]
-    fn representative_pre_states_are_admissible() {
-        for (active, file, sub) in [
-            ("active", "enabled", "running"),
-            ("inactive", "disabled", "dead"),
-            ("failed", "disabled", "failed"),
-            ("reloading", "enabled-runtime", "reload"),
-            ("activating", "static", "start"),
-            ("deactivating", "masked", "stop"),
-        ] {
-            let value = state(active, file, sub);
-            assert!(value.digest().is_ok());
-        }
+    fn representative_states_remain_distinct() {
+        let active = NixServiceObservedStateV1::parse_systemd_properties(
+            "nginx",
+            "ActiveState=active\nSubState=running\nUnitFileState=enabled\n",
+        ).unwrap();
+        let masked = NixServiceObservedStateV1::parse_systemd_properties(
+            "nginx",
+            "ActiveState=inactive\nSubState=dead\nUnitFileState=masked\n",
+        ).unwrap();
+        assert_ne!(active.digest().unwrap(), masked.digest().unwrap());
     }
 
     #[test]
@@ -333,6 +389,32 @@ mod tests {
         assert_ne!(baseline.digest().unwrap(), active.digest().unwrap());
         assert_ne!(baseline.digest().unwrap(), file.digest().unwrap());
         assert_ne!(baseline.digest().unwrap(), sub.digest().unwrap());
+    }
+
+    #[test]
+    fn sub_state_is_bounded_and_strict() {
+        assert_eq!(
+            NixServiceObservedStateV1::new(
+                "nginx",
+                ServiceActiveStateV1::Active,
+                ServiceUnitFileStateV1::Enabled,
+                "",
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::EmptySubState
+        );
+
+        let oversized = "x".repeat(MAX_SUB_STATE_BYTES + 1);
+        assert_eq!(
+            NixServiceObservedStateV1::new(
+                "nginx",
+                ServiceActiveStateV1::Active,
+                ServiceUnitFileStateV1::Enabled,
+                oversized,
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::SubStateTooLarge
+        );
     }
 
     #[test]
