@@ -822,3 +822,29 @@ This keeps three concerns separate:
 3. **Interoperability mapping** — owned by the Mycelix projection.
 
 Holochain's current validation guidance makes this separation particularly useful: validation must be deterministic, dependencies must be addressable, and missing dependencies are an unresolved condition rather than an implicit success.
+
+## SWA-027 — typed provenance-to-semantic binding registry
+
+SWA-026 made provenance node identity authoritative, but SWA-019 still used a direct identity-switching function to translate graph node IDs into semantic references. That left a small but important failure mode: an adapter could accidentally omit a node, map the wrong semantic object to a node, or silently carry an extra mapping.
+
+SWA-027 replaces that switch with a typed SemanticBindingRegistry keyed by authoritative provenance node identity.
+
+The registry is validated against the exact selected ProvenanceSlice before canonicalization:
+
+- every selected authoritative node must have exactly one semantic mapping;
+- missing mappings are rejected;
+- duplicate authoritative identities are rejected;
+- mappings for nodes outside the selected slice are rejected;
+- the semantic reference object ID must equal the authoritative provenance node ID;
+- canonical lookup is performed through the registry rather than by reconstructing graph semantics in the adapter;
+- registry insertion order is irrelevant because the registry is canonically keyed.
+
+This establishes the stronger invariant:
+
+**The adapter may translate identity domains, but it may neither invent provenance identity nor silently omit provenance identity.**
+
+The semantic reference object IDs for the provenance-bound nodes now deliberately equal the authoritative graph IDs. The object-local revision remains separate and is taken from the authoritative graph node revision. This prevents the adapter from turning an adapter-local alias into a second identity namespace.
+
+The registry is still an interoperability mapping, not a second provenance graph. Topology, node kinds, revisions, and edge relationships remain owned by provenance_graph; the registry only establishes the one-to-one projection needed to serialize that authoritative slice.
+
+The hardening is aligned with Holochain's validation model: validation inputs should be deterministic and addressable, and incomplete dependencies should remain unresolved rather than being implicitly accepted.
