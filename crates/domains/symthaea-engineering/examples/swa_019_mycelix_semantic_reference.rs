@@ -356,6 +356,7 @@ fn evidence_binding_digest(binding: &EvidenceBinding) -> String {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BindingRegistryError {
+    InvalidSliceBoundary,
     DuplicateAuthoritativeIdentity,
     MissingAuthoritativeMapping,
     ExtraMapping,
@@ -433,6 +434,9 @@ fn evidence_binding_digest_from_slice(
     slice: &ProvenanceSlice,
 ) -> Result<String, BindingRegistryError> {
     let registry = SemanticBindingRegistry::from_evidence_binding(binding)?;
+    reference_graph()
+        .validate_slice(slice)
+        .map_err(|_| BindingRegistryError::InvalidSliceBoundary)?;
     registry.validate_against(slice)?;
 
     let nodes = slice
@@ -778,6 +782,17 @@ mod tests {
         let baseline = evidence_binding_digest_from_slice(&binding, &baseline_slice);
         let changed = evidence_binding_digest_from_slice(&binding, &changed_slice);
         assert_ne!(baseline, changed);
+    }
+
+    #[test]
+    fn tampered_slice_boundary_is_rejected_before_projection() {
+        let binding = evidence_binding();
+        let mut slice = reference_graph().slice("claim-001").expect("valid claim slice");
+        slice.boundary.graph_digest.replace_range(0..1, "0");
+        assert_eq!(
+            evidence_binding_digest_from_slice(&binding, &slice),
+            Err(BindingRegistryError::InvalidSliceBoundary)
+        );
     }
 
     #[test]
