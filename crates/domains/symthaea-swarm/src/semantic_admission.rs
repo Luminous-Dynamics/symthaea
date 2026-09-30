@@ -49,7 +49,7 @@ pub struct SemanticResult {
 pub struct SemanticAdmissionState {
     pub deliveries: HashMap<Uuid, DeliveryContract>,
     pub observations: HashMap<ObservationKey, ObservationRecord>,
-    pub results: HashMap<Uuid, SemanticResult>,
+    pub results: HashMap<ObservationKey, SemanticResult>,
 }
 
 /// Explicit policy inputs. All time is supplied by the caller; the oracle never
@@ -142,27 +142,31 @@ pub enum CapacityBound {
 /// delivery identity semantics.
 pub fn validate_state(state: &SemanticAdmissionState) -> Result<(), StateInvariant> {
     for logical_delivery_id in state.deliveries.keys() {
-        if !state.results.contains_key(logical_delivery_id) {
+        let has_result = state
+            .results
+            .values()
+            .any(|result| result.logical_delivery_id == *logical_delivery_id);
+        if !has_result {
             return Err(StateInvariant::DeliveryMissingResult {
                 logical_delivery_id: *logical_delivery_id,
             });
         }
     }
 
-    for (logical_delivery_id, result) in &state.results {
-        if !state.deliveries.contains_key(logical_delivery_id) {
+    for (observation_key, result) in &state.results {
+        if !state.deliveries.contains_key(&result.logical_delivery_id) {
             return Err(StateInvariant::ResultMissingDelivery {
-                logical_delivery_id: *logical_delivery_id,
+                logical_delivery_id: result.logical_delivery_id,
             });
         }
-        if !state.observations.contains_key(&result.observation) {
+        if !state.observations.contains_key(observation_key) {
             return Err(StateInvariant::ResultMissingObservation {
-                logical_delivery_id: *logical_delivery_id,
+                logical_delivery_id: result.logical_delivery_id,
             });
         }
-        if result.logical_delivery_id != *logical_delivery_id {
+        if result.observation != *observation_key {
             return Err(StateInvariant::ResultObservationMismatch {
-                logical_delivery_id: *logical_delivery_id,
+                logical_delivery_id: result.logical_delivery_id,
             });
         }
     }
@@ -211,22 +215,21 @@ pub fn decide(
             };
         }
 
-        if let Some(result) = state.results.get(&delivery.logical_delivery_id) {
+        if let Some(result) = state.results.get(&observation.key) {
+            if result.logical_delivery_id != delivery.logical_delivery_id {
+                return AdmissionOutcome::Conflict {
+                    identity_kind: ConflictKind::ObservationRecord,
+                };
+            }
             if state.observations.get(&observation.key) == Some(observation) {
                 return AdmissionOutcome::Replay {
                     existing_result: result.clone(),
                 };
             }
-            if state.observations.contains_key(&observation.key) {
-                return AdmissionOutcome::Conflict {
-                    identity_kind: ConflictKind::ObservationRecord,
-                };
-            }
-            if !policy.allow_new_observation {
-                return AdmissionOutcome::Rejected {
-                    reason: RejectReason::NewObservationForbidden,
-                };
-            }
+        } else if !policy.allow_new_observation {
+            return AdmissionOutcome::Rejected {
+                reason: RejectReason::NewObservationForbidden,
+            };
         }
     }
 
@@ -244,12 +247,15 @@ pub fn decide(
         }
     }
 
-    if let Some(existing) = state.results.get(&delivery.logical_delivery_id) {
-        if existing.observation == observation.key {
+    if let Some(existing) = state.results.get(&observation.key) {
+        if existing.logical_delivery_id == delivery.logical_delivery_id {
             return AdmissionOutcome::Replay {
                 existing_result: existing.clone(),
             };
         }
+        return AdmissionOutcome::Conflict {
+            identity_kind: ConflictKind::ObservationRecord,
+        };
     }
 
     if now_ms.saturating_sub(observation.observed_at_ms) > policy.retention_ms {
@@ -285,7 +291,7 @@ pub fn decide(
         observation: observation.key.clone(),
     };
     next.results
-        .insert(delivery.logical_delivery_id, result.clone());
+        .insert(observation.key.clone(), result.clone());
 
     AdmissionOutcome::Admitted {
         next_state: next,
@@ -337,7 +343,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn valid_admitted_state_satisfies_invariants() {
         let (state, _, _) = admitted_state();
         assert_eq!(validate_state(&state), Ok(()));
@@ -360,6 +365,25 @@ mod tests {
             }
         );
         assert_eq!(state, before);
+    }
+
+    #[test]
+    fn second_observation_for_existing_delivery_is_retained_independently() {
+        let (state, delivery, mut observation) = admitted_state();
+        observation.key.observation_id = Uuid::from_u128(9_999);
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let AdmissionOutcome::Admitted { next_state, .. } =
+            decide(&state, &delivery, &observation, policy, 100)
+        else {
+            panic!("second observation should admit when policy allows it");
+        };
+        assert_eq!(next_state.deliveries.len(), 1);
+        assert_eq!(next_state.observations.len(), 2);
+        assert_eq!(next_state.results.len(), 2);
+        assert_eq!(validate_state(&next_state), Ok(()));
     }
 
     #[test]
