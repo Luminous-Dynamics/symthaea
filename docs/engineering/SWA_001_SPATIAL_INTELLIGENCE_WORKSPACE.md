@@ -380,3 +380,28 @@ The resulting architecture is now a small epistemic build system:
 claim -> provenance slice -> completeness certificate -> dependency frontier
 
 A future implementation can replace the fixture's simple node-kind closure with the actual typed dependency graph while preserving the same contract.
+
+
+## Reproducibility witnesses — SWA-011
+
+SWA-010 proves that a provenance slice is structurally complete. SWA-011 makes the next step executable: a complete slice can carry a deterministic replay witness.
+
+A **ReproducibilityWitness** binds five things without granting any of them authority:
+
+- claim identity;
+- execution recipe and algorithm revision;
+- canonicalized dependency revisions;
+- canonical input values;
+- the deterministically derived artifact.
+
+The fixture canonicalizes dependency and input ordering before deriving fingerprints. Identical manifests therefore produce identical witness identities, while a dependency revision change produces a different witness. Missing dependencies or inputs fail closed rather than producing a partial witness.
+
+The fixture currently uses a small dependency-free FNV-1a fingerprint because the example is intentionally self-contained. This is explicitly a fixture fingerprint, not a cryptographic commitment. A production interchange layer should substitute a cryptographic digest without changing the canonical-manifest contract.
+
+The important architectural distinction is:
+
+claim -> complete provenance slice -> canonical replay manifest -> deterministic execution -> reproducibility witness
+
+This also gives Sol Atlas a concrete answer to **“can this claim actually be reproduced from the evidence we say supports it?”** rather than treating provenance as descriptive metadata alone. W3C PROV explicitly includes reproducibility and versioning among the provenance requirements it supports, and its bundle model permits provenance to be independently established and linked across provenance boundaries. ASME's VVUQ lifecycle guidance likewise places verification, validation, and uncertainty work inside the model lifecycle rather than treating a validation result as permanently detached from model evolution.
+
+The next seam is **counterevidence witnesses**: supporting, qualifying, and contradicting claims should each be independently replayable from their own complete provenance slices, allowing the system to preserve disagreement without collapsing it into a single confidence value.
