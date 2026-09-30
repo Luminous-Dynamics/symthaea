@@ -216,6 +216,7 @@ fn bench_norm(c: &mut Criterion) {
 
     for dim in [1024, 4096, HDC_DIM, 32768, 131072, 262144] {
         let a = random_vec(dim, 42);
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (dim * std::mem::size_of::<f32>()) as u64 });
 
         group.bench_with_input(BenchmarkId::new("scalar", dim), &a, |bench, a| {
             bench.iter(|| black_box(scalar_norm(a)))
