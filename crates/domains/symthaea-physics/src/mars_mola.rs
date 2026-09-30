@@ -294,7 +294,10 @@ impl MolaMegdrMetadata {
         let sample_projection_offset = parse_f64(kv, "SAMPLE_PROJECTION_OFFSET")?;
         let pixel_scale = parse_f64_default(kv, "SCALING_FACTOR", 1.0)?;
         let pixel_offset = parse_f64_default(kv, "OFFSET", 0.0)?;
-        let missing_value = kv.get("MISSING_CONSTANT").and_then(|v| parse_number(v).ok());
+        let missing_value = match kv.get("MISSING_CONSTANT") {
+            Some(value) => Some(parse_number(value)?),
+            None => None,
+        };
         let map_kind = required(kv, "MAP_TYPE")?.chars().next().ok_or_else(|| {
             MolaError::InvalidMetadata("MAP_TYPE is empty".into())
         })?;
@@ -579,6 +582,49 @@ fn validate_creation_time(value: &str) -> Result<(), MolaError> {
     {
         return Err(MolaError::InvalidMetadata(
             "PRODUCT_CREATION_TIME must use YYYY-MM-DDThh:mm:ss format".into(),
+        ));
+    }
+
+    // The release gate below compares this field lexicographically, so the
+    // structural validation must reject impossible calendar/time components
+    // rather than merely checking separators and digit classes. MEGDR labels
+    // may carry optional fractional seconds, but no other suffix is accepted.
+    if b.len() > 19 && (b[19] != b'.' || !b[20..].iter().all(u8::is_ascii_digit)) {
+        return Err(MolaError::InvalidMetadata(
+            "PRODUCT_CREATION_TIME may only add fractional seconds after hh:mm:ss".into(),
+        ));
+    }
+
+    let year = value[0..4]
+        .parse::<u32>()
+        .map_err(|_| MolaError::InvalidMetadata("invalid creation year".into()))?;
+    let month = value[5..7]
+        .parse::<u32>()
+        .map_err(|_| MolaError::InvalidMetadata("invalid creation month".into()))?;
+    let day = value[8..10]
+        .parse::<u32>()
+        .map_err(|_| MolaError::InvalidMetadata("invalid creation day".into()))?;
+    let hour = value[11..13]
+        .parse::<u32>()
+        .map_err(|_| MolaError::InvalidMetadata("invalid creation hour".into()))?;
+    let minute = value[14..16]
+        .parse::<u32>()
+        .map_err(|_| MolaError::InvalidMetadata("invalid creation minute".into()))?;
+    let second = value[17..19]
+        .parse::<u32>()
+        .map_err(|_| MolaError::InvalidMetadata("invalid creation second".into()))?;
+
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => 0,
+    };
+    if days_in_month == 0 || day == 0 || day > days_in_month || hour > 23 || minute > 59 || second > 59 {
+        return Err(MolaError::InvalidMetadata(
+            "PRODUCT_CREATION_TIME contains an impossible calendar/time value".into(),
         ));
     }
     Ok(())
@@ -895,6 +941,34 @@ mod tests {
             "PRODUCT_CREATION_TIME = 2003/03/21 01:00:00",
         );
         let error = MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap_err();
+        assert!(matches!(error, MolaError::InvalidMetadata(_)));
+    }
+
+    #[test]
+    fn rejects_impossible_creation_time_components() {
+        for replacement in [
+            ("2003-13-21T00:00:00", "invalid month"),
+            ("2003-02-30T00:00:00", "invalid day"),
+            ("2003-03-21T24:00:00", "invalid hour"),
+            ("2003-03-21T00:60:00", "invalid minute"),
+            ("2003-03-21T00:00:60", "invalid second"),
+            ("2003-03-21T00:00:00Z", "invalid suffix"),
+        ] {
+            let text = label().replace(
+                "PRODUCT_CREATION_TIME = 2003-03-21T00:00:00",
+                &format!("PRODUCT_CREATION_TIME = {}", replacement.0),
+            );
+            let error =
+                MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap_err();
+            assert!(matches!(error, MolaError::InvalidMetadata(_)), "{}", replacement.1);
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_missing_constant_instead_of_dropping_it() {
+        let text = label().replace("OFFSET = 0.0", "OFFSET = 0.0\nMISSING_CONSTANT = not-a-number");
+        let error =
+            MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap_err();
         assert!(matches!(error, MolaError::InvalidMetadata(_)));
     }
 
