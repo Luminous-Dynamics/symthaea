@@ -756,6 +756,14 @@ jobs:
                 pass
             else:
                 raise AssertionError("indirect artifact execution must fail closed")
+        step_output = artifact_valid + "      - id: extract\n        run: echo \"name=receipt >> $GITHUB_OUTPUT\"\n      - run: bash \"$" + "{{ steps.extract.outputs.receipt }}\"\n"
+        try:
+            wf.write_text(step_output, encoding="utf-8")
+            parse_workflow(wf)
+        except InventoryError:
+            pass
+        else:
+            raise AssertionError("artifact data passed through GITHUB_OUTPUT into execution must fail closed")
         for malicious in (
             artifact_valid + "      - run: bash \${{ runner.temp }}/trusted-receipt/script.sh\n",
             artifact_valid + "      - run: source \${{ runner.temp }}/trusted-receipt/env.sh\n",
