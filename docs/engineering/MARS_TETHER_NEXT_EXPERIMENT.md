@@ -329,6 +329,25 @@ This deliberately makes `is_usable()` a downstream safety gate rather than a con
 
 The distinction mirrors the current PDS4 separation between provenance and processing information: PDS4 1.26.0.0 has dedicated dictionaries for both, with Processing Information describing processing history and Provenance providing a provenance insert. citeturn0search0
 
+## Cryptographic provenance validation is now fail-closed
+
+The terrain provenance envelope now treats content identity as a structured consistency boundary rather than merely a collection of strings:
+
+- SHA-256 entries must contain exactly 64 hexadecimal characters;
+- algorithm identifiers are compared case-insensitively;
+- SHA-256 hex digests are compared case-insensitively, so representation casing cannot create a false conflict;
+- repeated logical artifact names must resolve to the same identity;
+- conflicting identities for one logical artifact are rejected;
+- provenance merges validate the complete source envelope before combining artifacts.
+
+This is intentionally narrower than serializing the full PDS4 product model. NASA's current PDS4 1.26.0.0 release has dedicated **Provenance** and **Processing Information** dictionaries; the former captures provenance information while the latter captures processing history. Our domain model therefore keeps source-byte identity and observation derivation explicit without pretending to be a PDS4 serialization layer.
+
+The important invariant is:
+
+    logical artifact name -> one unambiguous cryptographic identity
+
+That gives later experiment manifests a stable foundation without allowing malformed or contradictory digest records to become usable evidence.
+
 ## Verification boundary after provenance closure
 
 The source changes above are committed to the research branch, but compiler/test execution remains a separate evidence state. No successful CI run is claimed unless GitHub reports one for the new head. The next verification step is therefore to compile and execute the physics-crate tests, followed by a fixture test that proves the four-artifact provenance closure through the actual MOLA sampling path.
