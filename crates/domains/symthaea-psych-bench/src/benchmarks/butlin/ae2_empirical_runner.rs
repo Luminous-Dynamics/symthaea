@@ -51,7 +51,7 @@ use super::qualification_runtime::{
 use super::report::{EvidenceOutcome, SupportTier, classify_ablation};
 use std::collections::HashMap;
 use symthaea::cognitive_loop::CycleMetadata;
-use symthaea_evidence_plane::{EvidenceCounters, Expectation, check_integrity, config_hash};
+use symthaea_evidence_plane::{EvidenceCounters, Expectation, check_integrity, stable_config_hash};
 
 const NUM_CYCLES: usize = 200;
 const WARMUP: usize = 20;
@@ -649,7 +649,7 @@ pub fn run_ae2_empirical() -> Ae2EmpiricalRun {
     // specific hash *value* (only presence/shape), so this is a safe
     // behavior-preserving substitution -- the fingerprint's exact bytes
     // change, but nothing depends on that.
-    let config_hash = config_hash(&(target_lever_name, sham_lever_name, functional_benchmark));
+    let config_hash = stable_config_hash(&(target_lever_name, sham_lever_name, functional_benchmark));
 
     Ae2EmpiricalRun {
         config_hash,
