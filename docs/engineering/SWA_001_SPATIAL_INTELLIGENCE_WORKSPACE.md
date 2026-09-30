@@ -496,3 +496,37 @@ The resulting flow is:
 This is consistent with W3C PROV's model of revision as a specialized derivation and invalidation as a distinct lifecycle event: provenance records what happened historically while the current system can determine whether an entity remains usable under a changed dependency context. citeturn0search0turn0search1
 
 SWA-014 deliberately does not convert stale evidence into false evidence. It also does not make a provenance result an authorization signal. The next useful seam is to connect this propagation frontier to the actual intervention/decision lineage so that a changed model can identify exactly which pending decision contexts require re-review without silently re-authorizing or rejecting anything.
+
+## Decision revalidation boundary — SWA-015
+
+SWA-014 already carried `DecisionContext` as a propagation node, so a separate generic decision model would duplicate existing work. SWA-015 instead makes the missing boundary explicit: **which pending decision contexts must be reopened when their required epistemic inputs are no longer current?**
+
+The fixture consumes the SWA-014-style freshness frontier and a decision context's explicit evidence dependencies. It produces only:
+
+- `Current` — every required evidence reference remains usable;
+- `ReopenForReview` — at least one required evidence item requires revalidation;
+- `Unknown` — required evidence is missing, provenance is unknown, or historical identity cannot be trusted.
+
+It intentionally does **not** produce `Approve`, `Reject`, `Execute`, or any other authorization result.
+
+This gives the architecture a clean separation:
+
+`dependency change -> invalidation propagation -> evidence/witness freshness -> decision-context revalidation -> human/governance authorization`
+
+The distinction is important:
+
+- **ReopenForReview != Reject**. A changed model means the prior decision context must be reconsidered; it does not establish that the intervention is wrong.
+- **RequiresRevalidation != False**. Staleness is an applicability state, not a truth judgment about the historical result.
+- **Unknown != Current**. Missing provenance fails closed.
+- **Historical authorization is immutable**. Revalidation creates a current review requirement without rewriting what was authorized historically.
+- **Contradiction remains unresolved**. The boundary consumes the freshness state of evidence/witnesses; it does not choose between competing epistemic branches.
+
+The fixture also canonicalizes evidence identifiers and dependency changes, so equivalent input orderings produce identical revalidation results.
+
+This boundary fits Holochain's agent-centric validation model as a separate layer rather than conflating the two. Holochain validation is designed to deterministically validate whether authored operations conform to application rules, with dependencies explicitly addressable and unresolved dependencies yielding an indeterminate result rather than an implicit pass. Its source chains are append-only records of an agent's authored state changes. Those properties are useful for the future Mycelix receipt/governance layer, while SWA-015 remains a local deterministic epistemic fixture and does not pretend that a provenance record itself carries physical authority. citeturn0search0turn0search2turn0search4
+
+The current Sol Atlas chain is therefore:
+
+`claim -> provenance slice -> completeness certificate -> integrity validation -> replay witness -> support/qualification/contradiction set -> invalidation propagation -> decision revalidation boundary`
+
+The next seam should not be another generic decision type. It should connect this boundary to the **intervention lifecycle** already represented elsewhere in the engineering fixture: preserve the proposed intervention, its counterfactual alternatives, expected outcomes, and reversibility/agency dimensions while making revalidation a prerequisite for a fresh authorization context. Mycelix/Holochain can then remain the durable distributed provenance/governance substrate rather than becoming a second physics or decision engine.
