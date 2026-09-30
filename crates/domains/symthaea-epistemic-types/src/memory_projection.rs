@@ -145,15 +145,28 @@ pub struct ProvenanceView {
 }
 
 impl ProvenanceView {
-    pub fn from_relations(relations: &[ProvenanceRelation]) -> Self {
-        let validation = ProvenanceValidationReport::from_relations(relations);
-        Self {
+    pub fn from_relations(
+        relations: &[ProvenanceRelation],
+        validation: ProvenanceValidationReport,
+    ) -> Result<Self, &'static str> {
+        if validation.snapshot_schema_version != PROVENANCE_SNAPSHOT_SCHEMA_VERSION {
+            return Err("provenance view schema version mismatch");
+        }
+        let expected_digest =
+            ProvenanceValidationReport::snapshot_digest_for(
+                relations,
+                validation.snapshot_schema_version,
+            );
+        if expected_digest != validation.snapshot_digest {
+            return Err("provenance view validation digest mismatch");
+        }
+        Ok(Self {
             validator_version: validation.validator_version.clone(),
             snapshot_schema_version: validation.snapshot_schema_version,
             snapshot_digest: validation.snapshot_digest.clone(),
             relations: relations.to_vec(),
             validation,
-        }
+        })
     }
 
     pub fn relations_from(&self, memory_id: &str) -> Vec<&ProvenanceRelation> {
@@ -373,7 +386,8 @@ mod tests {
             kind: ProvenanceRelationKind::DerivedFrom,
             created_at: "cycle:2".into(),
         };
-        let view = ProvenanceView::from_relations(std::slice::from_ref(&relation));
+        let validation = ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation));
+        let view = ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
         assert_eq!(view.relations, vec![relation]);
         assert_eq!(view.relations_from("derived").len(), 1);
         assert_eq!(view.relations_to("source").len(), 1);
@@ -390,7 +404,8 @@ mod tests {
             kind: ProvenanceRelationKind::Corroborates,
             created_at: "cycle:2".into(),
         };
-        let view = ProvenanceView::from_relations(&[relation]);
+        let validation = ProvenanceValidationReport::from_relations(&[relation]);
+        let view = ProvenanceView::from_relations(&[relation], validation).unwrap();
         assert!(view.is_structurally_conforming());
         // The view exposes relation structure only; no confidence/evidence field exists.
         assert_eq!(view.validation.relation_count, 1);
