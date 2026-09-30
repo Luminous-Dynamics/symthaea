@@ -12,6 +12,12 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::evidence_identity::{derive_experiment_key, verify_join_identity, verify_trajectory_target};
+use super::performance_evidence::PerformanceEvidenceRecord;
+use super::resource_evidence::ResourceEvidenceRecord;
+use super::task_quality_evidence::TaskQualityEvidenceRecord;
+use super::trajectory_evidence::TrajectoryEvidenceRecord;
+
 pub const COST_QUALITY_JOIN_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -55,6 +61,7 @@ pub enum CostQualityJoinError {
         field: &'static str,
         reason: &'static str,
     },
+    Identity(String),
     UnexpectedReferenceKind {
         field: &'static str,
         expected: &'static str,
@@ -77,6 +84,7 @@ impl std::fmt::Display for CostQualityJoinError {
             Self::InvalidReference { field, reason } => {
                 write!(f, "invalid {field} evidence reference: {reason}")
             }
+            Self::Identity(error) => write!(f, "evidence identity reconciliation failed: {error}"),
             Self::UnexpectedReferenceKind {
                 field,
                 expected,
@@ -92,6 +100,28 @@ impl std::fmt::Display for CostQualityJoinError {
 impl std::error::Error for CostQualityJoinError {}
 
 impl CostQualityJoinRecord {
+    /// Validate the manifest against the actual upstream evidence identities.
+    ///
+    /// This closes the gap between a structurally valid manifest and a
+    /// semantically valid join: the duplicated JoinIdentity is checked against
+    /// identities derived from the referenced source records.
+    pub fn validate_against_evidence(
+        &self,
+        task_quality: &TaskQualityEvidenceRecord,
+        performance: &PerformanceEvidenceRecord,
+        resource: &ResourceEvidenceRecord,
+        trajectory: &TrajectoryEvidenceRecord,
+    ) -> Result<(), CostQualityJoinError> {
+        self.validate()?;
+        let key = derive_experiment_key(task_quality, performance, resource)
+            .map_err(|error| CostQualityJoinError::Identity(error.to_string()))?;
+        verify_join_identity(&key, &self.identity)
+            .map_err(|error| CostQualityJoinError::Identity(error.to_string()))?;
+        verify_trajectory_target(&key, trajectory)
+            .map_err(|error| CostQualityJoinError::Identity(error.to_string()))?;
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), CostQualityJoinError> {
         if self.schema_version != COST_QUALITY_JOIN_SCHEMA_VERSION {
             return Err(CostQualityJoinError::UnsupportedSchema(self.schema_version));
