@@ -21,7 +21,7 @@
 use blake3;
 use serde::Serialize;
 use symthaea_engineering::provenance_binding::{CanonicalEdgeRef, CanonicalNodeRef, EvidenceSliceManifest};
-use symthaea_engineering::provenance_graph::{reference_graph, EdgeKind};
+use symthaea_engineering::provenance_graph::{reference_graph, EdgeKind, ProvenanceSlice};
 
 const OBSERVED_MYCELIX_INTEROP_COMMIT: &str =
     "b55bc03d99d0e8c89201dca06a264d16d5e2efd6";
@@ -340,7 +340,13 @@ fn evidence_binding_digest(binding: &EvidenceBinding) -> String {
     let slice = reference_graph()
         .slice("claim-001")
         .expect("authoritative reference claim exists");
+    evidence_binding_digest_from_slice(binding, &slice)
+}
 
+fn evidence_binding_digest_from_slice(
+    binding: &EvidenceBinding,
+    slice: &ProvenanceSlice,
+) -> String {
     let nodes = slice
         .nodes
         .iter()
@@ -672,15 +678,18 @@ mod tests {
     }
 
     #[test]
-    fn changing_slice_relationship_changes_projection_digest() {
-        let baseline = envelope();
-        let baseline_digest = baseline.source_content_digest.clone();
-        let mut changed = baseline.clone();
-        changed.evidence_binding.prediction_ref.object_version = Some("prediction@v2");
-        changed.source_content_digest = content_digest(&changed);
-        assert_ne!(baseline_digest, changed.source_content_digest);
-        assert_eq!(validate(&changed), ValidationOutcome::Valid);
-        assert_ne!(baseline.source_content_digest, content_digest(&changed));
+    fn changing_authoritative_slice_relationship_changes_projection_digest() {
+        let binding = evidence_binding();
+        let graph = reference_graph();
+        let baseline_slice = graph.slice("claim-001").expect("claim exists");
+
+        let mut changed_graph = graph.clone();
+        changed_graph.edges[0].kind = EdgeKind::ContradictedBy;
+        let changed_slice = changed_graph.slice("claim-001").expect("claim exists");
+
+        let baseline = evidence_binding_digest_from_slice(&binding, &baseline_slice);
+        let changed = evidence_binding_digest_from_slice(&binding, &changed_slice);
+        assert_ne!(baseline, changed);
     }
 
     #[test]
