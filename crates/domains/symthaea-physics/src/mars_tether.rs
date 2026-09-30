@@ -14,6 +14,7 @@
 //! can be cross-checked against hand calculations and external solvers.
 
 use std::f64::consts::PI;
+use sha2::{Digest, Sha256};
 
 /// Mars reference constants used by the first-order tether model.
 ///
@@ -474,6 +475,59 @@ impl TerrainArtifactComposition {
 
     pub fn validate(&self) -> Result<(), String> {
         Self::from_artifacts(self.artifacts.clone()).map(|_| ())
+    }
+}
+
+/// Stable digest of the exact terrain observation record and its consumed artifacts.
+///
+/// The v1 encoding is domain-separated, length-prefixed, and uses IEEE-754 bit
+/// patterns for floating-point values; it never depends on Debug formatting or
+/// map iteration order. It identifies the observation record, not its processing
+/// history or the experiment configuration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerrainObservationIdentity {
+    pub sha256: String,
+}
+
+impl TerrainObservationIdentity {
+    pub fn from_sample(
+        composition: &TerrainArtifactComposition,
+        sample: &TerrainSample,
+    ) -> Result<Self, String> {
+        composition.validate()?;
+        let cell = sample.source_grid_cell.ok_or_else(|| "terrain observation is missing its source grid cell".to_string())?;
+        if !sample.latitude_rad.is_finite() || !sample.longitude_rad.is_finite() {
+            return Err("terrain observation coordinates must be finite".into());
+        }
+        for value in [sample.elevation_m, sample.elevation_uncertainty_m, sample.slope_rad, sample.roughness_m].into_iter().flatten() {
+            if !value.is_finite() { return Err("terrain observation contains a non-finite value".into()); }
+        }
+        let mut bytes = b"symthaea:terrain-observation:v1\\0".to_vec();
+        let count = u64::try_from(composition.artifacts.len()).map_err(|_| "too many artifacts".to_string())?;
+        bytes.extend_from_slice(&count.to_le_bytes());
+        for artifact in &composition.artifacts {
+            for field in [&artifact.logical_file, &artifact.source_id, &artifact.source_revision, &artifact.coordinate_reference, &artifact.algorithm, &artifact.digest] {
+                let len = u64::try_from(field.len()).map_err(|_| "artifact field too long".to_string())?;
+                bytes.extend_from_slice(&len.to_le_bytes());
+                bytes.extend_from_slice(field.as_bytes());
+            }
+        }
+        bytes.extend_from_slice(&cell.0.to_le_bytes());
+        bytes.extend_from_slice(&cell.1.to_le_bytes());
+        bytes.push(match sample.sampling_method { TerrainSamplingMethod::NearestCellWithObservationCount => 1 });
+        bytes.extend_from_slice(&sample.latitude_rad.to_bits().to_le_bytes());
+        bytes.extend_from_slice(&sample.longitude_rad.to_bits().to_le_bytes());
+        for value in [sample.elevation_m, sample.elevation_uncertainty_m, sample.slope_rad, sample.roughness_m] {
+            match value {
+                Some(v) => { bytes.push(1); bytes.extend_from_slice(&v.to_bits().to_le_bytes()); },
+                None => bytes.push(0),
+            }
+        }
+        bytes.push(match sample.vertical_datum { TerrainVerticalDatum::AreoidRelative => 1, TerrainVerticalDatum::ReferenceSphereRelative => 2, TerrainVerticalDatum::PlanetocentricRadius => 3 });
+        bytes.push(match sample.quality { TerrainQuality::Measured => 1, TerrainQuality::Interpolated => 2, TerrainQuality::Missing => 3, TerrainQuality::Invalid => 4 });
+        let digest = Sha256::digest(&bytes);
+        let sha256 = digest.iter().map(|b| format!("{b:02x}")).collect();
+        Ok(Self { sha256 })
     }
 }
 
