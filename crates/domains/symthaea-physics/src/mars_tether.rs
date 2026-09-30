@@ -323,6 +323,17 @@ impl TerrainProvenance {
             ))
         }
     }
+
+    /// Require a complete set of cryptographically identified source artifacts.
+    pub fn require_sha256_set<'a, I>(&self, logical_files: I) -> Result<(), String>
+    where
+        I: IntoIterator<Item = &'a str>,
+    {
+        for logical_file in logical_files {
+            self.require_sha256(logical_file)?;
+        }
+        Ok(())
+    }
 }
 
 /// Immutable input identity for a reproducible tether-engineering run.
@@ -359,14 +370,12 @@ impl TetherExperimentProvenance {
             return Err("configuration must be a 64-character hexadecimal SHA-256 digest".into());
         }
         self.terrain.validate()?;
-        for logical_file in [
+        self.terrain.require_sha256_set([
             "detached-label",
             "raster-image",
             "counts-label",
             "counts-raster",
-        ] {
-            self.terrain.require_sha256(logical_file)?;
-        }
+        ])?;
         Ok(())
     }
 
@@ -882,6 +891,22 @@ mod tests {
         };
         let error = merged.merged_with(&conflict).unwrap_err();
         assert!(error.contains("conflicting provenance identities"));
+    }
+
+    #[test]
+    fn provenance_sha256_set_reports_the_first_missing_artifact() {
+        let provenance = TerrainProvenance {
+            source_id: "mola".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "ia2".into(),
+            content_digests: vec![
+                ("label".into(), "SHA-256".into(), "a".repeat(64)),
+            ],
+        };
+        let error = provenance
+            .require_sha256_set(["label", "raster", "counts"])
+            .unwrap_err();
+        assert!(error.contains("raster"));
     }
 
     #[test]
