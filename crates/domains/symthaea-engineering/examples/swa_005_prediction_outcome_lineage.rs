@@ -634,6 +634,65 @@ mod tests {
     }
 
     #[test]
+    fn holdout_validation_is_typed_evidence_not_authorization() {
+        let (prediction, _, _) = fixture();
+        let outcome = synthetic_world(
+            ZoneState { indoor_c: 21.0 },
+            ZoneParameters {
+                thermal_mass_kwh_per_c: 9.0,
+                envelope_u_kw_per_c: 0.23,
+                internal_gain_kw: 0.47,
+                setpoint_c: 21.0,
+                comfort_band_c: 2.0,
+            },
+            Intervention {
+                id: "zone-a-reversible-hvac",
+                hvac_capacity_kw: 2.0,
+            },
+            30.0,
+            8,
+        );
+        let evidence =
+            validate_holdout("validation-test-001", "holdout-test-001", prediction, outcome);
+
+        assert_eq!(evidence.model_id, prediction.model_id);
+        assert_eq!(evidence.parameter_set_id, prediction.parameter_set_id);
+        assert_eq!(evidence.intervention_id, prediction.intervention_id);
+        assert_eq!(evidence.scenario_id, "holdout-test-001");
+        assert!(!evidence.is_authorization);
+        assert!(evidence.comfort_error.is_finite());
+        assert!(evidence.energy_error_kwh.is_finite());
+    }
+
+    #[test]
+    fn validation_replay_is_deterministic() {
+        let (prediction, _, _) = fixture();
+        let outcome = synthetic_world(
+            ZoneState { indoor_c: 21.0 },
+            ZoneParameters {
+                thermal_mass_kwh_per_c: 9.0,
+                envelope_u_kw_per_c: 0.23,
+                internal_gain_kw: 0.47,
+                setpoint_c: 21.0,
+                comfort_band_c: 2.0,
+            },
+            Intervention {
+                id: "zone-a-reversible-hvac",
+                hvac_capacity_kw: 2.0,
+            },
+            30.0,
+            8,
+        );
+        let a = validate_holdout("validation-test-002", "holdout-test-002", prediction, outcome);
+        let b = validate_holdout("validation-test-002", "holdout-test-002", prediction, outcome);
+        assert_eq!(a, b);
+        assert_eq!(
+            serde_json::to_string(&a).expect("serialize a"),
+            serde_json::to_string(&b).expect("serialize b")
+        );
+    }
+
+    #[test]
     fn prediction_does_not_become_observation() {
         let (_, outcome, _) = fixture();
         assert_ne!(outcome.source, "telemetry");
