@@ -88,21 +88,31 @@ impl From<String> for RunId {
     }
 }
 
-/// Canonical, single-implementation config-identity fingerprint.
+/// Legacy config-identity fingerprint retained for compatibility.
 ///
-/// Hashes the `Debug` representation of `config` via `DefaultHasher`. This
-/// is an identity fingerprint for logging/deduplication/dashboards — it is
-/// **not** a cryptographic hash and must never be used for anything
-/// security-sensitive (no collision resistance, no stability guarantee
-/// across Rust versions).
-///
-/// Other code in this workspace should call this instead of reinventing the
-/// same `DefaultHasher`-over-`Debug`-string pattern locally (see the crate
-/// doc comment for the audit finding this closes).
+/// This is intentionally process/toolchain dependent: Rust does not specify
+/// the `DefaultHasher` algorithm as a stable serialization format. It is
+/// suitable only for local diagnostics/deduplication, never for persisted
+/// experiment identity or cross-version reproducibility.
 pub fn config_hash<T: fmt::Debug>(config: &T) -> String {
     let mut hasher = DefaultHasher::new();
     format!("{config:?}").hash(&mut hasher);
     format!("{:x}", hasher.finish())
+}
+
+/// Stable semantic configuration identity.
+///
+/// Unlike [`config_hash`], this hashes the explicit JSON serialization of a
+/// `Serialize` value with BLAKE3. The JSON bytes are the versioned semantic
+/// representation: callers that need a stronger compatibility contract must
+/// version their serialized configuration schema rather than relying on
+/// `Debug` output.
+///
+/// This is an identity/determinism primitive, not an authorization primitive.
+/// Use the evidence/provenance contracts for security-sensitive commitments.
+pub fn stable_config_hash<T: Serialize>(config: &T) -> String {
+    let bytes = serde_json::to_vec(config).expect("stable config serialization must succeed");
+    blake3::hash(&bytes).to_hex().to_string()
 }
 
 /// A named bag of measured evidence values.
