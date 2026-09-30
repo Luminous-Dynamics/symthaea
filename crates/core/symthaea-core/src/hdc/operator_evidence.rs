@@ -111,13 +111,13 @@ pub fn qualify_operator_matrix(records: &[OperatorEvidenceRecord]) -> OperatorEv
     let mut duplicate_records = 0;
 
     for record in records {
-        let key = (record.resolution, record.operation);
+        let key = (record.resolution, record.operation.as_str());
         if !seen.insert(key) {
             duplicate_records += 1;
         }
         if record.schema_version == EVIDENCE_SCHEMA_VERSION
             && record.representation == CONTINUOUS_F32_REPRESENTATION
-            && record.qualification_status == "qualified"
+            && record.qualification_status == QUALIFIED_STATUS
         {
             qualified_records += 1;
         } else {
@@ -170,7 +170,7 @@ fn scalar_record(
 
     OperatorEvidenceRecord {
         schema_version: EVIDENCE_SCHEMA_VERSION,
-        representation: "continuous_f32",
+        representation: CONTINUOUS_F32_REPRESENTATION.to_owned(),
         resolution: dim,
         operation: operation.to_owned(),
         seed_a: DEFAULT_SEED_A,
@@ -231,7 +231,7 @@ fn vector_record(
         max_relative_error,
         tolerance,
         logical_bytes,
-        qualification_status: status,
+        qualification_status: status.to_owned(),
     }
 }
 
