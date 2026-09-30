@@ -57,6 +57,7 @@ pub struct MolaMegdrMetadata {
     pub latitude_min_deg: f64,
     pub latitude_max_deg: f64,
     pub line_offset: u32,
+    pub image_byte_offset: u64,
     pub sample_offset: u32,
     pub line_projection_offset: f64,
     pub sample_projection_offset: f64,
@@ -297,7 +298,7 @@ impl MolaMegdrMetadata {
         let longitude_max_deg = parse_f64(kv, "EASTERNMOST_LONGITUDE")?;
         let latitude_min_deg = parse_f64(kv, "MINIMUM_LATITUDE")?;
         let latitude_max_deg = parse_f64(kv, "MAXIMUM_LATITUDE")?;
-        let line_offset = image_data_record_offset(kv)?;
+        let (line_offset, image_byte_offset) = image_data_pointer(kv)?;
         let sample_offset = 0;
         // Projection offsets are georeferencing authority, not safe-to-guess
         // defaults. A missing offset can silently shift every sampled cell.
@@ -460,6 +461,7 @@ impl MolaMegdrMetadata {
             latitude_min_deg,
             latitude_max_deg,
             line_offset,
+            image_byte_offset,
             sample_offset,
             line_projection_offset,
             sample_projection_offset,
@@ -544,37 +546,73 @@ fn parse_label(text: &str) -> std::collections::BTreeMap<String, String> {
     out
 }
 
-fn image_data_record_offset(
+fn image_data_pointer(
     kv: &std::collections::BTreeMap<String, String>,
-) -> Result<u32, MolaError> {
-    match kv.get("^IMAGE") {
-        None => Ok(0),
-        Some(pointer) => {
-            let pointer = pointer.trim();
+) -> Result<(u32, u64), MolaError> {
+    let pointer = match kv.get("^IMAGE") {
+        None => return Ok((0, 0)),
+        Some(pointer) => pointer.trim(),
+    };
 
-            // This adapter always receives a detached label and a separate IMG
-            // path. PDS3 permits a bare numeric ^IMAGE pointer for an attached
-            // label, but a detached label must identify the external file
-            // (optionally with an explicit record/byte offset). Treating a bare
-            // integer as an offset into the separate IMG would silently
-            // reinterpret an attached-label convention and can shift every
-            // sampled cell.
-            if pointer.parse::<f64>().is_ok() {
-                return Err(MolaError::InvalidMetadata(
-                    "bare numeric ^IMAGE pointers are invalid for detached labels".into(),
-                ));
-            }
-
-            if pointer.starts_with('"') || pointer.to_ascii_lowercase().ends_with(".img") {
-                // Detached IMAGE files begin at byte zero unless an explicit
-                // filename+offset tuple is supplied. MOLA MEGDR labels use the
-                // plain detached filename form.
-                return Ok(0);
-            }
-
-            Err(MolaError::InvalidMetadata("invalid ^IMAGE pointer".into()))
-        }
+    // Detached PDS3 pointers have a filename, optionally followed by a
+    // record or byte offset. Bare numeric pointers belong to attached labels
+    // and are rejected by this detached-label API.
+    if pointer.parse::<f64>().is_ok() {
+        return Err(MolaError::InvalidMetadata(
+            "bare numeric ^IMAGE pointers are invalid for detached labels".into(),
+        ));
     }
+
+    if pointer.starts_with('"') && pointer.ends_with('"') {
+        return Ok((0, 0));
+    }
+
+    if pointer.starts_with('(') && pointer.ends_with(')') {
+        let inner = pointer[1..pointer.len() - 1].trim();
+        let (filename, offset) = inner.split_once(',').ok_or_else(|| {
+            MolaError::InvalidMetadata(
+                "detached ^IMAGE tuple must contain filename and offset".into(),
+            )
+        })?;
+        let filename = filename.trim();
+        if filename.len() < 2 || !filename.starts_with('"') || !filename.ends_with('"') {
+            return Err(MolaError::InvalidMetadata(
+                "detached ^IMAGE tuple must begin with a quoted filename".into(),
+            ));
+        }
+        let offset = offset.trim();
+        if let Some(byte_value) = offset.strip_suffix("<BYTES>") {
+            let byte_value = parse_positive_pointer(byte_value, "^IMAGE byte offset")?;
+            return Ok((0, byte_value - 1));
+        }
+        let record = parse_positive_pointer(offset, "^IMAGE record offset")?;
+        let record = u32::try_from(record - 1).map_err(|_| {
+            MolaError::InvalidMetadata("^IMAGE record offset exceeds u32 range".into())
+        })?;
+        return Ok((record, 0));
+    }
+
+    if pointer.to_ascii_lowercase().ends_with(".img") {
+        return Ok((0, 0));
+    }
+
+    Err(MolaError::InvalidMetadata("invalid detached ^IMAGE pointer".into()))
+}
+
+fn parse_positive_pointer(value: &str, field: &str) -> Result<u64, MolaError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(MolaError::InvalidMetadata(format!("{field} is empty")));
+    }
+    let parsed = value.parse::<u64>().map_err(|_| {
+        MolaError::InvalidMetadata(format!("{field} must be a positive integer"))
+    })?;
+    if parsed == 0 {
+        return Err(MolaError::InvalidMetadata(format!(
+            "{field} must be positive"
+        )));
+    }
+    Ok(parsed)
 }
 
 fn required(
@@ -798,9 +836,14 @@ fn validate_img_size(metadata: &MolaMegdrMetadata, img_path: &Path) -> Result<()
             "sample payload exceeds the declared record size".into(),
         ));
     }
-    let required = metadata.record_bytes * u64::from(metadata.line_offset)
-        + u64::from(metadata.lines.saturating_sub(1)) * metadata.record_bytes
-        + row_payload;
+    let required = metadata
+        .image_byte_offset
+        .checked_add(metadata.record_bytes * u64::from(metadata.line_offset))
+        .and_then(|offset| offset.checked_add(
+            u64::from(metadata.lines.saturating_sub(1)) * metadata.record_bytes
+        ))
+        .and_then(|offset| offset.checked_add(row_payload))
+        .ok_or_else(|| MolaError::InvalidMetadata("IMG size calculation overflow".into()))?;
     if len < required {
         return Err(MolaError::InvalidMetadata(format!(
             "IMG is too small: {len} bytes, expected at least {required}"
@@ -1020,6 +1063,43 @@ mod tests {
             )
             .unwrap_err();
             assert!(matches!(error, MolaError::InvalidMetadata(_)), "^IMAGE={value}");
+        }
+    }
+
+    #[test]
+    fn parses_detached_image_record_and_byte_pointers() {
+        for (pointer, expected_record, expected_byte) in [
+            (r#"("MEGT00N000HB.IMG",2)"#, 1, 0),
+            (r#"("MEGT00N000HB.IMG",700 <BYTES>)"#, 0, 699),
+        ] {
+            let text = format!("{}\n^IMAGE = {}", label(), pointer);
+            let metadata = MolaMegdrMetadata::from_label(
+                &parse_label(&text),
+                "MEGT00N000HB",
+            )
+            .unwrap();
+            assert_eq!(metadata.line_offset, expected_record);
+            assert_eq!(metadata.image_byte_offset, expected_byte);
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_detached_image_pointers() {
+        for pointer in [
+            r#"("MEGT00N000HB.IMG",0)"#,
+            r#"("MEGT00N000HB.IMG",-1)"#,
+            r#"("MEGT00N000HB.IMG",1.5)"#,
+            r#"("MEGT00N000HB.IMG",NaN)"#,
+            r#"("MEGT00N000HB.IMG")"#,
+            r#"("MEGT00N000HB.IMG",1 <WORDS>)"#,
+        ] {
+            let text = format!("{}\n^IMAGE = {}", label(), pointer);
+            let error = MolaMegdrMetadata::from_label(
+                &parse_label(&text),
+                "MEGT00N000HB",
+            )
+            .unwrap_err();
+            assert!(matches!(error, MolaError::InvalidMetadata(_)), "^IMAGE={pointer}");
         }
     }
 
