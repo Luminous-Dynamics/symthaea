@@ -501,17 +501,20 @@ pub fn build_evidence_bundle(
     config: &BenchmarkConfig,
     ablations: Vec<AblationResult>,
 ) -> super::report::ButlinEvidenceBundle {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    use symthaea_evidence_plane::{
+        stable_config_hash, STABLE_CONFIG_IDENTITY_SCHEMA,
+    };
 
-    let mut hasher = DefaultHasher::new();
-    format!("{config:?}").hash(&mut hasher);
-    let config_hash = format!("{:x}", hasher.finish());
+    // Preserve the serialized field name for compatibility, but the value
+    // produced by current bundles is now the versioned stable semantic
+    // identity rather than a process/toolchain-dependent DefaultHasher result.
+    let config_hash = stable_config_hash(config);
 
     super::report::ButlinEvidenceBundle {
         schema_version: super::report::REPORT_SCHEMA_VERSION,
         commit_sha: "unknown".to_string(),
         config_hash,
+        config_identity_schema: Some(STABLE_CONFIG_IDENTITY_SCHEMA.to_string()),
         seeds: Vec::new(),
         generated_at: format!("{:?}", std::time::SystemTime::now()),
         ablations,
