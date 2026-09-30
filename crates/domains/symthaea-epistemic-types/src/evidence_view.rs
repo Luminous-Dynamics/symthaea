@@ -155,6 +155,17 @@ impl EvidenceView {
         if projection_identity_digests != receipt_projection_identity_digests {
             return Err(EvidenceViewError::ReceiptMismatch);
         }
+        let mut derived_families = groups.iter()
+            .flat_map(|group| group.provenance_families.iter().cloned())
+            .collect::<Vec<_>>();
+        derived_families.sort();
+        derived_families.dedup();
+        let mut receipt_families = receipt.provenance_families.clone();
+        receipt_families.sort();
+        receipt_families.dedup();
+        if derived_families != receipt_families {
+            return Err(EvidenceViewError::ReceiptMismatch);
+        }
         let mut view = Self {
             mode: receipt.mode,
             frontier_ref: receipt.frontier_ref.clone(),
@@ -254,6 +265,20 @@ mod tests {
             vec![candidate("claim:x", 0.7, "family:a")],
         );
         receipt.selected = vec!["claim:other".into()];
+        assert_eq!(
+            EvidenceView::from_retrieval(&groups, &receipt),
+            Err(EvidenceViewError::ReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn mismatched_provenance_family_set_is_rejected() {
+        let (groups, mut receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "q", 5),
+            vec![candidate("claim:x", 0.7, "family:a")],
+        );
+        receipt.provenance_families = vec!["family:other".into()];
+        receipt.receipt_digest = receipt.canonical_digest();
         assert_eq!(
             EvidenceView::from_retrieval(&groups, &receipt),
             Err(EvidenceViewError::ReceiptMismatch)
