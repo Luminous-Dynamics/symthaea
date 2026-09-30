@@ -680,7 +680,6 @@ mod adversarial_contract_tests {
                 FederationDependency::Derivation("derivation:z".into()),
                 FederationDependency::Derivation("frontier:1".into()),
                 FederationDependency::Frontier("frontier:1".into()),
-                FederationDependency::Frontier("frontier:1".into()),
             ]
         );
     }
