@@ -7,14 +7,13 @@
 //! This module does not claim benchmark performance: `logical_bytes` is a
 //! declared operation-level accounting quantity, not measured memory traffic.
 
-use serde::{Deserialize, Serialize};
-
 use super::{
     resolution_space::HdcResolution,
+    operator_evidence_contract::{CONTINUOUS_F32_REPRESENTATION, OPERATOR_EVIDENCE_SCHEMA_VERSION, QUALIFIED_STATUS},
     simd_continuous::{bind_simd, bundle_simd, dot_product_simd, norm_simd, similarity_simd},
 };
 
-pub const EVIDENCE_SCHEMA_VERSION: u32 = 1;
+pub const EVIDENCE_SCHEMA_VERSION: u32 = OPERATOR_EVIDENCE_SCHEMA_VERSION;
 pub const DEFAULT_SEED_A: u64 = 42;
 pub const DEFAULT_SEED_B: u64 = 43;
 
@@ -22,28 +21,7 @@ const EXTENDED_DIMS: &[usize] = &[16_384, 32_768, 65_536, 131_072, 262_144];
 const TOLERANCE_SCALAR: f64 = 1e-4;
 const TOLERANCE_VECTOR: f64 = 1e-5;
 
-/// One deterministic operator qualification observation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct OperatorEvidenceRecord {
-    pub schema_version: u32,
-    pub representation: &'static str,
-    pub resolution: usize,
-    pub operation: &'static str,
-    pub seed_a: u64,
-    pub seed_b: u64,
-    /// Scalar-oracle value. For vector-valued operations this is a deterministic
-    /// checksum (sum of elements), while max_abs_error is the fidelity metric.
-    pub scalar_reference: f64,
-    /// SIMD value using the same convention as scalar_reference.
-    pub simd_result: f64,
-    pub abs_error: f64,
-    pub relative_error: f64,
-    pub max_abs_error: f64,
-    pub max_relative_error: f64,
-    pub tolerance: f64,
-    pub logical_bytes: usize,
-    pub qualification_status: &'static str,
-}
+pub use super::operator_evidence_contract::{OperatorEvidenceRecord, OperatorEvidenceSummary};
 
 /// Generate the deterministic operator matrix used by the >64K evidence gate.
 ///
@@ -121,23 +99,6 @@ pub fn generate_extended_resolution_evidence() -> Vec<OperatorEvidenceRecord> {
     records
 }
 
-/// Summary produced by the operator evidence gate.
-///
-/// A trajectory experiment may consume operator evidence only when
-/// `qualified == true`. Missing and duplicate matrix cells are treated as
-/// failures rather than silently ignored.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OperatorEvidenceSummary {
-    pub schema_version: u32,
-    pub expected_records: usize,
-    pub observed_records: usize,
-    pub qualified_records: usize,
-    pub failed_records: usize,
-    pub missing_records: usize,
-    pub duplicate_records: usize,
-    pub qualified: bool,
-}
-
 /// Validate that a complete operator/resolution matrix exists and every cell
 /// passed its declared numerical tolerance.
 pub fn qualify_operator_matrix(records: &[OperatorEvidenceRecord]) -> OperatorEvidenceSummary {
@@ -150,13 +111,13 @@ pub fn qualify_operator_matrix(records: &[OperatorEvidenceRecord]) -> OperatorEv
     let mut duplicate_records = 0;
 
     for record in records {
-        let key = (record.resolution, record.operation);
+        let key = (record.resolution, record.operation.as_str());
         if !seen.insert(key) {
             duplicate_records += 1;
         }
         if record.schema_version == EVIDENCE_SCHEMA_VERSION
-            && record.representation == "continuous_f32"
-            && record.qualification_status == "qualified"
+            && record.representation == CONTINUOUS_F32_REPRESENTATION
+            && record.qualification_status == QUALIFIED_STATUS
         {
             qualified_records += 1;
         } else {
@@ -209,9 +170,9 @@ fn scalar_record(
 
     OperatorEvidenceRecord {
         schema_version: EVIDENCE_SCHEMA_VERSION,
-        representation: "continuous_f32",
+        representation: CONTINUOUS_F32_REPRESENTATION.to_owned(),
         resolution: dim,
-        operation,
+        operation: operation.to_owned(),
         seed_a: DEFAULT_SEED_A,
         seed_b: DEFAULT_SEED_B,
         scalar_reference: f64::from(scalar),
@@ -222,7 +183,7 @@ fn scalar_record(
         max_relative_error: relative_error,
         tolerance,
         logical_bytes,
-        qualification_status: status,
+        qualification_status: status.to_owned(),
     }
 }
 
@@ -270,7 +231,7 @@ fn vector_record(
         max_relative_error,
         tolerance,
         logical_bytes,
-        qualification_status: status,
+        qualification_status: status.to_owned(),
     }
 }
 
@@ -339,7 +300,7 @@ mod tests {
             let ops: Vec<_> = generate_extended_resolution_evidence()
                 .into_iter()
                 .filter(|record| record.resolution == dim)
-                .map(|record| record.operation)
+                .map(|record| record.operation.as_str())
                 .collect();
             assert_eq!(ops, vec!["dot", "bind", "bundle", "norm", "similarity"]);
         }
