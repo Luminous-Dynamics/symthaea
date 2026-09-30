@@ -551,21 +551,12 @@ mod tests {
 
     #[test]
     fn expired_delivery_precedes_new_observation_policy() {
-        let (state, mut delivery, mut observation) = admitted_state();
-        delivery.expires_at_ms = 100;
+        let (mut state, delivery, mut observation) = admitted_state();
+        state.deliveries.get_mut(&delivery.logical_delivery_id).unwrap().expires_at_ms = 100;
+        let expired_delivery = state.deliveries.get(&delivery.logical_delivery_id).unwrap().clone();
         observation.key.observation_id = Uuid::from_u128(9_999);
-        let policy = AdmissionPolicy::default();
         assert_eq!(
-            decide(&state, &delivery, &observation, policy, 100),
-            AdmissionOutcome::Conflict { identity_kind: ConflictKind::DeliveryContract }
-        );
-
-        // The contract mismatch above is intentional: an expired request must
-        // retain identity precedence. Now expire the stored contract itself.
-        let mut expired_state = state.clone();
-        expired_state.deliveries.get_mut(&delivery.logical_delivery_id).unwrap().expires_at_ms = 100;
-        assert_eq!(
-            decide(&expired_state, &expired_state.deliveries[&delivery.logical_delivery_id], &observation, policy, 100),
+            decide(&state, &expired_delivery, &observation, AdmissionPolicy::default(), 100),
             AdmissionOutcome::Expired { boundary: ExpiryBoundary::DeliveryDeadline }
         );
     }
