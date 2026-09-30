@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_trailing_data() {
+    #[test]\n    fn rejects_non_standard_numbers() {\n        for input in [br#"NaN"#.as_slice(), br#"Infinity"#.as_slice(), br#"-Infinity"#.as_slice()] {\n            assert!(matches!(\n                admit_value(input),\n                BoundaryResult::Rejected { reason: RejectionReason::InvalidJson, .. }\n            ));\n        }\n    }\n\n    #[test]\n    fn accepts_trailing_json_whitespace() {\n        assert!(matches!(\n            admit_value(b"{ } \\n\\t\\r"),\n            BoundaryResult::Accepted { .. }\n        ));\n    }\n\n    #[test]\n    fn rejects_trailing_data() {
         assert!(matches!(
             admit_value(br#"{} {}"#),
             BoundaryResult::Rejected { reason: RejectionReason::TrailingData, .. }
