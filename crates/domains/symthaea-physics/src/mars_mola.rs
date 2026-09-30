@@ -183,7 +183,7 @@ impl MolaMegdrProduct {
         let count = counts.read_count(line, sample)?;
         let provenance = self.provenance_with_counts(counts)?;
         if count == 0 {
-            return Ok(self.missing_sample(latitude_deg, longitude_deg, provenance));
+            return Ok(self.missing_sample(latitude_deg, longitude_deg, line, sample, provenance));
         }
         let value = self.read_i16(line, sample)? as f64;
         if self.metadata.missing_value.is_some_and(|m| value == m) {
@@ -218,13 +218,15 @@ impl MolaMegdrProduct {
         &self,
         latitude_deg: f64,
         longitude_deg: f64,
+        line: u32,
+        sample: u32,
         provenance: TerrainProvenance,
     ) -> TerrainSample {
         TerrainSample {
             latitude_rad: latitude_deg.to_radians(),
             longitude_rad: normalize_lon(longitude_deg).to_radians(),
             sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,
-            source_grid_cell: None,
+            source_grid_cell: Some((line, sample)),
             elevation_m: None,
             elevation_uncertainty_m: None,
             vertical_datum: TerrainVerticalDatum::AreoidRelative,
