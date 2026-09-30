@@ -243,7 +243,7 @@ impl ProcessingActivity {
     pub fn compute_execution_fingerprint(&self) -> Result<String, ObservationValidationError> {
         self.validate_without_execution_fingerprint()?;
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-processing-activity:v1\\n");
+        hasher.update(b"symthaea:observation-processing-activity:v1\n");
         write_canonical_string(&mut hasher, &self.activity_id);
         write_canonical_string(&mut hasher, &self.process_id);
         write_canonical_i128_option(&mut hasher, self.started_at_unix_ns);
@@ -311,7 +311,6 @@ fn write_canonical_i128_option(hasher: &mut blake3::Hasher, value: Option<i128>)
 fn write_canonical_string_vec(hasher: &mut blake3::Hasher, values: &[String]) {
     hasher.update(&(values.len() as u64).to_be_bytes());
     for value in values { write_canonical_string(hasher, value); }
-}
 }
 
 /// Provenance linking an observation to its producer and processing lineage.
