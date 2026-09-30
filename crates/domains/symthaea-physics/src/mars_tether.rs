@@ -227,6 +227,9 @@ pub struct TerrainProvenance {
     pub source_id: String,
     pub source_revision: String,
     pub coordinate_reference: String,
+    /// Cryptographic identity of the source bytes, when the adapter can
+    /// authenticate them. Each entry is (logical file, algorithm, digest).
+    pub content_digests: Vec<(String, String, String)>,
 }
 
 /// Quality state for a terrain sample.
