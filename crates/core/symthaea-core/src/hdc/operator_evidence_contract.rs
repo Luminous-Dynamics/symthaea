@@ -16,9 +16,9 @@ pub const QUALIFIED_STATUS: &str = "qualified";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OperatorEvidenceRecord {
     pub schema_version: u32,
-    pub representation: &'static str,
+    pub representation: String,
     pub resolution: usize,
-    pub operation: &'static str,
+    pub operation: String,
     pub seed_a: u64,
     pub seed_b: u64,
     pub scalar_reference: f64,
@@ -29,7 +29,7 @@ pub struct OperatorEvidenceRecord {
     pub max_relative_error: f64,
     pub tolerance: f64,
     pub logical_bytes: usize,
-    pub qualification_status: &'static str,
+    pub qualification_status: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -181,9 +181,9 @@ mod tests {
                 ["dot", "bind", "bundle", "norm", "similarity"].into_iter().map(
                     move |operation| OperatorEvidenceRecord {
                         schema_version: OPERATOR_EVIDENCE_SCHEMA_VERSION,
-                        representation: CONTINUOUS_F32_REPRESENTATION,
+                        representation: CONTINUOUS_F32_REPRESENTATION.to_owned(),
                         resolution,
-                        operation,
+                        operation: operation.to_owned(),
                         seed_a: 42,
                         seed_b: 43,
                         scalar_reference: 0.0,
@@ -194,7 +194,7 @@ mod tests {
                         max_relative_error: 0.0,
                         tolerance: 1e-4,
                         logical_bytes: 1,
-                        qualification_status: QUALIFIED_STATUS,
+                        qualification_status: QUALIFIED_STATUS.to_owned(),
                     },
                 )
             })
