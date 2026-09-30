@@ -693,3 +693,22 @@ SWA-019 now mirrors those **validation invariants** in its local adapter fixture
 The adapter still does not duplicate the Mycelix implementation. The actual Mycelix types remain authoritative once a production adapter can depend on the appropriate published/workspace contract. The Symthaea fixture exists to make the boundary deterministic and testable without introducing a cross-repository runtime dependency into this engineering reference fixture.
 
 This also reinforces the semantic rule already present in Mycelix's interoperability documentation: overlapping labels do not imply schema equivalence. A consumer must retain namespace, schema identity, and version rather than collapsing them into a shared ordinal or display label.
+
+
+## Content binding — SWA-021
+
+SWA-019 established semantic identity and dependency structure, but its digest was intentionally only a declaration. SWA-021 closes that gap at the local fixture boundary without pretending to be the final Mycelix cryptographic contract.
+
+The projection now derives a BLAKE3-256 digest from a deterministic serialized `ContentBindingPayload` containing the schema, source/target semantic references, projection target, observed Mycelix revision, author/authority references, dependency set, and authority/actuation state. The digest is computed over the payload **excluding the digest field itself**, avoiding a circular commitment. BLAKE3 provides a 32-byte default hash and deterministic hexadecimal representation in its Rust implementation. citeturn1search0turn1search1
+
+This establishes three useful invariants:
+
+- identical semantic input produces the same digest;
+- changing a committed field changes the digest;
+- the digest cannot silently become authority, authorization, or proof of physical execution.
+
+The algorithm is explicitly labeled in the envelope. This is a **fixture-level content commitment**, not yet a claim that Mycelix accepts BLAKE3 as its production receipt algorithm. The eventual adapter must use the target Mycelix crypto/profile contract and canonical wire representation rather than allowing each integration to invent its own commitment format.
+
+The resulting boundary is now:
+
+`Sol Atlas evidence identity -> semantic references -> canonical projection payload -> cryptographic content commitment -> Mycelix validation/governance boundary -> separately observed physical outcome`
