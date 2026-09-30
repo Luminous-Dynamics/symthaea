@@ -313,6 +313,10 @@ A returned TerrainSample now carries four cryptographic identities when produced
 
 This applies to both measured and missing samples because the counts raster participates in the observation decision even when the final result is TerrainQuality::Missing.
 
+The provenance envelope now also records the deterministic sampling procedure (NearestCellWithObservationCount) and the exact zero-based source grid cell selected by the adapter. This closes an important gap between **source identity** and **observation identity**: two runs can consume the same raster bytes but must still expose the cell-selection result that produced the observation. For missing observations, the selected cell is retained as well, so absence is auditable rather than represented only as None.
+
+This is intentionally analogous to the distinction made by current PDS4 between provenance and processing history. PDS4 1.26.0.0 provides a dedicated Provenance dictionary and a Processing Information dictionary; the latter is specifically intended to describe processing history used to produce a current product. Symthaea keeps the representation smaller, but now makes the observation derivation contract explicit instead of treating a source hash as sufficient.
+
 TetherExperimentProvenance now exposes require_reproducibly_pinned() -> Result<(), String> in addition to the boolean convenience check. The reproducibility gate fails closed unless experiment/model/constants/configuration identity and all four MOLA content identities are present and valid SHA-256 values. The diagnostic form is intentional: an audit boundary should explain which identity is absent rather than collapsing every failure into false.
 
 This is aligned with the current PDS4 architecture, which provides dedicated Provenance and Processing Information dictionaries in the 1.26.0.0 data-dictionary release. The Symthaea representation remains deliberately smaller and domain-specific; it does not claim to be a complete PDS4 provenance serialization. NASA's current PDS4 standards are version 1.26.0.0 (June 2026).
