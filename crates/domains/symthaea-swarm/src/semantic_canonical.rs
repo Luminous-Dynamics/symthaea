@@ -283,12 +283,14 @@ mod tests {
         assert_ne!(base, canonical_state_bytes(&changed).unwrap());
 
         let mut changed = state.clone();
-        changed.results.get_mut(&key).unwrap().observation = second_observation.key.clone();
-        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
-
-        let mut changed = state.clone();
-        changed.results.get_mut(&key).unwrap().observation.observation_id =
-            second_observation.key.observation_id;
+        let result = changed.results.remove(&key).unwrap();
+        changed.results.insert(
+            second_observation.key.clone(),
+            SemanticResult {
+                logical_delivery_id: result.logical_delivery_id,
+                observation: second_observation.key.clone(),
+            },
+        );
         assert_ne!(base, canonical_state_bytes(&changed).unwrap());
     }
 
