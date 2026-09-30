@@ -310,7 +310,7 @@ mod tests {
 mod digest_tests {
     use super::*;
 
-    fn base_claim() -> FederatedClaim {
+    pub(super) fn base_claim() -> FederatedClaim {
         let relation_a = ProvenanceRelation {
             source_memory_id: "derived".into(),
             target_memory_id: "source".into(),
