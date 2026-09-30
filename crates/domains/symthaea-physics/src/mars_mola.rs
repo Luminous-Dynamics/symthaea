@@ -388,9 +388,9 @@ impl MolaMegdrProduct {
                 sample,
                 provenance,
             );
-            return let identity = TerrainObservationIdentity::from_sample(&artifacts, &sample)
-            .map_err(MolaError::InvalidMetadata)?;
-        Ok(MolaTerrainObservation { sample, artifacts, identity });
+            let identity = TerrainObservationIdentity::from_sample(&artifacts, &sample)
+                .map_err(MolaError::InvalidMetadata)?;
+            return Ok(MolaTerrainObservation { sample, artifacts, identity });
         }
 
         let elevation = value * self.metadata.pixel_scale + self.metadata.pixel_offset;
@@ -413,7 +413,9 @@ impl MolaMegdrProduct {
             quality: TerrainQuality::Measured,
             provenance,
         };
-        Ok(MolaTerrainObservation { sample, artifacts })
+        let identity = TerrainObservationIdentity::from_sample(&artifacts, &sample)
+            .map_err(MolaError::InvalidMetadata)?;
+        Ok(MolaTerrainObservation { sample, artifacts, identity })
     }
 
     fn provenance_with_counts(&self, counts: &Self) -> Result<TerrainProvenance, MolaError> {
