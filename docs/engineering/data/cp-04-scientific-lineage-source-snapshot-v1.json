@@ -1,0 +1,217 @@
+{
+  "schema": "symthaea.cp-04-scientific-lineage-source-snapshot-v1",
+  "artifact_fixture": "docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json",
+  "source_graph_digest": "1bdcb0a0dc9cc82a501ccbc3ded3241d4fa736d9592f93d91ef4386e06653ec2",
+  "projection_digest": "024cb4f186e332085f6cd4c6089f41bfbbd640e62bf3e946155ce4c3bc79473a",
+  "nodes": [
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "model_parameters",
+      "canonical_identifier": "p",
+      "version": "1",
+      "content_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "representation",
+      "canonical_identifier": "rep",
+      "version": "1",
+      "content_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "requirement",
+      "canonical_identifier": "r",
+      "version": "1",
+      "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "uncertainty",
+      "canonical_identifier": "u",
+      "version": "1",
+      "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "deployment_artifact",
+      "canonical_identifier": "dep",
+      "version": "1",
+      "content_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "applicability",
+      "canonical_identifier": "app",
+      "version": "1",
+      "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "statistics",
+      "canonical_identifier": "s",
+      "version": "1",
+      "content_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "disposition",
+      "canonical_identifier": "d",
+      "version": "1",
+      "content_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "provenance_reference",
+      "canonical_identifier": "prov",
+      "version": "1",
+      "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "currentness",
+      "canonical_identifier": "cur",
+      "version": "1",
+      "content_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "accelerator",
+      "canonical_identifier": "acc",
+      "version": "1",
+      "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "model",
+      "canonical_identifier": "m",
+      "version": "1",
+      "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "toolchain",
+      "canonical_identifier": "tc",
+      "version": "1",
+      "content_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "execution_context",
+      "canonical_identifier": "ctx",
+      "version": "1",
+      "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "observation",
+      "canonical_identifier": "obs",
+      "version": "1",
+      "content_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "namespace": "cp04-fixture",
+      "object_kind": "runtime",
+      "canonical_identifier": "rt",
+      "version": "1",
+      "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "relations": [
+    {
+      "source_identity_digest": "28840c05265cf00285fe400913257e4062c8ce8a1ac9b16eea518b520af3dd3f",
+      "edge_type": "implements",
+      "target_identity_digest": "e0f344c8eb26205659006e701b1b9d79f544e0e2f1bc22d5d5a53fdb642faeb2",
+      "relation_digest": "5933f2f277740411b407f51a57ed4d585c9057874e571099d52dc487130c7a42"
+    },
+    {
+      "source_identity_digest": "39f1a54d7f79af6a8ad9da5d3980cf4c4aa253e2909346353b6506e351e93f32",
+      "edge_type": "requires",
+      "target_identity_digest": "28840c05265cf00285fe400913257e4062c8ce8a1ac9b16eea518b520af3dd3f",
+      "relation_digest": "9c71864edf2b0812e0ff63d6e692434ec9d8b7d683955abc997a52189939b1f5"
+    },
+    {
+      "source_identity_digest": "ab2bae57312b3f76881e154373321d411e1317e0bdc1ebba06e0ecbb378c61c8",
+      "edge_type": "executes",
+      "target_identity_digest": "e4bea3149e99a6e97b4c922148e447068ea493964e6430818f7e394d8bf29c84",
+      "relation_digest": "3acbc6d9f698919e22740f745a993e718bdf36ddc4ec98aa3b89d51d2334e9bf"
+    },
+    {
+      "source_identity_digest": "bbbdc0d3a544ec56ca0289d80d949187454af23421e2df29febaecffc64050b9",
+      "edge_type": "applicable_to",
+      "target_identity_digest": "e4bea3149e99a6e97b4c922148e447068ea493964e6430818f7e394d8bf29c84",
+      "relation_digest": "d561162658112b43ea99b34310ce7b0953a3b4e147774bd0aa4dd12f9650530a"
+    },
+    {
+      "source_identity_digest": "bc3a550c5dc35444272dc7050ac651331bd6f054dcad947a2bb0e5940bc07192",
+      "edge_type": "derives",
+      "target_identity_digest": "c44cba4b531fa054012ee4521357cea659081fdf235dca2a3ef38c51d288928e",
+      "relation_digest": "a01a13366ef5432b17f318483eaf362d181455fdf9d5a7f6d4659914311a97af"
+    },
+    {
+      "source_identity_digest": "caa9a620b895513193ed8f78beb2df842c8a848a6af870e5a41ed0d38288f953",
+      "edge_type": "currentness_for",
+      "target_identity_digest": "f87c7896fd5ca2a9bb3c6a6e6c86b91ad1d32989370ae19ca214a19eee5948c4",
+      "relation_digest": "1ecef1766fbcc4ca388b3e464efa967e8d3df65a959cd1f8f4688a4d02c55998"
+    },
+    {
+      "source_identity_digest": "ced93aeabca94290a32ff342f902ab3b4667c4af2cf684783b2f2c442cbe328f",
+      "edge_type": "deploys",
+      "target_identity_digest": "ab2bae57312b3f76881e154373321d411e1317e0bdc1ebba06e0ecbb378c61c8",
+      "relation_digest": "3e43f20f09d120f332fbe7239ebe3a3040870668510e4f6bee248c9b556bfa9b"
+    },
+    {
+      "source_identity_digest": "e0f344c8eb26205659006e701b1b9d79f544e0e2f1bc22d5d5a53fdb642faeb2",
+      "edge_type": "executes_with",
+      "target_identity_digest": "f87c7896fd5ca2a9bb3c6a6e6c86b91ad1d32989370ae19ca214a19eee5948c4",
+      "relation_digest": "457ab924b82ffa69ec3fd37dfd0d67ca8423b90e64e78075cfb7e2c9e2b1d71f"
+    },
+    {
+      "source_identity_digest": "e0f344c8eb26205659006e701b1b9d79f544e0e2f1bc22d5d5a53fdb642faeb2",
+      "edge_type": "parameterizes",
+      "target_identity_digest": "1896820ec0c1cfa2f1dba55ec694186ff06634de93ec7c6427891847e210fef7",
+      "relation_digest": "fe2ace066e5cf43829fa934a2d8419455e92282411912793916070531f7758e0"
+    },
+    {
+      "source_identity_digest": "e4bea3149e99a6e97b4c922148e447068ea493964e6430818f7e394d8bf29c84",
+      "edge_type": "observes",
+      "target_identity_digest": "e9de3e8363cc872a50bfe3d10e999f02537e819f7dc7fd41f6c19e2c2bb0e8a2",
+      "relation_digest": "8d1c4dccd88e021c9481e5558c665c39428072573c0a6758a84fe98210cbaaff"
+    },
+    {
+      "source_identity_digest": "e9de3e8363cc872a50bfe3d10e999f02537e819f7dc7fd41f6c19e2c2bb0e8a2",
+      "edge_type": "quantifies",
+      "target_identity_digest": "5aa57861fcf1de61e26a040f16d1d2bb34fdb6bd6303b8e23c5c250a82712bb1",
+      "relation_digest": "7bdcfc6c1b5c99572b10bfbd6a837292d21bb542b74c9376fef708947d7db0c9"
+    },
+    {
+      "source_identity_digest": "e9de3e8363cc872a50bfe3d10e999f02537e819f7dc7fd41f6c19e2c2bb0e8a2",
+      "edge_type": "quantifies",
+      "target_identity_digest": "bc3a550c5dc35444272dc7050ac651331bd6f054dcad947a2bb0e5940bc07192",
+      "relation_digest": "828bb75cdfd73f508fdad553c71da518a29aea9a18590ca13af462da73bc3828"
+    },
+    {
+      "source_identity_digest": "e9de3e8363cc872a50bfe3d10e999f02537e819f7dc7fd41f6c19e2c2bb0e8a2",
+      "edge_type": "traces_to",
+      "target_identity_digest": "c4c9612f775dfbf74a775c4a96aec53afd3adaa4f6c724a523a9405e292e0aa2",
+      "relation_digest": "96906a7ded0f6fa0ed26dbb0d0901caf71f092aa36df78da9057306aaa3d6008"
+    },
+    {
+      "source_identity_digest": "f87c7896fd5ca2a9bb3c6a6e6c86b91ad1d32989370ae19ca214a19eee5948c4",
+      "edge_type": "compiled_by",
+      "target_identity_digest": "e2cc01fc77f16e12fc9ad4dfe81f9c11d096d5d9e88d352a71b506ca466314f7",
+      "relation_digest": "5a9b6383aea90917e4fd798ba048bf78d423f47e5fe2afa0bf3063bda2735024"
+    },
+    {
+      "source_identity_digest": "f87c7896fd5ca2a9bb3c6a6e6c86b91ad1d32989370ae19ca214a19eee5948c4",
+      "edge_type": "runs_on",
+      "target_identity_digest": "ced93aeabca94290a32ff342f902ab3b4667c4af2cf684783b2f2c442cbe328f",
+      "relation_digest": "668c02f4a3c31a13ad5db6c333ed6ba6cad3b297f45e27f771d4e1fbc9b49cba"
+    }
+  ],
+  "epistemic_mutation": {
+    "source_identity_digest": "e9de3e8363cc872a50bfe3d10e999f02537e819f7dc7fd41f6c19e2c2bb0e8a2",
+    "edge_type": "supports",
+    "target_identity_digest": "e0f344c8eb26205659006e701b1b9d79f544e0e2f1bc22d5d5a53fdb642faeb2"
+  }
+}
