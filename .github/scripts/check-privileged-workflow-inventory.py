@@ -104,6 +104,12 @@ def parse_workflow(path: Path) -> dict[str, Any]:
             elif event in PRIVILEGED_EVENTS or key not in {"branches", "branches-ignore", "paths", "paths-ignore"}:
                 raise InventoryError(f"{path}: unsupported trigger field for {event}: {key}")
 
+    # A privileged workflow must have an explicit top-level permissions mapping
+    # in this restricted v1 grammar. Omitting it makes the effective token surface
+    # dependent on repository defaults, which this detector cannot safely infer.
+    if any(e in events for e in PRIVILEGED_EVENTS) and "permissions" not in top_keys:
+        raise InventoryError(f"{path}: privileged workflow must declare top-level permissions explicitly")
+
     privileged = [e for e in events if e in PRIVILEGED_EVENTS]
     if not privileged:
         return {"path": path.as_posix(), "privileged": False}
