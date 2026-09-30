@@ -86,9 +86,16 @@ fn validate_evidence_binding(binding: &EvidenceBinding) -> Result<(), ReferenceV
     ] {
         validate_semantic_ref(reference)?;
     }
-    if binding.slice_revision.is_empty()
-        || binding.provenance_digest != evidence_binding_digest(binding)
-    {
+    let graph = reference_graph();
+    if graph.validate().is_err() {
+        return Err(ReferenceValidationError::Empty);
+    }
+    let slice = graph
+        .slice("claim-001")
+        .ok_or(ReferenceValidationError::Empty)?;
+    let expected_digest = evidence_binding_digest_from_slice(binding, &slice)
+        .map_err(|_| ReferenceValidationError::Empty)?;
+    if binding.slice_revision.is_empty() || binding.provenance_digest != expected_digest {
         return Err(ReferenceValidationError::Empty);
     }
     Ok(())
