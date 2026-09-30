@@ -30,6 +30,7 @@ pub mod plan_executor;
 pub mod service_manager;
 pub mod service_domain;
 pub mod service_state;
+pub mod systemd_transport;
 pub mod temporal;
 
 pub use approver_evidence::{
