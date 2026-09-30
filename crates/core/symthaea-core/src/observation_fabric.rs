@@ -263,7 +263,7 @@ impl ProcessingActivity {
     pub fn compute_execution_fingerprint(&self) -> Result<String, ObservationValidationError> {
         self.validate_without_execution_fingerprint()?;
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-processing-activity:v1\n");
+        hasher.update(b"symthaea:observation-processing-activity:v2\n");
         write_canonical_string(&mut hasher, &self.activity_id);
         write_canonical_string(&mut hasher, &self.process_id);
         write_canonical_string_option(
@@ -1084,6 +1084,25 @@ mod tests {
         input.id = "input".into();
         let graph = ObservationGraph { observations: vec![input, output], relations: vec![] };
         assert_eq!(graph.validate(), Err(ObservationValidationError::DuplicateProcessingDerivation));
+    }
+
+    #[test]
+    fn processing_activity_fingerprint_domain_version_changes_identity() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into()],
+            derivations: Vec::new(),
+        };
+        let fingerprint = activity.compute_execution_fingerprint().unwrap();
+        assert_eq!(fingerprint.len(), 64);
     }
 
     #[test]
