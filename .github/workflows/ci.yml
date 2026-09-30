@@ -611,7 +611,8 @@ jobs:
           CARGO_TARGET_DIR: target/cognitive-hardening
         run: cargo test -p nixward --lib "mind::world_model"
 
-      - name: Phase 2.9-B — Episodic Memory Boundary Tests        env:
+      - name: Phase 2.9-B — Episodic Memory Boundary Tests
+        env:
           CARGO_TARGET_DIR: target/cognitive-hardening
         run: cargo test -p nixward --lib "mind::episodic_memory"
 
@@ -1210,7 +1211,8 @@ jobs:
               cargo check --features "$FEATURES"
               # Also compile the voice test surface: the gated integration
               # tests once bit-rotted invisibly (imports of deleted types)
-              # because feature legs were check-only and never built tests.              cargo check -p symthaea --features "$FEATURES" \
+              # because feature legs were check-only and never built tests.
+              cargo check -p symthaea --features "$FEATURES" \
                 --test voice_integration --test voice_pipeline_integration
               ;;
             *)
