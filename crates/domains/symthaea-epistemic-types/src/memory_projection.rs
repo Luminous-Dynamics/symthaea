@@ -131,6 +131,50 @@ pub struct ProvenanceValidationReport {
     pub violations: Vec<ProvenanceValidationViolation>,
 }
 
+/// Read-only provenance boundary for downstream evidence/federation adapters.
+///
+/// This view contains lineage metadata and the structural validation report only.
+/// It intentionally exposes no mutable cognitive state and assigns no evidential weight.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProvenanceView {
+    pub validator_version: String,
+    pub snapshot_schema_version: u16,
+    pub snapshot_digest: String,
+    pub relations: Vec<ProvenanceRelation>,
+    pub validation: ProvenanceValidationReport,
+}
+
+impl ProvenanceView {
+    pub fn from_relations(relations: &[ProvenanceRelation]) -> Self {
+        let validation = ProvenanceValidationReport::from_relations(relations);
+        Self {
+            validator_version: validation.validator_version.clone(),
+            snapshot_schema_version: validation.snapshot_schema_version,
+            snapshot_digest: validation.snapshot_digest.clone(),
+            relations: relations.to_vec(),
+            validation,
+        }
+    }
+
+    pub fn relations_from(&self, memory_id: &str) -> Vec<&ProvenanceRelation> {
+        self.relations
+            .iter()
+            .filter(|relation| relation.source_memory_id == memory_id)
+            .collect()
+    }
+
+    pub fn relations_to(&self, memory_id: &str) -> Vec<&ProvenanceRelation> {
+        self.relations
+            .iter()
+            .filter(|relation| relation.target_memory_id == memory_id)
+            .collect()
+    }
+
+    pub fn is_structurally_conforming(&self) -> bool {
+        self.validation.conforms
+    }
+}
+
 impl ProvenanceValidationReport {
     fn snapshot_digest_for(
         relations: &[ProvenanceRelation],
@@ -319,6 +363,37 @@ mod tests {
                 PROVENANCE_SNAPSHOT_SCHEMA_VERSION + 1,
             )
         );
+    }
+
+    #[test]
+    fn provenance_view_is_read_only_snapshot_with_bound_validation() {
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view = ProvenanceView::from_relations(std::slice::from_ref(&relation));
+        assert_eq!(view.relations, vec![relation]);
+        assert_eq!(view.relations_from("derived").len(), 1);
+        assert_eq!(view.relations_to("source").len(), 1);
+        assert!(view.is_structurally_conforming());
+        assert_eq!(view.snapshot_digest, view.validation.snapshot_digest);
+        assert_eq!(view.snapshot_schema_version, view.validation.snapshot_schema_version);
+    }
+
+    #[test]
+    fn provenance_view_does_not_assign_evidence_weight() {
+        let relation = ProvenanceRelation {
+            source_memory_id: "a".into(),
+            target_memory_id: "b".into(),
+            kind: ProvenanceRelationKind::Corroborates,
+            created_at: "cycle:2".into(),
+        };
+        let view = ProvenanceView::from_relations(&[relation]);
+        assert!(view.is_structurally_conforming());
+        // The view exposes relation structure only; no confidence/evidence field exists.
+        assert_eq!(view.validation.relation_count, 1);
     }
 
     #[test]
