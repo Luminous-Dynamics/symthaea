@@ -1006,6 +1006,60 @@ mod tests {
     }
 
     #[test]
+    fn numeric_image_pointer_is_applied_to_raster_reads() {
+        let mut path = std::env::temp_dir();
+        path.push(format!("mola_adapter_pointer_{}_label.lbl", std::process::id()));
+        let mut img = path.clone();
+        img.set_extension("img");
+
+        let text = format!("{}\n^IMAGE = 2", label());
+        std::fs::write(&path, text).unwrap();
+        let mut bytes = vec![0u8; 32];
+        bytes[16] = 0x03;
+        bytes[17] = 0xE8;
+        std::fs::write(&img, bytes).unwrap();
+
+        let product = MolaMegdrProduct::open(
+            &path,
+            &img,
+            "MEGT00N000HB",
+            "pds4-v1",
+        ).unwrap();
+        let mut count_path = path.clone();
+        count_path.set_file_name(format!(
+            "mola_adapter_pointer_count_{}_label.lbl",
+            std::process::id()
+        ));
+        let mut count_img = count_path.clone();
+        count_img.set_extension("img");
+        let count_label = label()
+            .replace("MEGT00N000HB", "MEGC00N000HB")
+            .replace("MAP_TYPE = T", "MAP_TYPE = C")
+            .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8")
+            + "\n^IMAGE = 2";
+        std::fs::write(&count_path, count_label).unwrap();
+        let mut count_bytes = vec![0u8; 32];
+        count_bytes[16] = 1;
+        std::fs::write(&count_img, count_bytes).unwrap();
+
+        let counts = MolaMegdrProduct::open(
+            &count_path,
+            &count_img,
+            "MEGC00N000HB",
+            "pds4-v1",
+        ).unwrap();
+        let sample = product
+            .sample_nearest_with_count(&counts, 0.0, 0.007, 3.0)
+            .unwrap();
+        assert_eq!(sample.elevation_m, Some(1000.0));
+
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(img);
+        let _ = std::fs::remove_file(count_path);
+        let _ = std::fs::remove_file(count_img);
+    }
+
+    #[test]
     fn detached_image_filename_pointer_is_zero_based_byte_origin() {
         for pointer in [
             r#""MEGT00N000HB.IMG""#,
