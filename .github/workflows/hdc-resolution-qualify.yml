@@ -20,11 +20,13 @@ on:
       - "crates/core/symthaea-core/src/hdc/dimension_sweep.rs"
       - "crates/core/symthaea-core/src/hdc/dimension_frontier.rs"
       - "crates/core/symthaea-core/src/hdc/dimension_task_harness.rs"
+      - "crates/core/symthaea-core/src/hdc/noise_robustness_harness.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/pareto_frontier.rs"
       - "crates/core/symthaea-core/tests/hdc_ltc_operator_evidence_chain.rs"
       - "crates/core/symthaea-core/examples/hdc_operator_evidence.rs"
       - "crates/core/symthaea-core/examples/hdc_dimension_task.rs"
+      - "crates/core/symthaea-core/examples/hdc_noise_robustness.rs"
       - "crates/core/symthaea-core/benches/simd_continuous.rs"
       - "docs/research/HDC_RESOLUTION_EXTENSIBILITY.md"
       - "docs/research/HDC_DIMENSION_SWEEP.md"
@@ -99,10 +101,12 @@ jobs:
             crates/core/symthaea-core/src/hdc/config.rs \
             crates/core/symthaea-core/src/hdc/dimension_observatory.rs \
             crates/core/symthaea-core/src/hdc/dimension_task_harness.rs \
+            crates/core/symthaea-core/src/hdc/noise_robustness_harness.rs \
             crates/core/symthaea-core/src/hdc/mod.rs \
             crates/core/symthaea-core/src/hdc/pareto_frontier.rs \
             crates/core/symthaea-core/examples/hdc_operator_evidence.rs \
             crates/core/symthaea-core/examples/hdc_dimension_task.rs \
+            crates/core/symthaea-core/examples/hdc_noise_robustness.rs \
             crates/core/symthaea-core/benches/simd_continuous.rs
 
       - name: Focused HDC resolution tests
@@ -124,6 +128,7 @@ jobs:
           cargo test -p symthaea-core --lib dimension_sweep
           cargo test -p symthaea-core --lib dimension_frontier
           cargo test -p symthaea-core --lib dimension_task_harness
+          cargo test -p symthaea-core --lib noise_robustness_harness
           cargo test -p symthaea-core --lib pareto_frontier
           cargo test -p symthaea-core --test hdc_ltc_operator_evidence_chain --features simd
 
@@ -241,6 +246,31 @@ jobs:
           PY
           sha256sum dimension-task-evidence.json | tee dimension-task-evidence.sha256
 
+      - name: Emit deterministic noise robustness surface
+        run: cargo run -p symthaea-core --example hdc_noise_robustness > hdc-noise-robustness-evidence.json
+
+      - name: Validate noise robustness surface
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          evidence = json.loads(Path("hdc-noise-robustness-evidence.json").read_text())
+          expected_dimensions = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
+          expected_noise = [0.10, 0.20, 0.35, 0.50, 0.65, 0.80]
+          cells = evidence["cells"]
+          assert evidence["schema_version"] == 1
+          assert evidence["task"] == "hdc_noise_robustness_prototype_retrieval"
+          assert len(cells) == len(expected_dimensions) * len(expected_noise)
+          assert [c["resolution"] for c in cells[::len(expected_noise)]] == expected_dimensions
+          assert [round(c["noise_weight"], 2) for c in cells[:len(expected_noise)]] == expected_noise
+          assert all(c["total"] == 128 for c in cells)
+          assert all(0.0 <= c["accuracy"] <= 1.0 for c in cells)
+          assert all(c["mean_margin"] == c["mean_margin"] for c in cells)
+          assert evidence["spec_identity"].startswith("sha256:")
+          PY
+          sha256sum hdc-noise-robustness-evidence.json | tee hdc-noise-robustness-evidence.sha256
+
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
 
@@ -286,3 +316,5 @@ jobs:
             dimension-sweep-evidence.sha256
             dimension-task-evidence.json
             dimension-task-evidence.sha256
+            hdc-noise-robustness-evidence.json
+            hdc-noise-robustness-evidence.sha256
