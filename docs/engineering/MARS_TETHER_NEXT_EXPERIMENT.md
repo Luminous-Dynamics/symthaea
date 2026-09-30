@@ -276,3 +276,18 @@ The regression suite now exercises this boundary: bare numeric pointers fail clo
 The PDS Geosciences archive now exposes the migrated PDS4 MEGDR bundle and the legacy PDS3 products for the 128-pixels/degree collection. The archive identifies the Valles-containing megt00n270hb.img as a 129,761,280-byte product and its companion PDS3 label as 4,822 bytes. The NASA PDS collection identifies the migrated 128-ppd collection as urn:nasa:pds:mgs_mola_topography_derived:data_meg128::1.0, under bundle DOI 10.17189/1z1b-kv84.
 
 This establishes a stronger archive identity, but it is not a substitute for content hashing. The adapter must not record a SHA-256 value until the exact binary and label bytes have been retrieved and hashed from the archive. The current execution environment cannot resolve the PDS archive host, so no hash is asserted here. The next provenance fixture should capture, at minimum, the exact PDS4 product identifier, PDS3 label byte hash, IMG byte hash, file sizes, retrieval timestamp, and the known-cell byte/value fixtures for both MEGT00N270HB and MEGC00N270HB.
+
+
+## Provenance closure
+
+The MOLA adapter now records SHA-256 digests for the exact detached label and raster bytes it consumed, and propagates those identities into every TerrainSample provenance record. Reproducible runs can use MolaMegdrProduct::open_verified(...) to require caller-supplied expected digests before terrain enters the engineering model.
+
+This creates three deliberately distinct evidence states:
+
+1. **Structural identity** — PDS3 label semantics, pointer relationship, dimensions, record layout, and raster bounds validate.
+2. **Content identity** — the exact label and raster byte streams receive recorded SHA-256 identities.
+3. **Pinned identity** — open_verified requires those identities to match an external expected manifest before use.
+
+The external manifest is intentionally not invented by the adapter. It should come from the archive/curation record or a separately controlled engineering artifact. NASA's current PDS4 model includes checksum manifests and file-level checksum metadata, making this separation consistent with the archive's provenance architecture.
+
+The remaining scientific gate is therefore not merely “can we read a MOLA file?” but “which exact archived byte artifacts are authorized inputs to this engineering run, and can the run reproduce that authorization later?”
