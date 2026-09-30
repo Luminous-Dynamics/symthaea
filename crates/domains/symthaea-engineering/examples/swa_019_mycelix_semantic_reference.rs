@@ -19,6 +19,7 @@
 //! - deterministic serialization/replay preserves the exact projection.
 
 use serde::Serialize;
+use blake3;
 
 const OBSERVED_MYCELIX_INTEROP_COMMIT: &str =
     "b55bc03d99d0e8c89201dca06a264d16d5e2efd6";
@@ -114,14 +115,15 @@ struct DependencyRef {
     required: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct MycelixProjectionEnvelope {
     schema: SchemaRefProjection,
     source: SemanticRefProjection,
     target: SemanticRefProjection,
     projection_target: ProjectionTarget,
     source_revision: &'static str,
-    source_content_digest: &'static str,
+    source_content_digest: String,
+    digest_algorithm: &'static str,
     digest_status: &'static str,
     author_ref: SemanticRefProjection,
     authority_ref: Option<SemanticRefProjection>,
@@ -191,21 +193,66 @@ fn dependency_refs() -> [DependencyRef; 2] {
     ]
 }
 
-fn envelope() -> MycelixProjectionEnvelope {
+fn envelope_without_digest() -> MycelixProjectionEnvelope {
     MycelixProjectionEnvelope {
         schema: SOL_ATLAS_SCHEMA,
         source: source_ref(),
         target: target_ref(),
         projection_target: ProjectionTarget::GovernanceProposalReview,
         source_revision: OBSERVED_MYCELIX_INTEROP_COMMIT,
-        source_content_digest: "not-yet-computed-by-this-reference-fixture",
-        digest_status: "declared-only; production adapter must canonicalize and cryptographically bind payload",
+        source_content_digest: String::new(),
+        digest_algorithm: "blake3-256",
+        digest_status: "cryptographically-bound fixture projection; production adapter must match the target Mycelix crypto profile",
         author_ref: author_ref(),
         authority_ref: None,
         dependencies: dependency_refs(),
         authority_granted: false,
         actuation_performed: false,
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+struct ContentBindingPayload {
+    schema: SchemaRefProjection,
+    source: SemanticRefProjection,
+    target: SemanticRefProjection,
+    projection_target: ProjectionTarget,
+    source_revision: &'static str,
+    author_ref: SemanticRefProjection,
+    authority_ref: Option<SemanticRefProjection>,
+    dependencies: [DependencyRef; 2],
+    authority_granted: bool,
+    actuation_performed: bool,
+}
+
+fn content_binding_payload() -> ContentBindingPayload {
+    let projection = envelope_without_digest();
+    ContentBindingPayload {
+        schema: projection.schema,
+        source: projection.source,
+        target: projection.target,
+        projection_target: projection.projection_target,
+        source_revision: projection.source_revision,
+        author_ref: projection.author_ref,
+        authority_ref: projection.authority_ref,
+        dependencies: projection.dependencies,
+        authority_granted: projection.authority_granted,
+        actuation_performed: projection.actuation_performed,
+    }
+}
+
+fn canonical_content_bytes() -> Vec<u8> {
+    serde_json::to_vec(&content_binding_payload()).expect("content binding serializes")
+}
+
+fn content_digest() -> String {
+    blake3::hash(&canonical_content_bytes()).to_hex().to_string()
+}
+
+fn envelope() -> MycelixProjectionEnvelope {
+    let mut projection = envelope_without_digest();
+    projection.source_content_digest = content_digest();
+    projection
 }
 
 fn validate(envelope: &MycelixProjectionEnvelope) -> ValidationOutcome {
@@ -268,7 +315,6 @@ fn main() {
 mod tests {
     use super::*;
 
-    #[test]
     #[test]
     fn reference_components_follow_mycelix_wire_safety_rules() {
         let projection = envelope();
@@ -374,12 +420,28 @@ mod tests {
     }
 
     #[test]
-    fn digest_declaration_does_not_claim_cryptographic_binding() {
+    fn digest_binds_canonical_projection_payload() {
         let projection = envelope();
-        assert_eq!(
-            projection.digest_status,
-            "declared-only; production adapter must canonicalize and cryptographically bind payload"
-        );
+        assert_eq!(projection.source_content_digest, content_digest());
+        assert_eq!(projection.digest_algorithm, "blake3-256");
+        assert_eq!(projection.source_content_digest.len(), 64);
+    }
+
+    #[test]
+    fn changing_bound_content_changes_digest() {
+        let baseline = content_digest();
+        let mut changed = content_binding_payload();
+        changed.authority_granted = true;
+        let changed_bytes = serde_json::to_vec(&changed).unwrap();
+        let changed_digest = blake3::hash(&changed_bytes).to_hex().to_string();
+        assert_ne!(baseline, changed_digest);
+    }
+
+    #[test]
+    fn canonical_payload_excludes_self_referential_digest() {
+        let payload = content_binding_payload();
+        let json = serde_json::to_string(&payload).unwrap();
+        assert!(!json.contains("source_content_digest"));
     }
 
     #[test]
