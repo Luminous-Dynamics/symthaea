@@ -16,10 +16,18 @@ pub struct ChanceOutcomeId(pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ObservationId(pub usize);
 
-/// A semantic observation emitted at a concrete state for one player.
+/// Scope of a semantic observation. Public observations are delivered to every
+/// player; private observations are delivered only to the named player.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ObservationScope {
+    Public,
+    Private(PlayerId),
+}
+
+/// A semantic observation emitted when a concrete state is entered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Observation {
-    pub observer: PlayerId,
+    pub scope: ObservationScope,
     pub observation: ObservationId,
 }
 
@@ -68,7 +76,7 @@ pub enum VisibilityValidationError {
 pub enum HistoryEvent {
     Decision { state: DecisionStateId, player: PlayerId, information_set: crate::strategic_context::InformationSetId, action: ActionId, visibility: EventVisibility },
     Chance { state: DecisionStateId, outcome: ChanceOutcomeId, next: DecisionStateId, visibility: EventVisibility },
-    Observation { state: DecisionStateId, observer: PlayerId, observation: ObservationId },
+    Observation { state: DecisionStateId, scope: ObservationScope, observation: ObservationId },
 }
 
 /// Player-local action-observation history. Private world events are not exposed.
@@ -148,9 +156,10 @@ fn project_player_history(player: PlayerId, history: &[HistoryEvent]) -> Vec<Pla
         HistoryEvent::Chance { state, outcome, visibility, .. } => visibility.visible_to(player, None).then_some(
             PlayerHistoryEvent::ChanceOutcome { outcome: *outcome }
         ),
-        HistoryEvent::Observation { state, observer, observation } => (*observer == player).then_some(
-            PlayerHistoryEvent::Observation { observation: *observation }
-        ),
+        HistoryEvent::Observation { scope, observation, .. } => {
+            matches!(scope, ObservationScope::Public)
+                || matches!(scope, ObservationScope::Private(observer) if *observer == player)
+        }.then_some(PlayerHistoryEvent::Observation { observation: *observation }),
     }).collect()
 }
 
@@ -188,11 +197,11 @@ impl ExtensiveGame {
             for (i, observation) in observations.iter().enumerate() {
                 if observations[..i]
                     .iter()
-                    .any(|prior| prior.observer == observation.observer)
+                    .any(|prior| prior.scope == observation.scope)
                 {
-                    return Err(ExtensiveGameError::DuplicateObservationObserver {
+                    return Err(ExtensiveGameError::DuplicateObservationScope {
                         state: *state,
-                        observer: observation.observer,
+                        scope: observation.scope,
                     });
                 }
             }
@@ -505,7 +514,7 @@ impl ExtensiveGame {
             for observation in observations {
                 history.push(HistoryEvent::Observation {
                     state,
-                    observer: observation.observer,
+                    scope: observation.scope,
                     observation: observation.observation,
                 });
             }
@@ -681,7 +690,7 @@ pub enum ExtensiveGameError {
         error: VisibilityValidationError,
     },
     ObservationStateMissing(DecisionStateId),
-    DuplicateObservationObserver { state: DecisionStateId, observer: PlayerId },
+    DuplicateObservationScope { state: DecisionStateId, scope: ObservationScope },
     InformationEncodingMismatch { state: DecisionStateId, expected: crate::strategic_context::InformationSetId, actual: crate::strategic_context::InformationSetId },
     InformationHistoryMismatch {
         information_set: crate::strategic_context::InformationSetId,
@@ -1093,7 +1102,7 @@ mod tests {
             },
             HistoryEvent::Observation {
                 state: DecisionStateId(1),
-                observer: PlayerId(0),
+                scope: ObservationScope::Private(PlayerId(0)),
                 observation: ObservationId(7),
             },
             HistoryEvent::Chance {
@@ -1422,7 +1431,7 @@ mod tests {
             observations: HashMap::from([(
                 DecisionStateId(1),
                 vec![Observation {
-                    observer: PlayerId(0),
+                    scope: ObservationScope::Private(PlayerId(0)),
                     observation: ObservationId(7),
                 }],
             )]),
