@@ -275,38 +275,52 @@ mod tests {
     #[test]
     fn lifecycle_gc_cas_collision_reloads_and_preserves_new_admission() {
         let (delivery, observation) = fixture();
-        let mut concurrent = SemanticAdmissionState::default();
+        let mut expired_state = SemanticAdmissionState::default();
         let AdmissionOutcome::Admitted { next_state, .. } = decide(
-            &concurrent,
+            &expired_state,
             &delivery,
             &observation,
             AdmissionPolicy::default(),
             100,
         ) else {
-            panic!("concurrent admission should succeed");
+            panic!("initial admission should succeed");
         };
-        concurrent = next_state;
-
-        let mut expired_state = concurrent.clone();
+        expired_state = next_state;
         expired_state.observations.get_mut(&observation.key).unwrap().observed_at_ms = 0;
 
+        let mut fresh_observation = observation.clone();
+        fresh_observation.key.observation_id = Uuid::from_u128(9_999);
+        fresh_observation.observed_at_ms = 101;
         let policy = AdmissionPolicy {
+            allow_new_observation: true,
             retention_ms: 10,
             tombstone_retention_ms: 100,
             ..AdmissionPolicy::default()
         };
+        let AdmissionOutcome::Admitted { next_state: concurrent, .. } = decide(
+            &expired_state,
+            &delivery,
+            &fresh_observation,
+            policy,
+            101,
+        ) else {
+            panic!("concurrent admission should succeed");
+        };
+
         let mut store = TestStore {
             state: expired_state,
             cas_results: VecDeque::from([Ok(false)]),
-            cas_false_state: Some(concurrent.clone()),
+            cas_false_state: Some(concurrent),
             ..Default::default()
         };
 
         let outcome = retire_expired_atomically(&mut store, policy, 101, 1);
 
         assert!(matches!(outcome, AtomicLifecycleOutcome::Retired { committed_version: 2 }));
-        assert!(store.state.observations.contains_key(&observation.key));
-        assert!(!store.state.observation_tombstones.contains_key(&observation.key));
+        assert!(!store.state.observations.contains_key(&observation.key));
+        assert!(store.state.observations.contains_key(&fresh_observation.key));
+        assert!(store.state.observation_tombstones.contains_key(&observation.key));
+        assert!(!store.state.observation_tombstones.contains_key(&fresh_observation.key));
         assert_eq!(store.loads, 2);
         assert_eq!(store.version, 2);
     }
