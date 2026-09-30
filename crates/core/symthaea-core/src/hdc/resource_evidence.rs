@@ -308,16 +308,19 @@ mod tests {
     }
 
     #[test]
-    fn overflow_fails_closed() {
+    fn resident_byte_overflow_fails_closed() {
+        let resolution = 1usize << (usize::BITS - 2);
         let workload = ResourceWorkload {
-            resolution: usize::MAX,
+            resolution,
             representation: "continuous_f32".to_owned(),
             element_size_bytes: usize::MAX,
-            resident_vectors: usize::MAX,
+            resident_vectors: 2,
         };
         assert!(matches!(
             workload.resident_bytes(),
-            Err(ResourceEvidenceError::Resolution(_))
+            Err(ResourceEvidenceError::Resolution(
+                ResolutionError::ByteSizeOverflow { .. }
+            )) | Err(ResourceEvidenceError::ResidentBytesOverflow)
         ));
     }
 }
