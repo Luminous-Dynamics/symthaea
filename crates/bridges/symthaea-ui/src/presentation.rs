@@ -59,6 +59,7 @@ pub struct CognitiveState {
     pub coherence: f64,
     pub thermodynamic_load: f64,
     pub confidence: f64,
+    pub prediction_error: f64,
 }
 
 impl CognitiveState {
@@ -102,6 +103,7 @@ impl CognitiveState {
             coherence: coherence.clamp(0.0, 1.0),
             thermodynamic_load: thermodynamic_load.clamp(0.0, 1.0),
             confidence: confidence.clamp(0.0, 1.0),
+            prediction_error: prediction_error.max(0.0),
         }
     }
 }
