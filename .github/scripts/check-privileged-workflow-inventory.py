@@ -114,6 +114,37 @@ def _artifact_indirect_sink_evidence(lines: list[str], artifact_paths: list[str]
                 evidence.append(stripped)
     return sorted(set(evidence))
 
+def _artifact_step_output_sink_evidence(lines: list[str], artifact_paths: list[str]) -> list[str]:
+    """Detect simple artifact -> GITHUB_OUTPUT -> later step output execution flows."""
+    if not artifact_paths:
+        return []
+    output_refs: set[str] = set()
+    evidence: list[str] = []
+    current_step_id: str | None = None
+    step_id_re = re.compile(r"^id:\s*([A-Za-z_][A-Za-z0-9_-]*)\s*$")
+    output_write_re = re.compile(r"^(?:printf|echo)\\b.*>>\\s*\\$GITHUB_OUTPUT\\b")
+    output_name_re = re.compile(r"(?:^|[ '\" ])name=([A-Za-z_][A-Za-z0-9_-]*)")
+    for raw in lines:
+        stripped = raw.strip()
+        if stripped.startswith(("- name:", "- run:", "- uses:")):
+            current_step_id = None
+        id_match = step_id_re.match(stripped)
+        if id_match:
+            current_step_id = id_match.group(1)
+        if output_write_re.search(stripped) and current_step_id:
+            if any(expr in stripped for expr in tuple(artifact_paths) + ("runner.temp", "$RUNNER_TEMP")):
+                name_match = output_name_re.search(stripped)
+                if name_match:
+                    output_refs.add("$" + "{{ steps.%s.outputs.%s }}" % (current_step_id, name_match.group(1)))
+    if not output_refs:
+        return []
+    sink_re = re.compile(r"\\b(?:bash|sh|zsh|fish|dash|ksh|pwsh|powershell|python(?:3)?|node|ruby|perl|php|lua|source|eval|xargs|find|tar|unzip)\\b")
+    for raw in lines:
+        stripped = raw.strip()
+        if any(ref in stripped for ref in output_refs) and sink_re.search(stripped):
+            evidence.append(stripped)
+    return sorted(set(evidence))
+
 def _parse_inline_list(value: str) -> list[str]:
     value = value.strip()
     if not (value.startswith("[") and value.endswith("]")):
@@ -387,10 +418,11 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                     raise InventoryError(f"{path}: artifact-id access is unsupported in privileged v1; bind to exact name + run-id")
             artifact_execution_evidence = _artifact_execution_evidence(lines, artifact_paths_observed)
             artifact_indirect_sink_evidence = _artifact_indirect_sink_evidence(lines, artifact_paths_observed)
+            artifact_step_output_sink_evidence = _artifact_step_output_sink_evidence(lines, artifact_paths_observed)
             artifact_action_sink_evidence = _artifact_action_sink_evidence(lines, artifact_paths_observed)
-            if artifact_execution_evidence or artifact_indirect_sink_evidence or artifact_action_sink_evidence:
+            if artifact_execution_evidence or artifact_indirect_sink_evidence or artifact_step_output_sink_evidence or artifact_action_sink_evidence:
                 raise InventoryError(
-                    f"{path}: downloaded workflow_run artifacts must not cross an unreviewed execution or action-processing boundary: commands={artifact_execution_evidence}; indirect={artifact_indirect_sink_evidence}; actions={artifact_action_sink_evidence}"
+                    f"{path}: downloaded workflow_run artifacts must not cross an unreviewed execution or action-processing boundary: commands={artifact_execution_evidence}; indirect={artifact_indirect_sink_evidence}; step_outputs={artifact_step_output_sink_evidence}; actions={artifact_action_sink_evidence}"
                 )
     for raw in lines:
         stripped = raw.strip()
@@ -429,6 +461,7 @@ def parse_workflow(path: Path) -> dict[str, Any]:
         "artifact_extraction_paths": sorted(set(artifact_paths_observed)),
         "artifact_execution_evidence": artifact_execution_evidence,
         "artifact_indirect_sink_evidence": artifact_indirect_sink_evidence,
+        "artifact_step_output_sink_evidence": artifact_step_output_sink_evidence,
         "artifact_action_sink_evidence": artifact_action_sink_evidence,
         "artifact_consumption_mode": "data_only" if download_artifact else "none",
         "explicit_cache_write_override_present": explicit_cache_write,
@@ -535,6 +568,8 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
                         mismatches.append(f"{path}: downloaded artifact execution evidence must be empty")
                     if observed_contract["cross_workflow_dataflow_observed"].get("artifact_indirect_sink_evidence"):
                         mismatches.append(f"{path}: downloaded artifact indirect-sink evidence must be empty")
+                    if observed_contract["cross_workflow_dataflow_observed"].get("artifact_step_output_sink_evidence"):
+                        mismatches.append(f"{path}: downloaded artifact step-output sink evidence must be empty")
                     if observed_contract["cross_workflow_dataflow_observed"].get("artifact_action_sink_evidence"):
                         mismatches.append(f"{path}: downloaded artifact action-sink evidence must be empty")
                 if not observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and dataflow.get("artifacts_consumed"):
