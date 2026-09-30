@@ -24,6 +24,39 @@ pub struct MixedAction {
     pub probability: f64,
 }
 
+/// The semantic set of actions available at a decision point.
+///
+/// The stored order is preserved for diagnostics/serialization, but semantic
+/// equality is set-based. Construction rejects empty and duplicate action IDs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionAvailability {
+    actions: Vec<ActionId>,
+}
+
+impl ActionAvailability {
+    pub fn new(actions: Vec<ActionId>) -> Result<Self, ContextError> {
+        validate_legal_actions(&actions)?;
+        Ok(Self { actions })
+    }
+
+    pub fn actions(&self) -> &[ActionId] {
+        &self.actions
+    }
+
+    pub fn permits(&self, action: ActionId) -> bool {
+        self.actions.contains(&action)
+    }
+
+    /// Compare action availability by semantic membership, ignoring source order.
+    pub fn equivalent(&self, other: &Self) -> bool {
+        let mut left = self.actions.clone();
+        let mut right = other.actions.clone();
+        left.sort_unstable();
+        right.sort_unstable();
+        left == right
+    }
+}
+
 /// An agent-local view at a decision point.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentContext {
@@ -181,11 +214,11 @@ impl InformationStructure {
                 // Legal-action ordering is representational, not semantic.
                 // Compare canonical sets so equivalent vocabularies cannot
                 // diverge merely because their source order differs.
-                let mut expected_actions = first.legal_actions.clone();
-                let mut actual_actions = state.legal_actions.clone();
-                expected_actions.sort_unstable();
-                actual_actions.sort_unstable();
-                if actual_actions != expected_actions {
+                let expected_actions = ActionAvailability::new(first.legal_actions.clone())
+                    .expect("validated legal actions must construct availability");
+                let actual_actions = ActionAvailability::new(state.legal_actions.clone())
+                    .expect("validated legal actions must construct availability");
+                if !actual_actions.equivalent(&expected_actions) {
                     return Err(InformationStructureError::InconsistentActionSet {
                         information_set: info_set.id,
                         expected: first.legal_actions.clone(),
@@ -491,6 +524,25 @@ mod tests {
                 members: vec![DecisionStateId(0), DecisionStateId(1)],
             }],
         }
+    }
+
+    #[test]
+    fn action_availability_is_set_semantic_but_preserves_source_order() {
+        let availability = ActionAvailability::new(vec![ActionId(2), ActionId(0), ActionId(1)]).unwrap();
+        let reordered = ActionAvailability::new(vec![ActionId(1), ActionId(2), ActionId(0)]).unwrap();
+        assert_eq!(availability.actions(), &[ActionId(2), ActionId(0), ActionId(1)]);
+        assert!(availability.equivalent(&reordered));
+        assert!(availability.permits(ActionId(1)));
+        assert!(!availability.permits(ActionId(9)));
+    }
+
+    #[test]
+    fn action_availability_rejects_empty_and_duplicate_sets() {
+        assert_eq!(ActionAvailability::new(vec![]), Err(ContextError::NoLegalActions));
+        assert_eq!(
+            ActionAvailability::new(vec![ActionId(1), ActionId(1)]),
+            Err(ContextError::DuplicateLegalAction(ActionId(1)))
+        );
     }
 
     #[test]
