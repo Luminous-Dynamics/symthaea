@@ -197,7 +197,6 @@ Build one deterministic fixture spanning a small building:
 7. replay proves that the same fixture produces the same decision evidence without requiring the same authority holder.
 
 This fixture should be the reference integration test before any real-world actuation work.
-
 Related: Symthaea issue #6624; Mycelix issue #3634.
 
 ## Calibration and model-history gate — SWA-005
@@ -397,7 +396,6 @@ A **ReproducibilityWitness** binds five things without granting any of them auth
 The fixture canonicalizes dependency and input ordering before deriving fingerprints. Identical manifests therefore produce identical witness identities, while a dependency revision change produces a different witness. Missing dependencies or inputs fail closed rather than producing a partial witness.
 
 The fixture currently uses a small dependency-free FNV-1a fingerprint because the example is intentionally self-contained. This is explicitly a fixture fingerprint, not a cryptographic commitment. A production interchange layer should substitute a cryptographic digest without changing the canonical-manifest contract.
-
 The important architectural distinction is:
 
 claim -> complete provenance slice -> canonical replay manifest -> deterministic execution -> reproducibility witness
@@ -559,8 +557,24 @@ This closes an important time-of-check/time-of-use seam. A decision cannot silen
 
 The architecture is now:
 
-`observation -> intervention-specific prediction -> outcome/residual -> provenance -> replay/counterevidence -> invalidation propagation -> decision revalidation -> intervention/scenario identity binding -> fresh authorization context`
+## End-to-end intervention revalidation — SWA-017
 
-This is also a useful boundary for Mycelix/Holochain. Holochain validation requires deterministic results for the same operation and supports explicit, addressable dependencies; unresolved dependencies are not treated as valid. Source-chain records are append-only and cryptographically linked. Those properties fit the durable receipt/attestation side of this architecture, while the actual physical intervention remains outside the provenance layer. citeturn0search0turn0search3turn0search5
+SWA-017 composes the contracts from SWA-011 through SWA-016 into one deterministic lifecycle fixture. Its purpose is to verify that the boundaries hold when evidence, intervention identity, model revisions, and historical authorization change together—not merely when each is tested in isolation.
 
-Most importantly, SWA-016 does not create a second authorization system. It makes the authorization context *more precise* so a future Mycelix governance/consent layer can authorize a specific reviewed intervention rather than an ambiguous action label.
+The scenario follows an intervention at revision 1 with supporting, qualifying, and contradicting evidence. A model revision makes the old evidence require revalidation while preserving its historical identity and the prior authorization record. A revised intervention cannot inherit that evidence. A new review context must bind to the exact revised intervention and scenario, and new evidence must explicitly bind to those same revisions.
+
+The lifecycle distinguishes:
+
+- **Current** — the required evidence is present and bound to the exact intervention/scenario revisions;
+- **ReopenForReview** — a required revision or evidence binding changed;
+- **Unknown** — required evidence is absent or its status cannot be established.
+
+The fixture retains contradictory and qualifying evidence as separate evidence identities; revalidation does not resolve the disagreement. It emits no aggregate score or intervention ranking. It also contains no physical actuation operation: readiness is an input to an external human or governance process, not a command to a building.
+
+The end-to-end contract is:
+
+`intervention/scenario revision -> evidence binding -> review readiness -> historical authorization -> dependency invalidation -> re-review -> new context -> fresh evidence -> external authorization`
+
+This is a deterministic local reference scenario, not a Holochain validation zome or a Mycelix receipt implementation. Holochain's validation callbacks are expected to be deterministic for a given operation, and missing addressable dependencies yield an unresolved/indeterminate result rather than an implicit pass. That is a useful design constraint for a future Mycelix receipt adapter, but the distributed persistence and governance integration should reuse existing Mycelix zomes after their actual schemas and validation contracts are inspected. See the Holochain documentation on [validation](https://developer.holochain.org/build/validation/) and [validate callbacks](https://developer.holochain.org/build/validate-callback/).
+
+SWA-017 therefore closes the local lifecycle composition seam. The next integration step is a narrow Mycelix/Holochain receipt projection with explicit content identity, author/authority separation, deterministic validation dependencies, and unresolved-dependency handling—not a second DKG, physics engine, or authorization system.
