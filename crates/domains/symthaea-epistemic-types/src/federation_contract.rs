@@ -211,6 +211,31 @@ impl FederatedClaim {
         Ok(())
     }
 
+    /// Stable, substrate-neutral dependency references an adapter must resolve or
+    /// otherwise account for before accepting this envelope. The method deliberately
+    /// returns identifiers only; it performs no I/O and makes no assumptions about
+    /// Holochain/DHT semantics.
+    pub fn dependency_refs(&self) -> Vec<String> {
+        let mut refs = Vec::new();
+        if let Some(frontier) = &self.frontier_ref {
+            refs.push(frontier.clone());
+        }
+        if let Some(frontier) = &self.admission_receipt.frontier_ref {
+            refs.push(frontier.clone());
+        }
+        refs.extend(self.derivation_refs.iter().cloned());
+        refs.sort();
+        refs.dedup();
+        refs
+    }
+
+    /// The canonical representation identity is also the idempotency key for a
+    /// substrate adapter: retrying the exact same envelope must address the same
+    /// representation, while any digest-bearing mutation creates a different key.
+    pub fn replay_key(&self) -> String {
+        self.canonical_digest()
+    }
+
     pub fn is_admission_bound(
         &self,
         validation: &crate::ProvenanceValidationReport,
@@ -599,6 +624,36 @@ mod adversarial_contract_tests {
                 "{name} should be structurally rejected"
             );
         }
+    }
+
+    #[test]
+    fn dependency_refs_are_sorted_deduplicated_and_substrate_neutral() {
+        let mut claim = claim();
+        claim.derivation_refs.push("frontier:1".into());
+        claim.derivation_refs.push("derivation:z".into());
+        claim.derivation_refs.push("derivation:a".into());
+        assert_eq!(
+            claim.dependency_refs(),
+            vec![
+                "derivation:a".to_string(),
+                "derivation:b".to_string(),
+                "derivation:z".to_string(),
+                "frontier:1".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn replay_key_is_exact_representation_identity() {
+        let a = claim();
+        let mut reordered = a.clone();
+        reordered.derivation_refs.reverse();
+        reordered.relations.reverse();
+        assert_eq!(a.replay_key(), reordered.replay_key());
+
+        let mut changed = a.clone();
+        changed.claim_identity.push_str(":retry-different");
+        assert_ne!(a.replay_key(), changed.replay_key());
     }
 
     #[test]
