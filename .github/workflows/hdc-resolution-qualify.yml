@@ -18,6 +18,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/config.rs"
       - "crates/core/symthaea-core/src/hdc/dimension_observatory.rs"
       - "crates/core/symthaea-core/src/hdc/dimension_sweep.rs"
+      - "crates/core/symthaea-core/src/hdc/dimension_frontier.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/pareto_frontier.rs"
       - "crates/core/symthaea-core/tests/hdc_ltc_operator_evidence_chain.rs"
@@ -115,6 +116,7 @@ jobs:
           cargo test -p symthaea-core --lib config
           cargo test -p symthaea-core --lib dimension_observatory
           cargo test -p symthaea-core --lib dimension_sweep
+          cargo test -p symthaea-core --lib dimension_frontier
           cargo test -p symthaea-core --lib pareto_frontier
           cargo test -p symthaea-core --test hdc_ltc_operator_evidence_chain --features simd
 
