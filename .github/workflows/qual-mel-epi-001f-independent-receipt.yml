@@ -19,6 +19,8 @@ jobs:
       - name: Build independent qualification receipt
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
+          EXPECTED_REPOSITORY: Luminous-Dynamics/symthaea
+          EXPECTED_WORKFLOW_NAME: QUAL MEL-EPI-001F exact subject dispatcher
           EXPECTED_SUBJECT: 9308736b927d85c19d882ba0db7ada1aaf5dc1d2
           EXPECTED_PARENT: a4f5351882b08f044319d5e61a01c792341f3726
           WORKFLOW_PATH: .github/workflows/qual-mel-epi-001f-dispatch.yml
@@ -30,9 +32,27 @@ jobs:
             const run = context.payload.workflow_run;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const expectedRepository = process.env.EXPECTED_REPOSITORY;
+            const expectedWorkflowName = process.env.EXPECTED_WORKFLOW_NAME;
             const subject = process.env.EXPECTED_SUBJECT;
             const expectedParent = process.env.EXPECTED_PARENT;
             const workflowPath = process.env.WORKFLOW_PATH;
+
+            if (run.repository?.full_name !== expectedRepository) {
+              throw new Error('workflow_run repository identity mismatch');
+            }
+            if (run.name !== expectedWorkflowName) {
+              throw new Error('workflow_run workflow identity mismatch');
+            }
+            if (run.head_branch !== 'main') {
+              throw new Error('workflow_run head branch mismatch');
+            }
+            if (run.head_sha !== subject) {
+              throw new Error('workflow_run subject SHA mismatch');
+            }
+            if (!run.id || !run.run_attempt) {
+              throw new Error('workflow_run run identity is incomplete');
+            }
 
             const jobs = await github.paginate(
               github.rest.actions.listJobsForWorkflowRun,
@@ -179,7 +199,12 @@ jobs:
 
             const qualificationResult =
               run.conclusion === 'success' &&
+              run.repository?.full_name === expectedRepository &&
+              run.name === expectedWorkflowName &&
               run.head_branch === 'main' &&
+              run.head_sha === subject &&
+              Boolean(run.id) &&
+              Boolean(run.run_attempt) &&
               missingWorkflowFragments.length === 0 &&
               ancestryVerified &&
               sourceSurfaceVerified &&
@@ -194,6 +219,8 @@ jobs:
               workflow_run: {
                 id: run.id,
                 attempt: run.run_attempt,
+                repository: run.repository?.full_name,
+                workflow_name: run.name,
                 conclusion: run.conclusion,
                 event: run.event,
                 head_branch: run.head_branch,
