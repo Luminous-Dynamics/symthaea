@@ -731,7 +731,7 @@ mod tests {
              changes, claim_scope_note()'s text needs to change with it"
         );
 
-        println!("\n=== AE-2 first empirical run: full evidence bundle ===\n{run:#?}\n");
+        assert_eq!(run.config_identity_schema, symthaea_evidence_plane::STABLE_CONFIG_IDENTITY_SCHEMA);\n        assert!(run.seed_identity.starts_with("genesis-blake3:v1:"));\n\n        println!("\n=== AE-2 first empirical run: full evidence bundle ===\n{run:#?}\n");
         println!("=== Outcome: {:?} ===", run.outcome);
         println!("=== Claim scope: {} ===", run.claim_scope_note());
         println!(
