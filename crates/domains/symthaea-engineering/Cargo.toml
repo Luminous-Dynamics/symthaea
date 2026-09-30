@@ -44,3 +44,4 @@ symthaea-types = { path = "../../core/symthaea-types" }
 symtropy-robotics-bridge-core = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
+blake3 = { workspace = true }
