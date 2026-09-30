@@ -9,11 +9,11 @@
 
 use super::{
     resolution_space::HdcResolution,
-    operator_evidence_contract::{CONTINUOUS_F32_REPRESENTATION, OPERATOR_OPERATOR_EVIDENCE_SCHEMA_VERSION, QUALIFIED_STATUS},
+    operator_evidence_contract::{CONTINUOUS_F32_REPRESENTATION, OPERATOR_EVIDENCE_SCHEMA_VERSION, QUALIFIED_STATUS},
     simd_continuous::{bind_simd, bundle_simd, dot_product_simd, norm_simd, similarity_simd},
 };
 
-pub const EVIDENCE_SCHEMA_VERSION: u32 = 1;
+pub const EVIDENCE_SCHEMA_VERSION: u32 = OPERATOR_EVIDENCE_SCHEMA_VERSION;
 pub const DEFAULT_SEED_A: u64 = 42;
 pub const DEFAULT_SEED_B: u64 = 43;
 
@@ -27,7 +27,7 @@ pub use super::operator_evidence_contract::{OperatorEvidenceRecord, OperatorEvid
 ///
 /// The returned records are suitable for JSON serialization and downstream
 /// trajectory qualification. A failed record is retained rather than filtered
-/// out, so evidence consumers cannot mistake "missing" for QUALIFIED_STATUS.
+/// out, so evidence consumers cannot mistake "missing" for "qualified".
 pub fn generate_extended_resolution_evidence() -> Vec<OperatorEvidenceRecord> {
     let mut records = Vec::with_capacity(EXTENDED_DIMS.len() * 5);
 
@@ -97,23 +97,6 @@ pub fn generate_extended_resolution_evidence() -> Vec<OperatorEvidenceRecord> {
     }
 
     records
-}
-
-/// Summary produced by the operator evidence gate.
-///
-/// A trajectory experiment may consume operator evidence only when
-/// `qualified == true`. Missing and duplicate matrix cells are treated as
-/// failures rather than silently ignored.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OperatorEvidenceSummary {
-    pub schema_version: u32,
-    pub expected_records: usize,
-    pub observed_records: usize,
-    pub qualified_records: usize,
-    pub failed_records: usize,
-    pub missing_records: usize,
-    pub duplicate_records: usize,
-    pub qualified: bool,
 }
 
 /// Validate that a complete operator/resolution matrix exists and every cell
