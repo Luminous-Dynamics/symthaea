@@ -160,6 +160,14 @@ mod tests {
     }
 
     #[test]
+    fn boundary_schema_is_part_of_slice_commitment() {
+        let baseline = manifest().digest();
+        let mut changed = manifest();
+        changed.boundary.schema = "sol-atlas/provenance-slice-boundary/v2";
+        assert_ne!(baseline, changed.digest());
+    }
+
+    #[test]
     fn boundary_graph_digest_is_part_of_slice_commitment() {
         let baseline = manifest().digest();
         let mut changed = manifest();
