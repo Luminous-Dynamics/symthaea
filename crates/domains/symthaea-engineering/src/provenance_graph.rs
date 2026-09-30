@@ -73,7 +73,7 @@ impl ProvenanceGraph {
         for node in nodes {
             hasher.update(node.id.as_bytes());
             hasher.update(&[0]);
-            hasher.update(format!("{:?}", node.kind).as_bytes());
+            hasher.update(&[node.kind as u8]);
             hasher.update(&[0]);
             if let Some(revision) = node.revision { hasher.update(revision.as_bytes()); }
             hasher.update(&[0xff]);
@@ -85,7 +85,7 @@ impl ProvenanceGraph {
             hasher.update(&[0]);
             hasher.update(edge.to.as_bytes());
             hasher.update(&[0]);
-            hasher.update(format!("{:?}", edge.kind).as_bytes());
+            hasher.update(&[edge.kind as u8]);
             hasher.update(&[0xff]);
         }
         hasher.finalize().to_hex().to_string()
@@ -279,6 +279,20 @@ pub fn reference_graph() -> ProvenanceGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn graph_identity_digest_changes_with_node_revision() {
+        let mut changed = reference_graph();
+        changed.nodes.iter_mut().find(|node| node.id == "model-001").unwrap().revision = Some("building-twin@v2");
+        assert_ne!(reference_graph().identity_digest(), changed.identity_digest());
+    }
+
+    #[test]
+    fn graph_identity_digest_changes_with_edge_kind() {
+        let mut changed = reference_graph();
+        changed.edges[0].kind = EdgeKind::QualifiedBy;
+        assert_ne!(reference_graph().identity_digest(), changed.identity_digest());
+    }
 
     #[test]
     fn invalid_node_identity_is_rejected() {
