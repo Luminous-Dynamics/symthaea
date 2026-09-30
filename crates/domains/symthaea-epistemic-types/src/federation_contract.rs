@@ -99,7 +99,7 @@ impl FederatedClaim {
             return Err("admission receipt must bind claim validation report");
         }
         if self.admission_receipt.provenance_snapshot_digest != self.provenance_snapshot_digest {
-            return Err("claim snapshot digest must match admission receipt");
+            return Err("claim snapshot digest must match validation report");
         }
         if self.admission_receipt.frontier_ref != self.frontier_ref {
             return Err("claim frontier must match admission receipt");
