@@ -439,7 +439,7 @@ mod tests {
         assert_eq!(
             outcome,
             AdmissionOutcome::Conflict {
-                identity_kind: ConflictKind::DeliveryContract
+                identity_kind: ConflictKind::ObservationRecord
             }
         );
     }
