@@ -10,7 +10,7 @@
 
 use super::executor::{NixOSCommand, SafetyLevel};
 use super::service_state::NixServiceObservedStateV1;
-use std::process::Command;
+use super::systemd_transport::observe_service_properties;
 
 /// Manages systemd services: start, stop, restart, enable, disable.
 pub struct ServiceManager;
@@ -159,30 +159,8 @@ impl ServiceManager {
     pub fn observed_state(service: &str) -> Result<NixServiceObservedStateV1, std::io::Error> {
         let unit = Self::normalize_name(service);
 
-        let output = Command::new("systemctl")
-            .args([
-                "show",
-                &unit,
-                "--no-pager",
-                "--property=Id,LoadState,ActiveState,SubState,UnitFileState",
-            ])
-            .output()?;
-
-        if !output.status.success() {
-            return Err(std::io::Error::other(format!(
-                "systemctl show failed for '{}': {}",
-                unit,
-                String::from_utf8_lossy(&output.stderr).trim()
-            )));
-        }
-
-        let stdout = std::str::from_utf8(&output.stdout)
-            .map_err(|error| std::io::Error::other(format!(
-                "systemctl show returned invalid UTF-8 for '{}': {error}",
-                unit
-            )))?;
-
-        NixServiceObservedStateV1::parse_systemd_properties(&unit, stdout)
+        let properties = observe_service_properties(&unit)?;
+        NixServiceObservedStateV1::parse_systemd_properties(&unit, &properties)
             .map_err(|error| std::io::Error::other(format!(
                 "invalid governed systemd observation for '{}': {error}",
                 unit
