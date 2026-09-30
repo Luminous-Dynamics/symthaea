@@ -116,6 +116,8 @@ jobs:
           test "$(jq -r '.observation_class' "$index")" = "reproduced"
           test "$(jq -r '.authority_class' "$index")" = "cross_artifact_execution_evidence_only"
 
+          printf '%s\n' verified > upstream-contract-verified.txt
+
           test "$(jq -r '.artifacts.primary.name' "$index")" = "se001q-repair-primary-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}"
           test "$(jq -r '.artifacts.replay.name' "$index")" = "se001q-repair-replay-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}"
           test "$(jq -r '.artifacts.delta.name' "$index")" = "se001q-repair-delta-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}"
@@ -168,6 +170,15 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2026-03-10" \
+            "https://api.github.com/repos/${{ github.repository }}/commits/$upstream_workflow_sha" \
+            -o upstream-workflow-commit.json
+
+          test "$(jq -r '.sha' upstream-workflow-commit.json)" = "$upstream_workflow_sha"
+
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
             "https://api.github.com/repos/${{ github.repository }}/contents/.github/workflows/systems-engineering-se001q-repair-execution-v1.yml?ref=$upstream_workflow_sha" \
             -o upstream-workflow.json
 
@@ -187,7 +198,7 @@ jobs:
           upstream_run_attempt="$(cat upstream-run-attempt.txt)"
           index=upstream-index/se001q-repair-evidence-index.json
 
-          if [[ -f "$index" ]]; then
+          if [[ -f upstream-contract-verified.txt ]]; then
             contract_status="verified"
           else
             contract_status="not_verified"
