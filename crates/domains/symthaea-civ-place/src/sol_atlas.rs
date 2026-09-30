@@ -344,7 +344,7 @@ pub fn project(input: &SolAtlasQualificationInputV1) -> Result<(Vec<NodeV1>, Vec
         claim_ceiling: input.plan.claim_ceiling,
     };
 
-    Ok((nodes, deps, projections.into_values().collect(), services, receipt))
+    Ok((nodes.into_values().collect(), deps, projections.into_values().collect(), services, receipt))
 }
 
 pub fn evaluate(input: &SolAtlasQualificationInputV1) -> Result<BTreeMap<String, PlaceEvaluationV1>, AdapterErrorV1> {
