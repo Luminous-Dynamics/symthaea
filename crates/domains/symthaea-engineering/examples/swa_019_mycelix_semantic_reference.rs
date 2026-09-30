@@ -783,7 +783,7 @@ mod tests {
     fn complete_binding_registry_covers_authoritative_slice() {
         let binding = evidence_binding();
         let registry = SemanticBindingRegistry::from_evidence_binding(&binding).unwrap();
-        let slice = reference_graph().slice("claim-001").unwrap();
+        let slice = reference_graph().slice("claim-001").expect("valid claim slice").unwrap();
         assert_eq!(registry.validate_against(&slice), Ok(()));
     }
 
@@ -800,7 +800,7 @@ mod tests {
             SemanticBinding { authoritative_id: "dataset-001", semantic_ref: binding.dataset_ref },
         ]).unwrap();
         assert_eq!(
-            registry.validate_against(&reference_graph().slice("claim-001").unwrap()),
+            registry.validate_against(&reference_graph().slice("claim-001").expect("valid claim slice").unwrap()),
             Err(BindingRegistryError::MissingAuthoritativeMapping)
         );
     }
@@ -823,7 +823,7 @@ mod tests {
         binding.model_ref.object_id = "wrong-model";
         let registry = SemanticBindingRegistry::from_evidence_binding(&binding).unwrap();
         assert_eq!(
-            registry.validate_against(&reference_graph().slice("claim-001").unwrap()),
+            registry.validate_against(&reference_graph().slice("claim-001").expect("valid claim slice").unwrap()),
             Err(BindingRegistryError::SemanticIdentityMismatch)
         );
     }
@@ -850,7 +850,7 @@ mod tests {
             SemanticBinding { authoritative_id: "extra-001", semantic_ref: binding.context_ref },
         ]).unwrap();
         assert_eq!(
-            registry.validate_against(&reference_graph().slice("claim-001").unwrap()),
+            registry.validate_against(&reference_graph().slice("claim-001").expect("valid claim slice").unwrap()),
             Err(BindingRegistryError::ExtraMapping)
         );
     }
@@ -869,7 +869,7 @@ mod tests {
             SemanticBinding { authoritative_id: "validation-001", semantic_ref: binding.evidence_ref },
             SemanticBinding { authoritative_id: "claim-001", semantic_ref: binding.claim_ref },
         ]).unwrap();
-        let slice = reference_graph().slice("claim-001").unwrap();
+        let slice = reference_graph().slice("claim-001").expect("valid claim slice").unwrap();
         let forward_digest = EvidenceSliceManifest {
             slice_ref: binding.slice_ref.object_id.to_string(),
             claim_ref: binding.claim_ref.object_id.to_string(),
