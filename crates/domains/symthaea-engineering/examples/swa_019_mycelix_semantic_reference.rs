@@ -69,8 +69,28 @@ fn validate_semantic_ref(reference: &SemanticRefProjection) -> Result<(), Refere
     Ok(())
 }
 
+fn validate_evidence_binding(binding: &EvidenceBinding) -> Result<(), ReferenceValidationError> {
+    for reference in [
+        &binding.slice_ref,
+        &binding.claim_ref,
+        &binding.evidence_ref,
+        &binding.model_ref,
+        &binding.scenario_ref,
+        &binding.dataset_ref,
+    ] {
+        validate_semantic_ref(reference)?;
+    }
+    if binding.slice_revision.is_empty()
+        || binding.provenance_digest != evidence_binding_digest(binding)
+    {
+        return Err(ReferenceValidationError::Empty);
+    }
+    Ok(())
+}
+
 fn validate_reference_fields(envelope: &MycelixProjectionEnvelope) -> Result<(), ReferenceValidationError> {
     validate_schema_ref(&envelope.schema)?;
+    validate_evidence_binding(&envelope.evidence_binding)?;
     validate_semantic_ref(&envelope.source)?;
     validate_semantic_ref(&envelope.target)?;
     validate_semantic_ref(&envelope.author_ref)?;
@@ -118,6 +138,7 @@ struct DependencyRef {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct MycelixProjectionEnvelope {
     schema: SchemaRefProjection,
+    evidence_binding: EvidenceBinding,
     source: SemanticRefProjection,
     target: SemanticRefProjection,
     projection_target: ProjectionTarget,
@@ -193,9 +214,49 @@ fn dependency_refs() -> [DependencyRef; 2] {
     ]
 }
 
+fn evidence_binding() -> EvidenceBinding {
+    let mut binding = EvidenceBinding {
+        slice_ref: SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: "SWA-003-BUILDING-001/provenance-slice",
+            object_version: Some("provenance-slice@v1"),
+        },
+        claim_ref: SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: "SWA-003-BUILDING-001/claim",
+            object_version: Some("claim@v1"),
+        },
+        evidence_ref: SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: "SWA-003-BUILDING-001/evidence",
+            object_version: Some("evidence@v1"),
+        },
+        model_ref: SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: "SWA-003-BUILDING-001/model",
+            object_version: Some("building-twin@fixture"),
+        },
+        scenario_ref: SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: "SWA-003-BUILDING-001/scenario",
+            object_version: Some("intervention-scenario@v1"),
+        },
+        dataset_ref: SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: "SWA-003-BUILDING-001/dataset",
+            object_version: Some("dataset@v1"),
+        },
+        slice_revision: "provenance-slice@v1",
+        provenance_digest: String::new(),
+    };
+    binding.provenance_digest = evidence_binding_digest(&binding);
+    binding
+}
+
 fn envelope_without_digest() -> MycelixProjectionEnvelope {
     MycelixProjectionEnvelope {
         schema: SOL_ATLAS_SCHEMA,
+        evidence_binding: evidence_binding(),
         source: source_ref(),
         target: target_ref(),
         projection_target: ProjectionTarget::GovernanceProposalReview,
@@ -212,8 +273,50 @@ fn envelope_without_digest() -> MycelixProjectionEnvelope {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+struct EvidenceBinding {
+    slice_ref: SemanticRefProjection,
+    claim_ref: SemanticRefProjection,
+    evidence_ref: SemanticRefProjection,
+    model_ref: SemanticRefProjection,
+    scenario_ref: SemanticRefProjection,
+    dataset_ref: SemanticRefProjection,
+    slice_revision: &'static str,
+    provenance_digest: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+struct EvidenceBindingPayload {
+    slice_ref: SemanticRefProjection,
+    claim_ref: SemanticRefProjection,
+    evidence_ref: SemanticRefProjection,
+    model_ref: SemanticRefProjection,
+    scenario_ref: SemanticRefProjection,
+    dataset_ref: SemanticRefProjection,
+    slice_revision: &'static str,
+}
+
+fn evidence_binding_payload(binding: &EvidenceBinding) -> EvidenceBindingPayload {
+    EvidenceBindingPayload {
+        slice_ref: binding.slice_ref,
+        claim_ref: binding.claim_ref,
+        evidence_ref: binding.evidence_ref,
+        model_ref: binding.model_ref,
+        scenario_ref: binding.scenario_ref,
+        dataset_ref: binding.dataset_ref,
+        slice_revision: binding.slice_revision,
+    }
+}
+
+fn evidence_binding_digest(binding: &EvidenceBinding) -> String {
+    let bytes = serde_json::to_vec(&evidence_binding_payload(binding))
+        .expect("evidence binding serializes");
+    blake3::hash(&bytes).to_hex().to_string()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 struct ContentBindingPayload {
     schema: SchemaRefProjection,
+    evidence_binding: EvidenceBinding,
     source: SemanticRefProjection,
     target: SemanticRefProjection,
     projection_target: ProjectionTarget,
@@ -228,6 +331,7 @@ struct ContentBindingPayload {
 fn content_binding_payload(envelope: &MycelixProjectionEnvelope) -> ContentBindingPayload {
     ContentBindingPayload {
         schema: envelope.schema,
+        evidence_binding: envelope.evidence_binding,
         source: envelope.source,
         target: envelope.target,
         projection_target: envelope.projection_target,
@@ -256,6 +360,10 @@ fn envelope() -> MycelixProjectionEnvelope {
 
 fn validate(envelope: &MycelixProjectionEnvelope) -> ValidationOutcome {
     if validate_reference_fields(envelope).is_err() {
+        return ValidationOutcome::Invalid;
+    }
+
+    if envelope.evidence_binding.provenance_digest != evidence_binding_digest(&envelope.evidence_binding) {
         return ValidationOutcome::Invalid;
     }
 
@@ -427,6 +535,14 @@ mod tests {
     }
 
     #[test]
+    fn evidence_binding_commits_exact_slice_manifest() {
+        let binding = evidence_binding();
+        assert_eq!(binding.provenance_digest, evidence_binding_digest(&binding));
+        assert_eq!(binding.slice_revision, "provenance-slice@v1");
+        assert_ne!(binding.claim_ref, binding.model_ref);
+    }
+
+    #[test]
     fn digest_binds_canonical_projection_payload() {
         let projection = envelope();
         assert_eq!(projection.source_content_digest, content_digest(&projection));
@@ -437,7 +553,7 @@ mod tests {
     #[test]
     fn tampering_with_bound_content_invalidates_projection() {
         let mut projection = envelope();
-        projection.authority_granted = true;
+        projection.evidence_binding.model_ref.object_version = Some("building-twin@tampered");
         assert_eq!(validate(&projection), ValidationOutcome::Invalid);
     }
 
