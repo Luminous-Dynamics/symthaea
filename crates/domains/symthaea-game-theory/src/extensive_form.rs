@@ -143,7 +143,7 @@ pub struct ExtensiveGame {
 
 fn project_player_history(player: PlayerId, history: &[HistoryEvent]) -> Vec<PlayerHistoryEvent> {
     history.iter().filter_map(|event| match event {
-        HistoryEvent::Decision { state, player: actor, action, visibility, .. } => {
+        HistoryEvent::Decision { player: actor, action, visibility, .. } => {
             if *actor == player {
                 Some(PlayerHistoryEvent::OwnAction { action: *action })
             } else if visibility.visible_to(player, Some(*actor)) {
@@ -152,7 +152,7 @@ fn project_player_history(player: PlayerId, history: &[HistoryEvent]) -> Vec<Pla
                 None
             }
         }
-        HistoryEvent::Chance { state, outcome, visibility, .. } => visibility.visible_to(player, None).then_some(
+        HistoryEvent::Chance { outcome, visibility, .. } => visibility.visible_to(player, None).then_some(
             PlayerHistoryEvent::ChanceOutcome { outcome: *outcome }
         ),
         HistoryEvent::Observation { scope, observation, .. } => {
