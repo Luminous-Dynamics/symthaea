@@ -266,6 +266,10 @@ fn run_row(
     let total_queries = CLASS_COUNT
         .checked_mul(queries_per_class)
         .ok_or(DimensionTaskError::TooManyQueries)?;
+    // Logical workload: one query vector plus one full candidate-vector read
+    // per class. This is a declared work-accounting convention, not measured
+    // allocation or physical memory traffic; the prototypes are reused across
+    // queries and are therefore not counted as fresh allocations here.
     let logical_bytes_per_query = (CLASS_COUNT + 1)
         .checked_mul(resolution)
         .and_then(|n| n.checked_mul(std::mem::size_of::<f32>()))
