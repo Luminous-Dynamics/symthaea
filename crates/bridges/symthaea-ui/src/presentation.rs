@@ -239,6 +239,107 @@ pub fn event_between(
     Some(CognitiveEvent::from_state(sequence, kind, cycle, current))
 }
 
+ 
+/// A bounded temporal span reconstructed from paired semantic events.
+///
+/// The UI may show these as cycle spans, but must not turn them into elapsed
+/// seconds: the presentation layer has daemon cycle identifiers, not an
+/// authoritative wall clock.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CognitiveSpanKind {
+    Processing,
+    Resting,
+}
+
+impl CognitiveSpanKind {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Processing => "processing",
+            Self::Resting => "resting",
+        }
+    }
+}
+
+/// A semantic interval with explicit entry/exit identities.
+///
+/// `end_*` is `None` while the interval remains open in the observed event
+/// window. An open interval is not treated as proof that the underlying state
+/// continues beyond the retained event history.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CognitiveSpan {
+    pub kind: CognitiveSpanKind,
+    pub start_sequence: u64,
+    pub start_cycle: u64,
+    pub end_sequence: Option<u64>,
+    pub end_cycle: Option<u64>,
+}
+
+impl CognitiveSpan {
+    pub const fn is_open(self) -> bool {
+        self.end_sequence.is_none()
+    }
+}
+
+/// Reconstructs only spans whose entry and exit are explicitly represented by
+/// semantic events. Unmatched exits are ignored rather than guessed.
+pub fn cognitive_spans(events: &[CognitiveEvent]) -> Vec<CognitiveSpan> {
+    let mut spans = Vec::new();
+    let mut open_processing: Option<CognitiveSpan> = None;
+    let mut open_resting: Option<CognitiveSpan> = None;
+
+    for event in events {
+        match event.kind {
+            CognitiveEventKind::ProcessingStarted => {
+                if open_processing.is_none() {
+                    open_processing = Some(CognitiveSpan {
+                        kind: CognitiveSpanKind::Processing,
+                        start_sequence: event.sequence,
+                        start_cycle: event.cycle,
+                        end_sequence: None,
+                        end_cycle: None,
+                    });
+                }
+            }
+            CognitiveEventKind::ProcessingCompleted => {
+                if let Some(mut span) = open_processing.take() {
+                    span.end_sequence = Some(event.sequence);
+                    span.end_cycle = Some(event.cycle);
+                    spans.push(span);
+                }
+            }
+            CognitiveEventKind::EnteredRest => {
+                if open_resting.is_none() {
+                    open_resting = Some(CognitiveSpan {
+                        kind: CognitiveSpanKind::Resting,
+                        start_sequence: event.sequence,
+                        start_cycle: event.cycle,
+                        end_sequence: None,
+                        end_cycle: None,
+                    });
+                }
+            }
+            CognitiveEventKind::ExitedRest => {
+                if let Some(mut span) = open_resting.take() {
+                    span.end_sequence = Some(event.sequence);
+                    span.end_cycle = Some(event.cycle);
+                    spans.push(span);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(span) = open_processing {
+        spans.push(span);
+    }
+    if let Some(span) = open_resting {
+        spans.push(span);
+    }
+
+    spans.sort_by_key(|span| span.start_sequence);
+    spans
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -346,6 +447,59 @@ mod tests {
             event_between(Some(previous), current, 3, 42, true, false)
                 .map(|event| event.kind),
             Some(CognitiveEventKind::SurpriseDetected)
+        );
+    }
+
+
+    #[test]
+    fn processing_span_uses_cycles_not_wall_clock() {
+        let events = vec![
+            CognitiveEvent::lifecycle(1, CognitiveEventKind::ProcessingStarted, 40),
+            CognitiveEvent::lifecycle(2, CognitiveEventKind::ProcessingCompleted, 44),
+        ];
+        let spans = cognitive_spans(&events);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].kind, CognitiveSpanKind::Processing);
+        assert_eq!(spans[0].start_cycle, 40);
+        assert_eq!(spans[0].end_cycle, Some(44));
+        assert_eq!(spans[0].start_sequence, 1);
+        assert_eq!(spans[0].end_sequence, Some(2));
+        assert!(!spans[0].is_open());
+    }
+
+    #[test]
+    fn unmatched_exit_does_not_fabricate_a_span() {
+        let events = vec![
+            CognitiveEvent::lifecycle(1, CognitiveEventKind::ProcessingCompleted, 44),
+        ];
+        assert!(cognitive_spans(&events).is_empty());
+    }
+
+    #[test]
+    fn open_span_remains_explicitly_open() {
+        let events = vec![
+            CognitiveEvent::lifecycle(3, CognitiveEventKind::EnteredRest, 90),
+        ];
+        let spans = cognitive_spans(&events);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].kind, CognitiveSpanKind::Resting);
+        assert_eq!(spans[0].start_cycle, 90);
+        assert_eq!(spans[0].end_cycle, None);
+        assert!(spans[0].is_open());
+    }
+
+    #[test]
+    fn span_order_follows_entry_sequence() {
+        let events = vec![
+            CognitiveEvent::lifecycle(5, CognitiveEventKind::EnteredRest, 50),
+            CognitiveEvent::lifecycle(6, CognitiveEventKind::ExitedRest, 52),
+            CognitiveEvent::lifecycle(7, CognitiveEventKind::ProcessingStarted, 53),
+            CognitiveEvent::lifecycle(8, CognitiveEventKind::ProcessingCompleted, 57),
+        ];
+        let spans = cognitive_spans(&events);
+        assert_eq!(
+            spans.iter().map(|span| span.kind).collect::<Vec<_>>(),
+            vec![CognitiveSpanKind::Resting, CognitiveSpanKind::Processing]
         );
     }
 
