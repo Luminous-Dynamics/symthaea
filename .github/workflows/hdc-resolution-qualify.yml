@@ -101,6 +101,7 @@ jobs:
             crates/core/symthaea-core/src/hdc/mod.rs \
             crates/core/symthaea-core/src/hdc/pareto_frontier.rs \
             crates/core/symthaea-core/examples/hdc_operator_evidence.rs \
+            crates/core/symthaea-core/examples/hdc_dimension_task.rs \
             crates/core/symthaea-core/benches/simd_continuous.rs
 
       - name: Focused HDC resolution tests
