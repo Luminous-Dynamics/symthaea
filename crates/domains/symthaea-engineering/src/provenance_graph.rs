@@ -220,6 +220,15 @@ mod tests {
     }
 
     #[test]
+    fn revision_is_part_of_authoritative_node_identity() {
+        let mut a = reference_graph();
+        let mut b = reference_graph();
+        a.nodes.iter_mut().find(|n| n.id == "model-001").unwrap().revision = Some("model@v1");
+        b.nodes.iter_mut().find(|n| n.id == "model-001").unwrap().revision = Some("model@v2");
+        assert_ne!(a, b);
+    }
+
+    #[test]
     fn reference_slice_is_deterministic_and_excludes_unrelated_nodes() {
         let first = reference_graph().slice("claim-001").expect("claim exists");
         let second = reference_graph().slice("claim-001").expect("claim exists");
