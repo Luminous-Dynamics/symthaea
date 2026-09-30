@@ -85,9 +85,8 @@ qualify an implementation.
 The qualification workflow executes the conformance emitter and archives its
 JSON output as an artifact. This is deliberately stronger than an assertion-only
 test: downstream trajectory experiments can consume the same schema rather than
-re-implementing their own scalar-oracle contract. JSON is a standard
-interchange format, and Serde provides typed serialization/deserialization for
-Rust structures. citeturn1search0turn1search9
+re-implementing their own scalar-oracle contract. JSON is a standard interchange format, and Serde provides typed
+serialization/deserialization for Rust structures.
 
 The emitted evidence is still **operator conformance**, not benchmark evidence.
 Logical bytes are accounting metadata, not measured cache traffic, DRAM traffic,
