@@ -110,6 +110,8 @@ impl ProvenanceRelation {
 /// Version of the local structural provenance validator. Bump when validation
 /// semantics change; this is intentionally independent of epistemic truth assessment.
 pub const PROVENANCE_VALIDATOR_VERSION: &str = "melothaea-provenance-structural-v1";
+/// Version of the canonical provenance snapshot encoding used by the digest.
+pub const PROVENANCE_SNAPSHOT_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProvenanceValidationViolation {
@@ -122,6 +124,7 @@ pub struct ProvenanceValidationViolation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProvenanceValidationReport {
     pub validator_version: String,
+    pub snapshot_schema_version: u16,
     pub snapshot_digest: String,
     pub relation_count: usize,
     pub conforms: bool,
@@ -150,6 +153,7 @@ impl ProvenanceValidationReport {
         let bytes = serde_json::to_vec(&canonical_fields)
             .expect("canonical provenance fields are serializable");
         Self {
+            snapshot_schema_version: PROVENANCE_SNAPSHOT_SCHEMA_VERSION,
             validator_version: PROVENANCE_VALIDATOR_VERSION.to_owned(),
             snapshot_digest: sha256_hex(&bytes),
             relation_count: relations.len(),
@@ -291,6 +295,7 @@ mod tests {
         assert!(first.conforms);
         assert!(first.violations.is_empty());
         assert_eq!(first.validator_version, PROVENANCE_VALIDATOR_VERSION);
+        assert_eq!(first.snapshot_schema_version, PROVENANCE_SNAPSHOT_SCHEMA_VERSION);
     }
 
     #[test]
