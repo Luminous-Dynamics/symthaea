@@ -1,6 +1,6 @@
 # MOLA Verified Snapshot Contract
 
-Status: design contract for issue #6653. This document does not claim the snapshot API is implemented.
+Status: partially implemented on PR #6588. The MOLA adapter now exposes a verified open-handle snapshot and snapshot-backed sampler; the caller-attested immutability guarantee remains external to the physics crate.
 
 ## Problem
 
@@ -55,7 +55,7 @@ The eventual API should make the evidence distinction visible in types:
 - provenance records both the archive/product identity, when available, and the exact snapshot byte identity;
 - artifact-local metadata remains attached to the artifact rather than being flattened into one shared terrain envelope.
 
-Exact type names are intentionally deferred until compiler-backed implementation work begins.
+Implemented types currently include `MolaRasterSnapshot`, `MolaSnapshotStorage`, `MolaTerrainObservation`, `TerrainArtifactIdentity`, and `TerrainArtifactComposition`. The snapshot sampler returns the existing `TerrainSample` plus the independent artifact composition and a canonical `TerrainObservationIdentity` SHA-256. This identity uses domain-separated, length-prefixed fields and IEEE-754 bit encodings; it is an observation-record identity, not a processing-history or full experiment identity.
 
 ## Companion products
 
@@ -110,4 +110,4 @@ Implementation should add regression coverage for:
 8. preservation of PDS product/version identity alongside the cryptographic snapshot identity;
 9. rejection of conflicting artifact metadata during multi-product composition.
 
-Compiler and CI results remain the authoritative implementation evidence once the API is introduced.
+Compiler and CI results remain the authoritative implementation evidence. Source changes and regression fixtures alone are not evidence that the code compiles or that tests pass.
