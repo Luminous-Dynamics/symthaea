@@ -811,4 +811,129 @@ mod tests {
         );
         assert_eq!(store.pending_count().unwrap(), 0);
     }
+    #[test]
+    fn consumed_capsule_rejects_mismatched_approver_reference() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 9);
+        let peer = peer(1000, 9);
+        let decision = LocalNixApprovalDecisionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+            "nixward-approver-evidence-v1:local-unix-peer-credential-v1:            00".repeat(32),
+        )
+        .unwrap();
+        let err = ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &request,
+            decision,
+            "00".repeat(32),
+            &peer,
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "approver evidence reference"
+            )
+        );
+    }
+
+    #[test]
+    fn consumed_capsule_rejects_peer_observation_after_evaluation() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 10);
+        let peer = peer(1000, 10);
+        let decision = LocalNixApprovalDecisionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+            format!(
+                "nixward-approver-evidence-v1:local-unix-peer-credential-v1:{}",
+                peer.evidence_ref().evidence_digest
+            ),
+        )
+        .unwrap();
+        let err = ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &request,
+            decision,
+            "00".repeat(32),
+            &peer,
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_000)),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "peer observation time"
+            )
+        );
+    }
+
+    #[test]
+    fn consumed_capsule_rejects_decision_after_evaluation() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 11);
+        let peer = peer(1000, 11);
+        let mut decision = LocalNixApprovalDecisionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+            format!(
+                "nixward-approver-evidence-v1:local-unix-peer-credential-v1:{}",
+                peer.evidence_ref().evidence_digest
+            ),
+        )
+        .unwrap();
+        decision.decided_at_unix_ms = 1_400;
+        let err = ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &request,
+            decision,
+            "00".repeat(32),
+            &peer,
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch("decision time")
+        );
+    }
+
+    #[test]
+    fn consumed_capsule_rejects_profile_substitution() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let mut request = request_for(&store, 12);
+        request.authority_profile_ref = "xenia-authenticated-operator-v1".to_string();
+        let peer = peer(1000, 12);
+        let decision = LocalNixApprovalDecisionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+            format!(
+                "nixward-approver-evidence-v1:local-unix-peer-credential-v1:{}",
+                peer.evidence_ref().evidence_digest
+            ),
+        )
+        .unwrap();
+        let err = ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &request,
+            decision,
+            "00".repeat(32),
+            &peer,
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "required/evidence profile"
+            )
+        );
+    }
+
 }
