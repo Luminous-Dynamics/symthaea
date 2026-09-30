@@ -825,18 +825,27 @@ def self_test() -> None:
         policy_path = Path(td) / "policy.json"
         policy_path.write_text(json.dumps(policy), encoding="utf-8")
         load_policy(policy_path)
-        weakened = json.loads(json.dumps(policy))
-        weakened["class_a_paths"] = [
-            entry for entry in weakened["class_a_paths"]
-            if entry["path"] != ".github/governance-change-policy-v1.json"
-        ]
-        policy_path.write_text(json.dumps(weakened), encoding="utf-8")
-        try:
-            load_policy(policy_path)
-        except GovernanceError:
-            pass
-        else:
-            raise AssertionError("policy self-root removal must fail closed")
+        for protected_path in (
+            ".github/governance-change-policy-v1.json",
+            ".github/scripts/check-privileged-workflow-inventory.py",
+            ".github/governance-privileged-workflow-inventory-v1.json",
+            "docs/compliance/adr/ADR-005-privileged-workflow-inventory.md",
+            ".github/workflows/workflow-syntax.yml",
+        ):
+            weakened = json.loads(json.dumps(policy))
+            weakened["class_a_paths"] = [
+                entry for entry in weakened["class_a_paths"]
+                if entry["path"] != protected_path
+            ]
+            policy_path.write_text(json.dumps(weakened), encoding="utf-8")
+            try:
+                load_policy(policy_path)
+            except GovernanceError:
+                pass
+            else:
+                raise AssertionError(
+                    f"protected Governance Root surface removal must fail closed: {protected_path}"
+                )
 
     valid_adr = """# ADR-001: Gate
 **Date**: 2026-09-21
