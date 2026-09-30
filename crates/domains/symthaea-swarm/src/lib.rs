@@ -800,6 +800,7 @@ mod domain_tests {
 }
 
 pub mod semantic_admission;
+pub mod semantic_canonical;
 pub mod semantic_commit;
 
 pub mod fault;
