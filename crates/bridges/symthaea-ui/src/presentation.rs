@@ -83,7 +83,7 @@ impl CognitiveState {
             PresenceState::Disconnected
         } else if processing {
             PresenceState::Processing
-        } else if coherence.is_nan() || thermodynamic_load.is_nan() {
+        } else if !coherence.is_finite() || !thermodynamic_load.is_finite() {
             PresenceState::Degraded
         } else {
             PresenceState::Available
