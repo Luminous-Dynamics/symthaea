@@ -642,3 +642,32 @@ The observed Mycelix interoperability primitive itself is intentionally not trea
 While inspecting the existing SWA-004 thermal counterfactual, the fixture contained a stale `hvac_max_kw` field in several `ZoneParameters` literals even though that field is not part of the struct and the intervention already owns HVAC capacity. SWA-019 work therefore also repaired SWA-004 by removing the invalid field and adding finite/positive input guards around the deterministic thermal step and comfort-band calculation.
 
 This is a source-level correction; hosted CI/test execution is still not claimed unless GitHub reports it for the exact new head.
+
+
+## Existing housing-governance lifecycle binding — SWA-020
+
+The Mycelix inspection found that the Commons DNA already includes `housing_governance_integrity` and its coordinator, alongside `housing_maintenance` and the unified `commons_bridge`. The housing governance model contains an existing `Resolution` record with explicit proposer, meeting, voting, quorum, passed, and effective-date fields. The Commons DNA manifest wires the housing governance integrity and coordinator zomes rather than requiring a new Sol Atlas governance system.
+
+SWA-020 therefore binds Sol Atlas to that **existing** lifecycle instead of inventing another proposal/authorization record.
+
+The fixture distinguishes:
+
+- `ReviewRequested` — Sol Atlas has produced a review request;
+- `ResolutionObserved` — a governance resolution exists but adoption has not been independently established;
+- `Adopted` — the observed resolution declares passed + quorum met + effective date.
+
+Even `Adopted` does not automatically become local physical authority. The fixture requires an explicit external authority reference before reporting `ExternallyAuthorized`, and it contains no actuator, device command, or execution operation.
+
+### Important Mycelix audit finding
+
+The existing housing-governance integrity code itself documents a remaining vote-integrity gap: `vote_on_resolution` accepts caller-supplied aggregate vote counts, quorum, and the resulting passed state. The integrity layer constrains which fields may change but cannot independently establish that those aggregate numbers represent individual votes.
+
+That means Sol Atlas should **not** treat `passed == true` as sufficient physical authorization merely because the field is present. A production adapter should bind to independently validated governance evidence—ideally the existing per-voter mechanisms where available—or require an explicit governance authority record whose own integrity rules establish the decision.
+
+This is exactly the kind of boundary Holochain's validation model is designed to preserve: validation is deterministic and dependency-addressable, while unavailable dependencies remain unresolved rather than becoming implicit approval. citeturn0search0turn0search1turn0search3
+
+The architecture is now:
+
+`Sol Atlas intervention + evidence -> semantic reference -> Mycelix review projection -> existing housing governance resolution -> independently validated authority -> separately observed maintenance/physical outcome`
+
+This is materially better than projecting directly into a generic "authorization receipt": the distributed system's existing domain semantics remain authoritative, while Sol Atlas remains responsible for evidence, provenance, model replay, and intervention identity.
