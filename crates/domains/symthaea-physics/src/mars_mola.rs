@@ -186,7 +186,7 @@ impl MolaMegdrProduct {
         }
         let value = self.read_i16(line, sample)? as f64;
         if self.metadata.missing_value.is_some_and(|m| value == m) {
-            return Ok(self.missing_sample(latitude_deg, longitude_deg));
+            return Ok(self.missing_sample(latitude_deg, longitude_deg, provenance));
         }
         let elevation = value * self.metadata.pixel_scale + self.metadata.pixel_offset;
         if !elevation.is_finite() {
@@ -1272,6 +1272,63 @@ mod tests {
             assert_eq!(metadata.line_offset, expected_record);
             assert_eq!(metadata.image_byte_offset, expected_byte);
         }
+    }
+
+    #[test]
+    fn count_gated_sample_carries_topography_and_count_digests() {
+        let mut label_path = std::env::temp_dir();
+        label_path.push(format!("mola_provenance_{}_label.lbl", std::process::id()));
+        let mut topography_path = label_path.clone();
+        topography_path.set_file_name("MEGT00N000HB.IMG");
+        let mut counts_label_path = label_path.clone();
+        counts_label_path.set_file_name("mola_counts.lbl");
+        let mut counts_path = label_path.clone();
+        counts_path.set_file_name("MEGC00N000HB.IMG");
+
+        let mut topography_bytes = vec![0u8; 64];
+        topography_bytes[40..42].copy_from_slice(&1000i16.to_be_bytes());
+        let mut count_bytes = vec![0u8; 32];
+        count_bytes[20] = 1;
+        std::fs::write(&label_path, label()).unwrap();
+        std::fs::write(&topography_path, topography_bytes).unwrap();
+        let counts_label = label()
+            .replace("MEGT00N000HB", "MEGC00N000HB")
+            .replace("MAP_TYPE = T", "MAP_TYPE = C")
+            .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8")
+            .replace("RECORD_BYTES = 16", "RECORD_BYTES = 8");
+        std::fs::write(&counts_label_path, counts_label).unwrap();
+        std::fs::write(&counts_path, count_bytes).unwrap();
+
+        let topo = MolaMegdrProduct::open(
+            &label_path,
+            &topography_path,
+            "MEGT00N000HB",
+            "fixture-v1",
+        )
+        .unwrap();
+        let counts = MolaMegdrProduct::open(
+            &counts_label_path,
+            &counts_path,
+            "MEGC00N000HB",
+            "fixture-v1",
+        )
+        .unwrap();
+        let sample = topo.sample_nearest_with_count(&counts, 0.0, 180.0, 2.0).unwrap();
+
+        assert_eq!(sample.quality, TerrainQuality::Measured);
+        assert_eq!(sample.elevation_m, Some(1000.0));
+        assert_eq!(sample.provenance.content_digests.len(), 4);
+        assert_eq!(sample.provenance.content_digests[0].0, "detached-label");
+        assert_eq!(sample.provenance.content_digests[1].0, "raster-image");
+        assert_eq!(sample.provenance.content_digests[2].0, "counts-label");
+        assert_eq!(sample.provenance.content_digests[3].0, "counts-raster");
+        assert_eq!(sample.provenance.content_digests[2].2, counts.label_sha256);
+        assert_eq!(sample.provenance.content_digests[3].2, counts.image_sha256);
+
+        let _ = std::fs::remove_file(label_path);
+        let _ = std::fs::remove_file(topography_path);
+        let _ = std::fs::remove_file(counts_label_path);
+        let _ = std::fs::remove_file(counts_path);
     }
 
     #[test]
