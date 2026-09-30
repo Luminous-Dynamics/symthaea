@@ -46,6 +46,7 @@ pub struct MolaMegdrMetadata {
     pub sample_bits: u16,
     pub sample_type: String,
     pub map_projection: String,
+    pub coordinate_system_type: String,
     pub latitude_type: String,
     pub longitude_direction: String,
     pub center_latitude_deg: f64,
@@ -216,7 +217,14 @@ impl MolaMegdrProduct {
             16 => {
                 let mut b = [0u8; 2];
                 file.read_exact(&mut b)?;
-                Ok(u32::from(u16::from_be_bytes(b)))
+                let value = match self.metadata.sample_type.as_str() {
+                    "MSB_INTEGER" => u16::from_be_bytes(b),
+                    "LSB_INTEGER" => u16::from_le_bytes(b),
+                    other => return Err(MolaError::Unsupported(format!(
+                        "sample type {other} is not a supported count encoding"
+                    ))),
+                };
+                Ok(u32::from(value))
             }
             _ => Err(MolaError::Unsupported(
                 "counts must be an 8-bit or 16-bit integer".into(),
@@ -262,10 +270,12 @@ impl MolaMegdrMetadata {
         let sample_bits = parse_u16(kv, "SAMPLE_BITS")?;
         let sample_type = required(kv, "SAMPLE_TYPE")?;
         let map_projection = required(kv, "MAP_PROJECTION_TYPE")?;
+        let coordinate_system_type = required(kv, "COORDINATE_SYSTEM_TYPE")?;
         let latitude_type = required(kv, "COORDINATE_SYSTEM_NAME")?;
         let longitude_direction = required(kv, "POSITIVE_LONGITUDE_DIRECTION")?;
         let center_latitude_deg = parse_f64(kv, "CENTER_LATITUDE")?;
         let center_longitude_deg = parse_f64(kv, "CENTER_LONGITUDE")?;
+        let projection_rotation_deg = parse_f64(kv, "MAP_PROJECTION_ROTATION")?;
         let longitude_min_deg = parse_f64(kv, "WESTERNMOST_LONGITUDE")?;
         let longitude_max_deg = parse_f64(kv, "EASTERNMOST_LONGITUDE")?;
         let latitude_min_deg = parse_f64(kv, "MINIMUM_LATITUDE")?;
@@ -337,6 +347,11 @@ impl MolaMegdrMetadata {
                 "only simple cylindrical MEGDR grids are supported".into(),
             ));
         }
+        if !coordinate_system_type.eq_ignore_ascii_case("BODY-FIXED ROTATING") {
+            return Err(MolaError::InvalidMetadata(
+                "coordinate system type must be BODY-FIXED ROTATING".into(),
+            ));
+        }
         if !latitude_type.to_ascii_lowercase().contains("planetocentric") {
             return Err(MolaError::InvalidMetadata(
                 "latitude coordinate system must be planetocentric".into(),
@@ -345,6 +360,11 @@ impl MolaMegdrMetadata {
         if !longitude_direction.eq_ignore_ascii_case("EAST") {
             return Err(MolaError::InvalidMetadata(
                 "longitude direction must be positive east".into(),
+            ));
+        }
+        if !projection_rotation_deg.is_finite() || projection_rotation_deg != 0.0 {
+            return Err(MolaError::Unsupported(
+                "only zero-rotation MOLA simple-cylindrical grids are supported".into(),
             ));
         }
         if !center_latitude_deg.is_finite()
@@ -402,6 +422,7 @@ impl MolaMegdrMetadata {
             sample_bits,
             sample_type,
             map_projection,
+            coordinate_system_type,
             latitude_type,
             longitude_direction,
             center_latitude_deg,
@@ -690,6 +711,11 @@ fn validate_img_size(metadata: &MolaMegdrMetadata, img_path: &Path) -> Result<()
     let len = std::fs::metadata(img_path)?.len();
     let bytes_per_sample = u64::from(metadata.sample_bits / 8);
     let row_payload = u64::from(metadata.samples) * bytes_per_sample;
+    if u64::from(metadata.sample_offset) + row_payload > metadata.record_bytes {
+        return Err(MolaError::InvalidMetadata(
+            "sample payload exceeds the declared record size".into(),
+        ));
+    }
     let required = metadata.record_bytes * u64::from(metadata.line_offset)
         + u64::from(metadata.lines.saturating_sub(1)) * metadata.record_bytes
         + row_payload;
@@ -718,10 +744,12 @@ mod tests {
             "SAMPLE_TYPE = MSB_INTEGER",
             "SAMPLE_BITS = 16",
             "MAP_PROJECTION_TYPE = SIMPLE CYLINDRICAL",
+            "COORDINATE_SYSTEM_TYPE = BODY-FIXED ROTATING",
             "COORDINATE_SYSTEM_NAME = PLANETOCENTRIC",
             "POSITIVE_LONGITUDE_DIRECTION = EAST",
             "CENTER_LATITUDE = 0.0",
             "CENTER_LONGITUDE = 180.0",
+            "MAP_PROJECTION_ROTATION = 0.0",
             "LINE_PROJECTION_OFFSET = 2.5",
             "SAMPLE_PROJECTION_OFFSET = 4.5",
             "WESTERNMOST_LONGITUDE = 0.0",
@@ -878,6 +906,34 @@ mod tests {
         assert_eq!(metadata.cell_for(89.875, 0.125), Ok((0, 0)));
         assert_eq!(metadata.cell_for(-89.875, 359.875), Ok((719, 1439)));
         assert_eq!(metadata.center_latitude_deg, 0.0);
+    }
+
+    #[test]
+    fn rejects_nonzero_projection_rotation() {
+        let text = label().replace(
+            "MAP_PROJECTION_ROTATION = 0.0",
+            "MAP_PROJECTION_ROTATION = 1.0",
+        );
+        let error = MolaMegdrMetadata::from_label(
+            &parse_label(&text),
+            "MEGT00N000HB",
+        )
+        .unwrap_err();
+        assert!(matches!(error, MolaError::Unsupported(_)));
+    }
+
+    #[test]
+    fn rejects_wrong_coordinate_system_type() {
+        let text = label().replace(
+            "COORDINATE_SYSTEM_TYPE = BODY-FIXED ROTATING",
+            "COORDINATE_SYSTEM_TYPE = INERTIAL",
+        );
+        let error = MolaMegdrMetadata::from_label(
+            &parse_label(&text),
+            "MEGT00N000HB",
+        )
+        .unwrap_err();
+        assert!(matches!(error, MolaError::InvalidMetadata(_)));
     }
 
     #[test]
