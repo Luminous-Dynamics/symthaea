@@ -1,0 +1,52 @@
+name: Scientific lineage adapter contract
+
+on:
+  pull_request:
+    paths:
+      - "docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json"
+      - "docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json"
+      - "docs/engineering/data/cp-04-scientific-lineage-adapter-v1-negative-contract-vectors.json"
+      - "docs/engineering/data/cp-04-scientific-lineage-source-snapshot-v1.json"
+      - "scripts/qualifiers/scientific_lineage_adapter_qualifier.py"
+      - ".github/workflows/scientific-lineage-adapter.yml"
+      - "crates/domains/symthaea-engineering/src/cp04_adapter.rs"
+      - "crates/domains/symthaea-engineering/src/engineering_identity.rs"
+      - "crates/domains/symthaea-engineering/src/engineering_relation.rs"
+      - "crates/domains/symthaea-engineering/src/scientific_lineage.rs"
+      - "crates/domains/symthaea-engineering/Cargo.toml"
+      - "crates/domains/symthaea-engineering/tests/cp04_digest_boundaries.rs"
+      - "crates/domains/symthaea-engineering/tests/cp04_negative_contract_vectors.rs"
+      - "crates/domains/symthaea-engineering/tests/cp04_source_snapshot_replay.rs"
+      - "crates/domains/symthaea-engineering/tests/cp04_dependency_contract.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-adapter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Bind exact checked-out head
+        shell: bash
+        run: |
+          test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
+          git status --short
+      - name: Verify CP-04 adapter vector
+        run: python3 scripts/qualifiers/scientific_lineage_adapter_qualifier.py
+      - name: Verify Rust fixture round-trip
+        run: cargo test -p symthaea-engineering checked_in_fixture_round_trips_through_rust_adapter --lib
+      - name: Verify digest boundary mutations
+        run: cargo test -p symthaea-engineering --test cp04_digest_boundaries
+      - name: Verify negative contract vectors
+        run: cargo test -p symthaea-engineering --test cp04_negative_contract_vectors
+      - name: Verify source snapshot replay contract
+        run: cargo test -p symthaea-engineering --test cp04_source_snapshot_replay
+      - name: Verify positive dependency contract
+        run: cargo test -p symthaea-engineering --test cp04_dependency_contract
+      - name: Verify fixture remains unchanged
+        run: git diff --exit-code -- docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json docs/engineering/data/cp-04-scientific-lineage-adapter-v1-negative-contract-vectors.json docs/engineering/data/cp-04-scientific-lineage-source-snapshot-v1.json scripts/qualifiers/scientific_lineage_adapter_qualifier.py

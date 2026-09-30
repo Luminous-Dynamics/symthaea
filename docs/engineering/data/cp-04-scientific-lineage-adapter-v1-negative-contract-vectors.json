@@ -1,0 +1,95 @@
+{
+  "schema": "symthaea.cp-04-qualification-adapter-negative-contract-v1",
+  "vectors": [
+    {
+      "id": "source-graph-digest-tamper",
+      "mutation_path": "source_graph_digest",
+      "mutation_value": "0",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
+    },
+    {
+      "id": "projection-digest-tamper",
+      "mutation_path": "projection_digest",
+      "mutation_value": "1",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
+    },
+    {
+      "id": "relation-digest-tamper",
+      "mutation_path": "edges[0].relation_digest",
+      "mutation_value": "2",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
+    },
+    {
+      "id": "identity-canonical-identifier-tamper",
+      "mutation_path": "nodes[0].identity.canonical_identifier",
+      "mutation_value": "tampered",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
+    },
+    {
+      "id": "claim-ceiling-tamper",
+      "mutation_path": "claim_ceiling",
+      "mutation_value": "tampered",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
+    },
+    {
+      "id": "source-graph-recomputed-envelope",
+      "mutation_path": "source_graph_digest",
+      "mutation_value": "0",
+      "digest_strategy": "recompute_artifact_digest",
+      "expected_validate": "accept",
+      "expected_source_binding": "reject",
+      "first_boundary": "source-binding"
+    },
+    {
+      "id": "projection-recomputed-envelope",
+      "mutation_path": "projection_digest",
+      "mutation_value": "1",
+      "digest_strategy": "recompute_artifact_digest",
+      "expected_validate": "accept",
+      "expected_source_binding": "reject",
+      "first_boundary": "source-binding"
+    },
+    {
+      "id": "identity-content-digest-tamper",
+      "mutation_path": "nodes[0].identity.content_digest",
+      "mutation_value": "c",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
+    },
+    {
+      "id": "endpoint-target-tamper",
+      "mutation_path": "edges[0].target_identity_digest",
+      "mutation_value": "3",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
+    },
+    {
+      "id": "relation-kind-tamper",
+      "mutation_path": "edges[0].edge_type",
+      "mutation_value": "implements",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
+    }
+  ]
+}

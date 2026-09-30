@@ -30,6 +30,17 @@ pub use symthaea_digital_twin as digital_twin;
 pub use symthaea_formal_safety as formal_safety;
 pub use symthaea_memory as memory;
 pub use symthaea_sim_bridge as sim_bridge;
+pub mod engineering_identity;
+pub mod engineering_relation;
+pub use engineering_identity::EngineeringObjectId;
+pub use engineering_relation::{EngineeringRelation, EngineeringRelationKind, RelationFamily};
+pub mod cp04_adapter;
+pub mod scientific_lineage;
+pub use cp04_adapter::{Cp04AdapterError, Cp04Edge, Cp04Node, Cp04QualificationArtifact};
+pub use scientific_lineage::{
+    AuthorityCeiling, QualificationProjection, QualificationProjectionError,
+    ScientificLineageGraph, QUALIFICATION_POLICY, QUALIFICATION_PROJECTION_SCHEMA, QUALIFICATION_PROJECTION_ARTIFACT_SCHEMA,
+};
 
 /// Debug-friendly wrapper for the fabrication autonomy loop.
 pub struct DebugFabricationLoop(pub AutonomyLoop);

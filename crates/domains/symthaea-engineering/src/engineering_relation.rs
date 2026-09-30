@@ -44,6 +44,11 @@ pub enum EngineeringRelationKind {
     Produces,
     Quantifies,
     HasProperty,
+    Summarizes,
+    TracesTo,
+    CurrentnessFor,
+    ApplicableTo,
+    Derives,
     Supports,
     Contradicts,
     DerivedFrom,
@@ -65,6 +70,9 @@ impl EngineeringRelationKind {
             Self::Constrains => "constrains", Self::Formalizes => "formalizes",
             Self::Instantiates => "instantiates", Self::Produces => "produces",
             Self::Quantifies => "quantifies", Self::HasProperty => "has_property",
+            Self::Summarizes => "summarizes", Self::TracesTo => "traces_to",
+            Self::CurrentnessFor => "currentness_for", Self::ApplicableTo => "applicable_to",
+            Self::Derives => "derives",
             Self::Supports => "supports", Self::Contradicts => "contradicts",
             Self::DerivedFrom => "derived_from", Self::Equivalent => "equivalent",
             Self::Generalizes => "generalizes", Self::Specializes => "specializes",
@@ -90,6 +98,11 @@ impl EngineeringRelationKind {
             Self::Produces => Some(&[("simulation", "prediction"), ("process", "material"), ("experiment", "observation")]),
             Self::Quantifies => Some(&[("observation", "uncertainty"), ("observation", "statistics")]),
             Self::HasProperty => Some(&[("material", "property"), ("material", "measured_property"), ("material", "predicted_property")]),
+            Self::Summarizes => Some(&[("observation", "statistics")]),
+            Self::TracesTo => Some(&[("observation", "provenance_reference")]),
+            Self::CurrentnessFor => Some(&[("currentness", "runtime")]),
+            Self::ApplicableTo => Some(&[("applicability", "execution_context")]),
+            Self::Derives => Some(&[("statistics", "disposition")]),
             Self::PartOf | Self::Contains | Self::DependsOn | Self::Supports | Self::Contradicts |
             Self::DerivedFrom | Self::Equivalent | Self::Generalizes | Self::Specializes => None,
         }
@@ -113,7 +126,12 @@ impl EngineeringRelationKind {
             | Self::Instantiates
             | Self::Produces
             | Self::Quantifies
-            | Self::HasProperty => RelationFamily::Scientific,
+            | Self::HasProperty
+            | Self::Summarizes
+            | Self::TracesTo
+            | Self::CurrentnessFor
+            | Self::ApplicableTo
+            | Self::Derives => RelationFamily::Scientific,
             Self::Supports
             | Self::Contradicts
             | Self::DerivedFrom
@@ -237,8 +255,8 @@ mod tests {
 
     fn relation(kind: EngineeringRelationKind) -> EngineeringRelation {
         EngineeringRelation::new(
-            object("physical-model", "model", A),
-            object("material", "candidate", B),
+            object("simulation", "model", A),
+            object("prediction", "candidate", B),
             kind,
         )
         .unwrap()
@@ -313,7 +331,7 @@ mod tests {
 
     #[test]
     fn serde_round_trip_preserves_relation() {
-        let relation = relation(EngineeringRelationKind::Constrains);
+        let relation = relation(EngineeringRelationKind::Produces);
         let json = serde_json::to_string(&relation).unwrap();
         let restored: EngineeringRelation = serde_json::from_str(&json).unwrap();
         assert_eq!(relation, restored);
