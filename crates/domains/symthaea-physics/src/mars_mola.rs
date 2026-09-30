@@ -471,6 +471,22 @@ impl MolaMegdrMetadata {
                 "normalized longitude outside [0, 360)".into(),
             ));
         }
+
+        // A tiled MEGDR raster is not a global longitude lookup table. Reject
+        // coordinates outside this label's declared geographic footprint before
+        // applying projection arithmetic; otherwise a valid-looking coordinate
+        // from another tile can wrap into an unrelated cell.
+        let longitude_is_global =
+            self.longitude_min_deg == 0.0 && self.longitude_max_deg == 360.0;
+        if latitude_deg < self.latitude_min_deg || latitude_deg > self.latitude_max_deg {
+            return Err(MolaError::OutOfBounds);
+        }
+        if !longitude_is_global
+            && (lon < self.longitude_min_deg || lon >= self.longitude_max_deg)
+        {
+            return Err(MolaError::OutOfBounds);
+        }
+
         // PDS simple-cylindrical projection coordinates are 1-based pixel
         // coordinates whose centers are represented by the .5 projection
         // offsets (e.g. 360.5/720.5 in the official 4 ppd label). Convert the
@@ -768,6 +784,39 @@ mod tests {
             "OFFSET = 0.0",
         ]
         .join("\n")
+    }
+
+    #[test]
+    fn tiled_grid_rejects_coordinates_outside_declared_footprint() {
+        let text = label()
+            .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 270.0")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 360.0")
+            .replace("MINIMUM_LATITUDE = -0.015625", "MINIMUM_LATITUDE = -44.0")
+            .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 0.0")
+            .replace("LINES = 4", "LINES = 5632")
+            .replace("LINE_SAMPLES = 8", "LINE_SAMPLES = 11520")
+            .replace("RECORD_BYTES = 16", "RECORD_BYTES = 23040")
+            .replace("LINE_PROJECTION_OFFSET = 2.5", "LINE_PROJECTION_OFFSET = 0.5")
+            .replace("SAMPLE_PROJECTION_OFFSET = 4.5", "SAMPLE_PROJECTION_OFFSET = -11519.5");
+        let metadata =
+            MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap();
+
+        assert!(matches!(
+            metadata.cell_for(-10.0, 269.999),
+            Err(MolaError::OutOfBounds)
+        ));
+        assert!(matches!(
+            metadata.cell_for(-10.0, 360.0),
+            Err(MolaError::OutOfBounds)
+        ));
+        assert!(matches!(
+            metadata.cell_for(-44.001, 300.0),
+            Err(MolaError::OutOfBounds)
+        ));
+        assert!(matches!(
+            metadata.cell_for(0.001, 300.0),
+            Err(MolaError::OutOfBounds)
+        ));
     }
 
     #[test]
