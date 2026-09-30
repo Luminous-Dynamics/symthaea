@@ -13,6 +13,17 @@ pub enum PresenceState {
     Processing,
     Recovering,
     Degraded,
+    #[test]
+    fn semantic_event_requires_a_transition_or_explicit_signal() {
+        let previous = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.8, 0.1);
+        let current = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.8, 0.1);
+        assert_eq!(
+            event_between(Some(previous), current, 42, true, false)
+                .map(|event| event.kind),
+            Some(CognitiveEventKind::SurpriseDetected)
+        );
+        assert!(event_between(Some(previous), current, 42, false, false).is_none());
+    }
 }
 
 impl PresenceState {
@@ -108,6 +119,70 @@ impl CognitiveState {
     }
 }
 
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CognitiveEventKind {
+    Connected,
+    Disconnected,
+    ProcessingStarted,
+    ProcessingCompleted,
+    AttentionShifted,
+    SurpriseDetected,
+    WorkspaceBroadcast,
+    EnteredRest,
+    ExitedRest,
+    StateChanged,
+}
+
+impl CognitiveEventKind {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Connected => "connected",
+            Self::Disconnected => "disconnected",
+            Self::ProcessingStarted => "processing started",
+            Self::ProcessingCompleted => "processing completed",
+            Self::AttentionShifted => "attention shifted",
+            Self::SurpriseDetected => "surprise detected",
+            Self::WorkspaceBroadcast => "workspace broadcast",
+            Self::EnteredRest => "entered rest",
+            Self::ExitedRest => "exited rest",
+            Self::StateChanged => "state changed",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CognitiveEvent {
+    pub kind: CognitiveEventKind,
+    pub cycle: u64,
+}
+
+pub fn event_between(previous: Option<CognitiveState>, current: CognitiveState, cycle: u64, surprise: bool, gwt: bool) -> Option<CognitiveEvent> {
+    let previous = previous?;
+    let kind = if previous.presence != current.presence {
+        match current.presence {
+            PresenceState::Disconnected => CognitiveEventKind::Disconnected,
+            PresenceState::Available => CognitiveEventKind::Connected,
+            _ => CognitiveEventKind::StateChanged,
+        }
+    } else if previous.mode != current.mode {
+        match (previous.mode, current.mode) {
+            (CognitiveMode::Resting, _) => CognitiveEventKind::ExitedRest,
+            (_, CognitiveMode::Resting) => CognitiveEventKind::EnteredRest,
+            (CognitiveMode::Responding, _) => CognitiveEventKind::ProcessingCompleted,
+            (_, CognitiveMode::Responding) => CognitiveEventKind::ProcessingStarted,
+            _ => CognitiveEventKind::StateChanged,
+        }
+    } else if surprise {
+        CognitiveEventKind::SurpriseDetected
+    } else if gwt {
+        CognitiveEventKind::WorkspaceBroadcast
+    } else {
+        return None;
+    };
+    Some(CognitiveEvent { kind, cycle })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,5 +219,6 @@ mod tests {
         assert_eq!(state.coherence, 1.0);
         assert_eq!(state.thermodynamic_load, 1.0);
         assert_eq!(state.confidence, 1.0);
+        assert_eq!(state.prediction_error, 1.0);
     }
 }
