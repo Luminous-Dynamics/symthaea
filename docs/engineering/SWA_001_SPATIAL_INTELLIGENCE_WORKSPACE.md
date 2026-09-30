@@ -421,7 +421,7 @@ claim -> contradiction witness
 
 Each witness can point back to its own complete provenance slice and dependency frontier. A later model revision can therefore invalidate one branch without silently deleting the historical fact that another branch contradicted it.
 
-This is consistent with the W3C provenance model's emphasis on validity and consistency checking: PROV defines constraints over provenance histories and provides normalization/equivalence machinery so provenance can be checked rather than merely stored. The provenance overview also explicitly lists reproducibility, versioning, procedures, and derivation as core provenance requirements. citeturn0search1turn0search5
+This is consistent with the W3C provenance model's emphasis on validity and consistency checking: PROV defines constraints over provenance histories and provides normalization/equivalence machinery so provenance can be checked rather than merely stored. The provenance overview also explicitly lists reproducibility, versioning, procedures, and derivation as core provenance requirements.
 
 The architectural progression is now:
 
@@ -454,7 +454,7 @@ The intended result is:
 
 `raw provenance -> normalized provenance -> integrity constraints -> Valid / Invalid`
 
-The validator is deliberately scoped to the SWA fixture rather than claiming to be a complete implementation of W3C PROV. That boundary matters. W3C PROV defines validity in terms of normalization plus uniqueness, ordering, type, and impossibility constraints, and explicitly notes that cyclic derivation can imply an impossible history. SWA-013 adopts the same engineering direction while implementing only the invariants required by this reference architecture. citeturn0search0turn0search4
+The validator is deliberately scoped to the SWA fixture rather than claiming to be a complete implementation of W3C PROV. That boundary matters. W3C PROV defines validity in terms of normalization plus uniqueness, ordering, type, and impossibility constraints, and explicitly notes that cyclic derivation can imply an impossible history. SWA-013 adopts the same engineering direction while implementing only the invariants required by this reference architecture.
 
 This changes the architecture from:
 
@@ -487,7 +487,7 @@ The resulting flow is:
 
 `dependency revision -> closure intersection -> deterministic propagation frontier -> downstream revalidation`
 
-This is consistent with W3C PROV's model of revision as a specialized derivation and invalidation as a distinct lifecycle event: provenance records what happened historically while the current system can determine whether an entity remains usable under a changed dependency context. citeturn0search0turn0search1
+This is consistent with W3C PROV's model of revision as a specialized derivation and invalidation as a distinct lifecycle event: provenance records what happened historically while the current system can determine whether an entity remains usable under a changed dependency context.
 
 SWA-014 deliberately does not convert stale evidence into false evidence. It also does not make a provenance result an authorization signal. The next useful seam is to connect this propagation frontier to the actual intervention/decision lineage so that a changed model can identify exactly which pending decision contexts require re-review without silently re-authorizing or rejecting anything.
 
@@ -517,7 +517,7 @@ The distinction is important:
 
 The fixture also canonicalizes evidence identifiers and dependency changes, so equivalent input orderings produce identical revalidation results.
 
-This boundary fits Holochain's agent-centric validation model as a separate layer rather than conflating the two. Holochain validation is designed to deterministically validate whether authored operations conform to application rules, with dependencies explicitly addressable and unresolved dependencies yielding an indeterminate result rather than an implicit pass. Its source chains are append-only records of an agent's authored state changes. Those properties are useful for the future Mycelix receipt/governance layer, while SWA-015 remains a local deterministic epistemic fixture and does not pretend that a provenance record itself carries physical authority. citeturn0search0turn0search2turn0search4
+This boundary fits Holochain's agent-centric validation model as a separate layer rather than conflating the two. Holochain validation is designed to deterministically validate whether authored operations conform to application rules, with dependencies explicitly addressable and unresolved dependencies yielding an indeterminate result rather than an implicit pass. Its source chains are append-only records of an agent's authored state changes. Those properties are useful for the future Mycelix receipt/governance layer, while SWA-015 remains a local deterministic epistemic fixture and does not pretend that a provenance record itself carries physical authority.
 
 The current Sol Atlas chain is therefore:
 
@@ -635,7 +635,7 @@ This makes the integration chain more precise:
 
 `Sol Atlas evidence/provenance -> semantic source reference -> typed Mycelix projection -> addressable dependency validation -> separate governance authorization -> separately observed physical outcome`
 
-The observed Mycelix interoperability primitive itself is intentionally not treated as proof of a live deployed DNA, and the referenced commit is not treated as current runtime authority. Holochain validation remains the relevant distributed boundary: validation must be deterministic, dependencies must be addressable, and unavailable dependencies produce an unresolved result rather than an implicit pass. citeturn0search0turn0search1
+The observed Mycelix interoperability primitive itself is intentionally not treated as proof of a live deployed DNA, and the referenced commit is not treated as current runtime authority. Holochain validation remains the relevant distributed boundary: validation must be deterministic, dependencies must be addressable, and unavailable dependencies produce an unresolved result rather than an implicit pass.
 
 ### Engineering correction discovered during SWA-019 review
 
@@ -664,7 +664,7 @@ The existing housing-governance integrity code itself documents a remaining vote
 
 That means Sol Atlas should **not** treat `passed == true` as sufficient physical authorization merely because the field is present. A production adapter should bind to independently validated governance evidence—ideally the existing per-voter mechanisms where available—or require an explicit governance authority record whose own integrity rules establish the decision.
 
-This is exactly the kind of boundary Holochain's validation model is designed to preserve: validation is deterministic and dependency-addressable, while unavailable dependencies remain unresolved rather than becoming implicit approval. citeturn0search0turn0search1turn0search3
+This is exactly the kind of boundary Holochain's validation model is designed to preserve: validation is deterministic and dependency-addressable, while unavailable dependencies remain unresolved rather than becoming implicit approval.
 
 The architecture is now:
 
@@ -699,7 +699,7 @@ This also reinforces the semantic rule already present in Mycelix's interoperabi
 
 SWA-019 established semantic identity and dependency structure, but its digest was intentionally only a declaration. SWA-021 closes that gap at the local fixture boundary without pretending to be the final Mycelix cryptographic contract.
 
-The projection now derives a BLAKE3-256 digest from a deterministic serialized `ContentBindingPayload` containing the schema, an explicit evidence-binding manifest, source/target semantic references, projection target, observed Mycelix revision, author/authority references, dependency set, and authority/actuation state. The digest is computed over the payload **excluding the digest field itself**, avoiding a circular commitment. BLAKE3 provides a 32-byte default hash and deterministic hexadecimal representation in its Rust implementation. citeturn1search0turn1search1
+The projection now derives a BLAKE3-256 digest from a deterministic serialized `ContentBindingPayload` containing the schema, an explicit evidence-binding manifest, source/target semantic references, projection target, observed Mycelix revision, author/authority references, dependency set, and authority/actuation state. The digest is computed over the payload **excluding the digest field itself**, avoiding a circular commitment. BLAKE3 provides a 32-byte default hash and deterministic hexadecimal representation in its Rust implementation.
 
 This establishes three useful invariants:
 
@@ -729,7 +729,7 @@ That distinction matters:
 - provenance integrity and Mycelix interoperability remain separate concerns;
 - the adapter still does not claim that a digest proves the underlying physical world state.
 
-Holochain's validation model strongly favors this structure: dependencies used for validation need deterministic, addressable identities, and unavailable dependencies are unresolved rather than silently accepted. citeturn0search0turn0search2
+Holochain's validation model strongly favors this structure: dependencies used for validation need deterministic, addressable identities, and unavailable dependencies are unresolved rather than silently accepted.
 
 The intended production evolution is therefore **not** to duplicate the provenance graph inside the Mycelix adapter. Instead, the Sol Atlas provenance layer should export a canonical slice identifier, exact dependency revisions, and an approved content commitment; the Mycelix adapter binds those references into its projection.
 
@@ -755,7 +755,7 @@ The trust boundary is now:
 
 `authoritative provenance graph -> canonical evidence-slice manifest -> BLAKE3-256 commitment -> semantic Mycelix projection -> Mycelix validation/governance -> independently observed outcome`
 
-This also matches Holochain's validation model: validation should be deterministic, dependencies should be addressable, and unavailable dependencies should remain unresolved rather than becoming implicit approval. citeturn1search0turn1search2
+This also matches Holochain's validation model: validation should be deterministic, dependencies should be addressable, and unavailable dependencies should remain unresolved rather than becoming implicit approval.
 
 
 ## Canonical encoding hardening — SWA-024
@@ -773,6 +773,33 @@ The evidence-slice commitment no longer depends on JSON serialization. The canon
 
 This removes an unnecessary dependency between the cryptographic identity and a presentation/wire serialization format. It also makes representation boundaries explicit: an absent revision and an explicitly empty revision are different byte sequences.
 
-BLAKE3 itself is unchanged; the improvement is the **input domain and framing** being committed. The BLAKE3 specification defines domain-separated modes and a fixed 256-bit default hash output; the fixture's own domain/version separator prevents unrelated Symthaea content from accidentally sharing this commitment namespace. citeturn0search4turn0search6
+BLAKE3 itself is unchanged; the improvement is the **input domain and framing** being committed. The BLAKE3 specification defines domain-separated modes and a fixed 256-bit default hash output; the fixture's own domain/version separator prevents unrelated Symthaea content from accidentally sharing this commitment namespace.
 
 This remains a content commitment, not a signature and not authorization. A production Mycelix adapter will still need the target system's accepted cryptographic/profile contract.
+
+
+## Authoritative provenance graph binding — SWA-025
+
+SWA-024 hardened the canonical byte encoding, but review exposed one remaining architectural duplication: SWA-019 was still reconstructing the SWA-009 fixture topology inside the Mycelix adapter.
+
+SWA-025 removes that duplication. The deterministic provenance graph primitives now live in the shared `symthaea-engineering::provenance_graph` module. SWA-009 uses that module for its slice traversal, and SWA-019 derives its evidence-binding nodes and relationships from the selected authoritative slice before passing them to `EvidenceSliceManifest`.
+
+The adapter therefore no longer owns a second copy of:
+
+- node membership;
+- edge direction;
+- support relationships;
+- dependency relationships;
+- qualification/contradiction edge vocabulary.
+
+The projection still owns the **mapping** from authoritative provenance identities to Mycelix semantic references. That mapping is an interoperability concern; the underlying provenance topology remains owned by the provenance layer.
+
+This distinction is important for future evolution. If the authoritative graph gains a dependency, removes one, changes a relationship, or adds preserved counterevidence, the evidence-binding digest must change because the projection consumes the graph rather than silently maintaining an independent topology.
+
+Holochain's validation model reinforces the same boundary: validation inputs and their dependencies should be deterministic and addressable, while unavailable dependencies remain unresolved rather than being treated as implicit validity. The Mycelix adapter should therefore consume an explicit, reproducible provenance slice rather than infer one from presentation fields.
+
+The resulting chain is:
+
+`authoritative provenance graph -> deterministic selected slice -> canonical evidence manifest -> BLAKE3-256 commitment -> semantic Mycelix projection -> Mycelix validation/governance -> independently observed outcome`
+
+SWA-025 does **not** introduce a second provenance graph or a second governance system. It makes the existing provenance graph the single source for the cross-system evidence topology.
