@@ -60,13 +60,22 @@ jobs:
 
       - name: Focused formatting
         run: |
-          rustfmt --check --edition 2024             crates/core/symthaea-core/src/hdc/resolution_space.rs             crates/core/symthaea-core/src/hdc/resolution_budget.rs             crates/core/symthaea-core/src/hdc/simd_continuous.rs             crates/core/symthaea-core/benches/simd_continuous.rs
+          rustfmt --check --edition 2024 \
+            crates/core/symthaea-core/src/hdc/resolution_space.rs \
+            crates/core/symthaea-core/src/hdc/resolution_budget.rs \
+            crates/core/symthaea-core/src/hdc/simd_continuous.rs \
+            crates/core/symthaea-core/benches/simd_continuous.rs
 
       - name: Focused HDC resolution tests
         run: |
           cargo test -p symthaea-core --lib resolution_space
           cargo test -p symthaea-core --lib resolution_budget
           cargo test -p symthaea-core --lib simd_continuous --features simd
+
+      - name: Focused strict Clippy
+        run: |
+          cargo clippy -p symthaea-core --lib --features simd -- \
+            -D warnings
 
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
