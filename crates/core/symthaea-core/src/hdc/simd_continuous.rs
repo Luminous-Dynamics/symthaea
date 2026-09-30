@@ -1543,11 +1543,15 @@ mod tests {
 
             let simd_bind = bind_simd(&a, &b);
             assert_eq!(simd_bind.len(), dim, "bind dimension changed at dim={dim}");
-            for (i, (&x, &y)) in simd_bind.iter().zip(a.iter().zip(b.iter())).enumerate() {
+            for (i, (&x, (&av, &bv))) in simd_bind
+                .iter()
+                .zip(a.iter().zip(b.iter()))
+                .enumerate()
+            {
+                let expected = av * bv;
                 assert!(
-                    (x - y).abs() < 1e-5,
-                    "bind mismatch at dim={dim}, index={i}: SIMD={x}, expected={}"
-                    , y
+                    (x - expected).abs() < 1e-5,
+                    "bind mismatch at dim={dim}, index={i}: SIMD={x}, expected={expected}"
                 );
             }
 
