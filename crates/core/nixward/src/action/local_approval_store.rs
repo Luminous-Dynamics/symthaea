@@ -484,7 +484,7 @@ mod tests {
         )
         .unwrap();
         let consumed = store
-            .consume_verified_submission(&new_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .consume_verified_submission_v1(&new_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         assert_eq!(consumed.request_id(), new_id);
     }
@@ -537,7 +537,7 @@ mod tests {
         assert_eq!(observation, PendingRequestCurrentnessV1::Current);
 
         store
-            .consume_verified_submission(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_400)))
+            .consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_400)))
             .unwrap();
 
         // The earlier Current result is intentionally only a historical observation.
@@ -573,7 +573,7 @@ mod tests {
         // The atomic consume boundary re-evaluates time itself. The stale
         // observation cannot authorize a consume at the exact expiry instant.
         assert!(matches!(
-            store.consume_verified_submission(&submission, &peer(1000, 1), ms(2_000)),
+            store.consume_verified_submission_v1(&submission, &peer(1000, 1), ms(2_000)),
             Err(LocalApprovalRequestStoreErrorV1::Admission(_))
         ));
         assert!(store.is_pending(&request_id).unwrap());
@@ -637,7 +637,7 @@ mod tests {
         store.install_pending(request).unwrap();
 
         let consumed = store
-            .consume_verified_submission(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
 
         assert_eq!(consumed.request_id(), request_id);
@@ -664,7 +664,7 @@ mod tests {
         store.install_pending(request).unwrap();
 
         assert!(matches!(
-            store.consume_verified_submission(&hostile, &peer(1000, 1), ms(1_300)),
+            store.consume_verified_submission_v1(&hostile, &peer(1000, 1), ms(1_300)),
             Err(LocalApprovalRequestStoreErrorV1::Admission(
                 LocalApprovalAdmissionErrorV1::Approval(LocalApprovalErrorV1::IntentMismatch)
             ))
@@ -672,7 +672,7 @@ mod tests {
         assert!(store.is_pending(&request_id).unwrap());
 
         store
-            .consume_verified_submission(&valid_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .consume_verified_submission_v1(&valid_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         assert!(!store.is_pending(&request_id).unwrap());
     }
@@ -691,7 +691,7 @@ mod tests {
         store.install_pending(request).unwrap();
 
         let consumed = store
-            .consume_verified_submission(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         assert_eq!(consumed.decision_kind(), LocalApprovalDecisionKindV1::Denied);
         assert_eq!(store.pending_count().unwrap(), 0);
@@ -719,7 +719,7 @@ mod tests {
             handles.push(thread::spawn(move || {
                 let peer = peer(uid, pid);
                 barrier.wait();
-                store.consume_verified_submission(&submission, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+                store.consume_verified_submission_v1(&submission, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             }));
         }
         barrier.wait();
