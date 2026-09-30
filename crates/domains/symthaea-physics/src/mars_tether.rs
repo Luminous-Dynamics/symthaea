@@ -406,6 +406,8 @@ pub struct TerrainSample {
     pub longitude_rad: f64,
     /// Exact derivation procedure used to obtain the observation.
     pub sampling_method: TerrainSamplingMethod,
+    /// Zero-based source grid cell used by the adapter, when the source is a grid.
+    pub source_grid_cell: Option<(u32, u32)>,
     pub elevation_m: Option<f64>,
     pub elevation_uncertainty_m: Option<f64>,
     pub vertical_datum: TerrainVerticalDatum,
@@ -814,6 +816,7 @@ mod tests {
             latitude_rad: 0.0,
             longitude_rad: 0.0,
             sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,
+            source_grid_cell: Some((0, 0)),
             elevation_m: Some(1200.0),
             elevation_uncertainty_m: Some(5.0),
             vertical_datum: TerrainVerticalDatum::AreoidRelative,
