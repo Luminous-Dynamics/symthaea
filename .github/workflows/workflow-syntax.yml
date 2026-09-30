@@ -133,6 +133,12 @@ jobs:
           set -euo pipefail
           while IFS= read -r file; do python3 -m py_compile "$file"; done < /tmp/github-python-files.txt
 
+      - name: Self-test Governance Root validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/check-pr-governance.py --self-test
+
       - name: Self-test privileged workflow inventory detector
         shell: bash
         run: |
