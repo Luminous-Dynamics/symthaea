@@ -86,6 +86,9 @@ pub const HDC_DIMENSION_64K: usize = 65_536;
 /// The finite empirical ladder remains separate from the open resolution space.
 pub mod resolution_space;
 
+/// Research-only resource admissibility separate from mathematical resolution validity.
+pub mod resolution_budget;
+
 /// HDC dimensionality configuration for runtime selection
 ///
 /// Supports both predefined tiers and custom arbitrary dimensions.
