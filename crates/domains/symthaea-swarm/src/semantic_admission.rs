@@ -246,17 +246,18 @@ pub fn decide(
         };
     }
 
-    if let Some(existing) = state.deliveries.get(&delivery.logical_delivery_id) {
-        if !policy.allow_new_observation {
-            return AdmissionOutcome::Rejected {
-                reason: RejectReason::NewObservationForbidden,
-            };
-        }
-    }
-
+    // Once identity has been resolved, an expired delivery cannot be revived by
+    // changing admission policy. Deadline semantics therefore precede the optional
+    // "new observation" policy gate.
     if now_ms >= delivery.expires_at_ms {
         return AdmissionOutcome::Expired {
             boundary: ExpiryBoundary::DeliveryDeadline,
+        };
+    }
+
+    if state.deliveries.contains_key(&delivery.logical_delivery_id) && !policy.allow_new_observation {
+        return AdmissionOutcome::Rejected {
+            reason: RejectReason::NewObservationForbidden,
         };
     }
 
@@ -545,6 +546,27 @@ mod tests {
         assert_eq!(
             decide(&state, &other_delivery, &observation, AdmissionPolicy::default(), 100),
             AdmissionOutcome::Conflict { identity_kind: ConflictKind::ObservationOwnership }
+        );
+    }
+
+    #[test]
+    fn expired_delivery_precedes_new_observation_policy() {
+        let (state, mut delivery, mut observation) = admitted_state();
+        delivery.expires_at_ms = 100;
+        observation.key.observation_id = Uuid::from_u128(9_999);
+        let policy = AdmissionPolicy::default();
+        assert_eq!(
+            decide(&state, &delivery, &observation, policy, 100),
+            AdmissionOutcome::Conflict { identity_kind: ConflictKind::DeliveryContract }
+        );
+
+        // The contract mismatch above is intentional: an expired request must
+        // retain identity precedence. Now expire the stored contract itself.
+        let mut expired_state = state.clone();
+        expired_state.deliveries.get_mut(&delivery.logical_delivery_id).unwrap().expires_at_ms = 100;
+        assert_eq!(
+            decide(&expired_state, &expired_state.deliveries[&delivery.logical_delivery_id], &observation, policy, 100),
+            AdmissionOutcome::Expired { boundary: ExpiryBoundary::DeliveryDeadline }
         );
     }
 
