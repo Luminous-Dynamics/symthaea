@@ -400,7 +400,7 @@ impl ObservationGraph {
             }
         }
 
-        let mut lineage_children: HashMap<&str, Vec<&str>> = HashMap::new();
+        let mut lineage_children: HashMap<String, Vec<String>> = HashMap::new();
         for observation in &self.observations {
             for parent_id in &observation.provenance.parent_observation_ids {
                 if !by_id.contains_key(parent_id.as_str()) {
@@ -409,15 +409,15 @@ impl ObservationGraph {
                     ));
                 }
                 lineage_children
-                    .entry(parent_id.as_str())
+                    .entry(parent_id.clone())
                     .or_default()
-                    .push(observation.id.as_str());
+                    .push(observation.id.clone());
             }
         }
 
         let mut visiting = HashSet::new();
         let mut visited = HashSet::new();
-        for id in by_id.keys().copied() {
+        for id in by_id.keys() {
             if !visited.contains(id) && Self::visit_lineage(id, &lineage_children, &mut visiting, &mut visited) {
                 return Err(ObservationValidationError::LineageCycle);
             }
@@ -439,13 +439,13 @@ impl ObservationGraph {
         Ok(())
     }
 
-    fn visit_lineage<'a>(
-        id: &'a str,
-        children: &HashMap<&'a str, Vec<&'a str>>,
-        visiting: &mut HashSet<&'a str>,
-        visited: &mut HashSet<&'a str>,
+    fn visit_lineage(
+        id: &str,
+        children: &HashMap<String, Vec<String>>,
+        visiting: &mut HashSet<String>,
+        visited: &mut HashSet<String>,
     ) -> bool {
-        if !visiting.insert(id) {
+        if !visiting.insert(id.to_string()) {
             return true;
         }
         if let Some(next) = children.get(id) {
@@ -496,6 +496,14 @@ pub enum ObservationValidationError {
     InvalidParentObservation,
     #[error("processing activity has invalid identifiers, fingerprints, or time bounds")]
     InvalidProcessingActivity,
+    #[error("observation ids must be unique within a closed graph")]
+    DuplicateObservationId,
+    #[error("parent observation is not present in the closed graph: {0}")]
+    MissingParentObservation(String),
+    #[error("observation parent lineage contains a cycle")]
+    LineageCycle,
+    #[error("relation endpoint is not present in the closed graph: {0}")]
+    MissingRelationEndpoint(String),
 }
 
 #[cfg(test)]
@@ -712,6 +720,90 @@ mod tests {
             activity.validate(),
             Err(ObservationValidationError::InvalidProcessingActivity)
         );
+    }
+
+    #[test]
+    fn graph_rejects_missing_parent() {
+        let mut child = fixture();
+        child.id = "child".into();
+        child.provenance.parent_observation_ids = vec!["missing".into()];
+        let graph = ObservationGraph {
+            observations: vec![child],
+            relations: vec![],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::MissingParentObservation("missing".into()))
+        );
+    }
+
+    #[test]
+    fn graph_rejects_duplicate_ids() {
+        let a = fixture();
+        let mut b = fixture();
+        b.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![a, b],
+            relations: vec![],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::DuplicateObservationId)
+        );
+    }
+
+    #[test]
+    fn graph_rejects_parent_cycle() {
+        let mut a = fixture();
+        let mut b = fixture();
+        a.id = "a".into();
+        b.id = "b".into();
+        a.provenance.parent_observation_ids = vec!["b".into()];
+        b.provenance.parent_observation_ids = vec!["a".into()];
+        let graph = ObservationGraph {
+            observations: vec![a, b],
+            relations: vec![],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::LineageCycle)
+        );
+    }
+
+    #[test]
+    fn graph_rejects_missing_relation_endpoint() {
+        let graph = ObservationGraph {
+            observations: vec![fixture()],
+            relations: vec![ObservationRelation {
+                source_observation_id: "obs-001".into(),
+                target_observation_id: "missing".into(),
+                kind: ObservationRelationKind::Supports,
+                independence: EvidenceIndependence::Unknown,
+            }],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::MissingRelationEndpoint("missing".into()))
+        );
+    }
+
+    #[test]
+    fn graph_accepts_valid_lineage_and_relation() {
+        let mut parent = fixture();
+        let mut child = fixture();
+        parent.id = "parent".into();
+        child.id = "child".into();
+        child.provenance.parent_observation_ids = vec!["parent".into()];
+        let graph = ObservationGraph {
+            observations: vec![parent, child],
+            relations: vec![ObservationRelation {
+                source_observation_id: "child".into(),
+                target_observation_id: "parent".into(),
+                kind: ObservationRelationKind::DerivedFrom,
+                independence: EvidenceIndependence::Derived,
+            }],
+        };
+        assert!(graph.validate().is_ok());
     }
 
     #[test]
