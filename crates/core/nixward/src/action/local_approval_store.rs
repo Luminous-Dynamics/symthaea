@@ -194,6 +194,11 @@ impl LocalApprovalRequestStoreV1 {
         Ok(ConsumedLocalApprovalDecisionV1 {
             request_id: submission.request_id.clone(),
             decision_evidence: decision,
+            projection_digest: record.projection_digest.clone(),
+            required_approval_profile: record.request.authority_profile_ref.clone(),
+            approver_evidence_ref: verified_peer.evidence_ref().clone(),
+            transport_instance_ref: verified_peer.audit_evidence().transport_instance_ref.clone(),
+            peer_observed_at_unix_ms: verified_peer.audit_evidence().observed_at_unix_ms,
             consumed_at_unix_ms: evaluation.evaluated_at().as_u64(),
         })
     }
@@ -284,6 +289,11 @@ pub enum PendingRequestCurrentnessV1 {
 pub struct ConsumedLocalApprovalDecisionV1 {
     request_id: String,
     decision_evidence: LocalNixApprovalDecisionV1,
+    projection_digest: String,
+    required_approval_profile: String,
+    approver_evidence_ref: super::approver_evidence::ApproverEvidenceRefV1,
+    transport_instance_ref: String,
+    peer_observed_at_unix_ms: u64,
     consumed_at_unix_ms: u64,
 }
 
@@ -300,6 +310,26 @@ impl ConsumedLocalApprovalDecisionV1 {
         &self.decision_evidence
     }
 
+    pub fn projection_digest(&self) -> &str {
+        &self.projection_digest
+    }
+
+    pub fn required_approval_profile(&self) -> &str {
+        &self.required_approval_profile
+    }
+
+    pub fn approver_evidence_ref(&self) -> &super::approver_evidence::ApproverEvidenceRefV1 {
+        &self.approver_evidence_ref
+    }
+
+    pub fn transport_instance_ref(&self) -> &str {
+        &self.transport_instance_ref
+    }
+
+    pub fn peer_observed_at(&self) -> UnixMillisV1 {
+        UnixMillisV1::new(self.peer_observed_at_unix_ms)
+    }
+
     pub fn consumed_at(&self) -> UnixMillisV1 {
         UnixMillisV1::new(self.consumed_at_unix_ms)
     }
@@ -310,6 +340,11 @@ impl std::fmt::Debug for ConsumedLocalApprovalDecisionV1 {
         f.debug_struct("ConsumedLocalApprovalDecisionV1")
             .field("request_id", &self.request_id)
             .field("decision", &self.decision_evidence.decision)
+            .field("projection_digest", &self.projection_digest)
+            .field("required_approval_profile", &self.required_approval_profile)
+            .field("approver_evidence_ref", &self.approver_evidence_ref)
+            .field("transport_instance_ref", &self.transport_instance_ref)
+            .field("peer_observed_at_unix_ms", &self.peer_observed_at_unix_ms)
             .field("consumed_at_unix_ms", &self.consumed_at_unix_ms)
             .finish_non_exhaustive()
     }
