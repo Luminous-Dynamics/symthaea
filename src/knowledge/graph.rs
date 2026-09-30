@@ -18,6 +18,7 @@ use symthaea_core::hdc::unified_hv::BinaryHV;
 use symthaea_epistemic_types::{
     MemoryKind, MemoryProvenance, ProvenanceRelation, ProvenanceRelationKind,
     ProvenanceValidationReport, ProvenanceValidationViolation,
+    ProvenanceView,
 };
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -425,6 +426,14 @@ impl EnhancedKnowledgeGraph {
 
     pub fn provenance_relations(&self) -> &[ProvenanceRelation] {
         &self.provenance_relations
+    }
+
+    /// Export a read-only provenance boundary for evidence/federation adapters.
+    ///
+    /// The returned view is a snapshot: mutating the cognitive graph afterwards cannot
+    /// mutate the view. The view carries lineage plus structural validation only.
+    pub fn provenance_view(&self) -> ProvenanceView {
+        ProvenanceView::from_relations(&self.provenance_relations)
     }
 
     /// Validate the current provenance snapshot without mutating graph state.
@@ -1201,6 +1210,36 @@ mod tests {
         graph.insert(make_encoding("claim c", 0.7), 3, None, false);
 
         assert_eq!(graph.provenance(id_a).unwrap().memory_id, memory_a);
+    }
+
+    #[test]
+    fn test_provenance_view_is_snapshot_and_non_mutating() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (a, _) = graph.insert(make_encoding("source", 0.8), 1, None, false);
+        let (b, _) = graph.insert(make_encoding("derived", 0.6), 2, None, false);
+        let source = graph.provenance(a).unwrap().memory_id;
+        let derived = graph.provenance(b).unwrap().memory_id;
+
+        graph.record_provenance_relation(ProvenanceRelation {
+            source_memory_id: derived.clone(),
+            target_memory_id: source.clone(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        }).unwrap();
+
+        let view = graph.provenance_view();
+        assert_eq!(view.relations_from(&derived).len(), 1);
+        assert!(view.is_structurally_conforming());
+
+        graph.record_provenance_relation(ProvenanceRelation {
+            source_memory_id: source,
+            target_memory_id: derived,
+            kind: ProvenanceRelationKind::Corroborates,
+            created_at: "cycle:3".into(),
+        }).unwrap();
+
+        assert_eq!(view.relations.len(), 1);
+        assert_eq!(graph.provenance_view().relations.len(), 2);
     }
 
     #[test]
