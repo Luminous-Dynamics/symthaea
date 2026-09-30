@@ -5,11 +5,13 @@
 //! may project a selected slice into another wire format, but they must not
 //! reconstruct the graph topology independently.
 
+use blake3::Hasher;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 pub const PROVENANCE_GRAPH_REVISION: &str = "sol-atlas-reference-graph@v1";
 pub const PROVENANCE_SLICE_TRAVERSAL_POLICY: &str = "outgoing-reachability-bfs@v1";
+const PROVENANCE_GRAPH_ENCODING_VERSION: &[u8] = b"symthaea:provenance-graph:v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum NodeKind {
@@ -62,6 +64,33 @@ pub enum ProvenanceGraphError {
 }
 
 impl ProvenanceGraph {
+    /// Deterministic identity commitment for the exact authoritative graph.
+    pub fn identity_digest(&self) -> String {
+        let mut hasher = Hasher::new();
+        hasher.update(PROVENANCE_GRAPH_ENCODING_VERSION);
+        let mut nodes = self.nodes.clone();
+        nodes.sort();
+        for node in nodes {
+            hasher.update(node.id.as_bytes());
+            hasher.update(&[0]);
+            hasher.update(format!("{:?}", node.kind).as_bytes());
+            hasher.update(&[0]);
+            if let Some(revision) = node.revision { hasher.update(revision.as_bytes()); }
+            hasher.update(&[0xff]);
+        }
+        let mut edges = self.edges.clone();
+        edges.sort();
+        for edge in edges {
+            hasher.update(edge.from.as_bytes());
+            hasher.update(&[0]);
+            hasher.update(edge.to.as_bytes());
+            hasher.update(&[0]);
+            hasher.update(format!("{:?}", edge.kind).as_bytes());
+            hasher.update(&[0xff]);
+        }
+        hasher.finalize().to_hex().to_string()
+    }
+
     /// Validate graph identity before any downstream projection consumes it.
     ///
     /// Node IDs are semantic identities, so duplicates are ambiguous. Edges
@@ -141,6 +170,7 @@ impl ProvenanceGraph {
         let boundary = SliceBoundaryCertificate {
             root,
             graph_revision: PROVENANCE_GRAPH_REVISION,
+            graph_digest: self.identity_digest(),
             traversal_policy: PROVENANCE_SLICE_TRAVERSAL_POLICY,
             graph_node_count: self.nodes.len(),
             graph_edge_count: self.edges.len(),
@@ -185,6 +215,8 @@ pub struct SliceBoundaryCertificate {
 impl SliceBoundaryCertificate {
     pub fn is_complete(&self) -> bool {
         self.frontier_exhausted
+            && self.graph_digest.len() == 64
+            && self.graph_digest.chars().all(|c| c.is_ascii_hexdigit())
             && self.graph_revision == PROVENANCE_GRAPH_REVISION
             && self.traversal_policy == PROVENANCE_SLICE_TRAVERSAL_POLICY
 
