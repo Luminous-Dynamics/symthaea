@@ -1,0 +1,24 @@
+name: cp-01-metrology
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "docs/engineering/data/cp-01-metrology-corpus-v1.json"
+      - "scripts/qualifiers/cp_01_metrology_qualifier.py"
+      - ".github/workflows/cp-01-metrology.yml"
+
+jobs:
+  qualifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Bind exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Run independent stdlib oracle
+        run: python3 scripts/qualifiers/cp_01_metrology_qualifier.py docs/engineering/data/cp-01-metrology-corpus-v1.json
+      - name: Verify qualified inputs stayed immutable
+        run: |
+          git diff --exit-code --             docs/engineering/data/cp-01-metrology-corpus-v1.json             scripts/qualifiers/cp_01_metrology_qualifier.py             .github/workflows/cp-01-metrology.yml
