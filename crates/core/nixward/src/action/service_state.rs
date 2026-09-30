@@ -922,6 +922,67 @@ CanReload=yes
     }
 
     #[test]
+    fn enablement_evidence_is_distinct_from_lifecycle_capabilities() {
+        let observed = state("active", "enabled", "running");
+        let enablement = NixServiceEnablementEvidenceV1::from_observed_state(&observed).unwrap();
+        let capabilities = NixServiceOperationCapabilitiesV1::from_observed_state(&observed, true, true, true).unwrap();
+
+        assert_eq!(enablement.unit(), "nginx.service");
+        assert_eq!(enablement.unit_file_state(), ServiceUnitFileStateV1::Enabled);
+        assert_eq!(enablement.pre_state_digest(), observed.digest().unwrap());
+        assert_ne!(enablement.digest().unwrap(), capabilities.digest().unwrap());
+    }
+
+    #[test]
+    fn enablement_state_changes_digest() {
+        let disabled = state("inactive", "disabled", "dead");
+        let enabled = state("inactive", "enabled", "dead");
+        let a = NixServiceEnablementEvidenceV1::from_observed_state(&disabled).unwrap();
+        let b = NixServiceEnablementEvidenceV1::from_observed_state(&enabled).unwrap();
+        assert_ne!(a.pre_state_digest(), b.pre_state_digest());
+        assert_ne!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn runtime_and_persistent_enablement_states_remain_distinct() {
+        let persistent = state("inactive", "enabled", "dead");
+        let runtime = state("inactive", "enabled-runtime", "dead");
+        let a = NixServiceEnablementEvidenceV1::from_observed_state(&persistent).unwrap();
+        let b = NixServiceEnablementEvidenceV1::from_observed_state(&runtime).unwrap();
+        assert_ne!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn masked_and_disabled_enablement_states_remain_distinct() {
+        let masked = state("inactive", "masked", "dead");
+        let disabled = state("inactive", "disabled", "dead");
+        let a = NixServiceEnablementEvidenceV1::from_observed_state(&masked).unwrap();
+        let b = NixServiceEnablementEvidenceV1::from_observed_state(&disabled).unwrap();
+        assert_ne!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn enablement_evidence_cannot_be_rebound_to_another_unit() {
+        let observed = state("inactive", "disabled", "dead");
+        let mut evidence = NixServiceEnablementEvidenceV1::from_observed_state(&observed).unwrap();
+        evidence.unit = "sshd.service".to_string();
+        assert_eq!(
+            evidence.validate_shape().unwrap_err(),
+            NixServiceStateErrorV1::InvalidPreStateDigest
+        );
+    }
+
+    #[test]
+    fn enablement_evidence_is_observation_not_operation_authorization() {
+        let observed = state("inactive", "disabled", "dead");
+        let evidence = NixServiceEnablementEvidenceV1::from_observed_state(&observed).unwrap();
+        let encoded = format!("{:?}", evidence);
+        assert!(!encoded.contains("executor"));
+        assert!(!encoded.contains("authorization"));
+        assert!(!encoded.contains("DispatchPermit"));
+    }
+
+    #[test]
     fn evidence_serialization_contains_no_executor_material() {
         let value = state("active", "enabled", "running");
         let encoded = serde_json::to_string(&value).unwrap();
