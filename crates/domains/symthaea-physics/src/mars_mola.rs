@@ -122,6 +122,28 @@ impl MolaMegdrProduct {
         })
     }
 
+    /// Open a product and require exact SHA-256 identities for both the
+    /// detached label and raster. This is the cryptographic provenance gate
+    /// intended for reproducible engineering runs.
+    pub fn open_verified(
+        label_path: impl AsRef<Path>,
+        img_path: impl AsRef<Path>,
+        expected_product_id: &str,
+        expected_revision: &str,
+        expected_label_sha256: &str,
+        expected_image_sha256: &str,
+    ) -> Result<Self, MolaError> {
+        let product = Self::open(
+            label_path,
+            img_path,
+            expected_product_id,
+            expected_revision,
+        )?;
+        verify_sha256("label", &product.label_sha256, expected_label_sha256)?;
+        verify_sha256("image", &product.image_sha256, expected_image_sha256)?;
+        Ok(product)
+    }
+
     /// Sample the nearest topography cell only when its companion counts map
     /// proves that the cell has at least one observation. No interpolation is
     /// performed and uncertainty must be supplied explicitly by the caller.
@@ -631,6 +653,25 @@ fn image_data_pointer(
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn verify_sha256(
+    kind: &str,
+    actual: &str,
+    expected: &str,
+) -> Result<(), MolaError> {
+    let expected = expected.trim().to_ascii_lowercase();
+    if expected.len() != 64 || !expected.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(MolaError::InvalidMetadata(format!(
+            "expected {kind} SHA-256 must be 64 hexadecimal characters"
+        )));
+    }
+    if actual != expected {
+        return Err(MolaError::InvalidMetadata(format!(
+            "{kind} SHA-256 mismatch: expected {expected}, got {actual}"
+        )));
+    }
+    Ok(())
 }
 
 fn sha256_file(path: &Path) -> Result<String, MolaError> {
@@ -1203,6 +1244,21 @@ mod tests {
             assert_eq!(metadata.line_offset, expected_record);
             assert_eq!(metadata.image_byte_offset, expected_byte);
         }
+    }
+
+    #[test]
+    fn sha256_verifier_is_strict_and_case_insensitive() {
+        let bytes = b"mola-provenance";
+        let actual = sha256_hex(bytes);
+        assert!(verify_sha256("fixture", &actual, &actual.to_ascii_uppercase()).is_ok());
+        assert!(matches!(
+            verify_sha256("fixture", &actual, "00"),
+            Err(MolaError::InvalidMetadata(_))
+        ));
+        assert!(matches!(
+            verify_sha256("fixture", &actual, &"0".repeat(64)),
+            Err(MolaError::InvalidMetadata(_))
+        ));
     }
 
     #[test]
