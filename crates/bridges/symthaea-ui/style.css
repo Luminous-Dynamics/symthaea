@@ -279,3 +279,84 @@ body {
         transition: none !important;
     }
 }
+
+
+/* Semantic history is a quiet event stream, not a telemetry dashboard. */
+.cognitive-timeline {
+    margin: 1.5rem 0;
+    padding: 0.9rem 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.timeline-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.timeline-header h2 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+    opacity: 0.7;
+}
+
+.timeline-count {
+    font-size: 0.72rem;
+    opacity: 0.45;
+}
+
+.timeline-list {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.65rem;
+}
+
+.timeline-event {
+    display: grid;
+    grid-template-columns: minmax(10rem, auto) auto 1fr;
+    align-items: baseline;
+    gap: 0.7rem;
+    padding: 0.35rem 0;
+    font-size: 0.78rem;
+}
+
+.timeline-kind {
+    opacity: 0.85;
+}
+
+.timeline-cycle,
+.timeline-evidence {
+    opacity: 0.45;
+}
+
+.timeline-evidence {
+    justify-self: end;
+}
+
+.timeline-empty {
+    margin: 0.4rem 0 0;
+    font-size: 0.78rem;
+    opacity: 0.45;
+}
+
+@media (max-width: 600px) {
+    .timeline-event {
+        grid-template-columns: 1fr auto;
+    }
+
+    .timeline-evidence {
+        grid-column: 1 / -1;
+        justify-self: start;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .timeline-event {
+        transition: none !important;
+    }
+}
