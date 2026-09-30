@@ -1502,11 +1502,18 @@ mod tests {
         std::fs::write(&path, label()).unwrap();
         let sample_label = label()
             .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 179.9")
-            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1");
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1")
+            .replace(
+                "MAP_TYPE = T",
+                "MAP_TYPE = T\n^IMAGE = (\"MEGT00N000HB.IMG\", 33 <BYTES>)",
+            );
         std::fs::write(&path, sample_label).unwrap();
-        let mut bytes = vec![0u8; 64];
-        bytes[18] = 0x03;
-        bytes[19] = 0xE8;
+        let mut bytes = vec![0u8; 96];
+        // The PDS byte pointer is 1-based: byte 33 => zero-based origin 32.
+        // The first sampled cell remains at the old row/sample offset 18,
+        // therefore its terrain bytes now begin at 32 + 18 = 50.
+        bytes[50] = 0x03;
+        bytes[51] = 0xE8;
         std::fs::write(&img, bytes).unwrap();
         let product = MolaMegdrProduct::open(&path, &img, "MEGT00N000HB", "pds4-v1").unwrap();
         let mut count_path = path.clone();
@@ -1518,10 +1525,15 @@ mod tests {
             .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1")
             .replace("MEGT00N000HB", "MEGC00N000HB")
             .replace("MAP_TYPE = T", "MAP_TYPE = C")
-            .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8");
+            .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8")
+            .replace(
+                "MAP_TYPE = C",
+                "MAP_TYPE = C\n^IMAGE = (\"MEGC00N000HB.IMG\", 33 <BYTES>)",
+            );
         std::fs::write(&count_path, count_label).unwrap();
-        let mut count_bytes = vec![0u8; 64];
-        count_bytes[17] = 1;
+        let mut count_bytes = vec![0u8; 96];
+        // The count byte uses the same detached byte origin: 32 + 17 = 49.
+        count_bytes[49] = 1;
         std::fs::write(&count_img, count_bytes).unwrap();
         let counts = MolaMegdrProduct::open(&count_path, &count_img, "MEGC00N000HB", "pds4-v1").unwrap();
         let sample = product.sample_nearest_with_count(&counts, 0.0, 179.984375, 3.0).unwrap();
