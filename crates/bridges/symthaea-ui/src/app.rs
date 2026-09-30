@@ -169,6 +169,9 @@ pub fn App() -> impl IntoView {
     let last_error = RwSignal::new(Option::<String>::None);
     let daemon_status = RwSignal::new(Option::<Value>::None);
     let events = RwSignal::new(Vec::<CognitiveEvent>::new());
+    // Pauses the presentation of the event stream, not the daemon itself.
+    // Incoming telemetry continues so resuming returns to current truth.
+    let timeline_paused = RwSignal::new(false);
     let semantic_announcement = RwSignal::new(String::new());
     let last_semantic_key = RwSignal::new(String::new());
 
@@ -461,12 +464,31 @@ pub fn App() -> impl IntoView {
 
             <section class="cognitive-timeline" aria-label="Cognitive timeline">
                 <div class="timeline-header">
-                    <h2>"recent events"</h2>
-                    <span class="timeline-count">{move || events.get().len().to_string()}</span>
+                    <div>
+                        <h2>"recent events"</h2>
+                        <span class="timeline-state">
+                            {move || if timeline_paused.get() { "paused view" } else { "live view" }}
+                        </span>
+                    </div>
+                    <div class="timeline-controls">
+                        <span class="timeline-count">{move || events.get().len().to_string()}</span>
+                        <button
+                            type="button"
+                            class="timeline-pause"
+                            aria-pressed=move || timeline_paused.get().to_string()
+                            on:click=move |_| timeline_paused.update(|paused| *paused = !*paused)
+                        >
+                            {move || if timeline_paused.get() { "resume" } else { "pause" }}
+                        </button>
+                    </div>
                 </div>
                 <div class="timeline-list" role="log" aria-live="off">
                     <For
-                        each=move || events.get().into_iter().rev().enumerate()
+                        each=move || if timeline_paused.get() {
+                            events.get_untracked().into_iter().rev().enumerate().collect::<Vec<_>>()
+                        } else {
+                            events.get().into_iter().rev().enumerate().collect::<Vec<_>>()
+                        }
                         key=|(i, event)| format!("{}-{}-{}", event.cycle, event.kind.label(), i)
                         children=move |(_, event)| {
                             view! {
