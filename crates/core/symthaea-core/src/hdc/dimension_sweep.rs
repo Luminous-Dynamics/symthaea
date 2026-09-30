@@ -16,7 +16,7 @@ use super::dimension_observatory::OBSERVATORY_DIMENSIONS;
 
 pub const DIMENSION_SWEEP_SCHEMA_VERSION: u32 = 1;
 pub const DIMENSION_SWEEP_DOMAIN: &[u8] = b"symthaea:hdc-dimension-sweep";
-pub const DEFAULT_SWEEP_SEED: u64 = 0xD1_M3_2026_u64;
+pub const DEFAULT_SWEEP_SEED: u64 = 0xD1E3_2026_u64;
 pub const DEFAULT_SAMPLES_PER_DIMENSION: u32 = 32;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
