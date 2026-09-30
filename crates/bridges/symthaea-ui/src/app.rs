@@ -485,7 +485,7 @@ pub fn App() -> impl IntoView {
                         } else {
                             events.get().into_iter().rev().enumerate().collect::<Vec<_>>()
                         }
-                        key=|(i, event)| format!("{}-{}-{}", event.cycle, event.kind.label(), i)
+                        key=|(_, event)| format!("{}-{}", event.cycle, event.kind.label())
                         children=move |(_, event)| {
                             view! {
                                 <div class="timeline-event">
