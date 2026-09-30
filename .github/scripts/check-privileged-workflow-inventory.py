@@ -190,6 +190,8 @@ def parse_workflow(path: Path) -> dict[str, Any]:
         "permissions": permissions,
         "third_party_actions": sorted(uses, key=lambda x: (x["uses"], x["sha"])),
     }
+    download_artifact = False
+    cache_modes: list[str] = []
     if event == "workflow_run":
         contract["trigger"]["workflows"] = events[event]["workflows"]
         source = "\n".join(lines)
@@ -243,7 +245,6 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                     f"{path}: artifact-consuming workflow_run must bind artifact access to runtime provenance: "
                     f"{missing_artifact_provenance}"
                 )
-        cache_modes = []
     for raw in lines:
         stripped = raw.strip()
         match = re.match(r"cache-mode:\s*(read|write|write-only|none)\s*$", stripped)
