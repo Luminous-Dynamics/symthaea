@@ -16,6 +16,7 @@ use super::trajectory_evidence::TrajectoryEvidenceRecord;
 
 pub const EVIDENCE_MANIFEST_SCHEMA_VERSION: u32 = 1;
 pub const EXPERIMENT_IDENTITY_PREFIX: &str = "sha256:";
+pub const EVIDENCE_MANIFEST_ARTIFACT_DOMAIN: &[u8] = b"symthaea:evidence-manifest";
 
 /// Artifact-level declaration of a semantic experiment identity.
 ///
@@ -112,6 +113,61 @@ impl EvidenceManifest {
     /// The declared digest is checked only after the semantic key has been
     /// independently derived from the source records. This makes the manifest
     /// identity a verifiable claim rather than caller-controlled identity.
+
+    /// Canonical bytes for the exact manifest artifact.
+    ///
+    /// This is deliberately separate from the experiment identity: changing a
+    /// referenced artifact, join declaration, or manifest schema changes the
+    /// artifact digest without changing the semantic experiment identity.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn push_field(bytes: &mut Vec<u8>, value: &[u8]) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value);
+        }
+
+        fn push_reference(bytes: &mut Vec<u8>, reference: &super::cost_quality_join::EvidenceReference) {
+            push_field(bytes, reference.kind.as_bytes());
+            bytes.extend_from_slice(&reference.schema_version.to_be_bytes());
+            push_field(bytes, reference.artifact_digest.as_bytes());
+            push_field(bytes, reference.artifact_id.as_bytes());
+        }
+
+        let mut bytes = Vec::with_capacity(1024);
+        bytes.extend_from_slice(EVIDENCE_MANIFEST_ARTIFACT_DOMAIN);
+        bytes.extend_from_slice(&self.schema_version.to_be_bytes());
+        bytes.extend_from_slice(&self.experiment_identity.schema_version.to_be_bytes());
+        push_field(&mut bytes, self.experiment_identity.digest.as_bytes());
+
+        let identity = &self.join.identity;
+        for field in [
+            identity.task.as_str(),
+            identity.scenario_set.as_str(),
+            identity.scenario_revision.as_str(),
+            identity.split.as_str(),
+            identity.protocol.as_str(),
+            identity.representation.as_str(),
+            identity.model_revision.as_str(),
+            identity.workload.as_str(),
+            identity.benchmark.as_str(),
+        ] {
+            push_field(&mut bytes, field.as_bytes());
+        }
+        bytes.extend_from_slice(&(identity.resolution as u64).to_be_bytes());
+        push_reference(&mut bytes, &self.join.trajectory);
+        push_reference(&mut bytes, &self.join.resource);
+        push_reference(&mut bytes, &self.join.performance);
+        push_reference(&mut bytes, &self.join.task_quality);
+        bytes
+    }
+
+    /// SHA-256 content identity of the exact manifest artifact.
+    pub fn artifact_digest(&self) -> String {
+        use sha2::{Digest, Sha256};
+
+        let digest = Sha256::digest(self.canonical_bytes());
+        digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
     pub fn validate_against_evidence(
         &self,
         task_quality: &TaskQualityEvidenceRecord,
@@ -208,6 +264,18 @@ mod tests {
             identity: JoinIdentity { task: key.task.clone(), scenario_set: key.scenario_set.clone(), scenario_revision: key.scenario_revision.clone(), split: key.split.clone(), protocol: key.protocol.clone(), resolution: key.resolution, representation: key.representation.clone(), model_revision: key.model_revision.clone(), workload: key.workload.clone(), benchmark: key.benchmark.clone() },
             trajectory: reference("trajectory"), resource: reference("resource"), performance: reference("performance"), task_quality: reference("task_quality"),
         }
+    }
+
+    #[test]
+    fn artifact_digest_changes_when_manifest_content_changes() {
+        let (task, performance, resource, trajectory) = evidence();
+        let key = derive_experiment_key(&task, &performance, &resource).unwrap();
+        let mut manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
+        let original = manifest.artifact_digest();
+        manifest.join.performance.artifact_id = "performance-v2".into();
+        assert_ne!(original, manifest.artifact_digest());
+        assert_eq!(manifest.experiment_identity.digest, EvidenceManifest::from_join_and_key(join(&key), &key).experiment_identity.digest);
+        manifest.validate_against_evidence(&task, &performance, &resource, &trajectory).unwrap();
     }
 
     #[test]
