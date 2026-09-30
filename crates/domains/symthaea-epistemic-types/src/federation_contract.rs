@@ -29,6 +29,18 @@ impl FederationDependency {
     }
 }
 
+/// Substrate-neutral validation classification for a federation adapter.
+///
+/// This mirrors the useful three-way boundary of definitive acceptance,
+/// definitive rejection, and dependency resolution without importing any
+/// substrate-specific validation type.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum FederationValidationOutcome {
+    Valid,
+    Invalid(String),
+    Unresolved(Vec<FederationDependency>),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FederatedClaim {
     pub schema_version: u16,
@@ -274,6 +286,27 @@ impl FederatedClaim {
     /// representation, while any digest-bearing mutation creates a different key.
     pub fn replay_key(&self) -> String {
         self.canonical_digest()
+    }
+
+    /// Classify an adapter's dependency-resolution result after applying the
+    /// substrate-neutral structural contract. Structural failure is definitive;
+    /// otherwise non-empty unresolved dependencies remain retryable/accountable.
+    pub fn validation_outcome<I>(&self, unresolved: I) -> FederationValidationOutcome
+    where
+        I: IntoIterator<Item = FederationDependency>,
+    {
+        if let Err(reason) = self.validate_structure() {
+            return FederationValidationOutcome::Invalid(reason.to_owned());
+        }
+
+        let mut dependencies: Vec<_> = unresolved.into_iter().collect();
+        dependencies.sort();
+        dependencies.dedup();
+        if dependencies.is_empty() {
+            FederationValidationOutcome::Valid
+        } else {
+            FederationValidationOutcome::Unresolved(dependencies)
+        }
     }
 
     pub fn is_admission_bound(
@@ -698,6 +731,29 @@ mod adversarial_contract_tests {
                 "derivation:z".to_string(),
                 "frontier:1".to_string(),
             ]
+        );
+    }
+
+    #[test]
+    fn validation_outcome_has_neutral_valid_invalid_unresolved_states() {
+        let claim = claim();
+        assert_eq!(
+            claim.validation_outcome(std::iter::empty()),
+            FederationValidationOutcome::Valid
+        );
+
+        assert_eq!(
+            claim.validation_outcome([FederationDependency::Frontier("frontier:1".into())]),
+            FederationValidationOutcome::Unresolved(vec![
+                FederationDependency::Frontier("frontier:1".into())
+            ])
+        );
+
+        let mut malformed = claim;
+        malformed.schema_version += 1;
+        assert_eq!(
+            malformed.validation_outcome(std::iter::empty()),
+            FederationValidationOutcome::Invalid("unsupported federated claim schema version".into())
         );
     }
 
