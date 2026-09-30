@@ -1257,11 +1257,11 @@ mod tests {
                 },
                 ExtensiveNode::Terminal {
                     state: DecisionStateId(1),
-                    payoffs: vec![1.0],
+                    payoffs: vec![1.0, 0.0],
                 },
                 ExtensiveNode::Terminal {
                     state: DecisionStateId(2),
-                    payoffs: vec![0.0],
+                    payoffs: vec![0.0, 0.0],
                 },
             ],
             information: info(),
