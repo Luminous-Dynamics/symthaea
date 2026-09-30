@@ -224,3 +224,35 @@ This also keeps model credibility concerns separate: verification asks whether t
 For digital twins, remaining discrepancy should not automatically be treated as parameter error. Model-form uncertainty can arise from abstraction and omitted physical processes, so a future calibration layer should be able to preserve residuals as unresolved/model-form discrepancy rather than forcing every residual into parameter updates. Recent digital-twin calibration research explicitly distinguishes model-form uncertainty from parameter uncertainty. See https://arxiv.org/abs/2609.10171.
 
 The current SWA-005 fixture is intentionally a deterministic laboratory fixture, not a claim of physical validation.
+
+## Validation freshness and revalidation frontier — SWA-006
+
+Validation evidence is immutable historical evidence. A later model or dependency revision must not rewrite the record that was produced under the earlier revision.
+
+SWA-006 therefore separates:
+
+1. **Historical validation evidence** — the exact evidence produced at a point in model history.
+2. **Dependency fingerprint** — model, parameter set, solver, scenario, dataset, uncertainty model, and context-of-use revisions used by that evidence.
+3. **Evidence freshness** — a derived view of whether that historical evidence remains applicable to the current dependency frontier.
+4. **Revalidation requirement** — the minimal reason and dependency change that must be addressed before relying on the evidence for the current revision.
+
+The important invariant is:
+
+**evidence can become stale without becoming historically false.**
+
+For example:
+
+- changing the model revision makes model-dependent evidence stale;
+- changing only the parameter set identifies a parameter-lineage change rather than silently classifying the residual as model-form error;
+- changing the uncertainty model invalidates the uncertainty characterization independently;
+- changing the context of use requires applicability reassessment;
+- changing the solver can require fresh verification/validation without mutating historical results;
+- incomplete provenance yields `Unknown`, never an implicit pass.
+
+The resulting flow is:
+
+`historical evidence -> dependency fingerprint -> current dependency comparison -> freshness -> revalidation frontier`
+
+The revalidation frontier is intentionally analogous to a build dependency graph: an upstream change propagates only to evidence that actually depends on that revision. This should eventually allow Sol Atlas to answer **which evidence must be regenerated, why, and which evidence remains applicable** without rewriting historical provenance.
+
+This is compatible with W3C PROV's distinction between entities, activities, agents, revisions, invalidation, and derivation. PROV explicitly treats revisions as new entities and supports provenance chains rather than mutable histories. See the W3C PROV Model Primer and PROV ontology.
