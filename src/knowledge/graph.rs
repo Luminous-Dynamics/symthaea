@@ -1248,7 +1248,7 @@ mod tests {
         assert_eq!(after.provenance_family.as_deref(), Some("source-family-1"));
     }
 
-    fn canonical_admission_rejects_empty_identity() {    #[test]
+    #[test]
     fn canonical_admission_receipt_binds_snapshot_context_without_evidence_weight() {
         let graph = EnhancedKnowledgeGraph::new(100);
         let receipt = CanonicalAdmissionReceipt::new(
