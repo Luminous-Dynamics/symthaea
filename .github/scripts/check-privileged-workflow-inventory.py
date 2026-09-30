@@ -54,6 +54,10 @@ def parse_workflow(path: Path) -> dict[str, Any]:
             top_keys[key] = i
     if "on" not in top_keys:
         raise InventoryError(f"{path}: missing top-level 'on' mapping")
+    on_line = KEY_RE.match(lines[top_keys["on"]].strip())
+    on_value = _strip_comment((on_line.group(2) if on_line else "") or "").strip()
+    if on_value and on_value not in {"{}", "{ }"}:
+        raise InventoryError(f"{path}: inline or ambiguous top-level 'on' syntax is unsupported")
 
     on_items, _ = _block(lines, top_keys["on"])
     events: dict[str, dict[str, Any]] = {}
@@ -69,9 +73,11 @@ def parse_workflow(path: Path) -> dict[str, Any]:
             raise InventoryError(f"{path}: duplicate event: {event}")
         events[event] = {"types": [], "workflows": []}
         event_lines[event] = next(i for i, raw in enumerate(lines) if _indent(raw) == 2 and raw.strip() == text)
-        value = _strip_comment(value or "")
+        value = _strip_comment(value or "").strip()
         if value.startswith("["):
             events[event]["types"] = _parse_inline_list(value)
+        elif value and value not in {"{}", "{ }"}:
+            raise InventoryError(f"{path}: inline or ambiguous trigger syntax is unsupported: {text}")
 
     for event, start in event_lines.items():
         nested, _ = _block(lines, start)
