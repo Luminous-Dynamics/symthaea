@@ -181,3 +181,23 @@ Build one deterministic fixture spanning a small building:
 This fixture should be the reference integration test before any real-world actuation work.
 
 Related: Symthaea issue #6624; Mycelix issue #3634.
+
+
+## 8. Boundary calibration against existing Mycelix primitives
+
+A deeper repository audit confirms that the workspace architecture should compose several existing Mycelix primitives rather than introduce a new generic consent or attribution stack:
+
+- mycelix-commons/zomes/boundary-contracts already models explicit, revocable boundaries with private terms and public status summaries. This is the natural consent/scope primitive for workspace interventions where a human or steward explicitly permits a class of action.
+- crates/mycelix-bridge-entry-types already provides schema-versioned BridgeEventEntry and BridgeQueryEntry for cross-cluster evidence/routing. A workspace decision can use the bridge event mechanism for durable lineage without turning an inference into policy.
+- mycelix-attribution UsageReceipt is specifically a dependency-usage attribution primitive. It must not be repurposed as a physical-workspace authorization or decision receipt merely because it is called a receipt.
+- Mycelix identity remains the actor-binding layer; governance remains the authorization/policy layer; Symthaea remains the inference/simulation layer.
+
+Therefore the intended boundary is:
+
+Symthaea evidence -> bridge/event projection -> identity-bound decision context -> explicit boundary/authorization -> physical actuation -> observed outcome
+
+A projection must preserve whether each field is a model-derived prediction, scenario assumption, observation, residual, or unresolved contradiction. Unsupported dimensions remain unknown rather than being synthesized into a composite score.
+
+### External digital-twin calibration
+
+The broader digital-twin ecosystem already demonstrates mature patterns for telemetry, thermal/energy simulation, spatial models, time-series replay, and 3D operational views. The differentiating research question here is not whether a building can be visualized or simulated; it is whether physical simulation can remain explicitly separated from consent, authorization, provenance, contestability, and institutional learning. The architecture therefore treats those as separate trust domains rather than adding another dashboard layer.
