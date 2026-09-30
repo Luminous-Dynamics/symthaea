@@ -252,13 +252,20 @@ mod tests {
 
     #[test]
     fn federated_claim_rejects_frontier_mismatch() {
-        let (mut r, validation) = receipt();
-        r.frontier_ref = Some("frontier:other".into());
+        let (r, validation) = receipt();
+        let mut claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            r.provenance_snapshot_digest.clone(),
+            validation,
+            r,
+        ).unwrap();
+        claim.frontier_ref = Some("frontier:other".into());
         assert_eq!(
-            FederatedClaim::new(
-                "claim:1", "canonical:1", "family:1", "author:1", "statement:1",
-                r.provenance_snapshot_digest.clone(), validation, r,
-            ).unwrap_err(),
+            claim.validate_structure().unwrap_err(),
             "claim frontier must match admission receipt"
         );
     }
