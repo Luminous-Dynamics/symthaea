@@ -256,6 +256,10 @@ pub struct ProcessingActivity {
     /// Observation IDs emitted by this activity.
     pub output_observation_ids: Vec<String>,
     /// Optional precise input-to-output derivation mappings.
+    ///
+    /// This is the compact core representation of qualified derivation.
+    /// Boundary adapters can expand each pair into explicit PROV Usage,
+    /// Generation, and Derivation records when event-level metadata exists.
     pub derivations: Vec<ProcessingDerivation>,
 }
 
@@ -981,6 +985,16 @@ mod tests {
             activity.validate(),
             Err(ObservationValidationError::InvalidProcessingActivity)
         );
+    }
+
+    #[test]
+    fn processing_derivation_without_events_remains_activity_level_provenance() {
+        let derivation = ProcessingDerivation {
+            input_observation_id: "input".into(),
+            output_observation_id: "output".into(),
+        };
+        assert_eq!(derivation.input_observation_id, "input");
+        assert_eq!(derivation.output_observation_id, "output");
     }
 
     #[test]
