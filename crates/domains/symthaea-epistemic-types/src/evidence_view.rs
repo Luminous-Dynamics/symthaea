@@ -144,6 +144,17 @@ impl EvidenceView {
         if representation_digests != receipt_representation_digests {
             return Err(EvidenceViewError::ReceiptMismatch);
         }
+        let mut projection_identity_digests = groups.iter()
+            .flat_map(|group| group.representations.iter().map(|candidate| {
+                (group.canonical_identity.clone(), candidate.projection.projection_identity_digest())
+            }))
+            .collect::<Vec<_>>();
+        projection_identity_digests.sort();
+        let mut receipt_projection_identity_digests = receipt.selected_projection_identity_digests.clone();
+        receipt_projection_identity_digests.sort();
+        if projection_identity_digests != receipt_projection_identity_digests {
+            return Err(EvidenceViewError::ReceiptMismatch);
+        }
         let mut view = Self {
             mode: receipt.mode,
             frontier_ref: receipt.frontier_ref.clone(),
@@ -259,6 +270,20 @@ mod tests {
             ],
         );
         receipt.selected_representation_digests.swap(0, 1);
+        receipt.receipt_digest = receipt.canonical_digest();
+        assert_eq!(
+            EvidenceView::from_retrieval(&groups, &receipt),
+            Err(EvidenceViewError::ReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn mismatched_projection_identity_binding_is_rejected() {
+        let (groups, mut receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "q", 5),
+            vec![candidate("claim:x", 0.7, "family:a")],
+        );
+        receipt.selected_projection_identity_digests[0].1 = "tampered-projection".into();
         receipt.receipt_digest = receipt.canonical_digest();
         assert_eq!(
             EvidenceView::from_retrieval(&groups, &receipt),
