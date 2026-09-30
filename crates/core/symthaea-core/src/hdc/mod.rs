@@ -108,6 +108,8 @@ pub mod cost_quality_join;
 pub mod evidence_identity;
 pub mod evidence_manifest;
 pub mod pareto_frontier;
+/// Deterministic synthetic task-quality/performance/resource sweep across HDC dimensions.
+pub mod dimension_task_harness;
 
 /// HDC dimensionality configuration for runtime selection
 ///
