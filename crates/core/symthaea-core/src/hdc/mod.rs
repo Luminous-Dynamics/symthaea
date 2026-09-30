@@ -376,6 +376,7 @@ pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnified
 pub mod config;
 pub mod dimension_observatory; // Centralized HDC configuration (runtime dimension management)
 pub mod dimension_sweep; // Deterministic empirical dimension-scaling evidence
+pub mod dimension_frontier; // Reference-only task/cost/quality frontier manifest
 pub mod projection;
 pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
 
