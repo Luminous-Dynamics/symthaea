@@ -7,10 +7,9 @@
 //! This module does not claim benchmark performance: `logical_bytes` is a
 //! declared operation-level accounting quantity, not measured memory traffic.
 
-use serde::{Deserialize, Serialize};
-
 use super::{
     resolution_space::HdcResolution,
+    operator_evidence_contract::{CONTINUOUS_F32_REPRESENTATION, OPERATOR_OPERATOR_EVIDENCE_SCHEMA_VERSION, QUALIFIED_STATUS},
     simd_continuous::{bind_simd, bundle_simd, dot_product_simd, norm_simd, similarity_simd},
 };
 
@@ -22,34 +21,13 @@ const EXTENDED_DIMS: &[usize] = &[16_384, 32_768, 65_536, 131_072, 262_144];
 const TOLERANCE_SCALAR: f64 = 1e-4;
 const TOLERANCE_VECTOR: f64 = 1e-5;
 
-/// One deterministic operator qualification observation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct OperatorEvidenceRecord {
-    pub schema_version: u32,
-    pub representation: &'static str,
-    pub resolution: usize,
-    pub operation: &'static str,
-    pub seed_a: u64,
-    pub seed_b: u64,
-    /// Scalar-oracle value. For vector-valued operations this is a deterministic
-    /// checksum (sum of elements), while max_abs_error is the fidelity metric.
-    pub scalar_reference: f64,
-    /// SIMD value using the same convention as scalar_reference.
-    pub simd_result: f64,
-    pub abs_error: f64,
-    pub relative_error: f64,
-    pub max_abs_error: f64,
-    pub max_relative_error: f64,
-    pub tolerance: f64,
-    pub logical_bytes: usize,
-    pub qualification_status: &'static str,
-}
+pub use super::operator_evidence_contract::{OperatorEvidenceRecord, OperatorEvidenceSummary};
 
 /// Generate the deterministic operator matrix used by the >64K evidence gate.
 ///
 /// The returned records are suitable for JSON serialization and downstream
 /// trajectory qualification. A failed record is retained rather than filtered
-/// out, so evidence consumers cannot mistake "missing" for "qualified".
+/// out, so evidence consumers cannot mistake "missing" for QUALIFIED_STATUS.
 pub fn generate_extended_resolution_evidence() -> Vec<OperatorEvidenceRecord> {
     let mut records = Vec::with_capacity(EXTENDED_DIMS.len() * 5);
 
@@ -155,7 +133,7 @@ pub fn qualify_operator_matrix(records: &[OperatorEvidenceRecord]) -> OperatorEv
             duplicate_records += 1;
         }
         if record.schema_version == EVIDENCE_SCHEMA_VERSION
-            && record.representation == "continuous_f32"
+            && record.representation == CONTINUOUS_F32_REPRESENTATION
             && record.qualification_status == "qualified"
         {
             qualified_records += 1;
