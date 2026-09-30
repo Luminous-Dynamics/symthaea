@@ -24,7 +24,8 @@ The inventory records:
 - third-party action pins;
 - trust guards and purpose;
 - migration/retirement target where applicable;
-- external event-policy attestation requirements.
+- external event-policy attestation requirements;
+- cross-workflow data-flow contract for `workflow_run` consumers, including upstream workflow identity, artifact consumption, artifact handling, cache influence, and privileged side effects.
 
 The inventory is **not authoritative by itself**. `.github/scripts/check-privileged-workflow-inventory.py` now discovers the repository's supported privileged trigger surfaces from the workflow tree and requires exact inventory coverage for the mechanically observable contract. An undocumented privileged trigger, stale inventory entry, trigger mismatch, permission mismatch, or action-pin mismatch fails closed.
 
@@ -41,7 +42,7 @@ The inventory and detector explicitly separate:
 
 This prevents a workflow with ordinary write permissions, such as a trusted deployment workflow, from being incorrectly classified solely because it has a write permission.
 
-The detector compares only mechanically observable fields: trigger/event configuration, workflow-run upstream workflow names, declared permissions, and pinned third-party action references. Human-purpose, guard, secret-consumption, and untrusted-code claims remain declarative evidence and are not silently inferred by the detector.
+The detector compares mechanically observable fields: trigger/event configuration, workflow-run upstream workflow names, declared permissions, pinned third-party action references, and the presence of artifact-download/cache-write override surfaces. For `workflow_run`, the inventory must additionally declare a cross-workflow data-flow contract. The detector fails closed when that contract is absent or inconsistent with the observed trigger/action surface. Human-purpose, guard, secret-consumption, and untrusted-code claims remain declarative evidence and are not silently inferred by the detector.
 
 ## External policy boundary
 
@@ -54,7 +55,10 @@ Accordingly, this ADR records the requirement for independent policy attestation
 The detector has a deterministic self-test covering:
 - valid `workflow_run` inventory;
 - trigger/activity mismatch;
-- stale inventory after privileged-trigger removal.
+- stale inventory after privileged-trigger removal;
+- missing cross-workflow data-flow contract;
+- false artifact-consumption declaration;
+- missing upstream workflow identity in the data-flow contract.
 
 The Workflow Syntax gate compiles changed `.github/scripts/*.py`, executes the detector self-test, validates the current privileged inventory, and JSON-parses changed `.github/*.json` files.
 
