@@ -17,6 +17,7 @@ use serde_json::Value;
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
+use crate::presentation::CognitiveState;
 
 const DEFAULT_GATEWAY: &str = "http://127.0.0.1:8090";
 
@@ -324,6 +325,32 @@ pub fn App() -> impl IntoView {
                 </div>
             </header>
 
+            <section class="cognitive-state" aria-label="Cognitive state">
+                {move || {
+                    let v = vitals.get();
+                    let state = CognitiveState::from_observation(
+                        ws_connected.get(),
+                        sending.get(),
+                        v.coherence,
+                        v.thermodynamic_load,
+                        v.reasoning_confidence,
+                    );
+                    view! {
+                        <div class="state-presence" role="status">
+                            <span class="state-mode">{state.mode.label()}</span>
+                            <span class="state-separator">" · "</span>
+                            <span class="state-presence-label">{state.presence.label()}</span>
+                        </div>
+                        <p class="state-description">
+                            {format!(
+                                "coherence {:.2} · load {:.2} · confidence {:.2}",
+                                state.coherence, state.thermodynamic_load, state.confidence
+                            )}
+                        </p>
+                    }
+                }}
+            </section>
+
             <section class="vitals">
                 <div class="orb-wrap">
                     <div class="orb"
@@ -340,7 +367,7 @@ pub fn App() -> impl IntoView {
                     ></div>
                 </div>
                 <dl class="readouts">
-                    <div><dt>"consciousness"</dt><dd>{move || format!("{:.1}%", vitals.get().consciousness_level * 100.0)}</dd></div>
+                    <div><dt>"integration measure"</dt><dd>{move || format!("{:.2}", vitals.get().consciousness_level)}</dd></div>
                     <div><dt>"valence"</dt><dd>{move || format!("{:+.2}", vitals.get().valence)}</dd></div>
                     <div><dt>"arousal"</dt><dd>{move || format!("{:.2}", vitals.get().arousal)}</dd></div>
                     <div><dt>"mood temp"</dt><dd>{move || format!("{:.2}", vitals.get().mood_temperature)}</dd></div>
