@@ -1768,6 +1768,11 @@ mod tests {
         let sample = product.sample_nearest_with_count(&counts, 0.0, 179.984375, 3.0).unwrap();
 
         assert_eq!(sample.quality, TerrainQuality::Missing);
+        assert_eq!(sample.source_grid_cell, Some((1, 1)));
+        assert_eq!(
+            sample.sampling_method,
+            TerrainSamplingMethod::NearestCellWithObservationCount
+        );
         assert!(sample.elevation_m.is_none());
         assert!(!sample.is_usable());
 
@@ -1822,6 +1827,11 @@ mod tests {
         let counts = MolaMegdrProduct::open(&count_path, &count_img, "MEGC00N000HB", "pds4-v1").unwrap();
         let sample = product.sample_nearest_with_count(&counts, 0.0, 179.984375, 3.0).unwrap();
         assert_eq!(sample.elevation_m, Some(1000.0));
+        assert_eq!(sample.source_grid_cell, Some((1, 1)));
+        assert_eq!(
+            sample.sampling_method,
+            TerrainSamplingMethod::NearestCellWithObservationCount
+        );
         assert!(sample.is_usable());
         let _ = std::fs::remove_file(count_path);
         let _ = std::fs::remove_file(count_img);
