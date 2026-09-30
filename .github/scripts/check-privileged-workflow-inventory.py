@@ -112,6 +112,10 @@ def parse_workflow(path: Path) -> dict[str, Any]:
 
     permissions: dict[str, Any] = {"top_level": {}, "jobs": {}}
     if "permissions" in top_keys:
+        permission_line = KEY_RE.match(lines[top_keys["permissions"]].strip())
+        permission_value = _strip_comment((permission_line.group(2) if permission_line else "") or "").strip()
+        if permission_value and permission_value not in {"{}", "{ }"}:
+            raise InventoryError(f"{path}: inline top-level permissions syntax is unsupported")
         items, _ = _block(lines, top_keys["permissions"])
         for indent, text in items:
             if indent == 2:
@@ -128,8 +132,11 @@ def parse_workflow(path: Path) -> dict[str, Any]:
             start = next(i for i, raw in enumerate(lines) if _indent(raw) == 2 and raw.strip() == job + ":")
             jb, _ = _block(lines, start)
             for indent, text in jb:
-                if indent == 4 and text == "permissions:":
-                    pstart = next(i for i, raw in enumerate(lines) if i > start and _indent(raw) == 4 and raw.strip() == "permissions:")
+                if indent == 4 and text.startswith("permissions:"):
+                    permission_value = _strip_comment(text.split(":", 1)[1]).strip()
+                    if permission_value and permission_value not in {"{}", "{ }"}:
+                        raise InventoryError(f"{path}: inline job permissions syntax is unsupported for {job}")
+                    pstart = next(i for i, raw in enumerate(lines) if i > start and _indent(raw) == 4 and raw.strip() == text)
                     pb, _ = _block(lines, pstart)
                     values = {}
                     for pi, pt in pb:
