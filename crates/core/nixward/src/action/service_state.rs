@@ -487,6 +487,41 @@ CanReload=no
     }
 
     #[test]
+    fn capability_facts_change_digest_without_changing_pre_state_digest() {
+        let state = state("active", "enabled", "running");
+        let a = NixServiceOperationCapabilitiesV1::from_observed_state(&state, true, true, true).unwrap();
+        let b = NixServiceOperationCapabilitiesV1::from_observed_state(&state, true, false, true).unwrap();
+        assert_eq!(a.pre_state_digest(), b.pre_state_digest());
+        assert_ne!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn capability_binding_changes_when_pre_state_changes() {
+        let active = state("active", "enabled", "running");
+        let failed = state("failed", "enabled", "running");
+        let a = NixServiceOperationCapabilitiesV1::from_observed_state(&active, true, true, true).unwrap();
+        let b = NixServiceOperationCapabilitiesV1::from_observed_state(&failed, true, true, true).unwrap();
+        assert_ne!(a.pre_state_digest(), b.pre_state_digest());
+        assert_ne!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn legacy_state_parser_does_not_accept_capability_fields() {
+        let error = NixServiceObservedStateV1::parse_systemd_properties(
+            "nginx",
+            "Id=nginx.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+",
+        )
+        .unwrap_err();
+        assert_eq!(error, NixServiceStateErrorV1::UnexpectedProperty);
+    }
+
+    #[test]
     fn rejects_unknown_or_missing_operation_capability_values() {
         assert_eq!(
             NixServiceObservedStateV1::parse_systemd_observation(
