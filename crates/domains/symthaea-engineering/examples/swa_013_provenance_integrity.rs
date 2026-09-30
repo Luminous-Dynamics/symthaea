@@ -52,6 +52,7 @@ pub struct Edge {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum IntegrityError {
+    EmptyNodeId,
     DuplicateNodeIdentity { id: String },
     ConflictingDependencyRevision {
         dependency_key: String,
@@ -113,7 +114,7 @@ impl ProvenanceGraph {
 
         for node in &self.nodes {
             if node.id.is_empty() {
-                errors.insert(IntegrityError::EmptyClaimId);
+                errors.insert(IntegrityError::EmptyNodeId);
             }
             if nodes_by_id.insert(node.id.clone(), node).is_some() {
                 errors.insert(IntegrityError::DuplicateNodeIdentity { id: node.id.clone() });
@@ -238,19 +239,22 @@ fn required_dependencies(
     nodes: &BTreeMap<String, &Node>,
 ) -> BTreeSet<NodeKind> {
     let mut required = BTreeSet::new();
-    let outgoing = edges.iter().filter(|edge| {
-        edge.from == claim.id
-            && matches!(
-                edge.kind,
-                EdgeKind::DerivedFrom
-            )
+    let outgoing = edges.iter().any(|edge| {
+        edge.from == claim.id && edge.kind == EdgeKind::DerivedFrom
     });
 
-    // Claims in this fixture must have evidence. The concrete evidence graph
-    // then supplies the prediction/model/parameter/scenario/dataset/context
-    // dependencies reachable from that evidence.
-    if outgoing.any(|edge| edge.kind == EdgeKind::DerivedFrom) {
-        required.insert(NodeKind::Evidence);
+    // The SWA reference claim is a prediction-validation claim. Its minimum
+    // reproducible dependency closure is explicit rather than inferred from
+    // whichever nodes happen to be reachable today.
+    if outgoing {
+        required.extend([
+            NodeKind::Evidence,
+            NodeKind::Prediction,
+            NodeKind::Model,
+            NodeKind::Parameters,
+            NodeKind::Scenario,
+            NodeKind::Dataset,
+        ]);
     }
 
     let _ = nodes;
@@ -362,8 +366,26 @@ mod tests {
             ],
             certificates: vec![CompletenessCertificate {
                 claim_id: "claim-001".into(),
-                required: [NodeKind::Evidence].into_iter().collect(),
-                observed: [NodeKind::Evidence].into_iter().collect(),
+                required: [
+                    NodeKind::Evidence,
+                    NodeKind::Prediction,
+                    NodeKind::Model,
+                    NodeKind::Parameters,
+                    NodeKind::Scenario,
+                    NodeKind::Dataset,
+                ]
+                .into_iter()
+                .collect(),
+                observed: [
+                    NodeKind::Evidence,
+                    NodeKind::Prediction,
+                    NodeKind::Model,
+                    NodeKind::Parameters,
+                    NodeKind::Scenario,
+                    NodeKind::Dataset,
+                ]
+                .into_iter()
+                .collect(),
             }],
         }
     }
