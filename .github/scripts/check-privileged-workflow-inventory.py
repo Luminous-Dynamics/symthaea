@@ -192,6 +192,35 @@ def parse_workflow(path: Path) -> dict[str, Any]:
     }
     if event == "workflow_run":
         contract["trigger"]["workflows"] = events[event]["workflows"]
+        source = "\n".join(lines)
+        required_provenance_fragments = (
+            "run.repository?.full_name",
+            "run.name",
+            "run.head_branch",
+            "run.head_sha",
+            "run.conclusion",
+            "run.id",
+            "run.run_attempt",
+        )
+        missing_provenance_fragments = [
+            fragment for fragment in required_provenance_fragments
+            if fragment not in source
+        ]
+        if missing_provenance_fragments:
+            raise InventoryError(
+                f"{path}: workflow_run must explicitly bind runtime provenance fields: "
+                f"{missing_provenance_fragments}"
+            )
+        if "run.repository?.full_name !== expectedRepository" not in source:
+            raise InventoryError(f"{path}: workflow_run repository identity guard is missing")
+        if "run.name !== expectedWorkflowName" not in source:
+            raise InventoryError(f"{path}: workflow_run workflow identity guard is missing")
+        if "run.head_branch !== 'main'" not in source:
+            raise InventoryError(f"{path}: workflow_run main-branch guard is missing")
+        if "run.head_sha !== subject" not in source:
+            raise InventoryError(f"{path}: workflow_run subject SHA guard is missing")
+        if "!run.id || !run.run_attempt" not in source:
+            raise InventoryError(f"{path}: workflow_run run identity guard is missing")
         download_artifact = any(
             "actions/download-artifact@" in raw.strip()
             for raw in lines
@@ -309,6 +338,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567
+        env:
+          EXPECTED_REPOSITORY: Luminous-Dynamics/symthaea
+          EXPECTED_WORKFLOW_NAME: Trusted upstream
+          EXPECTED_SUBJECT: 0123456789abcdef0123456789abcdef01234567
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const expectedRepository = process.env.EXPECTED_REPOSITORY;
+            const expectedWorkflowName = process.env.EXPECTED_WORKFLOW_NAME;
+            const subject = process.env.EXPECTED_SUBJECT;
+            if (run.repository?.full_name !== expectedRepository) throw new Error('repository identity mismatch');
+            if (run.name !== expectedWorkflowName) throw new Error('workflow identity mismatch');
+            if (run.head_branch !== 'main') throw new Error('branch mismatch');
+            if (run.head_sha !== subject) throw new Error('subject mismatch');
+            if (!run.id || !run.run_attempt) throw new Error('run identity incomplete');
+            if (run.conclusion !== 'success') throw new Error('conclusion mismatch');
 """, encoding="utf-8")
         observed = parse_workflow(wf)["contract"]
         assert observed["trigger"] == {"event": "workflow_run", "types": ["completed"], "workflows": ["Trusted upstream"]}
