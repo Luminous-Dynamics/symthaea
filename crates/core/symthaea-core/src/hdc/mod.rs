@@ -89,6 +89,10 @@ pub mod resolution_space;
 /// Research-only resource admissibility separate from mathematical resolution validity.
 pub mod resolution_budget;
 
+/// Machine-readable scalar/SIMD operator conformance evidence for research qualification.
+#[cfg(feature = "simd")]
+pub mod operator_evidence;
+
 /// HDC dimensionality configuration for runtime selection
 ///
 /// Supports both predefined tiers and custom arbitrary dimensions.
