@@ -25,6 +25,35 @@ use symthaea_epistemic_types::{
 /// Unique fact identifier
 pub type FactId = u64;
 
+/// Opaque capability representing an explicit canonical-memory admission.
+///
+/// The fields are intentionally private so retrieval/search code cannot manufacture
+/// an admission merely by constructing a provenance envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanonicalAdmission {
+    canonical_identity: String,
+    provenance_family: Option<String>,
+}
+
+impl CanonicalAdmission {
+    pub fn new(
+        canonical_identity: impl Into<String>,
+        provenance_family: Option<String>,
+    ) -> Result<Self, &'static str> {
+        let canonical_identity = canonical_identity.into();
+        if canonical_identity.trim().is_empty() {
+            return Err("canonical identity must be non-empty");
+        }
+        if provenance_family
+            .as_deref()
+            .is_some_and(|family| family.trim().is_empty())
+        {
+            return Err("provenance family must be non-empty when present");
+        }
+        Ok(Self { canonical_identity, provenance_family })
+    }
+}
+
 /// A fact stored in the knowledge graph with temporal metadata
 #[derive(Debug, Clone)]
 pub struct TemporalFact {
@@ -350,17 +379,27 @@ impl EnhancedKnowledgeGraph {
         std::mem::take(&mut self.pending_contradictions)
     }
 
-    /// Attach canonical/provenance identity to an existing local fact without changing its retrieval ID.
-    /// This is an explicit admission-boundary operation; retrieval itself never creates identity.
-    pub fn attach_provenance(
+    /// Admit a canonical identity into an opaque capability.
+    /// This is the sole construction path for the capability accepted by
+    /// attach_admitted_provenance; retrieval and HDC similarity do not create it.
+    pub fn admit_canonical_identity(
+        &self,
+        canonical_identity: impl Into<String>,
+        provenance_family: Option<String>,
+    ) -> Result<CanonicalAdmission, &'static str> {
+        CanonicalAdmission::new(canonical_identity, provenance_family)
+    }
+
+    /// Attach an explicitly admitted canonical/provenance identity to a local fact.
+    /// The retrieval handle remains unchanged. No confidence or evidence score is modified.
+    pub fn attach_admitted_provenance(
         &mut self,
         id: FactId,
-        canonical_identity: Option<String>,
-        provenance_family: Option<String>,
+        admission: CanonicalAdmission,
     ) -> bool {
         if let Some(fact) = self.facts.get_mut(&id) {
-            fact.canonical_identity = canonical_identity;
-            fact.provenance_family = provenance_family;
+            fact.canonical_identity = Some(admission.canonical_identity);
+            fact.provenance_family = admission.provenance_family;
             true
         } else {
             false
@@ -1127,14 +1166,29 @@ mod tests {
         let _ = graph.search(&query, 1, 2);
         assert!(graph.provenance(id).unwrap().canonical_identity.is_none());
 
-        assert!(graph.attach_provenance(
-            id,
-            Some("canonical:claim-1".into()),
-            Some("source-family-1".into()),
-        ));
+        let admission = graph
+            .admit_canonical_identity("canonical:claim-1", Some("source-family-1".into()))
+            .unwrap();
+        assert!(graph.attach_admitted_provenance(id, admission));
         let after = graph.provenance(id).unwrap();
         assert_eq!(after.canonical_identity.as_deref(), Some("canonical:claim-1"));
         assert_eq!(after.provenance_family.as_deref(), Some("source-family-1"));
+    }
+
+    #[test]
+    fn canonical_admission_rejects_empty_identity() {
+        let graph = EnhancedKnowledgeGraph::new(100);
+        assert_eq!(graph.admit_canonical_identity("  ", None).unwrap_err(), "canonical identity must be non-empty");
+        assert_eq!(graph.admit_canonical_identity("canonical:1", Some(" ".into())).unwrap_err(), "provenance family must be non-empty when present");
+    }
+
+    #[test]
+    fn retrieval_cannot_supply_canonical_admission_capability() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (id, _) = graph.insert(make_encoding("retrieval-only", 0.8), 1, None, false);
+        let query = graph.get_fact(id).unwrap().encoding.vector.clone();
+        let _ = graph.search(&query, 1, 2);
+        assert!(graph.provenance(id).unwrap().canonical_identity.is_none());
     }
 
     #[test]
