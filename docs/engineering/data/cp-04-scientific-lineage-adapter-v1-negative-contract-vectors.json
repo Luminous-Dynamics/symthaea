@@ -63,6 +63,33 @@
       "expected_validate": "accept",
       "expected_source_binding": "reject",
       "first_boundary": "source-binding"
+    },
+    {
+      "id": "identity-content-digest-tamper",
+      "mutation_path": "nodes[0].identity.content_digest",
+      "mutation_value": "c",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
+    },
+    {
+      "id": "endpoint-target-tamper",
+      "mutation_path": "edges[0].target_identity_digest",
+      "mutation_value": "3",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
+    },
+    {
+      "id": "relation-kind-tamper",
+      "mutation_path": "edges[0].edge_type",
+      "mutation_value": "implements",
+      "digest_strategy": "unchanged_artifact_digest",
+      "expected_validate": "reject",
+      "expected_source_binding": "reject",
+      "first_boundary": "artifact-integrity"
     }
   ]
 }
