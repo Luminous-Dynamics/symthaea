@@ -1027,6 +1027,95 @@ mod tests {
     }
 
     #[test]
+    fn processing_derivation_accepts_precise_lineage() {
+        let mut input = fixture();
+        input.id = "input".into();
+        let mut output = fixture();
+        output.id = "output".into();
+        output.provenance.parent_observation_ids = vec!["input".into()];
+        output.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into()],
+            derivations: vec![ProcessingDerivation {
+                input_observation_id: "input".into(),
+                output_observation_id: "output".into(),
+            }],
+        });
+        let graph = ObservationGraph { observations: vec![input, output], relations: vec![] };
+        assert!(graph.validate().is_ok());
+    }
+
+    #[test]
+    fn processing_derivation_rejects_duplicate_edges() {
+        let mut output = fixture();
+        output.id = "output".into();
+        output.provenance.parent_observation_ids = vec!["input".into()];
+        output.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into()],
+            derivations: vec![
+                ProcessingDerivation {
+                    input_observation_id: "input".into(),
+                    output_observation_id: "output".into(),
+                },
+                ProcessingDerivation {
+                    input_observation_id: "input".into(),
+                    output_observation_id: "output".into(),
+                },
+            ],
+        });
+        let mut input = fixture();
+        input.id = "input".into();
+        let graph = ObservationGraph { observations: vec![input, output], relations: vec![] };
+        assert_eq!(graph.validate(), Err(ObservationValidationError::DuplicateProcessingDerivation));
+    }
+
+    #[test]
+    fn processing_derivation_order_is_not_execution_identity() {
+        let mut first = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input-a".into(), "input-b".into()],
+            output_observation_ids: vec!["output-a".into(), "output-b".into()],
+            derivations: vec![
+                ProcessingDerivation {
+                    input_observation_id: "input-a".into(),
+                    output_observation_id: "output-a".into(),
+                },
+                ProcessingDerivation {
+                    input_observation_id: "input-b".into(),
+                    output_observation_id: "output-b".into(),
+                },
+            ],
+        };
+        let expected = first.compute_execution_fingerprint().unwrap();
+        first.derivations.reverse();
+        assert_eq!(expected, first.compute_execution_fingerprint().unwrap());
+    }
+
+    #[test]
     fn processing_activity_execution_fingerprint_is_deterministic() {
         let activity = ProcessingActivity {
             activity_id: "run-001".into(),
