@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Identity scope for an observation. IDs are only unique within this scope.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ObservationKey {
     pub namespace: String,
     pub observation_id: Uuid,
