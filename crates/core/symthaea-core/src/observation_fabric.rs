@@ -483,10 +483,15 @@ pub enum IndependenceBasis {
 /// that the observations are substantively true or independent in reality.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndependenceAssessment {
+    pub source_observation_id: String,
+    pub target_observation_id: String,
     pub classification: EvidenceIndependence,
     pub basis: IndependenceBasis,
     pub examined_observation_ids: Vec<String>,
     pub verifier_version: &'static str,
+    /// BLAKE3 commitment to the assessed pair, scope, classification, basis,
+    /// and verifier version. This is an assessment fingerprint, not a truth claim.
+    pub assessment_fingerprint: String,
 }
 
 impl IndependenceAssessment {
@@ -608,16 +613,45 @@ impl ObservationGraph {
                 target_observation_id.to_string(),
             ))?;
 
-        let examined_observation_ids = self
+        let mut examined_observation_ids = self
             .observations
             .iter()
             .map(|observation| observation.id.clone())
             .collect::<Vec<_>>();
-        let assessment = |classification, basis| IndependenceAssessment {
-            classification,
-            basis,
-            examined_observation_ids: examined_observation_ids.clone(),
-            verifier_version: IndependenceAssessment::VERIFIER_VERSION,
+        examined_observation_ids.sort();
+        let assessment = |classification, basis| {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(b"symthaea:observation-independence-assessment:v1\n");
+            write_canonical_string(
+                &mut hasher,
+                source_observation_id,
+            );
+            write_canonical_string(
+                &mut hasher,
+                target_observation_id,
+            );
+            write_canonical_string_vec(&mut hasher, &examined_observation_ids);
+            write_canonical_string(
+                &mut hasher,
+                IndependenceAssessment::VERIFIER_VERSION,
+            );
+            write_canonical_string(
+                &mut hasher,
+                &format!("{classification:?}"),
+            );
+            write_canonical_string(
+                &mut hasher,
+                &format!("{basis:?}"),
+            );
+            IndependenceAssessment {
+                source_observation_id: source_observation_id.to_string(),
+                target_observation_id: target_observation_id.to_string(),
+                classification,
+                basis,
+                examined_observation_ids: examined_observation_ids.clone(),
+                verifier_version: IndependenceAssessment::VERIFIER_VERSION,
+                assessment_fingerprint: hasher.finalize().to_hex().to_string(),
+            }
         };
 
         if source.provenance.source.sensor_id == target.provenance.source.sensor_id {
@@ -1675,10 +1709,14 @@ mod tests {
         }
         .assess_independence_detailed("obs-001", "obs-002")
         .expect("assessment");
+        assert_eq!(assessment.source_observation_id, "obs-001");
+        assert_eq!(assessment.target_observation_id, "obs-002");
         assert_eq!(assessment.classification, EvidenceIndependence::VerifiedIndependent);
         assert_eq!(assessment.basis, IndependenceBasis::NoSharedProvenance);
         assert_eq!(assessment.examined_observation_ids, vec!["obs-001", "obs-002"]);
         assert_eq!(assessment.verifier_version, "observation-fabric-independence-v1");
+        assert_eq!(assessment.assessment_fingerprint.len(), 64);
+        assert!(assessment.assessment_fingerprint.bytes().all(|b| b.is_ascii_hexdigit()));
     }
 
     #[test]
