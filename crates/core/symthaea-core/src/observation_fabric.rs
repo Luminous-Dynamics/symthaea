@@ -447,7 +447,8 @@ impl Observation {
 
 /// Directed relationship between two observations in the evidence graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ObservationRelationKind {    /// The source observation provides positive evidence for the target.
+pub enum ObservationRelationKind {
+    /// The source observation provides positive evidence for the target.
     Supports,
     /// The source observation provides evidence against the target.
     Contradicts,
@@ -528,7 +529,8 @@ impl ObservationRelation {
             return Err(ObservationValidationError::DerivedRelationIndependenceMismatch);
         }
         if matches!(self.kind, ObservationRelationKind::Corroborates)
-            && matches!(self.independence, EvidenceIndependence::Derived)        {
+            && matches!(self.independence, EvidenceIndependence::Derived)
+        {
             return Err(ObservationValidationError::CorroborationDerivedMismatch);
         }
         Ok(())
