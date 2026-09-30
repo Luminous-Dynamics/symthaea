@@ -426,10 +426,55 @@ impl ExtensiveGame {
     /// Verify that every decision state has the same legal-action *set* as
     /// its information-set peers. The current IR represents availability as
     /// a common finite action vocabulary; ordering is not semantic.
+    /// Validate that every decision node exposes exactly the legal-action set
+    /// declared by its information structure. Action ordering is not semantic.
+    ///
+    /// This focused check is useful to callers that want to validate action
+    /// availability without invoking the full extensive-form reachability and
+    /// transition checks performed by ExtensiveGame::validate.
     pub fn validate_action_availability(&self) -> Result<(), ExtensiveGameError> {
         self.information
             .validate()
-            .map_err(ExtensiveGameError::InformationStructure)
+            .map_err(ExtensiveGameError::InformationStructure)?;
+
+        for node in &self.nodes {
+            let ExtensiveNode::Decision {
+                state,
+                actions,
+                ..
+            } = node else {
+                continue;
+            };
+
+            let decision_state = self
+                .information
+                .state(*state)
+                .ok_or(ExtensiveGameError::DecisionStateMissingFromInformation(*state))?;
+
+            if actions.is_empty() {
+                return Err(ExtensiveGameError::NoActions(*state));
+            }
+
+            let mut action_ids: Vec<_> = actions.iter().map(|action| action.action).collect();
+            let mut legal_actions = decision_state.legal_actions.clone();
+            action_ids.sort_unstable();
+            legal_actions.sort_unstable();
+
+            if action_ids != legal_actions {
+                return Err(ExtensiveGameError::DecisionActionsMismatch(*state));
+            }
+
+            for (i, action) in actions.iter().enumerate() {
+                if actions[..i].iter().any(|prior| prior.action == action.action) {
+                    return Err(ExtensiveGameError::DuplicateAction {
+                        node: *state,
+                        action: action.action,
+                    });
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Verify that a semantic information encoder agrees with the declared partition.
@@ -829,6 +874,46 @@ mod tests {
         assert!(game.validate().is_ok());
     }
 
+
+    #[test]
+    fn focused_action_availability_validation_rejects_mismatch() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(0),
+                            next: DecisionStateId(1),
+                            visibility: EventVisibility::Public,
+                        },
+                        Transition {
+                            action: ActionId(2),
+                            next: DecisionStateId(2),
+                            visibility: EventVisibility::Public,
+                        },
+                    ],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(1),
+                    payoffs: vec![1.0],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(2),
+                    payoffs: vec![0.0],
+                },
+            ],
+            information: info(),
+            observations: HashMap::new(),
+        };
+
+        assert_eq!(
+            game.validate_action_availability(),
+            Err(ExtensiveGameError::DecisionActionsMismatch(DecisionStateId(0)))
+        );
+    }
 
     #[test]
     fn rejects_decision_actions_that_disagree_with_information_set() {
