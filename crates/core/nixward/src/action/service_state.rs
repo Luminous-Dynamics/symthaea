@@ -197,11 +197,15 @@ pub enum ServiceUnitFileStateV1 {
     EnabledRuntime,
     Linked,
     LinkedRuntime,
+    Alias,
     Masked,
     MaskedRuntime,
     Static,
     Disabled,
-    Invalid,
+    Indirect,
+    Generated,
+    Transient,
+    Bad,
 }
 
 impl ServiceUnitFileStateV1 {
@@ -211,11 +215,15 @@ impl ServiceUnitFileStateV1 {
             "enabled-runtime" => Ok(Self::EnabledRuntime),
             "linked" => Ok(Self::Linked),
             "linked-runtime" => Ok(Self::LinkedRuntime),
+            "alias" => Ok(Self::Alias),
             "masked" => Ok(Self::Masked),
             "masked-runtime" => Ok(Self::MaskedRuntime),
             "static" => Ok(Self::Static),
             "disabled" => Ok(Self::Disabled),
-            "invalid" => Ok(Self::Invalid),
+            "indirect" => Ok(Self::Indirect),
+            "generated" => Ok(Self::Generated),
+            "transient" => Ok(Self::Transient),
+            "bad" => Ok(Self::Bad),
             _ => Err(NixServiceStateErrorV1::UnknownUnitFileState),
         }
     }
@@ -226,11 +234,15 @@ impl ServiceUnitFileStateV1 {
             Self::EnabledRuntime => 1,
             Self::Linked => 2,
             Self::LinkedRuntime => 3,
-            Self::Masked => 4,
-            Self::MaskedRuntime => 5,
-            Self::Static => 6,
-            Self::Disabled => 7,
-            Self::Invalid => 8,
+            Self::Alias => 4,
+            Self::Masked => 5,
+            Self::MaskedRuntime => 6,
+            Self::Static => 7,
+            Self::Disabled => 8,
+            Self::Indirect => 9,
+            Self::Generated => 10,
+            Self::Transient => 11,
+            Self::Bad => 12,
         }
     }
 }
@@ -810,11 +822,57 @@ CanReload=yes
     }
 
     #[test]
-    fn unit_file_state_rejects_is_enabled_only_indirect_vocabulary() {
-        assert_eq!(
-            ServiceUnitFileStateV1::parse("indirect").unwrap_err(),
-            NixServiceStateErrorV1::UnknownUnitFileState
-        );
+    fn parses_full_current_systemd_unit_file_state_vocabulary() {
+        let cases = [
+            ("enabled", ServiceUnitFileStateV1::Enabled),
+            ("enabled-runtime", ServiceUnitFileStateV1::EnabledRuntime),
+            ("linked", ServiceUnitFileStateV1::Linked),
+            ("linked-runtime", ServiceUnitFileStateV1::LinkedRuntime),
+            ("alias", ServiceUnitFileStateV1::Alias),
+            ("masked", ServiceUnitFileStateV1::Masked),
+            ("masked-runtime", ServiceUnitFileStateV1::MaskedRuntime),
+            ("static", ServiceUnitFileStateV1::Static),
+            ("disabled", ServiceUnitFileStateV1::Disabled),
+            ("indirect", ServiceUnitFileStateV1::Indirect),
+            ("generated", ServiceUnitFileStateV1::Generated),
+            ("transient", ServiceUnitFileStateV1::Transient),
+            ("bad", ServiceUnitFileStateV1::Bad),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(ServiceUnitFileStateV1::parse(raw).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn every_unit_file_state_has_a_distinct_digest_commitment() {
+        let states = [
+            ServiceUnitFileStateV1::Enabled,
+            ServiceUnitFileStateV1::EnabledRuntime,
+            ServiceUnitFileStateV1::Linked,
+            ServiceUnitFileStateV1::LinkedRuntime,
+            ServiceUnitFileStateV1::Alias,
+            ServiceUnitFileStateV1::Masked,
+            ServiceUnitFileStateV1::MaskedRuntime,
+            ServiceUnitFileStateV1::Static,
+            ServiceUnitFileStateV1::Disabled,
+            ServiceUnitFileStateV1::Indirect,
+            ServiceUnitFileStateV1::Generated,
+            ServiceUnitFileStateV1::Transient,
+            ServiceUnitFileStateV1::Bad,
+        ];
+        let mut digests = std::collections::BTreeSet::new();
+        for file_state in states {
+            let value = state("inactive", "disabled", "dead");
+            let value = NixServiceObservedStateV1::new(
+                value.unit().to_string(),
+                value.load_state(),
+                value.active_state(),
+                file_state,
+                value.sub_state().to_string(),
+            ).unwrap();
+            assert!(digests.insert(value.digest().unwrap()));
+        }
+        assert_eq!(digests.len(), states.len());
     }
 
     #[test]
