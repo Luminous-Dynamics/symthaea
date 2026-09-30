@@ -60,6 +60,51 @@ pub struct MemoryProvenance {
     pub retrieval_index_ref: Option<String>,
 }
 
+/// Software-level receipt binding an explicit canonical admission to the
+/// provenance snapshot and frontier from which the admission was made.
+/// This is not a claim that the admitted object is true.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CanonicalAdmissionReceipt {
+    pub admission_event: String,
+    pub frontier_ref: Option<String>,
+    pub provenance_snapshot_digest: String,
+    pub validator_version: String,
+    pub snapshot_schema_version: u16,
+}
+
+impl CanonicalAdmissionReceipt {
+    pub fn new(
+        admission_event: impl Into<String>,
+        frontier_ref: Option<String>,
+        provenance_snapshot_digest: impl Into<String>,
+        validator_version: impl Into<String>,
+        snapshot_schema_version: u16,
+    ) -> Result<Self, &'static str> {
+        let admission_event = admission_event.into();
+        let provenance_snapshot_digest = provenance_snapshot_digest.into();
+        let validator_version = validator_version.into();
+        if admission_event.trim().is_empty() {
+            return Err("admission event must be non-empty");
+        }
+        if frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
+            return Err("frontier reference must be non-empty when present");
+        }
+        if provenance_snapshot_digest.trim().is_empty() {
+            return Err("provenance snapshot digest must be non-empty");
+        }
+        if validator_version.trim().is_empty() {
+            return Err("validator version must be non-empty");
+        }
+        Ok(Self {
+            admission_event,
+            frontier_ref,
+            provenance_snapshot_digest,
+            validator_version,
+            snapshot_schema_version,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProvenanceRelationKind {
     DerivedFrom,
