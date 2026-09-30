@@ -324,3 +324,35 @@ The next natural seam is **provenance slicing**: given a downstream claim, compu
 
 
 SWA-008 also makes claim freshness closure-specific rather than using the entire validation fingerprint. A solver change therefore stales a prediction-validation claim that depends on solver output, while leaving an applicability claim untouched when its declared closure does not include the solver. This preserves the same completeness/minimality principle established by SWA-007 at the claim layer.
+
+
+## Provenance slicing — SWA-009
+
+SWA-008 made claims explicit. SWA-009 makes their justification queryable.
+
+Given a downstream claim, the fixture computes the reachable provenance subgraph containing only the entities and derivations required to reproduce or challenge that claim. Unrelated provenance remains outside the slice.
+
+The reference chain is:
+
+claim -> validation evidence -> prediction -> model/parameters/scenario
+
+with validation also linked to:
+
+validation -> dataset/context-of-use
+
+The resulting slice exposes a dependency frontier that can be inspected independently of the rest of the system.
+
+This creates two important operations for Sol Atlas:
+
+1. **Reproduce** — start from the claim and recover the minimum upstream evidence/model/context chain needed to recreate the result.
+2. **Challenge** — inspect the same slice to identify which upstream entity, dependency revision, qualification, or counterevidence could weaken or invalidate the claim.
+
+The slice preserves ContradictedBy and QualifiedBy edges rather than resolving them. That is deliberate: provenance answers what led to a claim; it does not silently decide the dispute.
+
+This is closely aligned with W3C PROV's graph-oriented model of entities, activities, derivations, collections, and provenance bundles, including the ability to represent provenance across linked bundles.
+
+The architectural progression is now:
+
+validation evidence -> dependency closure -> evidence claim -> provenance slice
+
+The next useful constraint is **slice completeness**: the system should be able to prove that a purported minimal slice contains every dependency required by the claim's declared closure, and reject a slice that omits a required upstream entity.
