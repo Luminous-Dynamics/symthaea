@@ -115,9 +115,13 @@ pub mod pareto_frontier;
 /// All dimensions should be powers of 2 for optimal SIMD performance.
 ///
 /// # Predefined Tiers
+/// - **Micro (1K)**: Minimal continuous-HV research
+/// - **Tiny (2K)**: Constrained inference / STT boundary
+/// - **Compact (4K)**: Embedded and mobile workloads
+/// - **Rest (8K)**: Low-power background processing
 /// - **Standard (16K)**: Good balance of accuracy and memory
 /// - **Extended (32K)**: Higher semantic capacity
-/// - **Ultra (64K)**: Maximum precision
+/// - **Ultra (64K)**: Maximum predefined capacity
 /// - **Custom**: Any dimension (should be power of 2)
 ///
 /// # Usage
@@ -136,6 +140,12 @@ pub mod pareto_frontier;
     Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
 )]
 pub enum HdcDimensionality {
+    /// Micro 1,024 dimensions (2^10) - minimal continuous-HV research
+    Micro,
+    /// Tiny 2,048 dimensions (2^11) - constrained inference / STT boundary
+    Tiny,
+    /// Compact 4,096 dimensions (2^12) - embedded/mobile workloads
+    Compact,
     /// Rest 8,192 dimensions (2^13) - ultra-low power recovery mode
     Rest,
     /// Standard 16,384 dimensions (2^14) - good balance of accuracy and memory
@@ -153,6 +163,9 @@ impl HdcDimensionality {
     /// Get the numeric dimension value
     pub const fn dimension(&self) -> usize {
         match self {
+            Self::Micro => 1_024,
+            Self::Tiny => 2_048,
+            Self::Compact => 4_096,
             Self::Rest => HDC_DIMENSION_REST,
             Self::Standard => HDC_DIMENSION,
             Self::Extended => HDC_DIMENSION_32K,
@@ -167,6 +180,9 @@ impl HdcDimensionality {
     /// otherwise creates Custom variant.
     pub const fn from_dimension(dim: usize) -> Self {
         match dim {
+            1_024 => Self::Micro,
+            2_048 => Self::Tiny,
+            4_096 => Self::Compact,
             8_192 => Self::Rest,
             16_384 => Self::Standard,
             32_768 => Self::Extended,
@@ -183,7 +199,16 @@ impl HdcDimensionality {
 
     /// Check if dimension is a predefined tier
     pub const fn is_predefined(&self) -> bool {
-        matches!(self, Self::Standard | Self::Extended | Self::Ultra)
+        matches!(
+            self,
+            Self::Micro
+                | Self::Tiny
+                | Self::Compact
+                | Self::Rest
+                | Self::Standard
+                | Self::Extended
+                | Self::Ultra
+        )
     }
 
     /// Get memory usage per bipolar vector in bytes
