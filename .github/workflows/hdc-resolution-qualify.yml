@@ -100,11 +100,44 @@ jobs:
           assert {r["operation"] for r in records} == expected_ops
           assert {r["schema_version"] for r in records} == {1}
           assert {r["representation"] for r in records} == {"continuous_f32"}
+          keys = [(r["resolution"], r["operation"]) for r in records]
+          assert len(set(keys)) == 25
+          assert set(keys) == {
+              (d, op) for d in expected_dims for op in expected_ops
+          }
           assert all(r["qualification_status"] == "qualified" for r in records)
           assert all(r["logical_bytes"] > 0 for r in records)
           assert all(r["seed_a"] == 42 and r["seed_b"] == 43 for r in records)
           PY
           sha256sum operator-evidence.json | tee operator-evidence.sha256
+
+      - name: Write evidence provenance manifest
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          evidence = Path("operator-evidence.json").read_bytes()
+          digest = hashlib.sha256(evidence).hexdigest()
+          manifest = {
+              "schema_version": 1,
+              "exact_head": "$" + "{{ steps.head.outputs.sha }}",
+              "workflow": "$" + "{{ github.workflow }}",
+              "workflow_run_id": "$" + "{{ github.run_id }}",
+              "workflow_event": "$" + "{{ github.event_name }}",
+              "rust_toolchain": "1.96.0",
+              "operator_evidence_sha256": digest,
+              "operator_evidence_records": 25,
+              "operator_evidence_dimensions": [16384, 32768, 65536, 131072, 262144],
+              "operator_evidence_operations": ["dot", "bind", "bundle", "norm", "similarity"],
+              "benchmark_execution": "not-claimed",
+              "production_default_changed": False,
+          }
+          Path("operator-evidence-provenance.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+          )
+          PY
 
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
@@ -145,3 +178,4 @@ jobs:
             toolchain.txt
             operator-evidence.json
             operator-evidence.sha256
+            operator-evidence-provenance.json
