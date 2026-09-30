@@ -42,7 +42,7 @@ The inventory and detector explicitly separate:
 
 This prevents a workflow with ordinary write permissions, such as a trusted deployment workflow, from being incorrectly classified solely because it has a write permission.
 
-The detector compares mechanically observable fields: trigger/event configuration, workflow-run upstream workflow names, declared permissions, pinned third-party action references, and the presence of artifact-download/cache-write override surfaces. For `workflow_run`, the inventory must additionally declare a cross-workflow data-flow contract and the workflow source must explicitly bind runtime provenance: repository identity, configured workflow name, main-branch identity, expected subject SHA, conclusion, and run identity (`id` + `run_attempt`). The detector fails closed when that contract is absent, inconsistent with the observed trigger/action surface, or when the privileged consumer lacks these explicit runtime guards. Human-purpose, guard, secret-consumption, and untrusted-code claims remain declarative evidence and are not silently inferred by the detector.
+The detector compares mechanically observable fields: trigger/event configuration, workflow-run upstream workflow names, declared permissions, pinned third-party action references, artifact-download surfaces, cache authority, and local reusable-workflow calls. For privileged workflows, an explicit cache-mode disposition is recorded; write-capable `cache-mode` values are treated as an explicit trust-boundary override rather than inferred away. A privileged workflow that calls a local reusable workflow without an explicit cache cap fails closed, because GitHub permits cache authority to propagate from the caller and otherwise allows the called workflow to request write access. For `workflow_run`, the inventory must additionally declare a cross-workflow data-flow contract and the workflow source must explicitly bind runtime provenance: repository identity, configured workflow name, main-branch identity, expected subject SHA, conclusion, and run identity (`id` + `run_attempt`). The detector fails closed when that contract is absent, inconsistent with the observed trigger/action surface, or when the privileged consumer lacks these explicit runtime guards. Human-purpose, guard, secret-consumption, and untrusted-code claims remain declarative evidence and are not silently inferred by the detector.
 
 ## External policy boundary
 
@@ -59,7 +59,10 @@ The detector has a deterministic self-test covering:
 - missing cross-workflow data-flow contract;
 - false artifact-consumption declaration;
 - missing upstream workflow identity in the data-flow contract;
-- missing runtime provenance guards in a privileged `workflow_run` consumer.
+- missing runtime provenance guards in a privileged `workflow_run` consumer;
+- explicit `cache-mode: write` detection;
+- privileged reusable-workflow calls without an explicit cache cap;
+- accepted explicit read-only cache caps on reusable-workflow calls.
 
 The Workflow Syntax gate compiles changed `.github/scripts/*.py`, executes the detector self-test, validates the current privileged inventory, and JSON-parses changed `.github/*.json` files.
 
@@ -72,6 +75,7 @@ This is structural validation only. It does not prove that a GitHub Actions work
 - #6559 remains the exact history-topology authority boundary.
 - #6584 tracks the inventory/validator hardening tranche.
 - #6586 introduces the initial privileged-workflow inventory.
+- #6604 tracks cache-write override hardening.
 - This follow-on adds independent repository-side detection and fail-closed coverage checking.
 
 ## Test Evidence
