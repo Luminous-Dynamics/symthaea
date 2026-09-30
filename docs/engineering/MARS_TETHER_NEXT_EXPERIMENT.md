@@ -321,6 +321,14 @@ TetherExperimentProvenance now exposes require_reproducibly_pinned() -> Result<(
 
 This is aligned with the current PDS4 architecture, which provides dedicated Provenance and Processing Information dictionaries in the 1.26.0.0 data-dictionary release. The Symthaea representation remains deliberately smaller and domain-specific; it does not claim to be a complete PDS4 provenance serialization. NASA's current PDS4 standards are version 1.26.0.0 (June 2026).
 
+## Usability gate is now provenance-aware
+
+A terrain sample is not considered usable merely because its numeric fields are finite. The kernel now requires the observation trace to be structurally complete and the full terrain provenance envelope to validate. For the current MOLA adapter this means the sampling procedure must identify a concrete source grid cell and the provenance must contain a valid source identity, coordinate reference, and conflict-free content identities.
+
+This deliberately makes `is_usable()` a downstream safety gate rather than a convenience predicate. A future adapter can introduce another `TerrainSamplingMethod`, but it must also define what observation trace is required for that method before samples can become usable.
+
+The distinction mirrors the current PDS4 separation between provenance and processing information: PDS4 1.26.0.0 has dedicated dictionaries for both, with Processing Information describing processing history and Provenance providing a provenance insert. citeturn0search0
+
 ## Verification boundary after provenance closure
 
 The source changes above are committed to the research branch, but compiler/test execution remains a separate evidence state. No successful CI run is claimed unless GitHub reports one for the new head. The next verification step is therefore to compile and execute the physics-crate tests, followed by a fixture test that proves the four-artifact provenance closure through the actual MOLA sampling path.
