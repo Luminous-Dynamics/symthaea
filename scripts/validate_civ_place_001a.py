@@ -43,7 +43,12 @@ def derive(case: dict[str, object]) -> str:
     if kind == "spatial_proximity":
         return "NoDependency" if value["connected"] is False else "DependencyDeclared"
     if kind == "common_mode":
-        return "CommonModeRetained" if value["shared_upstream"] else "Independent"
+        if not value["shared_upstream"]:
+            return "Independent"
+        # A pair of redundant components cannot be independent when they
+        # share one upstream source; a larger declared group retains the
+        # common-mode relation as the claim-bearing disposition.
+        return "NotIndependent" if len(value["members"]) == 2 else "CommonModeRetained"
     if kind == "service":
         return "ServiceUnresolved" if value["quality"] == "Unknown" else "ServiceResolved"
     if kind == "currentness":
