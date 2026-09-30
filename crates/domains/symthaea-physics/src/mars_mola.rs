@@ -262,7 +262,7 @@ impl MolaMegdrMetadata {
         let map_projection = required(kv, "MAP_PROJECTION_TYPE")?;
         let latitude_type = required(kv, "COORDINATE_SYSTEM_NAME")?;
         let longitude_direction = required(kv, "POSITIVE_LONGITUDE_DIRECTION")?;
-        let center_latitude_deg = parse_f64_default(kv, "CENTER_LATITUDE", 0.0)?;
+        let center_latitude_deg = parse_f64(kv, "CENTER_LATITUDE")?;
         let center_longitude_deg = parse_f64(kv, "CENTER_LONGITUDE")?;
         let longitude_min_deg = parse_f64(kv, "WESTERNMOST_LONGITUDE")?;
         let longitude_max_deg = parse_f64(kv, "EASTERNMOST_LONGITUDE")?;
@@ -270,10 +270,10 @@ impl MolaMegdrMetadata {
         let latitude_max_deg = parse_f64(kv, "MAXIMUM_LATITUDE")?;
         let line_offset = image_data_record_offset(kv)?;
         let sample_offset = 0;
-        let line_projection_offset =
-            parse_f64_default(kv, "LINE_PROJECTION_OFFSET", latitude_max_deg * resolution as f64 + 0.5)?;
-        let sample_projection_offset =
-            parse_f64_default(kv, "SAMPLE_PROJECTION_OFFSET", longitude_min_deg * resolution as f64 + 0.5)?;
+        // Projection offsets are georeferencing authority, not safe-to-guess
+        // defaults. A missing offset can silently shift every sampled cell.
+        let line_projection_offset = parse_f64(kv, "LINE_PROJECTION_OFFSET")?;
+        let sample_projection_offset = parse_f64(kv, "SAMPLE_PROJECTION_OFFSET")?;
         let pixel_scale = parse_f64_default(kv, "SCALING_FACTOR", 1.0)?;
         let pixel_offset = parse_f64_default(kv, "OFFSET", 0.0)?;
         let missing_value = kv.get("MISSING_CONSTANT").and_then(|v| parse_number(v).ok());
@@ -875,6 +875,17 @@ mod tests {
         assert_eq!(metadata.cell_for(89.875, 0.125), Ok((0, 0)));
         assert_eq!(metadata.cell_for(-89.875, 359.875), Ok((719, 1439)));
         assert_eq!(metadata.center_latitude_deg, 0.0);
+    }
+
+    #[test]
+    fn rejects_missing_projection_offsets() {
+        let text = label().replace("LINE_PROJECTION_OFFSET = 2.5\\n", "");
+        let error = MolaMegdrMetadata::from_label(
+            &parse_label(&text),
+            "MEGT00N000HB",
+        )
+        .unwrap_err();
+        assert!(matches!(error, MolaError::InvalidMetadata(_)));
     }
 
     #[test]
