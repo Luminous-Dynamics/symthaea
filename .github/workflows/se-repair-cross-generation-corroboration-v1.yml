@@ -314,8 +314,14 @@ jobs:
             "qualification_state": "not_granted",
             "positive_invariants": [],
             "negative_invariants": [
-              "upstream workflow did not complete successfully",
-              "no current repair execution evidence is promoted"
+              {"id":"SE001.RECEIVER.UPSTREAM_NOT_SUCCESS","result":"satisfied","claim":"upstream workflow did not complete successfully","observation_class":"observed","authority":"receiver_execution_only"},
+              {"id":"SE001.RECEIVER.NO_CURRENT_PROMOTION","result":"satisfied","claim":"no current repair execution evidence is promoted","observation_class":"observed","authority":"receiver_execution_only"}
+            ],
+            "evidence_register": [
+              {"id":"upstream-result","class":"observed","authority":"receiver_execution_only","source":"workflow_run conclusion"},
+              {"id":"current-execution","class":"reproduced","authority":"none","source":"not available; no evidence promoted"},
+              {"id":"historical-oracle","class":"historical","authority":"oracle_only","source":"not inspected on non-success path"},
+              {"id":"inference","class":"inferred","authority":"none","source":"not used for corroboration"}
             ]
           }
           EOF
@@ -346,8 +352,14 @@ jobs:
             "qualification_state": "not_granted",
             "positive_invariants": [],
             "negative_invariants": [
-              "manual dispatch does not identify a completed repair execution run",
-              "no current repair execution evidence is promoted"
+              {"id":"SE001.RECEIVER.MANUAL_NO_EXECUTION_IDENTITY","result":"satisfied","claim":"manual dispatch does not identify a completed repair execution run","observation_class":"observed","authority":"receiver_execution_only"},
+              {"id":"SE001.RECEIVER.NO_CURRENT_PROMOTION","result":"satisfied","claim":"no current repair execution evidence is promoted","observation_class":"observed","authority":"receiver_execution_only"}
+            ],
+            "evidence_register": [
+              {"id":"manual-trigger","class":"observed","authority":"receiver_execution_only","source":"workflow_dispatch event"},
+              {"id":"current-execution","class":"reproduced","authority":"none","source":"not available; no evidence promoted"},
+              {"id":"historical-oracle","class":"historical","authority":"oracle_only","source":"not inspected on manual path"},
+              {"id":"inference","class":"inferred","authority":"none","source":"not used for corroboration"}
             ]
           }
           EOF
