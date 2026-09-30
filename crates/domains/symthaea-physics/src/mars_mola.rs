@@ -686,16 +686,6 @@ fn parse_u16(
     Ok(value as u16)
 }
 
-fn parse_u32_default(
-    kv: &std::collections::BTreeMap<String, String>,
-    key: &str,
-    default: u32,
-) -> Result<u32, MolaError> {
-    kv.get(key)
-        .map(|v| v.parse::<u32>().map_err(|_| MolaError::InvalidMetadata(format!("invalid integer key {key}"))))
-        .unwrap_or(Ok(default))
-}
-
 fn parse_f64_default(
     kv: &std::collections::BTreeMap<String, String>,
     key: &str,
@@ -989,6 +979,46 @@ mod tests {
         )
         .unwrap();
         assert_eq!(metadata.line_offset, 0);
+    }
+
+    #[test]
+    fn rejects_malformed_numeric_image_record_pointer() {
+        for value in ["1.5", "-1", "0", "NaN"] {
+            let text = format!("{}\n^IMAGE = {}", label(), value);
+            let error = MolaMegdrMetadata::from_label(
+                &parse_label(&text),
+                "MEGT00N000HB",
+            )
+            .unwrap_err();
+            assert!(matches!(error, MolaError::InvalidMetadata(_)), "^IMAGE={value}");
+        }
+    }
+
+    #[test]
+    fn accepts_positive_numeric_image_record_pointer_as_zero_based_offset() {
+        let text = format!("{}\n^IMAGE = 7", label());
+        let metadata = MolaMegdrMetadata::from_label(
+            &parse_label(&text),
+            "MEGT00N000HB",
+        )
+        .unwrap();
+        assert_eq!(metadata.line_offset, 6);
+    }
+
+    #[test]
+    fn detached_image_filename_pointer_is_zero_based_byte_origin() {
+        for pointer in [
+            r#""MEGT00N000HB.IMG""#,
+            "MEGT00N000HB.IMG",
+        ] {
+            let text = format!("{}\n^IMAGE = {}", label(), pointer);
+            let metadata = MolaMegdrMetadata::from_label(
+                &parse_label(&text),
+                "MEGT00N000HB",
+            )
+            .unwrap();
+            assert_eq!(metadata.line_offset, 0, "pointer={pointer}");
+        }
     }
 
     #[test]
