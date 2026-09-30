@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io::{self, BufReader, BufWriter, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use symthaea_muse::analysis_crosscheck::{
     AnalysisAgreementTolerance, AnalysisCrosscheckReport, NormalizedPrimaryAnalysis,
@@ -196,6 +196,7 @@ use symthaea_muse::study_runner::{
     build_pilot_runner_package, build_runner_package, compile_listener_block, new_session_log,
     validate_pilot_runner_package, validate_runner_package, validate_session_log,
 };
+use symthaea_muse::raw_json_admission::{admit, AdmissionLimits, BoundaryResult, RejectionReason};
 use symthaea_muse::temporal_confirmatory::{
     FrozenTemporalRecord, TemporalConfirmatoryPlan, analyze_temporal_confirmatory,
 };
@@ -1890,7 +1891,23 @@ fn require_len(args: &[String], expected: usize) -> Result<(), Box<dyn Error>> {
 }
 
 fn read_json<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T, Box<dyn Error>> {
-    Ok(serde_json::from_reader(BufReader::new(File::open(path)?))?)
+    let path = path.as_ref();
+    let bytes = std::fs::read(path)?;
+    match admit::<T>(&bytes, AdmissionLimits::default()) {
+        BoundaryResult::Accepted { document, .. } => Ok(document),
+        BoundaryResult::Rejected { reason, .. } => {
+            let detail = match reason {
+                RejectionReason::ResourceLimit => "resource limit",
+                RejectionReason::BomForbidden => "UTF-8 BOM forbidden",
+                RejectionReason::InvalidUtf8 => "invalid UTF-8",
+                RejectionReason::DuplicateDecodedName => "duplicate decoded object member name",
+                RejectionReason::InvalidJson => "invalid JSON",
+                RejectionReason::TrailingData => "trailing non-whitespace data",
+                RejectionReason::UnicodeScalarPolicy => "Unicode scalar policy violation",
+            };
+            Err(invalid_input(format!("{}: JSON admission rejected: {detail}", path.display())))
+        }
+    }
 }
 
 fn write_json<T: Serialize>(path: impl AsRef<Path>, value: &T) -> Result<(), Box<dyn Error>> {
