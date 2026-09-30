@@ -886,7 +886,7 @@ pub use hv_pool::{
     pooled_bind, pooled_similarity,
 };
 
-// Re-export SIMD continuous HV operations (4x+ speedup for 16K-dim vectors)
+// Re-export SIMD continuous HV operations; performance is benchmark-dependent.
 pub use simd_continuous::{
     bind_simd as continuous_bind_simd, bundle_simd as continuous_bundle_simd,
     dot_product_simd as continuous_dot_product_simd, norm_simd as continuous_norm_simd,
