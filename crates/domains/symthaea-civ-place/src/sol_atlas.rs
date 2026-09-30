@@ -308,6 +308,8 @@ pub fn project(input: &SolAtlasQualificationInputV1) -> Result<(Vec<NodeV1>, Vec
         });
     }
 
+    deps.sort_by(|a,b| a.id.cmp(&b.id));
+    
     let mut services = Vec::new();
     for s in &input.services {
         if !plan_ids.contains(s.root_element_id.as_str()) {
