@@ -181,6 +181,26 @@ impl ExtensiveGame {
             })
             .ok_or(ExtensiveGameError::NoTerminalNode)?;
 
+        // PlayerId is an index into the terminal utility vector. Keep that
+        // identity contract explicit: every player reference in the game must
+        // name one of the players represented by the payoff arity.
+        for state in &self.information.decision_states {
+            if state.player.0 >= players {
+                return Err(ExtensiveGameError::UnknownPlayer {
+                    player: state.player,
+                    player_count: players,
+                });
+            }
+        }
+        for info_set in &self.information.information_sets {
+            if info_set.player.0 >= players {
+                return Err(ExtensiveGameError::UnknownPlayer {
+                    player: info_set.player,
+                    player_count: players,
+                });
+            }
+        }
+
         for (i, node) in self.nodes.iter().enumerate() {
             if self.nodes[..i].iter().any(|prior| prior.state() == node.state()) {
                 return Err(ExtensiveGameError::DuplicateNodeId(node.state()));
@@ -192,6 +212,16 @@ impl ExtensiveGame {
         for (state, observations) in &self.observations {
             if self.node(*state).is_none() {
                 return Err(ExtensiveGameError::ObservationStateMissing(*state));
+            }
+            for observation in observations {
+                if let ObservationScope::Private(observer) = observation.scope {
+                    if observer.0 >= players {
+                        return Err(ExtensiveGameError::UnknownPlayer {
+                            player: observer,
+                            player_count: players,
+                        });
+                    }
+                }
             }
             for (i, observation) in observations.iter().enumerate() {
                 if observations[..i]
@@ -243,7 +273,21 @@ impl ExtensiveGame {
 
             match node {
                 ExtensiveNode::Decision { state, player, actions } => {
+                    if player.0 >= players {
+                        return Err(ExtensiveGameError::UnknownPlayer {
+                            player: *player,
+                            player_count: players,
+                        });
+                    }
                     for action in actions {
+                        if let EventVisibility::Players(observers) = &action.visibility {
+                            if let Some(observer) = observers.iter().find(|observer| observer.0 >= players) {
+                                return Err(ExtensiveGameError::UnknownPlayer {
+                                    player: *observer,
+                                    player_count: players,
+                                });
+                            }
+                        }
                         action
                             .visibility
                             .validate_for_event(Some(*player))
@@ -285,6 +329,14 @@ impl ExtensiveGame {
                 }
                 ExtensiveNode::Chance { state, outcomes } => {
                     for outcome in outcomes {
+                        if let EventVisibility::Players(observers) = &outcome.visibility {
+                            if let Some(observer) = observers.iter().find(|observer| observer.0 >= players) {
+                                return Err(ExtensiveGameError::UnknownPlayer {
+                                    player: *observer,
+                                    player_count: players,
+                                });
+                            }
+                        }
                         outcome
                             .visibility
                             .validate_for_event(None)
@@ -660,6 +712,7 @@ impl ExtensiveNode {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExtensiveGameError {
     InformationStructure(crate::strategic_context::InformationStructureError),
+    UnknownPlayer { player: PlayerId, player_count: usize },
     UnknownNode(DecisionStateId),
     DuplicateNodeId(DecisionStateId),
     DecisionStateMissingFromInformation(DecisionStateId),
@@ -1041,6 +1094,141 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn rejects_unknown_private_observation_player() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(0),
+                            next: DecisionStateId(1),
+                            visibility: EventVisibility::Public,
+                        },
+                        Transition {
+                            action: ActionId(1),
+                            next: DecisionStateId(2),
+                            visibility: EventVisibility::Public,
+                        },
+                    ],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(1),
+                    payoffs: vec![1.0],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(2),
+                    payoffs: vec![0.0],
+                },
+            ],
+            information: info(),
+            observations: HashMap::from([(
+                DecisionStateId(0),
+                vec![Observation {
+                    scope: ObservationScope::Private(PlayerId(1)),
+                    observation: ObservationId(7),
+                }],
+            )]),
+        };
+
+        assert_eq!(
+            game.validate(),
+            Err(ExtensiveGameError::UnknownPlayer {
+                player: PlayerId(1),
+                player_count: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_action_visibility_player() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(0),
+                            next: DecisionStateId(1),
+                            visibility: EventVisibility::Players(vec![PlayerId(1)]),
+                        },
+                        Transition {
+                            action: ActionId(1),
+                            next: DecisionStateId(2),
+                            visibility: EventVisibility::Public,
+                        },
+                    ],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(1),
+                    payoffs: vec![1.0],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(2),
+                    payoffs: vec![0.0],
+                },
+            ],
+            information: info(),
+            observations: HashMap::new(),
+        };
+
+        assert_eq!(
+            game.validate(),
+            Err(ExtensiveGameError::UnknownPlayer {
+                player: PlayerId(1),
+                player_count: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_decision_player() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(1),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(0),
+                            next: DecisionStateId(1),
+                            visibility: EventVisibility::Public,
+                        },
+                        Transition {
+                            action: ActionId(1),
+                            next: DecisionStateId(2),
+                            visibility: EventVisibility::Public,
+                        },
+                    ],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(1),
+                    payoffs: vec![1.0],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(2),
+                    payoffs: vec![0.0],
+                },
+            ],
+            information: info(),
+            observations: HashMap::new(),
+        };
+
+        assert_eq!(
+            game.validate(),
+            Err(ExtensiveGameError::UnknownPlayer {
+                player: PlayerId(1),
+                player_count: 1,
+            })
+        );
     }
 
     #[test]
