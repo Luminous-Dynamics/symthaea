@@ -55,7 +55,11 @@ pub async fn send_simple(gateway: &str, request_type: &str) -> Result<Value, Str
 /// Open the live telemetry WebSocket and invoke `on_message` for each
 /// `CycleMetadata` JSON payload received. Runs until the socket closes;
 /// callers spawn this via `wasm_bindgen_futures::spawn_local`.
-pub async fn stream_telemetry(gateway: &str, mut on_message: impl FnMut(Value)) {
+pub async fn stream_telemetry(
+    gateway: &str,
+    mut on_message: impl FnMut(Value),
+    on_connected: impl FnOnce(),
+) {
     let ws_url = format!(
         "{}/v1/ws/live",
         gateway
@@ -70,6 +74,7 @@ pub async fn stream_telemetry(gateway: &str, mut on_message: impl FnMut(Value)) 
             return;
         }
     };
+    on_connected();
     let (_write, mut read) = ws.split();
     while let Some(msg) = read.next().await {
         match msg {
