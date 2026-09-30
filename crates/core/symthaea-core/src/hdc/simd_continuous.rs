@@ -13,9 +13,10 @@
 //! - SSE4.1 (x86_64): 128-bit operations (4 f32s per instruction)
 //! - Portable: Safe fallback with auto-vectorization hints
 //!
-//! # Performance Targets
-//! - 4x+ speedup for 16,384-dim vectors over naive scalar implementation
-//! - GPU-ready architecture (identical algorithm patterns for future CUDA/Vulkan)
+//! # Performance Contract
+//! Performance is workload- and hardware-dependent. Benchmark results are
+//! required before making throughput or speedup claims.
+//! The scalar paths remain the numerical reference for conformance tests.
 //!
 //! # Feature Gate
 //! All SIMD operations are gated behind `#[cfg(feature = "simd")]`
@@ -39,9 +40,8 @@ use super::simd_detect::{has_avx, has_avx2, has_fma, has_neon, has_sse41};
 /// This is the fundamental building block for cosine similarity.
 ///
 /// # Performance
-/// - AVX2: ~4x speedup (8 f32s per cycle)
-/// - SSE4.1: ~2x speedup (4 f32s per cycle)
-/// - With FMA: Additional ~30% improvement
+/// Hardware-dependent; measure with the benchmark suite on the declared
+/// target CPU/toolchain rather than relying on fixed speedup estimates.
 ///
 /// # Panics
 /// Panics if `a.len() != b.len()`
