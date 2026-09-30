@@ -243,14 +243,35 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                     f"{path}: artifact-consuming workflow_run must bind artifact access to runtime provenance: "
                     f"{missing_artifact_provenance}"
                 )
-        cache_write = any(
-            re.search(r"(^|\s)cache-mode:\s*(write|write-only)\s*$", raw.strip())
-            for raw in lines
+        cache_modes = []
+    for raw in lines:
+        stripped = raw.strip()
+        match = re.match(r"cache-mode:\s*(read|write|write-only|none)\s*$", stripped)
+        if match:
+            cache_modes.append(match.group(1))
+    explicit_cache_write = any(mode in {"write", "write-only"} for mode in cache_modes)
+    local_reusable_calls = []
+    for raw in lines:
+        stripped = raw.strip()
+        if stripped.startswith("uses:"):
+            value = stripped[len("uses:"):].strip()
+            if value.startswith("./.github/workflows/"):
+                local_reusable_calls.append(value)
+    if local_reusable_calls and not cache_modes:
+        raise InventoryError(
+            f"{path}: privileged workflow calling a local reusable workflow must explicitly cap cache-mode"
         )
-        contract["cross_workflow_dataflow_observed"] = {
-            "artifact_download_action_present": download_artifact,
-            "explicit_cache_write_override_present": cache_write,
-        }
+    contract["cache_influence"] = (
+        "explicit_write_override"
+        if explicit_cache_write
+        else ("explicit_read_or_none" if cache_modes else "default_low_trust_read")
+    )
+    contract["cache_modes"] = sorted(set(cache_modes))
+    contract["local_reusable_workflow_calls"] = sorted(set(local_reusable_calls))
+    contract["cross_workflow_dataflow_observed"] = {
+        "artifact_download_action_present": download_artifact,
+        "explicit_cache_write_override_present": explicit_cache_write,
+    }
     return {"path": path.as_posix(), "privileged": True, "contract": contract}
 
 def load_inventory(path: Path) -> dict[str, Any]:
@@ -284,7 +305,14 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
     mismatches = []
     for path, observed_contract in observed.items():
         entry = declared[path]
-        for field in ("trigger", "permissions", "third_party_actions"):
+        for field in (
+            "trigger",
+            "permissions",
+            "third_party_actions",
+            "cache_influence",
+            "cache_modes",
+            "local_reusable_workflow_calls",
+        ):
             if entry.get(field) != observed_contract.get(field):
                 mismatches.append(f"{path}: {field} differs")
         if observed_contract["trigger"]["event"] == "workflow_run":
@@ -336,8 +364,8 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
                         mismatches.append(f"{path}: artifact_execution must be false for the current fail-closed v1 contract")
                 if not observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and dataflow.get("artifacts_consumed"):
                     mismatches.append(f"{path}: artifacts_consumed is true but no download-artifact action is present")
-                if observed_contract["cross_workflow_dataflow_observed"]["explicit_cache_write_override_present"] and dataflow.get("cache_influence") != "explicit_write_override":
-                    mismatches.append(f"{path}: cache write override requires explicit_write_override disposition")
+                if dataflow.get("cache_influence") != observed_contract["cache_influence"]:
+                    mismatches.append(f"{path}: cross_workflow_dataflow cache_influence differs from observed cache surface")
     if mismatches:
         raise InventoryError("privileged inventory mismatch: " + "; ".join(mismatches))
 
@@ -383,6 +411,9 @@ jobs:
 """, encoding="utf-8")
         observed = parse_workflow(wf)["contract"]
         assert observed["trigger"] == {"event": "workflow_run", "types": ["completed"], "workflows": ["Trusted upstream"]}
+        assert observed["cache_influence"] == "default_low_trust_read"
+        assert observed["cache_modes"] == []
+        assert observed["local_reusable_workflow_calls"] == []
         original = wf.read_text(encoding="utf-8")
         missing_permissions = original.replace("permissions:\n  contents: read\n", "")
         wf.write_text(missing_permissions, encoding="utf-8")
@@ -413,6 +444,9 @@ jobs:
         inv_entry = {
             "path": "example.yml",
             **observed,
+            "cache_influence": "default_low_trust_read",
+            "cache_modes": [],
+            "local_reusable_workflow_calls": [],
             "cross_workflow_dataflow": {
                 "upstream_workflow_names": ["Trusted upstream"],
                 "artifacts_consumed": False,
@@ -470,6 +504,37 @@ jobs:
             pass
         else:
             raise AssertionError("stale inventory must fail closed")
+
+        cache_write = original.replace(
+            "permissions:\n  contents: read\n",
+            "permissions:\n  contents: read\ncache-mode: write\n",
+        )
+        wf.write_text(cache_write, encoding="utf-8")
+        observed_cache_write = parse_workflow(wf)["contract"]
+        assert observed_cache_write["cache_influence"] == "explicit_write_override"
+        assert observed_cache_write["cache_modes"] == ["write"]
+
+        reusable_without_cap = original.replace(
+            "permissions:\n  contents: read\n",
+            "permissions:\n  contents: read\njobs:\n  call:\n    uses: ./.github/workflows/reusable.yml\n",
+        )
+        wf.write_text(reusable_without_cap, encoding="utf-8")
+        try:
+            parse_workflow(wf)
+        except InventoryError:
+            pass
+        else:
+            raise AssertionError("privileged reusable workflow caller without explicit cache cap must fail closed")
+
+        reusable_with_cap = reusable_without_cap.replace(
+            "permissions:\n  contents: read\n",
+            "permissions:\n  contents: read\ncache-mode: read\n",
+        )
+        wf.write_text(reusable_with_cap, encoding="utf-8")
+        observed_reusable = parse_workflow(wf)["contract"]
+        assert observed_reusable["cache_influence"] == "explicit_read_or_none"
+        assert observed_reusable["cache_modes"] == ["read"]
+        assert observed_reusable["local_reusable_workflow_calls"] == ["./.github/workflows/reusable.yml"]
 
 def main() -> int:
     parser = argparse.ArgumentParser()
