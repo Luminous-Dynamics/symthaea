@@ -75,7 +75,7 @@ impl ResourceWorkload {
 pub struct ResourceEvidenceRecord {
     pub schema_version: u32,
     pub workload: ResourceWorkload,
-    pub budget: ResourceBudget,
+    pub budget: Option<ResourceBudget>,
     pub vector_bytes: usize,
     pub resident_bytes: usize,
     pub peak_temporary_bytes: Option<usize>,
@@ -94,6 +94,9 @@ pub enum ResourceEvidenceError {
     VectorBudgetExceeded { required: usize, limit: usize },
     ResidentBudgetExceeded { required: usize, limit: usize },
     PeakTemporaryBudgetExceeded { required: usize, limit: usize },
+    MissingPeakTemporaryBudget,
+    MissingBudget,
+    QualificationStatusMismatch { observed: String },
     MissingProvenance,
     UnsupportedSchema(u32),
     RepresentationMismatch { expected: String, observed: String },
@@ -116,6 +119,9 @@ impl std::fmt::Display for ResourceEvidenceError {
                 write!(f, "resident budget exceeded: required {required}, limit {limit}"),
             Self::PeakTemporaryBudgetExceeded { required, limit } =>
                 write!(f, "peak temporary budget exceeded: required {required}, limit {limit}"),
+            Self::MissingPeakTemporaryBudget => write!(f, "peak temporary bytes are measured but no peak temporary budget is declared"),
+            Self::MissingBudget => write!(f, "resource budget is missing"),
+            Self::QualificationStatusMismatch { observed } => write!(f, "resource evidence is not qualified: {observed}"),
             Self::MissingProvenance => write!(f, "resource evidence provenance is missing"),
             Self::UnsupportedSchema(v) => write!(f, "unsupported resource evidence schema: {v}"),
             Self::RepresentationMismatch { expected, observed } =>
@@ -170,33 +176,31 @@ pub fn qualify_resource(
             observed: record.resident_bytes,
         });
     }
-    if expected_vector_bytes > record.budget.max_vector_bytes {
+    let budget = record.budget.ok_or(ResourceEvidenceError::MissingBudget)?;
+    if expected_vector_bytes > budget.max_vector_bytes {
         return Err(ResourceEvidenceError::VectorBudgetExceeded {
             required: expected_vector_bytes,
-            limit: record.budget.max_vector_bytes,
+            limit: budget.max_vector_bytes,
         });
     }
-    if expected_resident_bytes > record.budget.max_resident_bytes {
+    if expected_resident_bytes > budget.max_resident_bytes {
         return Err(ResourceEvidenceError::ResidentBudgetExceeded {
             required: expected_resident_bytes,
-            limit: record.budget.max_resident_bytes,
+            limit: budget.max_resident_bytes,
         });
     }
-    if let (Some(required), Some(limit)) =
-        (record.peak_temporary_bytes, record.budget.max_peak_temporary_bytes)
-    {
-        if required > limit {
-            return Err(ResourceEvidenceError::PeakTemporaryBudgetExceeded {
-                required,
-                limit,
-            });
+    match (record.peak_temporary_bytes, budget.max_peak_temporary_bytes) {
+        (Some(required), Some(limit)) if required > limit => {
+            return Err(ResourceEvidenceError::PeakTemporaryBudgetExceeded { required, limit });
         }
+        (Some(_), None) => return Err(ResourceEvidenceError::MissingPeakTemporaryBudget),
+        _ => {}
     }
 
     if record.qualification_status != RESOURCE_QUALIFIED_STATUS {
-        return Err(ResourceEvidenceError::UnsupportedSchema(
-            record.schema_version,
-        ));
+        return Err(ResourceEvidenceError::QualificationStatusMismatch {
+            observed: record.qualification_status.clone(),
+        });
     }
 
     Ok(())
@@ -221,7 +225,7 @@ mod tests {
             conversion_bytes: Some(0),
             provenance_id: "fixture-resource-v1".to_owned(),
             qualification_status: RESOURCE_QUALIFIED_STATUS.to_owned(),
-            budget: ResourceBudget::new(512 * 1024, 2 * 1024 * 1024, Some(64 * 1024)),
+            budget: Some(ResourceBudget::new(512 * 1024, 2 * 1024 * 1024, Some(64 * 1024))),
             workload,
         }
     }
@@ -237,7 +241,7 @@ mod tests {
     #[test]
     fn vector_budget_excess_fails_closed() {
         let mut record = record();
-        record.budget.max_vector_bytes = 512 * 1024 - 1;
+        record.budget.as_mut().unwrap().max_vector_bytes = 512 * 1024 - 1;
         assert!(matches!(
             qualify_resource(&record, 131_072, "continuous_f32"),
             Err(ResourceEvidenceError::VectorBudgetExceeded { .. })
@@ -247,7 +251,7 @@ mod tests {
     #[test]
     fn resident_budget_excess_fails_closed() {
         let mut record = record();
-        record.budget.max_resident_bytes = 2 * 1024 * 1024 - 1;
+        record.budget.as_mut().unwrap().max_resident_bytes = 2 * 1024 * 1024 - 1;
         assert!(matches!(
             qualify_resource(&record, 131_072, "continuous_f32"),
             Err(ResourceEvidenceError::ResidentBudgetExceeded { .. })
@@ -270,6 +274,26 @@ mod tests {
         assert!(matches!(
             qualify_resource(&record, 262_144, "continuous_f32"),
             Err(ResourceEvidenceError::ResolutionMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn missing_budget_fails_closed() {
+        let mut record = record();
+        record.budget = None;
+        assert!(matches!(
+            qualify_resource(&record, 131_072, "continuous_f32"),
+            Err(ResourceEvidenceError::MissingBudget)
+        ));
+    }
+
+    #[test]
+    fn measured_peak_without_peak_budget_fails_closed() {
+        let mut record = record();
+        record.budget.as_mut().unwrap().max_peak_temporary_bytes = None;
+        assert!(matches!(
+            qualify_resource(&record, 131_072, "continuous_f32"),
+            Err(ResourceEvidenceError::MissingPeakTemporaryBudget)
         ));
     }
 
