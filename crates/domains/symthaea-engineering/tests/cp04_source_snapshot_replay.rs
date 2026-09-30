@@ -79,18 +79,18 @@ fn reconstruct(snapshot: &SourceSnapshot) -> ScientificLineageGraph {
             .expect("source snapshot relation target exists")
             .clone();
         let relation_kind_value = relation_kind(&relation.edge_type);
-        let relation_source_digest = snapshot.relations.iter().find(|candidate| candidate.source_identity_digest == relation.source.identity_digest() && candidate.target_identity_digest == relation.target.identity_digest() && candidate.edge_type == relation.kind.wire_name()).expect("source snapshot relation is represented").source_identity_digest.clone();
-        let relation_target_digest = snapshot.relations.iter().find(|candidate| candidate.source_identity_digest == relation.source.identity_digest() && candidate.target_identity_digest == relation.target.identity_digest() && candidate.edge_type == relation.kind.wire_name()).expect("source snapshot relation is represented").target_identity_digest.clone();
-        let relation_edge_type = relation.kind.wire_name();
+        let relation_source_digest = relation.source_identity_digest.clone();
+        let relation_target_digest = relation.target_identity_digest.clone();
+        let relation_edge_type = relation.edge_type.clone();
         let relation = EngineeringRelation::new(source, target, relation_kind_value)
             .expect("source snapshot relation is valid");
         let expected_digest = snapshot
             .relations
             .iter()
             .find(|candidate| {
-                candidate.source_identity_digest == relation.source_identity_digest()
-                    && candidate.target_identity_digest == relation.target_identity_digest()
-                    && candidate.edge_type == relation.edge_type
+                candidate.source_identity_digest == relation_source_digest
+                    && candidate.target_identity_digest == relation_target_digest
+                    && candidate.edge_type == relation_edge_type
             })
             .expect("source snapshot relation is represented")
             .relation_digest
