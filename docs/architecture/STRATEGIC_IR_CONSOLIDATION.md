@@ -551,14 +551,15 @@ The extensive-form boundary now gives semantic history two identities that must 
 reconstructed from state IDs:
 
 - `ChanceOutcomeId` identifies the actual stochastic outcome taken at a chance node;
-- `ObservationId` identifies an observation token, with an explicit observer attached
+- `ObservationId` identifies an observation token, with an explicit scope attached
   to each observation event.
 
-`HistoryEvent` now carries decision, chance, and observation events. `ExtensiveGame`
-validates that a state cannot emit two observations for the same observer and that a
-chance node cannot reuse one outcome identity within its local distribution. The
-semantic information encoder therefore receives a history that can distinguish two
-histories reaching the same structural state for different stochastic or observational
+`HistoryEvent` now carries decision, chance, and observation events. A state may emit
+multiple observations with the same public/private scope: the observation vector is an
+ordered event stream, so repeated scope does not imply duplicate meaning. Validation
+therefore checks observer identity validity but does not collapse or reject repeated
+scope. The semantic information encoder receives the ordered history and can distinguish
+two histories reaching the same structural state for different stochastic or observational
 reasons.
 
 This is deliberately modeled after a useful ecosystem distinction: OpenSpiel separates
@@ -670,3 +671,27 @@ This follows the OpenSpiel distinction between observations and perfect-recall i
 ### 2026-09-30 encoder world-state isolation
 
 The information encoder no longer receives `DecisionStateId` as an argument. The earlier state-free `PlayerHistoryEvent` change removed state IDs from the history payload, but a follow-up audit found that the encoder's separate `state` parameter still allowed world-state-dependent information-set identity. The contract is now restricted to `(player, player-local action-observation history) -> InformationSetId`. This makes the information partition a function of player-visible history by construction, consistent with OpenSpiel's AOH/information-state consistency rule. Model replay still retains concrete state IDs internally to associate histories with declared decision states and report precise validation errors; those identifiers do not cross the encoder boundary. <Cite refs={["turn986240search0","turn986240search1"]} />
+
+
+### 2026-09-30 ordered observation-event semantics
+
+The observation boundary now treats `Vec<Observation>` as an ordered semantic event
+stream rather than a map keyed by scope. Multiple public observations and multiple
+private observations for the same player are valid on one state entry, and their order is
+preserved in `PlayerHistoryEvent` projection.
+
+This is a deliberate distinction between **scope** and **event identity**:
+
+- `ObservationScope` determines who receives an observation;
+- `ObservationId` identifies the semantic observation payload;
+- vector order determines the sequence presented to the information encoder.
+
+OpenSpiel similarly treats observations as information-bearing events whose complete
+action-observation history is used to reconstruct an information state, while public/private
+information is a separate dimension. The Symthaea IR therefore avoids imposing an
+artificial one-observation-per-scope rule that would reduce the expressiveness of ordered
+observation histories. citeturn0search0turn0search1
+
+Regression coverage now verifies both repeated-scope delivery and order sensitivity:
+permutation of two otherwise identical public observation events produces a different
+player-local history, while private events remain visible only to their named observer.
