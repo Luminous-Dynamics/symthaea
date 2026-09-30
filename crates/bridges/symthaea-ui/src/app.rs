@@ -19,7 +19,7 @@ use std::rc::Rc;
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
-use crate::presentation::{event_between, CognitiveEvent, CognitiveEventKind, CognitiveState};
+use crate::presentation::{cognitive_spans, event_between, CognitiveEvent, CognitiveEventKind, CognitiveState};
 
 const DEFAULT_GATEWAY: &str = "http://127.0.0.1:8090";
 
@@ -386,6 +386,19 @@ pub fn App() -> impl IntoView {
         });
     };
 
+    let visible_spans = move || {
+        let snapshot = if timeline_paused.get() {
+            events.get_untracked()
+        } else {
+            events.get()
+        };
+        cognitive_spans(&snapshot)
+            .into_iter()
+            .rev()
+            .take(4)
+            .collect::<Vec<_>>()
+    };
+
     view! {
         <div class="shell">
             <header class="shell-header">
@@ -498,6 +511,35 @@ pub fn App() -> impl IntoView {
                         </button>
                     </div>
                 </div>
+                {move || {
+                    let spans = visible_spans();
+                    if spans.is_empty() {
+                        None
+                    } else {
+                        Some(view! {
+                            <div class="timeline-spans" aria-label="Observed cognitive spans">
+                                <span class="timeline-spans-label">"cycle spans"</span>
+                                <For
+                                    each=move || spans.clone().into_iter()
+                                    key=|span| span.start_sequence
+                                    children=move |span| {
+                                        let range = match span.end_cycle {
+                                            Some(end) => format!("cycle {}–{}", span.start_cycle, end),
+                                            None => format!("cycle {}–open", span.start_cycle),
+                                        };
+                                        view! {
+                                            <span class="timeline-span">
+                                                <span class="timeline-span-kind">{span.kind.label()}</span>
+                                                <span class="timeline-span-range">{range}</span>
+                                            </span>
+                                        }
+                                    }
+                                />
+                                <span class="timeline-spans-note">"open means open within the retained event window"</span>
+                            </div>
+                        })
+                    }
+                }}
                 <div class="timeline-list" role="log" aria-live="off">
                     <For
                         each=move || if timeline_paused.get() {
