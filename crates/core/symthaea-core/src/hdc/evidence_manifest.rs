@@ -202,7 +202,7 @@ mod tests {
     }
 
     fn join(key: &ExperimentKey) -> CostQualityJoinRecord {
-        let reference = |kind: &str| EvidenceReference { kind: kind.into(), schema_version: 1, artifact_digest: format!("sha256:{kind}"), artifact_id: format!("{kind}-v1") };
+        let reference = |kind: &str| EvidenceReference { kind: kind.into(), schema_version: 1, artifact_digest: format!("sha256:{}", "0".repeat(64)), artifact_id: format!("{kind}-v1") };
         CostQualityJoinRecord {
             schema_version: crate::hdc::cost_quality_join::COST_QUALITY_JOIN_SCHEMA_VERSION,
             identity: JoinIdentity { task: key.task.clone(), scenario_set: key.scenario_set.clone(), scenario_revision: key.scenario_revision.clone(), split: key.split.clone(), protocol: key.protocol.clone(), resolution: key.resolution, representation: key.representation.clone(), model_revision: key.model_revision.clone(), workload: key.workload.clone(), benchmark: key.benchmark.clone() },
