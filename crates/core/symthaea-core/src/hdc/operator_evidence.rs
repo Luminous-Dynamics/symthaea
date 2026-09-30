@@ -31,7 +31,7 @@ pub use super::operator_evidence_contract::{OperatorEvidenceRecord, OperatorEvid
 pub fn generate_extended_resolution_evidence() -> Vec<OperatorEvidenceRecord> {
     let mut records = Vec::with_capacity(QUALIFICATION_DIMS.len() * 5);
 
-    for &raw_dim in EXTENDED_DIMS {
+    for &raw_dim in QUALIFICATION_DIMS {
         let dim = HdcResolution::new(raw_dim)
             .expect("qualification evidence dimensions must be valid power-of-two resolutions")
             .dimensions();
@@ -104,7 +104,7 @@ pub fn generate_extended_resolution_evidence() -> Vec<OperatorEvidenceRecord> {
 pub fn qualify_operator_matrix(records: &[OperatorEvidenceRecord]) -> OperatorEvidenceSummary {
     use std::collections::HashSet;
 
-    let expected = EXTENDED_DIMS.len() * 5;
+    let expected = QUALIFICATION_DIMS.len() * 5;
     let mut seen = HashSet::with_capacity(records.len());
     let mut qualified_records = 0;
     let mut failed_records = 0;
@@ -287,7 +287,7 @@ mod tests {
     #[test]
     fn evidence_matrix_has_stable_shape_and_schema() {
         let records = generate_extended_resolution_evidence();
-        assert_eq!(records.len(), EXTENDED_DIMS.len() * 5);
+        assert_eq!(records.len(), QUALIFICATION_DIMS.len() * 5);
         assert!(records
             .iter()
             .all(|record| record.schema_version == EVIDENCE_SCHEMA_VERSION));
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn evidence_covers_every_operator_at_every_resolution() {
-        for &dim in EXTENDED_DIMS {
+        for &dim in QUALIFICATION_DIMS {
             let ops: Vec<_> = generate_extended_resolution_evidence()
                 .into_iter()
                 .filter(|record| record.resolution == dim)
@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn resolution_metadata_is_consistent_with_evidence_ladder() {
-        for &dim in EXTENDED_DIMS {
+        for &dim in QUALIFICATION_DIMS {
             let resolution = HdcResolution::new(dim).expect("matrix dimension must be valid");
             assert!(resolution.is_canonical() || resolution.is_exploratory());
         }
