@@ -98,64 +98,33 @@ impl ServiceManager {
     /// result is not valid governed pre-state and must not cross into the
     /// authorization/effect-binding path.
     pub fn status(service: &str) -> Result<ServiceStatus, std::io::Error> {
-        let unit = Self::normalize_name(service);
+        let observed = Self::observed_state(service)?;
 
-        let output = Command::new("systemctl")
-            .args([
-                "show",
-                &unit,
-                "--no-pager",
-                "--property=ActiveState,SubState,UnitFileState",
-            ])
-            .output()?;
+        let active_state = match observed.active_state() {
+            super::service_state::ServiceActiveStateV1::Active => "active",
+            super::service_state::ServiceActiveStateV1::Reloading => "reloading",
+            super::service_state::ServiceActiveStateV1::Inactive => "inactive",
+            super::service_state::ServiceActiveStateV1::Failed => "failed",
+            super::service_state::ServiceActiveStateV1::Activating => "activating",
+            super::service_state::ServiceActiveStateV1::Deactivating => "deactivating",
+            super::service_state::ServiceActiveStateV1::Maintenance => "maintenance",
+            super::service_state::ServiceActiveStateV1::Refreshing => "refreshing",
+        };
 
-        if !output.status.success() {
-            return Err(std::io::Error::other(format!(
-                "systemctl show failed for '{}': {}",
-                unit,
-                String::from_utf8_lossy(&output.stderr).trim()
-            )));
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let mut active_state = String::new();
-        let mut sub_state = String::new();
-        let mut enabled = false;
-        let mut parsed_fields = 0u32;
-
-        for line in stdout.lines() {
-            if let Some((key, value)) = line.split_once('=') {
-                match key {
-                    "ActiveState" => {
-                        active_state = value.to_string();
-                        parsed_fields += 1;
-                    }
-                    "SubState" => {
-                        sub_state = value.to_string();
-                        parsed_fields += 1;
-                    }
-                    "UnitFileState" => {
-                        enabled = value == "enabled";
-                        parsed_fields += 1;
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        if parsed_fields == 0 {
-            return Err(std::io::Error::other(format!(
-                "systemctl show returned no parseable properties for '{}'",
-                unit
-            )));
-        }
+        let enabled = matches!(
+            observed.unit_file_state(),
+            super::service_state::ServiceUnitFileStateV1::Enabled
+        );
 
         Ok(ServiceStatus {
-            name: unit,
-            active: active_state == "active",
+            name: observed.unit().to_string(),
+            active: matches!(
+                observed.active_state(),
+                super::service_state::ServiceActiveStateV1::Active
+            ),
             enabled,
-            active_state,
-            sub_state,
+            active_state: active_state.to_string(),
+            sub_state: observed.sub_state().to_string(),
         })
     }
 
