@@ -136,7 +136,7 @@ pub enum CapacityBound {
 
 /// Validate the semantic state's internal referential invariants.
 ///
-/// Every admitted delivery has one retained result, and every result points
+/// Every admitted delivery has at least one retained result, and every result points
 /// to an existing delivery and observation. Observations may remain indexed
 /// independently so retention/GC can be implemented without changing
 /// delivery identity semantics.
@@ -428,6 +428,30 @@ mod tests {
             decide(&state, &delivery, &observation, AdmissionPolicy::default(), 100),
             AdmissionOutcome::Replay { .. }
         ));
+    }
+
+    #[test]
+    fn second_observation_replays_its_own_original_result() {
+        let (state, delivery, mut observation) = admitted_state();
+        observation.key.observation_id = Uuid::from_u128(9_999);
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let AdmissionOutcome::Admitted {
+            next_state,
+            result: admitted_result,
+        } = decide(&state, &delivery, &observation, policy, 100)
+        else {
+            panic!("second observation should admit");
+        };
+
+        assert_eq!(
+            decide(&next_state, &delivery, &observation, policy, 100),
+            AdmissionOutcome::Replay {
+                existing_result: admitted_result,
+            }
+        );
     }
 
     #[test]
