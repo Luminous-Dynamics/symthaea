@@ -21,7 +21,7 @@ Four deterministic prototype hypervectors represent four classes. Each held-out 
 
 Inference selects the prototype with maximum cosine similarity.
 
-The default run evaluates four queries per class, giving 16 held-out queries per dimension.
+The default run evaluates 32 queries per class, giving 128 held-out queries per dimension. The task protocol identifier does not encode this sample count; the canonical spec identity does.
 
 This is deliberately a controlled representation-scaling experiment, not a claim about general ML accuracy or a substitute for a public benchmark dataset.
 
