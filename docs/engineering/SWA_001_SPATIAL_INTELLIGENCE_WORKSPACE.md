@@ -198,7 +198,6 @@ Build one deterministic fixture spanning a small building:
 
 This fixture should be the reference integration test before any real-world actuation work.
 Related: Symthaea issue #6624; Mycelix issue #3634.
-
 ## Calibration and model-history gate — SWA-005
 
 Calibration must produce a **new parameter/model revision**, never mutate the historical prediction that exposed the residual.
@@ -397,7 +396,6 @@ The fixture canonicalizes dependency and input ordering before deriving fingerpr
 
 The fixture currently uses a small dependency-free FNV-1a fingerprint because the example is intentionally self-contained. This is explicitly a fixture fingerprint, not a cryptographic commitment. A production interchange layer should substitute a cryptographic digest without changing the canonical-manifest contract.
 The important architectural distinction is:
-
 claim -> complete provenance slice -> canonical replay manifest -> deterministic execution -> reproducibility witness
 
 This also gives Sol Atlas a concrete answer to **“can this claim actually be reproduced from the evidence we say supports it?”** rather than treating provenance as descriptive metadata alone. W3C PROV explicitly includes reproducibility and versioning among the provenance requirements it supports, and its bundle model permits provenance to be independently established and linked across provenance boundaries. ASME's VVUQ lifecycle guidance likewise places verification, validation, and uncertainty work inside the model lifecycle rather than treating a validation result as permanently detached from model evolution.
@@ -578,3 +576,28 @@ The end-to-end contract is:
 This is a deterministic local reference scenario, not a Holochain validation zome or a Mycelix receipt implementation. Holochain's validation callbacks are expected to be deterministic for a given operation, and missing addressable dependencies yield an unresolved/indeterminate result rather than an implicit pass. That is a useful design constraint for a future Mycelix receipt adapter, but the distributed persistence and governance integration should reuse existing Mycelix zomes after their actual schemas and validation contracts are inspected. See the Holochain documentation on [validation](https://developer.holochain.org/build/validation/) and [validate callbacks](https://developer.holochain.org/build/validate-callback/).
 
 SWA-017 therefore closes the local lifecycle composition seam. The next integration step is a narrow Mycelix/Holochain receipt projection with explicit content identity, author/authority separation, deterministic validation dependencies, and unresolved-dependency handling—not a second DKG, physics engine, or authorization system.
+
+## Mycelix receipt boundary contract — SWA-018
+
+SWA-017 established the local end-to-end review lifecycle. SWA-018 audits the existing public Mycelix domain surfaces and adds a local contract fixture for projecting a Sol Atlas review into Mycelix without inventing a parallel distributed record system.
+
+The inspected Mycelix repository already contains distinct domains relevant to this vertical slice:
+
+- **Attribution usage** defines voluntary dependency-usage receipts and usage attestations. These describe usage of a dependency; they are not generic prediction, validation, or authorization receipts.
+- **Governance proposals and execution** represent collective requests and governance execution/timelock states. A proposal is not itself an adopted resolution or physical outcome.
+- **Commons housing governance** defines cooperative meetings and resolutions.
+- **Commons housing maintenance** defines maintenance requests, work orders, and inspections. These record operational workflow and observations, not a blanket authorization to change building controls.
+
+SWA-018 therefore models an explicit projection envelope with a source namespace/object/revision, author reference, subject reference, declared content digest, disclosure class, exact dependency references, and separately optional authority/outcome references. Its example uses a governance-proposal target for a review request. It does not write to Holochain or claim to implement any Mycelix zome schema.
+
+The contract checks that required identities and digest declarations are present, dependency references are unique and non-empty, and the evidence projection cannot be mislabeled as an Attribution usage receipt. Missing declared dependencies map to `UnresolvedDependencies`, not `Valid`. This mirrors Holochain's documented validation contract: deterministic validation may return valid, invalid, or unresolved dependencies; a missing `must_get_*` dependency should be retried rather than silently accepted. See [Holochain validate callbacks](https://developer.holochain.org/build/validate-callback/) and [must_get host functions](https://developer.holochain.org/build/must-get-host-functions/).
+
+The key separation is:
+
+`Sol Atlas evidence/provenance -> typed Mycelix projection -> deterministic DHT validation -> separate governance authorization -> separately observed physical outcome`
+
+A valid projection is only structurally admissible under this fixture's local contract. It does not prove that a decision was authorized, that an intervention occurred, or that a building is safe. A Holochain record's author/signature and the domain's authority reference remain distinct; a receipt must never manufacture authority or substitute for physical telemetry.
+
+**Integration caveat from inspection:** the Mycelix Attribution usage coordinator currently documents a graceful-allow path when the registry lookup is unavailable, while its usage integrity source itself flags a UsageAttestation update-validation gap where coordinator-only field restrictions are not sufficient against direct DHT operations. These are concrete review items before using that surface as a security boundary. They are not modified by SWA-018. The Mycelix README also characterizes the broader repository as pre-alpha and says multi-agent validation coverage varies by cluster, so a unit-tested projection fixture must not be described as end-to-end DHT validation.
+
+SWA-018 closes the *mapping contract* seam only. The next step should be a focused Mycelix-side issue/patch proposal after inspecting the exact hApp DNA wiring and cross-zome identity conventions: select one destination record type, bind immutable source content identity and author, require addressable dependencies in integrity validation, preserve unresolved-dependency behavior, and add multi-agent tests for missing dependencies, tampered revisions, replay, and authorization separation. No DKG or chain-based replacement is warranted by this integration.
