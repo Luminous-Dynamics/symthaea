@@ -13,6 +13,7 @@ use super::task_quality_evidence::TaskQualityEvidenceRecord;
 use super::trajectory_evidence::TrajectoryEvidenceRecord;
 
 pub const EVIDENCE_IDENTITY_SCHEMA_VERSION: u32 = 1;
+const EXPERIMENT_IDENTITY_DOMAIN: &[u8] = b"symthaea:experiment-identity";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExperimentKey {
@@ -26,6 +27,44 @@ pub struct ExperimentKey {
     pub model_revision: String,
     pub workload: String,
     pub benchmark: String,
+}
+
+impl ExperimentKey {
+    /// Serialize the semantic identity into an explicit, length-delimited byte
+    /// representation. This is intentionally independent of serde/JSON field
+    /// ordering so the identity primitive is stable across serializers.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(256);
+        bytes.extend_from_slice(EXPERIMENT_IDENTITY_DOMAIN);
+        bytes.extend_from_slice(&EVIDENCE_IDENTITY_SCHEMA_VERSION.to_be_bytes());
+        bytes.extend_from_slice(&(self.resolution as u64).to_be_bytes());
+
+        for field in [
+            self.task.as_str(),
+            self.scenario_set.as_str(),
+            self.scenario_revision.as_str(),
+            self.split.as_str(),
+            self.protocol.as_str(),
+            self.representation.as_str(),
+            self.model_revision.as_str(),
+            self.workload.as_str(),
+            self.benchmark.as_str(),
+        ] {
+            let field = field.as_bytes();
+            bytes.extend_from_slice(&(field.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(field);
+        }
+
+        bytes
+    }
+
+    /// SHA-256 content identity of the canonical semantic experiment key.
+    pub fn identity_digest(&self) -> String {
+        use sha2::{Digest, Sha256};
+
+        let digest = Sha256::digest(self.canonical_bytes());
+        digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -254,6 +293,29 @@ mod tests {
     }
 
     #[test]
+    fn canonical_identity_is_deterministic_and_domain_separated() {
+        let key = derive_experiment_key(&task(), &performance(), &resource()).unwrap();
+        let first = key.canonical_bytes();
+        assert_eq!(first, key.canonical_bytes());
+        assert_eq!(key.identity_digest(), key.identity_digest());
+        assert_eq!(key.identity_digest().len(), 64);
+        assert!(first.starts_with(EXPERIMENT_IDENTITY_DOMAIN));
+        assert_eq!(
+            u32::from_be_bytes(first[EXPERIMENT_IDENTITY_DOMAIN.len()..EXPERIMENT_IDENTITY_DOMAIN.len() + 4].try_into().unwrap()),
+            EVIDENCE_IDENTITY_SCHEMA_VERSION
+        );
+    }
+
+    #[test]
+    fn semantic_identity_changes_when_identity_field_changes() {
+        let key = derive_experiment_key(&task(), &performance(), &resource()).unwrap();
+        let original = key.identity_digest();
+        let mut changed = key.clone();
+        changed.model_revision = "model-v2".into();
+        assert_ne!(original, changed.identity_digest());
+    }
+
+    #[test]
     fn declared_scenario_revision_mismatch_is_rejected() {
         let key = derive_experiment_key(&task(), &performance(), &resource()).unwrap();
         let mut declared = JoinIdentity {
@@ -301,7 +363,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn unqualified_resource_is_rejected() {
         let mut r = resource();
         r.qualification_status = "rejected".into();
@@ -321,6 +382,7 @@ mod tests {
         ));
     }
 
+    #[test]
     fn resource_resolution_mismatch_is_rejected() {
         let mut r = resource();
         r.workload.resolution = 65_536;
