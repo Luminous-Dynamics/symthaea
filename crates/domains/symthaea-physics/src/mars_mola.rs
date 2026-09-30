@@ -1012,11 +1012,16 @@ mod tests {
         let mut img = path.clone();
         img.set_extension("img");
 
-        let text = format!("{}\n^IMAGE = 2", label());
+        let text = format!(
+            "{}\n^IMAGE = 2",
+            label()
+                .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 179.9")
+                .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1")
+        );
         std::fs::write(&path, text).unwrap();
         let mut bytes = vec![0u8; 32];
-        bytes[16] = 0x03;
-        bytes[17] = 0xE8;
+        bytes[18] = 0x03;
+        bytes[19] = 0xE8;
         std::fs::write(&img, bytes).unwrap();
 
         let product = MolaMegdrProduct::open(
@@ -1033,6 +1038,8 @@ mod tests {
         let mut count_img = count_path.clone();
         count_img.set_extension("img");
         let count_label = label()
+            .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 179.9")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1")
             .replace("MEGT00N000HB", "MEGC00N000HB")
             .replace("MAP_TYPE = T", "MAP_TYPE = C")
             .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8")
@@ -1049,7 +1056,7 @@ mod tests {
             "pds4-v1",
         ).unwrap();
         let sample = product
-            .sample_nearest_with_count(&counts, 0.0, 0.007, 3.0)
+            .sample_nearest_with_count(&counts, 0.0, 179.984375, 3.0)
             .unwrap();
         assert_eq!(sample.elevation_m, Some(1000.0));
 
@@ -1387,7 +1394,10 @@ mod tests {
         path.push(format!("mola_adapter_zero_{}_label.lbl", std::process::id()));
         let mut img = path.clone();
         img.set_extension("img");
-        std::fs::write(&path, label()).unwrap();
+        let sample_label = label()
+            .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 179.9")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1");
+        std::fs::write(&path, sample_label).unwrap();
         std::fs::write(&img, vec![0u8; 64]).unwrap();
 
         let product = MolaMegdrProduct::open(&path, &img, "MEGT00N000HB", "pds4-v1").unwrap();
@@ -1397,6 +1407,8 @@ mod tests {
         let mut count_img = count_path.clone();
         count_img.set_extension("img");
         let count_label = label()
+            .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 179.9")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1")
             .replace("MEGT00N000HB", "MEGC00N000HB")
             .replace("MAP_TYPE = T", "MAP_TYPE = C")
             .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8");
@@ -1404,7 +1416,7 @@ mod tests {
         std::fs::write(&count_img, vec![0u8; 64]).unwrap();
 
         let counts = MolaMegdrProduct::open(&count_path, &count_img, "MEGC00N000HB", "pds4-v1").unwrap();
-        let sample = product.sample_nearest_with_count(&counts, 0.0, 0.007, 3.0).unwrap();
+        let sample = product.sample_nearest_with_count(&counts, 0.0, 179.984375, 3.0).unwrap();
 
         assert_eq!(sample.quality, TerrainQuality::Missing);
         assert!(sample.elevation_m.is_none());
@@ -1423,9 +1435,13 @@ mod tests {
         let mut img = path.clone();
         img.set_extension("img");
         std::fs::write(&path, label()).unwrap();
+        let sample_label = label()
+            .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 179.9")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1");
+        std::fs::write(&path, sample_label).unwrap();
         let mut bytes = vec![0u8; 64];
-        bytes[2 * 1] = 0x03;
-        bytes[2 * 1 + 1] = 0xE8;
+        bytes[18] = 0x03;
+        bytes[19] = 0xE8;
         std::fs::write(&img, bytes).unwrap();
         let product = MolaMegdrProduct::open(&path, &img, "MEGT00N000HB", "pds4-v1").unwrap();
         let mut count_path = path.clone();
@@ -1438,7 +1454,7 @@ mod tests {
             .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8");
         std::fs::write(&count_path, count_label).unwrap();
         let mut count_bytes = vec![0u8; 64];
-        count_bytes[32] = 1;
+        count_bytes[17] = 1;
         std::fs::write(&count_img, count_bytes).unwrap();
         let counts = MolaMegdrProduct::open(&count_path, &count_img, "MEGC00N000HB", "pds4-v1").unwrap();
         let sample = product.sample_nearest_with_count(&counts, 0.0, 0.007, 3.0).unwrap();
