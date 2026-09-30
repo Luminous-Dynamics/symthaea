@@ -14,6 +14,8 @@ These vectors define the byte-level contract for canonical retrieval receipts.
 - Projection-identity bindings are sorted by identity then projection-identity digest and bind the projection semantics exposed to reasoning, not just its representation bytes.
 - Exclusions are sorted by canonical identity then reason tag.
 - No JSON serialization, field ordering, platform endianness, or Rust enum representation participates in the digest.
+- Collection ordering is lexicographic over the UTF-8 string values (equivalently Unicode scalar-value order for valid UTF-8); no Unicode normalization is performed.
+- This is a versioned EPF-010 binary contract, not an RFC 8785/JCS serialization.
 
 The encoding is intentionally a narrow typed binary contract rather than a general-purpose JSON/RDF canonicalization format. RFC 8785 establishes the need for invariant representations for cryptographic hashing/signing and explicitly calls out overflow/input sanity checks. W3C Data Integrity likewise treats canonicalization correctness as security-critical.
 
