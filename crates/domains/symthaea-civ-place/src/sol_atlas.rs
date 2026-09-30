@@ -16,7 +16,6 @@ use crate::{
 
 pub const SOL_ATLAS_PROFILE: &str = "SOL-PLACE-001D";
 pub const SOL_ATLAS_SCHEMA_VERSION: &str = "place-plan-v1";
-pub const SOL_ATLAS_CLAIM_CEILING: &str = "plan-declared";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
