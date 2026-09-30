@@ -78,6 +78,9 @@ fn validate_evidence_binding(binding: &EvidenceBinding) -> Result<(), ReferenceV
         &binding.model_ref,
         &binding.scenario_ref,
         &binding.dataset_ref,
+        &binding.prediction_ref,
+        &binding.parameters_ref,
+        &binding.context_ref,
     ] {
         validate_semantic_ref(reference)?;
     }
