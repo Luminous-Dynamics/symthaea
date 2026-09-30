@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 pub const PROVENANCE_GRAPH_REVISION: &str = "sol-atlas-reference-graph@v1";
 pub const PROVENANCE_SLICE_TRAVERSAL_POLICY: &str = "outgoing-reachability-bfs@v1";
-const PROVENANCE_GRAPH_ENCODING_VERSION: &[u8] = b"symthaea:provenance-graph:v1";
+const PROVENANCE_GRAPH_ENCODING_VERSION: &[u8] = b"symthaea:provenance-graph:v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum NodeKind {
@@ -67,27 +67,26 @@ impl ProvenanceGraph {
     /// Deterministic identity commitment for the exact authoritative graph.
     pub fn identity_digest(&self) -> String {
         let mut hasher = Hasher::new();
-        hasher.update(PROVENANCE_GRAPH_ENCODING_VERSION);
+        append_graph_bytes(&mut hasher, PROVENANCE_GRAPH_ENCODING_VERSION);
+
         let mut nodes = self.nodes.clone();
         nodes.sort();
+        append_graph_u64(&mut hasher, nodes.len());
         for node in nodes {
-            hasher.update(node.id.as_bytes());
-            hasher.update(&[0]);
+            append_graph_bytes(&mut hasher, node.id.as_bytes());
             hasher.update(&[node.kind as u8]);
-            hasher.update(&[0]);
-            if let Some(revision) = node.revision { hasher.update(revision.as_bytes()); }
-            hasher.update(&[0xff]);
+            append_graph_optional_bytes(&mut hasher, node.revision.map(str::as_bytes));
         }
+
         let mut edges = self.edges.clone();
         edges.sort();
+        append_graph_u64(&mut hasher, edges.len());
         for edge in edges {
-            hasher.update(edge.from.as_bytes());
-            hasher.update(&[0]);
-            hasher.update(edge.to.as_bytes());
-            hasher.update(&[0]);
+            append_graph_bytes(&mut hasher, edge.from.as_bytes());
+            append_graph_bytes(&mut hasher, edge.to.as_bytes());
             hasher.update(&[edge.kind as u8]);
-            hasher.update(&[0xff]);
         }
+
         hasher.finalize().to_hex().to_string()
     }
 
@@ -204,12 +203,32 @@ pub struct SliceBoundaryCertificate {
     pub root: &'static str,
     /// Versioned identity of the authoritative graph representation.
     pub graph_revision: &'static str,
+    pub graph_digest: String,
     pub traversal_policy: &'static str,
     pub graph_node_count: usize,
     pub graph_edge_count: usize,
     pub slice_node_count: usize,
     pub slice_edge_count: usize,
     pub frontier_exhausted: bool,
+}
+
+fn append_graph_u64(hasher: &mut Hasher, value: usize) {
+    hasher.update(&(value as u64).to_be_bytes());
+}
+
+fn append_graph_bytes(hasher: &mut Hasher, value: &[u8]) {
+    append_graph_u64(hasher, value.len());
+    hasher.update(value);
+}
+
+fn append_graph_optional_bytes(hasher: &mut Hasher, value: Option<&[u8]>) {
+    match value {
+        Some(value) => {
+            hasher.update(&[1]);
+            append_graph_bytes(hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
 }
 
 impl SliceBoundaryCertificate {
