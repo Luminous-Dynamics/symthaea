@@ -103,6 +103,24 @@ identity -> consent -> authorization context -> decision -> receipt -> contestab
 
 A Mycelix receipt must never turn a Symthaea prediction into an observation or grant physical authority.
 
+
+## Provenance gate — SWA-004
+
+The reference fixture now treats provenance as part of the value, not metadata that can be inferred later.
+
+- ScenarioAssumption means an authored fixture/design assumption.
+- ModelDerivedPrediction is reserved for an intervention-specific model output.
+- ObservedOutcome is reserved for measured post-intervention state.
+- DerivedResidual is computed from typed prediction/outcome pairs.
+- UnresolvedEvidence remains contradictory without forced resolution.
+- UnknownUnmodeled is explicit when no model supports a dimension.
+
+This distinction follows the same basic discipline as the W3C PROV model: provenance describes entities, activities, agents, and derivations rather than treating all values as interchangeable facts. See the W3C PROV model and ontology. 
+
+SWA-003 currently demonstrates an important negative capability: its intervention dimension values are scenario assumptions, while BuildingTwin outputs remain building-model evidence. The fixture therefore refuses to call those intervention dimensions a counterfactual until an intervention-specific model actually produces them.
+
+That is intentional. Unknown is safer than fabricated precision.
+
 ## Multi-objective discipline
 
 Do not reduce the workspace to a single opaque optimization score.
