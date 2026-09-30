@@ -61,6 +61,7 @@ pub enum ProvenanceGraphError {
     MissingEdgeEndpoint,
     InvalidNodeIdentity,
     MissingRoot,
+    SliceMismatch,
 }
 
 impl ProvenanceGraph {
@@ -88,6 +89,19 @@ impl ProvenanceGraph {
         }
 
         hasher.finalize().to_hex().to_string()
+    }
+
+    /// Validate that a slice was produced from this exact authoritative graph.
+    ///
+    /// This closes the gap between a well-shaped certificate and a certificate
+    /// that actually commits to the graph being presented by the validator.
+    pub fn validate_slice(&self, slice: &ProvenanceSlice) -> Result<(), ProvenanceGraphError> {
+        let expected = self.slice(slice.root)?;
+        if expected == *slice {
+            Ok(())
+        } else {
+            Err(ProvenanceGraphError::SliceMismatch)
+        }
     }
 
     /// Validate graph identity before any downstream projection consumes it.
@@ -400,6 +414,17 @@ mod tests {
         assert_eq!(
             graph.slice("claim-001"),
             Err(ProvenanceGraphError::MissingEdgeEndpoint)
+        );
+    }
+
+    #[test]
+    fn tampered_boundary_cannot_validate_against_authoritative_graph() {
+        let graph = reference_graph();
+        let mut slice = graph.slice("claim-001").expect("claim exists");
+        slice.boundary.graph_digest.replace_range(0..1, "0");
+        assert_eq!(
+            graph.validate_slice(&slice),
+            Err(ProvenanceGraphError::SliceMismatch)
         );
     }
 
