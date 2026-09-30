@@ -98,7 +98,6 @@ pub trait InformationEncoder {
     fn encode(
         &self,
         player: PlayerId,
-        state: DecisionStateId,
         history: &[PlayerHistoryEvent],
     ) -> Result<crate::strategic_context::InformationSetId, InformationEncodingError>;
 }
@@ -390,7 +389,7 @@ impl ExtensiveGame {
             let paths = histories.get(&state.state).ok_or(ExtensiveGameError::InformationMemberNotReachable(state.state))?;
             for history in paths {
                 let local_history = project_player_history(state.player, history);
-                let encoded = encoder.encode(state.player, state.state, &local_history).map_err(|error| ExtensiveGameError::InformationEncodingFailed {
+                let encoded = encoder.encode(state.player, &local_history).map_err(|error| ExtensiveGameError::InformationEncodingFailed {
                         state: state.state,
                         message: error.message,
                     })?;
@@ -1332,11 +1331,10 @@ mod tests {
         impl InformationEncoder for Encoder {
             fn encode(
                 &self,
-                _player: PlayerId,
-                state: DecisionStateId,
-                _history: &[PlayerHistoryEvent],
+                player: PlayerId,
+                history: &[PlayerHistoryEvent],
             ) -> Result<InformationSetId, InformationEncodingError> {
-                if state == DecisionStateId(0) {
+                if player == PlayerId(0) && history.is_empty() {
                     Ok(InformationSetId(0))
                 } else {
                     Err(InformationEncodingError { message: "unexpected state".into() })
@@ -1374,7 +1372,6 @@ mod tests {
             fn encode(
                 &self,
                 _player: PlayerId,
-                _state: DecisionStateId,
                 history: &[PlayerHistoryEvent],
             ) -> Result<InformationSetId, InformationEncodingError> {
                 assert!(history.iter().any(|event| matches!(
@@ -1461,7 +1458,6 @@ mod tests {
             fn encode(
                 &self,
                 _player: PlayerId,
-                _state: DecisionStateId,
                 _history: &[PlayerHistoryEvent],
             ) -> Result<InformationSetId, InformationEncodingError> {
                 Ok(InformationSetId(99))
