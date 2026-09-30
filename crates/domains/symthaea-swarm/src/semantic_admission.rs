@@ -79,6 +79,7 @@ impl Default for AdmissionPolicy {
 pub enum ConflictKind {
     DeliveryContract,
     ObservationRecord,
+    ObservationOwnership,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -224,19 +225,29 @@ pub fn decide(
                 identity_kind: ConflictKind::DeliveryContract,
             };
         }
+    }
 
-        if let Some(result) = state.results.get(&observation.key) {
-            if result.logical_delivery_id != delivery.logical_delivery_id {
-                return AdmissionOutcome::Conflict {
-                    identity_kind: ConflictKind::ObservationRecord,
-                };
-            }
-            if state.observations.get(&observation.key) == Some(observation) {
-                return AdmissionOutcome::Replay {
-                    existing_result: result.clone(),
-                };
-            }
-        } else if !policy.allow_new_observation {
+    // Observation ownership is independent of delivery identity. Resolve it before
+    // admission policy so a key already owned by another delivery can never be
+    // hidden behind a local "new observation forbidden" policy decision.
+    if let Some(existing) = state.results.get(&observation.key) {
+        if existing.logical_delivery_id != delivery.logical_delivery_id {
+            return AdmissionOutcome::Conflict {
+                identity_kind: ConflictKind::ObservationOwnership,
+            };
+        }
+        if state.observations.get(&observation.key) == Some(observation) {
+            return AdmissionOutcome::Replay {
+                existing_result: existing.clone(),
+            };
+        }
+        return AdmissionOutcome::Conflict {
+            identity_kind: ConflictKind::ObservationRecord,
+        };
+    }
+
+    if let Some(existing) = state.deliveries.get(&delivery.logical_delivery_id) {
+        if !policy.allow_new_observation {
             return AdmissionOutcome::Rejected {
                 reason: RejectReason::NewObservationForbidden,
             };
@@ -439,7 +450,7 @@ mod tests {
         assert_eq!(
             outcome,
             AdmissionOutcome::Conflict {
-                identity_kind: ConflictKind::ObservationRecord
+                identity_kind: ConflictKind::ObservationOwnership
             }
         );
     }
@@ -522,6 +533,18 @@ mod tests {
             AdmissionOutcome::Conflict {
                 identity_kind: ConflictKind::DeliveryContract
             }
+        );
+    }
+
+    #[test]
+    fn same_observation_key_owned_by_another_delivery_is_ownership_conflict_even_when_new_observations_are_forbidden() {
+        let (state, delivery, observation) = admitted_state();
+        let mut other_delivery = delivery.clone();
+        other_delivery.logical_delivery_id = Uuid::from_u128(44);
+        other_delivery.payload = b"other".to_vec();
+        assert_eq!(
+            decide(&state, &other_delivery, &observation, AdmissionPolicy::default(), 100),
+            AdmissionOutcome::Conflict { identity_kind: ConflictKind::ObservationOwnership }
         );
     }
 
