@@ -79,7 +79,7 @@ fn step(
 ) -> (ZoneState, f64) {
     let dt_hours = 1.0;
     let hvac = ((params.setpoint_c - state.indoor_c)
-        * 8.0
+        * params.thermal_mass_kwh_per_c
         / dt_hours)
         .clamp(-intervention.hvac_capacity_kw, intervention.hvac_capacity_kw);
     let envelope_kw = params.envelope_u_kw_per_c * (outdoor_c - state.indoor_c);
