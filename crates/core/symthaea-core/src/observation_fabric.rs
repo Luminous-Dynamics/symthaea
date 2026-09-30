@@ -228,6 +228,11 @@ pub struct ProcessingActivity {
     pub agent_id: Option<String>,
     /// Fingerprint of code, configuration, and parameters used by this run.
     pub activity_fingerprint: Option<String>,
+    /// BLAKE3 fingerprint of the canonical execution envelope.
+    ///
+    /// This binds the concrete execution record to its identifiers, timing,
+    /// agent, process fingerprint, and ordered input/output observation IDs.
+    pub execution_fingerprint: Option<String>,
     /// Observation IDs consumed by this activity.
     pub input_observation_ids: Vec<String>,
     /// Observation IDs emitted by this activity.
@@ -235,7 +240,31 @@ pub struct ProcessingActivity {
 }
 
 impl ProcessingActivity {
-    pub fn validate(&self) -> Result<(), ObservationValidationError> {
+    pub fn compute_execution_fingerprint(&self) -> Result<String, ObservationValidationError> {
+        self.validate_without_execution_fingerprint()?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-processing-activity:v1\\n");
+        write_canonical_string(&mut hasher, &self.activity_id);
+        write_canonical_string(&mut hasher, &self.process_id);
+        write_canonical_i128_option(&mut hasher, self.started_at_unix_ns);
+        write_canonical_i128_option(&mut hasher, self.ended_at_unix_ns);
+        write_canonical_string_option(&mut hasher, self.agent_id.as_deref());
+        write_canonical_string_option(&mut hasher, self.activity_fingerprint.as_deref());
+        write_canonical_string_vec(&mut hasher, &self.input_observation_ids);
+        write_canonical_string_vec(&mut hasher, &self.output_observation_ids);
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+
+    pub fn verify_execution_fingerprint(&self) -> Result<(), ObservationValidationError> {
+        let expected = self.compute_execution_fingerprint()?;
+        match self.execution_fingerprint.as_deref() {
+            Some(actual) if actual == expected => Ok(()),
+            Some(_) => Err(ObservationValidationError::ExecutionFingerprintMismatch),
+            None => Err(ObservationValidationError::MissingExecutionFingerprint),
+        }
+    }
+
+    fn validate_without_execution_fingerprint(&self) -> Result<(), ObservationValidationError> {
         if self.activity_id.trim().is_empty() || self.process_id.trim().is_empty()
             || self.agent_id.as_deref().is_some_and(|id| id.trim().is_empty())
             || self.activity_fingerprint.as_deref().is_some_and(|id| id.trim().is_empty())
@@ -248,6 +277,41 @@ impl ProcessingActivity {
         }
         Ok(())
     }
+    
+    pub fn validate(&self) -> Result<(), ObservationValidationError> {
+        self.validate_without_execution_fingerprint()?;
+        if let Some(fingerprint) = self.execution_fingerprint.as_deref() {
+            if fingerprint.len() != 64 || !fingerprint.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return Err(ObservationValidationError::InvalidExecutionFingerprint);
+            }
+        }
+        Ok(())
+    }
+}
+
+fn write_canonical_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
+}
+fn write_canonical_string(hasher: &mut blake3::Hasher, value: &str) {
+    write_canonical_bytes(hasher, value.as_bytes());
+}
+fn write_canonical_string_option(hasher: &mut blake3::Hasher, value: Option<&str>) {
+    match value {
+        Some(value) => { hasher.update(&[1]); write_canonical_string(hasher, value); }
+        None => hasher.update(&[0]),
+    }
+}
+fn write_canonical_i128_option(hasher: &mut blake3::Hasher, value: Option<i128>) {
+    match value {
+        Some(value) => { hasher.update(&[1]); hasher.update(&value.to_be_bytes()); }
+        None => hasher.update(&[0]),
+    }
+}
+fn write_canonical_string_vec(hasher: &mut blake3::Hasher, values: &[String]) {
+    hasher.update(&(values.len() as u64).to_be_bytes());
+    for value in values { write_canonical_string(hasher, value); }
+}
 }
 
 /// Provenance linking an observation to its producer and processing lineage.
@@ -522,6 +586,12 @@ pub enum ObservationValidationError {
     InvalidParentObservation,
     #[error("processing activity has invalid identifiers, fingerprints, or time bounds")]
     InvalidProcessingActivity,
+    #[error("processing activity execution fingerprint must be 64 hexadecimal characters")]
+    InvalidExecutionFingerprint,
+    #[error("processing activity execution fingerprint does not match its canonical execution envelope")]
+    ExecutionFingerprintMismatch,
+    #[error("processing activity execution fingerprint is required for verification")]
+    MissingExecutionFingerprint,
     #[error("processing activity input observation is not present in the closed graph: {0}")]
     MissingActivityInput(String),
     #[error("processing activity output observation is not present in the closed graph: {0}")]
@@ -729,6 +799,7 @@ mod tests {
             ended_at_unix_ns: Some(10),
             agent_id: Some("worker-7".into()),
             activity_fingerprint: Some("sha256:config".into()),
+            execution_fingerprint: None,
             input_observation_ids: vec![],
             output_observation_ids: vec!["obs-001".into()],
         });
@@ -741,6 +812,79 @@ mod tests {
     }
 
     #[test]
+    fn processing_activity_execution_fingerprint_is_deterministic() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: Some(10),
+            ended_at_unix_ns: Some(20),
+            agent_id: Some("worker-7".into()),
+            activity_fingerprint: Some("blake3:config-v1".into()),
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input-a".into(), "input-b".into()],
+            output_observation_ids: vec!["output-a".into()],
+        };
+        let first = activity.compute_execution_fingerprint().expect("fingerprint");
+        let second = activity.compute_execution_fingerprint().expect("fingerprint");
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 64);
+        let mut reordered = activity.clone();
+        reordered.input_observation_ids.reverse();
+        assert_ne!(first, reordered.compute_execution_fingerprint().expect("fingerprint"));
+    }
+
+    #[test]
+    fn processing_activity_execution_fingerprint_detects_change() {
+        let mut activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: Some(10),
+            ended_at_unix_ns: Some(20),
+            agent_id: Some("worker-7".into()),
+            activity_fingerprint: Some("blake3:config-v1".into()),
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input-a".into()],
+            output_observation_ids: vec!["output-a".into()],
+        };
+        activity.execution_fingerprint = Some(activity.compute_execution_fingerprint().expect("fingerprint"));
+        assert_eq!(activity.verify_execution_fingerprint(), Ok(()));
+        activity.process_id = "transform-v2".into();
+        assert_eq!(activity.verify_execution_fingerprint(), Err(ObservationValidationError::ExecutionFingerprintMismatch));
+    }
+
+    #[test]
+    fn processing_activity_execution_fingerprint_requires_stored_value() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec![],
+            output_observation_ids: vec!["obs-001".into()],
+        };
+        assert_eq!(activity.verify_execution_fingerprint(), Err(ObservationValidationError::MissingExecutionFingerprint));
+    }
+
+    #[test]
+    fn processing_activity_rejects_malformed_execution_fingerprint() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: Some("not-a-digest".into()),
+            input_observation_ids: vec![],
+            output_observation_ids: vec!["obs-001".into()],
+        };
+        assert_eq!(activity.validate(), Err(ObservationValidationError::InvalidExecutionFingerprint));
+    }
+
+    #[test]
     fn processing_activity_rejects_blank_process_id() {
         let activity = ProcessingActivity {
             activity_id: "run-001".into(),
@@ -749,6 +893,7 @@ mod tests {
             ended_at_unix_ns: None,
             agent_id: None,
             activity_fingerprint: None,
+            execution_fingerprint: None,
             input_observation_ids: vec![],
             output_observation_ids: vec![],
         };
@@ -833,6 +978,7 @@ mod tests {
             ended_at_unix_ns: None,
             agent_id: None,
             activity_fingerprint: None,
+            execution_fingerprint: None,
             input_observation_ids: vec!["missing-input".into()],
             output_observation_ids: vec!["obs-001".into()],
         });
