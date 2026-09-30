@@ -84,7 +84,7 @@ impl FederatedClaim {
         }
 
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:federated-claim:v1\\0");
+        bytes.extend_from_slice(b"symthaea:federated-claim:v1\0");
         bytes.extend_from_slice(&self.schema_version.to_be_bytes());
         field(&mut bytes, "claim_identity", Some(&self.claim_identity));
         field(&mut bytes, "canonical_identity", Some(&self.canonical_identity));
@@ -337,6 +337,69 @@ mod digest_tests {
         let a = base_claim();
         let mut b = a.clone();
         b.author = "author:2".into();
+        assert_ne!(a.canonical_digest(), b.canonical_digest());
+    }
+
+    #[test]
+    fn federated_claim_json_round_trip_preserves_digest_and_admission_binding() {
+        let claim = base_claim();
+        let digest = claim.canonical_digest();
+        let encoded = serde_json::to_string(&claim).expect("claim should serialize");
+        let decoded: FederatedClaim =
+            serde_json::from_str(&encoded).expect("claim should deserialize");
+        assert_eq!(decoded, claim);
+        assert_eq!(decoded.canonical_digest(), digest);
+        assert!(decoded.validate_structure().is_ok());
+        assert!(decoded.is_admission_bound(&decoded.provenance_validation));
+    }
+
+    #[test]
+    fn federated_claim_rejects_mutated_admission_event() {
+        let mut claim = base_claim();
+        let original = claim.canonical_digest();
+        claim.admission_receipt.admission_event = "admission:event-tampered".into();
+        assert_ne!(claim.canonical_digest(), original);
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "admission receipt must bind claim validation report"
+        );
+    }
+
+    #[test]
+    fn federated_claim_rejects_mutated_validation_version() {
+        let mut claim = base_claim();
+        claim.provenance_validation.validator_version = "tampered-validator".into();
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "admission receipt must bind claim validation report"
+        );
+    }
+
+    #[test]
+    fn federated_claim_rejects_mutated_schema_version() {
+        let mut claim = base_claim();
+        claim.provenance_validation.snapshot_schema_version += 1;
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "admission receipt must bind claim validation report"
+        );
+    }
+
+    #[test]
+    fn federated_claim_rejects_mutated_relation_content() {
+        let mut claim = base_claim();
+        claim.relations[0].created_at = "cycle:999".into();
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "claim snapshot digest must match validation report"
+        );
+    }
+
+    #[test]
+    fn canonical_digest_changes_when_admission_event_changes() {
+        let a = base_claim();
+        let mut b = a.clone();
+        b.admission_receipt.admission_event = "admission:event-2".into();
         assert_ne!(a.canonical_digest(), b.canonical_digest());
     }
 
