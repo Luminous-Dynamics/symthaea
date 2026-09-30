@@ -550,6 +550,105 @@ pub struct ObservationGraph {
 }
 
 impl ObservationGraph {
+    /// Assess whether two observations have independent provenance within this
+    /// closed-world graph.
+    ///
+    /// VerifiedIndependent means only that the supplied provenance graph
+    /// exposes no shared upstream observation, producer platform, processing
+    /// activity, or exact asset hash. It is deliberately not a claim about
+    /// substantive truth or real-world independence outside the graph.
+    pub fn assess_independence(
+        &self,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> Result<EvidenceIndependence, ObservationValidationError> {
+        if source_observation_id == target_observation_id {
+            return Err(ObservationValidationError::SelfRelation);
+        }
+
+        let by_id = self
+            .observations
+            .iter()
+            .map(|observation| (observation.id.as_str(), observation))
+            .collect::<HashMap<_, _>>();
+
+        let source = by_id
+            .get(source_observation_id)
+            .ok_or_else(|| ObservationValidationError::MissingRelationEndpoint(
+                source_observation_id.to_string(),
+            ))?;
+        let target = by_id
+            .get(target_observation_id)
+            .ok_or_else(|| ObservationValidationError::MissingRelationEndpoint(
+                target_observation_id.to_string(),
+            ))?;
+
+        if source.provenance.source.sensor_id == target.provenance.source.sensor_id
+            || source.provenance.source.platform_id.is_some()
+                && source.provenance.source.platform_id == target.provenance.source.platform_id
+        {
+            return Ok(EvidenceIndependence::SharedUpstream);
+        }
+
+        let source_ancestors = Self::ancestor_ids(source_observation_id, &by_id)?;
+        let target_ancestors = Self::ancestor_ids(target_observation_id, &by_id)?;
+        if source_ancestors.intersection(&target_ancestors).next().is_some() {
+            return Ok(EvidenceIndependence::SharedUpstream);
+        }
+
+        let source_activities = source_ancestors
+            .iter()
+            .filter_map(|id| by_id.get(id.as_str()))
+            .chain(std::iter::once(source))
+            .filter_map(|observation| {
+                observation.provenance.processing_activity.as_ref()
+                    .map(|activity| activity.activity_id.as_str())
+            })
+            .collect::<HashSet<_>>();
+        let target_activities = target_ancestors
+            .iter()
+            .filter_map(|id| by_id.get(id.as_str()))
+            .chain(std::iter::once(target))
+            .filter_map(|observation| {
+                observation.provenance.processing_activity.as_ref()
+                    .map(|activity| activity.activity_id.as_str())
+            })
+            .collect::<HashSet<_>>();
+        if source_activities.intersection(&target_activities).next().is_some() {
+            return Ok(EvidenceIndependence::SharedUpstream);
+        }
+
+        if source.asset.as_ref().zip(target.asset.as_ref()).is_some_and(
+            |(source_asset, target_asset)| {
+                source_asset.hash_algorithm == target_asset.hash_algorithm
+                    && source_asset.content_hash == target_asset.content_hash
+            },
+        ) {
+            return Ok(EvidenceIndependence::SharedUpstream);
+        }
+
+        Ok(EvidenceIndependence::VerifiedIndependent)
+    }
+
+    fn ancestor_ids(
+        observation_id: &str,
+        by_id: &HashMap<&str, &Observation>,
+    ) -> Result<HashSet<String>, ObservationValidationError> {
+        let mut ancestors = HashSet::new();
+        let mut pending = vec![observation_id.to_string()];
+        while let Some(current) = pending.pop() {
+            let observation = by_id
+                .get(current.as_str())
+                .ok_or_else(|| ObservationValidationError::MissingParentObservation(current.clone()))?;
+            for parent_id in &observation.provenance.parent_observation_ids {
+                if ancestors.insert(parent_id.clone()) {
+                    pending.push(parent_id.clone());
+                }
+            }
+        }
+        Ok(ancestors)
+    }
+
     pub fn validate(&self) -> Result<(), ObservationValidationError> {
         let mut by_id = HashMap::with_capacity(self.observations.len());
         for observation in &self.observations {
@@ -1448,6 +1547,45 @@ mod tests {
         assert_eq!(
             relation.validate(),
             Err(ObservationValidationError::DerivedRelationIndependenceMismatch)
+        );
+    }
+
+    #[test]
+    fn graph_assesses_verified_independence_without_shared_provenance() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        assert_eq!(
+            ObservationGraph {
+                observations: vec![fixture(), second],
+                relations: vec![],
+            }
+            .assess_independence("obs-001", "obs-002"),
+            Ok(EvidenceIndependence::VerifiedIndependent)
+        );
+    }
+
+    #[test]
+    fn graph_assesses_shared_ancestor_as_non_independent() {
+        let mut parent = fixture();
+        parent.id = "parent".into();
+
+        let mut first = fixture();
+        first.id = "obs-001".into();
+        first.provenance.parent_observation_ids = vec!["parent".into()];
+
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        second.provenance.parent_observation_ids = vec!["parent".into()];
+
+        assert_eq!(
+            ObservationGraph {
+                observations: vec![parent, first, second],
+                relations: vec![],
+            }
+            .assess_independence("obs-001", "obs-002"),
+            Ok(EvidenceIndependence::SharedUpstream)
         );
     }
 
