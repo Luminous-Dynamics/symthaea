@@ -530,3 +530,37 @@ The current Sol Atlas chain is therefore:
 `claim -> provenance slice -> completeness certificate -> integrity validation -> replay witness -> support/qualification/contradiction set -> invalidation propagation -> decision revalidation boundary`
 
 The next seam should not be another generic decision type. It should connect this boundary to the **intervention lifecycle** already represented elsewhere in the engineering fixture: preserve the proposed intervention, its counterfactual alternatives, expected outcomes, and reversibility/agency dimensions while making revalidation a prerequisite for a fresh authorization context. Mycelix/Holochain can then remain the durable distributed provenance/governance substrate rather than becoming a second physics or decision engine.
+
+
+## Intervention identity binding — SWA-016
+
+SWA-015 closes the evidence-freshness boundary, but one subtle gap remained: **fresh evidence does not prove that the intervention currently being considered is the intervention that was reviewed**.
+
+SWA-016 binds the authorization context to:
+
+- an exact intervention identifier and revision;
+- an exact scenario identifier and revision;
+- evidence explicitly bound to those same intervention/scenario revisions.
+
+Therefore a changed intervention cannot inherit an otherwise-current evidence set merely because its human-readable name is unchanged.
+
+The resulting boundary is:
+
+`intervention revision + scenario revision + evidence freshness -> authorization-context readiness -> external authorization`
+
+Readiness remains deliberately non-authoritative:
+
+- `Current` means the context is internally coherent with its declared inputs.
+- `ReopenForReview` means the intervention, scenario, or required evidence changed relative to what was reviewed.
+- `Unknown` means required evidence cannot establish the binding.
+- No state means execute, approve, reject, or physically actuate.
+
+This closes an important time-of-check/time-of-use seam. A decision cannot silently migrate from intervention revision `v1` to `v2` while retaining the epistemic lineage of `v1`.
+
+The architecture is now:
+
+`observation -> intervention-specific prediction -> outcome/residual -> provenance -> replay/counterevidence -> invalidation propagation -> decision revalidation -> intervention/scenario identity binding -> fresh authorization context`
+
+This is also a useful boundary for Mycelix/Holochain. Holochain validation requires deterministic results for the same operation and supports explicit, addressable dependencies; unresolved dependencies are not treated as valid. Source-chain records are append-only and cryptographically linked. Those properties fit the durable receipt/attestation side of this architecture, while the actual physical intervention remains outside the provenance layer. citeturn0search0turn0search3turn0search5
+
+Most importantly, SWA-016 does not create a second authorization system. It makes the authorization context *more precise* so a future Mycelix governance/consent layer can authorize a specific reviewed intervention rather than an ambiguous action label.
