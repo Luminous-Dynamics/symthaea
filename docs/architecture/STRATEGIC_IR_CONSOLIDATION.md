@@ -626,3 +626,10 @@ world transition
 ```
 
 Visibility remains a transport/observation rule, not an information-set identity by itself; the encoder still determines the canonical `InformationSetId` from the observable history.
+
+
+### 2026-09-30 typed observation scope
+
+Observations now carry an explicit `ObservationScope`: `Public` or `Private(PlayerId)`. This removes the need to model a public observation by duplicating identical observer-tagged entries and makes public/private delivery part of the type contract. The player-local projection broadcasts public observation tokens to every player and includes private tokens only for their named observer. The privacy regression now verifies both paths.
+
+This follows the OpenSpiel distinction between observations and perfect-recall information states: observations may be partial, public/private information is an explicit dimension, and the complete action-observation history is the basis for reconstructing an information state. The IR keeps that reconstruction in the `InformationEncoder` rather than conflating a raw observation token with an information-set identity. <Cite refs={["turn986240search0","turn986240search1","turn986240search4"]} />
