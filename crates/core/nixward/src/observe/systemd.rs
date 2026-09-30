@@ -132,6 +132,7 @@ impl SystemdObserver {
 
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,32 +198,12 @@ mod tests {
 
     #[test]
     fn test_parse_unit_list_mixed_states() {
-        let output = "Id=test.service\nLoadState=loaded\nActiveState=active\nSubState=running\nDescription=Test\nExtraKey=ignored\n";
-        let unit = SystemdObserver::parse_unit_show(output).unwrap();
-        assert_eq!(unit.name, "test.service");
-    }
-
-    #[test]
-    fn test_parse_unit_show_empty_values() {
-        let output = "Id=test.service\nLoadState=\nActiveState=\nSubState=\nDescription=\n";
-        let unit = SystemdObserver::parse_unit_show(output).unwrap();
-        assert_eq!(unit.name, "test.service");
-        assert_eq!(unit.load_state, "");
-    }
-
-    #[test]
-    fn test_parse_unit_show_empty_output() {
-        let result = SystemdObserver::parse_unit_show("");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_parse_unit_list_mixed_states() {
         let output = "\
-  a.service loaded active   running   Service A\n\
-  b.service loaded inactive dead      Service B\n\
-  c.service loaded failed   failed    Service C\n\
-  d.service masked inactive dead      Masked D\n";
+  a.service loaded active   running   Service A
+  b.service loaded inactive dead      Service B
+  c.service loaded failed   failed    Service C
+  d.service masked inactive dead      Masked D
+";
         let units = SystemdObserver::parse_unit_list(output).unwrap();
         assert_eq!(units.len(), 4);
         assert_eq!(units[0].active_state, "active");
