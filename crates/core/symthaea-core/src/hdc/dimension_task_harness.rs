@@ -40,14 +40,14 @@ pub const TASK_NAME: &str = "hdc_synthetic_prototype_retrieval";
 pub const SCENARIO_SET: &str = "synthetic-prototype-retrieval-v1";
 pub const SCENARIO_REVISION: &str = "sha256:deterministic-fixture-v1";
 pub const SPLIT: &str = "held-out";
-pub const PROTOCOL: &str = "4-class-4-query-nearest-prototype-cosine";
+pub const PROTOCOL: &str = "4-class-nearest-prototype-cosine-v1";
 pub const REPRESENTATION: &str = "continuous_f32";
 pub const MODEL_REVISION: &str = "prototype-mixture-v1";
 pub const DEFAULT_SEED: u64 = 0x4844_4352_4554_5226;
 pub const DEFAULT_DIMENSIONS: &[usize] =
     &[1_024, 2_048, 4_096, 8_192, 16_384, 32_768, 65_536, 131_072, 262_144];
 pub const CLASS_COUNT: usize = 4;
-pub const QUERIES_PER_CLASS: usize = 4;
+pub const QUERIES_PER_CLASS: usize = 32;
 pub const NOISE_WEIGHT: f32 = 0.20;
 pub const PROTOTYPE_WEIGHT: f32 = 0.80;
 
@@ -107,6 +107,7 @@ pub enum DimensionTaskError {
     InvalidDimension(usize),
     UnsortedDimensions,
     ZeroQueries,
+    TooManyQueries,
     InvalidScore,
     Resource(String),
     Evidence(String),
@@ -120,6 +121,7 @@ impl std::fmt::Display for DimensionTaskError {
             Self::InvalidDimension(d) => write!(f, "invalid dimension: {d}"),
             Self::UnsortedDimensions => f.write_str("dimensions must be strictly ascending"),
             Self::ZeroQueries => f.write_str("queries_per_class must be non-zero"),
+            Self::TooManyQueries => f.write_str("queries_per_class exceeds the safety limit"),
             Self::InvalidScore => f.write_str("task score is non-finite"),
             Self::Resource(e) => write!(f, "resource evidence failed: {e}"),
             Self::Evidence(e) => write!(f, "evidence validation failed: {e}"),
@@ -139,6 +141,9 @@ impl DimensionTaskSpec {
         }
         if self.queries_per_class == 0 {
             return Err(DimensionTaskError::ZeroQueries);
+        }
+        if self.queries_per_class > 4_096 {
+            return Err(DimensionTaskError::TooManyQueries);
         }
         let mut previous = 0;
         for &dimension in self.dimensions {
@@ -258,7 +263,9 @@ fn run_row(
         .map(|class| ContinuousHV::random(resolution, seed.wrapping_add(class as u64 + 1)))
         .collect();
 
-    let total_queries = CLASS_COUNT * queries_per_class;
+    let total_queries = CLASS_COUNT
+        .checked_mul(queries_per_class)
+        .ok_or(DimensionTaskError::TooManyQueries)?;
     let logical_bytes_per_query = (CLASS_COUNT + 1)
         .checked_mul(resolution)
         .and_then(|n| n.checked_mul(std::mem::size_of::<f32>()))
@@ -501,6 +508,7 @@ mod tests {
         let spec = DimensionTaskSpec::default();
         spec.validate().unwrap();
         assert_eq!(spec.identity_digest(), DimensionTaskSpec::default().identity_digest());
+        assert_eq!(spec.queries_per_class, 32);
     }
 
     #[test]
