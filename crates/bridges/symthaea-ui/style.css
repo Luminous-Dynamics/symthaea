@@ -263,7 +263,8 @@ body {
 /* Keyboard users should always be able to see where interaction is. */
 .gateway-row input:focus-visible,
 .composer input:focus-visible,
-.composer button:focus-visible {
+.composer button:focus-visible,
+.timeline-pause:focus-visible {
     outline: 2px solid #9a90ff;
     outline-offset: 3px;
 }
@@ -294,6 +295,38 @@ body {
     align-items: baseline;
     justify-content: space-between;
     gap: 1rem;
+}
+
+.timeline-header > div:first-child {
+    display: flex;
+    align-items: baseline;
+    gap: 0.65rem;
+}
+
+.timeline-state {
+    font-size: 0.68rem;
+    opacity: 0.4;
+}
+
+.timeline-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.timeline-pause {
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.7rem;
+    cursor: pointer;
+}
+
+.timeline-pause:hover {
+    border-color: rgba(255,255,255,0.28);
 }
 
 .timeline-header h2 {
