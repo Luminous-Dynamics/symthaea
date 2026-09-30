@@ -175,7 +175,7 @@ mod tests {
                 "claim:1", "canonical:1", "family:1", "author:1", "statement:1",
                 "wrong-digest", validation, r,
             ).unwrap_err(),
-            "claim snapshot digest must match admission receipt"
+            "claim snapshot digest must match validation report"
         );
     }
 
