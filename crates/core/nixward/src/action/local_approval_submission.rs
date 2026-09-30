@@ -314,7 +314,7 @@ mod tests {
             &intent(),
             "nixward-daemon-incarnation-v1:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
             "nixos-rebuild switch --flake .#workstation",
-            "local-human-v1",
+            "same-uid-process-v1",
             ms(1_000),
             ms(2_000),
             [7; 32],

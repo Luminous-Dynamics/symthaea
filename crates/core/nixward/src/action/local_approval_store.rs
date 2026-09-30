@@ -151,6 +151,11 @@ impl LocalApprovalRequestStoreV1 {
         Ok(ConsumedLocalApprovalDecisionV1 {
             request_id: submission.request_id.clone(),
             decision_evidence: decision,
+            projection_digest: removed.projection_digest,
+            required_approval_profile: removed.request.authority_profile_ref.clone(),
+            approver_evidence_ref: verified_peer.evidence_ref().clone(),
+            transport_instance_ref: verified_peer.audit_evidence().transport_instance_ref.clone(),
+            peer_observed_at_unix_ms: verified_peer.audit_evidence().observed_at_unix_ms,
             consumed_at_unix_ms: evaluation.evaluated_at().as_u64(),
         })
     }
@@ -189,6 +194,11 @@ impl LocalApprovalRequestStoreV1 {
         Ok(ConsumedLocalApprovalDecisionV1 {
             request_id: submission.request_id.clone(),
             decision_evidence: decision,
+            projection_digest: record.projection_digest.clone(),
+            required_approval_profile: record.request.authority_profile_ref.clone(),
+            approver_evidence_ref: verified_peer.evidence_ref().clone(),
+            transport_instance_ref: verified_peer.audit_evidence().transport_instance_ref.clone(),
+            peer_observed_at_unix_ms: verified_peer.audit_evidence().observed_at_unix_ms,
             consumed_at_unix_ms: evaluation.evaluated_at().as_u64(),
         })
     }
@@ -279,6 +289,11 @@ pub enum PendingRequestCurrentnessV1 {
 pub struct ConsumedLocalApprovalDecisionV1 {
     request_id: String,
     decision_evidence: LocalNixApprovalDecisionV1,
+    projection_digest: String,
+    required_approval_profile: String,
+    approver_evidence_ref: super::approver_evidence::ApproverEvidenceRefV1,
+    transport_instance_ref: String,
+    peer_observed_at_unix_ms: u64,
     consumed_at_unix_ms: u64,
 }
 
@@ -295,6 +310,26 @@ impl ConsumedLocalApprovalDecisionV1 {
         &self.decision_evidence
     }
 
+    pub fn projection_digest(&self) -> &str {
+        &self.projection_digest
+    }
+
+    pub fn required_approval_profile(&self) -> &str {
+        &self.required_approval_profile
+    }
+
+    pub fn approver_evidence_ref(&self) -> &super::approver_evidence::ApproverEvidenceRefV1 {
+        &self.approver_evidence_ref
+    }
+
+    pub fn transport_instance_ref(&self) -> &str {
+        &self.transport_instance_ref
+    }
+
+    pub fn peer_observed_at(&self) -> UnixMillisV1 {
+        UnixMillisV1::new(self.peer_observed_at_unix_ms)
+    }
+
     pub fn consumed_at(&self) -> UnixMillisV1 {
         UnixMillisV1::new(self.consumed_at_unix_ms)
     }
@@ -305,6 +340,11 @@ impl std::fmt::Debug for ConsumedLocalApprovalDecisionV1 {
         f.debug_struct("ConsumedLocalApprovalDecisionV1")
             .field("request_id", &self.request_id)
             .field("decision", &self.decision_evidence.decision)
+            .field("projection_digest", &self.projection_digest)
+            .field("required_approval_profile", &self.required_approval_profile)
+            .field("approver_evidence_ref", &self.approver_evidence_ref)
+            .field("transport_instance_ref", &self.transport_instance_ref)
+            .field("peer_observed_at_unix_ms", &self.peer_observed_at_unix_ms)
             .field("consumed_at_unix_ms", &self.consumed_at_unix_ms)
             .finish_non_exhaustive()
     }
@@ -444,7 +484,7 @@ mod tests {
         )
         .unwrap();
         let consumed = store
-            .consume_verified_submission(&new_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .consume_verified_submission_v1(&new_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         assert_eq!(consumed.request_id(), new_id);
     }
@@ -497,7 +537,7 @@ mod tests {
         assert_eq!(observation, PendingRequestCurrentnessV1::Current);
 
         store
-            .consume_verified_submission(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_400)))
+            .consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_400)))
             .unwrap();
 
         // The earlier Current result is intentionally only a historical observation.
@@ -533,7 +573,7 @@ mod tests {
         // The atomic consume boundary re-evaluates time itself. The stale
         // observation cannot authorize a consume at the exact expiry instant.
         assert!(matches!(
-            store.consume_verified_submission(&submission, &peer(1000, 1), ms(2_000)),
+            store.consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(2_000))),
             Err(LocalApprovalRequestStoreErrorV1::Admission(_))
         ));
         assert!(store.is_pending(&request_id).unwrap());
@@ -541,6 +581,45 @@ mod tests {
             store.observe_currentness(&request_id, ms(2_000)).unwrap(),
             PendingRequestCurrentnessV1::Expired
         );
+    }
+
+    #[test]
+    fn v2_consume_returns_self_contained_approval_provenance_capsule() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 7);
+        let projection_digest = "ab".repeat(32);
+        let request_id = request.request_id().unwrap();
+        let submission = LocalApprovalSubmissionV2 {
+            request_id: request_id.clone(),
+            daemon_incarnation_id: request.daemon_incarnation_id.clone(),
+            action_intent_digest: request.action_intent_digest.clone(),
+            projection_digest: projection_digest.clone(),
+            decision: LocalApprovalDecisionKindV1::Approved,
+            decided_at_unix_ms: 1_200,
+        };
+        store
+            .install_pending_with_projection(request, projection_digest.clone())
+            .unwrap();
+
+        let consumed = store
+            .consume_verified_submission_v2(
+                &submission,
+                &peer(1000, 42),
+                AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+            )
+            .unwrap();
+
+        assert_eq!(consumed.request_id(), request_id);
+        assert_eq!(consumed.decision_kind(), LocalApprovalDecisionKindV1::Approved);
+        assert_eq!(consumed.projection_digest(), projection_digest);
+        assert_eq!(consumed.required_approval_profile(), "same-uid-process-v1");
+        assert_eq!(consumed.approver_evidence_ref().profile, super::super::approver_evidence::ApproverEvidenceProfileV1::LocalUnixPeerCredentialV1);
+        assert_eq!(consumed.approver_evidence_ref().evidence_digest.len(), 64);
+        assert_eq!(consumed.transport_instance_ref(), "unix-socket-instance:test-42");
+        assert_eq!(consumed.peer_observed_at(), ms(1_100));
+        assert_eq!(consumed.consumed_at(), ms(1_300));
+        assert_eq!(store.pending_count().unwrap(), 0);
     }
 
     #[test]
@@ -558,7 +637,7 @@ mod tests {
         store.install_pending(request).unwrap();
 
         let consumed = store
-            .consume_verified_submission(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
 
         assert_eq!(consumed.request_id(), request_id);
@@ -585,7 +664,7 @@ mod tests {
         store.install_pending(request).unwrap();
 
         assert!(matches!(
-            store.consume_verified_submission(&hostile, &peer(1000, 1), ms(1_300)),
+            store.consume_verified_submission_v1(&hostile, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))),
             Err(LocalApprovalRequestStoreErrorV1::Admission(
                 LocalApprovalAdmissionErrorV1::Approval(LocalApprovalErrorV1::IntentMismatch)
             ))
@@ -593,7 +672,7 @@ mod tests {
         assert!(store.is_pending(&request_id).unwrap());
 
         store
-            .consume_verified_submission(&valid_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .consume_verified_submission_v1(&valid_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         assert!(!store.is_pending(&request_id).unwrap());
     }
@@ -612,7 +691,7 @@ mod tests {
         store.install_pending(request).unwrap();
 
         let consumed = store
-            .consume_verified_submission(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         assert_eq!(consumed.decision_kind(), LocalApprovalDecisionKindV1::Denied);
         assert_eq!(store.pending_count().unwrap(), 0);
@@ -640,7 +719,7 @@ mod tests {
             handles.push(thread::spawn(move || {
                 let peer = peer(uid, pid);
                 barrier.wait();
-                store.consume_verified_submission(&submission, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+                store.consume_verified_submission_v1(&submission, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             }));
         }
         barrier.wait();
