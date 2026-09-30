@@ -135,7 +135,21 @@ impl ProvenanceGraph {
             .collect::<Vec<_>>();
         edges.sort();
 
-        Ok(ProvenanceSlice { root, nodes, edges })
+        let boundary = SliceBoundaryCertificate {
+            root,
+            graph_node_count: self.nodes.len(),
+            graph_edge_count: self.edges.len(),
+            slice_node_count: nodes.len(),
+            slice_edge_count: edges.len(),
+            frontier_exhausted: true,
+        };
+
+        Ok(ProvenanceSlice {
+            root,
+            nodes,
+            edges,
+            boundary,
+        })
     }
 }
 
@@ -144,6 +158,28 @@ pub struct ProvenanceSlice {
     pub root: &'static str,
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
+    /// Structural certificate issued by the authoritative traversal itself.
+    /// This is about traversal completeness, not semantic truth: SWA-010
+    /// remains responsible for claim-specific dependency requirements.
+    pub boundary: SliceBoundaryCertificate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct SliceBoundaryCertificate {
+    pub root: &'static str,
+    pub graph_node_count: usize,
+    pub graph_edge_count: usize,
+    pub slice_node_count: usize,
+    pub slice_edge_count: usize,
+    pub frontier_exhausted: bool,
+}
+
+impl SliceBoundaryCertificate {
+    pub fn is_complete(&self) -> bool {
+        self.frontier_exhausted
+            && self.slice_node_count <= self.graph_node_count
+            && self.slice_edge_count <= self.graph_edge_count
+    }
 }
 
 impl ProvenanceSlice {
