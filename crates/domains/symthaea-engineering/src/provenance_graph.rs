@@ -55,6 +55,7 @@ pub enum ProvenanceGraphError {
     DuplicateEdge,
     MissingEdgeEndpoint,
     InvalidNodeIdentity,
+    MissingRoot,
 }
 
 impl ProvenanceGraph {
@@ -93,8 +94,9 @@ impl ProvenanceGraph {
 
 
     pub fn slice(&self, root: &'static str) -> Result<ProvenanceSlice, ProvenanceGraphError> {
+        self.validate()?;
         if !self.nodes.iter().any(|node| node.id == root) {
-            return None;
+            return Err(ProvenanceGraphError::MissingRoot);
         }
 
         let mut outgoing: BTreeMap<&'static str, Vec<Edge>> = BTreeMap::new();
@@ -133,7 +135,7 @@ impl ProvenanceGraph {
             .collect::<Vec<_>>();
         edges.sort();
 
-        Some(ProvenanceSlice { root, nodes, edges })
+        Ok(ProvenanceSlice { root, nodes, edges })
     }
 }
 
@@ -277,6 +279,6 @@ mod tests {
 
     #[test]
     fn missing_root_is_not_an_empty_slice() {
-        assert!(reference_graph().slice("missing").is_none());
+        assert_eq!(reference_graph().slice("missing"), Err(ProvenanceGraphError::MissingRoot));
     }
 }
