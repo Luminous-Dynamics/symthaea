@@ -103,6 +103,15 @@ impl CanonicalAdmissionReceipt {
             snapshot_schema_version,
         })
     }
+
+    /// Returns true only when this receipt identifies exactly the supplied
+    /// provenance validation snapshot. This binds admission to a concrete,
+    /// schema-versioned structural state without assigning epistemic weight.
+    pub fn binds_validation(&self, validation: &ProvenanceValidationReport) -> bool {
+        self.provenance_snapshot_digest == validation.snapshot_digest
+            && self.validator_version == validation.validator_version
+            && self.snapshot_schema_version == validation.snapshot_schema_version
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -374,6 +383,29 @@ mod tests {
 
         p.memory_id.clear();
         assert_eq!(p.validate_structure(), Err("memory_id must be non-empty"));
+    }
+
+    #[test]
+    fn admission_receipt_binds_exact_validation_snapshot() {
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let validation = ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation));
+        let receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            Some("frontier:1".into()),
+            validation.snapshot_digest.clone(),
+            validation.validator_version.clone(),
+            validation.snapshot_schema_version,
+        ).unwrap();
+        assert!(receipt.binds_validation(&validation));
+
+        let mut changed = validation.clone();
+        changed.snapshot_schema_version += 1;
+        assert!(!receipt.binds_validation(&changed));
     }
 
     #[test]
