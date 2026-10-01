@@ -118,6 +118,8 @@ pub mod associative_cleanup_harness;
 pub mod sequence_order_harness;
 /// Matched direct-cleanup vs resonator retrieval cross-validation.
 pub mod resonator_cross_validation_harness;
+/// Deterministic coupled two-factor resonator factorization research harness.
+pub mod two_factor_resonator_harness;
 
 /// HDC dimensionality configuration for runtime selection
 ///
