@@ -575,7 +575,7 @@ impl EnhancedKnowledgeGraph {
             if current == source { return true; }
             if !visited.insert(current.clone()) { continue; }
             for relation in &self.provenance_relations {
-                if matches!(relation.kind, ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom)
+                if matches!(relation.kind, ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom | ProvenanceRelationKind::Supersedes)
                     && relation.source_memory_id == current
                 {
                     frontier.push(relation.target_memory_id.clone());
