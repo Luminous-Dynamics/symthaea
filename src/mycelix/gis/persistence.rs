@@ -223,6 +223,19 @@ impl StoredIgnoranceRecord {
             },
         };
 
+        let frame_revisions = self.frame_revisions_serialized.iter().filter_map(|s| {
+            let p: Vec<&str> = s.split(';').collect();
+            if p.len() < 6 { return None; }
+            Some(EpistemicFrameRevision {
+                prior_frame: p[0].to_string(),
+                revised_frame: p[1].to_string(),
+                trigger: p[2].to_string(),
+                newly_represented: if p[3].is_empty() { None } else { Some(p[3].to_string()) },
+                scope_change: p[4].to_string(),
+                affected_conclusions: p[5].split(',').map(|v| v.to_string()).collect(),
+            })
+        }).collect();
+
         Ok(IgnoranceRecord {
             id: self.id.clone(),
             detection,
