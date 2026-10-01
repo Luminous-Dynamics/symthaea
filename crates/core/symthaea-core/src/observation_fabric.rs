@@ -825,7 +825,7 @@ pub struct ReceiptAttestationEnvelope {
     pub proof: Option<Vec<u8>>,
 }
 
-impl ReceiptAttestationEnvelope {
+/// Time-relative validity of a detached receipt attestation envelope.\n///\n/// This is deliberately trust-neutral: it evaluates only the envelope's\n/// declared creation/expiry timestamps. It does not validate cryptographic\n/// proof material, attester identity, revocation, or the underlying receipt.\n#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]\npub enum ReceiptAttestationTemporalStatus {\n    NotYetValid,\n    Valid,\n    Expired,\n}\n\nimpl ReceiptAttestationEnvelope {
     /// Domain separator for the deterministic attestation payload.
     pub const DOMAIN_SEPARATOR: &'static [u8] =
         b"symthaea:observation-receipt-attestation:v1\\n";
@@ -884,7 +884,7 @@ impl ReceiptAttestationEnvelope {
             || self.cryptosuite.as_deref().is_some_and(|v| v.trim().is_empty())
             || self.domain.as_deref().is_some_and(|v| v.trim().is_empty())
             || self.challenge.as_deref().is_some_and(|v| v.trim().is_empty())
-            || matches!(self.expires_at_unix_ns, Some(expiry) if expiry < self.created_at_unix_ns)
+            || matches!(self.expires_at_unix_ns, Some(expiry) if expiry <= self.created_at_unix_ns)
         {
             return Err(ObservationValidationError::InvalidReceiptAttestationEnvelope);
         }
