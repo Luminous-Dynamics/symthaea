@@ -300,7 +300,9 @@ pub fn event_between(
     let (kind, evidence_basis) = if previous.presence != current.presence {
         let kind = match (previous.presence, current.presence) {
             (_, PresenceState::Processing) => CognitiveEventKind::ProcessingStarted,
-            (PresenceState::Processing, _) => CognitiveEventKind::ProcessingCompleted,
+            (PresenceState::Processing, PresenceState::Available) => {
+                CognitiveEventKind::ProcessingCompleted
+            }
             (PresenceState::Disconnected, _) => CognitiveEventKind::Connected,
             (_, PresenceState::Disconnected) => CognitiveEventKind::Disconnected,
             _ => CognitiveEventKind::StateChanged,
@@ -310,8 +312,6 @@ pub fn event_between(
         let kind = match (previous.mode, current.mode) {
             (CognitiveMode::Resting, _) => CognitiveEventKind::ExitedRest,
             (_, CognitiveMode::Resting) => CognitiveEventKind::EnteredRest,
-            (CognitiveMode::Responding, _) => CognitiveEventKind::ProcessingCompleted,
-            (_, CognitiveMode::Responding) => CognitiveEventKind::ProcessingStarted,
             _ => CognitiveEventKind::StateChanged,
         };
         (kind, EventEvidenceBasis::ModeTransition)
@@ -604,6 +604,42 @@ mod tests {
         assert_eq!(event.evidence_basis, EventEvidenceBasis::ExplicitSurpriseSignal);
     }
 
+
+    #[test]
+    fn processing_to_degraded_is_not_called_completion() {
+        let previous = state(true, true, 0.8, 0.5, 0.1);
+        let current = CognitiveState::from_observation(true, false, 0.8, 0.5, 0.8, 0.1);
+        assert_eq!(current.presence, PresenceState::Available);
+        let degraded = CognitiveState {
+            presence: PresenceState::Degraded,
+            ..current
+        };
+        let event = event_between(Some(previous), degraded, 4, 43, false, false).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::StateChanged);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::PresenceTransition);
+    }
+
+    #[test]
+    fn processing_to_recovering_is_not_called_completion() {
+        let previous = state(true, true, 0.8, 0.5, 0.1);
+        let recovering = CognitiveState {
+            presence: PresenceState::Recovering,
+            mode: CognitiveMode::Uncertain,
+            ..state(true, false, 0.8, 0.5, 0.1)
+        };
+        let event = event_between(Some(previous), recovering, 5, 44, false, false).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::StateChanged);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::PresenceTransition);
+    }
+
+    #[test]
+    fn processing_to_available_is_the_only_implicit_completion() {
+        let previous = state(true, true, 0.8, 0.5, 0.1);
+        let current = state(true, false, 0.8, 0.3, 0.1);
+        let event = event_between(Some(previous), current, 6, 45, false, false).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::ProcessingCompleted);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::PresenceTransition);
+    }
 
     #[test]
     fn processing_completion_has_presence_transition_basis() {
