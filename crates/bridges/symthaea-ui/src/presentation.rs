@@ -180,8 +180,12 @@ impl EventEvidenceBasis {
     const fn for_kind(kind: CognitiveEventKind) -> Self {
         match kind {
             CognitiveEventKind::Connected | CognitiveEventKind::Disconnected => Self::Lifecycle,
-            CognitiveEventKind::ProcessingStarted | CognitiveEventKind::ProcessingCompleted => Self::PresenceTransition,
-            CognitiveEventKind::EnteredRest | CognitiveEventKind::ExitedRest | CognitiveEventKind::StateChanged => Self::ModeTransition,
+            CognitiveEventKind::ProcessingStarted | CognitiveEventKind::ProcessingCompleted => {
+                Self::PresenceTransition
+            }
+            CognitiveEventKind::EnteredRest
+            | CognitiveEventKind::ExitedRest
+            | CognitiveEventKind::StateChanged => Self::ModeTransition,
             CognitiveEventKind::SurpriseDetected => Self::ExplicitSurpriseSignal,
             CognitiveEventKind::WorkspaceBroadcast => Self::ExplicitWorkspaceSignal,
         }
@@ -305,7 +309,7 @@ pub fn event_between(
     ))
 }
 
- 
+
 /// A bounded temporal span reconstructed from paired semantic events.
 ///
 /// The UI may show these as cycle spans, but must not turn them into elapsed
@@ -582,7 +586,8 @@ mod identity_tests {
             EventEvidenceBasis::Lifecycle
         );
         let state = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.8, 0.1);
-        let surprise = CognitiveEvent::from_state(2, CognitiveEventKind::SurpriseDetected, 9, state);
+        let surprise =
+            CognitiveEvent::from_state(2, CognitiveEventKind::SurpriseDetected, 9, state);
         assert_eq!(surprise.evidence_basis, EventEvidenceBasis::ExplicitSurpriseSignal);
         assert_eq!(surprise.evidence_basis.label(), "explicit surprise signal");
     }
