@@ -553,6 +553,7 @@ pub fn App() -> impl IntoView {
                                 <div class="timeline-event">
                                     <span class="timeline-kind">{event.kind.label()}</span>
                                     <span class="timeline-cycle">{format!("cycle {}", event.cycle)}</span>
+                                    <span class="timeline-basis">{event.evidence_basis.label()}</span>
                                     {move || match event.kind {
                                         CognitiveEventKind::SurpriseDetected => Some(view! {
                                             <span class="timeline-evidence">
