@@ -322,5 +322,298 @@ mod tests {
         let (before, after) = fixture();
         let commitment = transition_commitment(&before, &after, TransitionKind::Admission).unwrap();
         assert_eq!(commitment.as_bytes().len(), 32);
+
+    #[test]
+    fn valid_admission_transition_is_replayably_verifiable() {
+        use crate::semantic_admission::{decide, AdmissionOutcome, AdmissionPolicy};
+
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+
+        let outcome = decide(&before, &delivery, &observation, policy, 10);
+        let AdmissionOutcome::Admitted { result, .. } = outcome else {
+            panic!("fixture admission should succeed");
+        };
+        let commitment =
+            transition_commitment(&before, &after, TransitionKind::Admission).unwrap();
+
+        assert_eq!(
+            verify_admission_transition(
+                &before,
+                &after,
+                &delivery,
+                &observation,
+                policy,
+                10,
+                &result,
+                &commitment,
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn admission_verification_rejects_mutated_after_state() {
+        use crate::semantic_admission::{decide, AdmissionOutcome, AdmissionPolicy};
+
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let AdmissionOutcome::Admitted { result, .. } =
+            decide(&before, &delivery, &observation, policy, 10)
+        else {
+            panic!("fixture admission should succeed");
+        };
+        let commitment =
+            transition_commitment(&before, &after, TransitionKind::Admission).unwrap();
+
+        let mut mutated = after.clone();
+        mutated
+            .observations
+            .get_mut(&observation.key)
+            .unwrap()
+            .payload = b"tampered".to_vec();
+
+        assert_eq!(
+            verify_admission_transition(
+                &before,
+                &mutated,
+                &delivery,
+                &observation,
+                policy,
+                10,
+                &result,
+                &commitment,
+            ),
+            Err(TransitionVerificationError::CommitmentMismatch)
+                .or(Err(TransitionVerificationError::AfterStateMismatch))
+        );
+    }
+
+    #[test]
+    fn admission_verification_rejects_wrong_input_even_when_after_is_valid() {
+        use crate::semantic_admission::{decide, AdmissionOutcome, AdmissionPolicy};
+
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let mut wrong_observation = after.observations.values().next().unwrap().clone();
+        wrong_observation.payload = b"wrong".to_vec();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let AdmissionOutcome::Admitted { result, .. } =
+            decide(&before, &delivery, &after.observations.values().next().unwrap().clone(), policy, 10)
+        else {
+            panic!("fixture admission should succeed");
+        };
+        let commitment =
+            transition_commitment(&before, &after, TransitionKind::Admission).unwrap();
+
+        assert_eq!(
+            verify_admission_transition(
+                &before,
+                &after,
+                &delivery,
+                &wrong_observation,
+                policy,
+                10,
+                &result,
+                &commitment,
+            ),
+            Err(TransitionVerificationError::AdmissionNotAdmitted)
+        );
+    }
+
+    #[test]
+    fn valid_replay_transition_requires_unchanged_state() {
+        use crate::semantic_admission::{decide, AdmissionOutcome, AdmissionPolicy};
+
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let AdmissionOutcome::Replay { existing_result } =
+            decide(&after, &delivery, &observation, policy, 11)
+        else {
+            panic!("fixture should replay");
+        };
+        let commitment =
+            transition_commitment(&after, &after, TransitionKind::Replay).unwrap();
+
+        assert_eq!(
+            verify_replay_transition(
+                &after,
+                &after,
+                &delivery,
+                &observation,
+                policy,
+                11,
+                &existing_result,
+                &commitment,
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn replay_verification_rejects_a_state_change() {
+        use crate::semantic_admission::{decide, AdmissionOutcome, AdmissionPolicy};
+
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let AdmissionOutcome::Replay { existing_result } =
+            decide(&after, &delivery, &observation, policy, 11)
+        else {
+            panic!("fixture should replay");
+        };
+        let commitment =
+            transition_commitment(&after, &after, TransitionKind::Replay).unwrap();
+
+        assert_eq!(
+            verify_replay_transition(
+                &after,
+                &before,
+                &delivery,
+                &observation,
+                policy,
+                11,
+                &existing_result,
+                &commitment,
+            ),
+            Err(TransitionVerificationError::AfterStateMismatch)
+        );
+    }
+
+    #[test]
+    fn valid_lifecycle_retirement_is_replayably_verifiable() {
+        use crate::semantic_admission::{retire_expired, AdmissionPolicy};
+
+        let (mut before, delivery, observation) = {
+            let (state, delivery, observation) = {
+                let delivery = crate::semantic_admission::DeliveryContract {
+                    logical_delivery_id: Uuid::from_u128(1),
+                    schema_version: 1,
+                    expires_at_ms: 1_000,
+                    payload: b"delivery".to_vec(),
+                };
+                let observation = crate::semantic_admission::ObservationRecord {
+                    key: ObservationKey {
+                        namespace: "source".into(),
+                        observation_id: Uuid::from_u128(2),
+                    },
+                    source_id: Uuid::from_u128(3),
+                    observed_at_ms: 10,
+                    payload: b"observation".to_vec(),
+                };
+                let empty = SemanticAdmissionState::default();
+                let policy = AdmissionPolicy {
+                    allow_new_observation: true,
+                    ..AdmissionPolicy::default()
+                };
+                let state = match crate::semantic_admission::decide(
+                    &empty,
+                    &delivery,
+                    &observation,
+                    policy,
+                    10,
+                ) {
+                    AdmissionOutcome::Admitted { next_state, .. } => next_state,
+                    other => panic!("fixture admission failed: {other:?}"),
+                };
+                (state, delivery, observation)
+            };
+            (state, delivery, observation)
+        };
+        before.observations.get_mut(&observation.key).unwrap().observed_at_ms = 0;
+        let policy = AdmissionPolicy {
+            retention_ms: 10,
+            tombstone_retention_ms: 100,
+            ..AdmissionPolicy::default()
+        };
+        let after = retire_expired(&before, policy, 11).unwrap();
+        let commitment =
+            transition_commitment(&before, &after, TransitionKind::LifecycleRetirement).unwrap();
+
+        assert_eq!(
+            verify_lifecycle_retirement(&before, &after, policy, 11, &commitment),
+            Ok(())
+        );
+        assert!(!after.deliveries.contains_key(&delivery.logical_delivery_id));
+    }
+
+    #[test]
+    fn lifecycle_verification_rejects_noop_retirement() {
+        let (before, after) = fixture();
+        let commitment =
+            transition_commitment(&before, &before, TransitionKind::LifecycleRetirement).unwrap();
+
+        assert_eq!(
+            verify_lifecycle_retirement(
+                &before,
+                &after,
+                AdmissionPolicy::default(),
+                10,
+                &commitment,
+            ),
+            Err(TransitionVerificationError::NoStateChange)
+        );
+    }
+
+    #[test]
+    fn verification_rejects_invalid_before_state_before_hashing() {
+        let (before, after) = fixture();
+        let mut invalid = before.clone();
+        let delivery_id = *after.deliveries.keys().next().unwrap();
+        invalid.deliveries.insert(
+            delivery_id,
+            crate::semantic_admission::DeliveryContract {
+                logical_delivery_id: Uuid::from_u128(999),
+                schema_version: 1,
+                expires_at_ms: 1_000,
+                payload: b"bad".to_vec(),
+            },
+        );
+        let commitment =
+            transition_commitment(&before, &after, TransitionKind::Admission).unwrap();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let result = crate::semantic_admission::SemanticResult {
+            logical_delivery_id: delivery.logical_delivery_id,
+            observation: observation.key.clone(),
+        };
+
+        assert!(matches!(
+            verify_admission_transition(
+                &invalid,
+                &after,
+                &delivery,
+                &observation,
+                AdmissionPolicy::default(),
+                10,
+                &result,
+                &commitment,
+            ),
+            Err(TransitionVerificationError::InvalidBeforeState(_))
+        ));
+    }
+
     }
 }
