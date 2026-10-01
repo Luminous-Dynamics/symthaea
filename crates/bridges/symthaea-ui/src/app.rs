@@ -247,7 +247,9 @@ pub fn App() -> impl IntoView {
             telemetry_generation.set(generation);
             session
         };
-        let session_generation = Rc::clone(&telemetry_generation);
+        let telemetry_callback_generation = Rc::clone(&telemetry_generation);
+        let connected_callback_generation = Rc::clone(&telemetry_generation);
+        let disconnect_generation = Rc::clone(&telemetry_generation);
         spawn_local_scoped_with_cancellation(async move {
             let mut previous_state: Option<CognitiveState> = None;
             let event_sequence = Rc::new(Cell::new(0_u64));
@@ -258,7 +260,7 @@ pub fn App() -> impl IntoView {
                 &gw,
                 move |payload| {
                     if !telemetry_session_is_current(
-                        session_generation.get(),
+                        telemetry_callback_generation.get(),
                         session,
                     ) {
                         return;
@@ -309,7 +311,7 @@ pub fn App() -> impl IntoView {
                 },
                 move || {
                     if !telemetry_session_is_current(
-                        session_generation.get(),
+                        connected_callback_generation.get(),
                         session,
                     ) {
                         return;
@@ -328,7 +330,7 @@ pub fn App() -> impl IntoView {
             .await;
             if connected
                 && telemetry_session_is_current(
-                    session_generation.get(),
+                    disconnect_generation.get(),
                     session,
                 )
             {
