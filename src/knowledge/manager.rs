@@ -295,7 +295,14 @@ impl KnowledgeManager {
                 Ok(facts) => {
                     persistence_health.facts_loaded = true;
                     for record in &facts {
-                        graph.import_fact_record(record);
+                        if !graph.import_fact_record(record) {
+                            persistence_health.fact_rejections += 1;
+                            tracing::warn!(
+                                memory_id = %record.memory_id,
+                                rejected = persistence_health.fact_rejections,
+                                "Knowledge: rejected persisted fact during graph restore"
+                            );
+                        }
                     }
                     if !facts.is_empty() {
                         tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
@@ -1393,6 +1400,8 @@ impl KnowledgeManager {
 pub struct KnowledgePersistenceHealth {
     pub configured: bool,
     pub facts_loaded: bool,
+    /// Decoded fact rows rejected by graph admission during restore.
+    pub fact_rejections: usize,
     /// SQLite rows were decoded successfully. This does not imply every row was
     /// admitted into the graph; see provenance_rejections.
     pub provenance_loaded: bool,
@@ -1408,6 +1417,7 @@ impl KnowledgePersistenceHealth {
     pub fn is_degraded(self) -> bool {
         self.configured
             && !(self.facts_loaded
+                && self.fact_rejections == 0
                 && self.provenance_loaded
                 && self.provenance_rejections == 0
                 && self.provenance_snapshot_conforms
@@ -1417,7 +1427,10 @@ impl KnowledgePersistenceHealth {
 
     pub fn failed_domains(self) -> Vec<&'static str> {
         [
-            ("facts", !self.facts_loaded),
+            (
+                "facts",
+                !self.facts_loaded || self.fact_rejections > 0,
+            ),
             (
                 "provenance",
                 !self.provenance_loaded
@@ -1469,6 +1482,7 @@ mod tests {
         let health = KnowledgePersistenceHealth {
             configured: true,
             facts_loaded: true,
+            fact_rejections: 0,
             provenance_loaded: false,
             provenance_rejections: 0,
             provenance_snapshot_conforms: false,
@@ -1478,6 +1492,70 @@ mod tests {
 
         assert!(health.is_degraded());
         assert_eq!(health.failed_domains(), vec!["provenance", "ontology"]);
+    }
+
+    #[test]
+    fn test_persistence_health_reports_fact_rejections_as_degraded() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            fact_rejections: 1,
+            provenance_loaded: true,
+            provenance_rejections: 0,
+            provenance_snapshot_conforms: true,
+            causal_loaded: true,
+            ontology_loaded: true,
+        };
+
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["facts"]);
+    }
+
+    #[test]
+    fn test_persistence_restore_records_rejected_fact_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_fact_rejection_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id TEXT,
+                    canonical_identity TEXT,
+                    provenance_family TEXT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                INSERT INTO knowledge_facts
+                    (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+                VALUES ('bad-vector', X'00', 'bad vector', 0.5, 1, 0);",
+            )
+            .unwrap();
+        }
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mgr = KnowledgeManager::new(config);
+        let health = mgr.persistence_health();
+
+        assert!(health.facts_loaded);
+        assert_eq!(health.fact_rejections, 1);
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["facts"]);
+        assert_eq!(mgr.graph().len(), 0);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
