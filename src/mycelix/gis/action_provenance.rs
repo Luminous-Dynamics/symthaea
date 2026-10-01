@@ -4,7 +4,7 @@
 //! A frame revision can require fresh support for future high-risk execution
 //! without rewriting the historical record of an action that already happened.
 
-use super::ignorance_types::{EpistemicFrameImpact, EpistemicFrameRevision};
+use super::ignorance_types::{ConclusionDependencyGraph, EpistemicFrameImpact, EpistemicFrameRevision};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ActionRisk {
@@ -126,6 +126,28 @@ impl EpistemicAction {
         self.historical_decisions.push(witness);
         self.status = ActionStatus::Executed;
     }
+
+    /// Fail closed for high-risk actions when any declared prerequisite is absent.
+    /// The supplied set must come from the authoritative conclusion store.
+    pub fn defer_for_unresolved_prerequisites(
+        &mut self,
+        known_conclusions: &std::collections::HashSet<String>,
+    ) -> bool {
+        if !self.risk.requires_current_support()
+            || matches!(self.status, ActionStatus::Executed | ActionStatus::Superseded)
+        {
+            return false;
+        }
+
+        let unresolved = self.dependencies.iter().any(|dependency| {
+            !known_conclusions.contains(&dependency.conclusion_id)
+        });
+        if unresolved {
+            self.status = ActionStatus::Deferred;
+            return true;
+        }
+        false
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -136,6 +158,16 @@ pub struct ActionDependencyGraph {
 impl ActionDependencyGraph {
     pub fn add(&mut self, action: EpistemicAction) {
         self.actions.push(action);
+    }
+
+    /// Connect the action graph directly to the canonical conclusion-impact traversal.
+    pub fn reevaluate_with_conclusion_graph(
+        &mut self,
+        conclusions: &mut ConclusionDependencyGraph,
+        revision: &EpistemicFrameRevision,
+    ) -> Vec<String> {
+        let affected = conclusions.reopen_from_frame_revision(revision);
+        self.reevaluate_from_frame_revision(revision, &affected)
     }
 
     pub fn reevaluate_from_frame_revision(
@@ -180,6 +212,60 @@ impl ActionDependencyGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn high_risk_action_defers_when_prerequisite_is_missing() {
+        let mut action = EpistemicAction::new("a-missing", "intervention", ActionRisk::Critical);
+        action.dependencies.push(ActionDependency {
+            conclusion_id: "missing-c".into(),
+            kind: ActionDependencyKind::CausalBasis,
+        });
+        let known = std::collections::HashSet::new();
+        assert!(action.defer_for_unresolved_prerequisites(&known));
+        assert_eq!(action.status, ActionStatus::Deferred);
+    }
+
+    #[test]
+    fn frame_revision_connects_conclusion_and_action_graphs() {
+        use super::super::ignorance_types::{
+            ConclusionDependency, ConclusionDependencyKind, EpistemicConclusion,
+        };
+        let revision = EpistemicFrameRevision {
+            prior_frame: "f1".into(),
+            revised_frame: "f2".into(),
+            trigger: "ontology expanded".into(),
+            newly_represented: Some("institution".into()),
+            scope_change: "ontology".into(),
+            affected_conclusions: vec!["c-root".into()],
+            impact: EpistemicFrameImpact {
+                evidence_boundary: false,
+                ontology: true,
+                causal_model: false,
+                exclusions: false,
+                blind_spots: false,
+            },
+        };
+        let mut conclusions = ConclusionDependencyGraph::default();
+        conclusions.add(EpistemicConclusion::new("c-root", "root", "f1"));
+        conclusions.add(EpistemicConclusion::new("c-child", "child", "f1"));
+        conclusions.add_dependency(ConclusionDependency::new(
+            "c-root", "c-child", ConclusionDependencyKind::OntologyDependency,
+        ));
+
+        let mut action = EpistemicAction::new("a-ontology", "policy intervention", ActionRisk::High);
+        action.dependencies.push(ActionDependency {
+            conclusion_id: "c-child".into(),
+            kind: ActionDependencyKind::OntologyBasis,
+        });
+        let mut actions = ActionDependencyGraph::default();
+        actions.add(action);
+
+        assert_eq!(
+            actions.reevaluate_with_conclusion_graph(&mut conclusions, &revision),
+            vec!["a-ontology"]
+        );
+        assert_eq!(conclusions.conclusions[1].status, super::super::ignorance_types::ConclusionStatus::Reopened);
+    }
 
     #[test]
     fn high_risk_action_is_gated_but_executed_history_is_preserved() {
