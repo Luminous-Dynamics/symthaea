@@ -582,6 +582,14 @@ impl ConclusionDependencyGraph {
 
         reopened
     }
+
+    /// Apply the impact declared by a frame revision and propagate it through dependencies.
+    pub fn reopen_from_frame_revision(
+        &mut self,
+        revision: &EpistemicFrameRevision,
+    ) -> Vec<String> {
+        self.reopen_from(&revision.affected_conclusions)
+    }
 }
 
 /// Failure returned when a frame revision would corrupt append-only lineage.
@@ -897,6 +905,30 @@ mod tests {
 
         let reopened = graph.reopen_from(&["c1".to_string()]);
         assert_eq!(reopened, vec!["c1".to_string(), "c2".to_string(), "c3".to_string()]);
+        assert!(graph.conclusions.iter().all(|c| c.status == ConclusionStatus::Reopened));
+    }
+
+    #[test]
+    fn test_frame_revision_propagates_to_typed_conclusions() {
+        let prior = EpistemicFrame::default();
+        let revised = EpistemicFrame { version: 2, ..prior.clone() };
+        let revision = EpistemicFrameRevision::new(
+            &prior,
+            &revised,
+            "new variable represented",
+            Some("institutional-role".to_string()),
+            "expanded ontology",
+            vec!["c1".to_string()],
+        );
+
+        let mut graph = ConclusionDependencyGraph::default();
+        graph.add(EpistemicConclusion::new("c1", "root", prior.identity()));
+        let mut c2 = EpistemicConclusion::new("c2", "dependent", prior.identity());
+        c2.dependencies.push("c1".to_string());
+        graph.add(c2);
+
+        let reopened = graph.reopen_from_frame_revision(&revision);
+        assert_eq!(reopened, vec!["c1".to_string(), "c2".to_string()]);
         assert!(graph.conclusions.iter().all(|c| c.status == ConclusionStatus::Reopened));
     }
 
