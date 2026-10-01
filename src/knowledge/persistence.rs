@@ -235,8 +235,8 @@ impl KnowledgePersistence {
                 })
             })
             .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load fact row: {e}"))?;
 
         self.total_loaded += facts.len() as u64;
         Ok(facts)
@@ -544,6 +544,58 @@ mod tests {
         let mut p = KnowledgePersistence::default();
         assert!(!p.is_configured());
         assert!(p.save_facts(&[]).is_err());
+    }
+
+    #[test]
+    fn test_load_facts_surfaces_corrupt_rows_instead_of_dropping_them() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_corrupt_fact_load_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id TEXT,
+                    canonical_identity TEXT,
+                    provenance_family TEXT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );",
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO knowledge_facts
+                 (memory_id, canonical_identity, provenance_family, vector_blob, source_text, confidence, domain, cycle, is_causal)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                rusqlite::params![
+                    "memory-corrupt",
+                    Option::<String>::None,
+                    Option::<String>::None,
+                    vec![1u8; 2048],
+                    "corrupt confidence",
+                    "not-a-number",
+                    Option::<String>::None,
+                    1i64,
+                    false,
+                ],
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let err = p.load_facts().unwrap_err();
+        assert!(err.contains("Load fact row"));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
