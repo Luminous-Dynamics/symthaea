@@ -95,6 +95,25 @@ The checked API is deliberately small. It does not yet attempt to automatically 
 
 Recent 2026 provenance work independently reinforces the same direction: provenance should carry epistemic stance and disagreement without collapsing distinct attributed claims into one factual layer, while work on frame uncertainty emphasizes that variables outside a chosen specification can be structurally invisible rather than merely low-confidence. See the research notes in the PR for the external references.
 
+
+## Typed conclusion impact propagation
+
+The frame lineage now has a first downstream consumer: EpistemicConclusion and ConclusionDependencyGraph.
+
+A conclusion records its originating frame, direct evidence identifiers, upstream conclusion dependencies, and lifecycle state (Active, Qualified, Reopened, Superseded). The dependency graph can deterministically propagate a frame revision's affected_conclusions through transitive downstream dependencies.
+
+This intentionally stops short of claiming semantic invalidity. A frame change says **"re-evaluate these conclusions"**, not **"these conclusions are false."** The historical conclusion and its original frame remain intact.
+
+The resulting correction path is now:
+
+frame F1 -> conclusion C1 -> dependent C2 -> dependent C3
+
+then:
+
+F1 -> F2 revision -> reopen C1 -> reopen C2 -> reopen C3.
+
+This makes provenance operational rather than merely descriptive while preserving the distinction between correction, qualification, and falsification.
+
 ## Relationship to existing GIS
 
 This proposal complements, rather than replaces:
