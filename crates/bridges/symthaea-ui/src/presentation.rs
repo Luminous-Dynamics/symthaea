@@ -865,6 +865,145 @@ mod tests {
     }
 
     #[test]
+    fn presence_transition_contract_is_conservative() {
+        let available = state(true, false, 0.8, 0.3, 0.1);
+        let processing = state(true, true, 0.8, 0.5, 0.1);
+        let disconnected = state(false, false, 0.8, 0.3, 0.1);
+        let degraded = CognitiveState {
+            presence: PresenceState::Degraded,
+            mode: CognitiveMode::Uncertain,
+            ..available
+        };
+        let recovering = CognitiveState {
+            presence: PresenceState::Recovering,
+            mode: CognitiveMode::Uncertain,
+            ..available
+        };
+
+        let cases = [
+            (
+                available,
+                processing,
+                CognitiveEventKind::ProcessingStarted,
+                EventEvidenceBasis::PresenceTransition,
+            ),
+            (
+                processing,
+                available,
+                CognitiveEventKind::ProcessingCompleted,
+                EventEvidenceBasis::PresenceTransition,
+            ),
+            (
+                processing,
+                degraded,
+                CognitiveEventKind::StateChanged,
+                EventEvidenceBasis::PresenceTransition,
+            ),
+            (
+                processing,
+                recovering,
+                CognitiveEventKind::StateChanged,
+                EventEvidenceBasis::PresenceTransition,
+            ),
+            (
+                processing,
+                disconnected,
+                CognitiveEventKind::Disconnected,
+                EventEvidenceBasis::PresenceTransition,
+            ),
+            (
+                disconnected,
+                available,
+                CognitiveEventKind::Connected,
+                EventEvidenceBasis::PresenceTransition,
+            ),
+            (
+                disconnected,
+                processing,
+                CognitiveEventKind::ProcessingStarted,
+                EventEvidenceBasis::PresenceTransition,
+            ),
+            (
+                disconnected,
+                degraded,
+                CognitiveEventKind::Connected,
+                EventEvidenceBasis::PresenceTransition,
+            ),
+            (
+                degraded,
+                available,
+                CognitiveEventKind::StateChanged,
+                EventEvidenceBasis::PresenceTransition,
+            ),
+            (
+                recovering,
+                available,
+                CognitiveEventKind::StateChanged,
+                EventEvidenceBasis::PresenceTransition,
+            ),
+        ];
+
+        for (index, (previous, current, expected_kind, expected_basis)) in cases.into_iter().enumerate() {
+            let event = event_between(Some(previous), current, index as u64 + 1, 100 + index as u64, false, false)
+                .expect("every presence transition should produce one event");
+            assert_eq!(event.kind, expected_kind, "case {index}");
+            assert_eq!(event.evidence_basis, expected_basis, "case {index}");
+        }
+    }
+
+    #[test]
+    fn mode_transition_contract_never_promotes_generic_modes_to_lifecycle() {
+        let modes = [
+            CognitiveMode::Resting,
+            CognitiveMode::Exploring,
+            CognitiveMode::Integrating,
+            CognitiveMode::Responding,
+            CognitiveMode::Uncertain,
+        ];
+
+        for previous_mode in modes {
+            for current_mode in modes {
+                if previous_mode == current_mode {
+                    continue;
+                }
+                let previous = CognitiveState {
+                    presence: PresenceState::Available,
+                    mode: previous_mode,
+                    ..state(true, false, 0.8, 0.3, 0.1)
+                };
+                let current = CognitiveState {
+                    presence: PresenceState::Available,
+                    mode: current_mode,
+                    ..state(true, false, 0.8, 0.3, 0.1)
+                };
+                let event = event_between(Some(previous), current, 1, 100, false, false)
+                    .expect("mode transitions should produce one event");
+
+                assert_ne!(event.kind, CognitiveEventKind::ProcessingStarted);
+                assert_ne!(event.kind, CognitiveEventKind::ProcessingCompleted);
+                assert_eq!(event.evidence_basis, EventEvidenceBasis::ModeTransition);
+
+                match (previous_mode, current_mode) {
+                    (CognitiveMode::Resting, _) => {
+                        assert_eq!(event.kind, CognitiveEventKind::ExitedRest)
+                    }
+                    (_, CognitiveMode::Resting) => {
+                        assert_eq!(event.kind, CognitiveEventKind::EnteredRest)
+                    }
+                    _ => assert_eq!(event.kind, CognitiveEventKind::StateChanged),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn invalid_processing_observation_stays_degraded_and_uncertain() {
+        let value = CognitiveState::from_observation(true, true, f64::NAN, 0.5, 0.8, 0.1);
+        assert_eq!(value.presence, PresenceState::Degraded);
+        assert_eq!(value.mode, CognitiveMode::Uncertain);
+    }
+
+    #[test]
     fn quiet_cycle_creates_no_event() {
         let previous = state(true, false, 0.8, 0.3, 0.1);
         let current = state(true, false, 0.8, 0.3, 0.1);
