@@ -243,9 +243,13 @@ fn run_arm(
 /// field, and the final `EvidenceOutcome`.
 #[derive(Debug, Clone)]
 pub struct Ae2EmpiricalRun {
+    /// Stable semantic identity of the declared runner recipe.
+    pub config_identity: String,
+    /// Historical field name retained for compatibility with existing AE-2
+    /// diagnostics. It carries the same stable recipe identity as
+    /// `config_identity`; it is not a whole-run or artifact identity.
     pub config_hash: String,
-    /// Schema governing `config_hash`; explicit so consumers cannot infer its
-    /// semantics merely from the legacy field name.
+    /// Schema governing `config_identity`.
     pub config_identity_schema: &'static str,
     /// Historical field name retained for compatibility. In this deterministic
     /// runner it identifies the fixed genesis/seed material, not a numeric RNG
@@ -655,7 +659,7 @@ pub fn run_ae2_empirical() -> Ae2EmpiricalRun {
     // set, and fixed loop-construction profile. The actual code commit, runtime
     // environment, and produced artifact remain separate provenance layers.
     // The legacy field name is retained for report compatibility.
-    let config_hash = stable_config_hash(&(
+    let config_identity = stable_config_hash(&(
         target_lever_name,
         sham_lever_name,
         functional_benchmark,
@@ -673,7 +677,8 @@ pub fn run_ae2_empirical() -> Ae2EmpiricalRun {
     );
 
     Ae2EmpiricalRun {
-        config_hash,
+        config_identity: config_identity.clone(),
+        config_hash: config_identity,
         config_identity_schema: symthaea_evidence_plane::STABLE_CONFIG_IDENTITY_SCHEMA,
         seed_identity,
         target_lever_name,
@@ -742,6 +747,8 @@ mod tests {
             run.config_identity_schema,
             symthaea_evidence_plane::STABLE_CONFIG_IDENTITY_SCHEMA
         );
+        assert_eq!(run.config_hash, run.config_identity);
+        assert_eq!(run.config_identity.len(), 64);
         assert_eq!(run.config_hash.len(), 64, "BLAKE3 hex identity must be 64 characters");
         assert!(run.seed_identity.starts_with("genesis-blake3:v1:"));
 
