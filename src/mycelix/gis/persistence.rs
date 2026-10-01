@@ -32,8 +32,8 @@ use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::{
-    Domain, IgnoranceDetection, IgnoranceRecord, IgnoranceResolution, IgnoranceStatus,
-    IgnoranceType, ResolutionMethod, Uncertainty3D, ZKIgnoranceSignature,
+    Domain, EpistemicFrame, IgnoranceDetection, IgnoranceRecord, IgnoranceResolution,
+    IgnoranceStatus, IgnoranceType, ResolutionMethod, Uncertainty3D, ZKIgnoranceSignature,
 };
 
 // ============================================================================
@@ -90,6 +90,14 @@ pub struct StoredIgnoranceRecord {
     pub status: String,
     /// Serialized resolution: "method|answer|confidence|source|timestamp"
     pub resolution_serialized: Option<String>,
+    /// Stable frame identity and revision used to qualify the detection.
+    pub frame_id: String,
+    pub frame_version: u32,
+    pub frame_evidence_boundary: String,
+    pub frame_ontology_id: String,
+    pub frame_causal_model_id: String,
+    pub frame_excluded_variables: Vec<String>,
+    pub frame_known_blind_spots: Vec<String>,
     pub created_at: u64,
     pub updated_at: u64,
 }
@@ -133,6 +141,13 @@ impl StoredIgnoranceRecord {
             eig: record.detection.eig,
             status: format!("{:?}", record.status),
             resolution_serialized,
+            frame_id: record.detection.frame.id.clone(),
+            frame_version: record.detection.frame.version,
+            frame_evidence_boundary: record.detection.frame.evidence_boundary.clone(),
+            frame_ontology_id: record.detection.frame.ontology_id.clone(),
+            frame_causal_model_id: record.detection.frame.causal_model_id.clone(),
+            frame_excluded_variables: record.detection.frame.excluded_variables.clone(),
+            frame_known_blind_spots: record.detection.frame.known_blind_spots.clone(),
             created_at,
             updated_at,
         }
@@ -184,6 +199,15 @@ impl StoredIgnoranceRecord {
             domain,
             eig: self.eig,
             detected_at,
+            frame: EpistemicFrame {
+                id: if self.frame_id.is_empty() { "gis-default".to_string() } else { self.frame_id.clone() },
+                version: if self.frame_version == 0 { 1 } else { self.frame_version },
+                evidence_boundary: if self.frame_evidence_boundary.is_empty() { "local-query-context".to_string() } else { self.frame_evidence_boundary.clone() },
+                ontology_id: if self.frame_ontology_id.is_empty() { "general-v1".to_string() } else { self.frame_ontology_id.clone() },
+                causal_model_id: if self.frame_causal_model_id.is_empty() { "unspecified".to_string() } else { self.frame_causal_model_id.clone() },
+                excluded_variables: self.frame_excluded_variables.clone(),
+                known_blind_spots: if self.frame_known_blind_spots.is_empty() { vec!["unrepresented variables and categories".to_string()] } else { self.frame_known_blind_spots.clone() },
+            },
         };
 
         Ok(IgnoranceRecord {
