@@ -1128,6 +1128,59 @@ mod tests {
     }
 
     #[test]
+    fn test_solve_system_zero_iterations_reports_unconverged() {
+        let dim = 64;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+
+        let solutions = network
+            .solve_system_seeded(&["x"], &[constraint], Some(0), 7)
+            .unwrap();
+        let solution = solutions.get("x").expect("x solution should exist");
+
+        assert_eq!(solution.iterations, 0);
+        assert!(!solution.converged);
+        assert_eq!(network.total_iteration_count(), 0);
+        assert!(!network.resonator_states()[0].converged);
+    }
+
+    #[test]
+    fn test_solve_system_exhaustion_reports_unconverged() {
+        let dim = 64;
+        let config = ResonatorConfig {
+            convergence_threshold: 2.0,
+            max_iterations: 3,
+            ..Default::default()
+        };
+        let mut network = ResonatorNetwork::with_config(dim, config).unwrap();
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+
+        let solutions = network
+            .solve_system_seeded(&["x"], &[constraint], Some(3), 7)
+            .unwrap();
+        let solution = solutions.get("x").expect("x solution should exist");
+
+        assert_eq!(solution.iterations, 3);
+        assert!(!solution.converged);
+        assert_eq!(network.total_iteration_count(), 3);
+        assert!(!network.resonator_states()[0].converged);
+    }
+
+    #[test]
     fn test_simple_constraint_solving() {
         let dim = 1000;
         let mut network = ResonatorNetwork::new(dim).unwrap();
