@@ -255,7 +255,7 @@ impl Default for ResonatorConfig {
             energy_threshold: 0.1,
             cleanup_rule: CleanupRule::Softmax,
             polynomial_degree: 2,
-            cleanup_sign_projection: true,
+            cleanup_sign_projection: false,
         }
     }
 }
