@@ -1546,7 +1546,9 @@ pub enum ObservationValidationError {
     #[error("relation edge is duplicated within the closed graph")]
     DuplicateObservationRelation,
     #[error("relation endpoint is not present in the closed graph: {0}")]
-    #[error("invalid receipt attestation envelope")]\n    InvalidReceiptAttestationEnvelope,\n    MissingRelationEndpoint(String),
+    MissingRelationEndpoint(String),
+    #[error("invalid receipt attestation envelope")]
+    InvalidReceiptAttestationEnvelope,
 }
 
 #[cfg(test)]
