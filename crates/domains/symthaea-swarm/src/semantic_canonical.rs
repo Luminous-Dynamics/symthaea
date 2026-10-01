@@ -14,6 +14,14 @@ use uuid::Uuid;
 const DOMAIN: &[u8] = b"symthaea-swarm/semantic-admission-state";
 const VERSION: u16 = 1;
 
+// Fixed section tags make the grammar self-auditing and prevent future format
+// evolution from silently reinterpreting a section if its ordering changes.
+const SECTION_DELIVERIES: u8 = 1;
+const SECTION_OBSERVATIONS: u8 = 2;
+const SECTION_RESULTS: u8 = 3;
+const SECTION_DELIVERY_TOMBSTONES: u8 = 4;
+const SECTION_OBSERVATION_TOMBSTONES: u8 = 5;
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum CanonicalStateError {
     #[error("semantic state violates invariant: {0:?}")]
@@ -33,6 +41,7 @@ pub fn canonical_state_bytes(
     put_bytes(&mut out, DOMAIN)?;
     put_u16(&mut out, VERSION);
 
+    put_u8(&mut out, SECTION_DELIVERIES);
     let deliveries = sorted_deliveries(state);
     put_u64(&mut out, u64::try_from(deliveries.len()).map_err(|_| CanonicalStateError::FieldTooLarge)?);
     for (id, delivery) in deliveries {
@@ -42,6 +51,7 @@ pub fn canonical_state_bytes(
         put_bytes(&mut out, &delivery.payload)?;
     }
 
+    put_u8(&mut out, SECTION_OBSERVATIONS);
     let observations = sorted_observations(state);
     put_u64(&mut out, u64::try_from(observations.len()).map_err(|_| CanonicalStateError::FieldTooLarge)?);
     for (key, observation) in observations {
@@ -52,6 +62,7 @@ pub fn canonical_state_bytes(
         put_bytes(&mut out, &observation.payload)?;
     }
 
+    put_u8(&mut out, SECTION_RESULTS);
     let results = sorted_results(state);
     put_u64(&mut out, u64::try_from(results.len()).map_err(|_| CanonicalStateError::FieldTooLarge)?);
     for (key, result) in results {
@@ -62,6 +73,7 @@ pub fn canonical_state_bytes(
         put_uuid(&mut out, result.observation.observation_id);
     }
 
+    put_u8(&mut out, SECTION_DELIVERY_TOMBSTONES);
     let delivery_tombstones = sorted_delivery_tombstones(state);
     put_u64(&mut out, u64::try_from(delivery_tombstones.len()).map_err(|_| CanonicalStateError::FieldTooLarge)?);
     for (id, tombstone) in delivery_tombstones {
@@ -69,6 +81,7 @@ pub fn canonical_state_bytes(
         put_tombstone(&mut out, tombstone);
     }
 
+    put_u8(&mut out, SECTION_OBSERVATION_TOMBSTONES);
     let observation_tombstones = sorted_observation_tombstones(state);
     put_u64(&mut out, u64::try_from(observation_tombstones.len()).map_err(|_| CanonicalStateError::FieldTooLarge)?);
     for (key, tombstone) in observation_tombstones {
@@ -139,6 +152,10 @@ fn put_tombstone(out: &mut Vec<u8>, tombstone: &IdentityTombstone) {
     put_u64(out, tombstone.reusable_at_ms);
 }
 
+fn put_u8(out: &mut Vec<u8>, value: u8) {
+    out.push(value);
+}
+
 fn put_uuid(out: &mut Vec<u8>, value: Uuid) {
     out.extend_from_slice(value.as_bytes());
 }
@@ -202,6 +219,22 @@ mod tests {
             panic!("fixture admission should succeed");
         };
         next_state
+    }
+
+    #[test]
+    fn canonical_header_and_section_tags_are_explicit() {
+        let bytes = canonical_state_bytes(&admitted_state()).unwrap();
+        let domain_len = u64::try_from(DOMAIN.len()).unwrap() as usize;
+        assert_eq!(
+            &bytes[..domain_len],
+            &DOMAIN[..]
+        );
+        assert_eq!(
+            u16::from_be_bytes([bytes[domain_len], bytes[domain_len + 1]]),
+            VERSION
+        );
+        let first_section = domain_len + 2;
+        assert_eq!(bytes[first_section], SECTION_DELIVERIES);
     }
 
     #[test]
