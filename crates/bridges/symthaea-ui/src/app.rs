@@ -264,6 +264,7 @@ pub fn App() -> impl IntoView {
         let telemetry_callback_generation = Rc::clone(&telemetry_generation);
         let connected_callback_generation = Rc::clone(&telemetry_generation);
         let disconnect_generation = Rc::clone(&telemetry_generation);
+        let telemetry_gateway = gateway;
         let telemetry_sequence = Rc::clone(&event_sequence);
         let connected_sequence = Rc::clone(&event_sequence);
         let disconnect_sequence = Rc::clone(&event_sequence);
@@ -275,7 +276,8 @@ pub fn App() -> impl IntoView {
                     if !telemetry_session_is_current(
                         telemetry_callback_generation.get(),
                         session,
-                    ) {
+                    ) || telemetry_gateway.get_untracked() != gw
+                    {
                         return;
                     }
                     let Some(v) = Vitals::from_json(&payload) else {
@@ -326,7 +328,8 @@ pub fn App() -> impl IntoView {
                     if !telemetry_session_is_current(
                         connected_callback_generation.get(),
                         session,
-                    ) {
+                    ) || telemetry_gateway.get_untracked() != gw
+                    {
                         return;
                     }
                     ws_connected.set(true);
@@ -346,6 +349,7 @@ pub fn App() -> impl IntoView {
                     disconnect_generation.get(),
                     session,
                 )
+                && telemetry_gateway.get_untracked() == gw
             {
                 ws_connected.set(false);
                 let sequence = disconnect_sequence.get().saturating_add(1);
@@ -397,9 +401,12 @@ pub fn App() -> impl IntoView {
             loop {
                 let gw = gateway.get_untracked();
                 let response = api::send_simple(&gw, "status").await;
-                // Owner cancellation handles normal teardown; this generation
-                // check also covers a response that races the gateway change.
-                if status_authority.get() != status_session {
+                // Owner cancellation handles normal teardown; the generation
+                // and direct gateway check together cover a response that
+                // races the gateway change before the dependent effect reruns.
+                if status_authority.get() != status_session
+                    || gateway.get_untracked() != gw
+                {
                     return;
                 }
                 match response {
@@ -475,7 +482,9 @@ pub fn App() -> impl IntoView {
         let request_generation = Rc::clone(&request_generation);
         spawn_local_scoped_with_cancellation(async move {
             let response = api::send_query(&gw, &text).await;
-            if request_generation.get() != request_id {
+            if request_generation.get() != request_id
+                || gateway.get_untracked() != gw
+            {
                 return;
             }
             match response {
