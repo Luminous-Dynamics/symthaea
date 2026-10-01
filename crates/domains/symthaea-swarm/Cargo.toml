@@ -26,9 +26,10 @@ iroh-gossip = { version = "0.97", optional = true }
 
 [features]
 default = ["networking"]
+semantic-digest = ["dep:blake3"]
 networking = [
     "dep:bincode",
-    "dep:blake3",
+    "semantic-digest",
     "dep:futures",
     "dep:iroh",
     "dep:iroh-gossip",
