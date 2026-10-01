@@ -39,7 +39,7 @@ AUTHORITY_FILES=(
 DIAGNOSTIC_IDENTIFIERS='\b(ServiceStatus|UnitInfo|SystemdObserver)\b'
 SYSTEMCTL_PATTERN='(?:Command|process::Command)::new\(\s*["\x27]systemctl["\x27]'
 LEGACY_COMMAND_PATTERN='NixOSCommand::Custom'
-LEGACY_SERVICE_CONSTRUCTOR_PATTERN='\\bServiceManager::(start|stop|restart|reload|enable|disable)[[:space:]]*\\('
+LEGACY_SERVICE_CONSTRUCTOR_PATTERN='\bServiceManager::(start|stop|restart|reload|enable|disable)[[:space:]]*\('
 IMPLICIT_SERVICE_RESTART_PATTERN='_[[:space:]]*=>[[:space:]]*NixOSCommand::Custom[[:space:]]*\{[[:space:]]*command:[[:space:]]*["\x27]systemctl["\x27]'
 
 scan_diagnostic_boundary() {
