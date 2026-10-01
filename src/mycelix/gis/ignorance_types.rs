@@ -304,6 +304,7 @@ impl EpistemicFrame {
     /// their proposition-level confidence happens to be similar.
     pub fn divergence_from(&self, other: &Self) -> EpistemicFrameDivergence {
         EpistemicFrameDivergence {
+            version_changed: self.version != other.version,
             evidence_boundary_changed: self.evidence_boundary != other.evidence_boundary,
             ontology_changed: self.ontology_id != other.ontology_id,
             causal_model_changed: self.causal_model_id != other.causal_model_id,
@@ -320,6 +321,8 @@ impl EpistemicFrame {
 /// correction, and later model comparison.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EpistemicFrameDivergence {
+    /// Frame schema revision changed; provenance must therefore remain distinct.
+    pub version_changed: bool,
     pub evidence_boundary_changed: bool,
     pub ontology_changed: bool,
     pub causal_model_changed: bool,
@@ -330,7 +333,8 @@ pub struct EpistemicFrameDivergence {
 impl EpistemicFrameDivergence {
     /// Whether any epistemically material frame component differs.
     pub fn is_divergent(&self) -> bool {
-        self.evidence_boundary_changed
+        self.version_changed
+            || self.evidence_boundary_changed
             || self.ontology_changed
             || self.causal_model_changed
             || self.excluded_variables_changed
