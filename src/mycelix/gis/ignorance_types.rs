@@ -220,6 +220,19 @@ pub struct IgnoranceRecord {
     pub updated_at: SystemTime,
 }
 
+impl IgnoranceRecord {
+    /// Append a frame revision without mutating the historical detection.
+    pub fn append_frame_revision(&mut self, revision: EpistemicFrameRevision) {
+        self.frame_revisions.push(revision);
+        self.updated_at = SystemTime::now();
+    }
+
+    /// Return the most recent frame revision, if any.
+    pub fn latest_frame_revision(&self) -> Option<&EpistemicFrameRevision> {
+        self.frame_revisions.last()
+    }
+}
+
 /// Status of an ignorance record
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IgnoranceStatus {
