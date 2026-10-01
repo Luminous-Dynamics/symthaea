@@ -19,7 +19,10 @@ use std::rc::Rc;
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
-use crate::presentation::{cognitive_spans, event_between, push_cognitive_event, CognitiveEvent, CognitiveEventKind, CognitiveState};
+use crate::presentation::{
+    cognitive_spans, event_between, next_telemetry_session, push_cognitive_event,
+    telemetry_session_is_current, CognitiveEvent, CognitiveEventKind, CognitiveState,
+};
 
 const DEFAULT_GATEWAY: &str = "http://127.0.0.1:8090";
 
@@ -232,9 +235,17 @@ pub fn App() -> impl IntoView {
     // Open the telemetry stream once, on mount, against whatever gateway
     // URL is set at that moment. Reconnecting on URL change is a v1 nicety
     // — not required for the wiring to be real and useful today.
+    let telemetry_generation = Rc::new(Cell::new(0_u64));
+
     Effect::new(move |_| {
-        let gw = gateway.get_untracked();
+        let gw = gateway.get();
         ws_connected.set(false);
+        let session = {
+            let mut generation = telemetry_generation.get();
+            let session = next_telemetry_session(&mut generation);
+            telemetry_generation.set(generation);
+            session
+        };
         spawn_local_scoped_with_cancellation(async move {
             let mut previous_state: Option<CognitiveState> = None;
             let event_sequence = Rc::new(Cell::new(0_u64));
@@ -244,6 +255,12 @@ pub fn App() -> impl IntoView {
             let connected = api::stream_telemetry(
                 &gw,
                 move |payload| {
+                    if !telemetry_session_is_current(
+                        telemetry_generation.get(),
+                        session,
+                    ) {
+                        return;
+                    }
                     let Some(v) = Vitals::from_json(&payload) else {
                         leptos::logging::warn!(
                             "telemetry payload missing finite required cognitive measurements"
@@ -289,6 +306,12 @@ pub fn App() -> impl IntoView {
                     }
                 },
                 move || {
+                    if !telemetry_session_is_current(
+                        telemetry_generation.get(),
+                        session,
+                    ) {
+                        return;
+                    }
                     ws_connected.set(true);
                     let sequence = connected_sequence.get().saturating_add(1);
                     connected_sequence.set(sequence);
@@ -301,7 +324,12 @@ pub fn App() -> impl IntoView {
                 },
             )
             .await;
-            if connected {
+            if connected
+                && telemetry_session_is_current(
+                    telemetry_generation.get(),
+                    session,
+                )
+            {
                 ws_connected.set(false);
                 let sequence = disconnect_sequence.get().saturating_add(1);
                 disconnect_sequence.set(sequence);
@@ -326,6 +354,9 @@ pub fn App() -> impl IntoView {
     // case in production) — without this, an idle daemon would look
     // indistinguishable from an unreachable one.
     Effect::new(move |_| {
+        // Track the gateway so changing it starts a fresh status loop; the
+        // previous owner-scoped loop is cancelled on effect cleanup.
+        let _gateway_generation = gateway.get();
         spawn_local_scoped_with_cancellation(async move {
             loop {
                 let gw = gateway.get_untracked();
