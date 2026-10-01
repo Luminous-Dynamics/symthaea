@@ -39,6 +39,7 @@ AUTHORITY_FILES=(
 DIAGNOSTIC_IDENTIFIERS='\b(ServiceStatus|UnitInfo|SystemdObserver)\b'
 SYSTEMCTL_PATTERN='(?:Command|process::Command)::new\(\s*["\x27]systemctl["\x27]'
 LEGACY_COMMAND_PATTERN='NixOSCommand::Custom'
+IMPLICIT_SERVICE_RESTART_PATTERN='_[[:space:]]*=>[[:space:]]*NixOSCommand::Custom[[:space:]]*\{[[:space:]]*command:[[:space:]]*["\x27]systemctl["\x27]'
 
 scan_diagnostic_boundary() {
   local file="$1"
@@ -53,6 +54,11 @@ scan_direct_systemctl() {
 scan_legacy_custom_command() {
   local file="$1"
   rg -n --pcre2 "${LEGACY_COMMAND_PATTERN}" "$file"
+}
+
+scan_implicit_service_restart() {
+  local file="$1"
+  rg -n --pcre2 "${IMPLICIT_SERVICE_RESTART_PATTERN}" "$file"
 }
 
 run_boundary_check() {
@@ -116,6 +122,18 @@ run_boundary_check() {
     fi
   done
 
+  # CROSS-022: no wildcard action-category fallback may synthesize a
+  # systemctl command. New categories must be mapped explicitly or rejected.
+  local daemon="${ROOT}/crates/core/nixward/src/bin/nixward_daemon.rs"
+  if [[ ! -f "${daemon}" ]]; then
+    echo "ERROR: Nixward daemon source is missing" >&2
+    failed=1
+  elif matches="$(scan_implicit_service_restart "${daemon}")"; then
+    echo "ERROR: daemon wildcard action category may synthesize implicit systemctl restart" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+
   return "${failed}"
 }
 
@@ -140,9 +158,17 @@ run_self_test() {
     return 1
   fi
 
+  printf '%s\n' '_ => NixOSCommand::Custom { command: "systemctl", args: vec!["restart"], };' > "${tmp}/implicit-restart.rs"
+  if scan_implicit_service_restart "${tmp}/implicit-restart.rs"; then
+    :
+  else
+    echo "ERROR: CROSS-022 self-test failed to detect implicit service restart fallback" >&2
+    return 1
+  fi
+
   printf '%s\n' 'NixServiceObservedStateV1::parse_systemd_properties(...);' > "${tmp}/typed.rs"
   printf '%s\n' 'NixOSCommand::Custom { .. };' > "${tmp}/legacy-domain.rs"
-  if rg -n '\\bNixOSCommand\\b' "${tmp}/legacy-domain.rs"; then
+  if rg -n '\bNixOSCommand\b' "${tmp}/legacy-domain.rs"; then
     :
   else
     echo "ERROR: CROSS-022 self-test failed to detect legacy command dependency" >&2
