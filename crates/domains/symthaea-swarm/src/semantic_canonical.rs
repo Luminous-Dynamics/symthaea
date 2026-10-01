@@ -224,17 +224,95 @@ mod tests {
     #[test]
     fn canonical_header_and_section_tags_are_explicit() {
         let bytes = canonical_state_bytes(&admitted_state()).unwrap();
-        let domain_len = u64::try_from(DOMAIN.len()).unwrap() as usize;
+        let encoded_domain_len = u64::from_be_bytes(bytes[..8].try_into().unwrap()) as usize;
+        assert_eq!(encoded_domain_len, DOMAIN.len());
+        assert_eq!(&bytes[8..8 + encoded_domain_len], DOMAIN);
+        let version_offset = 8 + encoded_domain_len;
         assert_eq!(
-            &bytes[..domain_len],
-            &DOMAIN[..]
-        );
-        assert_eq!(
-            u16::from_be_bytes([bytes[domain_len], bytes[domain_len + 1]]),
+            u16::from_be_bytes(bytes[version_offset..version_offset + 2].try_into().unwrap()),
             VERSION
         );
-        let first_section = domain_len + 2;
-        assert_eq!(bytes[first_section], SECTION_DELIVERIES);
+        assert_eq!(bytes[version_offset + 2], SECTION_DELIVERIES);
+    }
+
+    #[test]
+    fn variable_length_boundaries_are_non_ambiguous() {
+        let state = admitted_state();
+        let base = canonical_state_bytes(&state).unwrap();
+
+        for payload in [
+            Vec::new(),
+            vec![0],
+            vec![0, 1],
+            vec![0, 1, 2, 3],
+            vec![0; 64],
+        ] {
+            let mut changed = state.clone();
+            changed.deliveries.values_mut().next().unwrap().payload = payload;
+            let candidate = canonical_state_bytes(&changed).unwrap();
+            assert_ne!(base, candidate);
+        }
+
+        let mut empty = state.clone();
+        empty.deliveries.values_mut().next().unwrap().payload = Vec::new();
+        let mut prefixed = empty.clone();
+        prefixed.deliveries.values_mut().next().unwrap().payload = vec![0];
+        let mut suffixed = empty.clone();
+        suffixed.deliveries.values_mut().next().unwrap().payload = vec![0, 0];
+
+        assert_ne!(
+            canonical_state_bytes(&empty).unwrap(),
+            canonical_state_bytes(&prefixed).unwrap()
+        );
+        assert_ne!(
+            canonical_state_bytes(&prefixed).unwrap(),
+            canonical_state_bytes(&suffixed).unwrap()
+        );
+    }
+
+    #[test]
+    fn adjacent_variable_length_fields_remain_distinct() {
+        let state = admitted_state();
+
+        let mut first = state.clone();
+        first.observations.values_mut().next().unwrap().payload = b"ab".to_vec();
+        let mut second = state.clone();
+        second.observations.values_mut().next().unwrap().payload = b"a".to_vec();
+
+        let first_bytes = canonical_state_bytes(&first).unwrap();
+        let second_bytes = canonical_state_bytes(&second).unwrap();
+        assert_ne!(first_bytes, second_bytes);
+
+        let mut namespace_a = state.clone();
+        namespace_a.observations.values_mut().next().unwrap().key.namespace = "a".into();
+        let mut namespace_ab = state.clone();
+        namespace_ab.observations.values_mut().next().unwrap().key.namespace = "ab".into();
+        assert_ne!(
+            canonical_state_bytes(&namespace_a).unwrap(),
+            canonical_state_bytes(&namespace_ab).unwrap()
+        );
+    }
+
+    #[test]
+    fn zero_record_sections_are_still_framed() {
+        let state = SemanticAdmissionState::default();
+        let bytes = canonical_state_bytes(&state).unwrap();
+        assert!(bytes.len() > 8 + DOMAIN.len() + 2 + 5);
+        let domain_len = u64::from_be_bytes(bytes[..8].try_into().unwrap()) as usize;
+        let mut offset = 8 + domain_len + 2;
+        for tag in [
+            SECTION_DELIVERIES,
+            SECTION_OBSERVATIONS,
+            SECTION_RESULTS,
+            SECTION_DELIVERY_TOMBSTONES,
+            SECTION_OBSERVATION_TOMBSTONES,
+        ] {
+            assert_eq!(bytes[offset], tag);
+            offset += 1;
+            assert_eq!(&bytes[offset..offset + 8], &[0; 8]);
+            offset += 8;
+        }
+        assert_eq!(offset, bytes.len());
     }
 
     #[test]
