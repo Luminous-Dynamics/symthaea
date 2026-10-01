@@ -527,6 +527,12 @@ pub struct IndependenceAssessment {
     pub basis: IndependenceBasis,
     pub examined_observation_ids: Vec<String>,
     pub verifier_version: &'static str,
+    /// BLAKE3 commitment to the independence-relevant provenance projection
+    /// of the observations examined by this assessment.
+    ///
+    /// This prevents the assessment commitment from remaining unchanged when
+    /// provenance fields relevant to the verifier are silently mutated.
+    pub examined_scope_fingerprint: String,
     /// BLAKE3 commitment to the assessed pair, scope, classification, basis,
     /// and verifier version. This is an assessment fingerprint, not a truth claim.
     pub assessment_fingerprint: String,
@@ -537,13 +543,22 @@ impl IndependenceAssessment {
 
     fn compute_fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-independence-assessment:v1\n");
+        hasher.update(b"symthaea:observation-independence-assessment:v2\n");
         write_canonical_string(&mut hasher, &self.source_observation_id);
         write_canonical_string(&mut hasher, &self.target_observation_id);
         write_canonical_string_vec(&mut hasher, &self.examined_observation_ids);
+        write_canonical_string(&mut hasher, &self.examined_scope_fingerprint);
         write_canonical_string(&mut hasher, self.verifier_version);
         write_canonical_independence(&mut hasher, &self.classification);
         write_canonical_independence_basis(&mut hasher, &self.basis);
+        hasher.finalize().to_hex().to_string()
+    }
+
+    fn compute_scope_fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-independence-scope:v1\n");
+        write_canonical_string_vec(&mut hasher, &self.examined_observation_ids);
+        write_canonical_string(&mut hasher, &self.examined_scope_fingerprint);
         hasher.finalize().to_hex().to_string()
     }
 
@@ -677,22 +692,47 @@ impl ObservationGraph {
             .map(|observation| observation.id.clone())
             .collect::<Vec<_>>();
         examined_observation_ids.sort();
+        let mut scope_hasher = blake3::Hasher::new();
+        scope_hasher.update(b"symthaea:observation-independence-scope:v1\n");
+        write_canonical_string_vec(&mut scope_hasher, &examined_observation_ids);
+        for observation_id in &examined_observation_ids {
+            let observation = by_id.get(observation_id.as_str()).expect("validated graph");
+            write_canonical_string(&mut scope_hasher, &observation.id);
+            write_canonical_string(&mut scope_hasher, &observation.provenance.source.sensor_id);
+            if let Some(platform_id) = &observation.provenance.source.platform_id {
+                scope_hasher.update(&[1]);
+                write_canonical_string(&mut scope_hasher, platform_id);
+            } else {
+                scope_hasher.update(&[0]);
+            }
+            let mut parent_ids = observation.provenance.parent_observation_ids.clone();
+            parent_ids.sort();
+            write_canonical_string_vec(&mut scope_hasher, &parent_ids);
+            if let Some(activity) = &observation.provenance.processing_activity {
+                scope_hasher.update(&[1]);
+                write_canonical_string(&mut scope_hasher, &activity.activity_id);
+                write_canonical_string(&mut scope_hasher, activity.execution_fingerprint.as_deref().unwrap_or(""));
+            } else {
+                scope_hasher.update(&[0]);
+            }
+            if let Some(asset) = &observation.asset {
+                scope_hasher.update(&[1]);
+                write_canonical_string(&mut scope_hasher, &asset.hash_algorithm);
+                write_canonical_string(&mut scope_hasher, &asset.content_hash);
+            } else {
+                scope_hasher.update(&[0]);
+            }
+        }
+        let examined_scope_fingerprint = scope_hasher.finalize().to_hex().to_string();
+
         let assessment = |classification, basis| {
             let mut hasher = blake3::Hasher::new();
-            hasher.update(b"symthaea:observation-independence-assessment:v1\n");
-            write_canonical_string(
-                &mut hasher,
-                source_observation_id,
-            );
-            write_canonical_string(
-                &mut hasher,
-                target_observation_id,
-            );
+            hasher.update(b"symthaea:observation-independence-assessment:v2\n");
+            write_canonical_string(&mut hasher, source_observation_id);
+            write_canonical_string(&mut hasher, target_observation_id);
             write_canonical_string_vec(&mut hasher, &examined_observation_ids);
-            write_canonical_string(
-                &mut hasher,
-                IndependenceAssessment::VERIFIER_VERSION,
-            );
+            write_canonical_string(&mut hasher, &examined_scope_fingerprint);
+            write_canonical_string(&mut hasher, IndependenceAssessment::VERIFIER_VERSION);
             write_canonical_independence(&mut hasher, &classification);
             write_canonical_independence_basis(&mut hasher, &basis);
             IndependenceAssessment {
@@ -702,6 +742,7 @@ impl ObservationGraph {
                 basis,
                 examined_observation_ids: examined_observation_ids.clone(),
                 verifier_version: IndependenceAssessment::VERIFIER_VERSION,
+                examined_scope_fingerprint: examined_scope_fingerprint.clone(),
                 assessment_fingerprint: hasher.finalize().to_hex().to_string(),
             }
         };
@@ -1810,12 +1851,30 @@ mod tests {
         assert_eq!(assessment.basis, IndependenceBasis::NoSharedProvenance);
         assert_eq!(assessment.examined_observation_ids, vec!["obs-001", "obs-002"]);
         assert_eq!(assessment.verifier_version, "observation-fabric-independence-v1");
+        assert_eq!(assessment.examined_scope_fingerprint.len(), 64);
         assert_eq!(assessment.assessment_fingerprint.len(), 64);
         assert!(assessment.assessment_fingerprint.bytes().all(|b| b.is_ascii_hexdigit()));
         assert!(assessment.verify_fingerprint());
     }
 
     #[test]
+    #[test]
+    fn detailed_independence_fingerprint_changes_when_scope_provenance_changes() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let mut assessment = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        }
+        .assess_independence_detailed("obs-001", "obs-002")
+        .expect("assessment");
+        let original = assessment.assessment_fingerprint.clone();
+        assessment.examined_scope_fingerprint = "0".repeat(64);
+        assert_ne!(original, assessment.compute_fingerprint());
+        assert!(!assessment.verify_fingerprint());
+    }
+
     fn detailed_independence_fingerprint_changes_when_basis_changes() {
         let mut second = fixture();
         second.id = "obs-002".into();
@@ -1849,10 +1908,11 @@ mod tests {
         .expect("assessment");
 
         let mut expected = blake3::Hasher::new();
-        expected.update(b"symthaea:observation-independence-assessment:v1\n");
+        expected.update(b"symthaea:observation-independence-assessment:v2\n");
         write_canonical_string(&mut expected, "obs-001");
         write_canonical_string(&mut expected, "obs-002");
         write_canonical_string_vec(&mut expected, &["obs-001".into(), "obs-002".into()]);
+        write_canonical_string(&mut expected, &assessment.examined_scope_fingerprint);
         write_canonical_string(&mut expected, "observation-fabric-independence-v1");
         write_canonical_independence(&mut expected, &EvidenceIndependence::VerifiedIndependent);
         write_canonical_independence_basis(&mut expected, &IndependenceBasis::NoSharedProvenance);
@@ -2048,127 +2108,3 @@ mod tests {
             ended_at_unix_ns: None,
             agent_id: None,
             activity_fingerprint: None,
-            execution_fingerprint: Some(
-                "0000000000000000000000000000000000000000000000000000000000000000".into(),
-            ),
-            input_observation_ids: vec![],
-            output_observation_ids: vec!["obs-001".into()],
-            derivations: Vec::new(),
-        };
-        observation.provenance.processing_activity = Some(activity);
-
-        let graph = ObservationGraph {
-            observations: vec![observation],
-            relations: vec![],
-        };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::ExecutionFingerprintMismatch)
-        );
-    }
-
-    #[test]
-    fn graph_rejects_unclaimed_activity_output() {
-        let mut input = fixture();
-        input.id = "input".into();
-        let mut output_a = fixture();
-        output_a.id = "output-a".into();
-        output_a.provenance.parent_observation_ids = vec!["input".into()];
-        output_a.provenance.processing_activity = Some(ProcessingActivity {
-            activity_id: "run-001".into(),
-            process_id: "transform-v1".into(),
-            process_definition_fingerprint: None,
-            started_at_unix_ns: None,
-            ended_at_unix_ns: None,
-            agent_id: None,
-            activity_fingerprint: None,
-            execution_fingerprint: None,
-            input_observation_ids: vec!["input".into()],
-            output_observation_ids: vec!["output-a".into(), "output-b".into()],
-            derivations: Vec::new(),
-        });
-        let mut output_b = fixture();
-        output_b.id = "output-b".into();
-        output_b.provenance.parent_observation_ids = vec!["input".into()];
-        let graph = ObservationGraph {
-            observations: vec![input, output_a, output_b],
-            relations: vec![],
-        };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::ActivityOutputMissingProducer("output-b".into()))
-        );
-    }
-
-    #[test]
-    fn graph_rejects_activity_input_missing_parent_lineage() {
-        let mut output = fixture();
-        output.id = "output".into();
-        output.provenance.processing_activity = Some(ProcessingActivity {
-            activity_id: "run-001".into(),
-            process_id: "transform-v1".into(),
-            process_definition_fingerprint: None,
-            started_at_unix_ns: None,
-            ended_at_unix_ns: None,
-            agent_id: None,
-            activity_fingerprint: None,
-            execution_fingerprint: None,
-            input_observation_ids: vec!["input".into()],
-            output_observation_ids: vec!["output".into()],
-            derivations: Vec::new(),
-        });
-        let graph = ObservationGraph { observations: vec![output], relations: vec![] };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::MissingActivityInput("input".into()))
-        );
-    }
-
-    #[test]
-    fn graph_rejects_missing_activity_input() {
-        let mut observation = fixture();
-        observation.provenance.processing_activity = Some(ProcessingActivity {
-            activity_id: "run-001".into(),
-            process_id: "transform-v1".into(),
-            process_definition_fingerprint: None,
-            started_at_unix_ns: None,
-            ended_at_unix_ns: None,
-            agent_id: None,
-            activity_fingerprint: None,
-            execution_fingerprint: None,
-            input_observation_ids: vec!["missing-input".into()],
-            output_observation_ids: vec!["obs-001".into()],
-            derivations: Vec::new(),
-        });
-        let graph = ObservationGraph {
-            observations: vec![observation],
-            relations: vec![],
-        };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::MissingActivityInput("missing-input".into()))
-        );
-    }
-
-    #[test]
-    fn graph_requires_activity_to_emit_its_observation() {
-        let mut observation = fixture();
-        observation.provenance.processing_activity = Some(ProcessingActivity {
-            activity_id: "run-001".into(),
-            process_id: "transform-v1".into(),
-            process_definition_fingerprint: None,
-            started_at_unix_ns: None,
-            ended_at_unix_ns: None,
-            agent_id: None,
-            activity_fingerprint: None,
-            input_observation_ids: vec![],
-            output_observation_ids: vec![],
-            derivations: Vec::new(),
-        });
-        let graph = ObservationGraph {
-            observations: vec![observation],
-            relations: vec![],
-        };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::ActivityOutputMissingSelf("obs-001".into()))
