@@ -1520,6 +1520,33 @@ mod tests {
     }
 
     #[test]
+    fn test_butlin_identity_fields_round_trip_additively() {
+        let bundle = ButlinEvidenceBundle {
+            schema_version: REPORT_SCHEMA_VERSION,
+            commit_sha: "test-commit".into(),
+            config_hash: "legacy-fingerprint".into(),
+            config_identity: Some("stable-identity".into()),
+            config_identity_schema: Some(
+                "symthaea:stable-config-identity:v1".into(),
+            ),
+            seeds: vec![1],
+            generated_at: "test".into(),
+            ablations: vec![],
+        };
+
+        let json = serde_json::to_string(&bundle).expect("bundle should serialize");
+        let decoded: ButlinEvidenceBundle =
+            serde_json::from_str(&json).expect("bundle should deserialize");
+
+        assert_eq!(decoded.config_hash, "legacy-fingerprint");
+        assert_eq!(decoded.config_identity.as_deref(), Some("stable-identity"));
+        assert_eq!(
+            decoded.config_identity_schema.as_deref(),
+            Some("symthaea:stable-config-identity:v1")
+        );
+    }
+
+    #[test]
     fn test_merge_rejects_unknown_indicator_id() {
         let report = ButlinIndicatorReport::from_indicators(vec![stub_indicator(
             "AE-1",
