@@ -195,7 +195,7 @@ fn digest(bytes: impl AsRef<[u8]>) -> String {
     out
 }
 
-fn fixture_seed(seed: u64, index: usize, salt: u64) -> u64 {
+pub(crate) fn fixture_seed(seed: u64, index: usize, salt: u64) -> u64 {
     let mut x = seed
         ^ (index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
         ^ salt.wrapping_mul(0xD1B5_4A32_D192_ED03);
@@ -210,7 +210,7 @@ fn fixture_seed(seed: u64, index: usize, salt: u64) -> u64 {
 /// This deliberately uses ±1 components so the cleanup experiment has an
 /// explicit, exact self-inverse binding algebra rather than relying on
 /// ContinuousHV's non-self-inverse real-valued binding.
-fn bipolar(dim: usize, seed: u64) -> ContinuousHV {
+pub(crate) fn bipolar(dim: usize, seed: u64) -> ContinuousHV {
     let random = ContinuousHV::random(dim, seed);
     ContinuousHV::from_vec(
         random
@@ -221,7 +221,7 @@ fn bipolar(dim: usize, seed: u64) -> ContinuousHV {
     )
 }
 
-fn noisy_query(value: &ContinuousHV, noise_weight: f32, seed: u64) -> ContinuousHV {
+pub(crate) fn noisy_query(value: &ContinuousHV, noise_weight: f32, seed: u64) -> ContinuousHV {
     if noise_weight == 0.0 {
         return value.clone();
     }
