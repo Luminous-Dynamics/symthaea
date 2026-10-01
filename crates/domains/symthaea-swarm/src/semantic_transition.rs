@@ -198,6 +198,50 @@ fn write_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
     hasher.update(bytes);
 }
 
+/// Typed, owned description of a semantic operation claim.
+///
+/// This groups complete operation inputs into one value so callers can retain,
+/// transport, and verify a claim without mixing fields from different calls.
+/// It is evidence data, not an assertion of authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TransitionClaim {
+    Admission {
+        delivery: crate::semantic_admission::DeliveryContract,
+        observation: crate::semantic_admission::ObservationRecord,
+        policy: crate::semantic_admission::AdmissionPolicy,
+        now_ms: u64,
+        result: crate::semantic_admission::SemanticResult,
+    },
+    Replay {
+        delivery: crate::semantic_admission::DeliveryContract,
+        observation: crate::semantic_admission::ObservationRecord,
+        policy: crate::semantic_admission::AdmissionPolicy,
+        now_ms: u64,
+        result: crate::semantic_admission::SemanticResult,
+    },
+    LifecycleRetirement {
+        policy: crate::semantic_admission::AdmissionPolicy,
+        now_ms: u64,
+    },
+}
+
+/// Commit a typed operation claim. Operation-specific helpers remain available
+/// for compatibility; new callers should prefer this typed dispatcher.
+pub fn transition_claim_commitment(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    claim: &TransitionClaim,
+) -> Result<TransitionClaimCommitment, TransitionCommitmentError> {
+    match claim {
+        TransitionClaim::Admission { delivery, observation, policy, now_ms, result } =>
+            admission_claim_commitment(before, after, delivery, observation, *policy, *now_ms, result),
+        TransitionClaim::Replay { delivery, observation, policy, now_ms, result } =>
+            replay_claim_commitment(before, after, delivery, observation, *policy, *now_ms, result),
+        TransitionClaim::LifecycleRetirement { policy, now_ms } =>
+            lifecycle_claim_commitment(before, after, *policy, *now_ms),
+    }
+}
+
 /// Failure returned when a claimed transition cannot be reconstructed from the
 /// semantic transition oracle and its committed state edge.
 ///
