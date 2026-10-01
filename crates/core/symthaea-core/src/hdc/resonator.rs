@@ -483,6 +483,7 @@ impl ResonatorNetwork {
     ) -> Result<HashMap<String, ResonatorSolution>> {
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
         let mut rng = StdRng::seed_from_u64(seed);
+        self.energy_history.clear();
 
         // Initialize estimates for all unknowns
         let mut estimates: HashMap<String, Vec<f32>> = unknowns
@@ -624,6 +625,30 @@ impl ResonatorNetwork {
                     state.converged = converged_flags[idx];
                 }
             }
+
+            // Record the joint constraint energy after this iteration. The
+            // single-unknown solver already exposes this signal; keeping the
+            // multi-unknown path on the same evidence surface prevents its
+            // ResonatorSolution::energy from silently defaulting to 1.0.
+            let mut total_energy = 0.0f32;
+            let mut total_weight = 0.0f32;
+            for constraint in constraints {
+                if let Factor::Unknown(name) = &constraint.unknown {
+                    let left = self.resolve_factor(&constraint.left, &estimates)?;
+                    let right = self.resolve_factor(&constraint.right, &estimates)?;
+                    if let Some(estimate) = estimates.get(name) {
+                        let expected = unbind(&left, &right);
+                        let similarity = cosine_similarity(estimate, &expected);
+                        total_energy += constraint.weight * (1.0 - similarity);
+                        total_weight += constraint.weight;
+                    }
+                }
+            }
+            self.energy_history.push(if total_weight > 0.0 {
+                total_energy / total_weight
+            } else {
+                1.0
+            });
 
             let n = unknowns.len();
             for i in 0..n {
@@ -1099,6 +1124,33 @@ mod tests {
             first.unwrap().get("x").unwrap().vector,
             second.unwrap().get("x").unwrap().vector,
             "explicitly seeded multi-unknown runs must reproduce exactly"
+        );
+    }
+
+    #[test]
+    fn test_solve_system_records_joint_energy() {
+        let dim = 64;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+
+        let solutions = network
+            .solve_system_seeded(&["x"], &[constraint], Some(4), 11)
+            .unwrap();
+        let solution = solutions.get("x").expect("x solution should exist");
+
+        assert_eq!(network.energy_history().len(), solution.iterations);
+        assert!(network.energy_history().iter().all(|energy| energy.is_finite()));
+        assert!(solution.energy.is_finite());
+        assert_eq!(
+            solution.energy,
+            *network.energy_history().last().expect("energy history is non-empty")
         );
     }
 

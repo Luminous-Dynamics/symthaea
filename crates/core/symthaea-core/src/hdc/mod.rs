@@ -120,6 +120,8 @@ pub mod sequence_order_harness;
 pub mod resonator_cross_validation_harness;
 /// Deterministic coupled two-factor resonator factorization research harness.
 pub mod two_factor_resonator_harness;
+/// Deterministic codebook-geometry sweep for coupled two-factor resonator research.
+pub mod resonator_separation_harness;
 
 /// HDC dimensionality configuration for runtime selection
 ///
