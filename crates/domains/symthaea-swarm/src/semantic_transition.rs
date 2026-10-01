@@ -267,6 +267,43 @@ pub fn verify_admission_transition(
     )
 }
 
+/// Verify an admission transition and its operation-level claim commitment.
+pub fn verify_admission_transition_claim(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    delivery: &crate::semantic_admission::DeliveryContract,
+    observation: &crate::semantic_admission::ObservationRecord,
+    policy: crate::semantic_admission::AdmissionPolicy,
+    now_ms: u64,
+    claimed_result: &crate::semantic_admission::SemanticResult,
+    claimed_commitment: &TransitionCommitment,
+    claimed_claim: &TransitionClaimCommitment,
+) -> Result<(), TransitionVerificationError> {
+    verify_admission_transition(
+        before,
+        after,
+        delivery,
+        observation,
+        policy,
+        now_ms,
+        claimed_result,
+        claimed_commitment,
+    )?;
+    let expected = admission_claim_commitment(
+        before,
+        after,
+        delivery,
+        observation,
+        policy,
+        now_ms,
+        claimed_result,
+    )?;
+    if expected != *claimed_claim {
+        return Err(TransitionVerificationError::ClaimCommitmentMismatch);
+    }
+    Ok(())
+}
+
 /// Verify an exact semantic replay.
 ///
 /// A replay is intentionally a no-op at the semantic-state layer. Transport
@@ -307,6 +344,43 @@ pub fn verify_replay_transition(
     )
 }
 
+/// Verify a replay transition and its operation-level claim commitment.
+pub fn verify_replay_transition_claim(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    delivery: &crate::semantic_admission::DeliveryContract,
+    observation: &crate::semantic_admission::ObservationRecord,
+    policy: crate::semantic_admission::AdmissionPolicy,
+    now_ms: u64,
+    claimed_result: &crate::semantic_admission::SemanticResult,
+    claimed_commitment: &TransitionCommitment,
+    claimed_claim: &TransitionClaimCommitment,
+) -> Result<(), TransitionVerificationError> {
+    verify_replay_transition(
+        before,
+        after,
+        delivery,
+        observation,
+        policy,
+        now_ms,
+        claimed_result,
+        claimed_commitment,
+    )?;
+    let expected = replay_claim_commitment(
+        before,
+        after,
+        delivery,
+        observation,
+        policy,
+        now_ms,
+        claimed_result,
+    )?;
+    if expected != *claimed_claim {
+        return Err(TransitionVerificationError::ClaimCommitmentMismatch);
+    }
+    Ok(())
+}
+
 /// Verify a lifecycle-retirement transition by replaying the pure GC oracle.
 ///
 /// Lifecycle retirement must actually change semantic state. A no-op lifecycle
@@ -340,6 +414,23 @@ pub fn verify_lifecycle_retirement(
         TransitionKind::LifecycleRetirement,
         claimed_commitment,
     )
+}
+
+/// Verify a lifecycle transition and its operation-level claim commitment.
+pub fn verify_lifecycle_retirement_claim(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    policy: crate::semantic_admission::AdmissionPolicy,
+    now_ms: u64,
+    claimed_commitment: &TransitionCommitment,
+    claimed_claim: &TransitionClaimCommitment,
+) -> Result<(), TransitionVerificationError> {
+    verify_lifecycle_retirement(before, after, policy, now_ms, claimed_commitment)?;
+    let expected = lifecycle_claim_commitment(before, after, policy, now_ms)?;
+    if expected != *claimed_claim {
+        return Err(TransitionVerificationError::ClaimCommitmentMismatch);
+    }
+    Ok(())
 }
 
 fn verify_commitment(
