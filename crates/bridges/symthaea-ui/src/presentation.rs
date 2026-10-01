@@ -487,33 +487,27 @@ mod tests {
     fn processing_transition_has_priority_over_broadcast() {
         let previous = state(true, false, 0.8, 0.3, 0.1);
         let current = state(true, true, 0.8, 0.3, 0.1);
-        assert_eq!(
-            event_between(Some(previous), current, 1, 42, true, true)
-                .map(|event| event.kind),
-            Some(CognitiveEventKind::ProcessingStarted)
-        );
+        let event = event_between(Some(previous), current, 1, 42, true, true).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::ProcessingStarted);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::PresenceTransition);
     }
 
     #[test]
     fn rest_transition_is_explicit() {
         let previous = state(true, false, 0.8, 0.3, 0.1);
         let current = state(true, false, 0.8, 0.1, 0.1);
-        assert_eq!(
-            event_between(Some(previous), current, 2, 42, false, false)
-                .map(|event| event.kind),
-            Some(CognitiveEventKind::EnteredRest)
-        );
+        let event = event_between(Some(previous), current, 2, 42, false, false).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::EnteredRest);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::ModeTransition);
     }
 
     #[test]
     fn explicit_surprise_creates_event_without_state_change() {
         let previous = state(true, false, 0.8, 0.3, 0.1);
         let current = state(true, false, 0.8, 0.3, 0.1);
-        assert_eq!(
-            event_between(Some(previous), current, 3, 42, true, false)
-                .map(|event| event.kind),
-            Some(CognitiveEventKind::SurpriseDetected)
-        );
+        let event = event_between(Some(previous), current, 3, 42, true, false).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::SurpriseDetected);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::ExplicitSurpriseSignal);
     }
 
 
