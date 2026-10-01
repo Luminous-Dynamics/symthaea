@@ -266,6 +266,53 @@ pub enum ResolutionMethod {
 }
 
 // =============================================================================
+// Epistemic frame provenance
+// =============================================================================
+
+/// The representational frame under which a GIS conclusion was produced.
+///
+/// A frame qualifies confidence: it records the evidence/model/schema boundary
+/// rather than pretending that a high proposition confidence proves completeness.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpistemicFrame {
+    /// Stable semantic identifier for the frame definition.
+    pub id: String,
+    /// Monotonic schema/frame revision.
+    pub version: u32,
+    /// Boundary of evidence considered by the frame.
+    pub evidence_boundary: String,
+    /// Ontology/schema identifier used to interpret observations.
+    pub ontology_id: String,
+    /// Causal/model identifier used for inference.
+    pub causal_model_id: String,
+    /// Variables deliberately excluded from the frame.
+    pub excluded_variables: Vec<String>,
+    /// Known blind spots acknowledged by the frame.
+    pub known_blind_spots: Vec<String>,
+}
+
+impl EpistemicFrame {
+    /// Stable identity used for provenance and future correction events.
+    pub fn identity(&self) -> String {
+        format!("{}@{}", self.id, self.version)
+    }
+}
+
+impl Default for EpistemicFrame {
+    fn default() -> Self {
+        Self {
+            id: "gis-default".to_string(),
+            version: 1,
+            evidence_boundary: "local-query-context".to_string(),
+            ontology_id: "general-v1".to_string(),
+            causal_model_id: "unspecified".to_string(),
+            excluded_variables: Vec::new(),
+            known_blind_spots: vec!["unrepresented variables and categories".to_string()],
+        }
+    }
+}
+
+// =============================================================================
 // GIS v4.0: Eight Harmonies Integration
 // =============================================================================
 
