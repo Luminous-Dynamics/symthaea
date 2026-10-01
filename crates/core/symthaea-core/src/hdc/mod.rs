@@ -126,6 +126,8 @@ pub mod resonator_separation_harness;
 pub mod resonator_temperature_harness;
 /// Deterministic interaction sweep crossing codebook separation and cleanup temperature.
 pub mod resonator_geometry_temperature_harness;
+/// Deterministic comparison of coupled resonator cleanup nonlinearities.
+pub mod resonator_cleanup_rule_harness;
 
 /// HDC dimensionality configuration for runtime selection
 ///
@@ -675,7 +677,7 @@ pub use statistical_retrieval::{
 pub use sequence_encoder::{SequenceEncoder, bind, bundle, permute, unpermute};
 
 pub use resonator::{
-    Constraint, Factor, MultiConstraint, ResonatorConfig, ResonatorNetwork, ResonatorSolution,
+    CleanupRule, Constraint, Factor, MultiConstraint, ResonatorConfig, ResonatorNetwork, ResonatorSolution,
 };
 
 pub use morphogenetic::{
