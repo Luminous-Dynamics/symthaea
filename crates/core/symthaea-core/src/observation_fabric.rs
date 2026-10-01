@@ -857,6 +857,19 @@ impl ReceiptAttestationEnvelope {
         }
     }
 
+    /// Verify that the envelope still names the exact receipt it claims to attest.
+    ///
+    /// This is a commitment check only. It does not verify the external proof,
+    /// attester identity, or any substantive observation claim.
+    pub fn verify_against_receipt(
+        &self,
+        receipt: &IndependenceVerificationReceipt,
+    ) -> bool {
+        self.receipt_fingerprint == receipt.fingerprint()
+            && self.verifier_version == receipt.verifier_version
+            && self.examined_scope_fingerprint == receipt.examined_scope_fingerprint
+    }
+
     /// Validate the envelope's structural commitments.
     ///
     /// This does not verify the external proof, resolve the attester, or
@@ -1620,6 +1633,10 @@ mod tests {
         );
         assert_eq!(envelope.validate(), Ok(()));
         assert_eq!(envelope.receipt_fingerprint, receipt.fingerprint());
+        assert!(envelope.verify_against_receipt(&receipt));
+        envelope.receipt_fingerprint = "00".repeat(32);
+        assert!(!envelope.verify_against_receipt(&receipt));
+        envelope.receipt_fingerprint = receipt.fingerprint();
         assert_eq!(envelope.examined_scope_fingerprint, receipt.examined_scope_fingerprint);
         assert_eq!(envelope.proof, None);
 
