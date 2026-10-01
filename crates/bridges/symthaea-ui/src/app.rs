@@ -500,7 +500,15 @@ pub fn App() -> impl IntoView {
                         </span>
                     </div>
                     <div class="timeline-controls">
-                        <span class="timeline-count">{move || events.get().len().to_string()}</span>
+                        <span class="timeline-count">{
+                            move || {
+                                if timeline_paused.get() {
+                                    events.get_untracked().len().to_string()
+                                } else {
+                                    events.get().len().to_string()
+                                }
+                            }
+                        }</span>
                         <button
                             type="button"
                             class="timeline-pause"
