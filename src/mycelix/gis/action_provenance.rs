@@ -4,7 +4,46 @@
 //! A frame revision can require fresh support for future high-risk execution
 //! without rewriting the historical record of an action that already happened.
 
-use super::ignorance_types::{ActionDependencyKind, ActionRisk, EpistemicFrameRevision};
+use super::ignorance_types::{EpistemicFrameImpact, EpistemicFrameRevision};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ActionRisk {
+    Informational,
+    Low,
+    High,
+    Critical,
+}
+
+impl ActionRisk {
+    pub const fn requires_current_support(self) -> bool {
+        matches!(self, Self::High | Self::Critical)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActionDependencyKind {
+    ConclusionSupport,
+    CausalBasis,
+    OntologyBasis,
+    EvidenceBasis,
+    AssumptionBasis,
+}
+
+impl ActionDependencyKind {
+    pub const fn affects(self, impact: EpistemicFrameImpact) -> bool {
+        match self {
+            Self::ConclusionSupport => impact.evidence_boundary || impact.ontology || impact.causal_model,
+            Self::CausalBasis => impact.causal_model,
+            Self::OntologyBasis => impact.ontology,
+            Self::EvidenceBasis => impact.evidence_boundary,
+            Self::AssumptionBasis => impact.evidence_boundary
+                || impact.ontology
+                || impact.causal_model
+                || impact.exclusions
+                || impact.blind_spots,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionStatus {
@@ -116,7 +155,7 @@ impl ActionDependencyGraph {
             let impacted: Vec<_> = action
                 .dependencies
                 .iter()
-                .filter(|dependency| affected.contains(dependency.conclusion_id.as_str()))
+                .filter(|dependency| affected.contains(dependency.conclusion_id.as_str()) && dependency.kind.affects(revision.impact))
                 .collect();
 
             if impacted.is_empty() {
@@ -151,7 +190,7 @@ mod tests {
             newly_represented: None,
             scope_change: "causal model".into(),
             affected_conclusions: vec!["c1".into()],
-            impact: super::super::ignorance_types::EpistemicFrameImpact {
+            impact: EpistemicFrameImpact {
                 evidence_boundary: false,
                 ontology: false,
                 causal_model: true,
