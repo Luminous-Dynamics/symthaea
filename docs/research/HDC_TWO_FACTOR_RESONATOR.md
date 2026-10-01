@@ -53,7 +53,7 @@ separate measurements.
 Recent resonator work treats factorization as a coupled dynamical problem whose
 difficulty grows with the combinatorial search space, and explicitly separates
 correct, spurious, and non-converged terminal states. This harness adopts that
-measurement discipline while retaining a transparent exhaustive reference. citeturn0search0
+measurement discipline while retaining a transparent exhaustive reference. See Yeung, Poduval, and Imani (2026), *A comparative study of nonlinear cleanup rules in resonator networks*, for the corresponding failure-mode analysis.
 
 This is deliberately **not** a claim that resonators outperform exhaustive search
 at these small sizes, nor a claim that any dimension is universally optimal. It is a
