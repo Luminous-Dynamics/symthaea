@@ -59,7 +59,7 @@ pub async fn stream_telemetry(
     gateway: &str,
     mut on_message: impl FnMut(Value),
     on_connected: impl FnOnce(),
-) {
+) -> bool {
     let ws_url = format!(
         "{}/v1/ws/live",
         gateway
@@ -71,7 +71,7 @@ pub async fn stream_telemetry(
         Ok(ws) => ws,
         Err(e) => {
             leptos::logging::error!("telemetry websocket open failed: {e}");
-            return;
+            return false;
         }
     };
     on_connected();
@@ -89,4 +89,5 @@ pub async fn stream_telemetry(
             }
         }
     }
+    true
 }
