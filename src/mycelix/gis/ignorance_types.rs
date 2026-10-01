@@ -210,6 +210,9 @@ pub struct IgnoranceRecord {
     /// Resolution (if resolved)
     pub resolution: Option<IgnoranceResolution>,
 
+    /// Append-only frame/correction lineage. Historical entries are never rewritten.
+    pub frame_revisions: Vec<EpistemicFrameRevision>,
+
     /// When created
     pub created_at: SystemTime,
 
