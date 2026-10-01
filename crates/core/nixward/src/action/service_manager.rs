@@ -289,7 +289,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn fallible_typed_renderers_reject_invalid_units() {
         for render in [
             ServiceManager::try_start,
@@ -314,6 +313,7 @@ mod tests {
         assert_eq!(args, vec!["restart", "nginx.service"]);
     }
 
+    #[test]
     fn test_normalize_name() {
         assert_eq!(ServiceManager::normalize_name("nginx"), "nginx.service");
         assert_eq!(
