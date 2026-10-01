@@ -24,6 +24,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/associative_cleanup_harness.rs"
       - "crates/core/symthaea-core/src/hdc/sequence_order_harness.rs"
       - "crates/core/symthaea-core/src/hdc/resonator.rs"
+      - "crates/core/symthaea-core/src/hdc/resonator_cross_validation_harness.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/pareto_frontier.rs"
       - "crates/core/symthaea-core/tests/hdc_ltc_operator_evidence_chain.rs"
@@ -32,6 +33,7 @@ on:
       - "crates/core/symthaea-core/examples/hdc_noise_robustness.rs"
       - "crates/core/symthaea-core/examples/hdc_associative_cleanup.rs"
       - "crates/core/symthaea-core/examples/hdc_sequence_order.rs"
+      - "crates/core/symthaea-core/examples/hdc_resonator_cross_validation.rs"
       - "crates/core/symthaea-core/benches/simd_continuous.rs"
       - "docs/research/HDC_RESOLUTION_EXTENSIBILITY.md"
       - "docs/research/HDC_DIMENSION_SWEEP.md"
@@ -39,6 +41,7 @@ on:
       - "docs/research/HDC_DIMENSION_TASK_HARNESS.md"
       - "docs/research/HDC_ASSOCIATIVE_CLEANUP_HARNESS.md"
       - "docs/research/HDC_SEQUENCE_ORDER_HARNESS.md"
+      - "docs/research/HDC_RESONATOR_CROSS_VALIDATION.md"
       - "docs/research/HDC_LTC_RESOLUTION_TRAJECTORY_MATRIX.md"
       - "rust-toolchain.toml"
       - ".github/workflows/hdc-resolution-qualify.yml"
@@ -111,6 +114,7 @@ jobs:
             crates/core/symthaea-core/src/hdc/noise_robustness_harness.rs \
             crates/core/symthaea-core/src/hdc/associative_cleanup_harness.rs \
             crates/core/symthaea-core/src/hdc/sequence_order_harness.rs \
+            crates/core/symthaea-core/src/hdc/resonator_cross_validation_harness.rs \
             crates/core/symthaea-core/src/hdc/mod.rs \
             crates/core/symthaea-core/src/hdc/pareto_frontier.rs \
             crates/core/symthaea-core/examples/hdc_operator_evidence.rs \
@@ -118,6 +122,7 @@ jobs:
             crates/core/symthaea-core/examples/hdc_noise_robustness.rs \
             crates/core/symthaea-core/examples/hdc_associative_cleanup.rs \
             crates/core/symthaea-core/examples/hdc_sequence_order.rs \
+            crates/core/symthaea-core/examples/hdc_resonator_cross_validation.rs \
             crates/core/symthaea-core/benches/simd_continuous.rs
 
       - name: Focused HDC resolution tests
@@ -142,6 +147,7 @@ jobs:
           cargo test -p symthaea-core --lib noise_robustness_harness
           cargo test -p symthaea-core --lib associative_cleanup_harness
           cargo test -p symthaea-core --lib sequence_order_harness
+          cargo test -p symthaea-core --lib resonator_cross_validation_harness
           cargo test -p symthaea-core --lib resonator
           cargo test -p symthaea-core --lib pareto_frontier
           cargo test -p symthaea-core --test hdc_ltc_operator_evidence_chain --features simd
@@ -302,7 +308,7 @@ jobs:
           cells = evidence["cells"]
           assert evidence["schema_version"] == 1
           assert evidence["task"] == "hdc_associative_cleanup_key_value"
-          assert len(cells) == len(expected_dimensions) * len(expected_loads) * len(expected_noise)
+          assert len(cells) == len(expected_dimensions) * len(expected_loads) * len(expected_noise)\n          assert evidence["max_solver_iterations"] == 12
           assert [c["resolution"] for c in cells[::len(expected_loads) * len(expected_noise)]] == expected_dimensions
           assert sorted({c["memory_load"] for c in cells}) == expected_loads
           assert sorted({round(c["query_noise_weight"], 2) for c in cells}) == expected_noise
@@ -341,6 +347,37 @@ jobs:
           assert evidence["spec_identity"].startswith("sha256:")
           PY
           sha256sum hdc-sequence-order-evidence.json | tee hdc-sequence-order-evidence.sha256
+
+      - name: Emit matched resonator cross-validation surface
+        run: cargo run -p symthaea-core --example hdc_resonator_cross_validation > hdc-resonator-cross-validation-evidence.json
+
+      - name: Validate matched resonator cross-validation surface
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          evidence = json.loads(Path("hdc-resonator-cross-validation-evidence.json").read_text())
+          expected_dimensions = [1024, 2048, 4096, 8192, 16384, 32768]
+          expected_loads = [2, 4, 8, 16]
+          expected_noise = [0.0, 0.10, 0.20, 0.35]
+          cells = evidence["cells"]
+          assert evidence["schema_version"] == 1
+          assert evidence["task"] == "hdc_associative_resonator_cross_validation"
+          assert len(cells) == len(expected_dimensions) * len(expected_loads) * len(expected_noise)
+          assert [c["resolution"] for c in cells[::len(expected_loads) * len(expected_noise)]] == expected_dimensions
+          assert sorted({c["memory_load"] for c in cells}) == expected_loads
+          assert sorted({round(c["query_noise_weight"], 2) for c in cells}) == expected_noise
+          assert len(evidence["solver_seeds"]) == 3
+          assert all(c["trials"] == c["memory_load"] * evidence["queries_per_load"] * len(evidence["solver_seeds"]) for c in cells)
+          assert all(c["correct_convergence"] + c["spurious_convergence"] + c["non_convergence"] == c["trials"] for c in cells)
+          assert all(0.0 <= c["direct_accuracy"] <= 1.0 for c in cells)
+          assert all(0.0 <= c["resonator_accuracy"] <= 1.0 for c in cells)
+          assert all(c["mean_iterations"] >= 0.0 for c in cells)
+          assert evidence["spec_identity"].startswith("sha256:")
+          assert evidence["artifact_digest"].startswith("sha256:")
+          PY
+          sha256sum hdc-resonator-cross-validation-evidence.json | tee hdc-resonator-cross-validation-evidence.sha256
 
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
@@ -393,3 +430,5 @@ jobs:
             hdc-associative-cleanup-evidence.sha256
             hdc-sequence-order-evidence.json
             hdc-sequence-order-evidence.sha256
+            hdc-resonator-cross-validation-evidence.json
+            hdc-resonator-cross-validation-evidence.sha256

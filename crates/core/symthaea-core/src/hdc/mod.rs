@@ -116,6 +116,8 @@ pub mod noise_robustness_harness;
 pub mod associative_cleanup_harness;
 /// Deterministic sequence/order retrieval task family for HDC dimension research.
 pub mod sequence_order_harness;
+/// Matched direct-cleanup vs resonator retrieval cross-validation.
+pub mod resonator_cross_validation_harness;
 
 /// HDC dimensionality configuration for runtime selection
 ///
