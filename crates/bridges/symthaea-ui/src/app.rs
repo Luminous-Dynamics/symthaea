@@ -232,9 +232,10 @@ pub fn App() -> impl IntoView {
     let movie_frame = RwSignal::new(0_usize);
     let movie_canvas = NodeRef::<leptos::html::Canvas>::new();
 
-    // Open the telemetry stream once, on mount, against whatever gateway
-    // URL is set at that moment. Reconnecting on URL change is a v1 nicety
-    // — not required for the wiring to be real and useful today.
+    // The gateway is a session boundary: changing it starts a new telemetry
+    // generation. Owner-scoped cancellation handles the normal teardown;
+    // the generation guard additionally makes stale callbacks harmless if
+    // they race with a reconnect or gateway change.
     let telemetry_generation = Rc::new(Cell::new(0_u64));
 
     Effect::new(move |_| {
