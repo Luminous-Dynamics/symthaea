@@ -113,6 +113,16 @@ mod tests {
     }
 
     #[test]
+    fn legacy_renderer_rejects_corrupted_internal_domain_state() {
+        let mut op = NixServiceOperationV1::new("nginx", NixServiceOperationKindV1::Start).unwrap();
+        op.unit = "../nginx.service".to_string();
+
+        let error = super::super::service_manager::ServiceManager::render_legacy_command(&op)
+            .unwrap_err();
+        assert_eq!(error, NixServiceOperationErrorV1::PathLikeUnit);
+    }
+
+    #[test]
     fn operation_is_domain_data_not_a_command() {
         let op = NixServiceOperationV1::new("nginx", NixServiceOperationKindV1::Start).unwrap();
         let encoded = serde_json::to_string(&op).unwrap();
