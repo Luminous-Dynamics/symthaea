@@ -554,13 +554,6 @@ impl IndependenceAssessment {
         hasher.finalize().to_hex().to_string()
     }
 
-    fn compute_scope_fingerprint(&self) -> String {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-independence-scope:v1\n");
-        write_canonical_string_vec(&mut hasher, &self.examined_observation_ids);
-        write_canonical_string(&mut hasher, &self.examined_scope_fingerprint);
-        hasher.finalize().to_hex().to_string()
-    }
 
     /// Verify that the stored fingerprint still commits to this assessment.
     ///
