@@ -479,6 +479,21 @@ mod tests {
         assert_eq!(stable_config_hash(&a), stable_config_hash(&b));
     }
 
+    #[test]
+    fn canonical_json_bytes_are_explicitly_stable() {
+        let value = serde_json::json!({
+            "outer": {"z": 1, "a": 2},
+            "first": [3, "x", true, null]
+        });
+        let mut canonical = Vec::new();
+        write_canonical_json(&value, &mut canonical);
+        assert_eq!(
+            String::from_utf8(canonical).unwrap(),
+            r#"{"first":[3,"x",true,null],"outer":{"a":2,"z":1}}"#
+        );
+    }
+
+
     /// Reproduces `TemporalStateMode::HdcLtc`'s requirement: the active
     /// mechanism's predict counter must be positive. A passing case.
     #[test]
