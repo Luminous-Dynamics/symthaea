@@ -41,6 +41,7 @@
 //! }
 //! ```
 
+pub mod action_provenance;
 pub mod curiosity;
 pub mod dht;
 pub mod epistemic_mirror;
@@ -51,6 +52,7 @@ pub mod socratic;
 pub mod uncertainty;
 pub mod zk_proofs;
 
+pub use action_provenance::*;
 pub use curiosity::*;
 pub use dht::*;
 pub use epistemic_mirror::*;
