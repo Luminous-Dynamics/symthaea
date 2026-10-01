@@ -222,10 +222,26 @@ impl CognitiveEvent {
         cycle: u64,
         state: CognitiveState,
     ) -> Self {
+        Self::from_state_with_basis(
+            sequence,
+            kind,
+            cycle,
+            state,
+            EventEvidenceBasis::for_kind(kind),
+        )
+    }
+
+    fn from_state_with_basis(
+        sequence: u64,
+        kind: CognitiveEventKind,
+        cycle: u64,
+        state: CognitiveState,
+        evidence_basis: EventEvidenceBasis,
+    ) -> Self {
         Self {
             sequence,
             kind,
-            evidence_basis: EventEvidenceBasis::for_kind(kind),
+            evidence_basis,
             cycle,
             coherence: state.coherence,
             thermodynamic_load: state.thermodynamic_load,
@@ -248,31 +264,45 @@ pub fn event_between(
 ) -> Option<CognitiveEvent> {
     let previous = previous?;
 
-    let kind = if previous.presence != current.presence {
-        match (previous.presence, current.presence) {
+    let (kind, evidence_basis) = if previous.presence != current.presence {
+        let kind = match (previous.presence, current.presence) {
             (_, PresenceState::Processing) => CognitiveEventKind::ProcessingStarted,
             (PresenceState::Processing, _) => CognitiveEventKind::ProcessingCompleted,
             (PresenceState::Disconnected, _) => CognitiveEventKind::Connected,
             (_, PresenceState::Disconnected) => CognitiveEventKind::Disconnected,
             _ => CognitiveEventKind::StateChanged,
-        }
+        };
+        (kind, EventEvidenceBasis::PresenceTransition)
     } else if previous.mode != current.mode {
-        match (previous.mode, current.mode) {
+        let kind = match (previous.mode, current.mode) {
             (CognitiveMode::Resting, _) => CognitiveEventKind::ExitedRest,
             (_, CognitiveMode::Resting) => CognitiveEventKind::EnteredRest,
             (CognitiveMode::Responding, _) => CognitiveEventKind::ProcessingCompleted,
             (_, CognitiveMode::Responding) => CognitiveEventKind::ProcessingStarted,
             _ => CognitiveEventKind::StateChanged,
-        }
+        };
+        (kind, EventEvidenceBasis::ModeTransition)
     } else if surprise {
-        CognitiveEventKind::SurpriseDetected
+        (
+            CognitiveEventKind::SurpriseDetected,
+            EventEvidenceBasis::ExplicitSurpriseSignal,
+        )
     } else if gwt {
-        CognitiveEventKind::WorkspaceBroadcast
+        (
+            CognitiveEventKind::WorkspaceBroadcast,
+            EventEvidenceBasis::ExplicitWorkspaceSignal,
+        )
     } else {
         return None;
     };
 
-    Some(CognitiveEvent::from_state(sequence, kind, cycle, current))
+    Some(CognitiveEvent::from_state_with_basis(
+        sequence,
+        kind,
+        cycle,
+        current,
+        evidence_basis,
+    ))
 }
 
  
