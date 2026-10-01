@@ -87,6 +87,88 @@ mod tests {
     }
 
     #[test]
+    fn admission_changes_digest_but_exact_replay_does_not() {
+        let delivery = DeliveryContract {
+            logical_delivery_id: Uuid::from_u128(10),
+            schema_version: 1,
+            expires_at_ms: 1_000,
+            payload: b"delivery".to_vec(),
+        };
+        let observation = ObservationRecord {
+            key: ObservationKey {
+                namespace: "source".into(),
+                observation_id: Uuid::from_u128(11),
+            },
+            source_id: Uuid::from_u128(12),
+            observed_at_ms: 10,
+            payload: b"observation".to_vec(),
+        };
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let before = SemanticAdmissionState::default();
+        let admitted = crate::semantic_admission::decide(
+            &before,
+            &delivery,
+            &observation,
+            &policy,
+            10,
+        );
+        let next = match admitted {
+            crate::semantic_admission::AdmissionOutcome::Admitted { next_state, .. } => next_state,
+            other => panic!("admission failed: {other:?}"),
+        };
+        assert_ne!(
+            semantic_digest(&before).unwrap(),
+            semantic_digest(&next).unwrap()
+        );
+
+        let replay = crate::semantic_admission::decide(
+            &next,
+            &delivery,
+            &observation,
+            &policy,
+            11,
+        );
+        assert!(matches!(
+            replay,
+            crate::semantic_admission::AdmissionOutcome::Replay { .. }
+        ));
+        assert_eq!(
+            semantic_digest(&next).unwrap(),
+            semantic_digest(&next).unwrap()
+        );
+    }
+
+    #[test]
+    fn garbage_collection_changes_digest_and_tombstone_lifecycle_is_committed() {
+        let original = state();
+        let policy = AdmissionPolicy {
+            retention_ms: 10,
+            tombstone_retention_ms: 100,
+            ..AdmissionPolicy::default()
+        };
+        let mut aged = original.clone();
+        aged.observations.values_mut().next().unwrap().observed_at_ms = 0;
+        let retired = crate::semantic_admission::retire_expired(&aged, policy, 11).unwrap();
+
+        assert_ne!(
+            semantic_digest(&aged).unwrap(),
+            semantic_digest(&retired).unwrap()
+        );
+
+        let mut retired_again = retired.clone();
+        let expired = crate::semantic_admission::retire_expired(&retired_again, policy, 111).unwrap();
+        assert_ne!(
+            semantic_digest(&retired_again).unwrap(),
+            semantic_digest(&expired).unwrap()
+        );
+        retired_again = expired;
+        assert!(retired_again.observation_tombstones.is_empty());
+    }
+
+    #[test]
     fn digest_is_deterministic() {
         assert_eq!(
             semantic_digest(&state()).unwrap(),
