@@ -37,6 +37,31 @@ pub struct ServiceStatus {
 }
 
 impl ServiceManager {
+    /// Render a typed service operation into the legacy command representation.
+    ///
+    /// This is a one-way compatibility projection only. The resulting
+    /// NixOSCommand::Custom is presentation/legacy data and must never be
+    /// parsed back into NixServiceOperationV1 or used as semantic input to
+    /// governed authorization/effect binding.
+    pub fn render_legacy_command(
+        operation: &super::service_domain::NixServiceOperationV1,
+    ) -> NixOSCommand {
+        let verb = match operation.operation() {
+            super::service_domain::NixServiceOperationKindV1::Enable => "enable",
+            super::service_domain::NixServiceOperationKindV1::Disable => "disable",
+            super::service_domain::NixServiceOperationKindV1::Start => "start",
+            super::service_domain::NixServiceOperationKindV1::Stop => "stop",
+            super::service_domain::NixServiceOperationKindV1::Restart => "restart",
+            super::service_domain::NixServiceOperationKindV1::Reload => "reload",
+        };
+
+        NixOSCommand::Custom {
+            command: "systemctl".to_string(),
+            args: vec![verb.to_string(), operation.unit().to_string()],
+            safety_level: SafetyLevel::SystemModify,
+        }
+    }
+
     /// Generate a command to start a service.
     pub fn start(service: &str) -> NixOSCommand {
         NixOSCommand::Custom {
