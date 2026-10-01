@@ -296,6 +296,46 @@ impl EpistemicFrame {
     pub fn identity(&self) -> String {
         format!("{}@{}", self.id, self.version)
     }
+
+    /// Compare this frame with another frame without collapsing either into a scalar score.
+    ///
+    /// A divergent ontology or causal model is itself epistemically relevant: conclusions
+    /// produced under the two frames must not be treated as interchangeable merely because
+    /// their proposition-level confidence happens to be similar.
+    pub fn divergence_from(&self, other: &Self) -> EpistemicFrameDivergence {
+        EpistemicFrameDivergence {
+            evidence_boundary_changed: self.evidence_boundary != other.evidence_boundary,
+            ontology_changed: self.ontology_id != other.ontology_id,
+            causal_model_changed: self.causal_model_id != other.causal_model_id,
+            excluded_variables_changed: self.excluded_variables != other.excluded_variables,
+            blind_spots_changed: self.known_blind_spots != other.known_blind_spots,
+        }
+    }
+}
+
+/// Structured difference between two epistemic frames.
+///
+/// This intentionally avoids a single "frame uncertainty" number. Different kinds of
+/// frame divergence have different meanings and should remain inspectable for provenance,
+/// correction, and later model comparison.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpistemicFrameDivergence {
+    pub evidence_boundary_changed: bool,
+    pub ontology_changed: bool,
+    pub causal_model_changed: bool,
+    pub excluded_variables_changed: bool,
+    pub blind_spots_changed: bool,
+}
+
+impl EpistemicFrameDivergence {
+    /// Whether any epistemically material frame component differs.
+    pub fn is_divergent(&self) -> bool {
+        self.evidence_boundary_changed
+            || self.ontology_changed
+            || self.causal_model_changed
+            || self.excluded_variables_changed
+            || self.blind_spots_changed
+    }
 }
 
 impl Default for EpistemicFrame {
