@@ -25,6 +25,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/sequence_order_harness.rs"
       - "crates/core/symthaea-core/src/hdc/resonator.rs"
       - "crates/core/symthaea-core/src/hdc/resonator_cross_validation_harness.rs"
+      - "crates/core/symthaea-core/src/hdc/two_factor_resonator_harness.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/pareto_frontier.rs"
       - "crates/core/symthaea-core/tests/hdc_ltc_operator_evidence_chain.rs"
@@ -34,6 +35,7 @@ on:
       - "crates/core/symthaea-core/examples/hdc_associative_cleanup.rs"
       - "crates/core/symthaea-core/examples/hdc_sequence_order.rs"
       - "crates/core/symthaea-core/examples/hdc_resonator_cross_validation.rs"
+      - "crates/core/symthaea-core/examples/hdc_two_factor_resonator.rs"
       - "crates/core/symthaea-core/benches/simd_continuous.rs"
       - "docs/research/HDC_RESOLUTION_EXTENSIBILITY.md"
       - "docs/research/HDC_DIMENSION_SWEEP.md"
@@ -115,6 +117,7 @@ jobs:
             crates/core/symthaea-core/src/hdc/associative_cleanup_harness.rs \
             crates/core/symthaea-core/src/hdc/sequence_order_harness.rs \
             crates/core/symthaea-core/src/hdc/resonator_cross_validation_harness.rs \
+            crates/core/symthaea-core/src/hdc/two_factor_resonator_harness.rs \
             crates/core/symthaea-core/src/hdc/mod.rs \
             crates/core/symthaea-core/src/hdc/pareto_frontier.rs \
             crates/core/symthaea-core/examples/hdc_operator_evidence.rs \
@@ -123,6 +126,7 @@ jobs:
             crates/core/symthaea-core/examples/hdc_associative_cleanup.rs \
             crates/core/symthaea-core/examples/hdc_sequence_order.rs \
             crates/core/symthaea-core/examples/hdc_resonator_cross_validation.rs \
+            crates/core/symthaea-core/examples/hdc_two_factor_resonator.rs \
             crates/core/symthaea-core/benches/simd_continuous.rs
 
       - name: Focused HDC resolution tests
@@ -148,6 +152,7 @@ jobs:
           cargo test -p symthaea-core --lib associative_cleanup_harness
           cargo test -p symthaea-core --lib sequence_order_harness
           cargo test -p symthaea-core --lib resonator_cross_validation_harness
+          cargo test -p symthaea-core --lib two_factor_resonator_harness
           cargo test -p symthaea-core --lib resonator
           cargo test -p symthaea-core --lib pareto_frontier
           cargo test -p symthaea-core --test hdc_ltc_operator_evidence_chain --features simd
@@ -379,6 +384,40 @@ jobs:
           PY
           sha256sum hdc-resonator-cross-validation-evidence.json | tee hdc-resonator-cross-validation-evidence.sha256
 
+      - name: Emit deterministic two-factor resonator surface
+        run: cargo run -p symthaea-core --example hdc_two_factor_resonator > hdc-two-factor-resonator-evidence.json
+
+      - name: Validate two-factor resonator surface
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          evidence = json.loads(Path("hdc-two-factor-resonator-evidence.json").read_text())
+          expected_dimensions = [1024, 2048, 4096, 8192]
+          expected_sizes = [4, 8]
+          expected_noise = [0.0, 0.20, 0.35]
+          cells = evidence["cells"]
+          assert evidence["schema_version"] == 1
+          assert evidence["task"] == "hdc_two_factor_resonator_factorization"
+          assert len(cells) == len(expected_dimensions) * len(expected_sizes) * len(expected_noise)
+          assert [c["resolution"] for c in cells[::len(expected_sizes) * len(expected_noise)]] == expected_dimensions
+          assert sorted({c["codebook_size"] for c in cells}) == expected_sizes
+          assert sorted({round(c["query_noise_weight"], 2) for c in cells}) == expected_noise
+          assert len(evidence["solver_seeds"]) == 3
+          assert evidence["exhaustive_search_space_formula"] == "n^2"
+          assert evidence["max_solver_iterations"] == 16
+          assert all(c["exhaustive_trials"] == c["codebook_size"] ** 2 * evidence["queries_per_size"] for c in cells)
+          assert all(c["resonator_trials"] == c["exhaustive_trials"] * len(evidence["solver_seeds"]) for c in cells)
+          assert all(c["correct_convergence"] + c["spurious_convergence"] + c["non_convergence"] == c["resonator_trials"] for c in cells)
+          assert all(0.0 <= c["exhaustive_accuracy"] <= 1.0 for c in cells)
+          assert all(0.0 <= c["joint_accuracy"] <= 1.0 for c in cells)
+          assert all(c["mean_iterations"] >= 0.0 for c in cells)
+          assert evidence["spec_identity"].startswith("sha256:")
+          assert evidence["artifact_digest"].startswith("sha256:")
+          PY
+          sha256sum hdc-two-factor-resonator-evidence.json | tee hdc-two-factor-resonator-evidence.sha256
+
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
 
@@ -432,3 +471,5 @@ jobs:
             hdc-sequence-order-evidence.sha256
             hdc-resonator-cross-validation-evidence.json
             hdc-resonator-cross-validation-evidence.sha256
+            hdc-two-factor-resonator-evidence.json
+            hdc-two-factor-resonator-evidence.sha256
