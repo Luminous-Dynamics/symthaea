@@ -39,6 +39,19 @@ pub struct CausalEdge {
 /// This is separate from symthaea-causal-reasoning's CausalDAG to avoid
 /// a hard dependency. The bridge exports edges that can be imported into
 /// the full do-calculus engine when the `counterfactual` feature is enabled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CausalRestoreOutcome {
+    /// Number of previously admitted edges evicted by the bridge's configured
+    /// capacity/strength pruning policy while restoring this record.
+    pub pruned_edges: usize,
+}
+
+impl CausalRestoreOutcome {
+    pub fn was_policy_limited(self) -> bool {
+        self.pruned_edges > 0
+    }
+}
+
 pub struct CausalKnowledgeBridge {
     /// All discovered causal edges
     edges: Vec<CausalEdge>,
@@ -236,7 +249,7 @@ impl CausalKnowledgeBridge {
     /// Import a causal edge directly from persistence (cause, effect, strength).
     ///
     /// Used during startup to restore edges from SQLite.
-    pub fn import_edge(&mut self, cause: String, effect: String, strength: f32) {
+    pub fn import_edge(&mut self, cause: String, effect: String, strength: f32) -> CausalRestoreOutcome {
         let edge = CausalEdge {
             cause,
             effect,
@@ -246,7 +259,11 @@ impl CausalKnowledgeBridge {
             source_text: String::new(),
             discovered_at_cycle: 0,
         };
+        let before = self.edges.len();
         self.add_edge(edge);
+        CausalRestoreOutcome {
+            pruned_edges: before.saturating_add(1).saturating_sub(self.edges.len()),
+        }
     }
 
     /// Export edges as (cause, effect, strength) triples for persistence.
@@ -651,6 +668,22 @@ mod tests {
 
         // Should have 2 raw edges but adjacency should show strengthened weight
         assert_eq!(bridge.node_count(), 2);
+    }
+
+    #[test]
+    fn test_import_edge_reports_policy_pruning() {
+        let mut bridge = CausalKnowledgeBridge::new(1);
+
+        let first = bridge.import_edge("weak".into(), "old".into(), 0.05);
+        assert!(!first.was_policy_limited());
+        assert_eq!(bridge.edge_count(), 1);
+
+        let second = bridge.import_edge("strong".into(), "new".into(), 0.8);
+        assert!(second.was_policy_limited());
+        assert_eq!(second.pruned_edges, 1);
+        assert_eq!(bridge.edge_count(), 1);
+        assert_eq!(bridge.effects_of("weak").len(), 0);
+        assert_eq!(bridge.effects_of("strong").len(), 1);
     }
 
     #[test]
