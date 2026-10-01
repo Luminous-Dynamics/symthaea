@@ -548,7 +548,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn disconnect_breaks_span_continuity() {
         let events = vec![
             CognitiveEvent::lifecycle(4, CognitiveEventKind::ProcessingStarted, 40),
@@ -575,6 +574,64 @@ mod tests {
     fn unmatched_exit_does_not_fabricate_a_span() {
         let events = vec![
             CognitiveEvent::lifecycle(1, CognitiveEventKind::ProcessingCompleted, 44),
+        ];
+        assert!(cognitive_spans(&events).is_empty());
+    }
+
+    #[test]
+    fn duplicate_start_does_not_replace_original_span() {
+        let events = vec![
+            CognitiveEvent::lifecycle(1, CognitiveEventKind::ProcessingStarted, 40),
+            CognitiveEvent::lifecycle(2, CognitiveEventKind::ProcessingStarted, 41),
+            CognitiveEvent::lifecycle(3, CognitiveEventKind::ProcessingCompleted, 44),
+        ];
+        let spans = cognitive_spans(&events);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].start_sequence, 1);
+        assert_eq!(spans[0].start_cycle, 40);
+        assert_eq!(spans[0].end_sequence, Some(3));
+    }
+
+    #[test]
+    fn duplicate_completion_does_not_fabricate_a_second_span() {
+        let events = vec![
+            CognitiveEvent::lifecycle(1, CognitiveEventKind::ProcessingStarted, 40),
+            CognitiveEvent::lifecycle(2, CognitiveEventKind::ProcessingCompleted, 44),
+            CognitiveEvent::lifecycle(3, CognitiveEventKind::ProcessingCompleted, 45),
+        ];
+        let spans = cognitive_spans(&events);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].end_sequence, Some(2));
+    }
+
+    #[test]
+    fn retained_window_with_evicted_start_does_not_fabricate_span() {
+        let events = vec![
+            CognitiveEvent::lifecycle(32, CognitiveEventKind::StateChanged, 70),
+            CognitiveEvent::lifecycle(33, CognitiveEventKind::ProcessingCompleted, 71),
+        ];
+        assert!(cognitive_spans(&events).is_empty());
+    }
+
+    #[test]
+    fn retained_window_with_start_but_no_exit_keeps_span_open() {
+        let events = vec![
+            CognitiveEvent::lifecycle(32, CognitiveEventKind::ProcessingStarted, 70),
+            CognitiveEvent::lifecycle(33, CognitiveEventKind::StateChanged, 71),
+        ];
+        let spans = cognitive_spans(&events);
+        assert_eq!(spans.len(), 1);
+        assert!(spans[0].is_open());
+        assert_eq!(spans[0].start_sequence, 32);
+    }
+
+    #[test]
+    fn reconnect_with_repeated_cycle_numbers_stays_disconnected() {
+        let events = vec![
+            CognitiveEvent::lifecycle(1, CognitiveEventKind::ProcessingStarted, 40),
+            CognitiveEvent::lifecycle(2, CognitiveEventKind::Disconnected, 40),
+            CognitiveEvent::lifecycle(3, CognitiveEventKind::Connected, 0),
+            CognitiveEvent::lifecycle(4, CognitiveEventKind::ProcessingCompleted, 40),
         ];
         assert!(cognitive_spans(&events).is_empty());
     }
