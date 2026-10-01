@@ -155,6 +155,7 @@ impl GracefulIgnoranceSystem {
             detection,
             status: IgnoranceStatus::Active,
             resolution: None,
+            frame_revisions: Vec::new(),
             created_at: SystemTime::now(),
             updated_at: SystemTime::now(),
         };
