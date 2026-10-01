@@ -1697,6 +1697,35 @@ mod tests {
     }
 
     #[test]
+    fn receipt_attestation_envelope_round_trips_through_serde() {
+        let receipt = fixture_receipt();
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(
+            &receipt,
+            "attester-1",
+            "assertion",
+            100,
+        );
+        envelope.expires_at_unix_ns = Some(200);
+        envelope.verification_method = Some("key-1".into());
+        envelope.cryptosuite = Some("suite-1".into());
+        envelope.domain = Some("example.org".into());
+        envelope.challenge = Some("nonce-1".into());
+        envelope.proof = Some(vec![1, 2, 3]);
+
+        let encoded = serde_json::to_string(&envelope).expect("serialize envelope");
+        let decoded: ReceiptAttestationEnvelope =
+            serde_json::from_str(&encoded).expect("deserialize envelope");
+
+        assert_eq!(decoded, envelope);
+        assert_eq!(decoded.validate(), Ok(()));
+        assert_eq!(
+            decoded.temporal_status_at(150),
+            ReceiptAttestationTemporalStatus::Valid
+        );
+        assert_eq!(decoded.payload_fingerprint(), envelope.payload_fingerprint());
+    }
+
+    #[test]
     fn receipt_attestation_envelope_is_detached_and_validatable() {
         let mut second = fixture();
         second.id = "obs-002".into();
