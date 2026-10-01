@@ -416,6 +416,8 @@ pub struct EpistemicFrameRevision {
     pub scope_change: String,
     /// Claim or conclusion identifiers affected by the revision.
     pub affected_conclusions: Vec<String>,
+    /// Typed impact mask derived from the prior/revised frame pair.
+    pub impact: EpistemicFrameImpact,
 }
 
 impl EpistemicFrameRevision {
@@ -435,6 +437,9 @@ impl EpistemicFrameRevision {
             newly_represented,
             scope_change: scope_change.into(),
             affected_conclusions,
+            impact: EpistemicFrameImpact::from_divergence(
+                &prior_frame.divergence_from(revised_frame),
+            ),
         }
     }
 
@@ -471,6 +476,74 @@ pub enum ConclusionDependencyKind {
     OntologyDependency,
     InferenceDependency,
     AssumptionDependency,
+}
+
+/// Which dependency kinds are potentially affected by a frame revision.
+///
+/// This is deliberately a capability mask rather than a scalar severity score.
+/// A revision asks which relationships require re-evaluation; it does not assert
+/// that every downstream conclusion is false.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EpistemicFrameImpact {
+    pub evidence_boundary: bool,
+    pub ontology: bool,
+    pub causal_model: bool,
+    pub exclusions: bool,
+    pub blind_spots: bool,
+}
+
+impl EpistemicFrameImpact {
+    pub const fn broad() -> Self {
+        Self {
+            evidence_boundary: true,
+            ontology: true,
+            causal_model: true,
+            exclusions: true,
+            blind_spots: true,
+        }
+    }
+
+    /// Derive dependency impact from a structured frame divergence.
+    pub fn from_divergence(divergence: &EpistemicFrameDivergence) -> Self {
+        let material = divergence.evidence_boundary_changed
+            || divergence.ontology_changed
+            || divergence.causal_model_changed
+            || divergence.excluded_variables_changed
+            || divergence.blind_spots_changed;
+
+        if !material {
+            // A version-only change is still a provenance boundary. Without a
+            // semantic diff, prefer re-evaluation over silently trusting old edges.
+            return Self::broad();
+        }
+
+        Self {
+            evidence_boundary: divergence.evidence_boundary_changed,
+            ontology: divergence.ontology_changed,
+            causal_model: divergence.causal_model_changed,
+            exclusions: divergence.excluded_variables_changed,
+            blind_spots: divergence.blind_spots_changed,
+        }
+    }
+
+    pub fn affects(&self, kind: ConclusionDependencyKind) -> bool {
+        match kind {
+            ConclusionDependencyKind::EvidenceSupport => self.evidence_boundary,
+            ConclusionDependencyKind::CausalDependency => self.causal_model,
+            ConclusionDependencyKind::DefinitionDependency => self.ontology,
+            ConclusionDependencyKind::OntologyDependency => self.ontology,
+            ConclusionDependencyKind::InferenceDependency => {
+                self.evidence_boundary || self.ontology || self.causal_model
+            }
+            ConclusionDependencyKind::AssumptionDependency => {
+                self.evidence_boundary
+                    || self.ontology
+                    || self.causal_model
+                    || self.exclusions
+                    || self.blind_spots
+            }
+        }
+    }
 }
 
 /// Typed dependency between epistemic conclusions.
@@ -1065,6 +1138,46 @@ mod tests {
         assert!(revision.follows_frame(&prior.identity()));
         assert!(revision.changes_frame());
         assert!(!revision.follows_frame("other@1"));
+    }
+
+    #[test]
+    fn test_frame_impact_is_dependency_sensitive() {
+        let prior = EpistemicFrame::default();
+        let revised = EpistemicFrame {
+            version: 2,
+            ontology_id: "collective-agents-v2".to_string(),
+            ..prior.clone()
+        };
+        let revision = EpistemicFrameRevision::new(
+            &prior,
+            &revised,
+            "ontology expanded",
+            Some("institutional-role".to_string()),
+            "ontology change",
+            vec!["c1".to_string()],
+        );
+
+        assert!(revision.impact.ontology);
+        assert!(!revision.impact.causal_model);
+        assert!(revision.impact.affects(ConclusionDependencyKind::OntologyDependency));
+        assert!(!revision.impact.affects(ConclusionDependencyKind::CausalDependency));
+
+        let mut graph = ConclusionDependencyGraph::default();
+        graph.add(EpistemicConclusion::new("c1", "root", prior.identity()));
+        graph.add(EpistemicConclusion::new("c2", "causal dependent", prior.identity()));
+        graph.add(EpistemicConclusion::new("c3", "ontology dependent", prior.identity()));
+        graph.add_dependency(ConclusionDependency::new(
+            "c1", "c2", ConclusionDependencyKind::CausalDependency,
+        ));
+        graph.add_dependency(ConclusionDependency::new(
+            "c1", "c3", ConclusionDependencyKind::OntologyDependency,
+        ));
+
+        let reopened = graph.reopen_from_frame_revision(&revision);
+        assert_eq!(reopened, vec!["c1".to_string(), "c3".to_string()]);
+        assert_eq!(graph.conclusions[0].status, ConclusionStatus::Reopened);
+        assert_eq!(graph.conclusions[1].status, ConclusionStatus::Active);
+        assert_eq!(graph.conclusions[2].status, ConclusionStatus::Reopened);
     }
 
     #[test]
