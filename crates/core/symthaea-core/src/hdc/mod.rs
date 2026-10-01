@@ -124,6 +124,8 @@ pub mod two_factor_resonator_harness;
 pub mod resonator_separation_harness;
 /// Deterministic cleanup-temperature sweep for coupled two-factor resonator research.
 pub mod resonator_temperature_harness;
+/// Deterministic interaction sweep crossing codebook separation and cleanup temperature.
+pub mod resonator_geometry_temperature_harness;
 
 /// HDC dimensionality configuration for runtime selection
 ///
