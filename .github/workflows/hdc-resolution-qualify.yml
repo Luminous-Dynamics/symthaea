@@ -27,6 +27,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/resonator_cross_validation_harness.rs"
       - "crates/core/symthaea-core/src/hdc/two_factor_resonator_harness.rs"
       - "crates/core/symthaea-core/src/hdc/resonator_separation_harness.rs"
+      - "crates/core/symthaea-core/src/hdc/resonator_temperature_harness.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/pareto_frontier.rs"
       - "crates/core/symthaea-core/tests/hdc_ltc_operator_evidence_chain.rs"
@@ -38,6 +39,7 @@ on:
       - "crates/core/symthaea-core/examples/hdc_resonator_cross_validation.rs"
       - "crates/core/symthaea-core/examples/hdc_two_factor_resonator.rs"
       - "crates/core/symthaea-core/examples/hdc_resonator_separation.rs"
+      - "crates/core/symthaea-core/examples/hdc_resonator_temperature.rs"
       - "crates/core/symthaea-core/benches/simd_continuous.rs"
       - "docs/research/HDC_RESOLUTION_EXTENSIBILITY.md"
       - "docs/research/HDC_DIMENSION_SWEEP.md"
@@ -48,6 +50,7 @@ on:
       - "docs/research/HDC_RESONATOR_CROSS_VALIDATION.md"
       - "docs/research/HDC_TWO_FACTOR_RESONATOR.md"
       - "docs/research/HDC_RESONATOR_SEPARATION.md"
+      - "docs/research/HDC_RESONATOR_TEMPERATURE.md"
       - "docs/research/HDC_LTC_RESOLUTION_TRAJECTORY_MATRIX.md"
       - "rust-toolchain.toml"
       - ".github/workflows/hdc-resolution-qualify.yml"
@@ -123,6 +126,7 @@ jobs:
             crates/core/symthaea-core/src/hdc/resonator_cross_validation_harness.rs \
             crates/core/symthaea-core/src/hdc/two_factor_resonator_harness.rs \
             crates/core/symthaea-core/src/hdc/resonator_separation_harness.rs \
+            crates/core/symthaea-core/src/hdc/resonator_temperature_harness.rs \
             crates/core/symthaea-core/src/hdc/mod.rs \
             crates/core/symthaea-core/src/hdc/pareto_frontier.rs \
             crates/core/symthaea-core/examples/hdc_operator_evidence.rs \
@@ -133,6 +137,7 @@ jobs:
             crates/core/symthaea-core/examples/hdc_resonator_cross_validation.rs \
             crates/core/symthaea-core/examples/hdc_two_factor_resonator.rs \
             crates/core/symthaea-core/examples/hdc_resonator_separation.rs \
+            crates/core/symthaea-core/examples/hdc_resonator_temperature.rs \
             crates/core/symthaea-core/benches/simd_continuous.rs
 
       - name: Focused HDC resolution tests
@@ -160,6 +165,7 @@ jobs:
           cargo test -p symthaea-core --lib resonator_cross_validation_harness
           cargo test -p symthaea-core --lib two_factor_resonator_harness
           cargo test -p symthaea-core --lib resonator_separation_harness
+          cargo test -p symthaea-core --lib resonator_temperature_harness
           cargo test -p symthaea-core --lib resonator
           cargo test -p symthaea-core --lib pareto_frontier
           cargo test -p symthaea-core --test hdc_ltc_operator_evidence_chain --features simd
@@ -469,6 +475,50 @@ jobs:
           PY
           sha256sum hdc-resonator-separation-evidence.json | tee hdc-resonator-separation-evidence.sha256
 
+      - name: Emit deterministic resonator cleanup-temperature surface
+        run: cargo run -p symthaea-core --example hdc_resonator_temperature > hdc-resonator-temperature-evidence.json
+
+      - name: Validate resonator cleanup-temperature surface
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          evidence = json.loads(Path("hdc-resonator-temperature-evidence.json").read_text())
+          expected_dimensions = [2048, 8192]
+          expected_sizes = [4, 8]
+          expected_temperatures = [0.05, 0.10, 0.20]
+          expected_noise = [0.0, 0.20]
+          cells = evidence["cells"]
+
+          assert evidence["schema_version"] == 1
+          assert evidence["task"] == "hdc_two_factor_resonator_temperature_sweep"
+          assert len(cells) == (
+              len(expected_dimensions)
+              * len(expected_sizes)
+              * len(expected_temperatures)
+              * len(expected_noise)
+          )
+          assert sorted({c["resolution"] for c in cells}) == expected_dimensions
+          assert sorted({c["codebook_size"] for c in cells}) == expected_sizes
+          assert sorted({round(c["temperature"], 2) for c in cells}) == expected_temperatures
+          assert sorted({round(c["query_noise_weight"], 2) for c in cells}) == expected_noise
+          assert len(evidence["solver_seeds"]) == 3
+          assert evidence["exhaustive_search_space_formula"] == "n^2"
+          assert evidence["cleanup_rule"] == "softmax-weighted codebook cleanup"
+          assert evidence["max_solver_iterations"] == 16
+          assert all(c["exhaustive_trials"] == c["codebook_size"] ** 2 * evidence["queries_per_size"] for c in cells)
+          assert all(c["resonator_trials"] == c["exhaustive_trials"] * len(evidence["solver_seeds"]) for c in cells)
+          assert all(c["correct_convergence"] + c["spurious_convergence"] + c["non_convergence"] == c["resonator_trials"] for c in cells)
+          assert all(0.0 <= c["exhaustive_accuracy"] <= 1.0 for c in cells)
+          assert all(0.0 <= c["joint_accuracy"] <= 1.0 for c in cells)
+          assert all(c["mean_iterations"] >= 0.0 for c in cells)
+          assert all(c["mean_terminal_energy"] == c["mean_terminal_energy"] for c in cells)
+          assert evidence["spec_identity"].startswith("sha256:")
+          assert evidence["artifact_digest"].startswith("sha256:")
+          PY
+          sha256sum hdc-resonator-temperature-evidence.json | tee hdc-resonator-temperature-evidence.sha256
+
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
 
@@ -526,3 +576,5 @@ jobs:
             hdc-two-factor-resonator-evidence.sha256
             hdc-resonator-separation-evidence.json
             hdc-resonator-separation-evidence.sha256
+            hdc-resonator-temperature-evidence.json
+            hdc-resonator-temperature-evidence.sha256
