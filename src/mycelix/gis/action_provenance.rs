@@ -127,6 +127,35 @@ impl EpistemicAction {
         self.status = ActionStatus::Executed;
     }
 
+    /// Authorize a current high-risk decision only when every declared conclusion
+    /// prerequisite is currently active in the authoritative conclusion store.
+    ///
+    /// This is intentionally separate from `record_decision`: historical witnesses
+    /// remain append-only, while current authorization must be re-established.
+    pub fn try_record_current_decision(
+        &mut self,
+        witness: ActionDecisionWitness,
+        conclusion_statuses: &std::collections::HashMap<String, super::ignorance_types::ConclusionStatus>,
+    ) -> Result<(), ActionStatus> {
+        if self.risk.requires_current_support() {
+            let all_current = self.dependencies.iter().all(|dependency| {
+                conclusion_statuses.get(&dependency.conclusion_id)
+                    == Some(&super::ignorance_types::ConclusionStatus::Active)
+            });
+            if !all_current {
+                self.status = if self.status == ActionStatus::RequiresReevaluation {
+                    ActionStatus::RequiresReevaluation
+                } else {
+                    ActionStatus::Deferred
+                };
+                return Err(self.status);
+            }
+        }
+
+        self.record_decision(witness);
+        Ok(())
+    }
+
     /// Fail closed for high-risk actions when any declared prerequisite is absent.
     /// The supplied set must come from the authoritative conclusion store.
     pub fn defer_for_unresolved_prerequisites(
@@ -265,6 +294,37 @@ mod tests {
             vec!["a-ontology"]
         );
         assert_eq!(conclusions.conclusions[1].status, super::super::ignorance_types::ConclusionStatus::Reopened);
+    }
+
+    #[test]
+    fn current_high_risk_decision_requires_active_prerequisites() {
+        use super::super::ignorance_types::ConclusionStatus;
+        let mut action = EpistemicAction::new("a-current", "intervention", ActionRisk::Critical);
+        action.dependencies.push(ActionDependency {
+            conclusion_id: "c1".into(),
+            kind: ActionDependencyKind::CausalBasis,
+        });
+
+        let witness = ActionDecisionWitness {
+            frame: "f1".into(),
+            conclusions: vec!["c1".into()],
+            evidence: vec!["e1".into()],
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+        };
+
+        let mut statuses = std::collections::HashMap::new();
+        statuses.insert("c1".into(), ConclusionStatus::Reopened);
+        assert_eq!(
+            action.try_record_current_decision(witness.clone(), &statuses),
+            Err(ActionStatus::Deferred)
+        );
+        assert!(action.historical_decisions.is_empty());
+
+        statuses.insert("c1".into(), ConclusionStatus::Active);
+        assert_eq!(action.try_record_current_decision(witness, &statuses), Ok(()));
+        assert_eq!(action.status, ActionStatus::Executed);
+        assert_eq!(action.historical_decisions.len(), 1);
     }
 
     #[test]
