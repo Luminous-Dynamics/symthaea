@@ -409,9 +409,10 @@ fn run_cell(
 
                     let iterations = x_solution.iterations.max(y_solution.iterations) as u64;
                     iteration_sum += iterations;
-                    terminal_energy_sum += f64::from(
-                        x_solution.energy.max(y_solution.energy),
-                    );
+                    // Use the coupled solver's joint constraint energy rather than
+                    // aggregating per-factor solution energies. The latter can describe
+                    // each factor independently while missing the joint constraint state.
+                    terminal_energy_sum += f64::from(network.current_energy());
 
                     let jointly_converged = x_solution.converged && y_solution.converged;
                     if jointly_converged {
