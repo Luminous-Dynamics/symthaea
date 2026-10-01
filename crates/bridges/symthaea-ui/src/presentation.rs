@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Semantic presentation types for the Symthaea UI.
@@ -5,6 +7,32 @@
 //! This crate-local module deliberately contains only small, WASM-friendly
 //! presentation semantics. It is not a mirror of the cognitive engine and
 //! makes no claim that a display label is itself a scientific measurement.
+
+/// Monotonic identity for one live telemetry connection.
+///
+/// A reconnect or gateway change creates a new generation. Callbacks retain
+/// their generation and must not mutate current UI state after they become
+/// stale. This is intentionally separate from event sequence numbers: event
+/// sequence identifies presentation items, while this identifies the
+/// authority allowed to produce them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TelemetrySessionId(u64);
+
+/// Starts a new telemetry session without wrapping the generation counter.
+/// Saturation is preferable to reusing an old identity after u64::MAX.
+pub fn next_telemetry_session(current: &mut u64) -> TelemetrySessionId {
+    *current = current.saturating_add(1);
+    TelemetrySessionId(*current)
+}
+
+/// Returns whether a callback still belongs to the currently authoritative
+/// telemetry session.
+pub const fn telemetry_session_is_current(
+    current: u64,
+    session: TelemetrySessionId,
+) -> bool {
+    current == session.0
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PresenceState {
@@ -433,6 +461,39 @@ pub fn cognitive_spans(events: &[CognitiveEvent]) -> Vec<CognitiveSpan> {
 
     spans.sort_by_key(|span| span.start_sequence);
     spans
+}
+
+#[cfg(test)]
+mod telemetry_session_tests {
+    use super::*;
+
+    #[test]
+    fn new_session_invalidates_previous_generation() {
+        let mut generation = 0;
+        let first = next_telemetry_session(&mut generation);
+        let second = next_telemetry_session(&mut generation);
+        assert_ne!(first, second);
+        assert!(!telemetry_session_is_current(generation, first));
+        assert!(telemetry_session_is_current(generation, second));
+    }
+
+    #[test]
+    fn generation_saturates_without_reusing_identity() {
+        let mut generation = u64::MAX - 1;
+        let first = next_telemetry_session(&mut generation);
+        let second = next_telemetry_session(&mut generation);
+        assert_eq!(generation, u64::MAX);
+        assert_ne!(first, second);
+        assert!(telemetry_session_is_current(generation, second));
+    }
+
+    #[test]
+    fn stale_callbacks_are_rejected() {
+        let mut generation = 0;
+        let stale = next_telemetry_session(&mut generation);
+        let _current = next_telemetry_session(&mut generation);
+        assert!(!telemetry_session_is_current(generation, stale));
+    }
 }
 
 #[cfg(test)]
