@@ -343,6 +343,49 @@ impl EpistemicFrameDivergence {
     }
 }
 
+
+/// Append-only record describing a revision of an epistemic frame.
+///
+/// A revision never mutates or erases conclusions produced under the prior frame.
+/// It records why the frame changed and which previously derived conclusions require
+/// re-evaluation or scope qualification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpistemicFrameRevision {
+    /// Prior frame identity (id@version).
+    pub prior_frame: String,
+    /// Revised frame identity (id@version).
+    pub revised_frame: String,
+    /// Evidence or observation that triggered the revision.
+    pub trigger: String,
+    /// Newly represented entity, variable, or relationship, if any.
+    pub newly_represented: Option<String>,
+    /// Human/model-readable scope change.
+    pub scope_change: String,
+    /// Claim or conclusion identifiers affected by the revision.
+    pub affected_conclusions: Vec<String>,
+}
+
+impl EpistemicFrameRevision {
+    /// Construct an append-only frame revision event.
+    pub fn new(
+        prior_frame: &EpistemicFrame,
+        revised_frame: &EpistemicFrame,
+        trigger: impl Into<String>,
+        newly_represented: Option<String>,
+        scope_change: impl Into<String>,
+        affected_conclusions: Vec<String>,
+    ) -> Self {
+        Self {
+            prior_frame: prior_frame.identity(),
+            revised_frame: revised_frame.identity(),
+            trigger: trigger.into(),
+            newly_represented,
+            scope_change: scope_change.into(),
+            affected_conclusions,
+        }
+    }
+}
+
 impl Default for EpistemicFrame {
     fn default() -> Self {
         Self {
