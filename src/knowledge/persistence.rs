@@ -599,6 +599,91 @@ mod tests {
     }
 
     #[test]
+    fn test_load_causal_edges_surfaces_corrupt_rows_instead_of_dropping_them() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_corrupt_causal_load_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_causal_edges (
+                    cause TEXT NOT NULL,
+                    effect TEXT NOT NULL,
+                    strength REAL NOT NULL,
+                    is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                    cycle INTEGER NOT NULL,
+                    PRIMARY KEY (cause, effect)
+                );",
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO knowledge_causal_edges
+                 (cause, effect, strength, is_inhibitory, cycle)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params!["cause", "effect", "not-a-number", false, 1i64],
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let err = p.load_causal_edges().unwrap_err();
+        assert!(err.contains("Load causal edge row"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_ontology_surfaces_corrupt_rows_instead_of_dropping_them() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_corrupt_ontology_load_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT
+                );",
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO knowledge_ontology
+                 (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle, is_a_parent)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    "corrupt",
+                    vec![1u8; 16],
+                    1i64,
+                    "not-a-number",
+                    1i64,
+                    1i64,
+                    Option::<String>::None,
+                ],
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let err = p.load_ontology().unwrap_err();
+        assert!(err.contains("Load ontology row"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_save_and_load_provenance_relations_append_only() {
         let dir = std::env::temp_dir().join(format!("symthaea_provenance_relation_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
