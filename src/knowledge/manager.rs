@@ -390,7 +390,14 @@ impl KnowledgeManager {
                     persistence_health.ontology_loaded = true;
                     let onto_count = records.len();
                     for record in &records {
-                        ontology.import_ontology_record(record);
+                        if !ontology.import_ontology_record(record) {
+                            persistence_health.ontology_rejections += 1;
+                            tracing::warn!(
+                                name = %record.name,
+                                rejected = persistence_health.ontology_rejections,
+                                "Knowledge: rejected persisted ontology record during restore"
+                            );
+                        }
                     }
                     if onto_count > 0 {
                         tracing::info!(
@@ -1411,6 +1418,8 @@ pub struct KnowledgePersistenceHealth {
     pub provenance_snapshot_conforms: bool,
     pub causal_loaded: bool,
     pub ontology_loaded: bool,
+    /// Decoded ontology rows rejected during graph/ontology restore.
+    pub ontology_rejections: usize,
 }
 
 impl KnowledgePersistenceHealth {
@@ -1422,7 +1431,8 @@ impl KnowledgePersistenceHealth {
                 && self.provenance_rejections == 0
                 && self.provenance_snapshot_conforms
                 && self.causal_loaded
-                && self.ontology_loaded)
+                && self.ontology_loaded
+                && self.ontology_rejections == 0)
     }
 
     pub fn failed_domains(self) -> Vec<&'static str> {
@@ -1438,7 +1448,10 @@ impl KnowledgePersistenceHealth {
                     || !self.provenance_snapshot_conforms,
             ),
             ("causal", !self.causal_loaded),
-            ("ontology", !self.ontology_loaded),
+            (
+                "ontology",
+                !self.ontology_loaded || self.ontology_rejections > 0,
+            ),
         ]
         .into_iter()
         .filter_map(|(name, failed)| failed.then_some(name))
@@ -1488,6 +1501,7 @@ mod tests {
             provenance_snapshot_conforms: false,
             causal_loaded: true,
             ontology_loaded: false,
+            ontology_rejections: 0,
         };
 
         assert!(health.is_degraded());
@@ -1505,10 +1519,29 @@ mod tests {
             provenance_snapshot_conforms: true,
             causal_loaded: true,
             ontology_loaded: true,
+            ontology_rejections: 0,
         };
 
         assert!(health.is_degraded());
         assert_eq!(health.failed_domains(), vec!["facts"]);
+    }
+
+    #[test]
+    fn test_persistence_health_reports_ontology_rejections_as_degraded() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            fact_rejections: 0,
+            provenance_loaded: true,
+            provenance_rejections: 0,
+            provenance_snapshot_conforms: true,
+            causal_loaded: true,
+            ontology_loaded: true,
+            ontology_rejections: 1,
+        };
+
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["ontology"]);
     }
 
     #[test]
@@ -1568,6 +1601,7 @@ mod tests {
             provenance_snapshot_conforms: true,
             causal_loaded: true,
             ontology_loaded: true,
+            ontology_rejections: 0,
         };
 
         assert!(health.is_degraded());
