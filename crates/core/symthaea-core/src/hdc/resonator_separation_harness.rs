@@ -282,7 +282,7 @@ fn unit(seed: u64) -> f32 {
     ((mix64(seed) >> 11) as f64 / ((1u64 << 53) as f64)) as f32
 }
 
-fn correlated_codebook(
+pub(crate) fn correlated_codebook(
     resolution: usize,
     codebook_size: usize,
     seed: u64,
@@ -315,7 +315,7 @@ fn correlated_codebook(
         .collect()
 }
 
-fn geometry(values: &[ContinuousHV]) -> (f64, f64) {
+pub(crate) fn geometry(values: &[ContinuousHV]) -> (f64, f64) {
     let mut sum = 0.0f64;
     let mut count = 0u64;
     let mut max = 0.0f64;
@@ -336,7 +336,7 @@ fn geometry(values: &[ContinuousHV]) -> (f64, f64) {
     }
 }
 
-fn nearest(values: &[ContinuousHV], query: &ContinuousHV) -> (usize, f32, f32) {
+pub(crate) fn nearest(values: &[ContinuousHV], query: &ContinuousHV) -> (usize, f32, f32) {
     let mut best_index = 0usize;
     let mut best = f32::NEG_INFINITY;
     let mut second = f32::NEG_INFINITY;
@@ -354,7 +354,7 @@ fn nearest(values: &[ContinuousHV], query: &ContinuousHV) -> (usize, f32, f32) {
     (best_index, best, second)
 }
 
-fn exhaustive_pair(values: &[ContinuousHV], query: &ContinuousHV) -> ((usize, usize), f32, f32) {
+pub(crate) fn exhaustive_pair(values: &[ContinuousHV], query: &ContinuousHV) -> ((usize, usize), f32, f32) {
     let mut best_pair = (0usize, 0usize);
     let mut best = f32::NEG_INFINITY;
     let mut second = f32::NEG_INFINITY;
