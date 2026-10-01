@@ -19,7 +19,7 @@ use std::rc::Rc;
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
-use crate::presentation::{cognitive_spans, event_between, CognitiveEvent, CognitiveEventKind, CognitiveState};
+use crate::presentation::{cognitive_spans, event_between, push_cognitive_event, CognitiveEvent, CognitiveEventKind, CognitiveState};
 
 const DEFAULT_GATEWAY: &str = "http://127.0.0.1:8090";
 
@@ -242,12 +242,7 @@ pub fn App() -> impl IntoView {
                         v.surprise_triggered,
                         v.gwt_broadcast,
                     ) {
-                        events.update(|items| {
-                            items.push(event);
-                            if items.len() > 32 {
-                                items.remove(0);
-                            }
-                        });
+                        events.update(|items| push_cognitive_event(items, event));
                     }
                     previous_state = Some(current_state);
                     last_cycle.set(cycle);
@@ -266,10 +261,10 @@ pub fn App() -> impl IntoView {
                     let sequence = connected_sequence.get().saturating_add(1);
                     connected_sequence.set(sequence);
                     events.update(|items| {
-                        items.push(CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Connected, 0));
-                        if items.len() > 32 {
-                            items.remove(0);
-                        }
+                        push_cognitive_event(
+                            items,
+                            CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Connected, 0),
+                        );
                     });
                 },
             )
@@ -279,10 +274,10 @@ pub fn App() -> impl IntoView {
             disconnect_sequence.set(sequence);
             let cycle = last_cycle.get_untracked();
             events.update(|items| {
-                items.push(CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Disconnected, cycle));
-                if items.len() > 32 {
-                    items.remove(0);
-                }
+                push_cognitive_event(
+                    items,
+                    CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Disconnected, cycle),
+                );
             });
         });
     });
