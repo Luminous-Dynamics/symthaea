@@ -664,7 +664,7 @@ pub struct IndependenceAssessment {
 /// These outcomes are intentionally distinct so callers can audit why a receipt
 /// was not accepted. A successful result remains a bounded provenance statement,
 /// not a claim that either observation is true.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReceiptVerificationOutcome {
     /// Receipt integrity and its result against the supplied graph were verified.
     VerifiedAgainstGraph,
@@ -2324,6 +2324,8 @@ mod tests {
         assert!(receipt.verify_integrity());
         assert_eq!(receipt.verify_against_graph(&graph), Ok(true));
         assert_eq!(receipt.verify_against_graph_detailed(&graph), Ok(ReceiptVerificationOutcome::VerifiedAgainstGraph));
+        let encoded = serde_json::to_string(&ReceiptVerificationOutcome::VerifiedAgainstGraph).expect("serialize outcome");
+        assert_eq!(serde_json::from_str::<ReceiptVerificationOutcome>(&encoded).expect("deserialize outcome"), ReceiptVerificationOutcome::VerifiedAgainstGraph);
         assert!(!receipt.canonical_bytes().is_empty());
         assert!(receipt.canonical_bytes().starts_with(IndependenceVerificationReceipt::DOMAIN_SEPARATOR));
         assert_eq!(receipt.fingerprint().len(), 64);
