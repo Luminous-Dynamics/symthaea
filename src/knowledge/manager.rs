@@ -258,8 +258,8 @@ pub struct KnowledgeManager {
     last_causal_depth: usize,
     /// Optional SQLite persistence layer
     persistence: Option<KnowledgePersistence>,
-    /// Whether startup encountered a persistence load error and continued with a degraded projection.
-    persistence_degraded: bool,
+    /// Structured health state for the persistence restore.
+    persistence_health: KnowledgePersistenceHealth,
     /// Save interval from config (cycles between persistence snapshots)
     save_interval: u64,
     /// Ontology learning rate multiplier, modulated by prediction error
@@ -284,12 +284,13 @@ impl KnowledgeManager {
         // Initialize persistence and load existing knowledge.
         // Loading is intentionally best-effort for backwards compatibility, but failures are
         // retained as explicit health state rather than being observable only through logs.
-        let mut persistence_degraded = false;
+        let mut persistence_health = KnowledgePersistenceHealth::default();
         let persistence = config.db_path.as_ref().map(|path| {
             let mut p = KnowledgePersistence::new(path);
             // Load existing facts
             match p.load_facts() {
                 Ok(facts) => {
+                    persistence_health.facts_loaded = true;
                     for record in &facts {
                         graph.import_fact_record(record);
                     }
@@ -298,7 +299,7 @@ impl KnowledgeManager {
                     }
                 }
                 Err(error) => {
-                    persistence_degraded = true;
+                    persistence_health.facts_loaded = false;
                     tracing::warn!(%error, "Knowledge: failed to load facts from SQLite");
                 }
             }
@@ -306,7 +307,8 @@ impl KnowledgeManager {
             // provenance and may intentionally reference memories no longer resident in the
             // local cognitive projection.
             match p.load_provenance_relations() {
-                Ok(relations) => {
+                Ok(relations) {
+                    persistence_health.provenance_loaded = true;
                     let mut loaded_relations = 0usize;
                     for record in relations {
                         match graph.import_provenance_relation(record.into()) {
@@ -336,13 +338,14 @@ impl KnowledgeManager {
                     }
                 }
                 Err(error) => {
-                    persistence_degraded = true;
+                    persistence_health.provenance_loaded = false;
                     tracing::warn!(%error, "Knowledge: failed to load provenance relations from SQLite");
                 },
             }
             // Load existing causal edges
             match p.load_causal_edges() {
-                Ok(edges) => {
+                Ok(edges) {
+                    persistence_health.causal_loaded = true;
                     let edge_count = edges.len();
                     for record in &edges {
                         causal_bridge.import_edge(
@@ -359,13 +362,14 @@ impl KnowledgeManager {
                     }
                 }
                 Err(error) => {
-                    persistence_degraded = true;
+                    persistence_health.causal_loaded = false;
                     tracing::warn!(%error, "Knowledge: failed to load causal edges from SQLite");
                 }
             }
             // Load existing ontology primitives
             match p.load_ontology() {
-                Ok(records) => {
+                Ok(records) {
+                    persistence_health.ontology_loaded = true;
                     let onto_count = records.len();
                     for record in &records {
                         ontology.import_ontology_record(record);
@@ -378,7 +382,7 @@ impl KnowledgeManager {
                     }
                 }
                 Err(error) => {
-                    persistence_degraded = true;
+                    persistence_health.ontology_loaded = false;
                     tracing::warn!(%error, "Knowledge: failed to load ontology primitives from SQLite");
                 }
             }
@@ -402,7 +406,7 @@ impl KnowledgeManager {
             bootstrap_done: false,
             last_causal_depth: 0,
             persistence,
-            persistence_degraded,
+            persistence_health,
             save_interval,
             ontology_lr_multiplier: 1.0,
             calibration_audit: CalibrationAudit::default(),
@@ -777,12 +781,14 @@ impl KnowledgeManager {
         &self.last_telemetry
     }
 
+    /// Structured result of the startup persistence restore.
+    pub fn persistence_health(&self) -> KnowledgePersistenceHealth {
+        self.persistence_health
+    }
+
     /// Whether startup encountered a persistence load failure.
-    ///
-    /// The manager remains usable for compatibility, but callers can distinguish a complete
-    /// persistence restore from a degraded in-memory projection without parsing logs.
     pub fn persistence_degraded(&self) -> bool {
-        self.persistence_degraded
+        self.persistence_health.is_degraded()
     }
 
     /// Get last signals
@@ -1368,6 +1374,36 @@ impl KnowledgeManager {
                 + (1.0 - avg_sim) * 0.4)
                 .clamp(0.0, 1.0),
         };
+    }
+}
+
+/// Structured result of the startup persistence restore.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct KnowledgePersistenceHealth {
+    pub facts_loaded: bool,
+    pub provenance_loaded: bool,
+    pub causal_loaded: bool,
+    pub ontology_loaded: bool,
+}
+
+impl KnowledgePersistenceHealth {
+    pub fn is_degraded(self) -> bool {
+        !(self.facts_loaded
+            && self.provenance_loaded
+            && self.causal_loaded
+            && self.ontology_loaded)
+    }
+
+    pub fn failed_domains(self) -> Vec<&'static str> {
+        [
+            ("facts", self.facts_loaded),
+            ("provenance", self.provenance_loaded),
+            ("causal", self.causal_loaded),
+            ("ontology", self.ontology_loaded),
+        ]
+        .into_iter()
+        .filter_map(|(name, loaded)| (!loaded).then_some(name))
+        .collect()
     }
 }
 
