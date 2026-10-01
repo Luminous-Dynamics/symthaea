@@ -815,8 +815,6 @@ mod tests {
         ));
     }
 
-    }
-
     #[test]
     fn admission_claim_binds_inputs_beyond_state_edge() {
         let (before, after) = fixture();
