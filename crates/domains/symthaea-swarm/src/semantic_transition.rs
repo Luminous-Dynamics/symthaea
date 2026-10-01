@@ -499,6 +499,30 @@ mod tests {
     };
     use uuid::Uuid;
 
+    #[test]
+    fn typed_claim_dispatch_matches_legacy_encoder_and_separates_kinds() {
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy { allow_new_observation: true, ..AdmissionPolicy::default() };
+        let result = crate::semantic_admission::SemanticResult {
+            logical_delivery_id: delivery.logical_delivery_id,
+            observation: observation.key.clone(),
+        };
+        let admission = TransitionClaim::Admission {
+            delivery: delivery.clone(), observation: observation.clone(), policy, now_ms: 10, result: result.clone(),
+        };
+        let replay = TransitionClaim::Replay { delivery: delivery.clone(), observation: observation.clone(), policy, now_ms: 10, result: result.clone() };
+        assert_eq!(
+            transition_claim_commitment(&before, &after, &admission).unwrap(),
+            admission_claim_commitment(&before, &after, &delivery, &observation, policy, 10, &result).unwrap(),
+        );
+        assert_ne!(
+            transition_claim_commitment(&before, &after, &admission).unwrap(),
+            transition_claim_commitment(&before, &after, &replay).unwrap(),
+        );
+    }
+
     fn fixture() -> (SemanticAdmissionState, SemanticAdmissionState) {
         let delivery = DeliveryContract {
             logical_delivery_id: Uuid::from_u128(1),
