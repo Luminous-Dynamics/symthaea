@@ -732,10 +732,9 @@ mod tests {
     fn valid_lifecycle_retirement_is_replayably_verifiable() {
         use crate::semantic_admission::{retire_expired, AdmissionPolicy};
 
-        let (mut before, delivery, observation) = {
-            let (state, delivery, observation) = fixture();
-            (state, delivery, observation)
-        };
+        let (mut before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
         before
             .observations
             .get_mut(&observation.key)
