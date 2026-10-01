@@ -506,42 +506,15 @@ mod tests {
         use crate::semantic_admission::{retire_expired, AdmissionPolicy};
 
         let (mut before, delivery, observation) = {
-            let (state, delivery, observation) = {
-                let delivery = crate::semantic_admission::DeliveryContract {
-                    logical_delivery_id: Uuid::from_u128(1),
-                    schema_version: 1,
-                    expires_at_ms: 1_000,
-                    payload: b"delivery".to_vec(),
-                };
-                let observation = crate::semantic_admission::ObservationRecord {
-                    key: ObservationKey {
-                        namespace: "source".into(),
-                        observation_id: Uuid::from_u128(2),
-                    },
-                    source_id: Uuid::from_u128(3),
-                    observed_at_ms: 10,
-                    payload: b"observation".to_vec(),
-                };
-                let empty = SemanticAdmissionState::default();
-                let policy = AdmissionPolicy {
-                    allow_new_observation: true,
-                    ..AdmissionPolicy::default()
-                };
-                let state = match crate::semantic_admission::decide(
-                    &empty,
-                    &delivery,
-                    &observation,
-                    policy,
-                    10,
-                ) {
-                    AdmissionOutcome::Admitted { next_state, .. } => next_state,
-                    other => panic!("fixture admission failed: {other:?}"),
-                };
-                (state, delivery, observation)
-            };
+            let (state, delivery, observation) = fixture();
             (state, delivery, observation)
         };
-        before.observations.get_mut(&observation.key).unwrap().observed_at_ms = 0;
+        before
+            .observations
+            .get_mut(&observation.key)
+            .unwrap()
+            .observed_at_ms = 0;
+
         let policy = AdmissionPolicy {
             retention_ms: 10,
             tombstone_retention_ms: 100,
