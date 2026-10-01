@@ -1210,6 +1210,22 @@ mod identity_tests {
     use super::*;
 
     #[test]
+    fn event_sequence_is_monotonic_and_never_wraps() {
+        let mut sequence = 40;
+        assert_eq!(next_event_sequence(&mut sequence), Some(41));
+        assert_eq!(next_event_sequence(&mut sequence), Some(42));
+        assert_eq!(sequence, 42);
+    }
+
+    #[test]
+    fn event_sequence_exhaustion_fails_closed() {
+        let mut sequence = u64::MAX;
+        assert_eq!(next_event_sequence(&mut sequence), None);
+        assert_eq!(sequence, u64::MAX);
+        assert_eq!(next_event_sequence(&mut sequence), None);
+    }
+
+    #[test]
     fn event_evidence_basis_is_explicit_and_kind_aligned() {
         assert_eq!(
             CognitiveEvent::lifecycle(1, CognitiveEventKind::Connected, 0).evidence_basis,
