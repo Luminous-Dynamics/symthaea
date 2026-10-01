@@ -743,9 +743,11 @@ mod tests {
                 domain: Domain::Physics,
                 eig,
                 detected_at: SystemTime::now(),
+                frame: EpistemicFrame::default(),
             },
             status: IgnoranceStatus::Active,
             resolution: None,
+            frame_revisions: Vec::new(),
             created_at: SystemTime::now(),
             updated_at: SystemTime::now(),
         }
