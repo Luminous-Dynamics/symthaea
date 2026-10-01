@@ -522,6 +522,135 @@ impl ResonatorNetwork {
             .map(|&name| (name.to_string(), vec![0.0f32; self.dimension]))
             .collect();
 
+        let mut iterations_performed = 0usize;
+        let mut converged = false;
+
+        for _iteration in 0..max_iterations {
+            // Compute updates for each unknown
+            let mut updates: HashMap<String, Vec<f32>> = unknowns
+                .iter()
+                .map(|&name| (name.to_string(), vec![0.0f32; self.dimension]))
+                .collect();
+
+            let mut weights: HashMap<String, f32> = unknowns
+                .iter()
+                .map(|&name| (name.to_string(), 0.0f32))
+                .collect();
+
+            for constraint in constraints {
+                // Get current values for factors
+                let left = self.resolve_factor(&constraint.left, &estimates)?;
+                let right = self.resolve_factor(&constraint.right, &estimates)?;
+
+                // Update the unknown being solved for
+                if let Factor::Unknown(name) = &constraint.unknown {
+                    let unbind_update = unbind(&left, &right);
+                    let update = updates
+                        .get_mut(name)
+                        .expect("updates map must contain all unknowns");
+                    let weight = weights
+                        .get_mut(name)
+                        .expect("weights map must contain all unknowns");
+
+                    for i in 0..self.dimension {
+                        update[i] += constraint.weight * unbind_update[i];
+                    }
+                    *weight += constraint.weight;
+                }
+            }
+
+            // Normalize and apply updates.
+            // An unknown with no positive-weight constraint cannot converge merely because it was never updated.
+            let mut all_converged = !unknowns.is_empty();
+
+            for name in unknowns {
+                let name = name.to_string();
+                let update = updates
+                    .get(&name)
+                    .expect("updates map must contain all unknowns");
+                let weight = *weights
+                    .get(&name)
+                    .expect("weights map must contain all unknowns");
+
+                if weight > 0.0 {
+                    let mut normalized_update: Vec<f32> =
+                        update.iter().map(|&x| x / weight).collect();
+
+                    // Cleanup
+                    if !self.codebook.is_empty() {
+                        normalized_update = self.cleanup(&normalized_update);
+                    }
+
+                    // Apply momentum
+                    let estimate = estimates
+                        .get_mut(&name)
+                        .expect("estimates map must contain all unknowns");
+                    let velocity = velocities
+                        .get_mut(&name)
+                        .expect("velocities map must contain all unknowns");
+                    let previous = estimate.clone();
+
+                    for i in 0..self.dimension {
+                        velocity[i] = self.config.momentum * velocity[i]
+                            + self.config.step_size * (normalized_update[i] - estimate[i]);
+                        estimate[i] += velocity[i];
+                    }
+                    normalize(estimate);
+
+                    // Check convergence
+                    let similarity = cosine_similarity(estimate, &previous);
+                    if similarity < self.config.convergence_threshold {
+                        all_converged = false;
+                    }
+                } else {
+                    all_converged = false;
+                }
+            }
+
+            iterations_performed += 1;
+            // Update introspection state
+            self.iteration_count += 1;
+            for (idx, &name_str) in unknowns.iter().enumerate() {
+                if let Some(est) = estimates.get(name_str)
+                    && let Some(state) = self.states.get_mut(idx)
+                {
+                    state.previous = state.estimate.clone();
+                    state.estimate = est.clone();
+                    state.converged = all_converged;
+                    state.confidence = if !self.codebook.is_empty() {
+                        self.codebook
+                            .iter()
+                            .map(|e| cosine_similarity(est, &e.vector))
+                            .fold(f32::NEG_INFINITY, f32::max)
+                    } else {
+                        0.5 // default confidence without codebook
+                    };
+                }
+            }
+
+            // Update coupling strengths between resonator pairs
+            let n = unknowns.len();
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    let ci = i * n - i * (i + 1) / 2 + j - i - 1;
+                    if let (Some(ei), Some(ej)) =
+                        (estimates.get(unknowns[i]), estimates.get(unknowns[j]))
+                        && ci < self.coupling_strengths.len()
+                    {
+                        self.coupling_strengths[ci] = cosine_similarity(ei, ej).abs();
+                    }
+                }
+            }
+
+            if all_converged {
+                // Mark all states as converged
+                for state in &mut self.states {
+                    state.converged = true;
+                }
+                break;
+            }
+        }
+
         for _iteration in 0..max_iterations {
             // Compute updates for each unknown
             let mut updates: HashMap<String, Vec<f32>> = unknowns
@@ -638,11 +767,12 @@ impl ResonatorNetwork {
                 for state in &mut self.states {
                     state.converged = true;
                 }
+                converged = true;
                 break;
             }
         }
 
-        // Create solutions
+        // Create solutions using the actual number of iterations and convergence outcome.
         let solutions = unknowns
             .iter()
             .map(|&name| {
@@ -651,14 +781,12 @@ impl ResonatorNetwork {
                     .expect("estimates map must contain all unknowns");
                 (
                     name.to_string(),
-                    self.create_solution(estimate, max_iterations, true),
+                    self.create_solution(estimate, iterations_performed, converged),
                 )
             })
             .collect();
 
         Ok(solutions)
-    }
-
     /// Cleanup vector to nearest codebook entry
     ///
     /// Uses softmax-weighted sum for smooth cleanup:
@@ -1632,6 +1760,57 @@ mod tests {
         if let Some(&last) = direct_history.last() {
             assert!((snap.current_energy - last).abs() < 1e-9);
         }
+    }
+
+    #[test]
+    fn test_solve_system_zero_iterations_reports_unconverged() {
+        let dim = 64;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+
+        let solutions = network.solve_system_seeded(&["x"], &[constraint], Some(0), 7).unwrap();
+        let solution = solutions.get("x").expect("x solution should exist");
+
+        assert_eq!(solution.iterations, 0);
+        assert!(!solution.converged);
+        assert_eq!(network.total_iteration_count(), 0);
+        assert!(!network.resonator_states()[0].converged);
+    }
+
+    #[test]
+    fn test_solve_system_exhaustion_reports_unconverged() {
+        let dim = 64;
+        let config = ResonatorConfig {
+            convergence_threshold: 2.0,
+            max_iterations: 3,
+            ..Default::default()
+        };
+        let mut network = ResonatorNetwork::with_config(dim, config).unwrap();
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+
+        let solutions = network.solve_system_seeded(&["x"], &[constraint], Some(3), 7).unwrap();
+        let solution = solutions.get("x").expect("x solution should exist");
+
+        assert_eq!(solution.iterations, 3);
+        assert!(!solution.converged);
+        assert_eq!(network.total_iteration_count(), 3);
+        assert!(!network.resonator_states()[0].converged);
     }
 
     #[test]
