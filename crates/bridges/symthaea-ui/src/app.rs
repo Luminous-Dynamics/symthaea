@@ -12,7 +12,7 @@
 
 use base64::Engine as _;
 use leptos::prelude::*;
-use leptos::task::spawn_local;
+use leptos::task::spawn_local_scoped_with_cancellation;
 use serde_json::Value;
 use std::cell::Cell;
 use std::rc::Rc;
@@ -235,7 +235,7 @@ pub fn App() -> impl IntoView {
     Effect::new(move |_| {
         let gw = gateway.get_untracked();
         ws_connected.set(false);
-        spawn_local(async move {
+        spawn_local_scoped_with_cancellation(async move {
             let mut previous_state: Option<CognitiveState> = None;
             let event_sequence = Rc::new(Cell::new(0_u64));
             let telemetry_sequence = Rc::clone(&event_sequence);
@@ -326,7 +326,7 @@ pub fn App() -> impl IntoView {
     // case in production) — without this, an idle daemon would look
     // indistinguishable from an unreachable one.
     Effect::new(move |_| {
-        spawn_local(async move {
+        spawn_local_scoped_with_cancellation(async move {
             loop {
                 let gw = gateway.get_untracked();
                 match api::send_simple(&gw, "status").await {
@@ -340,7 +340,7 @@ pub fn App() -> impl IntoView {
 
     // Advance the imagination loop at ~3fps whenever a movie is present.
     Effect::new(move |_| {
-        spawn_local(async move {
+        spawn_local_scoped_with_cancellation(async move {
             loop {
                 gloo_timers::future::TimeoutFuture::new(300).await;
                 if movie.with_untracked(|m| m.as_ref().is_some_and(|m| m.frames_rgba.len() > 1)) {
@@ -394,7 +394,7 @@ pub fn App() -> impl IntoView {
             })
         });
         let gw = gateway.get_untracked();
-        spawn_local(async move {
+        spawn_local_scoped_with_cancellation(async move {
             match api::send_query(&gw, &text).await {
                 Ok(resp) => {
                     if resp["type"] == "error" {
