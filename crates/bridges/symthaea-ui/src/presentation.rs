@@ -353,6 +353,21 @@ impl CognitiveSpan {
     }
 }
 
+/// Appends one event to the presentation window and enforces its bounded size.
+///
+/// This is intentionally the single mutation primitive for the timeline: callers
+/// cannot accidentally forget the retention limit when adding lifecycle or
+/// telemetry-derived events.
+pub const COGNITIVE_EVENT_WINDOW: usize = 32;
+
+pub fn push_cognitive_event(events: &mut Vec<CognitiveEvent>, event: CognitiveEvent) {
+    events.push(event);
+    if events.len() > COGNITIVE_EVENT_WINDOW {
+        let overflow = events.len() - COGNITIVE_EVENT_WINDOW;
+        events.drain(..overflow);
+    }
+}
+
 /// Reconstructs only spans whose entry and exit are explicitly represented by
 /// semantic events. Unmatched exits are ignored rather than guessed.
 pub fn cognitive_spans(events: &[CognitiveEvent]) -> Vec<CognitiveSpan> {
@@ -662,6 +677,34 @@ mod tests {
             spans.iter().map(|span| span.kind).collect::<Vec<_>>(),
             vec![CognitiveSpanKind::Resting, CognitiveSpanKind::Processing]
         );
+    }
+
+    #[test]
+    fn event_window_is_exactly_bounded() {
+        let mut events = Vec::new();
+        for sequence in 1..=COGNITIVE_EVENT_WINDOW as u64 + 5 {
+            push_cognitive_event(
+                &mut events,
+                CognitiveEvent::lifecycle(sequence, CognitiveEventKind::StateChanged, sequence),
+            );
+        }
+        assert_eq!(events.len(), COGNITIVE_EVENT_WINDOW);
+        assert_eq!(events.first().unwrap().sequence, 6);
+        assert_eq!(events.last().unwrap().sequence, 37);
+    }
+
+    #[test]
+    fn event_window_preserves_order_after_multiple_evictions() {
+        let mut events = Vec::new();
+        for sequence in 1..=64 {
+            push_cognitive_event(
+                &mut events,
+                CognitiveEvent::lifecycle(sequence, CognitiveEventKind::StateChanged, sequence),
+            );
+        }
+        assert!(events.windows(2).all(|pair| pair[0].sequence < pair[1].sequence));
+        assert_eq!(events.first().unwrap().sequence, 33);
+        assert_eq!(events.last().unwrap().sequence, 64);
     }
 
     #[test]
