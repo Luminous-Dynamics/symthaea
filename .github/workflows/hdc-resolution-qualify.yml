@@ -122,6 +122,7 @@ jobs:
             crates/core/symthaea-core/src/hdc/sequence_order_harness.rs \
             crates/core/symthaea-core/src/hdc/resonator_cross_validation_harness.rs \
             crates/core/symthaea-core/src/hdc/two_factor_resonator_harness.rs \
+            crates/core/symthaea-core/src/hdc/resonator_separation_harness.rs \
             crates/core/symthaea-core/src/hdc/mod.rs \
             crates/core/symthaea-core/src/hdc/pareto_frontier.rs \
             crates/core/symthaea-core/examples/hdc_operator_evidence.rs \
@@ -131,6 +132,7 @@ jobs:
             crates/core/symthaea-core/examples/hdc_sequence_order.rs \
             crates/core/symthaea-core/examples/hdc_resonator_cross_validation.rs \
             crates/core/symthaea-core/examples/hdc_two_factor_resonator.rs \
+            crates/core/symthaea-core/examples/hdc_resonator_separation.rs \
             crates/core/symthaea-core/benches/simd_continuous.rs
 
       - name: Focused HDC resolution tests
