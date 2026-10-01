@@ -77,8 +77,10 @@ impl ConsciousUncertaintyState {
     /// Create from Φ measurement and GIS detection
     pub fn from_phi_and_detection(phi: f32, detection: &IgnoranceDetection) -> Self {
         let epistemic_confidence = 1.0 - detection.uncertainty.total().min(1.0);
-        let is_grounded =
-            detection.ignorance_type == IgnoranceType::None || epistemic_confidence > 0.7;
+        // Grounding must come from measured epistemic confidence, not from the
+        // absence of a detected ignorance category. IgnoranceType::None means
+        // "no ignorance detected under the active frame", not completeness.
+        let is_grounded = epistemic_confidence > 0.7;
 
         Self {
             phi,
@@ -685,7 +687,7 @@ mod tests {
         );
         assert!(
             state_none.is_grounded,
-            "zero uncertainty + IgnoranceType::None should be grounded"
+            "zero uncertainty should be grounded even without relying on IgnoranceType::None"
         );
 
         // High uncertainty => effective << phi
