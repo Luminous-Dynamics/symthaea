@@ -3271,4 +3271,21 @@ mod tests {
         let result = writer.apply_patch(&patch).unwrap();
         assert!(result.changed);
     }
+    #[test]
+    fn legacy_service_bridge_uses_typed_enablement_domain() {
+        let command =
+            render_legacy_service_action(NixServiceOperationKindV1::Enable, "nginx").unwrap();
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "systemctl");
+        assert_eq!(args, vec!["enable".to_string(), "nginx.service".to_string()]);
+    }
+
+    #[test]
+    fn legacy_service_bridge_rejects_path_like_unit() {
+        let error =
+            render_legacy_service_action(NixServiceOperationKindV1::Disable, "../nginx.service")
+                .unwrap_err();
+        assert_eq!(error, NixServiceOperationErrorV1::PathLikeUnit);
+    }
+
 }
