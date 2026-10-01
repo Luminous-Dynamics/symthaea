@@ -394,8 +394,7 @@ mod tests {
                 &result,
                 &commitment,
             ),
-            Err(TransitionVerificationError::CommitmentMismatch)
-                .or(Err(TransitionVerificationError::AfterStateMismatch))
+            Err(TransitionVerificationError::AfterStateMismatch)
         );
     }
 
@@ -556,7 +555,8 @@ mod tests {
             verify_lifecycle_retirement(&before, &after, policy, 11, &commitment),
             Ok(())
         );
-        assert!(!after.deliveries.contains_key(&delivery.logical_delivery_id));
+        assert!(!after.observations.contains_key(&observation.key));
+        assert!(after.deliveries.contains_key(&delivery.logical_delivery_id));
     }
 
     #[test]
