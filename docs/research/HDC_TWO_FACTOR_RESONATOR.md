@@ -26,10 +26,10 @@ other's update, this is materially different from the one-unknown associative ca
 For each query, the harness also performs exhaustive pair retrieval over all
 `n²` ordered pairs and reports:
 
-- whether the exact target pair was recovered;
+- whether the target factor set was recovered, allowing X/Y swap because bipolar binding is commutative;
 - exhaustive top-1 accuracy;
 - top-1/top-2 similarity margin;
-- explicit search-space size formula (`n²`).
+- explicit search-space size formula (`n²`), while avoiding a false ordered-pair claim;
 
 The exhaustive path is a reference measurement, not a score against which a composite
 ranking is constructed.
