@@ -400,6 +400,16 @@ impl EpistemicFrameRevision {
             affected_conclusions,
         }
     }
+
+    /// Whether this revision continues directly from the supplied frame identity.
+    pub fn follows_frame(&self, frame_identity: &str) -> bool {
+        self.prior_frame == frame_identity
+    }
+
+    /// Whether this revision is structurally meaningful rather than a no-op.
+    pub fn changes_frame(&self) -> bool {
+        self.prior_frame != self.revised_frame
+    }
 }
 
 impl Default for EpistemicFrame {
@@ -642,6 +652,28 @@ mod tests {
             IgnoranceType::Unknown.confidence_ceiling()
                 > IgnoranceType::Impossible.confidence_ceiling()
         );
+    }
+
+    #[test]
+    fn test_frame_revision_continuity_and_non_noop() {
+        let prior = EpistemicFrame::default();
+        let revised = EpistemicFrame {
+            version: 2,
+            ontology_id: "collective-agents-v2".to_string(),
+            ..prior.clone()
+        };
+        let revision = EpistemicFrameRevision::new(
+            &prior,
+            &revised,
+            "new relationship observed",
+            Some("institutional-role".to_string()),
+            "expanded ontology",
+            vec!["conclusion-1".to_string()],
+        );
+
+        assert!(revision.follows_frame(&prior.identity()));
+        assert!(revision.changes_frame());
+        assert!(!revision.follows_frame("other@1"));
     }
 
     #[test]
