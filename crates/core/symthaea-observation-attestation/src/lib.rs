@@ -409,6 +409,51 @@ mod tests {
     }
 
     #[test]
+    fn resolver_separates_key_lifecycle_and_authorization() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let method = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([method]);
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            signing_key.verifying_key(),
+            150,
+        );
+        assert_eq!(
+            verifier.verify_with_resolver(&envelope, &receipt, &resolver),
+            ReceiptAttestationVerificationOutcome::Verified
+        );
+
+        let revoked = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Revoked,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([revoked]);
+        assert_eq!(
+            verifier.verify_with_resolver(&envelope, &receipt, &resolver),
+            ReceiptAttestationVerificationOutcome::VerificationMethodRevoked
+        );
+
+        let unauthorized = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["authentication".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([unauthorized]);
+        assert_eq!(
+            verifier.verify_with_resolver(&envelope, &receipt, &resolver),
+            ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized
+        );
+    }
+
+    #[test]
     fn proof_purpose_domain_and_challenge_are_policy_checks() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
         envelope.domain = Some("example.org".into());
