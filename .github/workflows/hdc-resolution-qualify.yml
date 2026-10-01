@@ -596,6 +596,13 @@ jobs:
           assert len(evidence["solver_seeds"]) == 3
           assert evidence["exhaustive_search_space_formula"] == "n^2"
           assert evidence["max_solver_iterations"] == 16
+          assert sorted({c["resolution"] for c in cells}) == [2048, 8192]
+          assert sorted({c["codebook_size"] for c in cells}) == [4, 8]
+          assert sorted({round(c["shared_component_probability"], 2) for c in cells}) == [0.0, 0.50, 0.75]
+          assert sorted({round(c["query_noise_weight"], 2) for c in cells}) == [0.0, 0.20]
+          assert sorted({round(c["cleanup_temperature"], 2) for c in cells}) == [0.05]
+          assert sorted({c["polynomial_degree"] for c in cells}) == [2]
+          assert {c["sign_projection"] for c in cells} == {False, True}
           assert all(c["cleanup_rule"] in expected_rules for c in cells)
           assert all(c["resonator_trials"] == c["codebook_size"] ** 2 * len(evidence["solver_seeds"]) for c in cells)
           assert all(c["correct_convergence"] + c["spurious_convergence"] + c["non_convergence"] == c["resonator_trials"] for c in cells)
