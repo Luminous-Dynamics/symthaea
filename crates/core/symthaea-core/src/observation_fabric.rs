@@ -677,7 +677,7 @@ pub struct IndependenceVerificationReceipt {
 }
 
 impl IndependenceVerificationReceipt {
-    pub const DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:observation-independence-receipt:v1\\n";
+    pub const DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:observation-independence-receipt:v2\\n";
 
     pub fn from_assessment(assessment: &IndependenceAssessment) -> Self {
         Self {
@@ -704,6 +704,35 @@ impl IndependenceVerificationReceipt {
             assessment_fingerprint: self.assessment_fingerprint.clone(),
         };
         assessment.verify_fingerprint()
+    }
+
+    /// Verify this receipt against the current closed-world observation graph.
+    ///
+    /// This is stronger than verify_integrity: it re-runs the bounded independence
+    /// assessment and confirms that the current provenance scope still produces
+    /// the same result. It does not verify an external signature or establish truth.
+    pub fn verify_against_graph(
+        &self,
+        graph: &ObservationGraph,
+    ) -> Result<bool, ObservationValidationError> {
+        if !self.verify_integrity() {
+            return Ok(false);
+        }
+        if self.verifier_version != IndependenceAssessment::VERIFIER_VERSION {
+            return Ok(false);
+        }
+        let assessment = graph.assess_independence_detailed(
+            &self.source_observation_id,
+            &self.target_observation_id,
+        )?;
+        Ok(
+            assessment.classification == self.classification
+                && assessment.basis == self.basis
+                && assessment.examined_observation_ids == self.examined_observation_ids
+                && assessment.examined_scope_fingerprint == self.examined_scope_fingerprint
+                && assessment.verifier_version == self.verifier_version
+                && assessment.assessment_fingerprint == self.assessment_fingerprint,
+        )
     }
 
     /// Produce canonical bytes an external attestation layer can sign or hash.
@@ -2264,12 +2293,39 @@ mod tests {
         let assessment = graph.assess_independence_detailed("obs-001", "obs-002").expect("assessment");
         let receipt = IndependenceVerificationReceipt::from_assessment(&assessment);
         assert!(receipt.verify_integrity());
+        assert_eq!(receipt.verify_against_graph(&graph), Ok(true));
         assert!(!receipt.canonical_bytes().is_empty());
         assert!(receipt.canonical_bytes().starts_with(IndependenceVerificationReceipt::DOMAIN_SEPARATOR));
         assert_eq!(receipt.fingerprint().len(), 64);
         assert_eq!(receipt.fingerprint(), IndependenceVerificationReceipt::from_assessment(&assessment).fingerprint());
     }
 
+    #[test]
+    fn receipt_graph_verification_detects_provenance_mutation() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph { observations: vec![fixture(), second], relations: vec![] };
+        let assessment = graph.assess_independence_detailed("obs-001", "obs-002").expect("assessment");
+        let receipt = IndependenceVerificationReceipt::from_assessment(&assessment);
+
+        let mut changed = graph.clone();
+        changed.observations[0].provenance.source.platform_id = Some("platform-9".into());
+        assert_eq!(receipt.verify_against_graph(&changed), Ok(false));
+    }
+
+    #[test]
+    fn receipt_graph_verification_rejects_unknown_verifier_version() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph { observations: vec![fixture(), second], relations: vec![] };
+        let assessment = graph.assess_independence_detailed("obs-001", "obs-002").expect("assessment");
+        let mut receipt = IndependenceVerificationReceipt::from_assessment(&assessment);
+        receipt.verifier_version = "observation-fabric-independence-v0";
+        assert!(!receipt.verify_integrity());
+        assert_eq!(receipt.verify_against_graph(&graph), Ok(false));
+    }
     #[test]
     fn detailed_independence_fingerprint_is_not_debug_format_dependent() {
         let mut second = fixture();
@@ -2288,7 +2344,7 @@ mod tests {
         write_canonical_string(&mut expected, "obs-002");
         write_canonical_string_vec(&mut expected, &["obs-001".into(), "obs-002".into()]);
         write_canonical_string(&mut expected, &assessment.examined_scope_fingerprint);
-        write_canonical_string(&mut expected, "observation-fabric-independence-v1");
+        write_canonical_string(&mut expected, "observation-fabric-independence-v2");
         write_canonical_independence(&mut expected, &EvidenceIndependence::VerifiedIndependent);
         write_canonical_independence_basis(&mut expected, &IndependenceBasis::NoSharedProvenance);
         assert_eq!(assessment.assessment_fingerprint, expected.finalize().to_hex().to_string());
