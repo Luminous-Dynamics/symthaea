@@ -135,14 +135,22 @@ impl EpistemicAction {
     pub fn try_record_current_decision(
         &mut self,
         witness: ActionDecisionWitness,
+        current_frame: &str,
         conclusion_statuses: &std::collections::HashMap<String, super::ignorance_types::ConclusionStatus>,
     ) -> Result<(), ActionStatus> {
         if self.risk.requires_current_support() {
+            // The authorization witness must be bound to the frame that is current
+            // at the execution boundary. A valid historical witness is not reusable.
+            let frame_matches = witness.frame == current_frame;
+            let dependencies_are_witnessed = self.dependencies.iter().all(|dependency| {
+                witness.conclusions.iter().any(|id| id == &dependency.conclusion_id)
+            });
             let all_current = self.dependencies.iter().all(|dependency| {
                 conclusion_statuses.get(&dependency.conclusion_id)
                     == Some(&super::ignorance_types::ConclusionStatus::Active)
             });
-            if !all_current {
+
+            if !frame_matches || !dependencies_are_witnessed || !all_current {
                 self.status = if self.status == ActionStatus::RequiresReevaluation {
                     ActionStatus::RequiresReevaluation
                 } else {
@@ -316,15 +324,41 @@ mod tests {
         let mut statuses = std::collections::HashMap::new();
         statuses.insert("c1".into(), ConclusionStatus::Reopened);
         assert_eq!(
-            action.try_record_current_decision(witness.clone(), &statuses),
+            action.try_record_current_decision(witness.clone(), "f1", &statuses),
             Err(ActionStatus::Deferred)
         );
         assert!(action.historical_decisions.is_empty());
 
         statuses.insert("c1".into(), ConclusionStatus::Active);
-        assert_eq!(action.try_record_current_decision(witness, &statuses), Ok(()));
+        assert_eq!(action.try_record_current_decision(witness, "f1", &statuses), Ok(()));
         assert_eq!(action.status, ActionStatus::Executed);
         assert_eq!(action.historical_decisions.len(), 1);
+    }
+
+    #[test]
+    fn current_witness_cannot_cross_frame_or_dependency_boundary() {
+        use super::super::ignorance_types::ConclusionStatus;
+        let mut action = EpistemicAction::new("a-bound", "intervention", ActionRisk::High);
+        action.dependencies.push(ActionDependency {
+            conclusion_id: "c1".into(),
+            kind: ActionDependencyKind::CausalBasis,
+        });
+
+        let witness = ActionDecisionWitness {
+            frame: "frame@1".into(),
+            conclusions: vec!["unrelated".into()],
+            evidence: vec!["e1".into()],
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+        };
+        let mut statuses = std::collections::HashMap::new();
+        statuses.insert("c1".into(), ConclusionStatus::Active);
+
+        assert_eq!(
+            action.try_record_current_decision(witness, "frame@2", &statuses),
+            Err(ActionStatus::Deferred)
+        );
+        assert!(action.historical_decisions.is_empty());
     }
 
     #[test]
