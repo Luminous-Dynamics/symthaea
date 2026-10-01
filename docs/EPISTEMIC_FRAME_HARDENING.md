@@ -78,6 +78,23 @@ A frame revision creates a correction event linked to the original claim, preser
 
 > Consensus is not completeness. Confidence is not ontology validation. A clean inference is not evidence that the frame was complete.
 
+
+## Append-only lineage invariant
+
+Frame correction history is now guarded by two complementary APIs:
+
+- append_frame_revision() remains the low-level append primitive for compatibility and reconstruction.
+- try_append_frame_revision() is the preferred mutation path for new code. It rejects a revision that does not start from the record's current frame and rejects no-op revisions.
+- frame_lineage_is_contiguous() remains an audit predicate for detecting malformed history, including records reconstructed from older or unchecked writers.
+
+This establishes an important provenance rule: **a frame correction may qualify historical conclusions, but it may not silently jump over the frame that produced them.**
+
+The checked API is deliberately small. It does not yet attempt to automatically invalidate every downstream conclusion because affected_conclusions are still identifiers rather than a typed dependency graph. That remains the next architectural boundary.
+
+## Research update
+
+Recent 2026 provenance work independently reinforces the same direction: provenance should carry epistemic stance and disagreement without collapsing distinct attributed claims into one factual layer, while work on frame uncertainty emphasizes that variables outside a chosen specification can be structurally invisible rather than merely low-confidence. See the research notes in the PR for the external references.
+
 ## Relationship to existing GIS
 
 This proposal complements, rather than replaces:
