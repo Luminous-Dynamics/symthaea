@@ -24,6 +24,15 @@ pub fn next_telemetry_session(current: &mut u64) -> Option<TelemetrySessionId> {
     Some(TelemetrySessionId(next))
 }
 
+/// Allocates a globally unique event sequence without wrapping or reusing IDs.
+/// `None` means the identity space is exhausted and callers must suppress new
+/// events rather than publish a colliding identity.
+pub fn next_event_sequence(current: &mut u64) -> Option<u64> {
+    let next = current.checked_add(1)?;
+    *current = next;
+    Some(next)
+}
+
 /// Returns whether a callback still belongs to the currently authoritative
 /// telemetry session.
 pub const fn telemetry_session_is_current(
