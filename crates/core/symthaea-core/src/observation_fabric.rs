@@ -784,6 +784,143 @@ impl IndependenceVerificationReceipt {
     }
 }
 
+
+/// Standards-aware, crypto-agnostic envelope for externally attesting an
+/// independence verification receipt.
+///
+/// The core owns the exact receipt commitment and the semantic boundary; an
+/// external adapter owns issuer/key trust, cryptographic verification, and
+/// credential semantics. The envelope therefore never turns a valid proof
+/// into a claim about substantive truth.
+///
+/// The field names intentionally mirror common proof-envelope concepts
+/// (purpose, verification method, cryptographic suite, creation/expiry,
+/// domain, and challenge) without claiming conformance to any particular
+/// external proof format.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReceiptAttestationEnvelope {
+    /// Fingerprint of the exact canonical receipt being attested.
+    pub receipt_fingerprint: String,
+    /// Verifier contract version that produced the receipt.
+    pub verifier_version: String,
+    /// Provenance scope fingerprint committed by the receipt.
+    pub examined_scope_fingerprint: String,
+    /// Opaque identity of the attester/issuer.
+    pub attester_id: String,
+    /// Purpose for which the proof was created; not a truth assertion.
+    pub proof_purpose: String,
+    /// Attestation creation time, expressed as Unix nanoseconds.
+    pub created_at_unix_ns: i128,
+    /// Optional expiry boundary, also Unix nanoseconds.
+    pub expires_at_unix_ns: Option<i128>,
+    /// Opaque reference to the external verification method/key.
+    pub verification_method: Option<String>,
+    /// Opaque external cryptographic-suite identifier.
+    pub cryptosuite: Option<String>,
+    /// Optional replay-binding security domain.
+    pub domain: Option<String>,
+    /// Optional verifier-supplied replay challenge.
+    pub challenge: Option<String>,
+    /// Opaque proof bytes owned and interpreted by the external adapter.
+    pub proof: Option<Vec<u8>>,
+}
+
+impl ReceiptAttestationEnvelope {
+    /// Domain separator for the deterministic attestation payload.
+    pub const DOMAIN_SEPARATOR: &'static [u8] =
+        b"symthaea:observation-receipt-attestation:v1\\n";
+
+    /// Build an unsigned envelope from an exact receipt.
+    ///
+    /// The returned value is metadata/commitment material only. It is not an
+    /// authenticated attestation until an external adapter supplies and
+    /// verifies a proof.
+    pub fn from_receipt(
+        receipt: &IndependenceVerificationReceipt,
+        attester_id: impl Into<String>,
+        proof_purpose: impl Into<String>,
+        created_at_unix_ns: i128,
+    ) -> Self {
+        Self {
+            receipt_fingerprint: receipt.fingerprint(),
+            verifier_version: receipt.verifier_version.to_string(),
+            examined_scope_fingerprint: receipt.examined_scope_fingerprint.clone(),
+            attester_id: attester_id.into(),
+            proof_purpose: proof_purpose.into(),
+            created_at_unix_ns,
+            expires_at_unix_ns: None,
+            verification_method: None,
+            cryptosuite: None,
+            domain: None,
+            challenge: None,
+            proof: None,
+        }
+    }
+
+    /// Validate the envelope's structural commitments.
+    ///
+    /// This does not verify the external proof, resolve the attester, or
+    /// establish the truth of the underlying observations.
+    pub fn validate(&self) -> Result<(), ObservationValidationError> {
+        if !is_hex_fingerprint(&self.receipt_fingerprint)
+            || !is_hex_fingerprint(&self.examined_scope_fingerprint)
+            || self.verifier_version.trim().is_empty()
+            || self.attester_id.trim().is_empty()
+            || self.proof_purpose.trim().is_empty()
+            || self.verification_method.as_deref().is_some_and(|v| v.trim().is_empty())
+            || self.cryptosuite.as_deref().is_some_and(|v| v.trim().is_empty())
+            || self.domain.as_deref().is_some_and(|v| v.trim().is_empty())
+            || self.challenge.as_deref().is_some_and(|v| v.trim().is_empty())
+            || matches!(self.expires_at_unix_ns, Some(expiry) if expiry < self.created_at_unix_ns)
+        {
+            return Err(ObservationValidationError::InvalidReceiptAttestationEnvelope);
+        }
+        Ok(())
+    }
+
+    /// Produce the exact payload an external proof adapter should protect.
+    ///
+    /// The proof field is deliberately excluded, matching the detached-proof
+    /// boundary used by common data-integrity systems. The canonical encoding
+    /// is Symthaea-native and is not a claim of JSON-LD/JCS conformance.
+    pub fn canonical_payload_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(Self::DOMAIN_SEPARATOR);
+        write_canonical_string_bytes(&mut bytes, &self.receipt_fingerprint);
+        write_canonical_string_bytes(&mut bytes, &self.verifier_version);
+        write_canonical_string_bytes(&mut bytes, &self.examined_scope_fingerprint);
+        write_canonical_string_bytes(&mut bytes, &self.attester_id);
+        write_canonical_string_bytes(&mut bytes, &self.proof_purpose);
+        bytes.extend_from_slice(&self.created_at_unix_ns.to_be_bytes());
+        write_canonical_string_option_bytes(&mut bytes, self.expires_at_unix_ns.map(|v| v.to_string()).as_deref());
+        write_canonical_string_option_bytes(&mut bytes, self.verification_method.as_deref());
+        write_canonical_string_option_bytes(&mut bytes, self.cryptosuite.as_deref());
+        write_canonical_string_option_bytes(&mut bytes, self.domain.as_deref());
+        write_canonical_string_option_bytes(&mut bytes, self.challenge.as_deref());
+        bytes
+    }
+
+    /// BLAKE3 commitment to the detached attestation payload.
+    pub fn payload_fingerprint(&self) -> String {
+        blake3::hash(&self.canonical_payload_bytes()).to_hex().to_string()
+    }
+}
+
+fn is_hex_fingerprint(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn write_canonical_string_option_bytes(bytes: &mut Vec<u8>, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            bytes.push(1);
+            write_canonical_string_bytes(bytes, value);
+        }
+        None => bytes.push(0),
+    }
+}
+
+
 impl IndependenceAssessment {
     const VERIFIER_VERSION: &'static str = IndependenceVerifierContract::CURRENT.version;
 
@@ -1409,7 +1546,7 @@ pub enum ObservationValidationError {
     #[error("relation edge is duplicated within the closed graph")]
     DuplicateObservationRelation,
     #[error("relation endpoint is not present in the closed graph: {0}")]
-    MissingRelationEndpoint(String),
+    #[error("invalid receipt attestation envelope")]\n    InvalidReceiptAttestationEnvelope,\n    MissingRelationEndpoint(String),
 }
 
 #[cfg(test)]
@@ -1448,6 +1585,33 @@ mod tests {
             asset: Some(AssetRef::blake3(b"frame-bytes")),
             disclosure: DisclosurePolicy::restricted(),
         }
+    }
+
+    #[test]
+    fn receipt_attestation_envelope_is_detached_and_validatable() {
+        let receipt = IndependenceVerificationReceipt::from_assessment(
+            &fixture_assessment(),
+        );
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(
+            &receipt,
+            "attester-1",
+            "https://example.org/purpose/observation-independence",
+            1_700_000_000_000_000_000,
+        );
+        assert_eq!(envelope.validate(), Ok(()));
+        assert_eq!(envelope.receipt_fingerprint, receipt.fingerprint());
+        assert_eq!(envelope.examined_scope_fingerprint, receipt.examined_scope_fingerprint);
+        assert_eq!(envelope.proof, None);
+
+        let payload = envelope.canonical_payload_bytes();
+        assert!(payload.starts_with(ReceiptAttestationEnvelope::DOMAIN_SEPARATOR));
+        assert_eq!(envelope.payload_fingerprint().len(), 64);
+
+        envelope.expires_at_unix_ns = Some(1_699_999_999_000_000_000);
+        assert_eq!(
+            envelope.validate(),
+            Err(ObservationValidationError::InvalidReceiptAttestationEnvelope)
+        );
     }
 
     #[test]
