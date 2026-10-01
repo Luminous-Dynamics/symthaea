@@ -824,7 +824,7 @@ mod tests {
             allow_new_observation: true,
             ..AdmissionPolicy::default()
         };
-        let result = SemanticResult {
+        let result = crate::semantic_admission::SemanticResult {
             logical_delivery_id: delivery.logical_delivery_id,
             observation: observation.key.clone(),
         };
