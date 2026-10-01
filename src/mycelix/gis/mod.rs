@@ -142,7 +142,7 @@ impl GracefulIgnoranceSystem {
             domain,
             eig,
             detected_at: SystemTime::now(),
-            frame: EpistemicFrame::default(),
+            frame,
         }
     }
 
@@ -626,13 +626,26 @@ mod tests {
     }
 
     #[test]
-    fn test_frame_revision_does_not_itself_imply_divergence() {
+    fn test_frame_revision_is_provenance_divergence() {
         let left = EpistemicFrame::default();
         let mut right = left.clone();
         assert!(!left.divergence_from(&right).is_divergent());
 
         right.version = 2;
-        assert!(!left.divergence_from(&right).is_divergent());
+        assert!(left.divergence_from(&right).is_divergent());
+        assert!(left.divergence_from(&right).version_changed);
+
+        let revision = EpistemicFrameRevision::new(
+            &left,
+            &right,
+            "newly observed entity",
+            Some("previously unrepresented institution".to_string()),
+            "expanded social ontology",
+            vec!["claim:C1".to_string(), "claim:C2".to_string()],
+        );
+        assert_eq!(revision.prior_frame, "gis-default@1");
+        assert_eq!(revision.revised_frame, "gis-default@2");
+        assert_eq!(revision.affected_conclusions.len(), 2);
 
         right.ontology_id = "alternative-ontology-v1".to_string();
         let divergence = left.divergence_from(&right);
