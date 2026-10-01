@@ -306,7 +306,7 @@ jobs:
           cells = evidence["cells"]
           assert evidence["schema_version"] == 1
           assert evidence["task"] == "hdc_associative_cleanup_key_value"
-          assert len(cells) == len(expected_dimensions) * len(expected_loads) * len(expected_noise)
+          assert len(cells) == len(expected_dimensions) * len(expected_loads) * len(expected_noise)\n          assert evidence["max_solver_iterations"] == 12
           assert [c["resolution"] for c in cells[::len(expected_loads) * len(expected_noise)]] == expected_dimensions
           assert sorted({c["memory_load"] for c in cells}) == expected_loads
           assert sorted({round(c["query_noise_weight"], 2) for c in cells}) == expected_noise
