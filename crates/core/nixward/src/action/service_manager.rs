@@ -180,12 +180,17 @@ impl ServiceManager {
             )))
     }
 
-    /// Check if a service is running (read-only, runs directly).
+    /// Check if a service is active through the single governed observation path.
+    ///
+    /// This remains a compatibility/diagnostic boolean and is not governed
+    /// pre-state evidence. Unknown or malformed observations now fail closed
+    /// instead of collapsing to false.
     pub fn is_active(service: &str) -> Result<bool, std::io::Error> {
-        let output = Command::new("systemctl")
-            .args(["is-active", "--quiet", &Self::normalize_name(service)])
-            .status()?;
-        Ok(output.success())
+        let observed = Self::observed_state(service)?;
+        Ok(matches!(
+            observed.active_state(),
+            super::service_state::ServiceActiveStateV1::Active
+        ))
     }
 
     /// Ensure service name ends with ".service" if no suffix given.
