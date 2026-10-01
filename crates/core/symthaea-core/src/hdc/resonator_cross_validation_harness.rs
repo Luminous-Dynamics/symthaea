@@ -302,7 +302,7 @@ fn run_cell(
                         .expect("value dimensions should match");
                 }
 
-                let constraint = Constraint::new(keys[target].values.clone(), memory.values.clone());
+                let constraint = Constraint::new(query.values.clone(), memory.values.clone());
                 let solutions = network
                     .solve_seeded(&[constraint], Some(max_solver_iterations), solver_seed)
                     .expect("single-constraint resonator solve should succeed");
