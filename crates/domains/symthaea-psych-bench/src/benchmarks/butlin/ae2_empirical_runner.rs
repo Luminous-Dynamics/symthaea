@@ -650,13 +650,20 @@ pub fn run_ae2_empirical() -> Ae2EmpiricalRun {
         classification.benchmark_degraded,
     );
 
-    // Canonical identity fingerprint, via the shared `symthaea-evidence-plane`
-    // stable identity contract instead of a locally hand-rolled
-    // `DefaultHasher`-over-format! computation. No existing test asserts a
-    // specific hash *value* (only presence/shape), so this is a safe
-    // behavior-preserving substitution -- the fingerprint's exact bytes
-    // change, but nothing depends on that.
-    let config_hash = stable_config_hash(&(target_lever_name, sham_lever_name, functional_benchmark));
+    // Stable identity of the declared runner recipe, not a whole-run identity:
+    // include the selected levers, functional proxy, sampling window, stimulus
+    // set, and fixed loop-construction profile. The actual code commit, runtime
+    // environment, and produced artifact remain separate provenance layers.
+    // The legacy field name is retained for report compatibility.
+    let config_hash = stable_config_hash(&(
+        target_lever_name,
+        sham_lever_name,
+        functional_benchmark,
+        NUM_CYCLES,
+        WARMUP,
+        STIMULI,
+        "standard-profile-async-training-disabled-v1",
+    ));
     // The runner has one fixed genesis phrase rather than a numeric RNG seed.
     // Give that material an explicit stable identity so `seed_identity` cannot
     // be mistaken for evidence of replicated seed sampling.
@@ -731,7 +738,14 @@ mod tests {
              changes, claim_scope_note()'s text needs to change with it"
         );
 
-        assert_eq!(run.config_identity_schema, symthaea_evidence_plane::STABLE_CONFIG_IDENTITY_SCHEMA);\n        assert!(run.seed_identity.starts_with("genesis-blake3:v1:"));\n\n        println!("\n=== AE-2 first empirical run: full evidence bundle ===\n{run:#?}\n");
+        assert_eq!(
+            run.config_identity_schema,
+            symthaea_evidence_plane::STABLE_CONFIG_IDENTITY_SCHEMA
+        );
+        assert_eq!(run.config_hash.len(), 64, "BLAKE3 hex identity must be 64 characters");
+        assert!(run.seed_identity.starts_with("genesis-blake3:v1:"));
+
+        println!("\n=== AE-2 first empirical run: full evidence bundle ===\n{run:#?}\n");
         println!("=== Outcome: {:?} ===", run.outcome);
         println!("=== Claim scope: {} ===", run.claim_scope_note());
         println!(
