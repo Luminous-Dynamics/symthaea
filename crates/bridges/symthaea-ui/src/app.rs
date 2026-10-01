@@ -200,6 +200,10 @@ pub fn App() -> impl IntoView {
     // Request generations prevent a response from an obsolete gateway/session
     // from mutating the current conversation or clearing a newer send state.
     let request_generation = Rc::new(Cell::new(0_u64));
+    // Status responses cross an async boundary too. Keep a generation so a
+    // response from the previous gateway cannot overwrite the new gateway's
+    // liveness state if it resolves during a session transition.
+    let status_generation = Rc::new(Cell::new(0_u64));
     let daemon_status = RwSignal::new(Option::<Value>::None);
     let events = RwSignal::new(Vec::<CognitiveEvent>::new());
     // Pauses the presentation of the event stream, not the daemon itself.
@@ -383,10 +387,22 @@ pub fn App() -> impl IntoView {
         // Track the gateway so changing it starts a fresh status loop; the
         // previous owner-scoped loop is cancelled on effect cleanup.
         let _gateway_generation = gateway.get();
+        let status_session = {
+            let next = status_generation.get().saturating_add(1);
+            status_generation.set(next);
+            next
+        };
+        let status_authority = Rc::clone(&status_generation);
         spawn_local_scoped_with_cancellation(async move {
             loop {
                 let gw = gateway.get_untracked();
-                match api::send_simple(&gw, "status").await {
+                let response = api::send_simple(&gw, "status").await;
+                // Owner cancellation handles normal teardown; this generation
+                // check also covers a response that races the gateway change.
+                if status_authority.get() != status_session {
+                    return;
+                }
+                match response {
                     Ok(resp) if resp["type"] != "error" => daemon_status.set(Some(resp)),
                     _ => daemon_status.set(None),
                 }
@@ -781,6 +797,18 @@ mod tests {
         generation = second;
         assert_eq!(generation, 2);
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn status_generation_rejects_previous_gateway_session() {
+        let mut generation = 0_u64;
+        let first = generation.saturating_add(1);
+        generation = first;
+        let second = generation.saturating_add(1);
+        generation = second;
+        assert_ne!(first, second);
+        assert_ne!(generation, first);
+        assert_eq!(generation, second);
     }
 
     #[test]
