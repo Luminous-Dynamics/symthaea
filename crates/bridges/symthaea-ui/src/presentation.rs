@@ -1004,6 +1004,31 @@ mod tests {
     }
 
     #[test]
+    fn transition_priority_coalesces_explicit_signals_deterministically() {
+        let previous = state(true, false, 0.8, 0.3, 0.1);
+        let current = state(true, true, 0.8, 0.5, 0.1);
+        let event = event_between(Some(previous), current, 1, 42, true, true).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::ProcessingStarted);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::PresenceTransition);
+    }
+
+    #[test]
+    fn explicit_signal_priority_is_surprise_before_workspace_broadcast() {
+        let state = state(true, false, 0.8, 0.3, 0.1);
+        let event = event_between(Some(state), state, 1, 42, true, true).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::SurpriseDetected);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::ExplicitSurpriseSignal);
+    }
+
+    #[test]
+    fn workspace_broadcast_is_reached_only_when_no_higher_signal_exists() {
+        let state = state(true, false, 0.8, 0.3, 0.1);
+        let event = event_between(Some(state), state, 1, 42, false, true).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::WorkspaceBroadcast);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::ExplicitWorkspaceSignal);
+    }
+
+    #[test]
     fn quiet_cycle_creates_no_event() {
         let previous = state(true, false, 0.8, 0.3, 0.1);
         let current = state(true, false, 0.8, 0.3, 0.1);
