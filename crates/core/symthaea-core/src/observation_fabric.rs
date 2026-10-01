@@ -825,7 +825,19 @@ pub struct ReceiptAttestationEnvelope {
     pub proof: Option<Vec<u8>>,
 }
 
-/// Time-relative validity of a detached receipt attestation envelope.\n///\n/// This is deliberately trust-neutral: it evaluates only the envelope's\n/// declared creation/expiry timestamps. It does not validate cryptographic\n/// proof material, attester identity, revocation, or the underlying receipt.\n#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]\npub enum ReceiptAttestationTemporalStatus {\n    NotYetValid,\n    Valid,\n    Expired,\n}\n\nimpl ReceiptAttestationEnvelope {
+/// Time-relative validity of a detached receipt attestation envelope.
+///
+/// This is deliberately trust-neutral: it evaluates only the envelope's
+/// declared creation/expiry timestamps. It does not validate cryptographic
+/// proof material, attester identity, revocation, or the underlying receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReceiptAttestationTemporalStatus {
+    NotYetValid,
+    Valid,
+    Expired,
+}
+
+impl ReceiptAttestationEnvelope {
     /// Domain separator for the deterministic attestation payload.
     pub const DOMAIN_SEPARATOR: &'static [u8] =
         b"symthaea:observation-receipt-attestation:v1\\n";
@@ -868,6 +880,26 @@ pub struct ReceiptAttestationEnvelope {
         self.receipt_fingerprint == receipt.fingerprint()
             && self.verifier_version == receipt.verifier_version
             && self.examined_scope_fingerprint == receipt.examined_scope_fingerprint
+    }
+
+    /// Evaluate the declared temporal validity at an explicit Unix-nanosecond instant.
+    ///
+    /// Expiry is an exclusive boundary: an envelope is expired at the
+    /// declared expiry instant. This method intentionally does not consult
+    /// wall-clock time, revocation registries, or external trust policy.
+    pub fn temporal_status_at(&self, now_unix_ns: i128) -> ReceiptAttestationTemporalStatus {
+        if now_unix_ns < self.created_at_unix_ns {
+            ReceiptAttestationTemporalStatus::NotYetValid
+        } else if self.expires_at_unix_ns.is_some_and(|expires_at| now_unix_ns >= expires_at) {
+            ReceiptAttestationTemporalStatus::Expired
+        } else {
+            ReceiptAttestationTemporalStatus::Valid
+        }
+    }
+
+    /// Return whether the envelope is expired at an explicit instant.
+    pub fn is_expired_at(&self, now_unix_ns: i128) -> bool {
+        matches!(self.temporal_status_at(now_unix_ns), ReceiptAttestationTemporalStatus::Expired)
     }
 
     /// Validate the envelope's structural commitments.
@@ -1610,6 +1642,58 @@ mod tests {
             asset: Some(AssetRef::blake3(b"frame-bytes")),
             disclosure: DisclosurePolicy::restricted(),
         }
+    }
+
+    fn fixture_receipt() -> IndependenceVerificationReceipt {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph { observations: vec![fixture(), second], relations: vec![] };
+        let assessment = graph.assess_independence_detailed("obs-001", "obs-002").expect("assessment");
+        IndependenceVerificationReceipt::from_assessment(&assessment)
+    }
+
+    #[test]
+    fn receipt_attestation_temporal_status_is_deterministic() {
+        let receipt = fixture_receipt();
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        envelope.expires_at_unix_ns = Some(200);
+        assert_eq!(envelope.temporal_status_at(99), ReceiptAttestationTemporalStatus::NotYetValid);
+        assert_eq!(envelope.temporal_status_at(100), ReceiptAttestationTemporalStatus::Valid);
+        assert_eq!(envelope.temporal_status_at(199), ReceiptAttestationTemporalStatus::Valid);
+        assert_eq!(envelope.temporal_status_at(200), ReceiptAttestationTemporalStatus::Expired);
+        assert!(envelope.is_expired_at(200));
+        envelope.expires_at_unix_ns = None;
+        assert_eq!(envelope.temporal_status_at(i128::MAX), ReceiptAttestationTemporalStatus::Valid);
+    }
+
+    #[test]
+    fn receipt_attestation_rejects_zero_duration_expiry() {
+        let receipt = fixture_receipt();
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        envelope.expires_at_unix_ns = Some(100);
+        assert_eq!(envelope.validate(), Err(ObservationValidationError::InvalidReceiptAttestationEnvelope));
+    }
+
+    #[test]
+    fn receipt_attestation_proof_is_detached_from_payload_commitment() {
+        let receipt = fixture_receipt();
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        let payload = envelope.payload_fingerprint();
+        envelope.proof = Some(vec![1, 2, 3, 4]);
+        assert_eq!(payload, envelope.payload_fingerprint());
+    }
+
+    #[test]
+    fn receipt_attestation_commitment_rejects_scope_and_version_mutation() {
+        let receipt = fixture_receipt();
+        let envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        let mut changed_scope = envelope.clone();
+        changed_scope.examined_scope_fingerprint = "0".repeat(64);
+        assert!(!changed_scope.verify_against_receipt(&receipt));
+        let mut changed_version = envelope;
+        changed_version.verifier_version = "observation-fabric-independence-v999".into();
+        assert!(!changed_version.verify_against_receipt(&receipt));
     }
 
     #[test]
