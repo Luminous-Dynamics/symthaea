@@ -302,6 +302,16 @@ impl FederatedClaim {
         let mut dependencies: Vec<_> = unresolved.into_iter().collect();
         dependencies.sort();
         dependencies.dedup();
+
+        let declared: std::collections::BTreeSet<_> =
+            self.dependency_bindings().into_iter().collect();
+        if let Some(undeclared) = dependencies.iter().find(|dependency| !declared.contains(*dependency)) {
+            return FederationValidationOutcome::Invalid(format!(
+                "unresolved dependency is not declared: {}",
+                undeclared.reference()
+            ));
+        }
+
         if dependencies.is_empty() {
             FederationValidationOutcome::Valid
         } else {
@@ -732,6 +742,31 @@ mod adversarial_contract_tests {
                 "frontier:1".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn validation_outcome_rejects_undeclared_unresolved_dependencies() {
+        let claim = claim();
+        assert_eq!(
+            claim.validation_outcome([FederationDependency::Frontier("frontier:missing".into())]),
+            FederationValidationOutcome::Invalid(
+                "unresolved dependency is not declared: frontier:missing".into()
+            )
+        );
+    }
+
+    #[test]
+    fn receipt_and_frontier_mutations_change_replay_identity() {
+        let original = claim();
+
+        let mut changed_receipt = original.clone();
+        changed_receipt.admission_receipt.admission_event = "admission:event-2".into();
+        assert_ne!(original.replay_key(), changed_receipt.replay_key());
+
+        let mut changed_frontier = original.clone();
+        changed_frontier.frontier_ref = Some("frontier:2".into());
+        changed_frontier.admission_receipt.frontier_ref = Some("frontier:2".into());
+        assert_ne!(original.replay_key(), changed_frontier.replay_key());
     }
 
     #[test]
