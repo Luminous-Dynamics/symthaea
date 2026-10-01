@@ -247,18 +247,32 @@ impl KnowledgePersistence {
         if !self.is_configured() { return Err("No database path configured".into()); }
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
-        conn.execute_batch("BEGIN TRANSACTION").map_err(|e| e.to_string())?;
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Begin provenance transaction: {e}"))?;
         let mut count = 0;
         for relation in relations {
             let relation_for_validation = ProvenanceRelation::from(relation.clone());
-            relation_for_validation.validate().map_err(|e| format!("Invalid provenance relation: {e}"))?;
-            let inserted = conn.execute(
-                "INSERT OR IGNORE INTO knowledge_provenance_relations (source_memory_id, target_memory_id, kind, created_at) VALUES (?1, ?2, ?3, ?4)",
-                rusqlite::params![relation.source_memory_id, relation.target_memory_id, format!("{:?}", relation.kind), relation.created_at],
-            ).map_err(|e| e.to_string())?;
+            relation_for_validation
+                .validate()
+                .map_err(|e| format!("Invalid provenance relation: {e}"))?;
+            let inserted = tx
+                .execute(
+                    "INSERT OR IGNORE INTO knowledge_provenance_relations
+                     (source_memory_id, target_memory_id, kind, created_at)
+                     VALUES (?1, ?2, ?3, ?4)",
+                    rusqlite::params![
+                        relation.source_memory_id,
+                        relation.target_memory_id,
+                        format!("{:?}", relation.kind),
+                        relation.created_at
+                    ],
+                )
+                .map_err(|e| e.to_string())?;
             count += inserted;
         }
-        conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+        tx.commit()
+            .map_err(|e| format!("Commit provenance transaction: {e}"))?;
         self.total_saved += count as u64;
         Ok(count)
     }
@@ -710,6 +724,39 @@ mod tests {
         let loaded = p.load_provenance_relations().unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].kind, ProvenanceRelationKind::DerivedFrom);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_provenance_relations_rolls_back_batch_on_validation_error() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_provenance_transaction_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let valid = ProvenanceRelationRecord {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let invalid = ProvenanceRelationRecord {
+            source_memory_id: " ".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:3".into(),
+        };
+
+        let err = p
+            .save_provenance_relations(&[valid, invalid])
+            .unwrap_err();
+        assert!(err.contains("Invalid provenance relation"));
+        assert_eq!(p.total_saved(), 0);
+        assert!(p.load_provenance_relations().unwrap().is_empty());
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
