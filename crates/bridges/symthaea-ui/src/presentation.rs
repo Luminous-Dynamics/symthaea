@@ -868,6 +868,58 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn disconnected_to_degraded_is_connection_recovery_not_cognitive_processing() {
+        let disconnected = CognitiveState {
+            presence: PresenceState::Disconnected,
+            mode: CognitiveMode::Uncertain,
+            ..state(false, false, 0.0, 0.0, 0.1)
+        };
+        let degraded = CognitiveState {
+            presence: PresenceState::Degraded,
+            mode: CognitiveMode::Uncertain,
+            ..state(true, false, 0.8, 0.3, 0.1)
+        };
+
+        let event = event_between(Some(disconnected), degraded, 1, 7, true, true)
+            .expect("connection recovery should be represented");
+
+        assert_eq!(event.kind, CognitiveEventKind::Connected);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::PresenceTransition);
+    }
+
+    #[test]
+    fn disconnected_to_processing_is_processing_start_with_explicit_observed_presence() {
+        let disconnected = CognitiveState {
+            presence: PresenceState::Disconnected,
+            mode: CognitiveMode::Uncertain,
+            ..state(false, false, 0.0, 0.0, 0.1)
+        };
+        let processing = state(true, true, 0.8, 0.5, 0.1);
+
+        let event = event_between(Some(disconnected), processing, 2, 8, true, true)
+            .expect("observed processing should be represented");
+
+        assert_eq!(event.kind, CognitiveEventKind::ProcessingStarted);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::PresenceTransition);
+    }
+
+    #[test]
+    fn degraded_to_processing_is_processing_start_when_presence_becomes_processing() {
+        let degraded = CognitiveState {
+            presence: PresenceState::Degraded,
+            mode: CognitiveMode::Uncertain,
+            ..state(true, false, 0.8, 0.3, 0.1)
+        };
+        let processing = state(true, true, 0.8, 0.5, 0.1);
+
+        let event = event_between(Some(degraded), processing, 3, 9, false, false)
+            .expect("observed processing should be represented");
+
+        assert_eq!(event.kind, CognitiveEventKind::ProcessingStarted);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::PresenceTransition);
+    }
+
     fn presence_transition_contract_is_conservative() {
         let available = state(true, false, 0.8, 0.3, 0.1);
         let processing = state(true, true, 0.8, 0.5, 0.1);
