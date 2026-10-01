@@ -56,7 +56,9 @@ pub async fn send_simple(gateway: &str, request_type: &str) -> Result<Value, Str
 /// `CycleMetadata` JSON payload received. Runs until the socket closes;
 /// callers should scope this future to the component owner with
 /// `leptos::task::spawn_local_scoped_with_cancellation` so the WebSocket
-/// cannot outlive the UI owner.
+/// cannot outlive the UI owner. The presentation layer should additionally
+/// gate callbacks by telemetry-session generation when multiple streams can
+/// overlap during reconnects or gateway changes.
 pub async fn stream_telemetry(
     gateway: &str,
     mut on_message: impl FnMut(Value),
