@@ -317,13 +317,21 @@ impl KnowledgeManager {
                         match graph.import_provenance_relation(record.into()) {
                             Ok(true) => loaded_relations += 1,
                             Ok(false) => {},
-                            Err(error) => tracing::warn!(%error, "Knowledge: rejected persisted provenance relation"),
+                            Err(error) => {
+                                persistence_health.provenance_rejections += 1;
+                                tracing::warn!(
+                                    %error,
+                                    rejected = persistence_health.provenance_rejections,
+                                    "Knowledge: rejected persisted provenance relation"
+                                );
+                            }
                         }
                     }
                     if loaded_relations > 0 {
                         tracing::info!(count = loaded_relations, "Knowledge: loaded provenance relations from SQLite");
                     }
                     let report = graph.validate_provenance();
+                    persistence_health.provenance_snapshot_conforms = report.conforms;
                     if report.conforms {
                         tracing::debug!(
                             relation_count = report.relation_count,
@@ -1385,7 +1393,13 @@ impl KnowledgeManager {
 pub struct KnowledgePersistenceHealth {
     pub configured: bool,
     pub facts_loaded: bool,
+    /// SQLite rows were decoded successfully. This does not imply every row was
+    /// admitted into the graph; see provenance_rejections.
     pub provenance_loaded: bool,
+    /// Number of decoded provenance rows rejected by graph admission during restore.
+    pub provenance_rejections: usize,
+    /// Whether the post-restore provenance graph satisfies its structural validator.
+    pub provenance_snapshot_conforms: bool,
     pub causal_loaded: bool,
     pub ontology_loaded: bool,
 }
@@ -1394,20 +1408,27 @@ impl KnowledgePersistenceHealth {
     pub fn is_degraded(self) -> bool {
         self.configured
             && !(self.facts_loaded
-            && self.provenance_loaded
-            && self.causal_loaded
-            && self.ontology_loaded)
+                && self.provenance_loaded
+                && self.provenance_rejections == 0
+                && self.provenance_snapshot_conforms
+                && self.causal_loaded
+                && self.ontology_loaded)
     }
 
     pub fn failed_domains(self) -> Vec<&'static str> {
         [
-            ("facts", self.facts_loaded),
-            ("provenance", self.provenance_loaded),
-            ("causal", self.causal_loaded),
-            ("ontology", self.ontology_loaded),
+            ("facts", !self.facts_loaded),
+            (
+                "provenance",
+                !self.provenance_loaded
+                    || self.provenance_rejections > 0
+                    || !self.provenance_snapshot_conforms,
+            ),
+            ("causal", !self.causal_loaded),
+            ("ontology", !self.ontology_loaded),
         ]
         .into_iter()
-        .filter_map(|(name, loaded)| (!loaded).then_some(name))
+        .filter_map(|(name, failed)| failed.then_some(name))
         .collect()
     }
 }
@@ -1449,12 +1470,76 @@ mod tests {
             configured: true,
             facts_loaded: true,
             provenance_loaded: false,
+            provenance_rejections: 0,
+            provenance_snapshot_conforms: false,
             causal_loaded: true,
             ontology_loaded: false,
         };
 
         assert!(health.is_degraded());
         assert_eq!(health.failed_domains(), vec!["provenance", "ontology"]);
+    }
+
+    #[test]
+    fn test_persistence_health_reports_provenance_rejections_as_degraded() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            provenance_loaded: true,
+            provenance_rejections: 1,
+            provenance_snapshot_conforms: true,
+            causal_loaded: true,
+            ontology_loaded: true,
+        };
+
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["provenance"]);
+    }
+
+    #[test]
+    fn test_persistence_restore_records_rejected_provenance_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_provenance_rejection_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                INSERT INTO knowledge_provenance_relations
+                    (source_memory_id, target_memory_id, kind, created_at)
+                VALUES ('a', 'b', 'DerivedFrom', 'cycle:1');
+                INSERT INTO knowledge_provenance_relations
+                    (source_memory_id, target_memory_id, kind, created_at)
+                VALUES ('b', 'a', 'DerivedFrom', 'cycle:2');",
+            )
+            .unwrap();
+        }
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mgr = KnowledgeManager::new(config);
+        let health = mgr.persistence_health();
+
+        assert!(health.provenance_loaded);
+        assert_eq!(health.provenance_rejections, 1);
+        assert!(health.provenance_snapshot_conforms);
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["provenance"]);
+        assert_eq!(mgr.graph().provenance_relations().len(), 1);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
