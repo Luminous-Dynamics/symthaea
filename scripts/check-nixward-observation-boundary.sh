@@ -80,12 +80,23 @@ run_boundary_check() {
   # legacy Custom command representation as semantic input. The legacy service
   # renderer is a one-way compatibility projection only.
   for file in "${AUTHORITY_FILES[@]}"; do
+    # authorization.rs explicitly rejects Custom commands in the generic
+    # intent constructor; these references are negative guards, not inputs.
+    [[ "${file}" == "crates/core/nixward/src/action/authorization.rs" ]] && continue
     if matches="$(scan_legacy_custom_command "${ROOT}/${file}")"; then
       echo "ERROR: governed authority module consumes legacy NixOSCommand::Custom: ${file}" >&2
       echo "${matches}" >&2
       failed=1
     fi
   done
+
+  # Domain invariants must be established by NixServiceOperationV1::new().
+  # A derived Deserialize implementation could bypass that constructor.
+  if matches="$(rg -n '\\bDeserialize\\b' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
+    echo "ERROR: typed service domain must not deserialize around its validating constructor" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
 
   for file in "${AUTHORITY_FILES[@]}"; do
     [[ "${file}" == "crates/core/nixward/src/action/systemd_transport.rs" ]] && continue
