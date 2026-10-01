@@ -105,6 +105,14 @@ mod tests {
         assert_eq!(bare.digest().unwrap(), explicit.digest().unwrap());
     }
     #[test]
+    fn digest_rejects_invalid_internal_domain_state() {
+        let mut op = NixServiceOperationV1::new("nginx", NixServiceOperationKindV1::Start).unwrap();
+        op.unit = "../nginx.service".to_string();
+        assert_eq!(op.validate_shape().unwrap_err(), NixServiceOperationErrorV1::PathLikeUnit);
+        assert_eq!(op.digest().unwrap_err(), NixServiceOperationErrorV1::PathLikeUnit);
+    }
+
+    #[test]
     fn operation_is_domain_data_not_a_command() {
         let op = NixServiceOperationV1::new("nginx", NixServiceOperationKindV1::Start).unwrap();
         let encoded = serde_json::to_string(&op).unwrap();
