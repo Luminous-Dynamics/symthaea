@@ -561,7 +561,7 @@ impl ResonatorNetwork {
             let mut all_converged = !unknowns.is_empty();
             let mut converged_flags = vec![false; unknowns.len()];
 
-            for (idx, name) in unknowns.iter().enumerate {
+            for (idx, name) in unknowns.iter().enumerate() {
                 let name = name.to_string();
                 let update = updates
                     .get(&name)
