@@ -240,10 +240,17 @@ pub fn App() -> impl IntoView {
     // the generation guard additionally makes stale callbacks harmless if
     // they race with a reconnect or gateway change.
     let telemetry_generation = Rc::new(Cell::new(0_u64));
+    // Event identity spans telemetry sessions because the retained timeline
+    // survives reconnects and gateway changes. Resetting this counter inside
+    // each WebSocket task would allow old and new events to share a key.
+    let event_sequence = Rc::new(Cell::new(0_u64));
 
     Effect::new(move |_| {
         let gw = gateway.get();
         ws_connected.set(false);
+        // Cycle identifiers are daemon-local; do not carry the previous
+        // session's cycle into a new session that has not emitted telemetry.
+        last_cycle.set(0);
         let session = {
             let mut generation = telemetry_generation.get();
             let session = next_telemetry_session(&mut generation);
@@ -253,12 +260,11 @@ pub fn App() -> impl IntoView {
         let telemetry_callback_generation = Rc::clone(&telemetry_generation);
         let connected_callback_generation = Rc::clone(&telemetry_generation);
         let disconnect_generation = Rc::clone(&telemetry_generation);
+        let telemetry_sequence = Rc::clone(&event_sequence);
+        let connected_sequence = Rc::clone(&event_sequence);
+        let disconnect_sequence = Rc::clone(&event_sequence);
         spawn_local_scoped_with_cancellation(async move {
             let mut previous_state: Option<CognitiveState> = None;
-            let event_sequence = Rc::new(Cell::new(0_u64));
-            let telemetry_sequence = Rc::clone(&event_sequence);
-            let connected_sequence = Rc::clone(&event_sequence);
-            let disconnect_sequence = Rc::clone(&event_sequence);
             let connected = api::stream_telemetry(
                 &gw,
                 move |payload| {
