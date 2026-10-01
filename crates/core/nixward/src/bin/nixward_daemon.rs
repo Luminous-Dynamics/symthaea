@@ -1054,10 +1054,20 @@ impl DaemonState {
                                         }
                                     }
                                 },
-                                _ => NixOSCommand::Custom {
-                                    command: "systemctl".into(),
-                                    args: vec!["restart".into(), target_name_clone.clone()],
-                                    safety_level: SafetyLevel::SystemModify,
+                                // Only explicit service operations may reach systemctl.
+                                // Package, configuration, update, and arbitrary custom
+                                // categories have different semantics; fail closed rather
+                                // than silently translating them into a service restart.
+                                ActionCategory::Install
+                                | ActionCategory::Remove
+                                | ActionCategory::Configure
+                                | ActionCategory::Update
+                                | ActionCategory::Custom(_) => {
+                                    eprintln!(
+                                        "nixward-daemon: no supported command mapping for action category {:?}; refusing implicit service operation",
+                                        best_action.action
+                                    );
+                                    return (free_energy, None);
                                 },
                             };
                             let (bin, args) = default_cmd.to_command();
