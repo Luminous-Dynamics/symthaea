@@ -38,6 +38,79 @@ pub enum ReceiptAttestationVerificationOutcome {
     DomainMismatch,
     ChallengeMismatch,
     InvalidSignature,
+    VerificationMethodUnavailable,
+    VerificationMethodRevoked,
+    VerificationMethodExpired,
+    ProofPurposeUnauthorized,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VerificationMethodStatus {
+    Active,
+    Revoked,
+    Expired,
+    Unknown,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedVerificationMethod {
+    pub verification_method: String,
+    pub verifying_key: VerifyingKey,
+    pub status: VerificationMethodStatus,
+    pub allowed_proof_purposes: Vec<String>,
+}
+
+impl ResolvedVerificationMethod {
+    pub fn is_authorized_for(&self, proof_purpose: &str) -> bool {
+        self.allowed_proof_purposes
+            .iter()
+            .any(|purpose| purpose == proof_purpose)
+    }
+}
+
+/// Application-supplied verification-method resolver.
+///
+/// Resolution, controller authorization, key lifecycle, and status are deliberately
+/// injected rather than performed through network access in this crate.
+pub trait VerificationMethodResolver {
+    fn resolve(
+        &self,
+        verification_method: &str,
+    ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum VerificationMethodResolutionError {
+    #[error("verification method is unavailable")]
+    Unavailable,
+}
+
+#[derive(Debug, Clone)]
+pub struct InMemoryVerificationMethodResolver {
+    methods: std::collections::BTreeMap<String, ResolvedVerificationMethod>,
+}
+
+impl InMemoryVerificationMethodResolver {
+    pub fn new(methods: impl IntoIterator<Item = ResolvedVerificationMethod>) -> Self {
+        Self {
+            methods: methods
+                .into_iter()
+                .map(|method| (method.verification_method.clone(), method))
+                .collect(),
+        }
+    }
+}
+
+impl VerificationMethodResolver for InMemoryVerificationMethodResolver {
+    fn resolve(
+        &self,
+        verification_method: &str,
+    ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
+        self.methods
+            .get(verification_method)
+            .cloned()
+            .ok_or(VerificationMethodResolutionError::Unavailable)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +163,62 @@ impl Ed25519ReceiptVerifier {
         envelope: &ReceiptAttestationEnvelope,
         receipt: &IndependenceVerificationReceipt,
     ) -> ReceiptAttestationVerificationOutcome {
+        self.verify_with_resolved_key(envelope, receipt, &self.verification_method, &self.verifying_key, None)
+    }
+
+    /// Verify using an application-controlled resolver.
+    ///
+    /// This adds verification-method resolution, lifecycle status, and proof-purpose
+    /// authorization without allowing this crate to fetch or trust remote key
+    /// material implicitly.
+    pub fn verify_with_resolver<R: VerificationMethodResolver>(
+        &self,
+        envelope: &ReceiptAttestationEnvelope,
+        receipt: &IndependenceVerificationReceipt,
+        resolver: &R,
+    ) -> ReceiptAttestationVerificationOutcome {
+        let Some(method) = envelope.verification_method.as_deref() else {
+            return ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable;
+        };
+        let resolved = match resolver.resolve(method) {
+            Ok(resolved) => resolved,
+            Err(_) => return ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+        };
+        if resolved.verification_method != method {
+            return ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable;
+        }
+        match resolved.status {
+            VerificationMethodStatus::Active => {}
+            VerificationMethodStatus::Revoked => {
+                return ReceiptAttestationVerificationOutcome::VerificationMethodRevoked;
+            }
+            VerificationMethodStatus::Expired => {
+                return ReceiptAttestationVerificationOutcome::VerificationMethodExpired;
+            }
+            VerificationMethodStatus::Unknown => {
+                return ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable;
+            }
+        }
+        if !resolved.is_authorized_for(&envelope.proof_purpose) {
+            return ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized;
+        }
+        self.verify_with_resolved_key(
+            envelope,
+            receipt,
+            method,
+            &resolved.verifying_key,
+            Some(true),
+        )
+    }
+
+    fn verify_with_resolved_key(
+        &self,
+        envelope: &ReceiptAttestationEnvelope,
+        receipt: &IndependenceVerificationReceipt,
+        verification_method: &str,
+        verifying_key: &VerifyingKey,
+        _resolved_authorized: Option<bool>,
+    ) -> ReceiptAttestationVerificationOutcome {
         if envelope.validate().is_err() {
             return ReceiptAttestationVerificationOutcome::InvalidEnvelope;
         }
@@ -108,7 +237,7 @@ impl Ed25519ReceiptVerifier {
         if envelope.cryptosuite.as_deref() != Some(CRYPTOSUITE) {
             return ReceiptAttestationVerificationOutcome::CryptosuiteMismatch;
         }
-        if envelope.verification_method.as_deref() != Some(self.verification_method.as_str()) {
+        if envelope.verification_method.as_deref() != Some(verification_method) {
             return ReceiptAttestationVerificationOutcome::VerificationMethodMismatch;
         }
         if let Some(expected) = &self.expected_proof_purpose {
