@@ -231,6 +231,22 @@ impl IgnoranceRecord {
     pub fn latest_frame_revision(&self) -> Option<&EpistemicFrameRevision> {
         self.frame_revisions.last()
     }
+
+    /// Verify that the append-only lineage forms one continuous frame chain.
+    ///
+    /// The first revision must begin at the detection frame, and every later revision
+    /// must begin at the prior revision's revised frame. This makes silent provenance
+    /// jumps detectable without rewriting historical entries.
+    pub fn frame_lineage_is_contiguous(&self) -> bool {
+        let mut expected = self.detection.frame.identity();
+        for revision in &self.frame_revisions {
+            if !revision.follows_frame(&expected) || !revision.changes_frame() {
+                return false;
+            }
+            expected = revision.revised_frame.clone();
+        }
+        true
+    }
 }
 
 /// Status of an ignorance record
@@ -628,6 +644,41 @@ fn harmony_resolution_effort(harmony: Harmony, impact: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_frame_lineage_contiguity() {
+        let mut record = IgnoranceRecord {
+            id: "lineage".to_string(),
+            detection: super::IgnoranceDetection {
+                query: "q".to_string(),
+                ignorance_type: IgnoranceType::KnownUnknown,
+                uncertainty: Uncertainty3D::new(0.2, 0.2, 0.2),
+                domain: Domain::General,
+                eig: 0.5,
+                detected_at: SystemTime::now(),
+                frame: EpistemicFrame::default(),
+            },
+            status: IgnoranceStatus::Active,
+            resolution: None,
+            frame_revisions: Vec::new(),
+            created_at: SystemTime::now(),
+            updated_at: SystemTime::now(),
+        };
+        assert!(record.frame_lineage_is_contiguous());
+
+        let prior = record.detection.frame.clone();
+        let revised = EpistemicFrame { version: 2, ..prior.clone() };
+        record.append_frame_revision(EpistemicFrameRevision::new(
+            &prior, &revised, "revision-1", None, "version bump", vec![],
+        ));
+        assert!(record.frame_lineage_is_contiguous());
+
+        let next = EpistemicFrame { version: 3, ..revised.clone() };
+        record.append_frame_revision(EpistemicFrameRevision::new(
+            &revised, &next, "revision-2", None, "version bump", vec![],
+        ));
+        assert!(record.frame_lineage_is_contiguous());
+    }
 
     #[test]
     fn test_ignorance_resolvability() {
