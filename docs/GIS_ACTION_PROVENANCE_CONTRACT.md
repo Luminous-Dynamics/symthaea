@@ -44,7 +44,7 @@ Typed dependency reasons prevent graph proximity from being treated as semantic 
 
 An ontology-only revision should affect ontology-dependent actions without automatically gating an unrelated causal action. A causal-model revision should affect causal interventions. An evidence-boundary revision should affect actions whose support depends on that boundary.
 
-The implementation now exposes a direct bridge that first asks the conclusion graph to reopen affected claims, then applies typed action dependencies and risk policy. Typed conclusion edges propagate only when their dependency kind is affected by the revision. Legacy untyped conclusion dependencies remain conservative because their semantic basis is unavailable. The action record also exposes a fail-closed prerequisite check for High/Critical actions. The caller must supply the authoritative current conclusion-ID set; action-provided identifiers are not treated as proof that a prerequisite exists. This check is a separate policy operation and must be invoked by the eventual execution boundary.
+The implementation now exposes a direct bridge that first asks the conclusion graph to reopen affected claims, then applies typed action dependencies and risk policy. Typed conclusion edges propagate only when their dependency kind is affected by the revision. Legacy untyped conclusion dependencies remain conservative because their semantic basis is unavailable. The action record exposes fail-closed current-authorization checks for High/Critical actions. Presence of an identifier is not treated as epistemic support: the execution boundary can require every declared prerequisite to be `Active` in the authoritative conclusion store. Reopened, superseded, qualified, or missing conclusions therefore cannot silently authorize a new high-risk decision. Historical `record_decision` remains available for recording already-authorized historical facts; current execution should use the current-authorization path.
 
 ## Historical execution
 
@@ -85,13 +85,14 @@ The current module includes focused tests for high-risk gating, ontology-only ty
 1. ontology-only revision gates ontology-dependent high-risk actions;
 2. causal revision gates causal interventions;
 3. evidence-boundary revision gates evidence-dependent actions;
-4. unrelated actions remain unaffected;
-5. superseded conclusions never resurrect old action authorization;
-6. missing/stale provenance fails closed for high-risk actions;
-7. executed history remains immutable;
-8. cycles terminate deterministically;
-9. re-evaluation is distinct from falsification;
-10. historical authorization is distinct from current authorization.
+4. current high-risk execution rejects missing, reopened, qualified, or superseded prerequisites;
+5. unrelated actions remain unaffected;
+6. superseded conclusions never resurrect old action authorization;
+7. missing/stale provenance fails closed for high-risk actions;
+8. executed history remains immutable;
+9. cycles terminate deterministically;
+10. re-evaluation is distinct from falsification;
+11. historical authorization is distinct from current authorization.
 
 ## Research alignment
 
