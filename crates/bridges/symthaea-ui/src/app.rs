@@ -241,7 +241,7 @@ pub fn App() -> impl IntoView {
             let telemetry_sequence = Rc::clone(&event_sequence);
             let connected_sequence = Rc::clone(&event_sequence);
             let disconnect_sequence = Rc::clone(&event_sequence);
-            api::stream_telemetry(
+            let connected = api::stream_telemetry(
                 &gw,
                 move |payload| {
                     let Some(v) = Vitals::from_json(&payload) else {
@@ -301,16 +301,22 @@ pub fn App() -> impl IntoView {
                 },
             )
             .await;
-            ws_connected.set(false);
-            let sequence = disconnect_sequence.get().saturating_add(1);
-            disconnect_sequence.set(sequence);
-            let cycle = last_cycle.get_untracked();
-            events.update(|items| {
-                push_cognitive_event(
-                    items,
-                    CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Disconnected, cycle),
-                );
-            });
+            if connected {
+                ws_connected.set(false);
+                let sequence = disconnect_sequence.get().saturating_add(1);
+                disconnect_sequence.set(sequence);
+                let cycle = last_cycle.get_untracked();
+                events.update(|items| {
+                    push_cognitive_event(
+                        items,
+                        CognitiveEvent::lifecycle(
+                            sequence,
+                            CognitiveEventKind::Disconnected,
+                            cycle,
+                        ),
+                    );
+                });
+            }
         });
     });
 
