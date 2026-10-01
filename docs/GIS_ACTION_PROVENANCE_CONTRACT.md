@@ -85,7 +85,7 @@ The current module includes focused tests for high-risk gating, ontology-only ty
 1. ontology-only revision gates ontology-dependent high-risk actions;
 2. causal revision gates causal interventions;
 3. evidence-boundary revision gates evidence-dependent actions;
-4. current high-risk execution rejects missing, reopened, qualified, or superseded prerequisites;
+4. current high-risk execution rejects missing, reopened, qualified, superseded, cross-frame, or incompletely witnessed prerequisites;
 5. unrelated actions remain unaffected;
 6. superseded conclusions never resurrect old action authorization;
 7. missing/stale provenance fails closed for high-risk actions;
