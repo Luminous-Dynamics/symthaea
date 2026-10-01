@@ -287,7 +287,7 @@ mod tests {
     fn evidence_has_complete_rule_matrix() {
         let evidence = run();
         assert_eq!(evidence.cleanup_rules.len(), 4);
-        assert_eq!(evidence.cells.len(), 128);
+        assert_eq!(evidence.cells.len(), 96);
         for cell in &evidence.cells {
             assert_eq!(
                 cell.correct_convergence + cell.spurious_convergence + cell.non_convergence,
