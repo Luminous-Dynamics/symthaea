@@ -621,18 +621,23 @@ pub struct AblationResult {
 pub struct ButlinEvidenceBundle {
     pub schema_version: u32,
     pub commit_sha: String,
-    /// Legacy field name retained for serialized compatibility. New producers should
-    /// treat this value as the stable semantic configuration identity.
+    /// Legacy/local configuration fingerprint retained for serialized compatibility.
+    /// This field is intentionally not the stable semantic identity.
     pub config_hash: String,
-    /// Explicit schema for the stable identity carried in `config_hash` by
-    /// current producers. Historical bundles may omit this field.
+    /// Stable semantic configuration identity for current producers.
+    ///
+    /// Historical bundles may omit this field rather than receiving an invented
+    /// identity. Consumers must pair it with config_identity_schema.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_identity: Option<String>,
+    /// Explicit schema for the stable identity carried in config_identity.
+    /// Historical bundles may omit this field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_identity_schema: Option<String>,
     pub seeds: Vec<u64>,
     pub generated_at: String,
     pub ablations: Vec<AblationResult>,
 }
-
 /// Failure modes for `annotate_with_ablation_results` — a strict, provenance-checking merge.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvidenceMergeError {
