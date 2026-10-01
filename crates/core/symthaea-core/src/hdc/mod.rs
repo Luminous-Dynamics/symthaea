@@ -128,6 +128,8 @@ pub mod resonator_temperature_harness;
 pub mod resonator_geometry_temperature_harness;
 /// Deterministic comparison of coupled resonator cleanup nonlinearities.
 pub mod resonator_cleanup_rule_harness;
+/// Research-only GF(2) linear-code algebraic substrate.
+pub mod linear_code;
 
 /// HDC dimensionality configuration for runtime selection
 ///
