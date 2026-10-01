@@ -196,6 +196,28 @@ impl Constraint {
     }
 }
 
+/// Cleanup nonlinearity used to reconstruct factor estimates from the codebook.
+///
+/// The default remains softmax, preserving the production behavior that existed
+/// before cleanup-rule research became configurable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CleanupRule {
+    /// Classical bipolar resonator cleanup with coordinate-wise sign projection.
+    Sign,
+    /// Softmax-weighted codebook reconstruction controlled by temperature.
+    Softmax,
+    /// ReLU-normalized codebook reconstruction without sign projection.
+    Relu,
+    /// ReLU^p-normalized codebook reconstruction without sign projection.
+    Polynomial,
+}
+
+impl Default for CleanupRule {
+    fn default() -> Self {
+        Self::Softmax
+    }
+}
+
 /// Configuration for resonator dynamics
 #[derive(Debug, Clone)]
 pub struct ResonatorConfig {
@@ -213,6 +235,12 @@ pub struct ResonatorConfig {
     pub noise_scale: f32,
     /// Energy threshold for solution acceptance
     pub energy_threshold: f32,
+    /// Cleanup nonlinearity used by codebook reconstruction.
+    pub cleanup_rule: CleanupRule,
+    /// Polynomial degree used when cleanup_rule is Polynomial.
+    pub polynomial_degree: u32,
+    /// Whether to project the reconstructed estimate back to bipolar signs.
+    pub cleanup_sign_projection: bool,
 }
 
 impl Default for ResonatorConfig {
@@ -225,6 +253,9 @@ impl Default for ResonatorConfig {
             max_iterations: 100,
             noise_scale: 0.01,
             energy_threshold: 0.1,
+            cleanup_rule: CleanupRule::Softmax,
+            polynomial_degree: 2,
+            cleanup_sign_projection: true,
         }
     }
 }
@@ -685,36 +716,63 @@ impl ResonatorNetwork {
         Ok(solutions)
     }
 
-    /// Cleanup vector to nearest codebook entry
-    ///
-    /// Uses softmax-weighted sum for smooth cleanup:
-    /// cleanup(x) = Σ_i softmax(sim(x, c_i) / T) * c_i
+    /// Cleanup a vector against the current codebook using the configured rule.
     pub fn cleanup(&self, vector: &[f32]) -> Vec<f32> {
         if self.codebook.is_empty() {
             return vector.to_vec();
         }
 
-        // Compute similarities to all codebook entries
-        let similarities: Vec<f32> = self
-            .codebook
-            .iter()
+        let similarities: Vec<f32> = self.codebook.iter()
             .map(|entry| cosine_similarity(vector, &entry.vector))
             .collect();
 
-        // Apply temperature-scaled softmax
-        let max_sim = similarities
-            .iter()
-            .cloned()
-            .fold(f32::NEG_INFINITY, f32::max);
-        let exp_sims: Vec<f32> = similarities
-            .iter()
-            .map(|&s| ((s - max_sim) / self.config.temperature).exp())
-            .collect();
-        let sum_exp: f32 = exp_sims.iter().sum();
+        let mut weights = vec![0.0f32; similarities.len()];
+        match self.config.cleanup_rule {
+            CleanupRule::Sign => {
+                weights.copy_from_slice(&similarities);
+            }
+            CleanupRule::Softmax => {
+                let temperature = self.config.temperature.max(f32::EPSILON);
+                let max_sim = similarities.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                let exp_sims: Vec<f32> = similarities.iter()
+                    .map(|&s| ((s - max_sim) / temperature).exp())
+                    .collect();
+                let sum_exp: f32 = exp_sims.iter().sum();
+                if sum_exp > 0.0 && sum_exp.is_finite() {
+                    for (weight, exp) in weights.iter_mut().zip(exp_sims) {
+                        *weight = exp / sum_exp;
+                    }
+                } else {
+                    weights.fill(1.0 / weights.len() as f32);
+                }
+            }
+            CleanupRule::Relu => {
+                let positive: Vec<f32> = similarities.iter().map(|&s| s.max(0.0)).collect();
+                let sum: f32 = positive.iter().sum();
+                if sum > 0.0 && sum.is_finite() {
+                    for (weight, value) in weights.iter_mut().zip(positive) {
+                        *weight = value / sum;
+                    }
+                } else {
+                    weights.fill(1.0 / weights.len() as f32);
+                }
+            }
+            CleanupRule::Polynomial => {
+                let degree = self.config.polynomial_degree.max(1);
+                let positive: Vec<f32> = similarities.iter()
+                    .map(|&s| s.max(0.0).powi(degree as i32))
+                    .collect();
+                let sum: f32 = positive.iter().sum();
+                if sum > 0.0 && sum.is_finite() {
+                    for (weight, value) in weights.iter_mut().zip(positive) {
+                        *weight = value / sum;
+                    }
+                } else {
+                    weights.fill(1.0 / weights.len() as f32);
+                }
+            }
+        }
 
-        let weights: Vec<f32> = exp_sims.iter().map(|&e| e / sum_exp).collect();
-
-        // Weighted sum of codebook vectors
         let mut result = vec![0.0f32; self.dimension];
         for (weight, entry) in weights.iter().zip(self.codebook.iter()) {
             for i in 0..self.dimension {
@@ -722,6 +780,11 @@ impl ResonatorNetwork {
             }
         }
 
+        if self.config.cleanup_sign_projection {
+            for value in &mut result {
+                *value = if *value >= 0.0 { 1.0 } else { -1.0 };
+            }
+        }
         normalize(&mut result);
         result
     }
