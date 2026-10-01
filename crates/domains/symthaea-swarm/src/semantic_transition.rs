@@ -62,6 +62,142 @@ pub fn transition_commitment(
 }
 
 
+/// A commitment to the semantic operation inputs in addition to the state edge.
+///
+/// TransitionCommitment identifies a (before, after, kind) edge. This
+/// commitment additionally binds the logical evaluation time, admission
+/// policy, operation inputs, and semantic result. It therefore prevents two
+/// distinct operation invocations that happen to produce the same state edge
+/// from being indistinguishable at the evidence layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TransitionClaimCommitment([u8; 32]);
+
+impl TransitionClaimCommitment {
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+pub const CLAIM_DOMAIN: &[u8] = b"symthaea-swarm/semantic-transition-claim";
+pub const CLAIM_VERSION: u16 = 1;
+
+pub fn admission_claim_commitment(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    delivery: &crate::semantic_admission::DeliveryContract,
+    observation: &crate::semantic_admission::ObservationRecord,
+    policy: crate::semantic_admission::AdmissionPolicy,
+    now_ms: u64,
+    result: &crate::semantic_admission::SemanticResult,
+) -> Result<TransitionClaimCommitment, TransitionCommitmentError> {
+    let before_digest = semantic_digest(before)?;
+    let after_digest = semantic_digest(after)?;
+    let mut hasher = blake3::Hasher::new();
+    write_claim_header(
+        &mut hasher,
+        TransitionKind::Admission,
+        &before_digest,
+        &after_digest,
+        policy,
+        now_ms,
+    );
+    hasher.update(delivery.logical_delivery_id.as_bytes());
+    hasher.update(&delivery.schema_version.to_be_bytes());
+    hasher.update(&delivery.expires_at_ms.to_be_bytes());
+    write_bytes(&mut hasher, &delivery.payload);
+    hasher.update(observation.key.observation_id.as_bytes());
+    write_bytes(&mut hasher, observation.key.namespace.as_bytes());
+    hasher.update(observation.source_id.as_bytes());
+    hasher.update(&observation.observed_at_ms.to_be_bytes());
+    write_bytes(&mut hasher, &observation.payload);
+    hasher.update(result.logical_delivery_id.as_bytes());
+    hasher.update(result.observation.observation_id.as_bytes());
+    write_bytes(&mut hasher, result.observation.namespace.as_bytes());
+    Ok(TransitionClaimCommitment(*hasher.finalize().as_bytes()))
+}
+
+pub fn replay_claim_commitment(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    delivery: &crate::semantic_admission::DeliveryContract,
+    observation: &crate::semantic_admission::ObservationRecord,
+    policy: crate::semantic_admission::AdmissionPolicy,
+    now_ms: u64,
+    result: &crate::semantic_admission::SemanticResult,
+) -> Result<TransitionClaimCommitment, TransitionCommitmentError> {
+    let before_digest = semantic_digest(before)?;
+    let after_digest = semantic_digest(after)?;
+    let mut hasher = blake3::Hasher::new();
+    write_claim_header(
+        &mut hasher,
+        TransitionKind::Replay,
+        &before_digest,
+        &after_digest,
+        policy,
+        now_ms,
+    );
+    hasher.update(delivery.logical_delivery_id.as_bytes());
+    hasher.update(&delivery.schema_version.to_be_bytes());
+    hasher.update(&delivery.expires_at_ms.to_be_bytes());
+    write_bytes(&mut hasher, &delivery.payload);
+    hasher.update(observation.key.observation_id.as_bytes());
+    write_bytes(&mut hasher, observation.key.namespace.as_bytes());
+    hasher.update(observation.source_id.as_bytes());
+    hasher.update(&observation.observed_at_ms.to_be_bytes());
+    write_bytes(&mut hasher, &observation.payload);
+    hasher.update(result.logical_delivery_id.as_bytes());
+    hasher.update(result.observation.observation_id.as_bytes());
+    write_bytes(&mut hasher, result.observation.namespace.as_bytes());
+    Ok(TransitionClaimCommitment(*hasher.finalize().as_bytes()))
+}
+
+pub fn lifecycle_claim_commitment(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    policy: crate::semantic_admission::AdmissionPolicy,
+    now_ms: u64,
+) -> Result<TransitionClaimCommitment, TransitionCommitmentError> {
+    let before_digest = semantic_digest(before)?;
+    let after_digest = semantic_digest(after)?;
+    let mut hasher = blake3::Hasher::new();
+    write_claim_header(
+        &mut hasher,
+        TransitionKind::LifecycleRetirement,
+        &before_digest,
+        &after_digest,
+        policy,
+        now_ms,
+    );
+    Ok(TransitionClaimCommitment(*hasher.finalize().as_bytes()))
+}
+
+fn write_claim_header(
+    hasher: &mut blake3::Hasher,
+    kind: TransitionKind,
+    before: &crate::semantic_digest::SemanticDigest,
+    after: &crate::semantic_digest::SemanticDigest,
+    policy: crate::semantic_admission::AdmissionPolicy,
+    now_ms: u64,
+) {
+    hasher.update(&(CLAIM_DOMAIN.len() as u64).to_be_bytes());
+    hasher.update(CLAIM_DOMAIN);
+    hasher.update(&CLAIM_VERSION.to_be_bytes());
+    hasher.update(&[kind.tag()]);
+    hasher.update(before.as_bytes());
+    hasher.update(after.as_bytes());
+    hasher.update(&now_ms.to_be_bytes());
+    hasher.update(&[policy.allow_new_observation as u8]);
+    hasher.update(&(policy.max_deliveries as u64).to_be_bytes());
+    hasher.update(&(policy.max_observations as u64).to_be_bytes());
+    hasher.update(&policy.retention_ms.to_be_bytes());
+    hasher.update(&policy.tombstone_retention_ms.to_be_bytes());
+}
+
+fn write_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
+}
+
 /// Failure returned when a claimed transition cannot be reconstructed from the
 /// semantic transition oracle and its committed state edge.
 ///
