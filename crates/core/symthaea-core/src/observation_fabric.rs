@@ -659,6 +659,23 @@ pub struct IndependenceAssessment {
     pub assessment_fingerprint: String,
 }
 
+/// Outcome of checking a receipt's integrity, verifier version, and graph binding.
+///
+/// These outcomes are intentionally distinct so callers can audit why a receipt
+/// was not accepted. A successful result remains a bounded provenance statement,
+/// not a claim that either observation is true.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReceiptVerificationOutcome {
+    /// Receipt integrity and its result against the supplied graph were verified.
+    VerifiedAgainstGraph,
+    /// The receipt's stored assessment fingerprint does not match its fields.
+    InvalidReceiptIntegrity,
+    /// The receipt was produced under a verifier contract this implementation does not support.
+    UnsupportedVerifierVersion,
+    /// The current graph does not reproduce the receipt's recorded assessment.
+    GraphMismatch,
+}
+
 /// Deterministic, attestation-ready receipt for a bounded independence assessment.
 ///
 /// This is intentionally not a credential and contains no issuer/trust semantics.
@@ -711,28 +728,40 @@ impl IndependenceVerificationReceipt {
     /// This is stronger than verify_integrity: it re-runs the bounded independence
     /// assessment and confirms that the current provenance scope still produces
     /// the same result. It does not verify an external signature or establish truth.
-    pub fn verify_against_graph(
+    pub fn verify_against_graph_detailed(
         &self,
         graph: &ObservationGraph,
-    ) -> Result<bool, ObservationValidationError> {
+    ) -> Result<ReceiptVerificationOutcome, ObservationValidationError> {
         if !self.verify_integrity() {
-            return Ok(false);
+            return Ok(ReceiptVerificationOutcome::InvalidReceiptIntegrity);
         }
         if self.verifier_version != IndependenceAssessment::VERIFIER_VERSION {
-            return Ok(false);
+            return Ok(ReceiptVerificationOutcome::UnsupportedVerifierVersion);
         }
         let assessment = graph.assess_independence_detailed(
             &self.source_observation_id,
             &self.target_observation_id,
         )?;
-        Ok(
-            assessment.classification == self.classification
-                && assessment.basis == self.basis
-                && assessment.examined_observation_ids == self.examined_observation_ids
-                && assessment.examined_scope_fingerprint == self.examined_scope_fingerprint
-                && assessment.verifier_version == self.verifier_version
-                && assessment.assessment_fingerprint == self.assessment_fingerprint,
-        )
+        let matches = assessment.classification == self.classification
+            && assessment.basis == self.basis
+            && assessment.examined_observation_ids == self.examined_observation_ids
+            && assessment.examined_scope_fingerprint == self.examined_scope_fingerprint
+            && assessment.verifier_version == self.verifier_version
+            && assessment.assessment_fingerprint == self.assessment_fingerprint;
+        Ok(if matches {
+            ReceiptVerificationOutcome::VerifiedAgainstGraph
+        } else {
+            ReceiptVerificationOutcome::GraphMismatch
+        })
+    }
+
+    /// Compatibility convenience method; use the detailed form for audit logs.
+    pub fn verify_against_graph(
+        &self,
+        graph: &ObservationGraph,
+    ) -> Result<bool, ObservationValidationError> {
+        Ok(self.verify_against_graph_detailed(graph)?
+            == ReceiptVerificationOutcome::VerifiedAgainstGraph)
     }
 
     /// Produce canonical bytes an external attestation layer can sign or hash.
@@ -2294,6 +2323,7 @@ mod tests {
         let receipt = IndependenceVerificationReceipt::from_assessment(&assessment);
         assert!(receipt.verify_integrity());
         assert_eq!(receipt.verify_against_graph(&graph), Ok(true));
+        assert_eq!(receipt.verify_against_graph_detailed(&graph), Ok(ReceiptVerificationOutcome::VerifiedAgainstGraph));
         assert!(!receipt.canonical_bytes().is_empty());
         assert!(receipt.canonical_bytes().starts_with(IndependenceVerificationReceipt::DOMAIN_SEPARATOR));
         assert_eq!(receipt.fingerprint().len(), 64);
@@ -2312,6 +2342,7 @@ mod tests {
         let mut changed = graph.clone();
         changed.observations[0].provenance.source.platform_id = Some("platform-9".into());
         assert_eq!(receipt.verify_against_graph(&changed), Ok(false));
+        assert_eq!(receipt.verify_against_graph_detailed(&changed), Ok(ReceiptVerificationOutcome::GraphMismatch));
     }
 
     #[test]
@@ -2325,6 +2356,7 @@ mod tests {
         receipt.verifier_version = "observation-fabric-independence-v0";
         assert!(!receipt.verify_integrity());
         assert_eq!(receipt.verify_against_graph(&graph), Ok(false));
+        assert_eq!(receipt.verify_against_graph_detailed(&graph), Ok(ReceiptVerificationOutcome::UnsupportedVerifierVersion));
     }
     #[test]
     fn detailed_independence_fingerprint_is_not_debug_format_dependent() {
