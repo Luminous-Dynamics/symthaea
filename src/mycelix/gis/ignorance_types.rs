@@ -449,6 +449,141 @@ impl EpistemicFrameRevision {
     }
 }
 
+/// Lifecycle state of a conclusion whose provenance may be affected by frame revision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConclusionStatus {
+    /// Conclusion remains usable under its originating frame.
+    Active,
+    /// Conclusion remains historical but requires qualification under a changed frame.
+    Qualified,
+    /// Conclusion must be evaluated again before being used as current knowledge.
+    Reopened,
+    /// Conclusion has been explicitly replaced by a later conclusion.
+    Superseded,
+}
+
+/// Typed dependency between epistemic conclusions.
+///
+/// Dependencies are directional: the source conclusion is upstream of the dependent
+/// conclusion. Keeping this relation explicit lets frame correction propagate without
+/// pretending that every affected conclusion is independently invalid.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConclusionDependency {
+    /// Upstream conclusion required by the dependent conclusion.
+    pub upstream: String,
+    /// Downstream conclusion that consumes the upstream conclusion.
+    pub downstream: String,
+}
+
+impl ConclusionDependency {
+    pub fn new(upstream: impl Into<String>, downstream: impl Into<String>) -> Self {
+        Self {
+            upstream: upstream.into(),
+            downstream: downstream.into(),
+        }
+    }
+}
+
+/// A frame-qualified epistemic conclusion.
+///
+/// This is intentionally narrower than a general knowledge-graph node: it records the
+/// provenance needed to reopen reasoning when its frame or an upstream conclusion changes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpistemicConclusion {
+    /// Stable conclusion identifier.
+    pub id: String,
+    /// Human/model-readable proposition represented by this conclusion.
+    pub proposition: String,
+    /// Frame under which the conclusion was produced.
+    pub originating_frame: String,
+    /// Evidence identifiers directly supporting the conclusion.
+    pub evidence: Vec<String>,
+    /// Upstream conclusion identifiers required by this conclusion.
+    pub dependencies: Vec<String>,
+    /// Current lifecycle state.
+    pub status: ConclusionStatus,
+}
+
+impl EpistemicConclusion {
+    pub fn new(
+        id: impl Into<String>,
+        proposition: impl Into<String>,
+        originating_frame: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            proposition: proposition.into(),
+            originating_frame: originating_frame.into(),
+            evidence: Vec::new(),
+            dependencies: Vec::new(),
+            status: ConclusionStatus::Active,
+        }
+    }
+
+    /// Mark a historical conclusion as requiring re-evaluation under a changed frame.
+    pub fn reopen(&mut self) {
+        self.status = ConclusionStatus::Reopened;
+    }
+
+    /// Preserve the conclusion while explicitly qualifying it against its originating frame.
+    pub fn qualify(&mut self) {
+        if self.status != ConclusionStatus::Reopened {
+            self.status = ConclusionStatus::Qualified;
+        }
+    }
+}
+
+/// Minimal dependency graph for deterministic downstream impact analysis.
+///
+/// The graph deliberately does not infer semantic validity. It only answers the narrower
+/// provenance question: which conclusions transitively depend on conclusions whose frame
+/// provenance has changed?
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ConclusionDependencyGraph {
+    pub conclusions: Vec<EpistemicConclusion>,
+}
+
+impl ConclusionDependencyGraph {
+    pub fn add(&mut self, conclusion: EpistemicConclusion) {
+        self.conclusions.push(conclusion);
+    }
+
+    /// Return conclusion IDs transitively downstream of the supplied roots.
+    pub fn downstream_of(&self, roots: &[String]) -> Vec<String> {
+        let mut affected = Vec::new();
+        let mut frontier = roots.to_vec();
+
+        while let Some(root) = frontier.pop() {
+            for conclusion in &self.conclusions {
+                if conclusion.dependencies.iter().any(|dep| dep == &root)
+                    && !affected.iter().any(|id| id == &conclusion.id)
+                    && !roots.iter().any(|id| id == &conclusion.id)
+                {
+                    affected.push(conclusion.id.clone());
+                    frontier.push(conclusion.id.clone());
+                }
+            }
+        }
+
+        affected
+    }
+
+    /// Reopen roots and all transitively dependent conclusions.
+    pub fn reopen_from(&mut self, roots: &[String]) -> Vec<String> {
+        let mut reopened = roots.to_vec();
+        let downstream = self.downstream_of(roots);
+        reopened.extend(downstream);
+
+        for conclusion in &mut self.conclusions {
+            if reopened.iter().any(|id| id == &conclusion.id) {
+                conclusion.reopen();
+            }
+        }
+
+        reopened
+    }
+}
+
 /// Failure returned when a frame revision would corrupt append-only lineage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrameLineageError {
@@ -744,6 +879,25 @@ mod tests {
             IgnoranceType::Unknown.confidence_ceiling()
                 > IgnoranceType::Impossible.confidence_ceiling()
         );
+    }
+
+    #[test]
+    fn test_conclusion_dependency_reopening_is_transitive() {
+        let mut graph = ConclusionDependencyGraph::default();
+
+        let root = EpistemicConclusion::new("c1", "A", "gis-default@1");
+        let mut dependent = EpistemicConclusion::new("c2", "B", "gis-default@1");
+        dependent.dependencies.push("c1".to_string());
+        let mut downstream = EpistemicConclusion::new("c3", "C", "gis-default@1");
+        downstream.dependencies.push("c2".to_string());
+
+        graph.add(root);
+        graph.add(dependent);
+        graph.add(downstream);
+
+        let reopened = graph.reopen_from(&["c1".to_string()]);
+        assert_eq!(reopened, vec!["c1".to_string(), "c2".to_string(), "c3".to_string()]);
+        assert!(graph.conclusions.iter().all(|c| c.status == ConclusionStatus::Reopened));
     }
 
     #[test]
