@@ -1034,6 +1034,108 @@ mod tests {
         let current = state(true, false, 0.8, 0.3, 0.1);
         assert!(event_between(Some(previous), current, 4, 42, false, false).is_none());
     }
+
+    #[test]
+    fn confidence_boundary_is_exactly_half() {
+        let below = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.499_999, 0.1);
+        let exact = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.5, 0.1);
+        let above = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.500_001, 0.1);
+
+        assert_eq!(below.mode, CognitiveMode::Uncertain);
+        assert_eq!(exact.mode, CognitiveMode::Resting);
+        assert_eq!(above.mode, CognitiveMode::Resting);
+    }
+
+    #[test]
+    fn prediction_error_boundary_is_strictly_greater_than_half() {
+        let below = state(true, false, 0.8, 0.3, 0.499_999);
+        let exact = state(true, false, 0.8, 0.3, 0.5);
+        let above = state(true, false, 0.8, 0.3, 0.500_001);
+
+        assert_eq!(below.mode, CognitiveMode::Resting);
+        assert_eq!(exact.mode, CognitiveMode::Resting);
+        assert_eq!(above.mode, CognitiveMode::Exploring);
+    }
+
+    #[test]
+    fn resting_load_boundary_is_strictly_less_than_point_twelve() {
+        let below = state(true, false, 0.8, 0.119_999, 0.1);
+        let exact = state(true, false, 0.8, 0.12, 0.1);
+        let above = state(true, false, 0.8, 0.120_001, 0.1);
+
+        assert_eq!(below.mode, CognitiveMode::Resting);
+        assert_ne!(exact.mode, CognitiveMode::Resting);
+        assert_ne!(above.mode, CognitiveMode::Resting);
+    }
+
+    #[test]
+    fn integrating_coherence_boundary_is_strictly_greater_than_point_seven() {
+        let below = state(true, false, 0.699_999, 0.5, 0.1);
+        let exact = state(true, false, 0.70, 0.5, 0.1);
+        let above = state(true, false, 0.700_001, 0.5, 0.1);
+
+        assert_ne!(below.mode, CognitiveMode::Integrating);
+        assert_ne!(exact.mode, CognitiveMode::Integrating);
+        assert_eq!(above.mode, CognitiveMode::Integrating);
+    }
+
+    #[test]
+    fn integrating_load_boundary_is_strictly_greater_than_point_four_five() {
+        let below = state(true, false, 0.8, 0.449_999, 0.1);
+        let exact = state(true, false, 0.8, 0.45, 0.1);
+        let above = state(true, false, 0.8, 0.450_001, 0.1);
+
+        assert_ne!(below.mode, CognitiveMode::Integrating);
+        assert_ne!(exact.mode, CognitiveMode::Integrating);
+        assert_eq!(above.mode, CognitiveMode::Integrating);
+    }
+
+    #[test]
+    fn disconnected_presence_overrides_measurements_and_processing() {
+        let value = CognitiveState::from_observation(false, true, 1.0, 1.0, 1.0, 1.0);
+
+        assert_eq!(value.presence, PresenceState::Disconnected);
+        assert_eq!(value.mode, CognitiveMode::Uncertain);
+    }
+
+    #[test]
+    fn processing_presence_overrides_mode_thresholds_when_valid() {
+        let value = CognitiveState::from_observation(true, true, 1.0, 0.1, 1.0, 1.0);
+
+        assert_eq!(value.presence, PresenceState::Processing);
+        assert_eq!(value.mode, CognitiveMode::Responding);
+    }
+
+    #[test]
+    fn invalid_telemetry_overrides_processing_presence() {
+        let value = CognitiveState::from_observation(true, true, f64::NAN, 0.1, 1.0, 1.0);
+
+        assert_eq!(value.presence, PresenceState::Degraded);
+        assert_eq!(value.mode, CognitiveMode::Uncertain);
+    }
+
+    #[test]
+    fn confidence_gate_precedes_prediction_error_and_load_thresholds() {
+        let value = CognitiveState::from_observation(true, false, 1.0, 0.5, 0.499_999, 1.0);
+
+        assert_eq!(value.presence, PresenceState::Available);
+        assert_eq!(value.mode, CognitiveMode::Uncertain);
+    }
+
+    #[test]
+    fn prediction_error_gate_precedes_lower_load_thresholds() {
+        let value = state(true, false, 0.8, 0.1, 0.500_001);
+
+        assert_eq!(value.mode, CognitiveMode::Exploring);
+    }
+
+    #[test]
+    fn integrating_requires_both_strict_upper_boundaries() {
+        let value = state(true, false, 0.700_001, 0.450_001, 0.1);
+
+        assert_eq!(value.mode, CognitiveMode::Integrating);
+    }
+
 }
 
 
