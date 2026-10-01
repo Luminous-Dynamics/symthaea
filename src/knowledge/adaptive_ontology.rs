@@ -388,6 +388,7 @@ impl AdaptiveOntology {
                 u.is_a_parent = record.is_a_parent.clone();
             }
         }
+        true
     }
 }
 
