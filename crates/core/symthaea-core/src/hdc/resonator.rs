@@ -467,14 +467,29 @@ impl ResonatorNetwork {
         constraints: &[MultiConstraint],
         max_iter: Option<usize>,
     ) -> Result<HashMap<String, ResonatorSolution>> {
+        self.solve_system_seeded(unknowns, constraints, max_iter, rand::random::<u64>())
+    }
+
+    /// Solve a multi-unknown system with explicit deterministic initialization.
+    ///
+    /// The system solver currently has no iterative noise injection; the seed
+    /// controls its initial estimates and makes otherwise identical runs repeatable.
+    pub fn solve_system_seeded(
+        &mut self,
+        unknowns: &[&str],
+        constraints: &[MultiConstraint],
+        max_iter: Option<usize>,
+        seed: u64,
+    ) -> Result<HashMap<String, ResonatorSolution>> {
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
+        let mut rng = StdRng::seed_from_u64(seed);
 
         // Initialize estimates for all unknowns
         let mut estimates: HashMap<String, Vec<f32>> = unknowns
             .iter()
             .map(|&name| {
                 let v: Vec<f32> = (0..self.dimension)
-                    .map(|_| rand::random::<f32>() * 2.0 - 1.0)
+                    .map(|_| rng.gen::<f32>() * 2.0 - 1.0)
                     .collect();
                 (name.to_string(), v)
             })
