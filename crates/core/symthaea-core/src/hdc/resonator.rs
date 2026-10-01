@@ -1536,6 +1536,10 @@ mod tests {
 
     #[test]
     fn test_cleanup_attracts_to_codebook() {
+        let default_config = ResonatorConfig::default();
+        assert_eq!(default_config.cleanup_rule, CleanupRule::Softmax);
+        assert!(!default_config.cleanup_sign_projection);
+        assert_eq!(default_config.polynomial_degree, 2);
         let dim = 500;
         let mut network = ResonatorNetwork::new(dim).unwrap();
 
