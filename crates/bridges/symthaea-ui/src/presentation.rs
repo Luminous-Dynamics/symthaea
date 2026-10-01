@@ -18,9 +18,10 @@ pub struct TelemetrySessionId(u64);
 
 /// Starts a new telemetry session without wrapping the generation counter.
 /// Saturation is preferable to reusing an old identity after u64::MAX.
-pub fn next_telemetry_session(current: &mut u64) -> TelemetrySessionId {
-    *current = current.saturating_add(1);
-    TelemetrySessionId(*current)
+pub fn next_telemetry_session(current: &mut u64) -> Option<TelemetrySessionId> {
+    let next = current.checked_add(1)?;
+    *current = next;
+    Some(TelemetrySessionId(next))
 }
 
 /// Returns whether a callback still belongs to the currently authoritative
@@ -471,28 +472,29 @@ mod telemetry_session_tests {
     #[test]
     fn new_session_invalidates_previous_generation() {
         let mut generation = 0;
-        let first = next_telemetry_session(&mut generation);
-        let second = next_telemetry_session(&mut generation);
+        let first = next_telemetry_session(&mut generation).unwrap();
+        let second = next_telemetry_session(&mut generation).unwrap();
         assert_ne!(first, second);
         assert!(!telemetry_session_is_current(generation, first));
         assert!(telemetry_session_is_current(generation, second));
     }
 
     #[test]
-    fn generation_saturates_without_reusing_identity() {
+    fn generation_exhaustion_fails_closed_without_reusing_identity() {
         let mut generation = u64::MAX - 1;
-        let first = next_telemetry_session(&mut generation);
-        let second = next_telemetry_session(&mut generation);
+        let final_session = next_telemetry_session(&mut generation).unwrap();
         assert_eq!(generation, u64::MAX);
-        assert_ne!(first, second);
-        assert!(telemetry_session_is_current(generation, second));
+        assert!(telemetry_session_is_current(generation, final_session));
+        assert!(next_telemetry_session(&mut generation).is_none());
+        assert_eq!(generation, u64::MAX);
+        assert!(telemetry_session_is_current(generation, final_session));
     }
 
     #[test]
     fn stale_callbacks_are_rejected() {
         let mut generation = 0;
-        let stale = next_telemetry_session(&mut generation);
-        let _current = next_telemetry_session(&mut generation);
+        let stale = next_telemetry_session(&mut generation).unwrap();
+        let _current = next_telemetry_session(&mut generation).unwrap();
         assert!(!telemetry_session_is_current(generation, stale));
     }
 }
