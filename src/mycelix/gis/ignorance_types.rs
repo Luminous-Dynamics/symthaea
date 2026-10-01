@@ -709,12 +709,55 @@ impl ConclusionDependencyGraph {
         reopened
     }
 
-    /// Apply the impact declared by a frame revision and propagate it through dependencies.
+    /// Apply a frame revision using dependency semantics rather than graph proximity.
+    /// Typed edges propagate only when their dependency kind is affected. Legacy untyped
+    /// dependency IDs remain conservative because their semantic basis is unavailable.
     pub fn reopen_from_frame_revision(
         &mut self,
         revision: &EpistemicFrameRevision,
     ) -> Vec<String> {
-        self.reopen_from(&revision.affected_conclusions)
+        let mut affected = Vec::new();
+        let mut frontier = Vec::new();
+        let known: std::collections::HashSet<&str> =
+            self.conclusions.iter().map(|c| c.id.as_str()).collect();
+
+        for root in &revision.affected_conclusions {
+            if known.contains(root.as_str()) && !affected.contains(root) {
+                affected.push(root.clone());
+                frontier.push(root.clone());
+            }
+        }
+
+        while let Some(upstream) = frontier.pop() {
+            for edge in &self.dependency_edges {
+                if edge.upstream == upstream
+                    && revision.impact.affects(edge.kind)
+                    && known.contains(edge.downstream.as_str())
+                    && !affected.contains(&edge.downstream)
+                {
+                    affected.push(edge.downstream.clone());
+                    frontier.push(edge.downstream.clone());
+                }
+            }
+
+            for conclusion in &self.conclusions {
+                let depends = conclusion.dependencies.iter().any(|id| id == &upstream);
+                let has_typed_edge = self.dependency_edges.iter().any(|edge| {
+                    edge.upstream == upstream && edge.downstream == conclusion.id
+                });
+                if depends && !has_typed_edge && !affected.contains(&conclusion.id) {
+                    affected.push(conclusion.id.clone());
+                    frontier.push(conclusion.id.clone());
+                }
+            }
+        }
+
+        for conclusion in &mut self.conclusions {
+            if affected.contains(&conclusion.id) {
+                conclusion.reopen();
+            }
+        }
+        affected
     }
 }
 
