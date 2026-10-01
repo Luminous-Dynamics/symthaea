@@ -44,6 +44,7 @@ on:
       - "docs/research/HDC_ASSOCIATIVE_CLEANUP_HARNESS.md"
       - "docs/research/HDC_SEQUENCE_ORDER_HARNESS.md"
       - "docs/research/HDC_RESONATOR_CROSS_VALIDATION.md"
+      - "docs/research/HDC_TWO_FACTOR_RESONATOR.md"
       - "docs/research/HDC_LTC_RESOLUTION_TRAJECTORY_MATRIX.md"
       - "rust-toolchain.toml"
       - ".github/workflows/hdc-resolution-qualify.yml"
