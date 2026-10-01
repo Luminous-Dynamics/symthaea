@@ -511,6 +511,29 @@ impl CausalKnowledgeBridge {
         let before = self.edges.len();
         self.edges.retain(|e| e.strength >= self.prune_threshold);
 
+        // Capacity is a hard upper bound after pruning. When more qualifying
+        // edges remain than the configured capacity, evict the weakest edge
+        // repeatedly. Ties evict the earliest retained edge, keeping restore
+        // behavior deterministic without relying on an unstable sort.
+        while self.edges.len() > self.capacity {
+            let weakest = self
+                .edges
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| {
+                    a.strength
+                        .partial_cmp(&b.strength)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .map(|(index, _)| index);
+
+            if let Some(index) = weakest {
+                self.edges.remove(index);
+            } else {
+                break;
+            }
+        }
+
         // Rebuild adjacency from surviving edges
         if self.edges.len() < before {
             self.adjacency.clear();
@@ -684,6 +707,24 @@ mod tests {
         assert_eq!(bridge.edge_count(), 1);
         assert_eq!(bridge.effects_of("weak").len(), 0);
         assert_eq!(bridge.effects_of("strong").len(), 1);
+    }
+
+    #[test]
+    fn test_capacity_remains_hard_bound_when_all_edges_clear_threshold() {
+        let mut bridge = CausalKnowledgeBridge::new(2);
+
+        let first = bridge.import_edge("A".into(), "B".into(), 0.9);
+        let second = bridge.import_edge("B".into(), "C".into(), 0.8);
+        let third = bridge.import_edge("C".into(), "D".into(), 0.7);
+
+        assert!(!first.was_policy_limited());
+        assert!(!second.was_policy_limited());
+        assert!(third.was_policy_limited());
+        assert_eq!(third.pruned_edges, 1);
+        assert_eq!(bridge.edge_count(), 2);
+        assert_eq!(bridge.effects_of("A").len(), 0);
+        assert_eq!(bridge.effects_of("B").len(), 1);
+        assert_eq!(bridge.effects_of("C").len(), 1);
     }
 
     #[test]
