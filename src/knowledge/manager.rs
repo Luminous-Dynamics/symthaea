@@ -366,11 +366,20 @@ impl KnowledgeManager {
                     persistence_health.causal_loaded = true;
                     let edge_count = edges.len();
                     for record in &edges {
-                        causal_bridge.import_edge(
+                        let outcome = causal_bridge.import_edge(
                             record.cause.clone(),
                             record.effect.clone(),
                             record.strength,
                         );
+                        persistence_health.causal_restore_evictions += outcome.pruned_edges;
+                        if outcome.was_policy_limited() {
+                            tracing::debug!(
+                                cause = %record.cause,
+                                effect = %record.effect,
+                                pruned = outcome.pruned_edges,
+                                "Knowledge: causal restore was limited by retention policy"
+                            );
+                        }
                     }
                     if edge_count > 0 {
                         tracing::info!(
@@ -1417,6 +1426,13 @@ pub struct KnowledgePersistenceHealth {
     /// Whether the post-restore provenance graph satisfies its structural validator.
     pub provenance_snapshot_conforms: bool,
     pub causal_loaded: bool,
+    /// Number of persisted causal rows whose restore insertion caused one or more
+    /// previously admitted edges to be evicted by the bridge's configured pruning policy.
+    ///
+    /// This is intentionally not a failed domain: pruning is a runtime retention policy,
+    /// not a decode/admission error. It makes "decoded" versus "retained" observable
+    /// without falsely treating policy-limited capacity as persistence corruption.
+    pub causal_restore_evictions: usize,
     pub ontology_loaded: bool,
     /// Decoded ontology rows rejected during graph/ontology restore.
     pub ontology_rejections: usize,
