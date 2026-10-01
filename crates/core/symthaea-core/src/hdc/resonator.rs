@@ -50,6 +50,7 @@ The system resonates to a fixed point that satisfies all constraints!
 */
 
 use anyhow::Result;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashMap;
 
 /// Resonator network for HDC constraint satisfaction
@@ -325,12 +326,27 @@ impl ResonatorNetwork {
         constraints: &[Constraint],
         max_iter: Option<usize>,
     ) -> Result<ResonatorSolution> {
+        self.solve_seeded(constraints, max_iter, rand::random::<u64>())
+    }
+
+    /// Solve with an explicit seed for deterministic research and evidence runs.
+    ///
+    /// The production `solve` path remains stochastic. This seeded entry point makes
+    /// initialization and exploratory noise reproducible without changing the
+    /// resonator dynamics themselves.
+    pub fn solve_seeded(
+        &mut self,
+        constraints: &[Constraint],
+        max_iter: Option<usize>,
+        seed: u64,
+    ) -> Result<ResonatorSolution> {
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
+        let mut rng = StdRng::seed_from_u64(seed);
         self.energy_history.clear();
 
         // Initialize estimate randomly
         let mut estimate: Vec<f32> = (0..self.dimension)
-            .map(|_| rand::random::<f32>() * 2.0 - 1.0)
+            .map(|_| rng.gen::<f32>() * 2.0 - 1.0)
             .collect();
         normalize(&mut estimate);
 
@@ -385,7 +401,7 @@ impl ResonatorNetwork {
             // Add noise for exploration
             if self.config.noise_scale > 0.0 {
                 for i in 0..self.dimension {
-                    velocity[i] += self.config.noise_scale * (rand::random::<f32>() * 2.0 - 1.0);
+                    velocity[i] += self.config.noise_scale * (rng.gen::<f32>() * 2.0 - 1.0);
                 }
             }
 
@@ -451,14 +467,29 @@ impl ResonatorNetwork {
         constraints: &[MultiConstraint],
         max_iter: Option<usize>,
     ) -> Result<HashMap<String, ResonatorSolution>> {
+        self.solve_system_seeded(unknowns, constraints, max_iter, rand::random::<u64>())
+    }
+
+    /// Solve a multi-unknown system with explicit deterministic initialization.
+    ///
+    /// The system solver currently has no iterative noise injection; the seed
+    /// controls its initial estimates and makes otherwise identical runs repeatable.
+    pub fn solve_system_seeded(
+        &mut self,
+        unknowns: &[&str],
+        constraints: &[MultiConstraint],
+        max_iter: Option<usize>,
+        seed: u64,
+    ) -> Result<HashMap<String, ResonatorSolution>> {
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
+        let mut rng = StdRng::seed_from_u64(seed);
 
         // Initialize estimates for all unknowns
         let mut estimates: HashMap<String, Vec<f32>> = unknowns
             .iter()
             .map(|&name| {
                 let v: Vec<f32> = (0..self.dimension)
-                    .map(|_| rand::random::<f32>() * 2.0 - 1.0)
+                    .map(|_| rng.gen::<f32>() * 2.0 - 1.0)
                     .collect();
                 (name.to_string(), v)
             })
@@ -491,8 +522,10 @@ impl ResonatorNetwork {
             .map(|&name| (name.to_string(), vec![0.0f32; self.dimension]))
             .collect();
 
+        let mut iterations_performed = 0usize;
+        let mut converged = false;
+
         for _iteration in 0..max_iterations {
-            // Compute updates for each unknown
             let mut updates: HashMap<String, Vec<f32>> = unknowns
                 .iter()
                 .map(|&name| (name.to_string(), vec![0.0f32; self.dimension]))
@@ -504,11 +537,9 @@ impl ResonatorNetwork {
                 .collect();
 
             for constraint in constraints {
-                // Get current values for factors
                 let left = self.resolve_factor(&constraint.left, &estimates)?;
                 let right = self.resolve_factor(&constraint.right, &estimates)?;
 
-                // Update the unknown being solved for
                 if let Factor::Unknown(name) = &constraint.unknown {
                     let unbind_update = unbind(&left, &right);
                     let update = updates
@@ -525,10 +556,12 @@ impl ResonatorNetwork {
                 }
             }
 
-            // Normalize and apply updates
-            let mut all_converged = true;
+            // An unknown with no positive-weight constraint is unresolved and cannot
+            // count as converged merely because it was never updated.
+            let mut all_converged = !unknowns.is_empty();
+            let mut converged_flags = vec![false; unknowns.len()];
 
-            for name in unknowns {
+            for (idx, name) in unknowns.iter().enumerate() {
                 let name = name.to_string();
                 let update = updates
                     .get(&name)
@@ -537,45 +570,48 @@ impl ResonatorNetwork {
                     .get(&name)
                     .expect("weights map must contain all unknowns");
 
-                if weight > 0.0 {
-                    let mut normalized_update: Vec<f32> =
-                        update.iter().map(|&x| x / weight).collect();
+                if weight <= 0.0 {
+                    all_converged = false;
+                    continue;
+                }
 
-                    // Cleanup
-                    if !self.codebook.is_empty() {
-                        normalized_update = self.cleanup(&normalized_update);
-                    }
+                let mut normalized_update: Vec<f32> =
+                    update.iter().map(|&x| x / weight).collect();
 
-                    // Apply momentum
-                    let estimate = estimates
-                        .get_mut(&name)
-                        .expect("estimates map must contain all unknowns");
-                    let velocity = velocities
-                        .get_mut(&name)
-                        .expect("velocities map must contain all unknowns");
-                    let previous = estimate.clone();
+                if !self.codebook.is_empty() {
+                    normalized_update = self.cleanup(&normalized_update);
+                }
 
-                    for i in 0..self.dimension {
-                        velocity[i] = self.config.momentum * velocity[i]
-                            + self.config.step_size * (normalized_update[i] - estimate[i]);
-                        estimate[i] += velocity[i];
-                    }
-                    normalize(estimate);
+                let estimate = estimates
+                    .get_mut(&name)
+                    .expect("estimates map must contain all unknowns");
+                let velocity = velocities
+                    .get_mut(&name)
+                    .expect("velocities map must contain all unknowns");
+                let previous = estimate.clone();
 
-                    // Check convergence
-                    let similarity = cosine_similarity(estimate, &previous);
-                    if similarity < self.config.convergence_threshold {
-                        all_converged = false;
-                    }
+                for i in 0..self.dimension {
+                    velocity[i] = self.config.momentum * velocity[i]
+                        + self.config.step_size * (normalized_update[i] - estimate[i]);
+                    estimate[i] += velocity[i];
+                }
+                normalize(estimate);
+
+                let similarity = cosine_similarity(estimate, &previous);
+                converged_flags[idx] = similarity >= self.config.convergence_threshold;
+                if !converged_flags[idx] {
+                    all_converged = false;
                 }
             }
 
-            // Update introspection state
+            iterations_performed += 1;
             self.iteration_count += 1;
+
             for (idx, &name_str) in unknowns.iter().enumerate() {
                 if let Some(est) = estimates.get(name_str)
                     && let Some(state) = self.states.get_mut(idx)
                 {
+                    state.previous = state.estimate.clone();
                     state.estimate = est.clone();
                     state.confidence = if !self.codebook.is_empty() {
                         self.codebook
@@ -583,12 +619,12 @@ impl ResonatorNetwork {
                             .map(|e| cosine_similarity(est, &e.vector))
                             .fold(f32::NEG_INFINITY, f32::max)
                     } else {
-                        0.5 // default confidence without codebook
+                        0.5
                     };
+                    state.converged = converged_flags[idx];
                 }
             }
 
-            // Update coupling strengths between resonator pairs
             let n = unknowns.len();
             for i in 0..n {
                 for j in (i + 1)..n {
@@ -603,15 +639,11 @@ impl ResonatorNetwork {
             }
 
             if all_converged {
-                // Mark all states as converged
-                for state in &mut self.states {
-                    state.converged = true;
-                }
+                converged = true;
                 break;
             }
         }
 
-        // Create solutions
         let solutions = unknowns
             .iter()
             .map(|&name| {
@@ -620,7 +652,7 @@ impl ResonatorNetwork {
                     .expect("estimates map must contain all unknowns");
                 (
                     name.to_string(),
-                    self.create_solution(estimate, max_iterations, true),
+                    self.create_solution(estimate, iterations_performed, converged),
                 )
             })
             .collect();
@@ -1042,6 +1074,110 @@ mod tests {
             similarity
         );
         println!("✅ Unbind correlation: {:.4} (threshold: 0.3)", similarity);
+    }
+
+    #[test]
+    fn test_seeded_solve_system_is_reproducible() {
+        let dim = 128;
+        let a: Vec<f32> = (0..dim)
+            .map(|i| if i % 3 == 0 { 1.0 } else { -1.0 })
+            .collect();
+        let x_true: Vec<f32> = (0..dim)
+            .map(|i| if i % 5 == 0 { -1.0 } else { 1.0 })
+            .collect();
+        let b: Vec<f32> = a.iter().zip(x_true.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+        let mut network_a = ResonatorNetwork::new(dim).unwrap();
+        let mut network_b = ResonatorNetwork::new(dim).unwrap();
+        let first = network_a.solve_system_seeded(&["x"], std::slice::from_ref(&constraint), Some(24), 0x5EED);
+        let second = network_b.solve_system_seeded(&["x"], std::slice::from_ref(&constraint), Some(24), 0x5EED);
+        assert_eq!(
+            first.unwrap().get("x").unwrap().vector,
+            second.unwrap().get("x").unwrap().vector,
+            "explicitly seeded multi-unknown runs must reproduce exactly"
+        );
+    }
+
+    #[test]
+    fn test_seeded_solve_is_reproducible() {
+        let dim = 256;
+        let mut network_a = ResonatorNetwork::new(dim).unwrap();
+        let mut network_b = ResonatorNetwork::new(dim).unwrap();
+
+        let a: Vec<f32> = (0..dim)
+            .map(|i| if i % 3 == 0 { 1.0 } else { -1.0 })
+            .collect();
+        let x_true: Vec<f32> = (0..dim)
+            .map(|i| if i % 5 == 0 { -1.0 } else { 1.0 })
+            .collect();
+        let b: Vec<f32> = a.iter().zip(x_true.iter()).map(|(ai, xi)| ai * xi).collect();
+
+        let constraint = Constraint::new(a, b);
+        let first = network_a.solve_seeded(std::slice::from_ref(&constraint), Some(32), 0x5EED);
+        let second = network_b.solve_seeded(std::slice::from_ref(&constraint), Some(32), 0x5EED);
+
+        assert_eq!(
+            first.unwrap().vector,
+            second.unwrap().vector,
+            "explicitly seeded resonator runs must reproduce exactly"
+        );
+    }
+
+    #[test]
+    fn test_solve_system_zero_iterations_reports_unconverged() {
+        let dim = 64;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+
+        let solutions = network
+            .solve_system_seeded(&["x"], &[constraint], Some(0), 7)
+            .unwrap();
+        let solution = solutions.get("x").expect("x solution should exist");
+
+        assert_eq!(solution.iterations, 0);
+        assert!(!solution.converged);
+        assert_eq!(network.total_iteration_count(), 0);
+        assert!(!network.resonator_states()[0].converged);
+    }
+
+    #[test]
+    fn test_solve_system_exhaustion_reports_unconverged() {
+        let dim = 64;
+        let config = ResonatorConfig {
+            convergence_threshold: 2.0,
+            max_iterations: 3,
+            ..Default::default()
+        };
+        let mut network = ResonatorNetwork::with_config(dim, config).unwrap();
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+
+        let solutions = network
+            .solve_system_seeded(&["x"], &[constraint], Some(3), 7)
+            .unwrap();
+        let solution = solutions.get("x").expect("x solution should exist");
+
+        assert_eq!(solution.iterations, 3);
+        assert!(!solution.converged);
+        assert_eq!(network.total_iteration_count(), 3);
+        assert!(!network.resonator_states()[0].converged);
     }
 
     #[test]
@@ -1550,6 +1686,57 @@ mod tests {
         if let Some(&last) = direct_history.last() {
             assert!((snap.current_energy - last).abs() < 1e-9);
         }
+    }
+
+    #[test]
+    fn test_solve_system_zero_iterations_reports_unconverged() {
+        let dim = 64;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+
+        let solutions = network.solve_system_seeded(&["x"], &[constraint], Some(0), 7).unwrap();
+        let solution = solutions.get("x").expect("x solution should exist");
+
+        assert_eq!(solution.iterations, 0);
+        assert!(!solution.converged);
+        assert_eq!(network.total_iteration_count(), 0);
+        assert!(!network.resonator_states()[0].converged);
+    }
+
+    #[test]
+    fn test_solve_system_exhaustion_reports_unconverged() {
+        let dim = 64;
+        let config = ResonatorConfig {
+            convergence_threshold: 2.0,
+            max_iterations: 3,
+            ..Default::default()
+        };
+        let mut network = ResonatorNetwork::with_config(dim, config).unwrap();
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+
+        let solutions = network.solve_system_seeded(&["x"], &[constraint], Some(3), 7).unwrap();
+        let solution = solutions.get("x").expect("x solution should exist");
+
+        assert_eq!(solution.iterations, 3);
+        assert!(!solution.converged);
+        assert_eq!(network.total_iteration_count(), 3);
+        assert!(!network.resonator_states()[0].converged);
     }
 
     #[test]

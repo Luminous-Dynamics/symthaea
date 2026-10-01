@@ -114,6 +114,8 @@ pub mod dimension_task_harness;
 pub mod noise_robustness_harness;
 /// Deterministic key/value associative-memory cleanup task family for HDC dimension research.
 pub mod associative_cleanup_harness;
+/// Deterministic sequence/order retrieval task family for HDC dimension research.
+pub mod sequence_order_harness;
 
 /// HDC dimensionality configuration for runtime selection
 ///
