@@ -63,7 +63,7 @@ impl IgnoranceType {
     /// Can this type of ignorance be resolved in principle?
     pub fn is_resolvable(&self) -> bool {
         match self {
-            Self::None => true,         // Already resolved
+            Self::None => true,         // No ignorance detected under the active frame
             Self::Known => true,        // Just need to fetch it
             Self::KnownUnknown => true, // Can research it
             Self::Unknown => false,     // Can't target what we don't know
@@ -84,7 +84,8 @@ impl IgnoranceType {
 
     /// Get confidence ceiling for this ignorance type
     ///
-    /// Even if we answer, this is the max confidence we can claim.
+    /// Even if we answer, this is the max confidence we can claim. For `None`, the
+    /// ceiling applies only to the ignorance category; it does not establish completeness.
     pub fn confidence_ceiling(&self) -> f32 {
         match self {
             // This is a ceiling for the ignorance category, not a proof of completeness.
@@ -110,7 +111,7 @@ impl IgnoranceType {
     /// Human-readable description
     pub fn description(&self) -> &'static str {
         match self {
-            Self::None => "Complete knowledge - no ignorance",
+            Self::None => "No ignorance detected under the active frame",
             Self::Known => "Information exists but is not currently accessible",
             Self::KnownUnknown => "We know what we don't know",
             Self::Unknown => "We don't know what we don't know",
