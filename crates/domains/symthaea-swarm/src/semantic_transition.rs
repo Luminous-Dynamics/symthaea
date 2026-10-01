@@ -816,4 +816,131 @@ mod tests {
     }
 
     }
+
+    #[test]
+    fn admission_claim_binds_inputs_beyond_state_edge() {
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let result = SemanticResult {
+            logical_delivery_id: delivery.logical_delivery_id,
+            observation: observation.key.clone(),
+        };
+
+        let original = admission_claim_commitment(
+            &before,
+            &after,
+            &delivery,
+            &observation,
+            policy,
+            10,
+            &result,
+        )
+        .unwrap();
+
+        let mut changed_observation = observation.clone();
+        changed_observation.payload = b"different".to_vec();
+        let changed = admission_claim_commitment(
+            &before,
+            &after,
+            &delivery,
+            &changed_observation,
+            policy,
+            10,
+            &result,
+        )
+        .unwrap();
+
+        assert_ne!(original, changed);
+    }
+
+    #[test]
+    fn admission_claim_binds_policy_and_logical_time() {
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let result = SemanticResult {
+            logical_delivery_id: delivery.logical_delivery_id,
+            observation: observation.key.clone(),
+        };
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+
+        let base =
+            admission_claim_commitment(&before, &after, &delivery, &observation, policy, 10, &result)
+                .unwrap();
+        let later =
+            admission_claim_commitment(&before, &after, &delivery, &observation, policy, 11, &result)
+                .unwrap();
+        let stricter = admission_claim_commitment(
+            &before,
+            &after,
+            &delivery,
+            &observation,
+            AdmissionPolicy {
+                max_observations: policy.max_observations - 1,
+                ..policy
+            },
+            10,
+            &result,
+        )
+        .unwrap();
+
+        assert_ne!(base, later);
+        assert_ne!(base, stricter);
+    }
+
+    #[test]
+    fn admission_claim_verification_rejects_tampered_claim() {
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let result = match decide(&before, &delivery, &observation, policy, 10) {
+            AdmissionOutcome::Admitted { result, .. } => result,
+            other => panic!("fixture admission failed: {other:?}"),
+        };
+        let transition =
+            transition_commitment(&before, &after, TransitionKind::Admission).unwrap();
+        let claim =
+            admission_claim_commitment(&before, &after, &delivery, &observation, policy, 10, &result)
+                .unwrap();
+        let mut tampered = claim.as_bytes().to_owned();
+        tampered[0] ^= 1;
+        let tampered = TransitionClaimCommitment(tampered);
+
+        assert_eq!(
+            verify_admission_transition_claim(
+                &before,
+                &after,
+                &delivery,
+                &observation,
+                policy,
+                10,
+                &result,
+                &transition,
+                &tampered,
+            ),
+            Err(TransitionVerificationError::ClaimCommitmentMismatch)
+        );
+    }
+
+    #[test]
+    fn lifecycle_claim_binds_policy_and_time() {
+        let (before, _) = fixture();
+        let policy = AdmissionPolicy::default();
+        let same = lifecycle_claim_commitment(&before, &before, policy, 10).unwrap();
+        let later = lifecycle_claim_commitment(&before, &before, policy, 11).unwrap();
+        assert_ne!(same, later);
+    }
+
 }
