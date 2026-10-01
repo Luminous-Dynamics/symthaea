@@ -633,6 +633,23 @@ mod tests {
     }
 
     #[test]
+    fn responding_mode_transition_is_never_processing_lifecycle() {
+        let previous = CognitiveState {
+            presence: PresenceState::Available,
+            mode: CognitiveMode::Exploring,
+            ..state(true, false, 0.8, 0.3, 0.6)
+        };
+        let current = CognitiveState {
+            presence: PresenceState::Available,
+            mode: CognitiveMode::Responding,
+            ..state(true, false, 0.8, 0.3, 0.1)
+        };
+        let event = event_between(Some(previous), current, 6, 45, false, false).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::StateChanged);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::ModeTransition);
+    }
+
+    #[test]
     fn processing_to_available_is_the_only_implicit_completion() {
         let previous = state(true, true, 0.8, 0.5, 0.1);
         let current = state(true, false, 0.8, 0.3, 0.1);
