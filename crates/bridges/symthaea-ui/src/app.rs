@@ -297,18 +297,20 @@ pub fn App() -> impl IntoView {
                         v.reasoning_confidence as f64,
                         v.prediction_error as f64,
                     );
+                    // Allocate identity only when a semantic event is actually
+                    // emitted. A quiet telemetry sample must not consume event IDs:
+                    // sequence numbers identify retained presentation events, not
+                    // observation count.
+                    let sequence = telemetry_sequence.get().saturating_add(1);
                     if let Some(event) = event_between(
                         previous_state,
                         current_state,
-                        {
-                            let next = telemetry_sequence.get().saturating_add(1);
-                            telemetry_sequence.set(next);
-                            next
-                        },
+                        sequence,
                         cycle,
                         v.surprise_triggered,
                         v.gwt_broadcast,
                     ) {
+                        telemetry_sequence.set(sequence);
                         events.update(|items| push_cognitive_event(items, event));
                     }
                     previous_state = Some(current_state);
