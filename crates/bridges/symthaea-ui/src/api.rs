@@ -54,7 +54,9 @@ pub async fn send_simple(gateway: &str, request_type: &str) -> Result<Value, Str
 
 /// Open the live telemetry WebSocket and invoke `on_message` for each
 /// `CycleMetadata` JSON payload received. Runs until the socket closes;
-/// callers spawn this via `wasm_bindgen_futures::spawn_local`.
+/// callers should scope this future to the component owner with
+/// `leptos::task::spawn_local_scoped_with_cancellation` so the WebSocket
+/// cannot outlive the UI owner.
 pub async fn stream_telemetry(
     gateway: &str,
     mut on_message: impl FnMut(Value),
