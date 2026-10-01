@@ -250,6 +250,57 @@ impl FederatedClaim {
                 return Err("representation relation cannot self-reference");
             }
         }
+
+        // A federated snapshot is a directed provenance graph. Reject cycles in
+        // semantic lineage edges so a derived/revised/superseding chain cannot
+        // claim that an object is ultimately derived from itself. This remains
+        // structural: temporal semantics and external event ordering belong to
+        // the provenance adapter, not this substrate-neutral contract.
+        let mut lineage = std::collections::BTreeMap::<&str, Vec<&str>>::new();
+        for relation in &self.relations {
+            if matches!(
+                relation.kind,
+                ProvenanceRelationKind::DerivedFrom
+                    | ProvenanceRelationKind::RevisedFrom
+                    | ProvenanceRelationKind::Supersedes
+            ) {
+                lineage
+                    .entry(relation.target_memory_id.as_str())
+                    .or_default()
+                    .push(relation.source_memory_id.as_str());
+            }
+        }
+        fn visit<'a>(
+            node: &'a str,
+            lineage: &std::collections::BTreeMap<&'a str, Vec<&'a str>>,
+            visiting: &mut std::collections::BTreeSet<&'a str>,
+            visited: &mut std::collections::BTreeSet<&'a str>,
+        ) -> bool {
+            if visiting.contains(node) {
+                return true;
+            }
+            if !visited.insert(node) {
+                return false;
+            }
+            visiting.insert(node);
+            if let Some(parents) = lineage.get(node) {
+                for parent in parents {
+                    if visit(parent, lineage, visiting, visited) {
+                        return true;
+                    }
+                }
+            }
+            visiting.remove(node);
+            false
+        }
+        let mut visiting = std::collections::BTreeSet::new();
+        let mut visited = std::collections::BTreeSet::new();
+        for node in lineage.keys().copied() {
+            if visit(node, &lineage, &mut visiting, &mut visited) {
+                return Err("provenance lineage contains a cycle");
+            }
+        }
+
         Ok(())
     }
 
@@ -395,6 +446,56 @@ mod tests {
                 ProvenanceView::from_relations(&[], validation).unwrap(), r,
             ).unwrap_err(),
             "claim snapshot digest must match validation report"
+        );
+    }
+
+    #[test]
+    fn federated_claim_rejects_lineage_cycle() {
+        let (r, validation) = receipt();
+        let relations = vec![
+            ProvenanceRelation {
+                source_memory_id: "b".into(),
+                target_memory_id: "a".into(),
+                kind: ProvenanceRelationKind::DerivedFrom,
+                created_at: "cycle:2".into(),
+            },
+            ProvenanceRelation {
+                source_memory_id: "a".into(),
+                target_memory_id: "b".into(),
+                kind: ProvenanceRelationKind::DerivedFrom,
+                created_at: "cycle:3".into(),
+            },
+        ];
+        let view = ProvenanceView::from_relations(&relations, validation).unwrap();
+        let receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-cycle",
+            Some("frontier:cycle".into()),
+            view.snapshot_digest.clone(),
+            view.validation.validator_version.clone(),
+            view.validation.snapshot_schema_version,
+        )
+        .unwrap();
+        let claim = FederatedClaim {
+            schema_version: FEDERATED_CLAIM_SCHEMA_VERSION,
+            claim_identity: "claim:cycle".into(),
+            canonical_identity: "canonical:cycle".into(),
+            provenance_family: "family:cycle".into(),
+            author: "author:1".into(),
+            statement_ref: "statement:cycle".into(),
+            source_event: None,
+            frontier_ref: Some("frontier:cycle".into()),
+            provenance_snapshot_digest: view.snapshot_digest.clone(),
+            provenance_validation: view.validation.clone(),
+            admission_receipt: receipt,
+            epistemic_state: None,
+            claim_ceiling: None,
+            model_ref: None,
+            derivation_refs: Vec::new(),
+            relations,
+        };
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "provenance lineage contains a cycle"
         );
     }
 
