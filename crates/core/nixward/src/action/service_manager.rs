@@ -63,6 +63,37 @@ impl ServiceManager {
         })
     }
 
+    /// Validate and render a typed start operation through the one-way legacy bridge.
+    /// Prefer this fallible API at new call sites; the result remains legacy data.
+    pub fn try_start(service: &str) -> Result<NixOSCommand, super::service_domain::NixServiceOperationErrorV1> {
+        Self::render_legacy_command(&super::service_domain::NixServiceOperationV1::new(service, super::service_domain::NixServiceOperationKindV1::Start)?)
+    }
+
+    /// Validate and render a typed stop operation through the one-way legacy bridge.
+    pub fn try_stop(service: &str) -> Result<NixOSCommand, super::service_domain::NixServiceOperationErrorV1> {
+        Self::render_legacy_command(&super::service_domain::NixServiceOperationV1::new(service, super::service_domain::NixServiceOperationKindV1::Stop)?)
+    }
+
+    /// Validate and render a typed restart operation through the one-way legacy bridge.
+    pub fn try_restart(service: &str) -> Result<NixOSCommand, super::service_domain::NixServiceOperationErrorV1> {
+        Self::render_legacy_command(&super::service_domain::NixServiceOperationV1::new(service, super::service_domain::NixServiceOperationKindV1::Restart)?)
+    }
+
+    /// Validate and render a typed reload operation through the one-way legacy bridge.
+    pub fn try_reload(service: &str) -> Result<NixOSCommand, super::service_domain::NixServiceOperationErrorV1> {
+        Self::render_legacy_command(&super::service_domain::NixServiceOperationV1::new(service, super::service_domain::NixServiceOperationKindV1::Reload)?)
+    }
+
+    /// Validate and render a typed enable operation through the one-way legacy bridge.
+    pub fn try_enable(service: &str) -> Result<NixOSCommand, super::service_domain::NixServiceOperationErrorV1> {
+        Self::render_legacy_command(&super::service_domain::NixServiceOperationV1::new(service, super::service_domain::NixServiceOperationKindV1::Enable)?)
+    }
+
+    /// Validate and render a typed disable operation through the one-way legacy bridge.
+    pub fn try_disable(service: &str) -> Result<NixOSCommand, super::service_domain::NixServiceOperationErrorV1> {
+        Self::render_legacy_command(&super::service_domain::NixServiceOperationV1::new(service, super::service_domain::NixServiceOperationKindV1::Disable)?)
+    }
+
     /// Generate a command to start a service.
     pub fn start(service: &str) -> NixOSCommand {
         NixOSCommand::Custom {
@@ -258,6 +289,31 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn fallible_typed_renderers_reject_invalid_units() {
+        for render in [
+            ServiceManager::try_start,
+            ServiceManager::try_stop,
+            ServiceManager::try_restart,
+            ServiceManager::try_reload,
+            ServiceManager::try_enable,
+            ServiceManager::try_disable,
+        ] {
+            assert_eq!(
+                render("../nginx").unwrap_err(),
+                super::super::service_domain::NixServiceOperationErrorV1::PathLikeUnit
+            );
+        }
+    }
+
+    #[test]
+    fn fallible_typed_renderer_uses_canonical_domain_spelling() {
+        let cmd = ServiceManager::try_restart("nginx").unwrap();
+        let (bin, args) = cmd.to_command();
+        assert_eq!(bin, "systemctl");
+        assert_eq!(args, vec!["restart", "nginx.service"]);
+    }
+
     fn test_normalize_name() {
         assert_eq!(ServiceManager::normalize_name("nginx"), "nginx.service");
         assert_eq!(
