@@ -44,7 +44,7 @@ Typed dependency reasons prevent graph proximity from being treated as semantic 
 
 An ontology-only revision should affect ontology-dependent actions without automatically gating an unrelated causal action. A causal-model revision should affect causal interventions. An evidence-boundary revision should affect actions whose support depends on that boundary.
 
-Legacy untyped dependencies remain conservative.
+The implementation now exposes a direct bridge that first asks the conclusion graph to reopen affected claims, then applies typed action dependencies and risk policy. Typed conclusion edges propagate only when their dependency kind is affected by the revision. Legacy untyped conclusion dependencies remain conservative because their semantic basis is unavailable. The action record also exposes a fail-closed prerequisite check for High/Critical actions. The caller must supply the authoritative current conclusion-ID set; action-provided identifiers are not treated as proof that a prerequisite exists. This check is a separate policy operation and must be invoked by the eventual execution boundary.
 
 ## Historical execution
 
@@ -80,7 +80,7 @@ This makes the gate explainable without trusting a free-form model rationale as 
 
 ## Adversarial requirements
 
-The implementation should deterministically test:
+The current module includes focused tests for high-risk gating, ontology-only typed propagation through the conclusion/action bridge, and missing-prerequisite deferral. These tests are source-level additions; they have not yet been run in a repository build. The full conformance suite should deterministically test:
 
 1. ontology-only revision gates ontology-dependent high-risk actions;
 2. causal revision gates causal interventions;
