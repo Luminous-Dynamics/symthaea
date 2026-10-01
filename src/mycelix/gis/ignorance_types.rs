@@ -605,9 +605,22 @@ impl ConclusionDependencyGraph {
 
     /// Reopen roots and all transitively dependent conclusions.
     pub fn reopen_from(&mut self, roots: &[String]) -> Vec<String> {
-        let mut reopened = roots.to_vec();
+        // Only return conclusions that actually exist in the graph. A provenance event
+        // may reference a stale/deleted ID; silently reporting it as reopened would turn
+        // missing provenance into false evidence of correction.
+        let known: std::collections::HashSet<&str> =
+            self.conclusions.iter().map(|c| c.id.as_str()).collect();
+
         let downstream = self.downstream_of(roots);
-        reopened.extend(downstream);
+        let mut candidates = roots.to_vec();
+        candidates.extend(downstream);
+
+        let mut reopened = Vec::new();
+        for id in candidates {
+            if known.contains(id.as_str()) && !reopened.iter().any(|seen| seen == &id) {
+                reopened.push(id);
+            }
+        }
 
         for conclusion in &mut self.conclusions {
             if reopened.iter().any(|id| id == &conclusion.id) {
@@ -1047,6 +1060,18 @@ mod tests {
         assert!(revision.follows_frame(&prior.identity()));
         assert!(revision.changes_frame());
         assert!(!revision.follows_frame("other@1"));
+    }
+
+    #[test]
+    fn test_reopen_preserves_already_superseded_state() {
+        let mut graph = ConclusionDependencyGraph::default();
+        let mut c = EpistemicConclusion::new("c1", "A", "gis-default@1");
+        c.status = ConclusionStatus::Superseded;
+        graph.add(c);
+
+        let reopened = graph.reopen_from(&["c1".to_string()]);
+        assert_eq!(reopened, vec!["c1".to_string()]);
+        assert_eq!(graph.conclusions[0].status, ConclusionStatus::Reopened);
     }
 
     #[test]
