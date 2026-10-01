@@ -781,9 +781,9 @@ impl EnhancedKnowledgeGraph {
     // ── Persistence Support ─────────────────────────────────────────────
 
     /// Import a fact from a persistence record.
-    pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
+    pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) -> bool {
         if record.vector_bytes.len() != 2048 {
-            return;
+            return false;
         }
         let mut arr = [0u8; 2048];
         arr.copy_from_slice(&record.vector_bytes);
@@ -817,6 +817,7 @@ impl EnhancedKnowledgeGraph {
                 .push(id);
         }
         self.facts.insert(id, fact);
+        true
     }
 
     /// Export all facts as persistence records.
