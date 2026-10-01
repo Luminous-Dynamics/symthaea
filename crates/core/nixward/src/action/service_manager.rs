@@ -8,8 +8,6 @@
 //! the Φ-gated executor — the service manager itself does NOT
 //! execute commands directly.
 
-use std::process::Command;
-
 use super::executor::{NixOSCommand, SafetyLevel};
 use super::service_state::{
     NixServiceEnablementEvidenceV1, NixServiceObservedStateV1, NixServiceOperationCapabilitiesV1,
