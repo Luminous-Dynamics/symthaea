@@ -80,6 +80,14 @@ run_boundary_check() {
   # legacy Custom command representation as semantic input. The legacy service
   # renderer is a one-way compatibility projection only.
   for file in "${AUTHORITY_FILES[@]}"; do
+    if matches="$(scan_legacy_custom_command "${ROOT}/${file}")"; then
+      echo "ERROR: governed authority module consumes legacy NixOSCommand::Custom: ${file}" >&2
+      echo "${matches}" >&2
+      failed=1
+    fi
+  done
+
+  for file in "${AUTHORITY_FILES[@]}"; do
     [[ "${file}" == "crates/core/nixward/src/action/systemd_transport.rs" ]] && continue
     if matches="$(scan_direct_systemctl "${ROOT}/${file}")"; then
       echo "ERROR: governed authority module directly invokes systemctl: ${file}" >&2
