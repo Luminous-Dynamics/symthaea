@@ -93,7 +93,7 @@ run_boundary_check() {
   # CROSS-022: the typed service domain is intentionally upstream of the
   # legacy command representation. It must not mention NixOSCommand at all,
   # preventing accidental reverse conversion or semantic coupling.
-  if matches="$(rg -n '\\bNixOSCommand\\b' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
+  if matches="$(rg -n '\bNixOSCommand\b' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
     echo "ERROR: typed service domain must not depend on legacy NixOSCommand representation" >&2
     echo "${matches}" >&2
     failed=1
