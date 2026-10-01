@@ -38,6 +38,7 @@ AUTHORITY_FILES=(
 
 DIAGNOSTIC_IDENTIFIERS='\b(ServiceStatus|UnitInfo|SystemdObserver)\b'
 SYSTEMCTL_PATTERN='(?:Command|process::Command)::new\(\s*["\x27]systemctl["\x27]'
+LEGACY_COMMAND_PATTERN='NixOSCommand::Custom'
 
 scan_diagnostic_boundary() {
   local file="$1"
@@ -47,6 +48,11 @@ scan_diagnostic_boundary() {
 scan_direct_systemctl() {
   local file="$1"
   rg -n --pcre2 "${SYSTEMCTL_PATTERN}" "$file"
+}
+
+scan_legacy_custom_command() {
+  local file="$1"
+  rg -n --pcre2 "${LEGACY_COMMAND_PATTERN}" "$file"
 }
 
 run_boundary_check() {
@@ -69,6 +75,10 @@ run_boundary_check() {
 
   # The transport waist is allowed to execute systemctl. Every other protected
   # authority module must remain free of direct host observation.
+  #
+  # CROSS-022: governed authority/effect-binding modules must not consume the
+  # legacy Custom command representation as semantic input. The legacy service
+  # renderer is a one-way compatibility projection only.
   for file in "${AUTHORITY_FILES[@]}"; do
     [[ "${file}" == "crates/core/nixward/src/action/systemd_transport.rs" ]] && continue
     if matches="$(scan_direct_systemctl "${ROOT}/${file}")"; then
@@ -103,6 +113,14 @@ run_self_test() {
   fi
 
   printf '%s\n' 'NixServiceObservedStateV1::parse_systemd_properties(...);' > "${tmp}/typed.rs"
+  printf '%s\n' 'let _ = NixOSCommand::Custom { .. };' > "${tmp}/legacy-custom.rs"
+  if scan_legacy_custom_command "${tmp}/legacy-custom.rs"; then
+    :
+  else
+    echo "ERROR: CROSS-022 self-test failed to detect legacy Custom command material" >&2
+    return 1
+  fi
+
   if scan_diagnostic_boundary "${tmp}/typed.rs"; then
     echo "ERROR: CROSS-015 self-test falsely rejected typed evidence" >&2
     return 1
