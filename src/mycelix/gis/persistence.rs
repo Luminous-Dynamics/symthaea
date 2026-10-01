@@ -151,6 +151,16 @@ impl StoredIgnoranceRecord {
             frame_causal_model_id: record.detection.frame.causal_model_id.clone(),
             frame_excluded_variables: record.detection.frame.excluded_variables.clone(),
             frame_known_blind_spots: record.detection.frame.known_blind_spots.clone(),
+            frame_revisions_serialized: record.frame_revisions.iter().map(|r| {
+                [
+                    r.prior_frame.clone(),
+                    r.revised_frame.clone(),
+                    r.trigger.clone(),
+                    r.newly_represented.clone().unwrap_or_default(),
+                    r.scope_change.clone(),
+                    r.affected_conclusions.join(","),
+                ].join("\n")
+            }).collect(),
             created_at,
             updated_at,
         }
