@@ -57,22 +57,46 @@ impl Vitals {
     /// the actual wire JSON is flat — every field is a top-level key. Confirmed
     /// live against a real daemon 2026-07-12 (an earlier nested-path version of
     /// this function silently read `None` for everything).
-    fn from_json(v: &Value) -> Self {
-        let f64_at = |key: &str| -> f64 { v[key].as_f64().unwrap_or(0.0) };
-        Self {
-            consciousness_level: f64_at("consciousness_level"),
-            valence: f64_at("affective_valence") as f32,
-            arousal: f64_at("affective_arousal") as f32,
-            mood_temperature: f64_at("mood_temperature") as f32,
-            thermodynamic_load: f64_at("thermodynamic_load") as f32,
-            moral_score: f64_at("value_evaluator_score"),
-            coherence: f64_at("harmonic_field_coherence"),
+    fn from_json(v: &Value) -> Option<Self> {
+        // These four fields are the minimum evidence required to construct a
+        // semantic cognitive state. Missing telemetry must not silently become
+        // zeros: doing so would turn malformed gateway data into apparently
+        // valid observations and could generate false timeline events.
+        let required_f64 = |key: &str| -> Option<f64> {
+            let value = v.get(key)?.as_f64()?;
+            value.is_finite().then_some(value)
+        };
+        let consciousness_level = v.get("consciousness_level")?.as_f64()?;
+        let valence = v.get("affective_valence")?.as_f64()?;
+        let arousal = v.get("affective_arousal")?.as_f64()?;
+        let mood_temperature = v.get("mood_temperature")?.as_f64()?;
+        let thermodynamic_load = required_f64("thermodynamic_load")?;
+        let moral_score = v.get("value_evaluator_score")?.as_f64()?;
+        let coherence = required_f64("harmonic_field_coherence")?;
+        let reasoning_confidence = required_f64("reasoning_confidence")?;
+        let prediction_error = required_f64("prediction_error")?;
+        if !consciousness_level.is_finite()
+            || !valence.is_finite()
+            || !arousal.is_finite()
+            || !mood_temperature.is_finite()
+            || !moral_score.is_finite()
+        {
+            return None;
+        }
+        Some(Self {
+            consciousness_level,
+            valence: valence as f32,
+            arousal: arousal as f32,
+            mood_temperature: mood_temperature as f32,
+            thermodynamic_load: thermodynamic_load as f32,
+            moral_score,
+            coherence,
             gwt_broadcast: v["gwt_broadcast"].as_bool().unwrap_or(false),
             dream_insights: v["dream_insights"].as_u64().unwrap_or(0) as usize,
             surprise_triggered: v["surprise_triggered"].as_bool().unwrap_or(false),
-            reasoning_confidence: f64_at("reasoning_confidence") as f32,
-            prediction_error: f64_at("prediction_error") as f32,
-        }
+            reasoning_confidence: reasoning_confidence as f32,
+            prediction_error: prediction_error as f32,
+        })
     }
 }
 
@@ -220,8 +244,16 @@ pub fn App() -> impl IntoView {
             api::stream_telemetry(
                 &gw,
                 move |payload| {
-                    let v = Vitals::from_json(&payload);
-                    let cycle = payload["cycle"].as_u64().unwrap_or(0);
+                    let Some(v) = Vitals::from_json(&payload) else {
+                        leptos::logging::warn!(
+                            "telemetry payload missing finite required cognitive measurements"
+                        );
+                        return;
+                    };
+                    let Some(cycle) = payload["cycle"].as_u64() else {
+                        leptos::logging::warn!("telemetry payload missing cycle identifier");
+                        return;
+                    };
                     let current_state = CognitiveState::from_observation(
                         true,
                         sending.get_untracked(),
@@ -636,5 +668,41 @@ pub fn App() -> impl IntoView {
                 </form>
             </section>
         </div>
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_payload() -> Value {
+        serde_json::json!({
+            "cycle": 42,
+            "consciousness_level": 0.7,
+            "affective_valence": 0.2,
+            "affective_arousal": 0.3,
+            "mood_temperature": 0.4,
+            "thermodynamic_load": 0.5,
+            "value_evaluator_score": 0.6,
+            "harmonic_field_coherence": 0.8,
+            "reasoning_confidence": 0.9,
+            "prediction_error": 0.1,
+            "gwt_broadcast": false,
+            "dream_insights": 0,
+            "surprise_triggered": false
+        })
+    }
+
+    #[test]
+    fn telemetry_requires_finite_cognitive_measurements() {
+        assert!(Vitals::from_json(&valid_payload()).is_some());
+    }
+
+    #[test]
+    fn missing_required_telemetry_is_rejected_instead_of_zero_filled() {
+        let mut payload = valid_payload();
+        payload.as_object_mut().unwrap().remove("harmonic_field_coherence");
+        assert!(Vitals::from_json(&payload).is_none());
     }
 }
