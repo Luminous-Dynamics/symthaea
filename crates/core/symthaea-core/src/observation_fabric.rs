@@ -346,6 +346,37 @@ fn write_canonical_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
     hasher.update(&(bytes.len() as u64).to_be_bytes());
     hasher.update(bytes);
 }
+fn write_canonical_string_bytes(bytes: &mut Vec<u8>, value: &str) {
+    bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(value.as_bytes());
+}
+
+fn write_canonical_string_vec_bytes(bytes: &mut Vec<u8>, values: &[String]) {
+    bytes.extend_from_slice(&(values.len() as u64).to_le_bytes());
+    for value in values { write_canonical_string_bytes(bytes, value); }
+}
+
+fn write_canonical_independence_bytes(bytes: &mut Vec<u8>, value: &EvidenceIndependence) {
+    bytes.push(match value {
+        EvidenceIndependence::Independent => 0,
+        EvidenceIndependence::VerifiedIndependent => 1,
+        EvidenceIndependence::SharedUpstream => 2,
+        EvidenceIndependence::Derived => 3,
+        EvidenceIndependence::Unknown => 4,
+    });
+}
+
+fn write_canonical_independence_basis_bytes(bytes: &mut Vec<u8>, value: &IndependenceBasis) {
+    match value {
+        IndependenceBasis::SharedSensor { sensor_id } => { bytes.push(0); write_canonical_string_bytes(bytes, sensor_id); }
+        IndependenceBasis::SharedPlatform { platform_id } => { bytes.push(1); write_canonical_string_bytes(bytes, platform_id); }
+        IndependenceBasis::SharedAncestor { observation_id } => { bytes.push(2); write_canonical_string_bytes(bytes, observation_id); }
+        IndependenceBasis::SharedProcessingActivity { activity_id } => { bytes.push(3); write_canonical_string_bytes(bytes, activity_id); }
+        IndependenceBasis::IdenticalAsset { hash_algorithm, content_hash } => { bytes.push(4); write_canonical_string_bytes(bytes, hash_algorithm); write_canonical_string_bytes(bytes, content_hash); }
+        IndependenceBasis::NoSharedProvenance => bytes.push(5),
+    }
+}
+
 fn write_canonical_string(hasher: &mut blake3::Hasher, value: &str) {
     write_canonical_bytes(hasher, value.as_bytes());
 }
@@ -577,6 +608,73 @@ pub struct IndependenceAssessment {
     /// BLAKE3 commitment to the assessed pair, scope, classification, basis,
     /// and verifier version. This is an assessment fingerprint, not a truth claim.
     pub assessment_fingerprint: String,
+}
+
+/// Deterministic, attestation-ready receipt for a bounded independence assessment.
+///
+/// This is intentionally not a credential and contains no issuer/trust semantics.
+/// External systems may bind a signature or credential to this receipt without
+/// changing what the core verifier means by VerifiedIndependent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndependenceVerificationReceipt {
+    pub source_observation_id: String,
+    pub target_observation_id: String,
+    pub classification: EvidenceIndependence,
+    pub basis: IndependenceBasis,
+    pub examined_observation_ids: Vec<String>,
+    pub verifier_version: &'static str,
+    pub examined_scope_fingerprint: String,
+    pub assessment_fingerprint: String,
+}
+
+impl IndependenceVerificationReceipt {
+    pub const DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:observation-independence-receipt:v1\\n";
+
+    pub fn from_assessment(assessment: &IndependenceAssessment) -> Self {
+        Self {
+            source_observation_id: assessment.source_observation_id.clone(),
+            target_observation_id: assessment.target_observation_id.clone(),
+            classification: assessment.classification.clone(),
+            basis: assessment.basis.clone(),
+            examined_observation_ids: assessment.examined_observation_ids.clone(),
+            verifier_version: assessment.verifier_version,
+            examined_scope_fingerprint: assessment.examined_scope_fingerprint.clone(),
+            assessment_fingerprint: assessment.assessment_fingerprint.clone(),
+        }
+    }
+
+    pub fn verify_integrity(&self) -> bool {
+        let assessment = IndependenceAssessment {
+            source_observation_id: self.source_observation_id.clone(),
+            target_observation_id: self.target_observation_id.clone(),
+            classification: self.classification.clone(),
+            basis: self.basis.clone(),
+            examined_observation_ids: self.examined_observation_ids.clone(),
+            verifier_version: self.verifier_version,
+            examined_scope_fingerprint: self.examined_scope_fingerprint.clone(),
+            assessment_fingerprint: self.assessment_fingerprint.clone(),
+        };
+        assessment.verify_fingerprint()
+    }
+
+    /// Produce canonical bytes an external attestation layer can sign or hash.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(Self::DOMAIN_SEPARATOR);
+        write_canonical_string_bytes(&mut bytes, &self.source_observation_id);
+        write_canonical_string_bytes(&mut bytes, &self.target_observation_id);
+        write_canonical_independence_bytes(&mut bytes, &self.classification);
+        write_canonical_independence_basis_bytes(&mut bytes, &self.basis);
+        write_canonical_string_vec_bytes(&mut bytes, &self.examined_observation_ids);
+        write_canonical_string_bytes(&mut bytes, self.verifier_version);
+        write_canonical_string_bytes(&mut bytes, &self.examined_scope_fingerprint);
+        write_canonical_string_bytes(&mut bytes, &self.assessment_fingerprint);
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        blake3::hash(&self.canonical_bytes()).to_hex().to_string()
+    }
 }
 
 impl IndependenceAssessment {
@@ -2020,6 +2118,21 @@ mod tests {
         assert_ne!(assessment.assessment_fingerprint, assessment.compute_fingerprint());
         assert_ne!(original, assessment.compute_fingerprint());
         assert!(!assessment.verify_fingerprint());
+    }
+
+    #[test]
+    fn independence_receipt_is_attestation_ready() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph { observations: vec![fixture(), second], relations: vec![] };
+        let assessment = graph.assess_independence_detailed("obs-001", "obs-002").expect("assessment");
+        let receipt = IndependenceVerificationReceipt::from_assessment(&assessment);
+        assert!(receipt.verify_integrity());
+        assert!(!receipt.canonical_bytes().is_empty());
+        assert!(receipt.canonical_bytes().starts_with(IndependenceVerificationReceipt::DOMAIN_SEPARATOR));
+        assert_eq!(receipt.fingerprint().len(), 64);
+        assert_eq!(receipt.fingerprint(), IndependenceVerificationReceipt::from_assessment(&assessment).fingerprint());
     }
 
     #[test]
