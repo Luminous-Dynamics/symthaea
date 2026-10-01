@@ -69,36 +69,32 @@ impl Vitals {
             let value = v.get(key)?.as_f64()?;
             value.is_finite().then_some(value)
         };
-        let consciousness_level = v.get("consciousness_level")?.as_f64()?;
-        let valence = v.get("affective_valence")?.as_f64()?;
-        let arousal = v.get("affective_arousal")?.as_f64()?;
-        let mood_temperature = v.get("mood_temperature")?.as_f64()?;
-        let thermodynamic_load = required_f64("thermodynamic_load")?;
-        let moral_score = v.get("value_evaluator_score")?.as_f64()?;
+        let required_f32 = |key: &str| -> Option<f32> {
+            let value = required_f64(key)? as f32;
+            value.is_finite().then_some(value)
+        };
+        let consciousness_level = required_f64("consciousness_level")?;
+        let valence = required_f32("affective_valence")?;
+        let arousal = required_f32("affective_arousal")?;
+        let mood_temperature = required_f32("mood_temperature")?;
+        let thermodynamic_load = required_f32("thermodynamic_load")?;
+        let moral_score = required_f64("value_evaluator_score")?;
         let coherence = required_f64("harmonic_field_coherence")?;
-        let reasoning_confidence = required_f64("reasoning_confidence")?;
-        let prediction_error = required_f64("prediction_error")?;
-        if !consciousness_level.is_finite()
-            || !valence.is_finite()
-            || !arousal.is_finite()
-            || !mood_temperature.is_finite()
-            || !moral_score.is_finite()
-        {
-            return None;
-        }
+        let reasoning_confidence = required_f32("reasoning_confidence")?;
+        let prediction_error = required_f32("prediction_error")?;
         Some(Self {
             consciousness_level,
-            valence: valence as f32,
-            arousal: arousal as f32,
-            mood_temperature: mood_temperature as f32,
-            thermodynamic_load: thermodynamic_load as f32,
+            valence,
+            arousal,
+            mood_temperature,
+            thermodynamic_load,
             moral_score,
             coherence,
             gwt_broadcast: v["gwt_broadcast"].as_bool().unwrap_or(false),
             dream_insights: v["dream_insights"].as_u64().unwrap_or(0) as usize,
             surprise_triggered: v["surprise_triggered"].as_bool().unwrap_or(false),
-            reasoning_confidence: reasoning_confidence as f32,
-            prediction_error: prediction_error as f32,
+            reasoning_confidence,
+            prediction_error,
         })
     }
 }
@@ -828,5 +824,19 @@ mod tests {
         let mut payload = valid_payload();
         payload.as_object_mut().unwrap().remove("harmonic_field_coherence");
         assert!(Vitals::from_json(&payload).is_none());
+    }
+
+    #[test]
+    fn f32_overflow_after_decode_is_rejected() {
+        let mut payload = valid_payload();
+        payload["thermodynamic_load"] = serde_json::json!(f64::MAX);
+        assert!(Vitals::from_json(&payload).is_none());
+    }
+
+    #[test]
+    fn f32_representable_boundary_remains_accepted() {
+        let mut payload = valid_payload();
+        payload["thermodynamic_load"] = serde_json::json!(f32::MAX as f64);
+        assert!(Vitals::from_json(&payload).is_some());
     }
 }
