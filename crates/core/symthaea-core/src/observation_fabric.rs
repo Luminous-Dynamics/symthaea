@@ -892,7 +892,7 @@ impl ReceiptAttestationEnvelope {
         write_canonical_string_bytes(&mut bytes, &self.attester_id);
         write_canonical_string_bytes(&mut bytes, &self.proof_purpose);
         bytes.extend_from_slice(&self.created_at_unix_ns.to_be_bytes());
-        write_canonical_string_option_bytes(&mut bytes, self.expires_at_unix_ns.map(|v| v.to_string()).as_deref());
+        write_canonical_i128_option_bytes(&mut bytes, self.expires_at_unix_ns);
         write_canonical_string_option_bytes(&mut bytes, self.verification_method.as_deref());
         write_canonical_string_option_bytes(&mut bytes, self.cryptosuite.as_deref());
         write_canonical_string_option_bytes(&mut bytes, self.domain.as_deref());
@@ -908,6 +908,16 @@ impl ReceiptAttestationEnvelope {
 
 fn is_hex_fingerprint(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn write_canonical_i128_option_bytes(bytes: &mut Vec<u8>, value: Option<i128>) {
+    match value {
+        Some(value) => {
+            bytes.push(1);
+            bytes.extend_from_slice(&value.to_be_bytes());
+        }
+        None => bytes.push(0),
+    }
 }
 
 fn write_canonical_string_option_bytes(bytes: &mut Vec<u8>, value: Option<&str>) {
@@ -1622,6 +1632,14 @@ mod tests {
             envelope.validate(),
             Err(ObservationValidationError::InvalidReceiptAttestationEnvelope)
         );
+
+        envelope.expires_at_unix_ns = None;
+        let baseline = envelope.payload_fingerprint();
+        envelope.challenge = Some("challenge-1".into());
+        assert_ne!(baseline, envelope.payload_fingerprint());
+        envelope.challenge = None;
+        envelope.proof_purpose = "https://example.org/purpose/other".into();
+        assert_ne!(baseline, envelope.payload_fingerprint());
     }
 
     #[test]
