@@ -307,7 +307,7 @@ impl KnowledgeManager {
             // provenance and may intentionally reference memories no longer resident in the
             // local cognitive projection.
             match p.load_provenance_relations() {
-                Ok(relations) {
+                Ok(relations) => {
                     persistence_health.provenance_loaded = true;
                     let mut loaded_relations = 0usize;
                     for record in relations {
@@ -344,7 +344,7 @@ impl KnowledgeManager {
             }
             // Load existing causal edges
             match p.load_causal_edges() {
-                Ok(edges) {
+                Ok(edges) => {
                     persistence_health.causal_loaded = true;
                     let edge_count = edges.len();
                     for record in &edges {
@@ -368,7 +368,7 @@ impl KnowledgeManager {
             }
             // Load existing ontology primitives
             match p.load_ontology() {
-                Ok(records) {
+                Ok(records) => {
                     persistence_health.ontology_loaded = true;
                     let onto_count = records.len();
                     for record in &records {
@@ -1437,6 +1437,19 @@ fn infer_domain(fact: &super::extraction::ExtractedFact) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_persistence_health_reports_failed_domain() {
+        let health = KnowledgePersistenceHealth {
+            facts_loaded: true,
+            provenance_loaded: false,
+            causal_loaded: true,
+            ontology_loaded: false,
+        };
+
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["provenance", "ontology"]);
+    }
 
     #[test]
     fn test_persistence_corruption_is_exposed_as_degraded_state() {
