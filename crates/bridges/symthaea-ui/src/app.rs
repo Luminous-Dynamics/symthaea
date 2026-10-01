@@ -197,6 +197,9 @@ pub fn App() -> impl IntoView {
     let draft = RwSignal::new(String::new());
     let sending = RwSignal::new(false);
     let last_error = RwSignal::new(Option::<String>::None);
+    // Request generations prevent a response from an obsolete gateway/session
+    // from mutating the current conversation or clearing a newer send state.
+    let request_generation = Rc::new(Cell::new(0_u64));
     let daemon_status = RwSignal::new(Option::<Value>::None);
     let events = RwSignal::new(Vec::<CognitiveEvent>::new());
     // Pauses the presentation of the event stream, not the daemon itself.
@@ -352,6 +355,19 @@ pub fn App() -> impl IntoView {
         });
     });
 
+    // Gateway changes also invalidate in-flight conversation requests.
+    // The old future may still resolve, but its response is no longer
+    // authoritative for the current gateway generation.
+    {
+        let request_generation = Rc::clone(&request_generation);
+        Effect::new(move |_| {
+            let _gateway_generation = gateway.get();
+            let next = request_generation.get().saturating_add(1);
+            request_generation.set(next);
+            sending.set(false);
+        });
+    }
+
     // Poll GET-equivalent /v1/service status every 5s. This is baseline
     // liveness feedback independent of the telemetry WS above, which stays
     // silent whenever the daemon's experience bridge is off (the common
@@ -429,8 +445,16 @@ pub fn App() -> impl IntoView {
             })
         });
         let gw = gateway.get_untracked();
+        let request_id = {
+            let next = request_generation.get().saturating_add(1);
+            request_generation.set(next);
+            next
+        };
+        let request_generation = Rc::clone(&request_generation);
         spawn_local_scoped_with_cancellation(async move {
             match api::send_query(&gw, &text).await {
+                response if request_generation.get() != request_id => return,
+                response => match response {
                 Ok(resp) => {
                     if resp["type"] == "error" {
                         let msg = resp["message"]
@@ -448,9 +472,12 @@ pub fn App() -> impl IntoView {
                         });
                     }
                 }
-                Err(e) => last_error.set(Some(e)),
+                    Err(e) => last_error.set(Some(e)),
+                },
             }
-            sending.set(false);
+            if request_generation.get() == request_id {
+                sending.set(false);
+            }
         });
     };
 
@@ -738,6 +765,17 @@ mod tests {
     #[test]
     fn telemetry_requires_finite_cognitive_measurements() {
         assert!(Vitals::from_json(&valid_payload()).is_some());
+    }
+
+    #[test]
+    fn request_generation_is_monotonic() {
+        let mut generation = 0_u64;
+        let first = generation.saturating_add(1);
+        generation = first;
+        let second = generation.saturating_add(1);
+        generation = second;
+        assert_eq!(generation, 2);
+        assert_ne!(first, second);
     }
 
     #[test]
