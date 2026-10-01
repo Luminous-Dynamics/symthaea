@@ -227,6 +227,27 @@ impl IgnoranceRecord {
         self.updated_at = SystemTime::now();
     }
 
+    /// Append a frame revision only when it continues the current lineage.
+    pub fn try_append_frame_revision(
+        &mut self,
+        revision: EpistemicFrameRevision,
+    ) -> Result<(), FrameLineageError> {
+        let expected = self
+            .latest_frame_revision()
+            .map(|entry| entry.revised_frame.as_str().to_owned())
+            .unwrap_or_else(|| self.detection.frame.identity());
+
+        if !revision.follows_frame(&expected) {
+            return Err(FrameLineageError::Discontinuous);
+        }
+        if !revision.changes_frame() {
+            return Err(FrameLineageError::NoOp);
+        }
+
+        self.append_frame_revision(revision);
+        Ok(())
+    }
+
     /// Return the most recent frame revision, if any.
     pub fn latest_frame_revision(&self) -> Option<&EpistemicFrameRevision> {
         self.frame_revisions.last()
@@ -427,6 +448,26 @@ impl EpistemicFrameRevision {
         self.prior_frame != self.revised_frame
     }
 }
+
+/// Failure returned when a frame revision would corrupt append-only lineage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameLineageError {
+    /// The revision starts from a different frame than the record's current frame.
+    Discontinuous,
+    /// The revision does not actually change the frame.
+    NoOp,
+}
+
+impl std::fmt::Display for FrameLineageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Discontinuous => write!(f, "frame revision is discontinuous"),
+            Self::NoOp => write!(f, "frame revision is a no-op"),
+        }
+    }
+}
+
+impl std::error::Error for FrameLineageError {}
 
 impl Default for EpistemicFrame {
     fn default() -> Self {
@@ -703,6 +744,57 @@ mod tests {
             IgnoranceType::Unknown.confidence_ceiling()
                 > IgnoranceType::Impossible.confidence_ceiling()
         );
+    }
+
+    #[test]
+    fn test_checked_frame_revision_append_rejects_invalid_history() {
+        let mut record = IgnoranceRecord {
+            id: "checked-lineage".to_string(),
+            detection: super::IgnoranceDetection {
+                query: "q".to_string(),
+                ignorance_type: IgnoranceType::KnownUnknown,
+                uncertainty: Uncertainty3D::new(0.2, 0.2, 0.2),
+                domain: Domain::General,
+                eig: 0.5,
+                detected_at: SystemTime::now(),
+                frame: EpistemicFrame::default(),
+            },
+            status: IgnoranceStatus::Active,
+            resolution: None,
+            frame_revisions: Vec::new(),
+            created_at: SystemTime::now(),
+            updated_at: SystemTime::now(),
+        };
+        let prior = record.detection.frame.clone();
+        let revised = EpistemicFrame { version: 2, ..prior.clone() };
+
+        let valid = EpistemicFrameRevision::new(
+            &prior, &revised, "valid", None, "version bump", vec![],
+        );
+        assert!(record.try_append_frame_revision(valid).is_ok());
+
+        let no_op = EpistemicFrameRevision::new(
+            &revised, &revised, "noop", None, "unchanged", vec![],
+        );
+        assert_eq!(
+            record.try_append_frame_revision(no_op),
+            Err(FrameLineageError::NoOp)
+        );
+
+        let discontinuous = EpistemicFrameRevision::new(
+            &prior,
+            &EpistemicFrame { version: 3, ..prior.clone() },
+            "stale writer",
+            None,
+            "skipped current frame",
+            vec![],
+        );
+        assert_eq!(
+            record.try_append_frame_revision(discontinuous),
+            Err(FrameLineageError::Discontinuous)
+        );
+        assert_eq!(record.frame_revisions.len(), 1);
+        assert!(record.frame_lineage_is_contiguous());
     }
 
     #[test]
