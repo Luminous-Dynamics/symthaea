@@ -32,8 +32,9 @@ use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::{
-    Domain, EpistemicFrame, IgnoranceDetection, IgnoranceRecord, IgnoranceResolution,
-    IgnoranceStatus, IgnoranceType, ResolutionMethod, Uncertainty3D, ZKIgnoranceSignature,
+    Domain, EpistemicFrame, EpistemicFrameRevision, IgnoranceDetection, IgnoranceRecord,
+    IgnoranceResolution, IgnoranceStatus, IgnoranceType, ResolutionMethod, Uncertainty3D,
+    ZKIgnoranceSignature,
 };
 
 // ============================================================================
@@ -98,6 +99,8 @@ pub struct StoredIgnoranceRecord {
     pub frame_causal_model_id: String,
     pub frame_excluded_variables: Vec<String>,
     pub frame_known_blind_spots: Vec<String>,
+    /// Append-only serialized frame revision lineage.
+    pub frame_revisions_serialized: Vec<String>,
     pub created_at: u64,
     pub updated_at: u64,
 }
