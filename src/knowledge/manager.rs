@@ -1516,6 +1516,7 @@ mod tests {
             provenance_rejections: 0,
             provenance_snapshot_conforms: false,
             causal_loaded: true,
+            causal_restore_evictions: 0,
             ontology_loaded: false,
             ontology_rejections: 0,
         };
@@ -1534,12 +1535,33 @@ mod tests {
             provenance_rejections: 0,
             provenance_snapshot_conforms: true,
             causal_loaded: true,
+            causal_restore_evictions: 0,
             ontology_loaded: true,
             ontology_rejections: 0,
         };
 
         assert!(health.is_degraded());
         assert_eq!(health.failed_domains(), vec!["facts"]);
+    }
+
+    #[test]
+    fn test_persistence_health_reports_causal_policy_evictions_without_degrading() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            fact_rejections: 0,
+            provenance_loaded: true,
+            provenance_rejections: 0,
+            provenance_snapshot_conforms: true,
+            causal_loaded: true,
+            causal_restore_evictions: 2,
+            ontology_loaded: true,
+            ontology_rejections: 0,
+        };
+
+        assert!(!health.is_degraded());
+        assert!(health.failed_domains().is_empty());
+        assert_eq!(health.causal_restore_evictions, 2);
     }
 
     #[test]
@@ -1552,6 +1574,7 @@ mod tests {
             provenance_rejections: 0,
             provenance_snapshot_conforms: true,
             causal_loaded: true,
+            causal_restore_evictions: 0,
             ontology_loaded: true,
             ontology_rejections: 1,
         };
@@ -1616,6 +1639,7 @@ mod tests {
             provenance_rejections: 1,
             provenance_snapshot_conforms: true,
             causal_loaded: true,
+            causal_restore_evictions: 0,
             ontology_loaded: true,
             ontology_rejections: 0,
         };
