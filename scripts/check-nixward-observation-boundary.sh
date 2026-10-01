@@ -90,6 +90,15 @@ run_boundary_check() {
     fi
   done
 
+  # CROSS-022: the typed service domain is intentionally upstream of the
+  # legacy command representation. It must not mention NixOSCommand at all,
+  # preventing accidental reverse conversion or semantic coupling.
+  if matches="$(rg -n '\\bNixOSCommand\\b' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
+    echo "ERROR: typed service domain must not depend on legacy NixOSCommand representation" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+
   # Domain invariants must be established by NixServiceOperationV1::new().
   # A derived Deserialize implementation could bypass that constructor.
   if matches="$(rg -n '\bDeserialize\b' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
