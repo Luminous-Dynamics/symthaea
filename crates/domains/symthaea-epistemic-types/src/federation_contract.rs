@@ -232,8 +232,18 @@ impl FederatedClaim {
             return Err("derivation references must be non-empty");
         }
 
+        let mut seen_relations = std::collections::HashSet::with_capacity(self.relations.len());
         for relation in &self.relations {
             relation.validate()?;
+            let relation_key = (
+                relation.source_memory_id.as_str(),
+                relation.target_memory_id.as_str(),
+                relation.kind.stable_code(),
+                relation.created_at.as_str(),
+            );
+            if !seen_relations.insert(relation_key) {
+                return Err("provenance relations must be unique");
+            }
             if relation.kind == ProvenanceRelationKind::RepresentationOf
                 && relation.source_memory_id == relation.target_memory_id
             {
@@ -385,6 +395,83 @@ mod tests {
                 ProvenanceView::from_relations(&[], validation).unwrap(), r,
             ).unwrap_err(),
             "claim snapshot digest must match validation report"
+        );
+    }
+
+    #[test]
+    fn federated_claim_rejects_duplicate_provenance_relation() {
+        let (r, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let mut claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            ProvenanceView::from_relations(&[relation.clone()], validation).unwrap(),
+            r,
+        )
+        .unwrap();
+        claim.relations.push(relation);
+        claim.provenance_validation.relation_count = 2;
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "claim snapshot digest must match validation report"
+        );
+
+        // Rebuild the validation snapshot around the duplicated relation so the
+        // duplicate itself, rather than a stale count/digest, is the rejected condition.
+        let duplicate_relations = vec![
+            ProvenanceRelation {
+                source_memory_id: "derived".into(),
+                target_memory_id: "source".into(),
+                kind: ProvenanceRelationKind::DerivedFrom,
+                created_at: "cycle:2".into(),
+            },
+            ProvenanceRelation {
+                source_memory_id: "derived".into(),
+                target_memory_id: "source".into(),
+                kind: ProvenanceRelationKind::DerivedFrom,
+                created_at: "cycle:2".into(),
+            },
+        ];
+        let duplicate_validation = ProvenanceValidationReport::from_relations(&duplicate_relations);
+        let duplicate_view =
+            ProvenanceView::from_relations(&duplicate_relations, duplicate_validation).unwrap();
+        let duplicate_receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            Some("frontier:1".into()),
+            duplicate_view.snapshot_digest.clone(),
+            duplicate_view.validation.validator_version.clone(),
+            duplicate_view.validation.snapshot_schema_version,
+        )
+        .unwrap();
+        let duplicate_claim = FederatedClaim {
+            schema_version: FEDERATED_CLAIM_SCHEMA_VERSION,
+            claim_identity: "claim:duplicate".into(),
+            canonical_identity: "canonical:duplicate".into(),
+            provenance_family: "family:1".into(),
+            author: "author:1".into(),
+            statement_ref: "statement:1".into(),
+            source_event: None,
+            frontier_ref: Some("frontier:1".into()),
+            provenance_snapshot_digest: duplicate_view.snapshot_digest.clone(),
+            provenance_validation: duplicate_view.validation.clone(),
+            admission_receipt: duplicate_receipt,
+            epistemic_state: None,
+            claim_ceiling: None,
+            model_ref: None,
+            derivation_refs: Vec::new(),
+            relations: duplicate_relations,
+        };
+        assert_eq!(
+            duplicate_claim.validate_structure().unwrap_err(),
+            "provenance relations must be unique"
         );
     }
 
