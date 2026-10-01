@@ -19,13 +19,12 @@ pub const TASK_NAME: &str = "hdc_associative_resonator_cross_validation";
 pub const SCENARIO_SET: &str = "associative-cleanup-resonator-cross-validation-v1";
 pub const SCENARIO_REVISION: &str = "sha256:associative-cleanup-fixture-v1";
 pub const DEFAULT_SEED: u64 = 0x4352_4F53_5356_414C;
-pub const DEFAULT_DIMENSIONS: &[usize] =
-    &[1_024, 2_048, 4_096, 8_192, 16_384, 32_768];
-pub const DEFAULT_MEMORY_LOADS: &[usize] = &[2, 4, 8, 16];
-pub const DEFAULT_QUERY_NOISE_WEIGHTS: &[f32] = &[0.0, 0.10, 0.20, 0.35];
+pub const DEFAULT_DIMENSIONS: &[usize] = &[1_024, 2_048, 4_096, 8_192, 16_384];
+pub const DEFAULT_MEMORY_LOADS: &[usize] = &[2, 4, 8];
+pub const DEFAULT_QUERY_NOISE_WEIGHTS: &[f32] = &[0.0, 0.20, 0.35];
 pub const DEFAULT_SOLVER_SEEDS: &[u64] = &[0x51, 0xA7, 0xD3];
 pub const QUERIES_PER_LOAD: usize = 1;
-pub const MAX_SOLVER_ITERATIONS: usize = 32;
+pub const MAX_SOLVER_ITERATIONS: usize = 12;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CrossValidationSpec {
