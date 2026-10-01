@@ -231,6 +231,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn typed_operation_renders_to_legacy_command_one_way() {
+        use super::super::service_domain::{
+            NixServiceOperationKindV1, NixServiceOperationV1,
+        };
+
+        let cases = [
+            (NixServiceOperationKindV1::Enable, "enable"),
+            (NixServiceOperationKindV1::Disable, "disable"),
+            (NixServiceOperationKindV1::Start, "start"),
+            (NixServiceOperationKindV1::Stop, "stop"),
+            (NixServiceOperationKindV1::Restart, "restart"),
+            (NixServiceOperationKindV1::Reload, "reload"),
+        ];
+
+        for (operation, verb) in cases {
+            let typed = NixServiceOperationV1::new("nginx", operation).unwrap();
+            let command = ServiceManager::render_legacy_command(&typed);
+            let (bin, args) = command.to_command();
+
+            assert_eq!(bin, "systemctl");
+            assert_eq!(args, vec![verb, "nginx.service"]);
+            assert_eq!(typed.unit(), "nginx.service");
+        }
+    }
+
+    #[test]
     fn test_normalize_name() {
         assert_eq!(ServiceManager::normalize_name("nginx"), "nginx.service");
         assert_eq!(
