@@ -677,7 +677,7 @@ pub use statistical_retrieval::{
 pub use sequence_encoder::{SequenceEncoder, bind, bundle, permute, unpermute};
 
 pub use resonator::{
-    Constraint, Factor, MultiConstraint, ResonatorConfig, ResonatorNetwork, ResonatorSolution,
+    CleanupRule, Constraint, Factor, MultiConstraint, ResonatorConfig, ResonatorNetwork, ResonatorSolution,
 };
 
 pub use morphogenetic::{
