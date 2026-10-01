@@ -462,25 +462,32 @@ pub enum ConclusionStatus {
     Superseded,
 }
 
+/// Why a downstream conclusion depends on an upstream conclusion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConclusionDependencyKind {
+    EvidenceSupport,
+    CausalDependency,
+    DefinitionDependency,
+    OntologyDependency,
+    InferenceDependency,
+    AssumptionDependency,
+}
+
 /// Typed dependency between epistemic conclusions.
-///
-/// Dependencies are directional: the source conclusion is upstream of the dependent
-/// conclusion. Keeping this relation explicit lets frame correction propagate without
-/// pretending that every affected conclusion is independently invalid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConclusionDependency {
-    /// Upstream conclusion required by the dependent conclusion.
     pub upstream: String,
-    /// Downstream conclusion that consumes the upstream conclusion.
     pub downstream: String,
+    pub kind: ConclusionDependencyKind,
 }
 
 impl ConclusionDependency {
-    pub fn new(upstream: impl Into<String>, downstream: impl Into<String>) -> Self {
-        Self {
-            upstream: upstream.into(),
-            downstream: downstream.into(),
-        }
+    pub fn new(
+        upstream: impl Into<String>,
+        downstream: impl Into<String>,
+        kind: ConclusionDependencyKind,
+    ) -> Self {
+        Self { upstream: upstream.into(), downstream: downstream.into(), kind }
     }
 }
 
@@ -541,11 +548,17 @@ impl EpistemicConclusion {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ConclusionDependencyGraph {
     pub conclusions: Vec<EpistemicConclusion>,
+    /// Typed dependency edges; legacy conclusion-local dependency IDs remain supported.
+    pub dependency_edges: Vec<ConclusionDependency>,
 }
 
 impl ConclusionDependencyGraph {
     pub fn add(&mut self, conclusion: EpistemicConclusion) {
         self.conclusions.push(conclusion);
+    }
+
+    pub fn add_dependency(&mut self, dependency: ConclusionDependency) {
+        self.dependency_edges.push(dependency);
     }
 
     /// Return conclusion IDs transitively downstream of the supplied roots.
@@ -554,6 +567,16 @@ impl ConclusionDependencyGraph {
         let mut frontier = roots.to_vec();
 
         while let Some(root) = frontier.pop() {
+            for dependency in &self.dependency_edges {
+                if dependency.upstream == root
+                    && !affected.iter().any(|id| id == &dependency.downstream)
+                    && !roots.iter().any(|id| id == &dependency.downstream)
+                {
+                    affected.push(dependency.downstream.clone());
+                    frontier.push(dependency.downstream.clone());
+                }
+            }
+
             for conclusion in &self.conclusions {
                 if conclusion.dependencies.iter().any(|dep| dep == &root)
                     && !affected.iter().any(|id| id == &conclusion.id)
@@ -566,6 +589,18 @@ impl ConclusionDependencyGraph {
         }
 
         affected
+    }
+
+    pub fn dependency_reasons(
+        &self,
+        upstream: &str,
+        downstream: &str,
+    ) -> Vec<ConclusionDependencyKind> {
+        self.dependency_edges
+            .iter()
+            .filter(|edge| edge.upstream == upstream && edge.downstream == downstream)
+            .map(|edge| edge.kind)
+            .collect()
     }
 
     /// Reopen roots and all transitively dependent conclusions.
@@ -902,10 +937,19 @@ mod tests {
         graph.add(root);
         graph.add(dependent);
         graph.add(downstream);
+        graph.add_dependency(ConclusionDependency::new(
+            "c1",
+            "c2",
+            ConclusionDependencyKind::OntologyDependency,
+        ));
 
         let reopened = graph.reopen_from(&["c1".to_string()]);
         assert_eq!(reopened, vec!["c1".to_string(), "c2".to_string(), "c3".to_string()]);
         assert!(graph.conclusions.iter().all(|c| c.status == ConclusionStatus::Reopened));
+        assert_eq!(
+            graph.dependency_reasons("c1", "c2"),
+            vec![ConclusionDependencyKind::OntologyDependency]
+        );
     }
 
     #[test]
