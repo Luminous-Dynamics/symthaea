@@ -829,7 +829,16 @@ mod tests {
 
     #[test]
     fn test_stored_record_serialization() {
-        let record = create_test_record("ser_test", "Serialization test", 0.65);
+        let mut record = create_test_record("ser_test", "Serialization test", 0.65);
+        record.detection.frame = EpistemicFrame {
+            id: "social-system".to_string(),
+            version: 3,
+            evidence_boundary: "institutional-records".to_string(),
+            ontology_id: "collective-agents-v2".to_string(),
+            causal_model_id: "institutional-feedback-v4".to_string(),
+            excluded_variables: vec!["informal-practices".to_string()],
+            known_blind_spots: vec!["unobserved local norms".to_string()],
+        };
 
         let stored = StoredIgnoranceRecord::from_record(&record);
         assert_eq!(stored.id, "ser_test");
@@ -838,5 +847,10 @@ mod tests {
         let restored = stored.to_record().unwrap();
         assert_eq!(restored.id, record.id);
         assert!((restored.detection.eig - record.detection.eig).abs() < 0.001);
+        assert_eq!(restored.detection.frame.identity(), "social-system@3");
+        assert_eq!(restored.detection.frame.ontology_id, "collective-agents-v2");
+        assert_eq!(restored.detection.frame.causal_model_id, "institutional-feedback-v4");
+        assert_eq!(restored.detection.frame.excluded_variables, vec!["informal-practices"]);
+        assert_eq!(restored.detection.frame.known_blind_spots, vec!["unobserved local norms"]);
     }
 }
