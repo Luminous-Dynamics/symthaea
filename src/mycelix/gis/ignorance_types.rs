@@ -12,7 +12,7 @@
 //! | ι₁ | Known Unknown | We know we don't know this specific thing |
 //! | ι₂ | Unknown Unknown | We don't know what we don't know |
 //! | ι₃ | Impossible | Fundamentally unknowable |
-//! | ι∞ | None | No ignorance (complete knowledge) |
+//! | ι∞ | None | No ignorance detected under the active frame |
 //!
 //! ## GIS v4.0 Extension: Harmonic Ignorance
 //!
@@ -40,7 +40,7 @@ use std::time::SystemTime;
 /// Based on epistemological analysis of what kinds of "not knowing" exist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum IgnoranceType {
-    /// No ignorance - we have complete knowledge (κ)
+    /// No ignorance detected under the active evidence/model/schema/ontology frame (κ).
     None,
 
     /// Known - Information exists somewhere, we know what it is but don't have it (κ temporally limited)
@@ -87,7 +87,8 @@ impl IgnoranceType {
     /// Even if we answer, this is the max confidence we can claim.
     pub fn confidence_ceiling(&self) -> f32 {
         match self {
-            Self::None => 1.0,
+            // This is a ceiling for the ignorance category, not a proof of completeness.
+        Self::None => 1.0,
             Self::Known => 0.95,
             Self::KnownUnknown => 0.85,
             Self::Unknown => 0.50,
