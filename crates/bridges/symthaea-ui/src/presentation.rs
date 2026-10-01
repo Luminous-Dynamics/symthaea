@@ -360,8 +360,15 @@ pub fn cognitive_spans(events: &[CognitiveEvent]) -> Vec<CognitiveSpan> {
     let mut open_processing: Option<CognitiveSpan> = None;
     let mut open_resting: Option<CognitiveSpan> = None;
 
-    for event in events {
+    let mut ordered = events.to_vec();
+    ordered.sort_by_key(|event| event.sequence);
+
+    for event in &ordered {
         match event.kind {
+            CognitiveEventKind::Disconnected => {
+                open_processing = None;
+                open_resting = None;
+            }
             CognitiveEventKind::ProcessingStarted => {
                 if open_processing.is_none() {
                     open_processing = Some(CognitiveSpan {
@@ -538,6 +545,30 @@ mod tests {
         assert_eq!(spans[0].start_sequence, 1);
         assert_eq!(spans[0].end_sequence, Some(2));
         assert!(!spans[0].is_open());
+    }
+
+    #[test]
+    #[test]
+    fn disconnect_breaks_span_continuity() {
+        let events = vec![
+            CognitiveEvent::lifecycle(4, CognitiveEventKind::ProcessingStarted, 40),
+            CognitiveEvent::lifecycle(5, CognitiveEventKind::Disconnected, 41),
+            CognitiveEvent::lifecycle(6, CognitiveEventKind::Connected, 0),
+            CognitiveEvent::lifecycle(7, CognitiveEventKind::ProcessingCompleted, 44),
+        ];
+        assert!(cognitive_spans(&events).is_empty());
+    }
+
+    #[test]
+    fn span_reconstruction_uses_sequence_order() {
+        let events = vec![
+            CognitiveEvent::lifecycle(8, CognitiveEventKind::ProcessingCompleted, 44),
+            CognitiveEvent::lifecycle(7, CognitiveEventKind::ProcessingStarted, 40),
+        ];
+        let spans = cognitive_spans(&events);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].start_sequence, 7);
+        assert_eq!(spans[0].end_sequence, Some(8));
     }
 
     #[test]
