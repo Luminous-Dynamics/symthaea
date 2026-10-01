@@ -241,7 +241,7 @@ impl StoredIgnoranceRecord {
             detection,
             status,
             resolution,
-            frame_revisions: Vec::new(),
+            frame_revisions,
             created_at,
             updated_at,
         })
@@ -881,5 +881,37 @@ mod tests {
         assert_eq!(restored.detection.frame.causal_model_id, "institutional-feedback-v4");
         assert_eq!(restored.detection.frame.excluded_variables, vec!["informal-practices"]);
         assert_eq!(restored.detection.frame.known_blind_spots, vec!["unobserved local norms"]);
+    }
+
+    #[test]
+    fn test_frame_revision_lineage_round_trip() {
+        let mut record = create_test_record("lineage_test", "What changed?", 0.8);
+        let prior = record.detection.frame.clone();
+        let revised = EpistemicFrame {
+            id: prior.id.clone(),
+            version: prior.version + 1,
+            evidence_boundary: "institutional-records".to_string(),
+            ontology_id: "collective-agents-v2".to_string(),
+            causal_model_id: prior.causal_model_id.clone(),
+            excluded_variables: vec!["informal-practices".to_string()],
+            known_blind_spots: vec!["unobserved local norms".to_string()],
+        };
+        record.append_frame_revision(EpistemicFrameRevision::new(
+            &prior,
+            &revised,
+            "new institutional evidence",
+            Some("informal-practices".to_string()),
+            "expanded scope to include informal practices",
+            vec!["conclusion-17".to_string(), "conclusion-23".to_string()],
+        ));
+
+        let stored = StoredIgnoranceRecord::from_record(&record);
+        let restored = stored.to_record().unwrap();
+
+        assert_eq!(restored.frame_revisions, record.frame_revisions);
+        assert_eq!(
+            restored.latest_frame_revision().unwrap().affected_conclusions,
+            vec!["conclusion-17", "conclusion-23"]
+        );
     }
 }
