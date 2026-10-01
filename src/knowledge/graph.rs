@@ -437,7 +437,7 @@ impl EnhancedKnowledgeGraph {
         relation.validate()?;
         // Endpoint memories may have been evicted from the local cognitive projection;
         // provenance history must remain referentially stable rather than being erased by eviction.
-        if matches!(relation.kind, ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom)
+        if matches!(relation.kind, ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom | ProvenanceRelationKind::Supersedes)
             && self.lineage_would_cycle(&relation.source_memory_id, &relation.target_memory_id)
         {
             return Err("derivation lineage relation would create a cycle");
@@ -468,7 +468,7 @@ impl EnhancedKnowledgeGraph {
     /// Validate the current provenance snapshot without mutating graph state.
     ///
     /// The report is structural only: it binds to an order-independent snapshot
-    /// digest and checks relation well-formedness plus derivation/revision acyclicity.
+    /// digest and checks relation well-formedness plus derivation/revision/supersession acyclicity.
     /// It does not assign truth, reliability, or evidential weight.
     pub fn validate_provenance(&self) -> ProvenanceValidationReport {
         let mut violations = Vec::new();
@@ -502,7 +502,9 @@ impl EnhancedKnowledgeGraph {
             .filter(|relation| {
                 matches!(
                     relation.kind,
-                    ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom
+                    ProvenanceRelationKind::DerivedFrom
+                        | ProvenanceRelationKind::RevisedFrom
+                        | ProvenanceRelationKind::Supersedes
                 )
             })
             .collect();
@@ -516,7 +518,7 @@ impl EnhancedKnowledgeGraph {
                         code: "lineage_cycle".into(),
                         source_memory_id: Some(relation.source_memory_id.clone()),
                         target_memory_id: Some(relation.target_memory_id.clone()),
-                        message: "derivation/revision lineage contains a cycle".into(),
+                        message: "derivation/revision/supersession lineage contains a cycle".into(),
                     });
                     break;
                 }
@@ -1455,6 +1457,30 @@ mod tests {
         let b_id = graph.provenance(b).unwrap().memory_id;
         graph.record_provenance_relation(ProvenanceRelation { source_memory_id: b_id.clone(), target_memory_id: a_id.clone(), kind: ProvenanceRelationKind::DerivedFrom, created_at: "cycle:2".into() }).unwrap();
         let err = graph.record_provenance_relation(ProvenanceRelation { source_memory_id: a_id, target_memory_id: b_id, kind: ProvenanceRelationKind::RevisedFrom, created_at: "cycle:3".into() }).unwrap_err();
+        assert_eq!(err, "derivation lineage relation would create a cycle");
+    }
+
+    #[test]
+    fn test_supersession_lineage_rejects_cycles() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (a, _) = graph.insert(make_encoding("a", 0.8), 1, None, false);
+        let (b, _) = graph.insert(make_encoding("b", 0.8), 2, None, false);
+        let a_id = graph.provenance(a).unwrap().memory_id;
+        let b_id = graph.provenance(b).unwrap().memory_id;
+
+        graph.record_provenance_relation(ProvenanceRelation {
+            source_memory_id: b_id.clone(),
+            target_memory_id: a_id.clone(),
+            kind: ProvenanceRelationKind::Supersedes,
+            created_at: "cycle:2".into(),
+        }).unwrap();
+
+        let err = graph.record_provenance_relation(ProvenanceRelation {
+            source_memory_id: a_id,
+            target_memory_id: b_id,
+            kind: ProvenanceRelationKind::Supersedes,
+            created_at: "cycle:3".into(),
+        }).unwrap_err();
         assert_eq!(err, "derivation lineage relation would create a cycle");
     }
 
