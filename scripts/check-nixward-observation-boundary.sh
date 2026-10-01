@@ -141,6 +141,13 @@ run_self_test() {
   fi
 
   printf '%s\n' 'NixServiceObservedStateV1::parse_systemd_properties(...);' > "${tmp}/typed.rs"
+  printf '%s\n' 'NixOSCommand::Custom { .. };' > "${tmp}/legacy-domain.rs"
+  if rg -n '\\bNixOSCommand\\b' "${tmp}/legacy-domain.rs"; then
+    :
+  else
+    echo "ERROR: CROSS-022 self-test failed to detect legacy command dependency" >&2
+    return 1
+  fi
   printf '%s\n' 'let _ = NixOSCommand::Custom { .. };' > "${tmp}/legacy-custom.rs"
   if scan_legacy_custom_command "${tmp}/legacy-custom.rs"; then
     :
