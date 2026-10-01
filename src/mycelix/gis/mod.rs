@@ -130,6 +130,7 @@ impl GracefulIgnoranceSystem {
             domain,
             eig,
             detected_at: SystemTime::now(),
+            frame: EpistemicFrame::default(),
         }
     }
 
@@ -436,6 +437,8 @@ pub struct IgnoranceDetection {
     pub eig: f32,
     /// When detected
     pub detected_at: SystemTime,
+    /// Epistemic frame qualifying the meaning of this detection.
+    pub frame: EpistemicFrame,
 }
 
 /// Knowledge check result
@@ -561,4 +564,20 @@ mod tests {
             _ => panic!("Expected OutOfDomain response"),
         }
     }
+    #[test]
+    fn test_default_epistemic_frame_is_explicit_and_versioned() {
+        let frame = EpistemicFrame::default();
+        assert_eq!(frame.identity(), "gis-default@1");
+        assert_eq!(frame.ontology_id, "general-v1");
+        assert!(!frame.known_blind_spots.is_empty());
+    }
+
+    #[test]
+    fn test_detection_carries_frame_provenance() {
+        let detection = GracefulIgnoranceSystem::new().detect_ignorance("What is 2 + 2?");
+        assert_eq!(detection.frame.identity(), "gis-default@1");
+        assert_eq!(detection.frame.ontology_id, "general-v1");
+    }
+
+
 }
