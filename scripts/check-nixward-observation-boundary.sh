@@ -92,7 +92,7 @@ run_boundary_check() {
 
   # Domain invariants must be established by NixServiceOperationV1::new().
   # A derived Deserialize implementation could bypass that constructor.
-  if matches="$(rg -n '\\bDeserialize\\b' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
+  if matches="$(rg -n '\bDeserialize\b' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
     echo "ERROR: typed service domain must not deserialize around its validating constructor" >&2
     echo "${matches}" >&2
     failed=1
