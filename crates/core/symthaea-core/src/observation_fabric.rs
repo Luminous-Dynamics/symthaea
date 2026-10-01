@@ -1589,9 +1589,17 @@ mod tests {
 
     #[test]
     fn receipt_attestation_envelope_is_detached_and_validatable() {
-        let receipt = IndependenceVerificationReceipt::from_assessment(
-            &fixture_assessment(),
-        );
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
+        let receipt = IndependenceVerificationReceipt::from_assessment(&assessment);
         let mut envelope = ReceiptAttestationEnvelope::from_receipt(
             &receipt,
             "attester-1",
