@@ -16,6 +16,8 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nixward::NixParser;
+use nixward::action::service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
+use nixward::action::service_manager::ServiceManager;
 use nixward::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
 use nixward::ipc::{
     AlertEntry, AlertSeverity, AnomalyEntry, CausalEdgeEntry, ConcernEntry, DaemonConfig,
@@ -41,6 +43,23 @@ use symthaea_core::hdc::ContinuousHV;
 
 #[cfg(feature = "observability")]
 use nixward::observability::{Metrics, PhaseTimer, init_tracing};
+
+/// Legacy compatibility bridge for service actions.
+///
+/// This is deliberately a one-way projection through the typed service domain;
+/// it does not confer authorization or bypass the future effect-binding path.
+fn render_legacy_service_action(
+    action: &ActionCategory,
+    unit: &str,
+) -> Result<nixward::action::executor::NixOSCommand, NixServiceOperationErrorV1> {
+    let operation = match action {
+        ActionCategory::Enable => NixServiceOperationKindV1::Enable,
+        ActionCategory::Disable => NixServiceOperationKindV1::Disable,
+        _ => return Err(NixServiceOperationErrorV1::UnsupportedOperation),
+    };
+    let typed = NixServiceOperationV1::new(unit, operation)?;
+    ServiceManager::render_legacy_command(&typed)
+}
 
 /// Mutable daemon state collected across cycles.
 struct DaemonState {
@@ -1023,15 +1042,20 @@ impl DaemonState {
                                     extra_args: vec![],
                                 },
                                 ActionCategory::Rollback => NixOSCommand::EnvRollback,
-                                ActionCategory::Enable => NixOSCommand::Custom {
-                                    command: "systemctl".into(),
-                                    args: vec!["enable".into(), target_name_clone.clone()],
-                                    safety_level: SafetyLevel::SystemModify,
-                                },
-                                ActionCategory::Disable => NixOSCommand::Custom {
-                                    command: "systemctl".into(),
-                                    args: vec!["disable".into(), target_name_clone.clone()],
-                                    safety_level: SafetyLevel::SystemModify,
+                                ActionCategory::Enable | ActionCategory::Disable => {
+                                    match render_legacy_service_action(
+                                        &best_action.action,
+                                        &target_name_clone,
+                                    ) {
+                                        Ok(cmd) => cmd,
+                                        Err(error) => {
+                                            eprintln!(
+                                                "nixward-daemon: refusing invalid typed service action for {}: {:?}",
+                                                target_name_clone, error
+                                            );
+                                            return (free_energy, None);
+                                        }
+                                    }
                                 },
                                 _ => NixOSCommand::Custom {
                                     command: "systemctl".into(),
