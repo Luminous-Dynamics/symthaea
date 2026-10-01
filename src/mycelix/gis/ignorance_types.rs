@@ -1050,6 +1050,32 @@ mod tests {
     }
 
     #[test]
+    fn test_reopen_does_not_report_missing_roots() {
+        let mut graph = ConclusionDependencyGraph::default();
+        graph.add(EpistemicConclusion::new("c1", "A", "gis-default@1"));
+
+        let reopened = graph.reopen_from(&["missing".to_string()]);
+        assert!(reopened.is_empty());
+        assert_eq!(graph.conclusions[0].status, ConclusionStatus::Active);
+    }
+
+    #[test]
+    fn test_typed_dependency_cycle_terminates_deterministically() {
+        let mut graph = ConclusionDependencyGraph::default();
+        graph.add(EpistemicConclusion::new("c1", "A", "gis-default@1"));
+        graph.add(EpistemicConclusion::new("c2", "B", "gis-default@1"));
+        graph.add_dependency(ConclusionDependency::new(
+            "c1", "c2", ConclusionDependencyKind::InferenceDependency,
+        ));
+        graph.add_dependency(ConclusionDependency::new(
+            "c2", "c1", ConclusionDependencyKind::AssumptionDependency,
+        ));
+
+        let reopened = graph.reopen_from(&["c1".to_string()]);
+        assert_eq!(reopened, vec!["c1".to_string(), "c2".to_string()]);
+    }
+
+    #[test]
     fn test_domain_classification() {
         assert!(Domain::Mathematics.is_formal());
         assert!(!Domain::Mathematics.is_empirical());
