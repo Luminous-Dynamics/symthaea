@@ -3,7 +3,7 @@
 //! This is the first genuinely coupled factorization layer after the single-unknown
 //! associative cross-validation. The query is a noisy bound product X ⊛ Y, and the
 //! resonator must recover both factors jointly. An exhaustive n² pair search is kept
-//! as a transparent reference; no composite score or dimension ranking is defined.
+//! as a transparent reference; no composite score or dimension ranking is defined. Bipolar binding is commutative, so joint correctness is evaluated up to factor swap.
 
 use super::associative_cleanup_harness::{bipolar, fixture_seed, noisy_query};
 use super::resonator::{Factor, MultiConstraint, ResonatorNetwork};
@@ -56,13 +56,13 @@ pub struct TwoFactorCell {
     pub codebook_size: usize,
     pub query_noise_weight: f32,
     pub exhaustive_trials: u64,
-    pub exhaustive_correct: u64,
+    pub exhaustive_unordered_correct: u64,
     pub exhaustive_accuracy: f64,
     pub exhaustive_mean_margin: f64,
     pub resonator_trials: u64,
     pub factor_x_correct: u64,
     pub factor_y_correct: u64,
-    pub joint_correct: u64,
+    pub unordered_unordered_joint_correct: u64,
     pub joint_accuracy: f64,
     pub correct_convergence: u64,
     pub spurious_convergence: u64,
@@ -284,7 +284,7 @@ fn run_cell(
         .map(|i| bipolar(resolution, fixture_seed(seed, i, 0x32464143)))
         .collect();
 
-    let mut exhaustive_correct = 0u64;
+    let mut exhaustive_unordered_correct = 0u64;
     let mut exhaustive_margin_sum = 0.0f64;
     let mut factor_x_correct = 0u64;
     let mut factor_y_correct = 0u64;
