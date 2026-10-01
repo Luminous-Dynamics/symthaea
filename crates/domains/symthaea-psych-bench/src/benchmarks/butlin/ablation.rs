@@ -502,18 +502,21 @@ pub fn build_evidence_bundle(
     ablations: Vec<AblationResult>,
 ) -> super::report::ButlinEvidenceBundle {
     use symthaea_evidence_plane::{
-        stable_config_hash, STABLE_CONFIG_IDENTITY_SCHEMA,
+        config_hash, stable_config_hash, STABLE_CONFIG_IDENTITY_SCHEMA,
     };
 
-    // Preserve the serialized field name for compatibility, but the value
-    // produced by current bundles is now the versioned stable semantic
-    // identity rather than a process/toolchain-dependent DefaultHasher result.
-    let config_hash = stable_config_hash(config);
+    // Keep the legacy/local fingerprint in its original field and publish
+    // the stable semantic identity separately. This prevents a serialized
+    // field name from carrying two different identity semantics across
+    // generations of evidence.
+    let config_hash = config_hash(config);
+    let config_identity = stable_config_hash(config);
 
     super::report::ButlinEvidenceBundle {
         schema_version: super::report::REPORT_SCHEMA_VERSION,
         commit_sha: "unknown".to_string(),
         config_hash,
+        config_identity: Some(config_identity),
         config_identity_schema: Some(STABLE_CONFIG_IDENTITY_SCHEMA.to_string()),
         seeds: Vec::new(),
         generated_at: format!("{:?}", std::time::SystemTime::now()),
