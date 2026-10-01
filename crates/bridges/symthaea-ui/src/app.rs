@@ -452,9 +452,11 @@ pub fn App() -> impl IntoView {
         };
         let request_generation = Rc::clone(&request_generation);
         spawn_local_scoped_with_cancellation(async move {
-            match api::send_query(&gw, &text).await {
-                response if request_generation.get() != request_id => return,
-                response => match response {
+            let response = api::send_query(&gw, &text).await;
+            if request_generation.get() != request_id {
+                return;
+            }
+            match response {
                 Ok(resp) => {
                     if resp["type"] == "error" {
                         let msg = resp["message"]
@@ -472,12 +474,9 @@ pub fn App() -> impl IntoView {
                         });
                     }
                 }
-                    Err(e) => last_error.set(Some(e)),
-                },
+                Err(e) => last_error.set(Some(e)),
             }
-            if request_generation.get() == request_id {
-                sending.set(false);
-            }
+            sending.set(false);
         });
     };
 
