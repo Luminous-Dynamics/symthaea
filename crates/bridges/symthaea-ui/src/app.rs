@@ -265,6 +265,9 @@ pub fn App() -> impl IntoView {
         let connected_callback_generation = Rc::clone(&telemetry_generation);
         let disconnect_generation = Rc::clone(&telemetry_generation);
         let telemetry_gateway = gateway;
+        let message_gateway = gw.clone();
+        let connected_gateway = gw.clone();
+        let disconnect_gateway = gw.clone();
         let telemetry_sequence = Rc::clone(&event_sequence);
         let connected_sequence = Rc::clone(&event_sequence);
         let disconnect_sequence = Rc::clone(&event_sequence);
@@ -276,7 +279,7 @@ pub fn App() -> impl IntoView {
                     if !telemetry_session_is_current(
                         telemetry_callback_generation.get(),
                         session,
-                    ) || telemetry_gateway.get_untracked() != gw
+                    ) || telemetry_gateway.get_untracked() != message_gateway
                     {
                         return;
                     }
@@ -328,7 +331,7 @@ pub fn App() -> impl IntoView {
                     if !telemetry_session_is_current(
                         connected_callback_generation.get(),
                         session,
-                    ) || telemetry_gateway.get_untracked() != gw
+                    ) || telemetry_gateway.get_untracked() != connected_gateway
                     {
                         return;
                     }
@@ -349,7 +352,7 @@ pub fn App() -> impl IntoView {
                     disconnect_generation.get(),
                     session,
                 )
-                && telemetry_gateway.get_untracked() == gw
+                && telemetry_gateway.get_untracked() == disconnect_gateway
             {
                 ws_connected.set(false);
                 let sequence = disconnect_sequence.get().saturating_add(1);
