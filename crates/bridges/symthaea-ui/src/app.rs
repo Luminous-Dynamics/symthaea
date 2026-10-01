@@ -20,8 +20,9 @@ use wasm_bindgen::JsCast;
 
 use crate::api::{self};
 use crate::presentation::{
-    cognitive_spans, event_between, next_telemetry_session, push_cognitive_event,
-    telemetry_session_is_current, CognitiveEvent, CognitiveEventKind, CognitiveState,
+    cognitive_spans, event_between, next_event_sequence, next_telemetry_session,
+    push_cognitive_event, telemetry_session_is_current, CognitiveEvent, CognitiveEventKind,
+    CognitiveState,
 };
 
 const DEFAULT_GATEWAY: &str = "http://127.0.0.1:8090";
@@ -304,17 +305,21 @@ pub fn App() -> impl IntoView {
                     // emitted. A quiet telemetry sample must not consume event IDs:
                     // sequence numbers identify retained presentation events, not
                     // observation count.
-                    let sequence = telemetry_sequence.get().saturating_add(1);
-                    if let Some(event) = event_between(
-                        previous_state,
-                        current_state,
-                        sequence,
-                        cycle,
-                        v.surprise_triggered,
-                        v.gwt_broadcast,
-                    ) {
-                        telemetry_sequence.set(sequence);
-                        events.update(|items| push_cognitive_event(items, event));
+                    let mut sequence_counter = telemetry_sequence.get();
+                    if let Some(sequence) = next_event_sequence(&mut sequence_counter) {
+                        if let Some(event) = event_between(
+                            previous_state,
+                            current_state,
+                            sequence,
+                            cycle,
+                            v.surprise_triggered,
+                            v.gwt_broadcast,
+                        ) {
+                            telemetry_sequence.set(sequence_counter);
+                            events.update(|items| push_cognitive_event(items, event));
+                        }
+                    } else {
+                        leptos::logging::error!("cognitive event sequence exhausted; suppressing event identity reuse");
                     }
                     previous_state = Some(current_state);
                     last_cycle.set(cycle);
@@ -337,14 +342,18 @@ pub fn App() -> impl IntoView {
                         return;
                     }
                     ws_connected.set(true);
-                    let sequence = connected_sequence.get().saturating_add(1);
-                    connected_sequence.set(sequence);
-                    events.update(|items| {
-                        push_cognitive_event(
-                            items,
-                            CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Connected, 0),
-                        );
-                    });
+                    let mut sequence_counter = connected_sequence.get();
+                    if let Some(sequence) = next_event_sequence(&mut sequence_counter) {
+                        connected_sequence.set(sequence_counter);
+                        events.update(|items| {
+                            push_cognitive_event(
+                                items,
+                                CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Connected, 0),
+                            );
+                        });
+                    } else {
+                        leptos::logging::error!("cognitive event sequence exhausted; suppressing connected marker");
+                    }
                 },
             )
             .await;
@@ -356,19 +365,23 @@ pub fn App() -> impl IntoView {
                 && telemetry_gateway.get_untracked() == disconnect_gateway
             {
                 ws_connected.set(false);
-                let sequence = disconnect_sequence.get().saturating_add(1);
-                disconnect_sequence.set(sequence);
-                let cycle = last_cycle.get_untracked();
-                events.update(|items| {
-                    push_cognitive_event(
-                        items,
-                        CognitiveEvent::lifecycle(
-                            sequence,
-                            CognitiveEventKind::Disconnected,
-                            cycle,
-                        ),
-                    );
-                });
+                let mut sequence_counter = disconnect_sequence.get();
+                if let Some(sequence) = next_event_sequence(&mut sequence_counter) {
+                    disconnect_sequence.set(sequence_counter);
+                    let cycle = last_cycle.get_untracked();
+                    events.update(|items| {
+                        push_cognitive_event(
+                            items,
+                            CognitiveEvent::lifecycle(
+                                sequence,
+                                CognitiveEventKind::Disconnected,
+                                cycle,
+                            ),
+                        );
+                    });
+                } else {
+                    leptos::logging::error!("cognitive event sequence exhausted; suppressing disconnected marker");
+                }
             }
         });
     });
