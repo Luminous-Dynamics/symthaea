@@ -49,14 +49,9 @@ use nixward::observability::{Metrics, PhaseTimer, init_tracing};
 /// This is deliberately a one-way projection through the typed service domain;
 /// it does not confer authorization or bypass the future effect-binding path.
 fn render_legacy_service_action(
-    action: &ActionCategory,
+    operation: NixServiceOperationKindV1,
     unit: &str,
 ) -> Result<nixward::action::executor::NixOSCommand, NixServiceOperationErrorV1> {
-    let operation = match action {
-        ActionCategory::Enable => NixServiceOperationKindV1::Enable,
-        ActionCategory::Disable => NixServiceOperationKindV1::Disable,
-        _ => return Err(NixServiceOperationErrorV1::UnsupportedOperation),
-    };
     let typed = NixServiceOperationV1::new(unit, operation)?;
     ServiceManager::render_legacy_command(&typed)
 }
@@ -1043,10 +1038,12 @@ impl DaemonState {
                                 },
                                 ActionCategory::Rollback => NixOSCommand::EnvRollback,
                                 ActionCategory::Enable | ActionCategory::Disable => {
-                                    match render_legacy_service_action(
-                                        &best_action.action,
-                                        &target_name_clone,
-                                    ) {
+                                    let operation = match best_action.action {
+                                        ActionCategory::Enable => NixServiceOperationKindV1::Enable,
+                                        ActionCategory::Disable => NixServiceOperationKindV1::Disable,
+                                        _ => unreachable!("service-action compatibility arm only handles enable/disable"),
+                                    };
+                                    match render_legacy_service_action(operation, &target_name_clone) {
                                         Ok(cmd) => cmd,
                                         Err(error) => {
                                             eprintln!(
