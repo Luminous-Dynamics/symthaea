@@ -804,6 +804,8 @@ pub mod semantic_canonical;
 pub mod semantic_commit;
 #[cfg(feature = "semantic-digest")]
 pub mod semantic_digest;
+#[cfg(feature = "semantic-digest")]
+pub mod semantic_transition;
 
 pub mod fault;
 #[cfg(feature = "networking")]
