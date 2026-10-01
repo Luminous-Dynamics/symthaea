@@ -163,7 +163,7 @@ impl Ed25519ReceiptVerifier {
         envelope: &ReceiptAttestationEnvelope,
         receipt: &IndependenceVerificationReceipt,
     ) -> ReceiptAttestationVerificationOutcome {
-        self.verify_with_resolved_key(envelope, receipt, &self.verification_method, &self.verifying_key, None)
+        self.verify_with_resolved_key(envelope, receipt, &self.verification_method, &self.verifying_key)
     }
 
     /// Verify using an application-controlled resolver.
@@ -202,13 +202,7 @@ impl Ed25519ReceiptVerifier {
         if !resolved.is_authorized_for(&envelope.proof_purpose) {
             return ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized;
         }
-        self.verify_with_resolved_key(
-            envelope,
-            receipt,
-            method,
-            &resolved.verifying_key,
-            Some(true),
-        )
+        self.verify_with_resolved_key(envelope, receipt, method, &resolved.verifying_key)
     }
 
     fn verify_with_resolved_key(
@@ -217,7 +211,6 @@ impl Ed25519ReceiptVerifier {
         receipt: &IndependenceVerificationReceipt,
         verification_method: &str,
         verifying_key: &VerifyingKey,
-        _resolved_authorized: Option<bool>,
     ) -> ReceiptAttestationVerificationOutcome {
         if envelope.validate().is_err() {
             return ReceiptAttestationVerificationOutcome::InvalidEnvelope;
@@ -264,7 +257,7 @@ impl Ed25519ReceiptVerifier {
         };
         let signature = Signature::from_bytes(&proof_bytes);
 
-        match self.verifying_key.verify(&envelope.canonical_payload_bytes(), &signature) {
+        match verifying_key.verify(&envelope.canonical_payload_bytes(), &signature) {
             Ok(()) => ReceiptAttestationVerificationOutcome::Verified,
             Err(_) => ReceiptAttestationVerificationOutcome::InvalidSignature,
         }
@@ -450,6 +443,29 @@ mod tests {
         assert_eq!(
             verifier.verify_with_resolver(&envelope, &receipt, &resolver),
             ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized
+        );
+    }
+
+    #[test]
+    fn resolver_uses_resolved_key_not_embedded_verifier_key() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let unrelated_key = SigningKey::from_bytes(&[9u8; 32]);
+        let method = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([method]);
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            unrelated_key.verifying_key(),
+            150,
+        );
+
+        assert_eq!(
+            verifier.verify_with_resolver(&envelope, &receipt, &resolver),
+            ReceiptAttestationVerificationOutcome::Verified
         );
     }
 
