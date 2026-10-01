@@ -592,6 +592,25 @@ mod tests {
     }
 
     #[test]
+    fn test_frame_aware_detection_preserves_supplied_frame() {
+        let gis = GracefulIgnoranceSystem::new();
+        let frame = EpistemicFrame {
+            id: "institutional-v2".to_string(),
+            version: 2,
+            evidence_boundary: "public-records".to_string(),
+            ontology_id: "collective-agents-v2".to_string(),
+            causal_model_id: "institutional-feedback-v2".to_string(),
+            excluded_variables: vec!["private-intent".to_string()],
+            known_blind_spots: vec!["informal norms".to_string()],
+        };
+
+        let detection = gis.detect_ignorance_in_frame("Why did the institution act?", frame.clone());
+
+        assert_eq!(detection.frame, frame);
+        assert_eq!(detection.frame.identity(), "institutional-v2@2");
+    }
+
+    #[test]
     fn test_same_query_can_be_evaluated_under_divergent_frames() {
         let gis = GracefulIgnoranceSystem::new();
         let social_frame = EpistemicFrame {
