@@ -356,8 +356,8 @@ impl KnowledgePersistence {
                 })
             })
             .map_err(|e| e.to_string())?
-            .filter_map(|r| r.ok())
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load causal edge row: {e}"))?;
 
         self.total_loaded += edges.len() as u64;
         Ok(edges)
@@ -437,7 +437,7 @@ impl KnowledgePersistence {
             })
             .map_err(|e| format!("Query: {e}"))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Collect: {e}"))?;
+            .map_err(|e| format!("Load ontology row: {e}"))?;
 
         self.total_loaded += records.len() as u64;
         Ok(records)
