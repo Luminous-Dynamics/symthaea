@@ -1403,7 +1403,7 @@ pub struct KnowledgePersistenceHealth {
     /// Decoded fact rows rejected by graph admission during restore.
     pub fact_rejections: usize,
     /// SQLite rows were decoded successfully. This does not imply every row was
-    /// admitted into the graph; see provenance_rejections.
+    /// admitted into the graph; see the admission rejection counters.
     pub provenance_loaded: bool,
     /// Number of decoded provenance rows rejected by graph admission during restore.
     pub provenance_rejections: usize,
