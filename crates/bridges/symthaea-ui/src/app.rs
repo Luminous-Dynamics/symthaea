@@ -253,7 +253,10 @@ pub fn App() -> impl IntoView {
         last_cycle.set(0);
         let session = {
             let mut generation = telemetry_generation.get();
-            let session = next_telemetry_session(&mut generation);
+            let Some(session) = next_telemetry_session(&mut generation) else {
+                leptos::logging::error!("telemetry session generation exhausted; refusing to reuse identity");
+                return;
+            };
             telemetry_generation.set(generation);
             session
         };
