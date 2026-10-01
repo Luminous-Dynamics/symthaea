@@ -1403,6 +1403,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_persistence_corruption_is_exposed_as_degraded_state() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_persistence_health_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                INSERT INTO knowledge_provenance_relations
+                    (source_memory_id, target_memory_id, kind, created_at)
+                VALUES ('derived', 'source', 'NotAProvenanceKind', 'cycle:2');",
+            )
+            .unwrap();
+        }
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mgr = KnowledgeManager::new(config);
+
+        assert!(mgr.persistence_degraded());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_basic_process() {
         let mut mgr = KnowledgeManager::default();
         mgr.bootstrap_entities();
