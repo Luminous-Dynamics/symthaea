@@ -62,7 +62,7 @@ pub struct TwoFactorCell {
     pub resonator_trials: u64,
     pub factor_x_correct: u64,
     pub factor_y_correct: u64,
-    pub unordered_unordered_joint_correct: u64,
+    pub unordered_joint_correct: u64,
     pub joint_accuracy: f64,
     pub correct_convergence: u64,
     pub spurious_convergence: u64,
@@ -288,7 +288,7 @@ fn run_cell(
     let mut exhaustive_margin_sum = 0.0f64;
     let mut factor_x_correct = 0u64;
     let mut factor_y_correct = 0u64;
-    let mut joint_correct = 0u64;
+    let mut unordered_joint_correct = 0u64;
     let mut correct_convergence = 0u64;
     let mut spurious_convergence = 0u64;
     let mut non_convergence = 0u64;
@@ -312,7 +312,9 @@ fn run_cell(
                 );
 
                 let (pair, best, second) = exhaustive_pair(&values, &query);
-                exhaustive_correct += u64::from(pair == (x_target, y_target));
+                exhaustive_unordered_correct += u64::from(
+                    (pair == (x_target, y_target)) || (pair == (y_target, x_target)),
+                );
                 exhaustive_margin_sum += f64::from(best - second);
 
                 for &solver_seed in solver_seeds {
@@ -355,8 +357,9 @@ fn run_cell(
 
                     factor_x_correct += u64::from(x_index == x_target);
                     factor_y_correct += u64::from(y_index == y_target);
-                    let joint = x_index == x_target && y_index == y_target;
-                    joint_correct += u64::from(joint);
+                    let joint = (x_index == x_target && y_index == y_target)
+                        || (x_index == y_target && y_index == x_target);
+                    unordered_joint_correct += u64::from(joint);
                     factor_margin_sum +=
                         f64::from((x_best - x_second).min(y_best - y_second));
 
@@ -386,14 +389,14 @@ fn run_cell(
         codebook_size,
         query_noise_weight,
         exhaustive_trials,
-        exhaustive_correct,
-        exhaustive_accuracy: exhaustive_correct as f64 / exhaustive_trials as f64,
+        exhaustive_unordered_correct,
+        exhaustive_accuracy: exhaustive_unordered_correct as f64 / exhaustive_trials as f64,
         exhaustive_mean_margin: exhaustive_margin_sum / exhaustive_trials as f64,
         resonator_trials,
         factor_x_correct,
         factor_y_correct,
-        joint_correct,
-        joint_accuracy: joint_correct as f64 / resonator_trials as f64,
+        unordered_joint_correct,
+        joint_accuracy: unordered_joint_correct as f64 / resonator_trials as f64,
         correct_convergence,
         spurious_convergence,
         non_convergence,
