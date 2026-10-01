@@ -373,7 +373,8 @@ fn write_canonical_independence_basis_bytes(bytes: &mut Vec<u8>, value: &Indepen
         IndependenceBasis::SharedAncestor { observation_id } => { bytes.push(2); write_canonical_string_bytes(bytes, observation_id); }
         IndependenceBasis::SharedProcessingActivity { activity_id } => { bytes.push(3); write_canonical_string_bytes(bytes, activity_id); }
         IndependenceBasis::IdenticalAsset { hash_algorithm, content_hash } => { bytes.push(4); write_canonical_string_bytes(bytes, hash_algorithm); write_canonical_string_bytes(bytes, content_hash); }
-        IndependenceBasis::NoSharedProvenance => bytes.push(5),
+        IndependenceBasis::InsufficientProvenance { coverage } => { bytes.push(5); write_canonical_provenance_coverage_bytes(bytes, coverage); }
+        IndependenceBasis::NoSharedProvenance => bytes.push(6),
     }
 }
 
@@ -395,6 +396,22 @@ fn write_canonical_i128_option(hasher: &mut blake3::Hasher, value: Option<i128>)
 fn write_canonical_string_vec(hasher: &mut blake3::Hasher, values: &[String]) {
     hasher.update(&(values.len() as u64).to_be_bytes());
     for value in values { write_canonical_string(hasher, value); }
+}
+
+fn write_canonical_provenance_coverage_bytes(bytes: &mut Vec<u8>, value: &ProvenanceCoverage) {
+    bytes.push(match value {
+        ProvenanceCoverage::Complete => 0,
+        ProvenanceCoverage::Partial => 1,
+        ProvenanceCoverage::Redacted => 2,
+    });
+}
+
+fn write_canonical_provenance_coverage(hasher: &mut blake3::Hasher, value: &ProvenanceCoverage) {
+    hasher.update(&[match value {
+        ProvenanceCoverage::Complete => 0,
+        ProvenanceCoverage::Partial => 1,
+        ProvenanceCoverage::Redacted => 2,
+    }]);
 }
 
 fn write_canonical_independence(hasher: &mut blake3::Hasher, value: &EvidenceIndependence) {
@@ -431,7 +448,33 @@ fn write_canonical_independence_basis(hasher: &mut blake3::Hasher, value: &Indep
             write_canonical_string(hasher, hash_algorithm);
             write_canonical_string(hasher, content_hash);
         }
-        IndependenceBasis::NoSharedProvenance => hasher.update(&[5]),
+        IndependenceBasis::InsufficientProvenance { coverage } => {
+            hasher.update(&[5]);
+            write_canonical_provenance_coverage(hasher, coverage);
+        }
+        IndependenceBasis::NoSharedProvenance => hasher.update(&[6]),
+    }
+}
+
+/// Declares whether the provenance fields exposed to the observation fabric are complete enough
+/// for independence verification.
+///
+/// This is a provenance-availability declaration, not a cryptographic trust result.
+/// A value of Partial or Redacted prevents the bounded independence verifier from
+/// converting absence of a discovered shared basis into VerifiedIndependent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ProvenanceCoverage {
+    /// The represented provenance is intended to be complete for this observation.
+    Complete,
+    /// Some provenance relevant to independence may be unavailable.
+    Partial,
+    /// Provenance was intentionally withheld or redacted.
+    Redacted,
+}
+
+impl Default for ProvenanceCoverage {
+    fn default() -> Self {
+        Self::Complete
     }
 }
 
@@ -440,6 +483,9 @@ fn write_canonical_independence_basis(hasher: &mut blake3::Hasher, value: &Indep
 pub struct ObservationProvenance {
     pub source: SensorIdentity,
     pub verification: ProvenanceVerification,
+    /// Explicit availability declaration for provenance relevant to independence.
+    #[serde(default)]
+    pub coverage: ProvenanceCoverage,
     /// Stable reference to the attestation/evidence used for verification.
     pub attestation_id: Option<String>,
     pub acquired_by: Option<String>,
@@ -565,7 +611,7 @@ pub struct IndependenceVerifierContract {
 
 impl IndependenceVerifierContract {
     pub const CURRENT: Self = Self {
-        version: "observation-fabric-independence-v1",
+        version: "observation-fabric-independence-v2",
         predicates: &[
             IndependenceVerifierPredicate::SensorIdentity,
             IndependenceVerifierPredicate::PlatformIdentity,
@@ -583,6 +629,8 @@ pub enum IndependenceBasis {
     SharedAncestor { observation_id: String },
     SharedProcessingActivity { activity_id: String },
     IdenticalAsset { hash_algorithm: String, content_hash: String },
+    /// The graph contains an explicit declaration that relevant provenance may be unavailable.
+    InsufficientProvenance { coverage: ProvenanceCoverage },
     NoSharedProvenance,
 }
 
@@ -600,7 +648,8 @@ pub struct IndependenceAssessment {
     pub examined_observation_ids: Vec<String>,
     pub verifier_version: &'static str,
     /// BLAKE3 commitment to the independence-relevant provenance projection
-    /// of the observations examined by this assessment.
+    /// of the observations examined by this assessment, including explicit
+    /// provenance-coverage declarations.
     ///
     /// This prevents the assessment commitment from remaining unchanged when
     /// provenance fields relevant to the verifier are silently mutated.
@@ -711,7 +760,7 @@ pub enum EvidenceIndependence {
     /// treat it as independently established evidence without an explicit
     /// verification step.
     Independent,
-    /// A verifier established that no shared upstream was found in the
+    /// A verifier established that no shared upstream was found in complete
     /// provenance evidence available to it.
     ///
     /// This does not assert substantive truth or metaphysical independence;
@@ -828,6 +877,7 @@ impl ObservationGraph {
             .compute_independence_scope_fingerprint(&by_id, &examined_observation_ids)?;
 
         let assessment = |classification, basis| {
+
             let mut hasher = blake3::Hasher::new();
             hasher.update(b"symthaea:observation-independence-assessment:v2\n");
             write_canonical_string(&mut hasher, source_observation_id);
@@ -848,6 +898,20 @@ impl ObservationGraph {
                 assessment_fingerprint: hasher.finalize().to_hex().to_string(),
             }
         };
+
+        if !matches!(source.provenance.coverage, ProvenanceCoverage::Complete)
+            || !matches!(target.provenance.coverage, ProvenanceCoverage::Complete)
+        {
+            let coverage = if !matches!(source.provenance.coverage, ProvenanceCoverage::Complete) {
+                source.provenance.coverage
+            } else {
+                target.provenance.coverage
+            };
+            return Ok(assessment(
+                EvidenceIndependence::Unknown,
+                IndependenceBasis::InsufficientProvenance { coverage },
+            ));
+        }
 
         if source.provenance.source.sensor_id == target.provenance.source.sensor_id {
             return Ok(assessment(
@@ -988,6 +1052,7 @@ impl ObservationGraph {
                 .ok_or_else(|| ObservationValidationError::MissingRelationEndpoint(observation_id.clone()))?;
             write_canonical_string(&mut scope_hasher, &observation.id);
             write_canonical_string(&mut scope_hasher, &observation.provenance.source.sensor_id);
+            write_canonical_provenance_coverage(&mut scope_hasher, &observation.provenance.coverage);
             if let Some(platform_id) = &observation.provenance.source.platform_id {
                 scope_hasher.update(&[1]);
                 write_canonical_string(&mut scope_hasher, platform_id);
@@ -1315,6 +1380,7 @@ mod tests {
             provenance: ObservationProvenance {
                 source: SensorIdentity::new("camera-1"),
                 verification: ProvenanceVerification::Unverified,
+                coverage: ProvenanceCoverage::Complete,
                 attestation_id: None,
                 acquired_by: None,
                 parent_observation_ids: Vec::new(),
@@ -2023,7 +2089,7 @@ mod tests {
         assert_eq!(assessment.classification, EvidenceIndependence::VerifiedIndependent);
         assert_eq!(assessment.basis, IndependenceBasis::NoSharedProvenance);
         assert_eq!(assessment.examined_observation_ids, vec!["obs-001", "obs-002"]);
-        assert_eq!(assessment.verifier_version, "observation-fabric-independence-v1");
+        assert_eq!(assessment.verifier_version, "observation-fabric-independence-v2");
         assert_eq!(assessment.examined_scope_fingerprint.len(), 64);
         assert_eq!(assessment.assessment_fingerprint.len(), 64);
         assert!(assessment.assessment_fingerprint.bytes().all(|b| b.is_ascii_hexdigit()));
@@ -2118,6 +2184,75 @@ mod tests {
         assert_ne!(assessment.assessment_fingerprint, assessment.compute_fingerprint());
         assert_ne!(original, assessment.compute_fingerprint());
         assert!(!assessment.verify_fingerprint());
+    }
+
+    #[test]
+    fn partial_provenance_cannot_be_verified_independent() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        second.provenance.coverage = ProvenanceCoverage::Partial;
+
+        let assessment = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        }
+        .assess_independence_detailed("obs-001", "obs-002")
+        .expect("assessment");
+
+        assert_eq!(assessment.classification, EvidenceIndependence::Unknown);
+        assert_eq!(
+            assessment.basis,
+            IndependenceBasis::InsufficientProvenance {
+                coverage: ProvenanceCoverage::Partial,
+            }
+        );
+        assert!(assessment.verify_fingerprint());
+    }
+
+    #[test]
+    fn redacted_provenance_cannot_be_verified_independent() {
+        let mut first = fixture();
+        first.provenance.coverage = ProvenanceCoverage::Redacted;
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+
+        let assessment = ObservationGraph {
+            observations: vec![first, second],
+            relations: vec![],
+        }
+        .assess_independence_detailed("obs-001", "obs-002")
+        .expect("assessment");
+
+        assert_eq!(assessment.classification, EvidenceIndependence::Unknown);
+        assert_eq!(
+            assessment.basis,
+            IndependenceBasis::InsufficientProvenance {
+                coverage: ProvenanceCoverage::Redacted,
+            }
+        );
+    }
+
+    #[test]
+    fn provenance_coverage_is_part_of_independence_scope() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let baseline = graph
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
+
+        let mut changed = graph.clone();
+        changed.observations[0].provenance.coverage = ProvenanceCoverage::Partial;
+        assert!(!changed
+            .verify_independence_scope_fingerprint(&baseline)
+            .expect("scope verification"));
     }
 
     #[test]
