@@ -20,8 +20,8 @@ The comparator should have:
 
 1. A deterministic Boolean linear-code generator.
 2. An explicit GF(2) representation with a documented mapping to the HDC-facing vector representation.
-3. A bound-composition fixture whose factors are members of the same generated linear-code family.
-4. A recovery implementation that uses the code/subspace structure, not exhaustive n² search.
+3. A bound-composition fixture using factor domains/subcodes whose relationship is justified by the paper's construction; a generic single-subspace codebook is not sufficient.
+4. A recovery implementation that uses the paper's exact code/subspace structure, not exhaustive n² search.
 5. A matched exhaustive oracle used only for ground truth.
 6. The existing resonator solver run on a separate, representation-matched ordinary bipolar fixture.
 7. Separate measurements for exact factor recovery, spurious recovery, non-recovery, query corruption tolerance, and computational work.
@@ -71,7 +71,7 @@ Tests should cover:
 
 ### Stage B — bound fixture
 
-Construct a codebook from a generated linear code and form bound pairs using the Boolean-field operation prescribed by the research framework.
+Do not assume that choosing both factors from one arbitrary linear subspace makes the pair identifiable. Since a linear code is closed under XOR, a composite can have multiple decompositions into members of that same code. The fixture must therefore reproduce the paper's actual factor-domain/subcode/key-value structure, or explicitly characterize the ambiguity rather than label an arbitrary pair as uniquely recoverable. Confirm the exact bound construction from the paper before fixing fixture semantics.
 
 The fixture must record:
 
@@ -123,7 +123,7 @@ The branch is ready for an evidence-producing benchmark only when:
 
 - every generated code is full-rank according to its declared rank;
 - every fixture is reproducible byte-for-byte from its seed and revision;
-- clean bound recovery matches exhaustive truth on all validation fixtures;
+- the clean fixture's identifiability conditions are explicit and the recovery result matches exhaustive truth (including ambiguity) on all validation fixtures;
 - intentionally corrupted queries produce classified outcomes rather than silent false positives;
 - the resonator control uses the same ground-truth factor set and independently verified fixture;
 - the evidence schema records the representation family explicitly.
