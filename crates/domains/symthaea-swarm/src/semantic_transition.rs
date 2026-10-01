@@ -7,7 +7,7 @@
 //! It is not a signature and does not establish who performed the transition.
 
 use crate::semantic_admission::SemanticAdmissionState;
-use crate::semantic_digest::{semantic_digest, SemanticDigest, SemanticDigestError};
+use crate::semantic_digest::{semantic_digest, SemanticDigestError};
 
 pub const ALGORITHM: &str = "BLAKE3-256";
 pub const VERSION: u16 = 1;
