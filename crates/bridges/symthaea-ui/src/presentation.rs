@@ -230,6 +230,9 @@ pub struct CognitiveEvent {
     pub sequence: u64,
     pub kind: CognitiveEventKind,
     pub evidence_basis: EventEvidenceBasis,
+    /// Daemon-local sample label. It is descriptive metadata only: it must
+    /// never determine temporal ordering, identity, or span reconstruction.
+    /// The stable presentation sequence above is authoritative for ordering.
     pub cycle: u64,
     pub coherence: f64,
     pub thermodynamic_load: f64,
@@ -1172,5 +1175,40 @@ mod identity_tests {
         let event = CognitiveEvent::lifecycle(9, CognitiveEventKind::Disconnected, 1234);
         assert_eq!(event.sequence, 9);
         assert_eq!(event.cycle, 1234);
+    }
+
+    #[test]
+    fn regressive_cycle_values_do_not_change_event_order() {
+        let state = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.8, 0.1);
+        let earlier = CognitiveEvent::from_state(
+            10,
+            CognitiveEventKind::ProcessingStarted,
+            100,
+            state,
+        );
+        let later = CognitiveEvent::from_state(
+            11,
+            CognitiveEventKind::ProcessingCompleted,
+            1,
+            state,
+        );
+
+        assert!(earlier.sequence < later.sequence);
+        assert!(earlier.cycle > later.cycle);
+    }
+
+    #[test]
+    fn regressive_cycle_values_do_not_reverse_span_reconstruction() {
+        let events = vec![
+            CognitiveEvent::lifecycle(20, CognitiveEventKind::ProcessingStarted, 100),
+            CognitiveEvent::lifecycle(21, CognitiveEventKind::ProcessingCompleted, 1),
+        ];
+
+        let spans = cognitive_spans(&events);
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].start_sequence, 20);
+        assert_eq!(spans[0].end_sequence, Some(21));
+        assert_eq!(spans[0].start_cycle, 100);
+        assert_eq!(spans[0].end_cycle, Some(1));
     }
 }
