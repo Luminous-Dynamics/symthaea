@@ -11,6 +11,7 @@
 use super::associative_cleanup_harness::{bipolar, fixture_seed, noisy_query};
 use super::resonator::{Constraint, ResonatorNetwork};
 use super::unified_hv::ContinuousHV;
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -306,9 +307,10 @@ fn run_cell(
                 let solutions = network
                     .solve_seeded(&[constraint], Some(max_solver_iterations), solver_seed)
                     .expect("single-constraint resonator solve should succeed");
-                let solution = solutions_for_single(&solutions, target);
+                let solution = solutions.get("x").expect("single unknown is named x");
                 let (_, resonator_best, resonator_second) = nearest(&values, &ContinuousHV::from_vec(solution.vector.clone()));
-                let correct = solution.closest_symbol.as_deref() == Some(&format!("value-{target}"));
+                let target_name = format!("value-{target}");
+                let correct = solution.closest_symbol.as_deref() == Some(target_name.as_str());
                 resonator_correct += u64::from(correct);
                 resonator_margin_sum += f64::from(resonator_best - resonator_second);
                 iteration_sum += solution.iterations as u64;
