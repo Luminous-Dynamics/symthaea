@@ -317,11 +317,11 @@ mod tests {
     #[test]
     fn transition_commitment_is_not_an_authenticator() {
         // This test documents the security boundary: the commitment contains
-        // no signer identity or secret material. Authentication belongs to a
-        // separate signature/attestation layer.
+        // no signer identity. Authentication belongs to a separate layer.
         let (before, after) = fixture();
         let commitment = transition_commitment(&before, &after, TransitionKind::Admission).unwrap();
         assert_eq!(commitment.as_bytes().len(), 32);
+    }
 
     #[test]
     fn valid_admission_transition_is_replayably_verifiable() {
