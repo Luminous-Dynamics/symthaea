@@ -139,3 +139,22 @@ A future GIS implementation should be able to say, deterministically and honestl
 > Within frame F, given evidence E, claim C has confidence X. Frame F has these assumptions and exclusions. Alternative frame F2 changes these variables. Therefore the confidence value is conditional, not a claim of completeness.
 
 That is a materially stronger epistemic contract than simply returning a high confidence score.
+
+## Typed dependency reasons
+
+The conclusion graph now supports explicit dependency reasons:
+
+- EvidenceSupport
+- CausalDependency
+- DefinitionDependency
+- OntologyDependency
+- InferenceDependency
+- AssumptionDependency
+
+This is intentionally provenance metadata rather than another confidence score. When a frame revision reopens a conclusion, the graph can preserve the reason that connects an upstream conclusion to its dependent conclusion. Existing conclusion-local dependency IDs remain supported for compatibility, while new code can register typed ConclusionDependency edges.
+
+The propagation invariant is:
+
+> A frame revision requests re-evaluation; a dependency edge explains why the affected conclusion is downstream. Neither operation by itself declares the conclusion false.
+
+The graph also guards two failure modes deterministically: nonexistent roots are not reported as reopened conclusions, and cyclic dependency edges terminate without duplicate propagation.
