@@ -283,10 +283,35 @@ mod tests {
         let second_bytes = canonical_state_bytes(&second).unwrap();
         assert_ne!(first_bytes, second_bytes);
 
+        let (delivery, observation) = fixture();
         let mut namespace_a = state.clone();
-        namespace_a.observations.values_mut().next().unwrap().key.namespace = "a".into();
+        let mut observation_a = observation.clone();
+        observation_a.key.namespace = "a".into();
+        namespace_a.observations.clear();
+        namespace_a.results.clear();
+        namespace_a.observations.insert(observation_a.key.clone(), observation_a.clone());
+        namespace_a.results.insert(
+            observation_a.key.clone(),
+            SemanticResult {
+                logical_delivery_id: delivery.logical_delivery_id,
+                observation: observation_a.key.clone(),
+            },
+        );
+
         let mut namespace_ab = state.clone();
-        namespace_ab.observations.values_mut().next().unwrap().key.namespace = "ab".into();
+        let mut observation_ab = observation;
+        observation_ab.key.namespace = "ab".into();
+        namespace_ab.observations.clear();
+        namespace_ab.results.clear();
+        namespace_ab.observations.insert(observation_ab.key.clone(), observation_ab.clone());
+        namespace_ab.results.insert(
+            observation_ab.key.clone(),
+            SemanticResult {
+                logical_delivery_id: delivery.logical_delivery_id,
+                observation: observation_ab.key.clone(),
+            },
+        );
+
         assert_ne!(
             canonical_state_bytes(&namespace_a).unwrap(),
             canonical_state_bytes(&namespace_ab).unwrap()
