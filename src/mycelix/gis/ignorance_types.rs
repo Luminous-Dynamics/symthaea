@@ -529,7 +529,12 @@ impl EpistemicConclusion {
 
     /// Mark a historical conclusion as requiring re-evaluation under a changed frame.
     pub fn reopen(&mut self) {
-        self.status = ConclusionStatus::Reopened;
+        // Superseded conclusions remain historical replacements; reopening them would
+        // blur the distinction between correction of a live belief and resurrection of
+        // an explicitly replaced one.
+        if self.status != ConclusionStatus::Superseded {
+            self.status = ConclusionStatus::Reopened;
+        }
     }
 
     /// Preserve the conclusion while explicitly qualifying it against its originating frame.
@@ -1071,11 +1076,11 @@ mod tests {
 
         let reopened = graph.reopen_from(&["c1".to_string()]);
         assert_eq!(reopened, vec!["c1".to_string()]);
-        assert_eq!(graph.conclusions[0].status, ConclusionStatus::Reopened);
+        assert_eq!(graph.conclusions[0].status, ConclusionStatus::Superseded);
     }
 
     #[test]
-    fn test_reopen_does_not_report_missing_roots() {
+    fn test_reopen_does_not_report_missing_roots {
         let mut graph = ConclusionDependencyGraph::default();
         graph.add(EpistemicConclusion::new("c1", "A", "gis-default@1"));
 
