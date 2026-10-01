@@ -559,8 +559,9 @@ impl ResonatorNetwork {
             // An unknown with no positive-weight constraint is unresolved and cannot
             // count as converged merely because it was never updated.
             let mut all_converged = !unknowns.is_empty();
+            let mut converged_flags = vec![false; unknowns.len()];
 
-            for name in unknowns {
+            for (idx, name) in unknowns.iter().enumerate {
                 let name = name.to_string();
                 let update = updates
                     .get(&name)
@@ -597,7 +598,8 @@ impl ResonatorNetwork {
                 normalize(estimate);
 
                 let similarity = cosine_similarity(estimate, &previous);
-                if similarity < self.config.convergence_threshold {
+                converged_flags[idx] = similarity >= self.config.convergence_threshold;
+                if !converged_flags[idx] {
                     all_converged = false;
                 }
             }
@@ -619,7 +621,7 @@ impl ResonatorNetwork {
                     } else {
                         0.5
                     };
-                    state.converged = all_converged;
+                    state.converged = converged_flags[idx];
                 }
             }
 
