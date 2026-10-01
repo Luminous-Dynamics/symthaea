@@ -258,6 +258,8 @@ pub struct KnowledgeManager {
     last_causal_depth: usize,
     /// Optional SQLite persistence layer
     persistence: Option<KnowledgePersistence>,
+    /// Whether startup encountered a persistence load error and continued with a degraded projection.
+    persistence_degraded: bool,
     /// Save interval from config (cycles between persistence snapshots)
     save_interval: u64,
     /// Ontology learning rate multiplier, modulated by prediction error
@@ -279,16 +281,25 @@ impl KnowledgeManager {
         let mut causal_bridge = CausalKnowledgeBridge::new(config.causal_capacity);
         let mut ontology = AdaptiveOntology::new(config.ontology_config.clone());
 
-        // Initialize persistence and load existing knowledge
+        // Initialize persistence and load existing knowledge.
+        // Loading is intentionally best-effort for backwards compatibility, but failures are
+        // retained as explicit health state rather than being observable only through logs.
+        let mut persistence_degraded = false;
         let persistence = config.db_path.as_ref().map(|path| {
             let mut p = KnowledgePersistence::new(path);
             // Load existing facts
-            if let Ok(facts) = p.load_facts() {
-                for record in &facts {
-                    graph.import_fact_record(record);
+            match p.load_facts() {
+                Ok(facts) => {
+                    for record in &facts {
+                        graph.import_fact_record(record);
+                    }
+                    if !facts.is_empty() {
+                        tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
+                    }
                 }
-                if !facts.is_empty() {
-                    tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
+                Err(error) => {
+                    persistence_degraded = true;
+                    tracing::warn!(%error, "Knowledge: failed to load facts from SQLite");
                 }
             }
             // Load append-only provenance relations after facts. Relations are historical
@@ -324,36 +335,51 @@ impl KnowledgeManager {
                         );
                     }
                 }
-                Err(error) => tracing::warn!(%error, "Knowledge: failed to load provenance relations from SQLite"),
+                Err(error) => {
+                    persistence_degraded = true;
+                    tracing::warn!(%error, "Knowledge: failed to load provenance relations from SQLite");
+                },
             }
             // Load existing causal edges
-            if let Ok(edges) = p.load_causal_edges() {
-                let edge_count = edges.len();
-                for record in &edges {
-                    causal_bridge.import_edge(
-                        record.cause.clone(),
-                        record.effect.clone(),
-                        record.strength,
-                    );
+            match p.load_causal_edges() {
+                Ok(edges) => {
+                    let edge_count = edges.len();
+                    for record in &edges {
+                        causal_bridge.import_edge(
+                            record.cause.clone(),
+                            record.effect.clone(),
+                            record.strength,
+                        );
+                    }
+                    if edge_count > 0 {
+                        tracing::info!(
+                            count = edge_count,
+                            "Knowledge: loaded causal edges from SQLite"
+                        );
+                    }
                 }
-                if edge_count > 0 {
-                    tracing::info!(
-                        count = edge_count,
-                        "Knowledge: loaded causal edges from SQLite"
-                    );
+                Err(error) => {
+                    persistence_degraded = true;
+                    tracing::warn!(%error, "Knowledge: failed to load causal edges from SQLite");
                 }
             }
             // Load existing ontology primitives
-            if let Ok(records) = p.load_ontology() {
-                let onto_count = records.len();
-                for record in &records {
-                    ontology.import_ontology_record(record);
+            match p.load_ontology() {
+                Ok(records) => {
+                    let onto_count = records.len();
+                    for record in &records {
+                        ontology.import_ontology_record(record);
+                    }
+                    if onto_count > 0 {
+                        tracing::info!(
+                            count = onto_count,
+                            "Knowledge: loaded ontology primitives from SQLite"
+                        );
+                    }
                 }
-                if onto_count > 0 {
-                    tracing::info!(
-                        count = onto_count,
-                        "Knowledge: loaded ontology primitives from SQLite"
-                    );
+                Err(error) => {
+                    persistence_degraded = true;
+                    tracing::warn!(%error, "Knowledge: failed to load ontology primitives from SQLite");
                 }
             }
             p
@@ -376,6 +402,7 @@ impl KnowledgeManager {
             bootstrap_done: false,
             last_causal_depth: 0,
             persistence,
+            persistence_degraded,
             save_interval,
             ontology_lr_multiplier: 1.0,
             calibration_audit: CalibrationAudit::default(),
@@ -748,6 +775,14 @@ impl KnowledgeManager {
     /// Get last telemetry
     pub fn telemetry(&self) -> &KnowledgeTelemetry {
         &self.last_telemetry
+    }
+
+    /// Whether startup encountered a persistence load failure.
+    ///
+    /// The manager remains usable for compatibility, but callers can distinguish a complete
+    /// persistence restore from a degraded in-memory projection without parsing logs.
+    pub fn persistence_degraded(&self) -> bool {
+        self.persistence_degraded
     }
 
     /// Get last signals
