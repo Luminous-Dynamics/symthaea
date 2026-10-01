@@ -732,11 +732,11 @@ impl IndependenceVerificationReceipt {
         &self,
         graph: &ObservationGraph,
     ) -> Result<ReceiptVerificationOutcome, ObservationValidationError> {
-        if !self.verify_integrity() {
-            return Ok(ReceiptVerificationOutcome::InvalidReceiptIntegrity);
-        }
         if self.verifier_version != IndependenceAssessment::VERIFIER_VERSION {
             return Ok(ReceiptVerificationOutcome::UnsupportedVerifierVersion);
+        }
+        if !self.verify_integrity() {
+            return Ok(ReceiptVerificationOutcome::InvalidReceiptIntegrity);
         }
         let assessment = graph.assess_independence_detailed(
             &self.source_observation_id,
