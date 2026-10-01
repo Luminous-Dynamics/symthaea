@@ -1128,6 +1128,33 @@ mod tests {
     }
 
     #[test]
+    fn test_solve_system_records_joint_energy() {
+        let dim = 64;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(a),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(b),
+        );
+
+        let solutions = network
+            .solve_system_seeded(&["x"], &[constraint], Some(4), 11)
+            .unwrap();
+        let solution = solutions.get("x").expect("x solution should exist");
+
+        assert_eq!(network.energy_history().len(), solution.iterations);
+        assert!(network.energy_history().iter().all(|energy| energy.is_finite()));
+        assert!(solution.energy.is_finite());
+        assert_eq!(
+            solution.energy,
+            *network.energy_history().last().expect("energy history is non-empty")
+        );
+    }
+
+    #[test]
     fn test_seeded_solve_is_reproducible() {
         let dim = 256;
         let mut network_a = ResonatorNetwork::new(dim).unwrap();
