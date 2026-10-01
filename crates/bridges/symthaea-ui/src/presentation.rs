@@ -606,6 +606,51 @@ mod tests {
 
 
     #[test]
+    fn processing_completion_has_presence_transition_basis() {
+        let previous = state(true, true, 0.8, 0.5, 0.1);
+        let current = state(true, false, 0.8, 0.3, 0.1);
+        let event = event_between(Some(previous), current, 4, 43, false, false).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::ProcessingCompleted);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::PresenceTransition);
+    }
+
+    #[test]
+    fn processing_start_has_presence_transition_basis() {
+        let previous = state(true, false, 0.8, 0.3, 0.1);
+        let current = state(true, true, 0.8, 0.5, 0.1);
+        let event = event_between(Some(previous), current, 5, 44, false, false).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::ProcessingStarted);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::PresenceTransition);
+    }
+
+    #[test]
+    fn resting_exit_is_not_mislabeled_as_processing() {
+        let previous = state(true, false, 0.8, 0.1, 0.1);
+        let current = state(true, false, 0.8, 0.3, 0.1);
+        let event = event_between(Some(previous), current, 6, 45, false, false).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::ExitedRest);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::ModeTransition);
+    }
+
+    #[test]
+    fn workspace_broadcast_is_used_when_no_stronger_transition_exists() {
+        let previous = state(true, false, 0.8, 0.3, 0.1);
+        let current = state(true, false, 0.8, 0.3, 0.1);
+        let event = event_between(Some(previous), current, 7, 46, false, true).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::WorkspaceBroadcast);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::ExplicitWorkspaceSignal);
+    }
+
+    #[test]
+    fn state_change_is_reserved_for_non_specific_mode_transitions() {
+        let previous = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.8, 0.1);
+        let current = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.4, 0.1);
+        let event = event_between(Some(previous), current, 8, 47, false, false).unwrap();
+        assert_eq!(event.kind, CognitiveEventKind::StateChanged);
+        assert_eq!(event.evidence_basis, EventEvidenceBasis::ModeTransition);
+    }
+
+    #[test]
     fn processing_span_uses_cycles_not_wall_clock() {
         let events = vec![
             CognitiveEvent::lifecycle(1, CognitiveEventKind::ProcessingStarted, 40),
