@@ -32,7 +32,7 @@ use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::{
-    Domain, EpistemicFrame, EpistemicFrameRevision, IgnoranceDetection, IgnoranceRecord,
+    Domain, EpistemicFrame, EpistemicFrameImpact, EpistemicFrameRevision, IgnoranceDetection, IgnoranceRecord,
     IgnoranceResolution, IgnoranceStatus, IgnoranceType, ResolutionMethod, Uncertainty3D,
     ZKIgnoranceSignature,
 };
@@ -159,6 +159,14 @@ impl StoredIgnoranceRecord {
                     r.newly_represented.clone().unwrap_or_default(),
                     r.scope_change.clone(),
                     r.affected_conclusions.join(","),
+                    format!(
+                        "{},{},{},{},{}",
+                        r.impact.evidence_boundary,
+                        r.impact.ontology,
+                        r.impact.causal_model,
+                        r.impact.exclusions,
+                        r.impact.blind_spots,
+                    ),
                 ].join(";")
             }).collect(),
             created_at,
@@ -232,7 +240,26 @@ impl StoredIgnoranceRecord {
                 trigger: p[2].to_string(),
                 newly_represented: if p[3].is_empty() { None } else { Some(p[3].to_string()) },
                 scope_change: p[4].to_string(),
-                affected_conclusions: p[5].split(',').map(|v| v.to_string()).collect(),
+                affected_conclusions: p[5]
+                    .split(',')
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string())
+                    .collect(),
+                impact: p.get(6)
+                    .and_then(|encoded| {
+                        let flags: Vec<&str> = encoded.split(',').collect();
+                        if flags.len() != 5 {
+                            return None;
+                        }
+                        Some(EpistemicFrameImpact {
+                            evidence_boundary: flags[0].parse().ok()?,
+                            ontology: flags[1].parse().ok()?,
+                            causal_model: flags[2].parse().ok()?,
+                            exclusions: flags[3].parse().ok()?,
+                            blind_spots: flags[4].parse().ok()?,
+                        })
+                    })
+                    .unwrap_or_else(EpistemicFrameImpact::broad),
             })
         }).collect();
 
@@ -912,6 +939,38 @@ mod tests {
         assert_eq!(
             restored.latest_frame_revision().unwrap().affected_conclusions,
             vec!["conclusion-17", "conclusion-23"]
+        );
+        let impact = restored.latest_frame_revision().unwrap().impact;
+        assert!(impact.evidence_boundary);
+        assert!(impact.ontology);
+        assert!(!impact.causal_model);
+        assert!(impact.exclusions);
+        assert!(impact.blind_spots);
+    }
+
+    #[test]
+    fn test_legacy_frame_revision_without_impact_is_conservative() {
+        let record = create_test_record("legacy_lineage", "Legacy", 0.4);
+        let prior = record.detection.frame.clone();
+        let revised = EpistemicFrame { version: 2, ..prior.clone() };
+        let revision = EpistemicFrameRevision::new(
+            &prior, &revised, "legacy", None, "version bump", vec!["c1".to_string()],
+        );
+
+        let mut stored = StoredIgnoranceRecord::from_record(&record);
+        stored.frame_revisions_serialized = vec![format!(
+            "{};{};{};;{};{}",
+            revision.prior_frame,
+            revision.revised_frame,
+            revision.trigger,
+            revision.scope_change,
+            revision.affected_conclusions.join(",")
+        )];
+
+        let restored = stored.to_record().unwrap();
+        assert_eq!(
+            restored.latest_frame_revision().unwrap().impact,
+            EpistemicFrameImpact::broad()
         );
     }
 }
