@@ -802,6 +802,8 @@ mod domain_tests {
 pub mod semantic_admission;
 pub mod semantic_canonical;
 pub mod semantic_commit;
+#[cfg(feature = "semantic-digest")]
+pub mod semantic_digest;
 
 pub mod fault;
 #[cfg(feature = "networking")]
