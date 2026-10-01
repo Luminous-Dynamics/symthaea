@@ -155,6 +155,39 @@ impl CognitiveEventKind {
     }
 }
 
+/// Observable basis for presenting an event. This is provenance for the UI
+/// heuristic/signal, not a claim about hidden cognitive causality.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EventEvidenceBasis {
+    Lifecycle,
+    PresenceTransition,
+    ModeTransition,
+    ExplicitSurpriseSignal,
+    ExplicitWorkspaceSignal,
+}
+
+impl EventEvidenceBasis {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Lifecycle => "lifecycle marker",
+            Self::PresenceTransition => "presence transition",
+            Self::ModeTransition => "mode transition",
+            Self::ExplicitSurpriseSignal => "explicit surprise signal",
+            Self::ExplicitWorkspaceSignal => "explicit workspace signal",
+        }
+    }
+
+    const fn for_kind(kind: CognitiveEventKind) -> Self {
+        match kind {
+            CognitiveEventKind::Connected | CognitiveEventKind::Disconnected => Self::Lifecycle,
+            CognitiveEventKind::ProcessingStarted | CognitiveEventKind::ProcessingCompleted => Self::PresenceTransition,
+            CognitiveEventKind::EnteredRest | CognitiveEventKind::ExitedRest | CognitiveEventKind::StateChanged => Self::ModeTransition,
+            CognitiveEventKind::SurpriseDetected => Self::ExplicitSurpriseSignal,
+            CognitiveEventKind::WorkspaceBroadcast => Self::ExplicitWorkspaceSignal,
+        }
+    }
+}
+
 /// A timeline event carries the measurements that justified its presentation.
 /// It never contains private chain-of-thought.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -163,6 +196,7 @@ pub struct CognitiveEvent {
     /// This keeps reconnects and repeated cycle values from colliding in the UI.
     pub sequence: u64,
     pub kind: CognitiveEventKind,
+    pub evidence_basis: EventEvidenceBasis,
     pub cycle: u64,
     pub coherence: f64,
     pub thermodynamic_load: f64,
@@ -174,6 +208,7 @@ impl CognitiveEvent {
         Self {
             sequence,
             kind,
+            evidence_basis: EventEvidenceBasis::for_kind(kind),
             cycle,
             coherence: 0.0,
             thermodynamic_load: 0.0,
@@ -190,6 +225,7 @@ impl CognitiveEvent {
         Self {
             sequence,
             kind,
+            evidence_basis: EventEvidenceBasis::for_kind(kind),
             cycle,
             coherence: state.coherence,
             thermodynamic_load: state.thermodynamic_load,
@@ -514,6 +550,18 @@ mod tests {
 #[cfg(test)]
 mod identity_tests {
     use super::*;
+
+    #[test]
+    fn event_evidence_basis_is_explicit_and_kind_aligned() {
+        assert_eq!(
+            CognitiveEvent::lifecycle(1, CognitiveEventKind::Connected, 0).evidence_basis,
+            EventEvidenceBasis::Lifecycle
+        );
+        let state = CognitiveState::from_observation(true, false, 0.8, 0.3, 0.8, 0.1);
+        let surprise = CognitiveEvent::from_state(2, CognitiveEventKind::SurpriseDetected, 9, state);
+        assert_eq!(surprise.evidence_basis, EventEvidenceBasis::ExplicitSurpriseSignal);
+        assert_eq!(surprise.evidence_basis.label(), "explicit surprise signal");
+    }
 
     #[test]
     fn event_identity_is_independent_of_cycle() {
