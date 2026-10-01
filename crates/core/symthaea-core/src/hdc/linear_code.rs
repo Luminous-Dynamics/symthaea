@@ -52,6 +52,35 @@ impl BinaryCodeword {
     }
 
     pub fn words(&self) -> &[u64] { &self.words }
+
+    /// Convert the Boolean codeword to the bipolar HDC observation convention.
+    /// GF(2) zero maps to -1 and one maps to +1.
+    pub fn to_bipolar(&self) -> Vec<i8> {
+        (0..self.dimension)
+            .map(|index| if self.bit(index) { 1 } else { -1 })
+            .collect()
+    }
+
+    /// Construct a Boolean codeword from a bipolar observation.
+    /// Returns None when an observation contains a value other than -1 or +1.
+    pub fn from_bipolar(values: &[i8]) -> Option<Self> {
+        let mut codeword = Self::zero(values.len());
+        for (index, &value) in values.iter().enumerate() {
+            match value {
+                -1 => {}
+                1 => codeword.set_bit(index, true),
+                _ => return None,
+            }
+        }
+        Some(codeword)
+    }
+
+    /// Boolean-field binding: XOR of the packed codewords.
+    pub fn bound(&self, other: &Self) -> Self {
+        let mut bound = self.clone();
+        bound.xor_assign(other);
+        bound
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +114,16 @@ impl RandomLinearCode {
     pub fn dimension(&self) -> usize { self.dimension }
     pub fn rank(&self) -> usize { self.rank }
     pub fn basis(&self) -> &[BinaryCodeword] { &self.basis }
+
+    /// Test whether a word belongs to this code's Boolean subspace.
+    pub fn contains(&self, word: &BinaryCodeword) -> bool {
+        if word.dimension() != self.dimension {
+            return false;
+        }
+        let mut extended = self.basis.clone();
+        extended.push(word.clone());
+        basis_rank(&extended, self.dimension) == self.rank
+    }
 
     pub fn encode(&self, message: &[bool]) -> BinaryCodeword {
         assert_eq!(message.len(), self.rank);
@@ -196,5 +235,42 @@ mod tests {
     #[should_panic(expected = "rank must be in 1..=dimension")]
     fn invalid_rank_is_rejected() {
         let _ = RandomLinearCode::generate(8, 9, 1);
+    }
+
+    #[test]
+    fn zero_is_in_every_generated_code() {
+        let code = RandomLinearCode::generate(97, 9, 0xFACE);
+        assert!(code.contains(&BinaryCodeword::zero(97)));
+    }
+
+    #[test]
+    fn membership_rejects_same_dimension_non_members() {
+        let code = RandomLinearCode::generate(64, 5, 0x123456);
+        let outsider = BinaryCodeword::from_words(64, vec![u64::MAX]);
+        assert!(!code.contains(&outsider));
+    }
+
+    #[test]
+    fn bipolar_round_trip_is_exact() {
+        let code = RandomLinearCode::generate(73, 8, 0xABCD);
+        for word in code.enumerate() {
+            let bipolar = word.to_bipolar();
+            assert_eq!(BinaryCodeword::from_bipolar(&bipolar), Some(word));
+        }
+    }
+
+    #[test]
+    fn malformed_bipolar_observation_is_rejected() {
+        assert_eq!(BinaryCodeword::from_bipolar(&[-1, 0, 1]), None);
+    }
+
+    #[test]
+    fn boolean_binding_preserves_code_membership() {
+        let code = RandomLinearCode::generate(80, 7, 0xBADA55);
+        let a = code.encode(&[true, false, true, false, false, true, false]);
+        let b = code.encode(&[false, true, true, false, true, false, false]);
+        let bound = a.bound(&b);
+        assert!(code.contains(&bound));
+        assert_eq!(bound.dimension(), 80);
     }
 }
