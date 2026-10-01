@@ -180,7 +180,7 @@ impl KnowledgePersistence {
                     fact.source_text,
                     fact.confidence,
                     fact.domain,
-                    fact.cycle as i64,
+                    i64::try_from(fact.cycle).map_err(|_| rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "fact cycle exceeds SQLite INTEGER range"))))?,
                     fact.is_causal,
                 ],
             )
@@ -230,7 +230,7 @@ impl KnowledgePersistence {
                     source_text: row.get(5)?,
                     confidence: row.get(6)?,
                     domain: row.get(7)?,
-                    cycle: row.get::<_, i64>(8)? as u64,
+                    cycle: u64::try_from(row.get::<_, i64>(8)?).map_err(|_| rusqlite::Error::InvalidColumnType(8, "cycle".into(), rusqlite::types::Type::Integer))?,
                     is_causal: row.get(9)?,
                 })
             })
@@ -317,7 +317,7 @@ impl KnowledgePersistence {
                     edge.effect,
                     edge.strength,
                     edge.is_inhibitory,
-                    edge.cycle as i64,
+                    i64::try_from(edge.cycle).map_err(|_| rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "causal edge cycle exceeds SQLite INTEGER range"))))?,
                 ],
             )
             .map_err(|e| e.to_string())?;
@@ -352,7 +352,7 @@ impl KnowledgePersistence {
                     effect: row.get(1)?,
                     strength: row.get(2)?,
                     is_inhibitory: row.get(3)?,
-                    cycle: row.get::<_, i64>(4)? as u64,
+                    cycle: u64::try_from(row.get::<_, i64>(4)?).map_err(|_| rusqlite::Error::InvalidColumnType(4, "cycle".into(), rusqlite::types::Type::Integer))?,
                 })
             })
             .map_err(|e| e.to_string())?
@@ -390,10 +390,10 @@ impl KnowledgePersistence {
                 stmt.execute(rusqlite::params![
                     r.name,
                     r.vector_bytes,
-                    r.usage_count as i64,
+                    i64::try_from(r.usage_count).map_err(|_| rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "ontology usage count exceeds SQLite INTEGER range"))))?,
                     r.utility,
-                    r.created_at_cycle as i64,
-                    r.last_used_cycle as i64,
+                    i64::try_from(r.created_at_cycle).map_err(|_| rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "ontology creation cycle exceeds SQLite INTEGER range"))))?,
+                    i64::try_from(r.last_used_cycle).map_err(|_| rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "ontology last-used cycle exceeds SQLite INTEGER range"))))?,
                     r.is_a_parent,
                 ])
                 .map_err(|e| format!("Insert ontology: {e}"))?;
@@ -428,10 +428,10 @@ impl KnowledgePersistence {
                 Ok(OntologyRecord {
                     name: row.get(0)?,
                     vector_bytes: row.get(1)?,
-                    usage_count: row.get::<_, i64>(2)? as u64,
+                    usage_count: u64::try_from(row.get::<_, i64>(2)?).map_err(|_| rusqlite::Error::InvalidColumnType(2, "usage_count".into(), rusqlite::types::Type::Integer))?,
                     utility: row.get(3)?,
-                    created_at_cycle: row.get::<_, i64>(4)? as u64,
-                    last_used_cycle: row.get::<_, i64>(5)? as u64,
+                    created_at_cycle: u64::try_from(row.get::<_, i64>(4)?).map_err(|_| rusqlite::Error::InvalidColumnType(4, "created_at_cycle".into(), rusqlite::types::Type::Integer))?,
+                    last_used_cycle: u64::try_from(row.get::<_, i64>(5)?).map_err(|_| rusqlite::Error::InvalidColumnType(5, "last_used_cycle".into(), rusqlite::types::Type::Integer))?,
                     is_a_parent: row.get(6)?,
                 })
             })
@@ -596,6 +596,21 @@ mod tests {
         assert!(err.contains("Load fact row"));
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_rejects_negative_cycle_instead_of_wrapping() {
+        let dir = std::env::temp_dir().join(format!("symthaea_negative_fact_cycle_test_{}", std::process::id()));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch("CREATE TABLE knowledge_facts (id INTEGER PRIMARY KEY AUTOINCREMENT, memory_id TEXT, canonical_identity TEXT, provenance_family TEXT, vector_blob BLOB NOT NULL, source_text TEXT NOT NULL, confidence REAL NOT NULL, domain TEXT, cycle INTEGER NOT NULL, is_causal INTEGER NOT NULL DEFAULT 0);").unwrap();
+            conn.execute("INSERT INTO knowledge_facts (memory_id, vector_blob, source_text, confidence, cycle, is_causal) VALUES (?1, ?2, ?3, ?4, ?5, ?6)", rusqlite::params!["memory-negative", vec![0u8; 2048], "negative", 0.5f32, -1i64, false]).unwrap();
+        }
+        let mut p=KnowledgePersistence::new(&db_path);
+        assert!(p.load_facts().unwrap_err().contains("Load fact row"));
+        let _=std::fs::remove_dir_all(&dir);
     }
 
     #[test]
