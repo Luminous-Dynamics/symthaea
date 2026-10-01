@@ -39,10 +39,13 @@ on:
       - "crates/core/symthaea-core/examples/hdc_resonator_cross_validation.rs"
       - "crates/core/symthaea-core/examples/hdc_two_factor_resonator.rs"
       - "crates/core/symthaea-core/examples/hdc_resonator_separation.rs"
-      - "crates/core/symthaea-core/examples/hdc_resonator_temperature.rs
-      - 'crates/core/symthaea-core/src/hdc/resonator_geometry_temperature_harness.rs'
-      - 'crates/core/symthaea-core/examples/hdc_resonator_geometry_temperature.rs'
-      - 'docs/research/HDC_RESONATOR_GEOMETRY_TEMPERATURE_INTERACTION.md'"
+      - "crates/core/symthaea-core/examples/hdc_resonator_temperature.rs"
+      - "crates/core/symthaea-core/src/hdc/resonator_geometry_temperature_harness.rs"
+      - "crates/core/symthaea-core/examples/hdc_resonator_geometry_temperature.rs"
+      - "crates/core/symthaea-core/src/hdc/resonator_cleanup_rule_harness.rs"
+      - "crates/core/symthaea-core/examples/hdc_resonator_cleanup_rules.rs"
+      - "docs/research/HDC_RESONATOR_GEOMETRY_TEMPERATURE_INTERACTION.md"
+      - "docs/research/HDC_RESONATOR_CLEANUP_RULES.md"
       - "crates/core/symthaea-core/benches/simd_continuous.rs"
       - "docs/research/HDC_RESOLUTION_EXTENSIBILITY.md"
       - "docs/research/HDC_DIMENSION_SWEEP.md"
@@ -169,6 +172,8 @@ jobs:
           cargo test -p symthaea-core --lib two_factor_resonator_harness
           cargo test -p symthaea-core --lib resonator_separation_harness
           cargo test -p symthaea-core --lib resonator_temperature_harness
+          cargo test -p symthaea-core --lib resonator_geometry_temperature_harness
+          cargo test -p symthaea-core --lib resonator_cleanup_rule_harness
           cargo test -p symthaea-core --lib resonator
           cargo test -p symthaea-core --lib pareto_frontier
           cargo test -p symthaea-core --test hdc_ltc_operator_evidence_chain --features simd
@@ -571,6 +576,40 @@ jobs:
           PY
           sha256sum hdc-resonator-geometry-temperature-evidence.json | tee hdc-resonator-geometry-temperature-evidence.sha256
 
+      - name: Emit deterministic resonator cleanup-rule comparison
+        run: cargo run -p symthaea-core --example hdc_resonator_cleanup_rules > hdc-resonator-cleanup-rules-evidence.json
+
+      - name: Validate resonator cleanup-rule comparison
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          evidence = json.loads(Path("hdc-resonator-cleanup-rules-evidence.json").read_text())
+          expected_rules = ["sign", "softmax", "relu", "polynomial"]
+          cells = evidence["cells"]
+
+          assert evidence["schema_version"] == 1
+          assert evidence["task"] == "hdc_two_factor_resonator_cleanup_rule_comparison"
+          assert len(cells) == 96
+          assert evidence["cleanup_rules"] == expected_rules
+          assert len(evidence["solver_seeds"]) == 3
+          assert evidence["exhaustive_search_space_formula"] == "n^2"
+          assert evidence["max_solver_iterations"] == 16
+          assert all(c["cleanup_rule"] in expected_rules for c in cells)
+          assert all(c["resonator_trials"] == c["codebook_size"] ** 2 * len(evidence["solver_seeds"]) for c in cells)
+          assert all(c["correct_convergence"] + c["spurious_convergence"] + c["non_convergence"] == c["resonator_trials"] for c in cells)
+          assert all(0.0 <= c["exhaustive_accuracy"] <= 1.0 for c in cells)
+          assert all(0.0 <= c["joint_accuracy"] <= 1.0 for c in cells)
+          assert all(0.0 <= c["mean_abs_pairwise_similarity"] <= 1.0 for c in cells)
+          assert all(0.0 <= c["max_abs_pairwise_similarity"] <= 1.0 for c in cells)
+          assert all(c["mean_iterations"] >= 0.0 for c in cells)
+          assert all(c["mean_terminal_energy"] == c["mean_terminal_energy"] for c in cells)
+          assert evidence["spec_identity"].startswith("sha256:")
+          assert evidence["artifact_digest"].startswith("sha256:")
+          PY
+          sha256sum hdc-resonator-cleanup-rules-evidence.json | tee hdc-resonator-cleanup-rules-evidence.sha256
+
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
 
@@ -632,3 +671,5 @@ jobs:
             hdc-resonator-temperature-evidence.sha256
             hdc-resonator-geometry-temperature-evidence.json
             hdc-resonator-geometry-temperature-evidence.sha256
+            hdc-resonator-cleanup-rules-evidence.json
+            hdc-resonator-cleanup-rules-evidence.sha256
