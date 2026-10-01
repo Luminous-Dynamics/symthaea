@@ -228,6 +228,7 @@ impl StoredIgnoranceRecord {
             detection,
             status,
             resolution,
+            frame_revisions: Vec::new(),
             created_at,
             updated_at,
         })
