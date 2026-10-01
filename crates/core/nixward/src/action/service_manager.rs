@@ -56,7 +56,7 @@ impl ServiceManager {
             super::service_domain::NixServiceOperationKindV1::Reload => "reload",
         };
 
-        NixOSCommand::Custom {
+        Ok(NixOSCommand::Custom {
             command: "systemctl".to_string(),
             args: vec![verb.to_string(), operation.unit().to_string()],
             safety_level: SafetyLevel::SystemModify,
