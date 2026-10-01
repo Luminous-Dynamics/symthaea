@@ -11,7 +11,6 @@
 use super::associative_cleanup_harness::{bipolar, fixture_seed, noisy_query};
 use super::resonator::{Constraint, ResonatorNetwork};
 use super::unified_hv::ContinuousHV;
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -352,16 +351,6 @@ fn run_cell(
         },
         resonator_mean_margin: resonator_margin_sum / trials as f64,
     }
-}
-
-fn solutions_for_single(
-    solutions: &std::collections::HashMap<String, super::resonator::ResonatorSolution>,
-    _target: usize,
-) -> super::resonator::ResonatorSolution {
-    solutions
-        .get("x")
-        .expect("single unknown is named x")
-        .clone()
 }
 
 pub fn run_cross_validation(
