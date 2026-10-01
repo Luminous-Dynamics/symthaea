@@ -39,6 +39,7 @@ AUTHORITY_FILES=(
 DIAGNOSTIC_IDENTIFIERS='\b(ServiceStatus|UnitInfo|SystemdObserver)\b'
 SYSTEMCTL_PATTERN='(?:Command|process::Command)::new\(\s*["\x27]systemctl["\x27]'
 LEGACY_COMMAND_PATTERN='NixOSCommand::Custom'
+LEGACY_SERVICE_CONSTRUCTOR_PATTERN='\\bServiceManager::(start|stop|restart|reload|enable|disable)[[:space:]]*\\('
 IMPLICIT_SERVICE_RESTART_PATTERN='_[[:space:]]*=>[[:space:]]*NixOSCommand::Custom[[:space:]]*\{[[:space:]]*command:[[:space:]]*["\x27]systemctl["\x27]'
 
 scan_diagnostic_boundary() {
@@ -54,6 +55,11 @@ scan_direct_systemctl() {
 scan_legacy_custom_command() {
   local file="$1"
   rg -n --pcre2 "${LEGACY_COMMAND_PATTERN}" "$file"
+}
+
+scan_legacy_service_constructor() {
+  local file="$1"
+  rg -n --pcre2 "${LEGACY_SERVICE_CONSTRUCTOR_PATTERN}" "$file"
 }
 
 scan_implicit_service_restart() {
@@ -122,6 +128,16 @@ run_boundary_check() {
     fi
   done
 
+  # CROSS-022: legacy ServiceManager lifecycle constructors remain
+  # compatibility APIs, but governed callers must use the fallible typed
+  # bridges. Keep the compatibility implementation itself out of this scan.
+  local nixward_src="${ROOT}/crates/core/nixward/src"
+  if matches="$(rg -n --pcre2 "${LEGACY_SERVICE_CONSTRUCTOR_PATTERN}" "${nixward_src}" --glob '*.rs' --glob '!action/service_manager.rs')"; then
+    echo "ERROR: Nixward caller uses infallible legacy ServiceManager constructor" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+
   # CROSS-022: no wildcard action-category fallback may synthesize a
   # systemctl command. New categories must be mapped explicitly or rejected.
   local daemon="${ROOT}/crates/core/nixward/src/bin/nixward_daemon.rs"
@@ -174,6 +190,14 @@ run_self_test() {
     echo "ERROR: CROSS-022 self-test failed to detect legacy command dependency" >&2
     return 1
   fi
+  printf '%s\n' 'ServiceManager::restart("nginx");' > "${tmp}/legacy-service.rs"
+  if scan_legacy_service_constructor "${tmp}/legacy-service.rs"; then
+    :
+  else
+    echo "ERROR: CROSS-022 self-test failed to detect legacy ServiceManager constructor" >&2
+    return 1
+  fi
+
   printf '%s\n' 'let _ = NixOSCommand::Custom { .. };' > "${tmp}/legacy-custom.rs"
   if scan_legacy_custom_command "${tmp}/legacy-custom.rs"; then
     :
