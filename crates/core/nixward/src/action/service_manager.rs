@@ -45,7 +45,8 @@ impl ServiceManager {
     /// governed authorization/effect binding.
     pub fn render_legacy_command(
         operation: &super::service_domain::NixServiceOperationV1,
-    ) -> NixOSCommand {
+    ) -> Result<NixOSCommand, super::service_domain::NixServiceOperationErrorV1> {
+        operation.validate_shape()?;
         let verb = match operation.operation() {
             super::service_domain::NixServiceOperationKindV1::Enable => "enable",
             super::service_domain::NixServiceOperationKindV1::Disable => "disable",
@@ -59,7 +60,7 @@ impl ServiceManager {
             command: "systemctl".to_string(),
             args: vec![verb.to_string(), operation.unit().to_string()],
             safety_level: SafetyLevel::SystemModify,
-        }
+        })
     }
 
     /// Generate a command to start a service.
@@ -247,7 +248,7 @@ mod tests {
 
         for (operation, verb) in cases {
             let typed = NixServiceOperationV1::new("nginx", operation).unwrap();
-            let command = ServiceManager::render_legacy_command(&typed);
+            let command = ServiceManager::render_legacy_command(&typed).unwrap();
             let (bin, args) = command.to_command();
 
             assert_eq!(bin, "systemctl");
