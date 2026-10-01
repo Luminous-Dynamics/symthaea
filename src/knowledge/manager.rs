@@ -284,7 +284,10 @@ impl KnowledgeManager {
         // Initialize persistence and load existing knowledge.
         // Loading is intentionally best-effort for backwards compatibility, but failures are
         // retained as explicit health state rather than being observable only through logs.
-        let mut persistence_health = KnowledgePersistenceHealth::default();
+        let mut persistence_health = KnowledgePersistenceHealth {
+            configured: config.db_path.is_some(),
+            ..Default::default()
+        };
         let persistence = config.db_path.as_ref().map(|path| {
             let mut p = KnowledgePersistence::new(path);
             // Load existing facts
@@ -1380,6 +1383,7 @@ impl KnowledgeManager {
 /// Structured result of the startup persistence restore.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct KnowledgePersistenceHealth {
+    pub configured: bool,
     pub facts_loaded: bool,
     pub provenance_loaded: bool,
     pub causal_loaded: bool,
@@ -1388,7 +1392,8 @@ pub struct KnowledgePersistenceHealth {
 
 impl KnowledgePersistenceHealth {
     pub fn is_degraded(self) -> bool {
-        !(self.facts_loaded
+        self.configured
+            && !(self.facts_loaded
             && self.provenance_loaded
             && self.causal_loaded
             && self.ontology_loaded)
@@ -1441,6 +1446,7 @@ mod tests {
     #[test]
     fn test_persistence_health_reports_failed_domain() {
         let health = KnowledgePersistenceHealth {
+            configured: true,
             facts_loaded: true,
             provenance_loaded: false,
             causal_loaded: true,
