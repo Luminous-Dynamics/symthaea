@@ -61,6 +61,164 @@ pub fn transition_commitment(
     Ok(TransitionCommitment(*hasher.finalize().as_bytes()))
 }
 
+
+/// Failure returned when a claimed transition cannot be reconstructed from the
+/// semantic transition oracle and its committed state edge.
+///
+/// Verification is deliberately stronger than checking hashes: the verifier
+/// re-executes the same pure semantic rule against the claimed inputs and then
+/// checks that the resulting state, semantic result, and transition commitment
+/// all agree. A successful verification therefore establishes replayable
+/// transition validity, not signer identity or non-repudiation.
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum TransitionVerificationError {
+    #[error("before state violates semantic invariants: {0:?}")]
+    InvalidBeforeState(crate::semantic_admission::StateInvariant),
+    #[error("after state violates semantic invariants: {0:?}")]
+    InvalidAfterState(crate::semantic_admission::StateInvariant),
+    #[error("admission oracle did not produce an admission")]
+    AdmissionNotAdmitted,
+    #[error("replay oracle did not produce an exact replay")]
+    ReplayNotReplayed,
+    #[error("lifecycle oracle produced no semantic state change")]
+    NoStateChange,
+    #[error("claimed after state differs from oracle output")]
+    AfterStateMismatch,
+    #[error("claimed semantic result differs from oracle output")]
+    ResultMismatch,
+    #[error("claimed transition commitment does not match the reconstructed transition")]
+    CommitmentMismatch,
+    #[error("transition commitment could not be reconstructed: {0}")]
+    Commitment(#[from] TransitionCommitmentError),
+}
+
+/// Verify an admission transition by replaying the pure admission oracle.
+///
+/// The caller supplies all semantic inputs explicitly. No clock, storage,
+/// transport metadata, or mutable state is consulted by this verifier.
+pub fn verify_admission_transition(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    delivery: &crate::semantic_admission::DeliveryContract,
+    observation: &crate::semantic_admission::ObservationRecord,
+    policy: crate::semantic_admission::AdmissionPolicy,
+    now_ms: u64,
+    claimed_result: &crate::semantic_admission::SemanticResult,
+    claimed_commitment: &TransitionCommitment,
+) -> Result<(), TransitionVerificationError> {
+    use crate::semantic_admission::{decide, validate_state, AdmissionOutcome};
+
+    validate_state(before).map_err(TransitionVerificationError::InvalidBeforeState)?;
+    validate_state(after).map_err(TransitionVerificationError::InvalidAfterState)?;
+
+    let outcome = decide(before, delivery, observation, policy, now_ms);
+    let AdmissionOutcome::Admitted { next_state, result } = outcome else {
+        return Err(TransitionVerificationError::AdmissionNotAdmitted);
+    };
+
+    if next_state != *after {
+        return Err(TransitionVerificationError::AfterStateMismatch);
+    }
+    if result != *claimed_result {
+        return Err(TransitionVerificationError::ResultMismatch);
+    }
+
+    verify_commitment(
+        before,
+        after,
+        TransitionKind::Admission,
+        claimed_commitment,
+    )
+}
+
+/// Verify an exact semantic replay.
+///
+/// A replay is intentionally a no-op at the semantic-state layer. Transport
+/// retries may differ while this verifier requires the same semantic result and
+/// an unchanged before/after state pair.
+pub fn verify_replay_transition(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    delivery: &crate::semantic_admission::DeliveryContract,
+    observation: &crate::semantic_admission::ObservationRecord,
+    policy: crate::semantic_admission::AdmissionPolicy,
+    now_ms: u64,
+    claimed_result: &crate::semantic_admission::SemanticResult,
+    claimed_commitment: &TransitionCommitment,
+) -> Result<(), TransitionVerificationError> {
+    use crate::semantic_admission::{decide, validate_state, AdmissionOutcome};
+
+    validate_state(before).map_err(TransitionVerificationError::InvalidBeforeState)?;
+    validate_state(after).map_err(TransitionVerificationError::InvalidAfterState)?;
+
+    let outcome = decide(before, delivery, observation, policy, now_ms);
+    let AdmissionOutcome::Replay { existing_result } = outcome else {
+        return Err(TransitionVerificationError::ReplayNotReplayed);
+    };
+
+    if before != after {
+        return Err(TransitionVerificationError::AfterStateMismatch);
+    }
+    if existing_result != *claimed_result {
+        return Err(TransitionVerificationError::ResultMismatch);
+    }
+
+    verify_commitment(
+        before,
+        after,
+        TransitionKind::Replay,
+        claimed_commitment,
+    )
+}
+
+/// Verify a lifecycle-retirement transition by replaying the pure GC oracle.
+///
+/// Lifecycle retirement must actually change semantic state. A no-op lifecycle
+/// check is policy evaluation, not a transition, and therefore has no valid
+/// retirement commitment.
+pub fn verify_lifecycle_retirement(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    policy: crate::semantic_admission::AdmissionPolicy,
+    now_ms: u64,
+    claimed_commitment: &TransitionCommitment,
+) -> Result<(), TransitionVerificationError> {
+    use crate::semantic_admission::{retire_expired, validate_state};
+
+    validate_state(before).map_err(TransitionVerificationError::InvalidBeforeState)?;
+    validate_state(after).map_err(TransitionVerificationError::InvalidAfterState)?;
+
+    let next_state = retire_expired(before, policy, now_ms)
+        .map_err(TransitionVerificationError::InvalidBeforeState)?;
+
+    if next_state == *before {
+        return Err(TransitionVerificationError::NoStateChange);
+    }
+    if next_state != *after {
+        return Err(TransitionVerificationError::AfterStateMismatch);
+    }
+
+    verify_commitment(
+        before,
+        after,
+        TransitionKind::LifecycleRetirement,
+        claimed_commitment,
+    )
+}
+
+fn verify_commitment(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    kind: TransitionKind,
+    claimed_commitment: &TransitionCommitment,
+) -> Result<(), TransitionVerificationError> {
+    let expected = transition_commitment(before, after, kind)?;
+    if expected != *claimed_commitment {
+        return Err(TransitionVerificationError::CommitmentMismatch);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
