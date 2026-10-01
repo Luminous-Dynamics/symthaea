@@ -102,6 +102,8 @@ impl CognitiveState {
             CognitiveMode::Uncertain
         } else if processing {
             CognitiveMode::Responding
+        } else if confidence < 0.5 {
+            CognitiveMode::Uncertain
         } else if prediction_error > 0.5 {
             CognitiveMode::Exploring
         } else if thermodynamic_load < 0.12 {
@@ -162,6 +164,7 @@ pub enum EventEvidenceBasis {
     Lifecycle,
     PresenceTransition,
     ModeTransition,
+    StateTransition,
     ExplicitSurpriseSignal,
     ExplicitWorkspaceSignal,
 }
@@ -172,6 +175,7 @@ impl EventEvidenceBasis {
             Self::Lifecycle => "lifecycle marker",
             Self::PresenceTransition => "presence transition",
             Self::ModeTransition => "mode transition",
+            Self::StateTransition => "state transition",
             Self::ExplicitSurpriseSignal => "explicit surprise signal",
             Self::ExplicitWorkspaceSignal => "explicit workspace signal",
         }
@@ -183,9 +187,8 @@ impl EventEvidenceBasis {
             CognitiveEventKind::ProcessingStarted | CognitiveEventKind::ProcessingCompleted => {
                 Self::PresenceTransition
             }
-            CognitiveEventKind::EnteredRest
-            | CognitiveEventKind::ExitedRest
-            | CognitiveEventKind::StateChanged => Self::ModeTransition,
+            CognitiveEventKind::EnteredRest | CognitiveEventKind::ExitedRest => Self::ModeTransition,
+            CognitiveEventKind::StateChanged => Self::StateTransition,
             CognitiveEventKind::SurpriseDetected => Self::ExplicitSurpriseSignal,
             CognitiveEventKind::WorkspaceBroadcast => Self::ExplicitWorkspaceSignal,
         }
@@ -458,6 +461,12 @@ mod tests {
     }
 
     #[test]
+    fn low_confidence_suppresses_strong_mode_inference() {
+        let value = CognitiveState::from_observation(true, false, 0.8, 0.5, 0.4, 0.9);
+        assert_eq!(value.mode, CognitiveMode::Uncertain);
+    }
+
+    #[test]
     fn values_are_clamped_for_display() {
         let value = CognitiveState::from_observation(true, false, 2.0, 4.0, 3.0, 2.0);
         assert_eq!(value.coherence, 1.0);
@@ -590,6 +599,8 @@ mod identity_tests {
             CognitiveEvent::from_state(2, CognitiveEventKind::SurpriseDetected, 9, state);
         assert_eq!(surprise.evidence_basis, EventEvidenceBasis::ExplicitSurpriseSignal);
         assert_eq!(surprise.evidence_basis.label(), "explicit surprise signal");
+        let changed = CognitiveEvent::from_state(3, CognitiveEventKind::StateChanged, 10, state);
+        assert_eq!(changed.evidence_basis, EventEvidenceBasis::StateTransition);
     }
 
     #[test]
