@@ -1655,6 +1655,50 @@ mod tests {
     }
 
     #[test]
+    fn test_persistence_restore_records_rejected_ontology_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_ontology_rejection_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT
+                );
+                INSERT INTO knowledge_ontology
+                    (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle)
+                VALUES ('bad-vector', X'00', 0, 0.0, 1, 1);",
+            )
+            .unwrap();
+        }
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mgr = KnowledgeManager::new(config);
+        let health = mgr.persistence_health();
+
+        assert!(health.ontology_loaded);
+        assert_eq!(health.ontology_rejections, 1);
+        assert!(health.is_degraded());
+        assert_eq!(health.failed_domains(), vec!["ontology"]);
+        assert!(mgr.ontology().primitives().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_persistence_corruption_is_exposed_as_degraded_state() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_manager_persistence_health_test_{}",
