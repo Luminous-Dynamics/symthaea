@@ -366,6 +366,44 @@ fn write_canonical_string_vec(hasher: &mut blake3::Hasher, values: &[String]) {
     for value in values { write_canonical_string(hasher, value); }
 }
 
+fn write_canonical_independence(hasher: &mut blake3::Hasher, value: &EvidenceIndependence) {
+    let tag = match value {
+        EvidenceIndependence::Independent => 0u8,
+        EvidenceIndependence::VerifiedIndependent => 1,
+        EvidenceIndependence::SharedUpstream => 2,
+        EvidenceIndependence::Derived => 3,
+        EvidenceIndependence::Unknown => 4,
+    };
+    hasher.update(&[tag]);
+}
+
+fn write_canonical_independence_basis(hasher: &mut blake3::Hasher, value: &IndependenceBasis) {
+    match value {
+        IndependenceBasis::SharedSensor { sensor_id } => {
+            hasher.update(&[0]);
+            write_canonical_string(hasher, sensor_id);
+        }
+        IndependenceBasis::SharedPlatform { platform_id } => {
+            hasher.update(&[1]);
+            write_canonical_string(hasher, platform_id);
+        }
+        IndependenceBasis::SharedAncestor { observation_id } => {
+            hasher.update(&[2]);
+            write_canonical_string(hasher, observation_id);
+        }
+        IndependenceBasis::SharedProcessingActivity { activity_id } => {
+            hasher.update(&[3]);
+            write_canonical_string(hasher, activity_id);
+        }
+        IndependenceBasis::IdenticalAsset { hash_algorithm, content_hash } => {
+            hasher.update(&[4]);
+            write_canonical_string(hasher, hash_algorithm);
+            write_canonical_string(hasher, content_hash);
+        }
+        IndependenceBasis::NoSharedProvenance => hasher.update(&[5]),
+    }
+}
+
 /// Provenance linking an observation to its producer and processing lineage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationProvenance {
@@ -496,6 +534,26 @@ pub struct IndependenceAssessment {
 
 impl IndependenceAssessment {
     const VERIFIER_VERSION: &'static str = "observation-fabric-independence-v1";
+
+    fn compute_fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-independence-assessment:v1\n");
+        write_canonical_string(&mut hasher, &self.source_observation_id);
+        write_canonical_string(&mut hasher, &self.target_observation_id);
+        write_canonical_string_vec(&mut hasher, &self.examined_observation_ids);
+        write_canonical_string(&mut hasher, self.verifier_version);
+        write_canonical_independence(&mut hasher, &self.classification);
+        write_canonical_independence_basis(&mut hasher, &self.basis);
+        hasher.finalize().to_hex().to_string()
+    }
+
+    /// Verify that the stored fingerprint still commits to this assessment.
+    ///
+    /// This verifies the integrity of the assessment record itself. It does
+    /// not re-run graph analysis and does not assert that the assessment is true.
+    pub fn verify_fingerprint(&self) -> bool {
+        self.assessment_fingerprint == self.compute_fingerprint()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -635,14 +693,8 @@ impl ObservationGraph {
                 &mut hasher,
                 IndependenceAssessment::VERIFIER_VERSION,
             );
-            write_canonical_string(
-                &mut hasher,
-                &format!("{classification:?}"),
-            );
-            write_canonical_string(
-                &mut hasher,
-                &format!("{basis:?}"),
-            );
+            write_canonical_independence(&mut hasher, &classification);
+            write_canonical_independence_basis(&mut hasher, &basis);
             IndependenceAssessment {
                 source_observation_id: source_observation_id.to_string(),
                 target_observation_id: target_observation_id.to_string(),
@@ -1760,6 +1812,52 @@ mod tests {
         assert_eq!(assessment.verifier_version, "observation-fabric-independence-v1");
         assert_eq!(assessment.assessment_fingerprint.len(), 64);
         assert!(assessment.assessment_fingerprint.bytes().all(|b| b.is_ascii_hexdigit()));
+        assert!(assessment.verify_fingerprint());
+    }
+
+    #[test]
+    fn detailed_independence_fingerprint_changes_when_basis_changes() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let mut assessment = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        }
+        .assess_independence_detailed("obs-001", "obs-002")
+        .expect("assessment");
+        let original = assessment.assessment_fingerprint.clone();
+
+        assessment.basis = IndependenceBasis::SharedPlatform {
+            platform_id: "platform-1".into(),
+        };
+        assert_ne!(assessment.assessment_fingerprint, assessment.compute_fingerprint());
+        assert_ne!(original, assessment.compute_fingerprint());
+        assert!(!assessment.verify_fingerprint());
+    }
+
+    #[test]
+    fn detailed_independence_fingerprint_is_not_debug_format_dependent() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let assessment = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        }
+        .assess_independence_detailed("obs-001", "obs-002")
+        .expect("assessment");
+
+        let mut expected = blake3::Hasher::new();
+        expected.update(b"symthaea:observation-independence-assessment:v1\n");
+        write_canonical_string(&mut expected, "obs-001");
+        write_canonical_string(&mut expected, "obs-002");
+        write_canonical_string_vec(&mut expected, &["obs-001".into(), "obs-002".into()]);
+        write_canonical_string(&mut expected, "observation-fabric-independence-v1");
+        write_canonical_independence(&mut expected, &EvidenceIndependence::VerifiedIndependent);
+        write_canonical_independence_basis(&mut expected, &IndependenceBasis::NoSharedProvenance);
+        assert_eq!(assessment.assessment_fingerprint, expected.finalize().to_hex().to_string());
+        assert!(assessment.verify_fingerprint());
     }
 
     #[test]
