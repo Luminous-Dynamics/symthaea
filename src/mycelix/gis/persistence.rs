@@ -159,7 +159,7 @@ impl StoredIgnoranceRecord {
                     r.newly_represented.clone().unwrap_or_default(),
                     r.scope_change.clone(),
                     r.affected_conclusions.join(","),
-                ].join("\n")
+                ].join(";")
             }).collect(),
             created_at,
             updated_at,
