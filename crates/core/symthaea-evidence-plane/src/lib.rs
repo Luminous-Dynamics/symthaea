@@ -159,7 +159,7 @@ impl<'de> Deserialize<'de> for RepositorySourceSnapshotId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(try_from = "ExecutionLineageV1Wire")]
 pub struct ExecutionLineageV1 {
     pub source_repository: String,
@@ -191,7 +191,7 @@ pub struct ExecutionLineageV1 {
 /// Keeping this separate from the public representation means JSON/binary
 /// inputs cannot bypass the semantic admission check merely by deserializing
 /// into the same field shape.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ExecutionLineageV1Wire {
     pub source_repository: String,
@@ -235,6 +235,32 @@ impl TryFrom<ExecutionLineageV1Wire> for ExecutionLineageV1 {
         };
         lineage.validate()?;
         Ok(lineage)
+    }
+}
+
+impl Serialize for ExecutionLineageV1 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.validate().map_err(serde::ser::Error::custom)?;
+
+        ExecutionLineageV1Wire {
+            source_repository: self.source_repository.clone(),
+            source_revision: self.source_revision.clone(),
+            source_tree: self.source_tree.clone(),
+            repository_source_snapshot_id: self.repository_source_snapshot_id.clone(),
+            lock_digests: self.lock_digests.clone(),
+            toolchain_versions: self.toolchain_versions.clone(),
+            host_target: self.host_target.clone(),
+            nix_identity: self.nix_identity.clone(),
+            feature_flags: self.feature_flags.clone(),
+            cwd: self.cwd.clone(),
+            argv: self.argv.clone(),
+            allowed_env: self.allowed_env.clone(),
+            immutable_input_digests: self.immutable_input_digests.clone(),
+        }
+        .serialize(serializer)
     }
 }
 
@@ -1052,6 +1078,16 @@ mod tests {
     #[test]
     fn execution_lineage_fixture_is_admissible() {
         assert!(lineage_fixture().validate().is_ok());
+    }
+
+    #[test]
+    fn execution_lineage_serde_rejects_invalid_direct_value_on_serialize() {
+        let mut lineage = lineage_fixture();
+        lineage.source_repository.clear();
+
+        let error = serde_json::to_value(&lineage)
+            .expect_err("invalid direct lineage must not serialize");
+        assert!(error.to_string().contains("empty lineage field source_repository"));
     }
 
     #[test]
