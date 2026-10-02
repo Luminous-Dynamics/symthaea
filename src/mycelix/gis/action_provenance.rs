@@ -103,6 +103,7 @@ pub struct ActionAuthorizationWitness {
     pub decision: String,
     pub issued_at: String,
     pub expires_at: Option<String>,
+    pub authority_epoch: u64,
 }
 
 impl ActionAuthorizationWitness {
@@ -119,6 +120,188 @@ impl ActionAuthorizationWitness {
             && self.support_digest == expected_support_digest
             && self.policy == expected_policy
             && !self.issued_at.is_empty()
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuthorizationLeaseState {
+    Ready,
+    Prepared { attempt_id: String },
+    Indeterminate { attempt_id: String },
+    Exhausted,
+    Revoked,
+    Expired,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionOutcome {
+    Succeeded,
+    Failed,
+    Indeterminate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionReceipt {
+    pub action_id: String,
+    pub action_digest: String,
+    pub attempt_id: String,
+    pub authority_epoch: u64,
+    pub outcome: ExecutionOutcome,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthorizationConsumptionError {
+    InvalidBinding,
+    NotReady,
+    BudgetExhausted,
+    AttemptMismatch,
+    IndeterminateRequiresReconciliation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthorizationLease {
+    pub action_id: String,
+    pub action_digest: String,
+    pub support_digest: String,
+    pub policy: String,
+    pub authority_epoch: u64,
+    pub remaining_executions: u32,
+    pub state: AuthorizationLeaseState,
+}
+
+impl AuthorizationLease {
+    pub fn new(
+        action_id: impl Into<String>,
+        action_digest: impl Into<String>,
+        support_digest: impl Into<String>,
+        policy: impl Into<String>,
+        authority_epoch: u64,
+        execution_budget: u32,
+    ) -> Self {
+        Self {
+            action_id: action_id.into(),
+            action_digest: action_digest.into(),
+            support_digest: support_digest.into(),
+            policy: policy.into(),
+            authority_epoch,
+            remaining_executions: execution_budget,
+            state: if execution_budget == 0 {
+                AuthorizationLeaseState::Exhausted
+            } else {
+                AuthorizationLeaseState::Ready
+            },
+        }
+    }
+
+    pub fn prepare_for_execution(
+        &mut self,
+        witness: &ActionAuthorizationWitness,
+        action: &EpistemicAction,
+        current_frame: &str,
+        attempt_id: impl Into<String>,
+    ) -> Result<(), AuthorizationConsumptionError> {
+        if !witness.is_bound_to(action, current_frame, &self.support_digest, &self.policy)
+            || witness.action_digest != self.action_digest
+            || witness.authority_epoch != self.authority_epoch
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding);
+        }
+
+        if self.remaining_executions == 0
+            || matches!(self.state, AuthorizationLeaseState::Exhausted)
+        {
+            return Err(AuthorizationConsumptionError::BudgetExhausted);
+        }
+
+        if !matches!(self.state, AuthorizationLeaseState::Ready) {
+            return match self.state {
+                AuthorizationLeaseState::Indeterminate { .. } => {
+                    Err(AuthorizationConsumptionError::IndeterminateRequiresReconciliation)
+                }
+                _ => Err(AuthorizationConsumptionError::NotReady),
+            };
+        }
+
+        self.state = AuthorizationLeaseState::Prepared {
+            attempt_id: attempt_id.into(),
+        };
+        Ok(())
+    }
+
+    pub fn commit(
+        &mut self,
+        attempt_id: &str,
+        outcome: ExecutionOutcome,
+    ) -> Result<ExecutionReceipt, AuthorizationConsumptionError> {
+        let prepared = matches!(
+            &self.state,
+            AuthorizationLeaseState::Prepared { attempt_id: id } if id == attempt_id
+        );
+        if !prepared {
+            return if matches!(self.state, AuthorizationLeaseState::Indeterminate { .. }) {
+                Err(AuthorizationConsumptionError::IndeterminateRequiresReconciliation)
+            } else if matches!(self.state, AuthorizationLeaseState::Exhausted) {
+                Err(AuthorizationConsumptionError::BudgetExhausted)
+            } else {
+                Err(AuthorizationConsumptionError::AttemptMismatch)
+            };
+        }
+
+        let receipt = ExecutionReceipt {
+            action_id: self.action_id.clone(),
+            action_digest: self.action_digest.clone(),
+            attempt_id: attempt_id.to_owned(),
+            authority_epoch: self.authority_epoch,
+            outcome,
+        };
+
+        match outcome {
+            ExecutionOutcome::Indeterminate => {
+                self.state = AuthorizationLeaseState::Indeterminate {
+                    attempt_id: attempt_id.to_owned(),
+                };
+            }
+            ExecutionOutcome::Succeeded | ExecutionOutcome::Failed => {
+                self.remaining_executions -= 1;
+                self.state = if self.remaining_executions == 0 {
+                    AuthorizationLeaseState::Exhausted
+                } else {
+                    AuthorizationLeaseState::Ready
+                };
+            }
+        }
+
+        Ok(receipt)
+    }
+
+    pub fn reconcile_indeterminate(
+        &mut self,
+        attempt_id: &str,
+        outcome: ExecutionOutcome,
+    ) -> Result<ExecutionReceipt, AuthorizationConsumptionError> {
+        if !matches!(
+            &self.state,
+            AuthorizationLeaseState::Indeterminate { attempt_id: id } if id == attempt_id
+        ) || matches!(outcome, ExecutionOutcome::Indeterminate)
+        {
+            return Err(AuthorizationConsumptionError::AttemptMismatch);
+        }
+
+        self.remaining_executions = self.remaining_executions.saturating_sub(1);
+        self.state = if self.remaining_executions == 0 {
+            AuthorizationLeaseState::Exhausted
+        } else {
+            AuthorizationLeaseState::Ready
+        };
+
+        Ok(ExecutionReceipt {
+            action_id: self.action_id.clone(),
+            action_digest: self.action_digest.clone(),
+            attempt_id: attempt_id.to_owned(),
+            authority_epoch: self.authority_epoch,
+            outcome,
+        })
     }
 }
 
@@ -472,6 +655,104 @@ mod tests {
             assert_eq!(action.try_record_current_decision(witness.clone(), "f1", &statuses), Err(ActionStatus::Deferred));
             assert!(action.historical_decisions.is_empty());
         }
+    }
+
+
+    #[test]
+    fn authorization_lease_blocks_replay_and_fresh_witness_reissuance() {
+        let action = EpistemicAction::new("a-lease", "intervention", ActionRisk::Critical);
+        let witness = ActionAuthorizationWitness {
+            action_id: "a-lease".into(),
+            action_digest: "sha256:canonical-action".into(),
+            frame: "f1".into(),
+            support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(),
+            expires_at: None,
+            authority_epoch: 7,
+        };
+        let mut lease = AuthorizationLease::new("a-lease", "sha256:canonical-action", "sha256:support", "policy-v1", 7, 1);
+        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
+        let receipt = lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap();
+        assert_eq!(receipt.outcome, ExecutionOutcome::Succeeded);
+        assert_eq!(lease.state, AuthorizationLeaseState::Exhausted);
+        let fresh_witness = ActionAuthorizationWitness { issued_at: "2026-10-02T20:01:00Z".into(), ..witness };
+        assert_eq!(
+            lease.prepare_for_execution(&fresh_witness, &action, "f1", "attempt-2"),
+            Err(AuthorizationConsumptionError::BudgetExhausted)
+        );
+    }
+
+    #[test]
+    fn authorization_lease_serializes_prepare_and_commit() {
+        let action = EpistemicAction::new("a-concurrent", "intervention", ActionRisk::High);
+        let witness = ActionAuthorizationWitness {
+            action_id: "a-concurrent".into(), action_digest: "sha256:canonical".into(),
+            frame: "f1".into(), support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(), decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 1,
+        };
+        let mut lease = AuthorizationLease::new("a-concurrent", "sha256:canonical", "sha256:support", "policy-v1", 1, 1);
+        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
+        assert_eq!(
+            lease.prepare_for_execution(&witness, &action, "f1", "attempt-2"),
+            Err(AuthorizationConsumptionError::NotReady)
+        );
+    }
+
+    #[test]
+    fn indeterminate_commit_requires_reconciliation_before_retry() {
+        let action = EpistemicAction::new("a-crash", "intervention", ActionRisk::Critical);
+        let witness = ActionAuthorizationWitness {
+            action_id: "a-crash".into(), action_digest: "sha256:canonical".into(),
+            frame: "f1".into(), support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(), decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 3,
+        };
+        let mut lease = AuthorizationLease::new("a-crash", "sha256:canonical", "sha256:support", "policy-v1", 3, 1);
+        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
+        let receipt = lease.commit("attempt-1", ExecutionOutcome::Indeterminate).unwrap();
+        assert_eq!(receipt.outcome, ExecutionOutcome::Indeterminate);
+        assert_eq!(
+            lease.prepare_for_execution(&witness, &action, "f1", "attempt-2"),
+            Err(AuthorizationConsumptionError::IndeterminateRequiresReconciliation)
+        );
+        let reconciled = lease.reconcile_indeterminate("attempt-1", ExecutionOutcome::Succeeded).unwrap();
+        assert_eq!(reconciled.outcome, ExecutionOutcome::Succeeded);
+        assert_eq!(lease.state, AuthorizationLeaseState::Exhausted);
+    }
+
+    #[test]
+    fn authorization_lease_rejects_frame_support_policy_or_epoch_changes() {
+        let action = EpistemicAction::new("a-binding", "intervention", ActionRisk::High);
+        let base = ActionAuthorizationWitness {
+            action_id: "a-binding".into(), action_digest: "sha256:canonical".into(),
+            frame: "f1".into(), support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(), decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 9,
+        };
+        for witness in [
+            ActionAuthorizationWitness { frame: "f2".into(), ..base.clone() },
+            ActionAuthorizationWitness { support_digest: "sha256:other".into(), ..base.clone() },
+            ActionAuthorizationWitness { policy: "policy-v2".into(), ..base.clone() },
+            ActionAuthorizationWitness { authority_epoch: 10, ..base.clone() },
+        ] {
+            let mut lease = AuthorizationLease::new("a-binding", "sha256:canonical", "sha256:support", "policy-v1", 9, 1);
+            assert_eq!(
+                lease.prepare_for_execution(&witness, &action, "f1", "attempt"),
+                Err(AuthorizationConsumptionError::InvalidBinding)
+            );
+        }
+    }
+
+    #[test]
+    fn execution_receipt_is_not_an_authorization_witness() {
+        let receipt = ExecutionReceipt {
+            action_id: "a-receipt".into(), action_digest: "sha256:canonical".into(),
+            attempt_id: "attempt-1".into(), authority_epoch: 1, outcome: ExecutionOutcome::Succeeded,
+        };
+        assert_eq!(receipt.outcome, ExecutionOutcome::Succeeded);
     }
 
     #[test]
