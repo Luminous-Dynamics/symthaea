@@ -1,4 +1,4 @@
-use symthaea_core::hdc::linear_code::{BinaryCodeword, RandomLinearCode};
+use symthaea_core::hdc::linear_code::{basis_rank, solve_linear_combination, BinaryCodeword, RandomLinearCode};
 
 #[test]
 fn arbitrary_same_subspace_bound_is_not_uniquely_identifiable() {
@@ -35,9 +35,20 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
         left.rank() + right.rank()
     );
 
-    let a = left.encode(&[true, false, true, false, true, false]);
-    let b = right.encode(&[false, true, true, false, false, true]);
+    let left_message = [true, false, true, false, true, false];
+    let right_message = [false, true, true, false, false, true];
+    let a = left.encode(&left_message);
+    let b = right.encode(&right_message);
     let composite = a.bound(&b);
+
+    // Stage-C algebraic recovery: solve the clean bound directly in the
+    // concatenated factor basis, then split the coefficients by domain.
+    let mut basis = left.basis().to_vec();
+    basis.extend(right.basis().iter().cloned());
+    assert_eq!(basis_rank(&basis, 96), basis.len());
+    let recovered = solve_linear_combination(&composite, &basis).expect("clean bound must be in span");
+    let expected: Vec<bool> = left_message.into_iter().chain(right_message).collect();
+    assert_eq!(recovered, expected);
 
     let matches: Vec<_> = left
         .enumerate()
