@@ -40,6 +40,8 @@ DIAGNOSTIC_IDENTIFIERS='\b(ServiceStatus|UnitInfo|SystemdObserver)\b'
 SYSTEMCTL_PATTERN='(?:Command|process::Command)::new\(\s*["\x27]systemctl["\x27]'
 LEGACY_COMMAND_PATTERN='NixOSCommand::Custom'
 LEGACY_SERVICE_CONSTRUCTOR_PATTERN='\bServiceManager::(start|stop|restart|reload|enable|disable)[[:space:]]*\('
+LEGACY_SERVICE_RENDERER_PATTERN='\bServiceManager::render_legacy_command[[:space:]]*\('
+REVERSE_SERVICE_CONVERSION_PATTERN='impl[[:space:]]+(TryFrom|From)<[^>]*NixOSCommand[^>]*>[[:space:]]+for[[:space:]]+NixServiceOperationV1'
 IMPLICIT_SERVICE_RESTART_PATTERN='_[[:space:]]*=>[[:space:]]*NixOSCommand::Custom[[:space:]]*\{[[:space:]]*command:[[:space:]]*["\x27]systemctl["\x27]'
 
 scan_diagnostic_boundary() {
@@ -60,6 +62,16 @@ scan_legacy_custom_command() {
 scan_legacy_service_constructor() {
   local file="$1"
   rg -n --pcre2 "${LEGACY_SERVICE_CONSTRUCTOR_PATTERN}" "$file"
+}
+
+scan_legacy_service_renderer() {
+  local file="$1"
+  rg -n --pcre2 "${LEGACY_SERVICE_RENDERER_PATTERN}" "$file"
+}
+
+scan_reverse_service_conversion() {
+  local file="$1"
+  rg -n --pcre2 "${REVERSE_SERVICE_CONVERSION_PATTERN}" "$file"
 }
 
 scan_implicit_service_restart() {
@@ -101,6 +113,27 @@ run_boundary_check() {
       failed=1
     fi
   done
+
+  # CROSS-022: compatibility rendering is not an authority primitive.
+  # Authority modules must not invoke the legacy renderer directly, even if
+  # they avoid mentioning NixOSCommand at the call site.
+  for file in "${AUTHORITY_FILES[@]}"; do
+    [[ "${file}" == "crates/core/nixward/src/action/service_manager.rs" ]] && continue
+    if matches="$(scan_legacy_service_renderer "${ROOT}/${file}")"; then
+      echo "ERROR: governed authority module invokes the legacy service renderer: ${file}" >&2
+      echo "${matches}" >&2
+      failed=1
+    fi
+  done
+
+  # CROSS-022: the service domain is one-way from semantic data toward the
+  # compatibility renderer. A reverse From/TryFrom implementation would make
+  # legacy command bytes semantic input again.
+  if matches="$(scan_reverse_service_conversion "${ROOT}/crates/core/nixward/src")"; then
+    echo "ERROR: reverse NixOSCommand -> NixServiceOperationV1 conversion is forbidden" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
 
   # CROSS-022: the typed service domain is intentionally upstream of the
   # legacy command representation. It must not mention NixOSCommand at all,
@@ -190,6 +223,22 @@ run_self_test() {
     echo "ERROR: CROSS-022 self-test failed to detect legacy command dependency" >&2
     return 1
   fi
+  printf '%s\n' 'ServiceManager::render_legacy_command(&typed);' > "${tmp}/legacy-renderer.rs"
+  if scan_legacy_service_renderer "${tmp}/legacy-renderer.rs"; then
+    :
+  else
+    echo "ERROR: CROSS-022 self-test failed to detect legacy renderer usage" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'impl TryFrom<&NixOSCommand> for NixServiceOperationV1 {}' > "${tmp}/reverse-service.rs"
+  if scan_reverse_service_conversion "${tmp}/reverse-service.rs"; then
+    :
+  else
+    echo "ERROR: CROSS-022 self-test failed to detect reverse service conversion" >&2
+    return 1
+  fi
+
   printf '%s\n' 'ServiceManager::restart("nginx");' > "${tmp}/legacy-service.rs"
   if scan_legacy_service_constructor "${tmp}/legacy-service.rs"; then
     :
