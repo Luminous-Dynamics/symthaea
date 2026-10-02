@@ -19,7 +19,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 use std::time::Duration;
-use rusqlite::OptionalExtension;
+use rusqlite::{OptionalExtension, TransactionBehavior};
 use symthaea_core::hdc::unified_hv::BinaryHV;
 use symthaea_epistemic_types::{ProvenanceRelation, ProvenanceRelationKind};
 
@@ -159,6 +159,18 @@ pub struct KnowledgePersistenceSnapshot {
 pub struct KnowledgeSnapshotReceipt {
     pub generation: u64,
     pub canonical_digest_hex: String,
+    /// Self-digest over temporal receipt metadata; tamper-evidence only.
+    pub receipt_digest_hex: String,
+}
+
+impl KnowledgeSnapshotReceipt {
+    fn canonical_receipt_digest_hex(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.epf-011.snapshot-receipt.v1");
+        digest_u64(&mut hasher, self.generation);
+        digest_str(&mut hasher, &self.canonical_digest_hex);
+        hasher.finalize().to_hex().to_string()
+    }
 }
 
 /// Immutable record that a named validator evaluated the currently committed
@@ -588,11 +600,12 @@ impl KnowledgePersistence {
         }
         .canonical_digest_hex();
 
-        let conn = self.open_connection()?;
+        let mut conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
         let tx = conn
-            .unchecked_transaction()
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|e| format!("Begin snapshot transaction: {e}"))?;
+        verify_snapshot_receipts_in_tx(&tx)?;
 
         // A snapshot represents the current resident projection. Reconcile the
         // projection tables before upserting so facts/causal edges/ontology that
@@ -729,9 +742,36 @@ impl KnowledgePersistence {
             ));
         }
 
+        let previous_generation = tx
+            .query_row(
+                "SELECT MAX(generation) FROM knowledge_snapshot_receipts",
+                [],
+                |row| row.get::<_, Option<i64>>(0),
+            )
+            .map_err(|e| format!("Load snapshot receipt generation: {e}"))?;
+        let generation = match previous_generation {
+            None => 1_i64,
+            Some(value) => value
+                .checked_add(1)
+                .ok_or("Snapshot receipt generation exhausted SQLite INTEGER range")?,
+        };
+        if generation <= 0 {
+            return Err("Snapshot receipt generation must be positive".into());
+        }
+
+        let receipt = KnowledgeSnapshotReceipt {
+            generation: u64::try_from(generation)
+                .map_err(|_| "Snapshot receipt generation exceeds SQLite INTEGER range")?,
+            canonical_digest_hex: actual_digest.clone(),
+            receipt_digest_hex: String::new(),
+        };
+        let receipt_digest_hex = receipt.canonical_receipt_digest_hex();
+
         tx.execute(
-            "INSERT INTO knowledge_snapshot_receipts (canonical_digest_hex) VALUES (?1)",
-            rusqlite::params![actual_digest],
+            "INSERT INTO knowledge_snapshot_receipts
+             (generation, canonical_digest_hex, receipt_digest_hex)
+             VALUES (?1, ?2, ?3)",
+            rusqlite::params![generation, actual_digest, receipt_digest_hex],
         )
         .map_err(|e| format!("Snapshot receipt: {e}"))?;
 
