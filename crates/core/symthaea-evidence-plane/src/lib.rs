@@ -1048,13 +1048,40 @@ mod tests {
     #[test]
     fn lineage_digest_binds_repository_source_snapshot_schema() {
         let lineage = lineage_fixture();
-        let digest = lineage.digest();
+        let current = lineage.digest();
 
-        let mut manual = blake3::Hasher::new();
-        manual.update(ExecutionLineageV1::DOMAIN_SEPARATOR);
-        lineage.write_canonical(&mut manual);
-        assert_eq!(digest, manual.finalize().to_hex().to_string());
+        // Reproduce the pre-schema-binding canonical encoding. The new digest
+        // must differ, proving the schema discriminator is actually committed.
+        let mut legacy = blake3::Hasher::new();
+        legacy.update(ExecutionLineageV1::DOMAIN_SEPARATOR);
+        append_str(&mut legacy, "source_repository", &lineage.source_repository);
+        append_str(&mut legacy, "source_revision", &lineage.source_revision);
+        append_str(&mut legacy, "source_tree", &lineage.source_tree);
+        append_str(
+            &mut legacy,
+            "repository_source_snapshot_id",
+            lineage.repository_source_snapshot_id.as_str(),
+        );
+        append_map(&mut legacy, "lock_digests", &lineage.lock_digests);
+        append_map(
+            &mut legacy,
+            "toolchain_versions",
+            &lineage.toolchain_versions,
+        );
+        append_str(&mut legacy, "host_target", &lineage.host_target);
+        append_str(&mut legacy, "nix_identity", &lineage.nix_identity);
+        append_set(&mut legacy, "feature_flags", &lineage.feature_flags);
+        append_str(&mut legacy, "cwd", &lineage.cwd);
+        append_sequence(&mut legacy, "argv", &lineage.argv);
+        append_map(&mut legacy, "allowed_env", &lineage.allowed_env);
+        append_map(
+            &mut legacy,
+            "immutable_input_digests",
+            &lineage.immutable_input_digests,
+        );
 
+        let legacy = legacy.finalize().to_hex().to_string();
+        assert_ne!(current, legacy);
         assert_eq!(
             RepositorySourceSnapshotId::SCHEMA,
             "symthaea.repository-source-snapshot.v2"
