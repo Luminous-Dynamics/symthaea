@@ -138,6 +138,32 @@ pub enum ReceiptAttestationVerificationOutcome {
     ProofPurposeUnauthorized,
 }
 
+/// Stable wire/canonicalization tags for outcomes.
+///
+/// Do not derive these from enum discriminants: inserting or reordering enum variants
+/// must never silently change the identity of historical evidence.
+fn verification_outcome_tag(outcome: ReceiptAttestationVerificationOutcome) -> u8 {
+    match outcome {
+        ReceiptAttestationVerificationOutcome::Verified => 0,
+        ReceiptAttestationVerificationOutcome::InvalidEnvelope => 1,
+        ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch => 2,
+        ReceiptAttestationVerificationOutcome::NotYetValid => 3,
+        ReceiptAttestationVerificationOutcome::Expired => 4,
+        ReceiptAttestationVerificationOutcome::MissingProof => 5,
+        ReceiptAttestationVerificationOutcome::InvalidProofEncoding => 6,
+        ReceiptAttestationVerificationOutcome::CryptosuiteMismatch => 7,
+        ReceiptAttestationVerificationOutcome::VerificationMethodMismatch => 8,
+        ReceiptAttestationVerificationOutcome::ProofPurposeMismatch => 9,
+        ReceiptAttestationVerificationOutcome::DomainMismatch => 10,
+        ReceiptAttestationVerificationOutcome::ChallengeMismatch => 11,
+        ReceiptAttestationVerificationOutcome::InvalidSignature => 12,
+        ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable => 13,
+        ReceiptAttestationVerificationOutcome::VerificationMethodRevoked => 14,
+        ReceiptAttestationVerificationOutcome::VerificationMethodExpired => 15,
+        ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized => 16,
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationStage {
     Passed,
@@ -312,7 +338,7 @@ impl ReceiptAttestationVerificationReport {
     
     pub fn canonical_bytes(&self) -> Vec<u8> {
         fn write_string(bytes: &mut Vec<u8>, value: &str) {
-            bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
             bytes.extend_from_slice(value.as_bytes());
         }
         fn write_stage(bytes: &mut Vec<u8>, stage: VerificationStage) {
@@ -320,7 +346,7 @@ impl ReceiptAttestationVerificationReport {
                 VerificationStage::Passed => bytes.push(0),
                 VerificationStage::Failed(outcome) => {
                     bytes.push(1);
-                    bytes.push(outcome as u8);
+                    bytes.push(verification_outcome_tag(outcome));
                 }
                 VerificationStage::NotEvaluated => bytes.push(2),
             }
@@ -344,7 +370,7 @@ impl ReceiptAttestationVerificationReport {
             }
             None => bytes.push(0),
         }
-        bytes.push(self.outcome as u8);
+        bytes.push(verification_outcome_tag(self.outcome));
         write_stage(&mut bytes, self.structural_validation);
         write_stage(&mut bytes, self.receipt_commitment);
         write_stage(&mut bytes, self.temporal_validity);
@@ -456,8 +482,11 @@ impl VerificationMethodResolver for InMemoryVerificationMethodResolver {
                 VerificationMethodStatus::Expired => 2,
                 VerificationMethodStatus::Unknown => 3,
             }]);
-            hasher.update(&(method.allowed_proof_purposes.len() as u64).to_be_bytes());
-            for purpose in &method.allowed_proof_purposes {
+            let mut purposes = method.allowed_proof_purposes.clone();
+            purposes.sort();
+            purposes.dedup();
+            hasher.update(&(purposes.len() as u64).to_be_bytes());
+            for purpose in &purposes {
                 hasher.update(&(purpose.len() as u64).to_be_bytes());
                 hasher.update(purpose.as_bytes());
             }
@@ -1312,6 +1341,50 @@ mod tests {
             report.resolution_snapshot_fingerprint,
             changed_report.resolution_snapshot_fingerprint
         );
+    }
+
+    #[test]
+    fn verification_report_canonical_encoding_uses_stable_outcome_tags() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let mut report = verifier.verify_report(&envelope, &receipt);
+        let verified = report.canonical_bytes();
+        assert_eq!(verified[verified.len() - 1], 0);
+
+        report.outcome = ReceiptAttestationVerificationOutcome::InvalidSignature;
+        report.cryptographic_proof =
+            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::InvalidSignature);
+        let invalid = report.canonical_bytes();
+        assert!(invalid.windows(2).any(|pair| pair == [1, 12]));
+    }
+
+    #[test]
+    fn resolver_snapshot_treats_authorized_purposes_as_a_set() {
+        let (_, signing_key, _) = envelope_and_key();
+        let first = InMemoryVerificationMethodResolver::new([ResolvedVerificationMethod {
+            verification_method: "did:example:key".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec![
+                "z-purpose".into(),
+                "a-purpose".into(),
+                "z-purpose".into(),
+            ],
+        }]);
+        let second = InMemoryVerificationMethodResolver::new([ResolvedVerificationMethod {
+            verification_method: "did:example:key".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec![
+                "a-purpose".into(),
+                "z-purpose".into(),
+            ],
+        }]);
+        assert_eq!(first.snapshot_fingerprint(), second.snapshot_fingerprint());
     }
 
     #[test]
