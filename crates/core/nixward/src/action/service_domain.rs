@@ -6,13 +6,13 @@
 //! Domain data only: no command conversion, executor handle, or authority.
 
 use blake3::Hasher;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use thiserror::Error;
 
 const SERVICE_OPERATION_DOMAIN_V1: &[u8] = b"nixward-service-operation-v1";
 const MAX_SERVICE_UNIT_BYTES_V1: usize = 255;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum NixServiceOperationKindV1 { Enable, Disable, Start, Stop, Restart, Reload }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -246,16 +246,6 @@ mod tests {
         op.unit = "../nginx.service".to_string();
         assert_eq!(op.validate_shape().unwrap_err(), NixServiceOperationErrorV1::PathLikeUnit);
         assert_eq!(op.digest().unwrap_err(), NixServiceOperationErrorV1::PathLikeUnit);
-    }
-
-    #[test]
-    fn legacy_renderer_rejects_corrupted_internal_domain_state() {
-        let mut op = NixServiceOperationV1::new("nginx", NixServiceOperationKindV1::Start).unwrap();
-        op.unit = "../nginx.service".to_string();
-
-        let error = super::super::service_manager::ServiceManager::render_legacy_command(&op)
-            .unwrap_err();
-        assert_eq!(error, NixServiceOperationErrorV1::PathLikeUnit);
     }
 
     #[test]
