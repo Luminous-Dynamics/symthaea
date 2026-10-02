@@ -406,6 +406,27 @@ fn exhaustive_overlapping_recovery_preserves_valid_factorization() {
 }
 
 #[test]
+fn general_recovery_rejects_target_outside_union_span() {
+    let parent = RandomLinearCode::generate(16, 5, 0xBADA);
+    let left =
+        RandomLinearCode::from_basis(parent.basis()[..3].to_vec()).expect("left subcode");
+    let right = RandomLinearCode::from_basis(parent.basis()[3..].to_vec()).expect("right subcode");
+
+    let mut outsider = BinaryCodeword::zero(16);
+    let index = (0..16)
+        .find(|&index| {
+            let mut candidate = BinaryCodeword::zero(16);
+            candidate.set_bit(index, true);
+            !parent.contains(&candidate)
+        })
+        .expect("low-rate parent code must have an outsider");
+    outsider.set_bit(index, true);
+
+    assert!(!parent.contains(&outsider));
+    assert!(recover_linear_bound(&outsider, &[&left, &right]).is_none());
+}
+
+#[test]
 fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
     let parent = RandomLinearCode::generate(96, 8, 0x4444);
     let left = RandomLinearCode::from_basis(parent.basis()[..4].to_vec()).expect("left subcode");
