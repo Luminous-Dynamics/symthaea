@@ -32,6 +32,7 @@ pub const MAX_RFC9942_SIGNATURE_PAYLOAD_BYTES: usize = 8 * 1024 * 1024;
 pub const RFC9942_VDP_HEADER_LABEL: i64 = 396;
 pub const COSE_SIGN1_TAG: u64 = 18;
 pub const COSE_ALG_HEADER_LABEL: i64 = 1;
+pub const COSE_CRIT_HEADER_LABEL: i64 = 2;
 pub const COSE_KTY_LABEL: i64 = 1;
 pub const COSE_KID_LABEL: i64 = 2;
 pub const COSE_KEY_ALG_LABEL: i64 = 3;
@@ -457,7 +458,7 @@ impl Rfc9942ReceiptEnvelope {
         let protected=reader.read_bstr_bounded(4096).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         let mut ph=CborReader::new(&protected); let ph_len=ph.read_map_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         if ph_len<2||ph_len>16{return Err(Rfc9942VdpError::InvalidStructure);}
-        let mut algorithm=None; let mut vds=None;
+        let mut algorithm=None; let mut vds=None; let mut protected_crit=None;
         let mut protected_extensions=Vec::new();
         let mut protected_labels=std::collections::HashSet::new();
         for _ in 0..ph_len{
@@ -468,12 +469,27 @@ impl Rfc9942ReceiptEnvelope {
             match label{
                 Some(COSE_ALG_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if algorithm.replace(value).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
                 Some(RFC9942_VDS_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if value<0{return Err(Rfc9942VdpError::InvalidStructure);}if vds.replace(value as u64).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
+                Some(COSE_CRIT_HEADER_LABEL)=>{
+                    if protected_crit.is_some(){return Err(Rfc9942VdpError::InvalidStructure);}
+                    let count=ph.read_array_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    if count==0 || count>16{return Err(Rfc9942VdpError::CriticalHeaderMalformed);}
+                    let mut crit_labels=Vec::with_capacity(count);
+                    let mut seen_crit=std::collections::HashSet::new();
+                    for _ in 0..count{
+                        let key=ph.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                        if !seen_crit.insert(key.clone()){return Err(Rfc9942VdpError::InvalidStructure);}
+                        crit_labels.push(key);
+                    }
+                    protected_crit=Some(crit_labels);
+                    protected_extensions.push(ph.bytes[entry_start..ph.offset].to_vec());
+                }
                 _=>{
                     ph.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                     protected_extensions.push(ph.bytes[entry_start..ph.offset].to_vec());
                 }
             }
         }
+        if let Some(crit)=protected_crit.as_deref(){validate_cose_crit(&protected_labels,crit,CoseCritContext::Receipt)?;}
         ph.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         let algorithm=algorithm.ok_or(Rfc9942VdpError::InvalidStructure)?; let vds_id=vds.ok_or(Rfc9942VdpError::InvalidStructure)?;
         if vds_id!=RFC9162_VDS_ID{return Err(Rfc9942VdpError::VdsMismatch(vds_id));}
@@ -486,6 +502,7 @@ impl Rfc9942ReceiptEnvelope {
             let label_key=reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !unprotected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
             let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Text(_)=>None };
+            if label==Some(COSE_CRIT_HEADER_LABEL){return Err(Rfc9942VdpError::CriticalHeaderNotProtected);}
             if label==Some(RFC9942_VDP_HEADER_LABEL){
                 if vdp.is_some(){return Err(Rfc9942VdpError::InvalidStructure);}
                 vdp=Some(Rfc9942Vdp::from_reader(&mut reader)?);
@@ -544,7 +561,7 @@ pub struct Rfc9942SignatureWithReceipts {
     protected_receipts: Option<Rfc9942ReceiptCollection>,
     unprotected_extensions: Vec<Vec<u8>>,
     unprotected_receipts: Option<Rfc9942ReceiptCollection>,
-    payload: Rfc9942ReceiptPayload,
+    payload: Rfc9942SignaturePayload,
     signature: Vec<u8>,
 }
 
@@ -774,6 +791,7 @@ impl Rfc9942SignatureWithReceipts {
 
         let mut protected_extensions = Vec::new();
         let mut protected_receipts = None;
+        let mut protected_crit = None;
         let mut protected_labels = std::collections::HashSet::new();
         for _ in 0..protected_len {
             let start = protected_reader.offset;
@@ -791,12 +809,36 @@ impl Rfc9942SignatureWithReceipts {
                     return Err(Rfc9942VdpError::InvalidStructure);
                 }
                 protected_receipts = Some(Rfc9942ReceiptCollection::from_reader(&mut protected_reader)?);
+            } else if label == Some(COSE_CRIT_HEADER_LABEL) {
+                if protected_crit.is_some() {
+                    return Err(Rfc9942VdpError::InvalidStructure);
+                }
+                let count = protected_reader.read_array_len()
+                    .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                if count == 0 || count > 16 {
+                    return Err(Rfc9942VdpError::CriticalHeaderMalformed);
+                }
+                let mut crit_labels = Vec::with_capacity(count);
+                let mut seen_crit = std::collections::HashSet::new();
+                for _ in 0..count {
+                    let key = protected_reader.read_cose_label_key()
+                        .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    if !seen_crit.insert(key.clone()) {
+                        return Err(Rfc9942VdpError::InvalidStructure);
+                    }
+                    crit_labels.push(key);
+                }
+                protected_crit = Some(crit_labels);
+                protected_extensions.push(
+                    protected_reader.bytes[start..protected_reader.offset].to_vec()
+                );
             } else {
                 protected_reader.skip_value(0)
                     .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                 protected_extensions.push(protected_reader.bytes[start..protected_reader.offset].to_vec());
             }
         }
+        if let Some(crit)=protected_crit.as_deref(){validate_cose_crit(&protected_labels,crit,CoseCritContext::Outer)?;}
         protected_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
 
         let unprotected_len = reader.read_map_len()
@@ -819,7 +861,9 @@ impl Rfc9942SignatureWithReceipts {
                 CborLabelKey::Integer(value) => Some(*value),
                 CborLabelKey::Text(_) => None,
             };
-            if label == Some(RFC9942_RECEIPTS_HEADER_LABEL) {
+            if label == Some(COSE_CRIT_HEADER_LABEL) {
+                return Err(Rfc9942VdpError::CriticalHeaderNotProtected);
+            } else if label == Some(RFC9942_RECEIPTS_HEADER_LABEL) {
                 if protected_receipts.is_some() || unprotected_receipts.is_some() {
                     return Err(Rfc9942VdpError::InvalidStructure);
                 }
@@ -1045,6 +1089,12 @@ pub enum Rfc9942VdpError {
     Es256CoseKeyOperationNotPermitted,
     #[error("ES256 public-key adapter refuses private EC2 key material")]
     Es256PrivateKeyMaterial,
+    #[error("COSE crit header parameter must contain at least one label and use a bounded label list")]
+    CriticalHeaderMalformed,
+    #[error("COSE crit names a header parameter that is not in the protected bucket")]
+    CriticalHeaderNotProtected,
+    #[error("COSE crit names a protected header parameter this adapter does not understand")]
+    CriticalHeaderNotUnderstood,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
     VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
@@ -1430,6 +1480,45 @@ pub enum Rfc9162ProofDecodeError {
     InvalidHashLength,
     #[error("trailing bytes after proof")]
     TrailingBytes,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CoseCritContext {
+    Receipt,
+    Outer,
+}
+
+fn validate_cose_crit(
+    protected_labels: &std::collections::HashSet<CborLabelKey>,
+    crit_labels: &[CborLabelKey],
+    context: CoseCritContext,
+) -> Result<(), Rfc9942VdpError> {
+    if crit_labels.is_empty() {
+        return Err(Rfc9942VdpError::CriticalHeaderMalformed);
+    }
+    for label in crit_labels {
+        if !protected_labels.contains(label) {
+            return Err(Rfc9942VdpError::CriticalHeaderNotProtected);
+        }
+        let understood = match context {
+            CoseCritContext::Receipt => matches!(
+                label,
+                CborLabelKey::Integer(
+                    COSE_ALG_HEADER_LABEL | COSE_CRIT_HEADER_LABEL | RFC9942_VDS_HEADER_LABEL
+                )
+            ),
+            CoseCritContext::Outer => matches!(
+                label,
+                CborLabelKey::Integer(
+                    COSE_ALG_HEADER_LABEL | COSE_CRIT_HEADER_LABEL | RFC9942_RECEIPTS_HEADER_LABEL
+                )
+            ),
+        };
+        if !understood {
+            return Err(Rfc9942VdpError::CriticalHeaderNotUnderstood);
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -2768,6 +2857,124 @@ mod tests {
         bytes.extend_from_slice(&collection.to_cbor());
         bytes.push(0xf6); cbor_bytes(&mut bytes,&[0xAA]);
         assert_eq!(Rfc9942SignatureWithReceipts::from_cbor(&bytes),Err(Rfc9942VdpError::InvalidStructure));
+    }
+
+    #[test]
+    fn rfc9942_outer_signature_accepts_generic_payload_larger_than_receipt_root() {
+        let payload = vec![0x5A; 33];
+        let value = Rfc9942SignatureWithReceipts::new(
+            Rfc9942SignaturePayload::Attached(payload.clone()),
+            vec![0xBB; 64],
+            None,
+        );
+        let encoded = value.to_cbor();
+        let decoded = Rfc9942SignatureWithReceipts::from_cbor(&encoded).unwrap();
+        assert_eq!(
+            decoded.payload(),
+            &Rfc9942SignaturePayload::Attached(payload)
+        );
+    }
+
+    #[test]
+    fn rfc9942_outer_signature_rejects_unknown_critical_protected_header() {
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, 2);
+        cbor_int(&mut protected, COSE_CRIT_HEADER_LABEL);
+        cbor_array_len(&mut protected, 1);
+        cbor_int(&mut protected, 900);
+        cbor_int(&mut protected, 900);
+        cbor_uint(&mut protected, 1);
+
+        let mut bytes = Vec::new();
+        cbor_tag(&mut bytes, COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes, 4);
+        cbor_bytes(&mut bytes, &protected);
+        cbor_map_len(&mut bytes, 0);
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes, &[0xBB; 64]);
+
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&bytes),
+            Err(Rfc9942VdpError::CriticalHeaderNotUnderstood)
+        );
+    }
+
+    #[test]
+    fn rfc9942_outer_signature_rejects_unprotected_critical_header() {
+        let mut unprotected = Vec::new();
+        cbor_map_len(&mut unprotected, 1);
+        cbor_int(&mut unprotected, COSE_CRIT_HEADER_LABEL);
+        cbor_array_len(&mut unprotected, 1);
+        cbor_int(&mut unprotected, COSE_ALG_HEADER_LABEL);
+
+        let mut bytes = Vec::new();
+        cbor_tag(&mut bytes, COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes, 4);
+        cbor_bytes(&mut bytes, &[]);
+        bytes.extend_from_slice(&unprotected);
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes, &[0xBB; 64]);
+
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&bytes),
+            Err(Rfc9942VdpError::CriticalHeaderNotProtected)
+        );
+    }
+
+    #[test]
+    fn rfc9942_outer_signature_accepts_critical_algorithm_when_protected() {
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, 2);
+        cbor_int(&mut protected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected, COSE_CRIT_HEADER_LABEL);
+        cbor_array_len(&mut protected, 1);
+        cbor_int(&mut protected, COSE_ALG_HEADER_LABEL);
+
+        let mut bytes = Vec::new();
+        cbor_tag(&mut bytes, COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes, 4);
+        cbor_bytes(&mut bytes, &protected);
+        cbor_map_len(&mut bytes, 0);
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes, &[0xBB; 64]);
+
+        let decoded = Rfc9942SignatureWithReceipts::from_cbor(&bytes).unwrap();
+        assert_eq!(
+            decoded.protected_algorithm_id().unwrap(),
+            COSE_ES256_ALGORITHM_ID
+        );
+    }
+
+    #[test]
+    fn rfc9942_receipt_rejects_unknown_critical_protected_header() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,3);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected,COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected,RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected,RFC9162_VDS_ID);
+        cbor_int(&mut protected,COSE_CRIT_HEADER_LABEL);
+        cbor_array_len(&mut protected,1);
+        cbor_int(&mut protected,900);
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,1);
+        cbor_int(&mut bytes,RFC9942_VDP_HEADER_LABEL);
+        bytes.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut bytes,&[0x22;32]);
+        cbor_bytes(&mut bytes,&[0xAA;64]);
+
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&bytes),
+            Err(Rfc9942VdpError::CriticalHeaderNotUnderstood)
+        );
     }
 
     #[test]
