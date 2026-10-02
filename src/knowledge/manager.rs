@@ -367,10 +367,12 @@ impl KnowledgeManager {
 
                     persistence_health.causal_loaded = true;
                     for record in &causal_edges {
-                        let outcome = causal_bridge.import_edge(
+                        let outcome = causal_bridge.import_edge_with_metadata(
                             record.cause.clone(),
                             record.effect.clone(),
                             record.strength,
+                            record.is_inhibitory,
+                            record.cycle,
                         );
                         persistence_health.causal_restore_evictions += outcome.pruned_edges;
                         if outcome.was_policy_limited() {
@@ -865,16 +867,18 @@ impl KnowledgeManager {
     pub fn persist_snapshot(&mut self) {
         if let Some(ref mut p) = self.persistence {
             let facts = self.graph.export_fact_records();
-            let edge_tuples = self.causal_bridge.export_edge_records();
-            let edges: Vec<CausalEdgeRecord> = edge_tuples
+            let edge_records = self.causal_bridge.export_edge_records_with_metadata();
+            let edges: Vec<CausalEdgeRecord> = edge_records
                 .into_iter()
-                .map(|(cause, effect, strength)| CausalEdgeRecord {
-                    cause,
-                    effect,
-                    strength,
-                    is_inhibitory: strength < 0.0,
-                    cycle: 0,
-                })
+                .map(
+                    |(cause, effect, strength, is_inhibitory, cycle)| CausalEdgeRecord {
+                        cause,
+                        effect,
+                        strength,
+                        is_inhibitory,
+                        cycle,
+                    },
+                )
                 .collect();
             let ontology_records = self.ontology.export_ontology_records();
             let provenance_relations: Vec<ProvenanceRelationRecord> = self
@@ -1668,11 +1672,12 @@ mod tests {
         let mut first = KnowledgeManager::new(config.clone());
         first.process("Sanctions caused oil shortage.", 1);
         first.process("Oil shortage caused inflation.", 2);
+        first.process("Ceasefire prevented escalation.", 7);
         first.persist_snapshot();
 
         let first_facts = first.graph().export_fact_records();
         let first_relations: Vec<_> = first.graph().provenance_relations().to_vec();
-        let first_edges = first.causal_bridge().export_edge_records();
+        let first_edges = first.causal_bridge().export_edge_records_with_metadata();
         let first_ontology = first.ontology().export_ontology_records();
 
         let second = KnowledgeManager::new(config.clone());
@@ -1684,7 +1689,7 @@ mod tests {
 
         let second_facts = second.graph().export_fact_records();
         let second_relations: Vec<_> = second.graph().provenance_relations().to_vec();
-        let second_edges = second.causal_bridge().export_edge_records();
+        let second_edges = second.causal_bridge().export_edge_records_with_metadata();
         let second_ontology = second.ontology().export_ontology_records();
 
         assert_eq!(
@@ -1740,18 +1745,22 @@ mod tests {
         assert_eq!(
             second_edges
                 .iter()
-                .map(|(cause, effect, strength)| (
+                .map(|(cause, effect, strength, is_inhibitory, cycle)| (
                     cause.as_str(),
                     effect.as_str(),
-                    strength.to_bits()
+                    strength.to_bits(),
+                    *is_inhibitory,
+                    *cycle,
                 ))
                 .collect::<Vec<_>>(),
             first_edges
                 .iter()
-                .map(|(cause, effect, strength)| (
+                .map(|(cause, effect, strength, is_inhibitory, cycle)| (
                     cause.as_str(),
                     effect.as_str(),
-                    strength.to_bits()
+                    strength.to_bits(),
+                    *is_inhibitory,
+                    *cycle,
                 ))
                 .collect::<Vec<_>>()
         );
@@ -1796,7 +1805,10 @@ mod tests {
                 .map(|f| (f.memory_id.as_str(), f.vector_bytes.as_slice(), f.confidence.to_bits()))
                 .collect::<Vec<_>>()
         );
-        assert_eq!(fourth.causal_bridge().export_edge_records(), first_edges);
+        assert_eq!(
+            fourth.causal_bridge().export_edge_records_with_metadata(),
+            first_edges
+        );
         let fourth_ontology = fourth.ontology().export_ontology_records();
         assert_eq!(
             fourth_ontology
