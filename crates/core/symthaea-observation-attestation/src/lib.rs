@@ -1575,13 +1575,10 @@ impl Ed25519ReceiptVerifier {
         resolver: &R,
     ) -> ReceiptAttestationVerificationReport {
         let mut report = self.verify_with_resolver_report_inner(envelope, receipt, resolver);
-        if report.resolution_snapshot_fingerprint.is_none() {
+        if report.resolution_snapshot_fingerprint.is_none()
+            && report.resolved_verification_method.is_none()
+        {
             report.resolution_snapshot_fingerprint = self.resolution_snapshot_fingerprint.clone();
-            if report.resolution_snapshot_fingerprint.is_none()
-                && report.resolved_verification_method.is_some()
-            {
-                report.resolution_snapshot_fingerprint = resolver.snapshot_fingerprint();
-            }
         }
         report
     }
@@ -2481,6 +2478,64 @@ mod tests {
             base.snapshot_fingerprint(),
             changed_authorization.snapshot_fingerprint()
         );
+    }
+
+    #[test]
+    fn paired_resolution_none_snapshot_is_not_recombined_with_later_resolver_state() {
+        struct NoSnapshotResolver {
+            snapshot_calls: std::cell::Cell<u32>,
+            method: ResolvedVerificationMethod,
+        }
+
+        impl VerificationMethodResolver for NoSnapshotResolver {
+            fn resolve(
+                &self,
+                _verification_method: &str,
+            ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
+                Ok(self.method.clone())
+            }
+
+            fn resolve_with_snapshot(
+                &self,
+                _verification_method: &str,
+            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+                Ok(ResolvedVerificationMethodSnapshot {
+                    resolved: self.method.clone(),
+                    snapshot_fingerprint: None,
+                })
+            }
+
+            fn snapshot_fingerprint(&self) -> Option<String> {
+                self.snapshot_calls
+                    .set(self.snapshot_calls.get() + 1);
+                Some("later-state".to_string())
+            }
+        }
+
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let method = resolved_method(
+            &envelope.attester_id,
+            signing_key.verifying_key(),
+        );
+        let resolver = NoSnapshotResolver {
+            snapshot_calls: std::cell::Cell::new(0),
+            method,
+        };
+        let verifier = Ed25519ReceiptVerifier::new(
+            envelope.attester_id.clone(),
+            signing_key.verifying_key(),
+            150,
+        );
+
+        let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::Verified
+        );
+        assert_eq!(report.resolved_verification_method.as_deref(), Some(envelope.attester_id.as_str()));
+        assert_eq!(report.resolution_snapshot_fingerprint, None);
+        assert_eq!(resolver.snapshot_calls.get(), 0);
     }
 
     #[test]
