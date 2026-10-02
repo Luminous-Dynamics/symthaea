@@ -9,6 +9,13 @@ echo "HEAD: $(git rev-parse HEAD)"
 echo "Rust: $(rustc --version)"
 echo "Cargo: $(cargo --version)"
 
+echo "-- source-boundary scanner prerequisite --"
+if ! command -v rg >/dev/null 2>&1; then
+  echo "ERROR: ripgrep (rg) is required for CROSS-015/CROSS-022 source qualification" >&2
+  exit 1
+fi
+echo "ripgrep: $(rg --version | head -n1)"
+
 echo "-- focused Nixward formatting --"
 # Validate formatting only for the authority surfaces maintained by this
 # qualification lane. The wider Nixward tree contains historical formatting
