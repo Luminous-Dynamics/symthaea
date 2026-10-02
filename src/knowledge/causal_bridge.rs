@@ -904,7 +904,7 @@ mod tests {
         bridge.add_edge(CausalEdge {
             cause: "policy".into(),
             effect: "growth".into(),
-            strength: 0.2,
+            strength: 0.25,
             is_inhibitory: false,
             is_negated: false,
             source_text: "first".into(),
@@ -913,7 +913,7 @@ mod tests {
         bridge.add_edge(CausalEdge {
             cause: "policy".into(),
             effect: "growth".into(),
-            strength: 0.8,
+            strength: 0.75,
             is_inhibitory: false,
             is_negated: false,
             source_text: "second".into(),
@@ -922,7 +922,7 @@ mod tests {
         bridge.add_edge(CausalEdge {
             cause: "policy".into(),
             effect: "growth".into(),
-            strength: 0.4,
+            strength: 0.25,
             is_inhibitory: true,
             is_negated: false,
             source_text: "latest".into(),
@@ -935,7 +935,7 @@ mod tests {
             vec![(
                 "policy".to_string(),
                 "growth".to_string(),
-                -0.45,
+                -0.5,
                 true,
                 3,
             )]
