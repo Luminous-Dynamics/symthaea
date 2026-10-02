@@ -841,6 +841,9 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             ),
         }
     }
