@@ -670,7 +670,7 @@ impl VerificationContext {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum EvaluationClaim {
     ReceiptIntegrity,
     AttestationAuthenticity,
@@ -982,6 +982,7 @@ impl EvidenceEvaluation {
             && self.execution_trace.procedure_fingerprint == report.procedure_fingerprint
             && self.execution_trace.terminal_outcome() == Some(self.outcome)
             && self.execution_trace.is_well_formed()
+            && self.boundary.is_well_formed()
     }
 
     pub fn fingerprint(&self) -> String {
