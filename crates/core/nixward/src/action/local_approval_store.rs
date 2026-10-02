@@ -157,7 +157,7 @@ impl LocalApprovalRequestStoreV1 {
             removed.projection_digest,
             verified_peer,
             evaluation,
-        )?
+        )
     }
 
     /// Test-only legacy V1 admission, isolated from production callers.
@@ -442,6 +442,8 @@ pub enum LocalApprovalRequestStoreErrorV1 {
     RequestDisappearedDuringConsume,
     #[error("consumed approval provenance is internally inconsistent: {0}")]
     ConsumedProvenanceMismatch(&'static str),
+    #[error("invalid projection digest")]
+    InvalidProjectionDigest,
 }
 
 #[cfg(test)]
