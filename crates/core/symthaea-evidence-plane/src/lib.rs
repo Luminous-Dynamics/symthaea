@@ -50,7 +50,7 @@ pub mod seed_plan;
 pub mod task_validator;
 
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
@@ -104,6 +104,118 @@ pub fn config_hash<T: fmt::Debug>(config: &T) -> String {
     format!("{config:?}").hash(&mut hasher);
     format!("{:x}", hasher.finish())
 }
+
+
+/// Canonical execution identity for evidence admission and replay.
+///
+/// This v1 identity contains only computational inputs that can change what
+/// was executed: source snapshot, dependency locks, toolchains, host/target,
+/// Nix identity, feature selection, working directory, exact argv, allow-listed
+/// environment, and immutable input digests.
+///
+/// Run timestamps, generated run IDs, wall-clock outcomes, and other runtime
+/// bookkeeping are intentionally outside this identity. They may belong in an
+/// evidence envelope, but must not silently create a new computational lineage.
+///
+/// Canonicalization is explicit and domain-separated so the digest is stable
+/// across map insertion order and does not rely on Debug formatting.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionLineageV1 {
+    pub source_repository: String,
+    pub source_revision: String,
+    pub source_tree: String,
+    pub lock_digests: BTreeMap<String, String>,
+    pub toolchain_versions: BTreeMap<String, String>,
+    pub host_target: String,
+    pub nix_identity: String,
+    pub feature_flags: BTreeSet<String>,
+    pub cwd: String,
+    pub argv: Vec<String>,
+    pub allowed_env: BTreeMap<String, String>,
+    pub immutable_input_digests: BTreeMap<String, String>,
+}
+
+impl ExecutionLineageV1 {
+    pub const DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:execution-lineage:v1\n";
+
+    pub fn digest(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_SEPARATOR);
+        self.write_canonical(&mut hasher);
+        hasher.finalize().to_hex().to_string()
+    }
+
+    fn write_canonical(&self, hasher: &mut blake3::Hasher) {
+        append_str(hasher, "source_repository", &self.source_repository);
+        append_str(hasher, "source_revision", &self.source_revision);
+        append_str(hasher, "source_tree", &self.source_tree);
+        append_map(hasher, "lock_digests", &self.lock_digests);
+        append_map(hasher, "toolchain_versions", &self.toolchain_versions);
+        append_str(hasher, "host_target", &self.host_target);
+        append_str(hasher, "nix_identity", &self.nix_identity);
+        append_set(hasher, "feature_flags", &self.feature_flags);
+        append_str(hasher, "cwd", &self.cwd);
+        append_sequence(hasher, "argv", &self.argv);
+        append_map(hasher, "allowed_env", &self.allowed_env);
+        append_map(hasher, "immutable_input_digests", &self.immutable_input_digests);
+    }
+}
+
+fn append_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
+}
+
+fn append_str(hasher: &mut blake3::Hasher, field: &str, value: &str) {
+    append_bytes(hasher, field.as_bytes());
+    append_bytes(hasher, value.as_bytes());
+}
+
+fn append_sequence(hasher: &mut blake3::Hasher, field: &str, values: &[String]) {
+    append_bytes(hasher, field.as_bytes());
+    hasher.update(&(values.len() as u64).to_be_bytes());
+    for value in values {
+        append_bytes(hasher, value.as_bytes());
+    }
+}
+
+fn append_set(hasher: &mut blake3::Hasher, field: &str, values: &BTreeSet<String>) {
+    append_bytes(hasher, field.as_bytes());
+    hasher.update(&(values.len() as u64).to_be_bytes());
+    for value in values {
+        append_bytes(hasher, value.as_bytes());
+    }
+}
+
+fn append_map(hasher: &mut blake3::Hasher, field: &str, values: &BTreeMap<String, String>) {
+    append_bytes(hasher, field.as_bytes());
+    hasher.update(&(values.len() as u64).to_be_bytes());
+    for (key, value) in values {
+        append_bytes(hasher, key.as_bytes());
+        append_bytes(hasher, value.as_bytes());
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineagePerturbationResult {
+    Stable,
+    Changed,
+}
+
+pub fn qualify_lineage_perturbation(
+    before: &ExecutionLineageV1,
+    after: &ExecutionLineageV1,
+    dependency_changed: bool,
+) -> LineagePerturbationResult {
+    let changed = before.digest() != after.digest();
+    match (dependency_changed, changed) {
+        (false, false) => LineagePerturbationResult::Stable,
+        (true, true) => LineagePerturbationResult::Changed,
+        (false, true) => LineagePerturbationResult::Changed,
+        (true, false) => LineagePerturbationResult::Stable,
+    }
+}
+
 
 /// A named bag of measured evidence values.
 ///
@@ -345,6 +457,75 @@ mod tests {
 
     /// Reproduces `TemporalStateMode::HdcLtc`'s requirement: the active
     /// mechanism's predict counter must be positive. A passing case.
+
+    fn lineage_fixture() -> ExecutionLineageV1 {
+        ExecutionLineageV1 {
+            source_repository: "github.com/Luminous-Dynamics/symthaea".into(),
+            source_revision: "abc123".into(),
+            source_tree: "tree456".into(),
+            lock_digests: [("Cargo.lock".into(), "lock789".into())].into_iter().collect(),
+            toolchain_versions: [("rustc".into(), "1.96.0".into())].into_iter().collect(),
+            host_target: "x86_64-unknown-linux-gnu".into(),
+            nix_identity: "nixpkgs:deadbeef".into(),
+            feature_flags: ["default".into()].into_iter().collect(),
+            cwd: "/workspace/symthaea".into(),
+            argv: vec!["cargo".into(), "test".into(), "-p".into(), "symthaea-evidence-plane".into()],
+            allowed_env: [("RUST_BACKTRACE".into(), "0".into())].into_iter().collect(),
+            immutable_input_digests: [("fixture.json".into(), "sha256:1234".into())].into_iter().collect(),
+        }
+    }
+
+    #[test]
+    fn execution_lineage_digest_is_insertion_order_independent() {
+        let mut a = lineage_fixture();
+        let mut b = lineage_fixture();
+        a.lock_digests.insert("z".into(), "2".into());
+        a.lock_digests.insert("a".into(), "1".into());
+        b.lock_digests.insert("a".into(), "1".into());
+        b.lock_digests.insert("z".into(), "2".into());
+        assert_eq!(a.digest(), b.digest());
+    }
+
+    #[test]
+    fn execution_lineage_relevant_changes_change_identity() {
+        let base = lineage_fixture();
+        let mut revision = base.clone();
+        revision.source_revision = "def456".into();
+        let mut lock = base.clone();
+        lock.lock_digests.insert("Cargo.lock".into(), "lock999".into());
+        let mut argv = base.clone();
+        argv.argv.push("--nocapture".into());
+
+        assert_ne!(base.digest(), revision.digest());
+        assert_ne!(base.digest(), lock.digest());
+        assert_ne!(base.digest(), argv.digest());
+    }
+
+    #[test]
+    fn execution_lineage_qualification_distinguishes_expected_change() {
+        let base = lineage_fixture();
+        let mut changed = base.clone();
+        changed.source_revision = "def456".into();
+
+        assert_eq!(
+            qualify_lineage_perturbation(&base, &changed, true),
+            LineagePerturbationResult::Changed
+        );
+        assert_eq!(
+            qualify_lineage_perturbation(&base, &base, true),
+            LineagePerturbationResult::Stable
+        );
+    }
+
+    #[test]
+    fn execution_lineage_run_id_is_not_part_of_identity() {
+        let lineage = lineage_fixture();
+        let run_a = RunId::new("run-a");
+        let run_b = RunId::new("run-b");
+        assert_ne!(run_a, run_b);
+        assert_eq!(lineage.digest(), lineage.digest());
+    }
+
     #[test]
     fn hdc_ltc_style_positive_case_passes() {
         let mut declared = HashMap::new();
