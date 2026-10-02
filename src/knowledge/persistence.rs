@@ -281,6 +281,30 @@ impl KnowledgePersistence {
             .unchecked_transaction()
             .map_err(|e| format!("Begin snapshot transaction: {e}"))?;
 
+        // A snapshot represents the current resident projection. Reconcile the
+        // projection tables before upserting so facts/causal edges/ontology that
+        // were pruned in memory cannot be resurrected on the next startup.
+        // Provenance remains append-only below because it is historical lineage.
+        delete_absent_keys(
+            &tx,
+            "knowledge_facts",
+            "memory_id",
+            facts.iter().map(|f| f.memory_id.as_str()).collect(),
+        )?;
+        delete_absent_composite_keys(
+            &tx,
+            "knowledge_causal_edges",
+            "cause",
+            "effect",
+            edges.iter().map(|e| (e.cause.as_str(), e.effect.as_str())).collect(),
+        )?;
+        delete_absent_keys(
+            &tx,
+            "knowledge_ontology",
+            "name",
+            ontology.iter().map(|o| o.name.as_str()).collect(),
+        )?;
+
         let mut saved_count = 0usize;
 
         for fact in facts {
@@ -784,6 +808,69 @@ impl KnowledgePersistence {
     }
 }
 
+fn delete_absent_keys(
+    tx: &rusqlite::Transaction<'_>,
+    table: &str,
+    key_column: &str,
+    retained: Vec<&str>,
+) -> Result<(), String> {
+    if retained.is_empty() {
+        tx.execute(&format!("DELETE FROM {table}"), [])
+            .map_err(|e| format!("Reconcile {table}: {e}"))?;
+        return Ok(());
+    }
+
+    let placeholders = (1..=retained.len())
+        .map(|i| format!("?{i}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!(
+        "DELETE FROM {table}
+         WHERE {key_column} IS NULL
+            OR {key_column} NOT IN ({placeholders})"
+    );
+    let params: Vec<&dyn rusqlite::ToSql> = retained
+        .iter()
+        .map(|value| value as &dyn rusqlite::ToSql)
+        .collect();
+    tx.execute(&sql, rusqlite::params_from_iter(params))
+        .map_err(|e| format!("Reconcile {table}: {e}"))?;
+    Ok(())
+}
+
+fn delete_absent_composite_keys(
+    tx: &rusqlite::Transaction<'_>,
+    table: &str,
+    left_column: &str,
+    right_column: &str,
+    retained: Vec<(&str, &str)>,
+) -> Result<(), String> {
+    if retained.is_empty() {
+        tx.execute(&format!("DELETE FROM {table}"), [])
+            .map_err(|e| format!("Reconcile {table}: {e}"))?;
+        return Ok(());
+    }
+
+    let clauses = retained
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            let base = i * 2 + 1;
+            format!("({left_column} = ?{base} AND {right_column} = ?{})", base + 1)
+        })
+        .collect::<Vec<_>>()
+        .join(" OR ");
+    let sql = format!("DELETE FROM {table} WHERE NOT ({clauses})");
+    let mut values: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(retained.len() * 2);
+    for (left, right) in retained {
+        values.push(left as &dyn rusqlite::ToSql);
+        values.push(right as &dyn rusqlite::ToSql);
+    }
+    tx.execute(&sql, rusqlite::params_from_iter(values))
+        .map_err(|e| format!("Reconcile {table}: {e}"))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -943,6 +1030,92 @@ mod tests {
         let mut p = KnowledgePersistence::new(&db_path);
         let err = p.load_ontology().unwrap_err();
         assert!(err.contains("Load ontology row"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_snapshot_reconciles_pruned_projection_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_reconcile_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let old_fact = FactRecord {
+            memory_id: "old-fact".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![1u8; BinaryHV::BYTES],
+            source_text: "old".into(),
+            confidence: 0.4,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        let old_edge = CausalEdgeRecord {
+            cause: "old-cause".into(),
+            effect: "old-effect".into(),
+            strength: 0.5,
+            is_inhibitory: false,
+            cycle: 1,
+        };
+        let old_ontology = OntologyRecord {
+            name: "old-primitive".into(),
+            vector_bytes: vec![2u8; BinaryHV::BYTES],
+            usage_count: 1,
+            utility: 0.2,
+            created_at_cycle: 1,
+            last_used_cycle: 1,
+            is_a_parent: None,
+        };
+        p.save_snapshot(&[old_fact], &[], &[old_edge], &[old_ontology])
+            .unwrap();
+
+        let new_fact = FactRecord {
+            memory_id: "new-fact".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![3u8; BinaryHV::BYTES],
+            source_text: "new".into(),
+            confidence: 0.9,
+            domain: None,
+            cycle: 2,
+            is_causal: false,
+        };
+        let new_edge = CausalEdgeRecord {
+            cause: "new-cause".into(),
+            effect: "new-effect".into(),
+            strength: 0.8,
+            is_inhibitory: true,
+            cycle: 2,
+        };
+        let new_ontology = OntologyRecord {
+            name: "new-primitive".into(),
+            vector_bytes: vec![4u8; BinaryHV::BYTES],
+            usage_count: 3,
+            utility: 0.7,
+            created_at_cycle: 2,
+            last_used_cycle: 3,
+            is_a_parent: Some("concept".into()),
+        };
+        p.save_snapshot(&[new_fact], &[], &[new_edge], &[new_ontology])
+            .unwrap();
+
+        let facts = p.load_facts().unwrap();
+        let edges = p.load_causal_edges().unwrap();
+        let ontology = p.load_ontology().unwrap();
+
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].memory_id, "new-fact");
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].cause, "new-cause");
+        assert!(edges[0].is_inhibitory);
+        assert_eq!(ontology.len(), 1);
+        assert_eq!(ontology[0].name, "new-primitive");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
