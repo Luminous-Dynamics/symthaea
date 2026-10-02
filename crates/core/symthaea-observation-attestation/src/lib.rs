@@ -663,15 +663,15 @@ impl ReceiptAttestationVerificationReport {
             None => bytes.push(0),
         }
         bytes.push(verification_outcome_tag(self.outcome));
-        write_stage(bytes.as_mut_slice(), self.structural_validation);
-        write_stage(bytes.as_mut_slice(), self.receipt_commitment);
-        write_stage(bytes.as_mut_slice(), self.temporal_validity);
-        write_stage(bytes.as_mut_slice(), self.cryptosuite);
-        write_stage(bytes.as_mut_slice(), self.verification_method);
-        write_stage(bytes.as_mut_slice(), self.lifecycle);
-        write_stage(bytes.as_mut_slice(), self.proof_purpose_authorization);
-        write_stage(bytes.as_mut_slice(), self.proof_policy);
-        write_stage(bytes.as_mut_slice(), self.cryptographic_proof);
+        write_stage(&mut bytes, self.structural_validation);
+        write_stage(&mut bytes, self.receipt_commitment);
+        write_stage(&mut bytes, self.temporal_validity);
+        write_stage(&mut bytes, self.cryptosuite);
+        write_stage(&mut bytes, self.verification_method);
+        write_stage(&mut bytes, self.lifecycle);
+        write_stage(&mut bytes, self.proof_purpose_authorization);
+        write_stage(&mut bytes, self.proof_policy);
+        write_stage(&mut bytes, self.cryptographic_proof);
         bytes
     }
 
