@@ -929,7 +929,11 @@ impl EvidenceLineageGuardV1 {
             .validate()
             .map_err(EvidenceLineageCommitError::InvalidCurrentLineage)?;
 
-        match self.check(current) {
+        let decision = self
+            .try_check(current)
+            .map_err(EvidenceLineageCommitError::InvalidCurrentLineage)?;
+
+        match decision {
             EvidenceLineageDecision::Stable => {
                 self.evidence_committed = true;
                 Ok(())
@@ -942,6 +946,23 @@ impl EvidenceLineageGuardV1 {
         &self.prepared_digest
     }
 
+    /// Validate the current lineage before returning the admission decision.
+    ///
+    /// This is the preferred decision path for callers that do not already
+    /// have a separately validated lineage.
+    pub fn try_check(&self, current: &ExecutionLineageV1) -> Result<EvidenceLineageDecision, String> {
+        let current_digest = current.validated_digest()?;
+        Ok(if self.prepared_digest == current_digest {
+            EvidenceLineageDecision::Stable
+        } else if self.evidence_committed {
+            EvidenceLineageDecision::RefuseMixedLineageAfterEvidence
+        } else {
+            EvidenceLineageDecision::ReprepareBeforeEvidence
+        })
+    }
+
+    /// Compatibility decision path for callers that already validated the
+    /// current lineage. It does not perform semantic validation itself.
     pub fn check(&self, current: &ExecutionLineageV1) -> EvidenceLineageDecision {
         if self.prepared_digest == current.digest() {
             EvidenceLineageDecision::Stable
@@ -1234,6 +1255,30 @@ mod tests {
 
     /// Reproduces `TemporalStateMode::HdcLtc`'s requirement: the active
     /// mechanism's predict counter must be positive. A passing case.
+
+    #[test]
+    fn guard_try_check_rejects_invalid_direct_construction() {
+        let lineage = lineage_fixture();
+        let guard = EvidenceLineageGuardV1::prepare(&lineage).expect("valid fixture");
+        let mut invalid = lineage.clone();
+        invalid.argv.clear();
+
+        let error = guard
+            .try_check(&invalid)
+            .expect_err("invalid current lineage must fail closed");
+        assert!(error.contains("empty lineage argv"));
+    }
+
+    #[test]
+    fn guard_try_check_matches_compatibility_decision_for_valid_lineage() {
+        let lineage = lineage_fixture();
+        let guard = EvidenceLineageGuardV1::prepare(&lineage).expect("valid fixture");
+
+        assert_eq!(
+            guard.try_check(&lineage).expect("valid current lineage"),
+            guard.check(&lineage)
+        );
+    }
 
     #[test]
     fn validated_digest_rejects_invalid_direct_construction() {
