@@ -91,6 +91,11 @@ pub enum NixActionDescriptorV1 {
         operation: NixServiceOperationKindV1,
         unit: String,
     },
+    ConfigPatch {
+        option_path: String,
+        value: String,
+        expected_config_digest: String,
+    },
 }
 
 impl TryFrom<&NixOSCommand> for NixActionDescriptorV1 {
@@ -159,6 +164,15 @@ impl TryFrom<&NixOSCommand> for NixActionDescriptorV1 {
             NixOSCommand::Service { operation, unit } => Self::Service {
                 operation: *operation,
                 unit: unit.clone(),
+            },
+            NixOSCommand::ConfigPatch {
+                option_path,
+                value,
+                expected_config_digest,
+            } => Self::ConfigPatch {
+                option_path: option_path.clone(),
+                value: value.clone(),
+                expected_config_digest: expected_config_digest.clone(),
             },
             NixOSCommand::Custom { .. } => {
                 return Err(NixAuthorizationErrorV1::UnsupportedCustomCommand)
@@ -501,6 +515,25 @@ fn validate_action_shape(action: &NixActionDescriptorV1) -> Result<(), NixAuthor
             validate_canonical_service_operation_v1(unit, *operation)
                 .map_err(|error| NixAuthorizationErrorV1::InvalidTypedCommand(error.to_string()))?;
         }
+        NixActionDescriptorV1::ConfigPatch {
+            option_path,
+            value,
+            expected_config_digest,
+        } => {
+            if option_path.trim().is_empty() {
+                return Err(NixAuthorizationErrorV1::EmptyField("config patch option path"));
+            }
+            if value.trim().is_empty() {
+                return Err(NixAuthorizationErrorV1::EmptyField("config patch value"));
+            }
+            if expected_config_digest.len() != 64
+                || !expected_config_digest.bytes().all(|b| b.is_ascii_hexdigit())
+            {
+                return Err(NixAuthorizationErrorV1::InvalidTypedCommand(
+                    "config patch expected config digest must be 64 hex characters".to_string(),
+                ));
+            }
+        }
         NixActionDescriptorV1::EnvRollback
         | NixActionDescriptorV1::ChannelList
         | NixActionDescriptorV1::FlakeShow
@@ -529,8 +562,9 @@ fn minimum_scope_for_action(action: &NixActionDescriptorV1) -> NixActionScopeV1 
 
         NixActionDescriptorV1::RebuildTest { .. }
         | NixActionDescriptorV1::RebuildBoot { .. }
-        | NixActionDescriptorV1::Service { .. } => NixActionScopeV1::SystemModify
-        NixActionDescriptorV1::RebuildSwitch { .. } => NixActionScopeV1::SystemCritical,
+        | NixActionDescriptorV1::Service { .. } => NixActionScopeV1::SystemModify,
+        NixActionDescriptorV1::ConfigPatch { .. }
+        | NixActionDescriptorV1::RebuildSwitch { .. } => NixActionScopeV1::SystemCritical,
         NixActionDescriptorV1::CollectGarbage { .. } => NixActionScopeV1::Destructive,
     }
 }
@@ -712,6 +746,16 @@ fn put_action(h: &mut Hasher, action: &NixActionDescriptorV1) {
             );
             put_str(h, unit);
         }
+        NixActionDescriptorV1::ConfigPatch {
+            option_path,
+            value,
+            expected_config_digest,
+        } => {
+            put_u8(h, 18);
+            put_str(h, option_path);
+            put_str(h, value);
+            put_str(h, expected_config_digest);
+        }
     }
 }
 
@@ -850,6 +894,34 @@ mod tests {
                 ref unit,
             } if unit == "nginx.service"
         ));
+    }
+
+    #[test]
+    fn config_patch_intent_is_exact_and_system_critical() {
+        let a = NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "ab".repeat(32),
+        };
+        let intent = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".to_string()),
+            &a,
+        )
+        .unwrap();
+        assert_eq!(intent.maximum_scope, NixActionScopeV1::SystemCritical);
+
+        let mut changed = a.clone();
+        if let NixOSCommand::ConfigPatch { value, .. } = &mut changed {
+            *value = "false".to_string();
+        }
+        let changed_intent = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".to_string()),
+            &changed,
+        )
+        .unwrap();
+        assert_ne!(intent.digest().unwrap(), changed_intent.digest().unwrap());
     }
 
     #[test]
