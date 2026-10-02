@@ -176,8 +176,9 @@ pub enum VerificationStage {
     NotEvaluated,
 }
 
-/// Structured stage-by-stage verification evidence. This deliberately does not
-/// collapse evidence into an aggregate trust score.
+/// Typed identifiers for each verification procedure check.
+/// Keeping the identifier and report-stage mapping together prevents a second
+/// positional check-id list from silently diverging from the verification report.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvaluationCheck {
     EnvelopeStructuralValidation,
@@ -294,6 +295,9 @@ impl EvaluationProcedure {
             .collect()
     }
 }
+
+/// Structured stage-by-stage verification evidence. This deliberately does not
+/// collapse evidence into an aggregate trust score.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptAttestationVerificationReport {
     pub outcome: ReceiptAttestationVerificationOutcome,
