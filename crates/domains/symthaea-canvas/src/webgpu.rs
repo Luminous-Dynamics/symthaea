@@ -24,6 +24,7 @@ const MAX_GPU_VERTICES: usize = 200_000;
 const CIRCLE_SEGMENTS: usize = 32;
 const MAX_POLYGON_POINTS: usize = 128;
 const MIN_LINE_WIDTH: f32 = 0.25;
+const DEFAULT_STROKE_WIDTH: f32 = 1.0;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
@@ -62,13 +63,6 @@ impl GpuScene {
         self.vertices.len() * (std::mem::size_of::<f32>() * 6)
     }
 
-    fn push_vertex(&mut self, vertex: GpuVertex) -> bool {
-        if self.vertices.len() >= MAX_GPU_VERTICES {
-            return false;
-        }
-        self.vertices.push(vertex);
-        true
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -310,8 +304,8 @@ fn effective_stroke(style: &Style, opacity: f32) -> Option<[f32; 4]> {
 fn stroke_width(style: &Style, transform: Affine) -> f32 {
     let base = style
         .stroke_width
-        .map(|value| finite(value, MIN_LINE_WIDTH).max(MIN_LINE_WIDTH))
-        .unwrap_or(MIN_LINE_WIDTH);
+        .map(|value| finite(value, DEFAULT_STROKE_WIDTH).max(MIN_LINE_WIDTH))
+        .unwrap_or(DEFAULT_STROKE_WIDTH);
     (base * transform.scale_abs()).max(MIN_LINE_WIDTH)
 }
 
