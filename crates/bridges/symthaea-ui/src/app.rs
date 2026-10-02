@@ -59,7 +59,7 @@ struct Vitals {
     moral_score: f64,
     coherence: f64,
     gwt_broadcast: bool,
-    dream_insights: usize,
+    dream_insights: u64,
     surprise_triggered: bool,
     reasoning_confidence: f32,
     prediction_error: f32,
@@ -104,7 +104,7 @@ impl Vitals {
             moral_score,
             coherence,
             gwt_broadcast: v["gwt_broadcast"].as_bool().unwrap_or(false),
-            dream_insights: v["dream_insights"].as_u64().unwrap_or(0) as usize,
+            dream_insights: v["dream_insights"].as_u64().unwrap_or(0),
             surprise_triggered: v["surprise_triggered"].as_bool().unwrap_or(false),
             reasoning_confidence,
             prediction_error,
@@ -181,7 +181,14 @@ impl Movie {
             frames_rgba,
             width,
             height,
-            semantic_coherence: m["semantic_coherence"].as_f64().unwrap_or(0.0) as f32,
+            semantic_coherence: m["semantic_coherence"]
+                .as_f64()
+                .filter(|value| value.is_finite())
+                .and_then(|value| {
+                    let value = value as f32;
+                    value.is_finite().then_some(value)
+                })
+                .unwrap_or(0.0),
         })
     }
 }
@@ -875,6 +882,23 @@ mod tests {
         payload["mental_movie"]["height"] = 1;
         payload["mental_movie"]["channels"] = 2;
         assert!(Movie::from_json(&payload).is_none());
+    }
+
+    #[test]
+    fn movie_semantic_coherence_fails_closed_on_non_finite_or_f32_overflow() {
+        let mut payload = serde_json::json!({
+            "mental_movie": {
+                "width": 1,
+                "height": 1,
+                "channels": 1,
+                "frames_b64": ["AA=="],
+                "semantic_coherence": f64::MAX
+            }
+        });
+        assert_eq!(Movie::from_json(&payload).unwrap().semantic_coherence, 0.0);
+
+        payload["mental_movie"]["semantic_coherence"] = serde_json::json!(f64::NAN);
+        assert_eq!(Movie::from_json(&payload).unwrap().semantic_coherence, 0.0);
     }
 
     #[test]
