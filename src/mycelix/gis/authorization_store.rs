@@ -263,6 +263,9 @@ impl SqliteAuthorizationStore {
     ) -> Result<(), AuthorizationStoreError> {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if load_lease_boundary(&tx, authorization_instance)?.is_some() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
         let mut lease = load_lease(&tx, authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
         lease.mark_dispatch_pending(attempt_id)?;
@@ -415,6 +418,11 @@ impl SqliteAuthorizationStore {
     ) -> Result<(), AuthorizationStoreError> {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if load_lease_boundary(&tx, authorization_instance)?.is_some()
+            || dispatch_boundary(&tx, authorization_instance, attempt_id)?.is_some()
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
         let mut lease = load_lease(&tx, authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
         lease.mark_invoked(attempt_id)?;
@@ -673,7 +681,8 @@ impl SqliteAuthorizationStore {
                 tx.prepare(
                     "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
                      FROM authorization_leases
-                     WHERE state IN ('prepared','dispatch_pending','invoked')",
+                     WHERE state IN ('prepared','dispatch_pending','invoked')
+                       AND boundary_id IS NULL",
                 )?
             };
             let bound_params = boundary_filter.map(|id| vec![id.to_owned()]).unwrap_or_default();
@@ -1200,6 +1209,42 @@ mod tests {
         ));
         let receipt=store.commit_bound(&record,ExecutionOutcome::Succeeded).unwrap();
         assert_eq!(receipt.provider_idempotency_key,record.provider_idempotency_key);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn legacy_transitions_cannot_bypass_boundary_owned_attempts() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-legacy-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=EpistemicAction::new("boundary-legacy-fence","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(), authorization_instance:"approval-legacy-fence".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:09:00Z".into(), expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-legacy-fence",action.id.clone(),digest,"sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-legacy-fence","boundary-A"
+        ).unwrap();
+        assert!(matches!(
+            store.mark_dispatch_pending("approval-legacy-fence","attempt-legacy-fence"),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let record=store.mark_dispatch_pending_bound(
+            "approval-legacy-fence","attempt-legacy-fence",&action,&effect,"boundary-A"
+        ).unwrap();
+        assert!(matches!(
+            store.mark_invoked("approval-legacy-fence","attempt-legacy-fence"),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+        store.mark_invoked_bound(&record).unwrap();
         let _=std::fs::remove_file(path);
     }
 
