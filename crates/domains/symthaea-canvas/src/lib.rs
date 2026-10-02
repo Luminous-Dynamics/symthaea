@@ -22,6 +22,7 @@ pub mod color;
 pub mod geometry;
 pub mod scene_features;
 pub mod scene_graph;
+pub mod scene_wire;
 pub mod svg_renderer;
 #[cfg(feature = "webgpu")]
 pub mod webgpu;
@@ -37,6 +38,7 @@ pub use color::{Color, Palette};
 pub use geometry::build_scene;
 pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
+pub use scene_wire::{RemoteScene, WireNode, WirePrimitive, WireStyle, WireTransform};
 pub use svg_renderer::{SvgRenderOptions, render_svg, render_svg_with_options};
 pub use validation::{SnapshotLimits, SnapshotSanitization};
 #[cfg(feature = "webgpu")]
