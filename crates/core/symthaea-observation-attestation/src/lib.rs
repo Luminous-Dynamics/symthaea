@@ -949,4 +949,27 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn verification_report_fingerprint_is_deterministic_and_binds_receipt() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let first = verifier.verify_report(&envelope, &receipt);
+        let second = verifier.verify_report(&envelope, &receipt);
+        assert_eq!(first.fingerprint(), second.fingerprint());
+        assert_eq!(first.receipt_fingerprint, receipt.fingerprint());
+
+        let other_receipt = {
+            let mut r = receipt.clone();
+            r.source_observation_id = "different-source".into();
+            r
+        };
+        assert_ne!(first.receipt_fingerprint, other_receipt.fingerprint());
+    }
+
+
 }
