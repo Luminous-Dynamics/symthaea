@@ -59,6 +59,8 @@ pub struct Rfc9942Vdp {
 pub enum Rfc9942VdpError {
     #[error("proof collection must contain at least one proof")]
     EmptyProofCollection,
+    #[error("RFC 9942 receipt payload must be exactly 32 bytes for SHA-256")]
+    InvalidPayloadLength,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
     VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
@@ -82,7 +84,12 @@ impl Rfc9942Vdp {
         }
         for proof in &proofs {
             match kind {
-                Rfc9942ProofKind::Inclusion => { Rfc9162InclusionProof::from_cbor(proof)?; }
+                Rfc9942ProofKind::Inclusion => {
+                    let decoded = Rfc9162InclusionProof::from_cbor(proof)?;
+                    if decoded.inclusion_path.is_empty() {
+                        return Err(Rfc9942VdpError::InvalidProof(Rfc9162ProofDecodeError::InvalidStructure));
+                    }
+                }
                 Rfc9942ProofKind::Consistency => { Rfc9162ConsistencyProof::from_cbor(proof)?; }
             }
         }
@@ -115,6 +122,32 @@ impl Rfc9942Vdp {
         self.verify_inclusion(candidate_entry, expected_head)
     }
 
+    /// Verify inclusion against the 32-byte signed/detached receipt payload root.
+    /// COSE signature verification and detached-payload resolution remain external.
+    pub fn verify_inclusion_with_payload(
+        &self,
+        candidate_entry: &[u8],
+        payload: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        if self.kind != Rfc9942ProofKind::Inclusion {
+            return Err(Rfc9942VdpError::WrongProofKind);
+        }
+        if payload.len() != 32 {
+            return Err(Rfc9942VdpError::InvalidPayloadLength);
+        }
+        let mut root = [0u8; 32];
+        root.copy_from_slice(payload);
+        let vds = Rfc9162Sha256Vds;
+        for proof_bytes in &self.proofs {
+            let proof = Rfc9162InclusionProof::from_cbor(proof_bytes)?;
+            let head = VdsTreeHead::new(proof.tree_size, root);
+            if vds.verify_inclusion(candidate_entry, root, &proof) {
+                return Ok(head);
+            }
+        }
+        Err(Rfc9942VdpError::NoMatchingProof)
+    }
+
     pub fn verify_inclusion(
         &self,
         candidate_entry: &[u8],
@@ -142,6 +175,35 @@ impl Rfc9942Vdp {
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
         self.validate_vds_id(vds_id)?;
         self.verify_consistency(older, newer)
+    }
+
+    /// Verify consistency against the 32-byte signed/detached newer-tree root.
+    /// The older tree head is supplied separately; COSE remains external.
+    pub fn verify_consistency_with_payload(
+        &self,
+        older: VdsTreeHead,
+        payload: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        if self.kind != Rfc9942ProofKind::Consistency {
+            return Err(Rfc9942VdpError::WrongProofKind);
+        }
+        if payload.len() != 32 {
+            return Err(Rfc9942VdpError::InvalidPayloadLength);
+        }
+        let mut root = [0u8; 32];
+        root.copy_from_slice(payload);
+        let vds = Rfc9162Sha256Vds;
+        for proof_bytes in &self.proofs {
+            let proof = Rfc9162ConsistencyProof::from_cbor(proof_bytes)?;
+            if proof.first != older.tree_size() {
+                continue;
+            }
+            let newer = VdsTreeHead::new(proof.second, root);
+            if vds.verify(older.root(), root, &proof) {
+                return Ok(newer);
+            }
+        }
+        Err(Rfc9942VdpError::NoMatchingProof)
     }
 
     pub fn verify_consistency(
@@ -919,6 +981,33 @@ mod tests {
         let decoded=Rfc9942Vdp::from_cbor(&vdp.to_cbor()).unwrap();
         assert_eq!(decoded.kind(),Rfc9942ProofKind::Consistency);
         assert_eq!(decoded.proofs(),&[consistency]);
+    }
+
+    #[test]
+    fn rfc9942_vdp_rejects_rfc9162_singleton_inclusion_proof() {
+        let singleton=Rfc9162InclusionProof::new(1,0,Vec::new()).to_cbor();
+        assert_eq!(Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![singleton]),Err(Rfc9942VdpError::InvalidProof(Rfc9162ProofDecodeError::InvalidStructure)));
+    }
+
+    #[test]
+    fn rfc9942_vdp_binds_inclusion_to_receipt_payload_root() {
+        let vds=Rfc9162Sha256Vds; let leaves=vec![b"a".to_vec(),b"b".to_vec()]; let head=vds.tree_head(&leaves);
+        let proof=vds.inclusion_proof(&leaves,0).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        assert_eq!(vdp.verify_inclusion_with_payload(b"a",&head.root()).unwrap(),head);
+        assert_eq!(vdp.verify_inclusion_with_payload(b"a",&[0xAA;32]),Err(Rfc9942VdpError::NoMatchingProof));
+        assert_eq!(vdp.verify_inclusion_with_payload(b"a",&[0xAA;31]),Err(Rfc9942VdpError::InvalidPayloadLength));
+    }
+
+    #[test]
+    fn rfc9942_vdp_binds_consistency_to_newer_receipt_payload_root() {
+        let vds=Rfc9162Sha256Vds; let leaves:Vec<Vec<u8>>=(0..4).map(|i|format!("leaf-{i}").into_bytes()).collect();
+        let older=vds.tree_head(&leaves[..2].to_vec()); let newer=vds.tree_head(&leaves);
+        let proof=vds.prove(&leaves,2).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Consistency,vec![proof]).unwrap();
+        assert_eq!(vdp.verify_consistency_with_payload(older,&newer.root()).unwrap(),newer);
+        assert_eq!(vdp.verify_consistency_with_payload(older,&[0xAA;32]),Err(Rfc9942VdpError::NoMatchingProof));
+        assert_eq!(vdp.verify_consistency_with_payload(older,&[0xAA;31]),Err(Rfc9942VdpError::InvalidPayloadLength));
     }
 
     #[test]
