@@ -25,7 +25,7 @@ pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
 pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v4";
 
 pub const EVALUATION_PROCEDURE_VERSION: &str =
-    "symthaea-observation-evaluation-procedure-v1";
+    "symthaea-observation-evaluation-procedure-v2";
 pub const EVALUATION_PROCEDURE_ID: &str =
     "symthaea-observation-attestation-ed25519-procedure-v1";
 
@@ -206,6 +206,10 @@ impl EvaluationCheck {
         Self::CryptographicProof,
     ];
 
+    pub const fn definition_version(self) -> &'static str {
+        "v1"
+    }
+
     pub const fn id(self) -> &'static str {
         match self {
             Self::EnvelopeStructuralValidation => "envelope-structural-validation",
@@ -293,19 +297,20 @@ impl EvaluationProcedure {
         }
 
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:observation-evaluation-procedure:v1\n");
+        bytes.extend_from_slice(b"symthaea:observation-evaluation-procedure:v2\n");
         write_string(&mut bytes, self.procedure_version);
         write_string(&mut bytes, self.procedure_id);
         bytes.extend_from_slice(&(self.checks.len() as u64).to_be_bytes());
         for check in self.checks {
             write_string(&mut bytes, check.id());
+            write_string(&mut bytes, check.definition_version());
         }
         bytes
     }
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-evaluation-procedure:v1\n");
+        hasher.update(b"symthaea:observation-evaluation-procedure:v2\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -2682,6 +2687,23 @@ mod tests {
             changed.context.authorization_policy_fingerprint.as_deref(),
             Some("authorization-policy-a")
         );
+    }
+
+    #[test]
+    fn evaluation_procedure_canonicalization_binds_check_definition_versions() {
+        let procedure = EvaluationProcedure::attestation_ed25519();
+        let canonical = procedure.canonical_bytes();
+        for check in procedure.checks {
+            let id = check.id();
+            let version = check.definition_version();
+            assert!(canonical.windows(id.len()).any(|window| window == id.as_bytes()));
+            assert!(canonical
+                .windows(version.len())
+                .any(|window| window == version.as_bytes()));
+        }
+        assert!(canonical.starts_with(
+            b"symthaea:observation-evaluation-procedure:v2\n"
+        ));
     }
 
     #[test]
