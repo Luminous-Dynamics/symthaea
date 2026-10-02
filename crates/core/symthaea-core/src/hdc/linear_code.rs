@@ -99,7 +99,7 @@ impl RandomLinearCode {
 
         while basis.len() < rank {
             let mut candidate = BinaryCodeword::zero(dimension);
-            for word in &mut candidate.words { *word = rng.gen(); }
+            for word in &mut candidate.words { *word = rng.r#gen(); }
             if dimension % 64 != 0 {
                 if let Some(last) = candidate.words.last_mut() {
                     *last &= last_word_mask(dimension);
