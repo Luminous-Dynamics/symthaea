@@ -117,8 +117,6 @@ pub fn config_hash<T: fmt::Debug>(config: &T) -> String {
 /// bookkeeping are intentionally outside this identity. They may belong in an
 /// evidence envelope, but must not silently create a new computational lineage.
 ///
-/// Canonicalization is explicit and domain-separated so the digest is stable
-/// across map insertion order and does not rely on Debug formatting.
 /// Canonical identity of a validated repository source snapshot.
 ///
 /// The inner value is private so callers cannot bypass canonicalization. The
@@ -161,6 +159,7 @@ impl<'de> Deserialize<'de> for RepositorySourceSnapshotId {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionLineageV1 {
     pub source_repository: String,
     pub source_revision: String,
