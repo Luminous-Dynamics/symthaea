@@ -518,101 +518,106 @@ impl EvaluationBoundary {
             stage: VerificationStage,
             claim: EvaluationClaim,
             established: &mut Vec<EvaluationClaim>,
+            not_established: &mut Vec<EvaluationClaim>,
             indeterminate: &mut Vec<EvaluationClaim>,
         ) {
             match stage {
                 VerificationStage::Passed => established.push(claim),
-                VerificationStage::Failed(_) | VerificationStage::NotEvaluated => {
-                    indeterminate.push(claim)
-                }
+                VerificationStage::Failed(_) => not_established.push(claim),
+                VerificationStage::NotEvaluated => indeterminate.push(claim),
             }
         }
 
         let mut established = Vec::new();
+        let mut not_established = Vec::new();
         let mut indeterminate = Vec::new();
+
         classify(
             report.receipt_commitment,
             EvaluationClaim::ReceiptIntegrity,
             &mut established,
-            &mut indeterminate,
-        );
-        classify(
-            report.verification_method,
-            EvaluationClaim::VerificationMethodResolution,
-            &mut established,
+            &mut not_established,
             &mut indeterminate,
         );
         classify(
             report.temporal_validity,
             EvaluationClaim::TemporalValidity,
             &mut established,
+            &mut not_established,
             &mut indeterminate,
         );
         classify(
             report.cryptosuite,
             EvaluationClaim::CryptosuiteConformance,
             &mut established,
+            &mut not_established,
+            &mut indeterminate,
+        );
+        classify(
+            report.verification_method,
+            EvaluationClaim::VerificationMethodResolution,
+            &mut established,
+            &mut not_established,
             &mut indeterminate,
         );
         classify(
             report.lifecycle,
             EvaluationClaim::VerificationMethodLifecycle,
             &mut established,
+            &mut not_established,
             &mut indeterminate,
         );
         classify(
             report.proof_purpose_authorization,
             EvaluationClaim::ProofPurposeAuthorization,
             &mut established,
+            &mut not_established,
             &mut indeterminate,
         );
         classify(
             report.proof_policy,
             EvaluationClaim::ProofPolicyConformance,
             &mut established,
+            &mut not_established,
             &mut indeterminate,
         );
         classify(
             report.cryptographic_proof,
             EvaluationClaim::CryptographicProofValidity,
             &mut established,
+            &mut not_established,
             &mut indeterminate,
         );
 
-        // A structurally valid, signed attestation is still not a truth oracle.
-        // These claims require separate domain-specific evidence or procedures.
-        established.push(EvaluationClaim::AttestationAuthenticity);
-        for claim in [
-            EvaluationClaim::UnderlyingObservationTruth,
-            EvaluationClaim::SemanticValidity,
-            EvaluationClaim::ExternalWorldCorrespondence,
-            EvaluationClaim::AttesterIntent,
-            EvaluationClaim::EvaluatorIndependence,
-        ] {
-            // These are deliberately represented as not-established rather than
-            // indeterminate: this verifier does not claim to evaluate them at all.
-            //
-            // Keeping this distinction prevents "not checked" from being confused
-            // with "checked but failed" in downstream evidence reasoning.
-            //
-            // The lists are normalized during canonicalization.
-            //
-            // (The report's stage failures remain indeterminate for the claims
-            // represented by actual verification procedures.)
-            //
-            // This is an explicit boundary of the evidence type.
-            //
-            // Push below after the loop to keep the construction readable.
-            let _ = claim;
+        // Authenticity is a compound claim: the receipt must be structurally
+        // acceptable, bound to its commitment, and cryptographically valid.
+        match (
+            report.structural_validation,
+            report.receipt_commitment,
+            report.cryptographic_proof,
+        ) {
+            (
+                VerificationStage::Passed,
+                VerificationStage::Passed,
+                VerificationStage::Passed,
+            ) => established.push(EvaluationClaim::AttestationAuthenticity),
+            (VerificationStage::NotEvaluated, _, _)
+            | (_, VerificationStage::NotEvaluated, _)
+            | (_, _, VerificationStage::NotEvaluated) => {
+                indeterminate.push(EvaluationClaim::AttestationAuthenticity)
+            }
+            _ => not_established.push(EvaluationClaim::AttestationAuthenticity),
         }
 
-        let not_established = vec![
+        // These claims are outside the scope of this cryptographic verifier.
+        // They are therefore explicitly not-established, not merely omitted.
+        not_established.extend([
             EvaluationClaim::UnderlyingObservationTruth,
             EvaluationClaim::SemanticValidity,
             EvaluationClaim::ExternalWorldCorrespondence,
             EvaluationClaim::AttesterIntent,
             EvaluationClaim::EvaluatorIndependence,
-        ];
+        ]);
 
         Self {
             established,
@@ -1817,6 +1822,31 @@ mod tests {
 
 
 
+
+    #[test]
+    fn evidence_evaluation_boundary_marks_failed_checks_as_not_established() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        envelope.proof.proof_value[0] ^= 0x01;
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+        assert!(evaluation
+            .boundary
+            .not_established
+            .contains(&EvaluationClaim::CryptographicProofValidity));
+        assert!(evaluation
+            .boundary
+            .not_established
+            .contains(&EvaluationClaim::AttestationAuthenticity));
+        assert!(!evaluation
+            .boundary
+            .indeterminate
+            .contains(&EvaluationClaim::CryptographicProofValidity));
+    }
 
     #[test]
     fn evidence_evaluation_boundary_distinguishes_established_from_not_established() {
