@@ -36,6 +36,9 @@ cargo test -p nixward --bin nixward_daemon
 echo "-- TUI approval-binding tests --"
 cargo test -p nixward --lib tui::app::tests
 
+echo "-- daemon snapshot IPC compatibility tests --"
+cargo test -p nixward --test daemon_state_integration
+
 echo "-- temporal tests --"
 cargo test -p nixward --lib action::temporal::tests
 
