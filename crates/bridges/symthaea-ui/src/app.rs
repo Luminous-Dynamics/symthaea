@@ -1913,9 +1913,9 @@ mod tests {
         ];
         let mut many_attrs = String::new();
         for i in 0..205 {
-            many_attrs.push_str(&format!("<g id="g{i}" "));
+            many_attrs.push_str(&format!("<g id=\"g{i}\" "));
             for (key, value) in allowed_attrs {
-                many_attrs.push_str(&format!("{key}="{value}" "));
+                many_attrs.push_str(&format!("{key}=\"{value}\" "));
             }
             many_attrs.push_str("/>");
         }
