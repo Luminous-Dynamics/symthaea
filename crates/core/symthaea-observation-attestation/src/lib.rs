@@ -1576,10 +1576,12 @@ impl Ed25519ReceiptVerifier {
     ) -> ReceiptAttestationVerificationReport {
         let mut report = self.verify_with_resolver_report_inner(envelope, receipt, resolver);
         if report.resolution_snapshot_fingerprint.is_none() {
-            report.resolution_snapshot_fingerprint = self
-                .resolution_snapshot_fingerprint
-                .clone()
-                .or_else(|| resolver.snapshot_fingerprint());
+            report.resolution_snapshot_fingerprint = self.resolution_snapshot_fingerprint.clone();
+            if report.resolution_snapshot_fingerprint.is_none()
+                && report.resolved_verification_method.is_some()
+            {
+                report.resolution_snapshot_fingerprint = resolver.snapshot_fingerprint();
+            }
         }
         report
     }
@@ -2479,6 +2481,28 @@ mod tests {
             base.snapshot_fingerprint(),
             changed_authorization.snapshot_fingerprint()
         );
+    }
+
+    #[test]
+    fn resolver_snapshot_is_not_attached_when_resolution_never_occurs() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        envelope.attester_id.clear();
+
+        let resolver = InMemoryVerificationMethodResolver::default();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+
+        let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::InvalidEnvelope
+        );
+        assert_eq!(report.resolved_verification_method, None);
+        assert_eq!(report.resolution_snapshot_fingerprint, None);
     }
 
     #[test]
