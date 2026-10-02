@@ -789,6 +789,15 @@ mod tests {
     }
 
     #[test]
+    fn lineage_digest_is_case_canonical_for_snapshot_id() {
+        let mut upper = lineage_fixture();
+        let lower = lineage_fixture();
+        upper.repository_source_snapshot_id =
+            RepositorySourceSnapshotId::parse(&"A".repeat(64)).expect("valid snapshot id");
+        assert_eq!(upper.digest(), lower.digest());
+    }
+
+    #[test]
     fn execution_lineage_validation_rejects_invalid_repository_source_snapshot_id() {
         assert!(RepositorySourceSnapshotId::parse("not-a-sha256").is_err());
     }
