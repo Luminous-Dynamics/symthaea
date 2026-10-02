@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::color::Color;
-use crate::scene_graph::{NodeKind, SceneNode};
+use crate::scene_graph::{NodeKind, SceneNode, Style, Transform};
 
 const MAX_SCENE_NODES: usize = 256;
 const MAX_SCENE_DEPTH: usize = 24;
@@ -114,7 +114,8 @@ impl RemoteScene {
     /// resulting document is self-contained and backend-neutral.
     pub fn from_scene(scene: &SceneNode) -> Self {
         let mut node_count = 0usize;
-        let root = compile_node(scene, 0, &mut node_count);
+        let gradients = collect_first_gradient_colors(scene);
+        let root = compile_node(scene, 0, &mut node_count, &gradients);
         let root = root.unwrap_or_else(|| WireNode {
             primitive: WirePrimitive::Group,
             transform: WireTransform::default(),
@@ -144,6 +145,11 @@ impl RemoteScene {
         }
     }
 
+    /// Reconstruct a native SceneNode from the bounded wire representation.
+    pub fn to_scene_node(&self) -> SceneNode {
+        wire_to_scene_node(&self.root)
+    }
+
     pub fn serialized_len(&self) -> usize {
         serde_json::to_vec(self).map(|bytes| bytes.len()).unwrap_or(MAX_SCENE_BYTES + 1)
     }
@@ -153,7 +159,12 @@ impl RemoteScene {
     }
 }
 
-fn compile_node(node: &SceneNode, depth: usize, count: &mut usize) -> Option<WireNode> {
+fn compile_node(
+    node: &SceneNode,
+    depth: usize,
+    count: &mut usize,
+    gradients: &std::collections::HashMap<&str, Color>,
+) -> Option<WireNode> {
     if depth > MAX_SCENE_DEPTH || *count >= MAX_SCENE_NODES {
         return None;
     }
@@ -214,7 +225,11 @@ fn compile_node(node: &SceneNode, depth: usize, count: &mut usize) -> Option<Wir
     };
 
     let wire_style = WireStyle {
-        fill: node.style.fill.map(|c| c.sanitized()),
+        fill: node
+            .style
+            .fill
+            .or_else(|| node.style.fill_url.as_deref().and_then(|id| gradients.get(id).copied()))
+            .map(|c| c.sanitized()),
         stroke: node.style.stroke.map(|c| c.sanitized()),
         stroke_width: node.style.stroke_width.map(|v| nonnegative(v)),
         opacity: node
@@ -227,7 +242,7 @@ fn compile_node(node: &SceneNode, depth: usize, count: &mut usize) -> Option<Wir
     let children = node
         .children
         .iter()
-        .filter_map(|child| compile_node(child, depth + 1, count))
+        .filter_map(|child| compile_node(child, depth + 1, count, gradients))
         .collect();
 
     Some(WireNode {
@@ -236,6 +251,73 @@ fn compile_node(node: &SceneNode, depth: usize, count: &mut usize) -> Option<Wir
         style: wire_style,
         children,
     })
+}
+
+fn collect_first_gradient_colors(root: &SceneNode) -> std::collections::HashMap<&str, Color> {
+    fn visit<'a>(node: &'a SceneNode, colors: &mut std::collections::HashMap<&'a str, Color>) {
+        if let NodeKind::RadialGradient { id, stops } = &node.kind {
+            if let Some(stop) = stops.first() {
+                colors.entry(id.as_str()).or_insert(stop.color);
+            }
+        }
+        for child in &node.children {
+            visit(child, colors);
+        }
+    }
+    let mut colors = std::collections::HashMap::new();
+    visit(root, &mut colors);
+    colors
+}
+
+fn wire_to_scene_node(node: &WireNode) -> SceneNode {
+    let transform = Transform {
+        translate_x: node.transform.translate_x,
+        translate_y: node.transform.translate_y,
+        rotate_deg: node.transform.rotate_deg,
+        scale: node.transform.scale,
+    };
+    let style = Style {
+        fill: node.style.fill,
+        fill_url: None,
+        stroke: node.style.stroke,
+        stroke_width: node.style.stroke_width,
+        opacity: Some(node.style.opacity),
+        filter: None,
+        css_class: None,
+    };
+    let kind = match &node.primitive {
+        WirePrimitive::Group => NodeKind::Group { id: None },
+        WirePrimitive::Circle { cx, cy, r } => NodeKind::Circle { cx: *cx, cy: *cy, r: *r },
+        WirePrimitive::Ellipse { cx, cy, rx, ry } => NodeKind::Ellipse {
+            cx: *cx,
+            cy: *cy,
+            rx: *rx,
+            ry: *ry,
+        },
+        WirePrimitive::Line { x1, y1, x2, y2 } => NodeKind::Line {
+            x1: *x1,
+            y1: *y1,
+            x2: *x2,
+            y2: *y2,
+        },
+        WirePrimitive::Polygon { points, closed } => NodeKind::Polygon {
+            points: points.iter().map(|p| (p[0], p[1])).collect(),
+            closed: *closed,
+        },
+        WirePrimitive::Rect { x, y, w, h, rx } => NodeKind::Rect {
+            x: *x,
+            y: *y,
+            w: *w,
+            h: *h,
+            rx: *rx,
+        },
+    };
+    SceneNode {
+        kind,
+        transform,
+        style,
+        children: node.children.iter().map(wire_to_scene_node).collect(),
+    }
 }
 
 fn finite(value: f32, fallback: f32) -> f32 {
