@@ -214,8 +214,8 @@ fn visit(
                 .collect::<Vec<_>>();
 
             if let Some(fill) = effective_fill(&node.style, gradients, opacity) {
-                if *closed {
-                    emit_fan_fill(out, &transformed, fill);
+                if *closed && !emit_polygon_fill(out, &transformed, fill) {
+                    out.skipped_nodes = out.skipped_nodes.saturating_add(1);
                 }
             }
             if let Some(stroke) = effective_stroke(&node.style, opacity) {
@@ -250,7 +250,9 @@ fn visit(
                 .collect::<Vec<_>>();
 
             if let Some(fill) = effective_fill(&node.style, gradients, opacity) {
-                emit_fan_fill(out, &points, fill);
+                if !emit_polygon_fill(out, &points, fill) {
+                    out.skipped_nodes = out.skipped_nodes.saturating_add(1);
+                }
             }
             if let Some(stroke) = effective_stroke(&node.style, opacity) {
                 let width = stroke_width(&node.style, transform);
@@ -375,31 +377,127 @@ fn emit_ellipse(
     }
 }
 
-fn emit_fan_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) {
+fn emit_polygon_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) -> bool {
     if points.len() < 3 {
-        return;
+        return true;
     }
-    let center = polygon_centroid(points);
-    for i in 0..points.len() {
-        push_triangle(
-            out,
-            center,
-            points[i],
-            points[(i + 1) % points.len()],
-            color,
-        );
+    if points
+        .iter()
+        .any(|point| !point[0].is_finite() || !point[1].is_finite())
+    {
+        return false;
     }
+
+    // Remove only exact adjacent duplicates. They are common at shape seams and
+    // otherwise create zero-area candidate ears that can stall triangulation.
+    let mut polygon = Vec::with_capacity(points.len());
+    for (index, point) in points.iter().enumerate() {
+        if polygon
+            .last()
+            .is_none_or(|&last: &usize| points[last] != *point)
+        {
+            polygon.push(index);
+        }
+    }
+    if polygon.len() > 1 && points[*polygon.first().unwrap()] == points[*polygon.last().unwrap()] {
+        polygon.pop();
+    }
+    if polygon.len() < 3 {
+        return true;
+    }
+
+    let area2 = polygon
+        .iter()
+        .enumerate()
+        .map(|(i, &a)| {
+            let b = polygon[(i + 1) % polygon.len()];
+            points[a][0] * points[b][1] - points[a][1] * points[b][0]
+        })
+        .sum::<f32>();
+    if !area2.is_finite() || area2.abs() <= 1e-6 {
+        return false;
+    }
+
+    // Ear clipping handles concave simple polygons without creating triangles
+    // that cross the polygon boundary. The point count is already hard-bounded.
+    let ccw = area2 > 0.0;
+    let mut remaining = polygon;
+    let mut triangles = Vec::with_capacity(remaining.len().saturating_sub(2));
+    let max_iterations = remaining
+        .len()
+        .saturating_mul(remaining.len())
+        .max(1);
+    let mut iterations = 0usize;
+    let mut cursor = 0usize;
+
+    while remaining.len() > 3 {
+        let len = remaining.len();
+        let prev = remaining[(cursor + len - 1) % len];
+        let curr = remaining[cursor];
+        let next = remaining[(cursor + 1) % len];
+        let turn = cross(points[prev], points[curr], points[next]);
+        let convex = if ccw { turn > 1e-6 } else { turn < -1e-6 };
+
+        if convex
+            && !remaining.iter().any(|&candidate| {
+                candidate != prev
+                    && candidate != curr
+                    && candidate != next
+                    && point_in_triangle(
+                        points[candidate],
+                        points[prev],
+                        points[curr],
+                        points[next],
+                        ccw,
+                    )
+            })
+        {
+            triangles.push((prev, curr, next));
+            remaining.remove(cursor);
+            cursor %= remaining.len();
+            iterations = 0;
+            continue;
+        }
+
+        cursor = (cursor + 1) % len;
+        iterations += 1;
+        if iterations >= max_iterations {
+            return false;
+        }
+    }
+
+    triangles.push((remaining[0], remaining[1], remaining[2]));
+
+    let needed_vertices = triangles.len().saturating_mul(3);
+    if out.vertices.len().saturating_add(needed_vertices) > MAX_GPU_VERTICES {
+        return false;
+    }
+    for (a, b, c) in triangles {
+        push_triangle(out, points[a], points[b], points[c], color);
+    }
+    true
 }
 
-fn polygon_centroid(points: &[[f32; 2]]) -> [f32; 2] {
-    let mut x = 0.0;
-    let mut y = 0.0;
-    for point in points {
-        x += point[0];
-        y += point[1];
+fn cross(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+}
+
+fn point_in_triangle(
+    point: [f32; 2],
+    a: [f32; 2],
+    b: [f32; 2],
+    c: [f32; 2],
+    ccw: bool,
+) -> bool {
+    let ab = cross(a, b, point);
+    let bc = cross(b, c, point);
+    let ca = cross(c, a, point);
+    let epsilon = 1e-6;
+    if ccw {
+        ab >= -epsilon && bc >= -epsilon && ca >= -epsilon
+    } else {
+        ab <= epsilon && bc <= epsilon && ca <= epsilon
     }
-    let inv = 1.0 / points.len() as f32;
-    [x * inv, y * inv]
 }
 
 fn emit_thick_segment(
@@ -1191,5 +1289,49 @@ mod tests {
         let rect = SceneNode::rect(10.0, 20.0, 100.0, 60.0);
         let scene = GpuScene::from_scene(&rect);
         assert_eq!(scene.vertex_count(), 6);
+    }
+
+    #[test]
+    fn concave_polygon_is_triangulated_without_centroid_fan_artifacts() {
+        let polygon = SceneNode::polygon(
+            vec![
+                (20.0, 20.0),
+                (140.0, 20.0),
+                (140.0, 60.0),
+                (80.0, 60.0),
+                (80.0, 140.0),
+                (20.0, 140.0),
+            ],
+            true,
+        )
+        .with_style(Style {
+            fill: Some(Color::rgb(0.2, 0.4, 0.8)),
+            ..Style::default()
+        });
+        let scene = GpuScene::from_scene(&polygon);
+        assert_eq!(scene.vertex_count(), 12, "six-point simple polygon needs four triangles");
+        assert_eq!(scene.skipped_nodes, 0);
+    }
+
+    #[test]
+    fn clockwise_concave_polygon_is_supported() {
+        let polygon = SceneNode::polygon(
+            vec![
+                (20.0, 140.0),
+                (80.0, 140.0),
+                (80.0, 60.0),
+                (140.0, 60.0),
+                (140.0, 20.0),
+                (20.0, 20.0),
+            ],
+            true,
+        )
+        .with_style(Style {
+            fill: Some(Color::rgb(0.8, 0.4, 0.2)),
+            ..Style::default()
+        });
+        let scene = GpuScene::from_scene(&polygon);
+        assert_eq!(scene.vertex_count(), 12);
+        assert_eq!(scene.skipped_nodes, 0);
     }
 }
