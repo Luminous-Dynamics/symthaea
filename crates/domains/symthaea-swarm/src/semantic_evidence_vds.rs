@@ -103,6 +103,7 @@ impl Rfc9942Es256CoseKey {
         let mut y=None;
         let mut key_ops_seen=false;
         let mut key_ops_verify=false;
+        let mut key_ops_values=std::collections::HashSet::new();
         let mut seen=std::collections::HashSet::new();
 
         for _ in 0..len {
@@ -138,17 +139,25 @@ impl Rfc9942Es256CoseKey {
                     let count=reader.read_array_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                     if count==0 || count>16 { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
                     for _ in 0..count {
-                        match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
-                            0 | 1 => {
-                                if reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)? == COSE_KEY_OP_VERIFY {
-                                    key_ops_verify=true;
-                                }
-                            }
+                        let op=match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
+                            0 | 1 => CborLabelKey::Integer(
+                                reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?,
+                            ),
                             3 => {
                                 let value=reader.read_text_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-                                if value==b"verify" { key_ops_verify=true; }
+                                if value==b"verify" {
+                                    CborLabelKey::Integer(COSE_KEY_OP_VERIFY)
+                                } else {
+                                    CborLabelKey::Text(value)
+                                }
                             }
                             _ => return Err(Rfc9942VdpError::InvalidEs256CoseKey),
+                        };
+                        if !key_ops_values.insert(op.clone()) {
+                            return Err(Rfc9942VdpError::InvalidEs256CoseKey);
+                        }
+                        if op == CborLabelKey::Integer(COSE_KEY_OP_VERIFY) {
+                            key_ops_verify=true;
                         }
                     }
                 }
@@ -2615,6 +2624,24 @@ mod tests {
     }
 
     #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn rfc9942_es256_cose_key_rejects_duplicate_key_ops() {
+        let x=[0x11;32];
+        let y=[0x22;32];
+        let mut cose=Vec::new();
+        cbor_map_len(&mut cose,5);
+        cbor_int(&mut cose,COSE_KTY_LABEL); cbor_int(&mut cose,COSE_EC2_KTY);
+        cbor_int(&mut cose,COSE_KEY_OPS_LABEL); cbor_array_len(&mut cose,2); cbor_int(&mut cose,COSE_KEY_OP_VERIFY); cbor_text(&mut cose,b"verify");
+        cbor_int(&mut cose,-1); cbor_int(&mut cose,COSE_P256_CRV);
+        cbor_int(&mut cose,-2); cbor_bytes(&mut cose,&x);
+        cbor_int(&mut cose,-3); cbor_bytes(&mut cose,&y);
+
+        assert_eq!(
+            Rfc9942Es256CoseKey::from_cbor(&cose),
+            Err(Rfc9942VdpError::InvalidEs256CoseKey)
+        );
+    }
+
     #[test]
     fn rfc9942_es256_cose_key_rejects_empty_key_ops() {
         let x=[0x11;32];
