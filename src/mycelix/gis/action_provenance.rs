@@ -175,6 +175,7 @@ pub enum AuthorizationConsumptionError {
     BudgetExhausted,
     AttemptMismatch,
     IndeterminateRequiresReconciliation,
+    PreDispatchRecoveryNotAllowed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
