@@ -1058,6 +1058,9 @@ impl KnowledgePersistence {
         let tx = conn
             .unchecked_transaction()
             .map_err(|e| format!("Begin validation receipt verification: {e}"))?;
+        // Validation receipts are cross-bound to snapshot receipts, so the verifier must
+        // validate both ledgers before declaring validation provenance internally consistent.
+        verify_snapshot_receipts_in_tx(&tx)?;
         verify_snapshot_validation_receipts_in_tx(&tx)?;
         tx.commit()
             .map_err(|e| format!("Commit validation receipt verification: {e}"))?;
