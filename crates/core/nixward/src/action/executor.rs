@@ -18,6 +18,18 @@ use std::process::Stdio;
 use tokio::process::Command;
 use tracing::{info, warn};
 
+fn parse_generation_pre_state_identity(identity: &str) -> Result<u32, String> {
+    const PREFIX: &str = "generation:";
+    let raw = identity
+        .strip_prefix(PREFIX)
+        .ok_or_else(|| format!("unsupported pre-state identity format: {identity}"))?;
+    if raw.is_empty() {
+        return Err("generation pre-state identity has no generation number".to_string());
+    }
+    raw.parse::<u32>()
+        .map_err(|_| format!("invalid generation pre-state identity: {identity}"))
+}
+
 /// NixOS-specific commands with structured parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NixOSCommand {
@@ -247,8 +259,7 @@ impl NixOSCommand {
             Self::HomeManagerSwitch { .. } => {
                 Some(NixOSCommand::Custom {
                     command: "sh".to_string(),
-                    args: vec![
-                        "-c".to_string(),
+                    args: vec![                        "-c".to_string(),
                         "home-manager generations | head -2 | tail -1 | awk '{print $NF}' | xargs -I {} {}/activate".to_string(),
                     ],
                     safety_level: SafetyLevel::UserModify,
@@ -498,7 +509,6 @@ impl NixOSExecutor {
             .stderr(Stdio::piped())
             .output()
             .await?;
-
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         for line in stdout.lines() {
@@ -676,6 +686,12 @@ impl NixOSExecutor {
                 safety_level: safety,
             };
         }
+        if let Err(reason) = self.validate_authorized_pre_state_identity(&authority).await {
+            return ExecutionResult::Blocked {
+                reason,
+                safety_level: safety,
+            };
+        }
 
         if let NixOSCommand::ConfigPatch {
             option_path,
@@ -718,6 +734,35 @@ impl NixOSExecutor {
         self.execute_confirmed_inner(command, 0.0).await
     }
 
+    /// Revalidate the state identity bound into live authority immediately before dispatch.
+    ///
+    /// V1 currently binds Nixward local-authority requests to a NixOS generation.
+    /// Unknown identity formats fail closed rather than being treated as fresh.
+    async fn validate_authorized_pre_state_identity(
+        &mut self,
+        authority: &NixLocalExecutionAuthorityV1,
+    ) -> Result<(), String> {
+        let identity = authority
+            .pre_state_identity()
+            .ok_or_else(|| "execution authority has no bound pre-state identity".to_string())?;
+        let expected_generation = parse_generation_pre_state_identity(identity)?;
+        if self.dry_run {
+            return Ok(());
+        }
+
+        let actual_generation = self
+            .capture_generation()
+            .await
+            .map_err(|error| format!("could not revalidate current NixOS generation: {error}"))?;
+        if actual_generation != expected_generation {
+            return Err(format!(
+                "execution authority is stale: approved generation={} but current generation={}",
+                expected_generation, actual_generation
+            ));
+        }
+        Ok(())
+    }
+
     /// Execute unconditionally, bypassing the tier-threshold check in
     /// `execute()`. `phi` is recorded for telemetry only (`ExecutionRecord`),
     /// not checked. Only call this when the command was already confirmed by
@@ -747,7 +792,6 @@ impl NixOSExecutor {
     ) -> ExecutionResult {
         let safety = command.safety_level();
         let (cmd, args) = command.to_command();
-
         info!(
             command = %cmd,
             args = ?args,
@@ -836,6 +880,14 @@ impl NixOSExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generation_pre_state_identity_parser_is_strict() {
+        assert_eq!(parse_generation_pre_state_identity("generation:42").unwrap(), 42);
+        assert!(parse_generation_pre_state_identity("generation:").is_err());
+        assert!(parse_generation_pre_state_identity("generation:-1").is_err());
+        assert!(parse_generation_pre_state_identity("host:workstation").is_err());
+    }
 
     #[test]
     fn test_command_safety_levels() {
@@ -997,8 +1049,7 @@ mod tests {
             result,
             ExecutionResult::Blocked {
                 safety_level: SafetyLevel::SystemModify,
-                ..
-            }
+                ..            }
         ));
     }
 
@@ -1247,7 +1298,6 @@ mod tests {
             older_than_days: None,
             delete_all: false,
         };
-
         assert!(switch.rollback_command().is_some());
         assert!(test.rollback_command().is_some());
         assert!(boot.rollback_command().is_some());
