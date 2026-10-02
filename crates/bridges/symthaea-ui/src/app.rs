@@ -457,7 +457,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
         };
 
         command_count = command_count.checked_add(1).unwrap_or(usize::MAX);
-        if command_count > MAX_PORTRAIT_NUMBER_TOKENS {
+        if command_count > MAX_PORTRAIT_PATH_COMMANDS {
             return false;
         }
 
@@ -475,6 +475,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
         active_command = Some(command);
         first_multiplicity = true;
         let mut consumed = 0usize;
+        let mut completed_group = false;
 
         while index < tokens.len() && matches!(tokens[index], Token::Number) {
             consumed += 1;
@@ -492,6 +493,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
                 active_command = Some(repeated);
                 first_multiplicity = false;
                 consumed = 0;
+                completed_group = true;
 
                 if index < tokens.len() && matches!(tokens[index], Token::Command(_)) {
                     break;
@@ -499,7 +501,10 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
             }
         }
 
-        if consumed != 0 {
+        // Every non-close command must consume at least one complete
+        // parameter group. An explicit command with no parameters is
+        // malformed and must fail closed.
+        if consumed != 0 || !completed_group {
             return false;
         }
     }
@@ -1584,6 +1589,18 @@ mod tests {
             r#"<svg><circle cx="1000001" cy="0" r="1"/></svg>"#,
             r#"<svg><rect x="0" y="0" width="1.2.3" height="1"/></svg>"#,
             r#"<svg><path d="M0 0 L1e9999 2"/></svg>"#,
+        ] {
+            assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(), "accepted: {svg}");
+        }
+    }
+
+    #[test]
+    fn portrait_rejects_empty_parameter_path_commands() {
+        for svg in [
+            r#"<svg><path d="M"/></svg>"#,
+            r#"<svg><path d="M0 0 L"/></svg>"#,
+            r#"<svg><path d="M0 0 C"/></svg>"#,
+            r#"<svg><path d="M0 0 A"/></svg>"#,
         ] {
             assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(), "accepted: {svg}");
         }
