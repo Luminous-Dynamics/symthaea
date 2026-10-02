@@ -1700,7 +1700,7 @@ mod tests {
             vec![(
                 "policy".to_string(),
                 "growth".to_string(),
-                -0.8,
+                -0.6,
                 true,
                 9,
             )]
