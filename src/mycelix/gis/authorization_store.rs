@@ -67,6 +67,7 @@ impl RecoveryAuthorizationWitness {
             && !self.issued_at.is_empty()
             && self.authorization_instance == lease.authorization_instance
             && self.action_digest == lease.action_digest
+            && self.policy == lease.policy
             && self.authority_epoch == lease.authority_epoch
     }
 }
