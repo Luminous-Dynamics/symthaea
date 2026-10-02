@@ -11,6 +11,7 @@
 //! - knowledge_facts: id, vector_blob, source_text, confidence, domain, cycle, is_causal
 //! - knowledge_causal_edges: cause, effect, strength, cycle
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
+//! - knowledge_snapshot_receipts: generation, canonical_digest_hex
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
@@ -148,7 +149,7 @@ pub struct KnowledgePersistenceSnapshot {
     pub ontology: Vec<OntologyRecord>,
 }
 
-/// Immutable admission metadata for a complete snapshot committed by `save_snapshot`.
+/// Immutable commit metadata for a complete snapshot committed by `save_snapshot`.
 ///
 /// The generation identifies the committed persistence event; the digest identifies
 /// the exact canonical content of the snapshot. This is provenance metadata, not
