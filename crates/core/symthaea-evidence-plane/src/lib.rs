@@ -405,8 +405,14 @@ impl EvidenceLineageGuardV1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineagePerturbationResult {
-    Stable,
-    Changed,
+    /// The declared dependency did not change and the lineage stayed stable.
+    InvariantPreserved,
+    /// The declared dependency changed and the lineage changed.
+    ExpectedDependencyChanged,
+    /// An undeclared dependency changed the lineage.
+    UnexpectedCollateralChange,
+    /// A declared dependency changed but the lineage stayed stable.
+    UnexpectedInvariance,
 }
 
 pub fn qualify_lineage_perturbation(
@@ -416,10 +422,10 @@ pub fn qualify_lineage_perturbation(
 ) -> LineagePerturbationResult {
     let changed = before.digest() != after.digest();
     match (dependency_changed, changed) {
-        (false, false) => LineagePerturbationResult::Stable,
-        (true, true) => LineagePerturbationResult::Changed,
-        (false, true) => LineagePerturbationResult::Changed,
-        (true, false) => LineagePerturbationResult::Stable,
+        (false, false) => LineagePerturbationResult::InvariantPreserved,
+        (true, true) => LineagePerturbationResult::ExpectedDependencyChanged,
+        (false, true) => LineagePerturbationResult::UnexpectedCollateralChange,
+        (true, false) => LineagePerturbationResult::UnexpectedInvariance,
     }
 }
 
@@ -834,18 +840,26 @@ mod tests {
     }
 
     #[test]
-    fn execution_lineage_qualification_distinguishes_expected_change() {
+    fn execution_lineage_qualification_distinguishes_all_perturbation_cases() {
         let base = lineage_fixture();
         let mut changed = base.clone();
         changed.source_revision = "def456".into();
 
         assert_eq!(
+            qualify_lineage_perturbation(&base, &base, false),
+            LineagePerturbationResult::InvariantPreserved
+        );
+        assert_eq!(
             qualify_lineage_perturbation(&base, &changed, true),
-            LineagePerturbationResult::Changed
+            LineagePerturbationResult::ExpectedDependencyChanged
+        );
+        assert_eq!(
+            qualify_lineage_perturbation(&base, &changed, false),
+            LineagePerturbationResult::UnexpectedCollateralChange
         );
         assert_eq!(
             qualify_lineage_perturbation(&base, &base, true),
-            LineagePerturbationResult::Stable
+            LineagePerturbationResult::UnexpectedInvariance
         );
     }
 
