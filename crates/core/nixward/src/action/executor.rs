@@ -478,14 +478,47 @@ pub enum ExecutionResult {
     },
 }
 
+enum ExecutionBasisV1 {
+    Phi { phi: f32 },
+    LiveAuthority {
+        intent_digest: String,
+        approval_request_id: String,
+        projection_digest: String,
+    },
+}
+
+/// In-memory provenance for an execution that crossed the live Nixward
+/// authority boundary. This is separate from ExecutionRecord, whose
+/// phi_at_execution field is legacy telemetry.
+#[derive(Debug, Clone)]
+pub struct AuthorizedExecutionRecordV1 {
+    command: NixOSCommand,
+    action_intent_digest: String,
+    approval_request_id: String,
+    projection_digest: String,
+    pre_state_identity: Option<String>,
+    result: ExecutionResult,
+    timestamp_ms: u64,
+}
+
+impl AuthorizedExecutionRecordV1 {
+    pub fn command(&self) -> &NixOSCommand { &self.command }
+    pub fn action_intent_digest(&self) -> &str { &self.action_intent_digest }
+    pub fn approval_request_id(&self) -> &str { &self.approval_request_id }
+    pub fn projection_digest(&self) -> &str { &self.projection_digest }
+    pub fn pre_state_identity(&self) -> Option<&str> { self.pre_state_identity.as_deref() }
+    pub fn result(&self) -> &ExecutionResult { &self.result }
+    pub fn timestamp_ms(&self) -> u64 { self.timestamp_ms }
+}
+
 /// NixOS-aware command executor with Φ integration
 pub struct NixOSExecutor {
     current_generation: Option<u32>,
     thresholds: ConsciousnessThresholds,
     history: VecDeque<ExecutionRecord>,
+    authorized_history: VecDeque<AuthorizedExecutionRecordV1>,
     dry_run: bool,
 }
-
 /// Record of an execution for learning
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionRecord {
@@ -507,6 +540,7 @@ impl NixOSExecutor {
             current_generation: None,
             thresholds: ConsciousnessThresholds::default(),
             history: VecDeque::with_capacity(1000),
+            authorized_history: VecDeque::with_capacity(1000),
             dry_run: false,
         }
     }
@@ -739,21 +773,33 @@ impl NixOSExecutor {
             }
         }
 
-        let intent_digest = authority.action_intent_digest().unwrap_or_else(|| "<invalid-intent>".to_string());
-        info!(
-            command = ?command,
-            intent = %intent_digest,
-            approval_request = %authority.approval_request_id(),
-            projection = %authority.projection_digest(),
-            "Executing command with live Nixward authority"
+        let intent_digest = authority
+            .action_intent_digest()
+            .unwrap_or_else(|_| "<invalid-intent>".to_string());
+        let approval_request_id = authority.approval_request_id().to_string();
+        let projection_digest = authority.projection_digest().to_string();
+        let pre_state_identity = authority.pre_state_identity().map(str::to_owned);
+
+        let result = self
+            .execute_confirmed_inner(
+                command.clone(),
+                ExecutionBasisV1::LiveAuthority {
+                    intent_digest: intent_digest.clone(),
+                    approval_request_id: approval_request_id.clone(),
+                    projection_digest: projection_digest.clone(),
+                },
+            )
+            .await;
+        self.record_authorized_execution(
+            command,
+            intent_digest,
+            approval_request_id,
+            projection_digest,
+            pre_state_identity,
+            &result,
         );
-
-        // The authority token is intentionally consumed here by value. The legacy
-        // confirmed executor remains the mechanical dispatch primitive, while the
-        // authority boundary is enforced before it can be reached.
-        self.execute_confirmed_inner(command, 0.0).await
+        result
     }
-
     /// Revalidate the state identity bound into live authority immediately before dispatch.
     ///
     /// V1 currently binds Nixward local-authority requests to a NixOS generation.
@@ -808,17 +854,37 @@ impl NixOSExecutor {
     async fn execute_confirmed_inner(
         &mut self,
         command: NixOSCommand,
-        phi: f32,
+        basis: ExecutionBasisV1,
     ) -> ExecutionResult {
         let safety = command.safety_level();
         let (cmd, args) = command.to_command();
-        info!(
-            command = %cmd,
-            args = ?args,
-            phi = %phi,
-            confirmed = true,
-            "Executing confirmed NixOS command"
-        );
+
+        match &basis {
+            ExecutionBasisV1::Phi { phi } => {
+                info!(
+                    command = %cmd,
+                    args = ?args,
+                    phi = %phi,
+                    confirmed = true,
+                    "Executing confirmed NixOS command"
+                );
+            }
+            ExecutionBasisV1::LiveAuthority {
+                intent_digest,
+                approval_request_id,
+                projection_digest,
+            } => {
+                info!(
+                    command = %cmd,
+                    args = ?args,
+                    intent = %intent_digest,
+                    approval_request = %approval_request_id,
+                    projection = %projection_digest,
+                    confirmed = true,
+                    "Executing command through live Nixward authority"
+                );
+            }
+        }
 
         if self.dry_run {
             return ExecutionResult::Success {
@@ -873,8 +939,39 @@ impl NixOSExecutor {
         }
     }
 
+    fn record_authorized_execution(
+        &mut self,
+        command: NixOSCommand,
+        action_intent_digest: String,
+        approval_request_id: String,
+        projection_digest: String,
+        pre_state_identity: Option<String>,
+        result: &ExecutionResult,
+    ) {
+        self.authorized_history.push_back(AuthorizedExecutionRecordV1 {
+            command,
+            action_intent_digest,
+            approval_request_id,
+            projection_digest,
+            pre_state_identity,
+            result: result.clone(),
+            timestamp_ms: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0),
+        });
+
+        if self.authorized_history.len() > 1000 {
+            self.authorized_history.pop_front();
+        }
+    }
+
     pub fn history(&self) -> &VecDeque<ExecutionRecord> {
         &self.history
+    }
+
+    pub fn authorized_history(&self) -> &VecDeque<AuthorizedExecutionRecordV1> {
+        &self.authorized_history
     }
 
     pub fn success_rate(&self, safety_level: SafetyLevel) -> Option<f32> {
@@ -932,6 +1029,37 @@ mod tests {
         assert!(parse_current_generation("{not-json}").is_err());
     }
 
+    #[test]
+    fn authorized_history_records_non_phi_provenance() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        let result = ExecutionResult::Success {
+            stdout: "dry-run".to_string(),
+            stderr: String::new(),
+            execution_time_ms: 0,
+        };
+
+        executor.record_authorized_execution(
+            command.clone(),
+            "intent-123".to_string(),
+            "request-123".to_string(),
+            "projection-123".to_string(),
+            Some("generation:42".to_string()),
+            &result,
+        );
+
+        let record = executor.authorized_history().front().unwrap();
+        assert_eq!(record.command(), &command);
+        assert_eq!(record.action_intent_digest(), "intent-123");
+        assert_eq!(record.approval_request_id(), "request-123");
+        assert_eq!(record.projection_digest(), "projection-123");
+        assert_eq!(record.pre_state_identity(), Some("generation:42"));
+        assert!(matches!(record.result(), ExecutionResult::Success { .. }));
+        assert!(record.timestamp_ms() > 0);
+    }
     #[test]
     fn test_command_safety_levels() {
         let search = NixOSCommand::Search {
