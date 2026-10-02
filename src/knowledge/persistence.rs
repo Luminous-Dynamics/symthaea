@@ -706,6 +706,215 @@ impl KnowledgePersistence {
         .map_err(|e| format!("Load latest snapshot receipt: {e}"))
     }
 
+    /// Load the latest committed complete snapshot together with the receipt that
+    /// certifies that exact content, from one SQLite read transaction.
+    ///
+    /// This is the preferred API when callers need temporal provenance. The receipt
+    /// and all four knowledge domains are observed from one SQLite snapshot, and the
+    /// canonical digest is checked before the transaction is released.
+    pub fn load_snapshot_with_receipt(
+        &mut self,
+    ) -> Result<Option<(KnowledgePersistenceSnapshot, KnowledgeSnapshotReceipt)>, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+
+        // Materialize deterministic identities for pre-EPF-011 rows before
+        // beginning the read transaction.
+        conn.execute(
+            "UPDATE knowledge_facts
+             SET memory_id = 'legacy-fact:' || id
+             WHERE memory_id IS NULL",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Begin verified persistence snapshot read: {e}"))?;
+
+        let receipt = tx
+            .query_row(
+                "SELECT generation, canonical_digest_hex
+                 FROM knowledge_snapshot_receipts
+                 ORDER BY generation DESC
+                 LIMIT 1",
+                [],
+                |row| {
+                    let generation = row.get::<_, i64>(0)?;
+                    Ok(KnowledgeSnapshotReceipt {
+                        generation: u64::try_from(generation).map_err(|_| {
+                            rusqlite::Error::IntegralValueOutOfRange(0, generation)
+                        })?,
+                        canonical_digest_hex: row.get(1)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|e| format!("Load verified snapshot receipt: {e}"))?;
+
+        let Some(receipt) = receipt else {
+            tx.commit()
+                .map_err(|e| format!("Commit empty verified snapshot read: {e}"))?;
+            return Ok(None);
+        };
+
+        let facts = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT id, memory_id, canonical_identity, provenance_family, vector_blob, source_text, confidence, domain, cycle, is_causal
+                     FROM knowledge_facts ORDER BY cycle DESC, memory_id ASC, id ASC",
+                )
+                .map_err(|e| format!("Prepare snapshot facts: {e}"))?;
+            stmt.query_map([], |row| {
+                Ok(FactRecord {
+                    memory_id: row.get(1)?,
+                    canonical_identity: row.get(2)?,
+                    provenance_family: row.get(3)?,
+                    vector_bytes: row.get(4)?,
+                    source_text: row.get(5)?,
+                    confidence: row.get(6)?,
+                    domain: row.get(7)?,
+                    cycle: u64::try_from(row.get::<_, i64>(8)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(8, "cycle".into(), rusqlite::types::Type::Integer))?,
+                    is_causal: row.get(9)?,
+                })
+            })
+            .map_err(|e| format!("Query snapshot facts: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load snapshot fact row: {e}"))?
+        };
+
+        let provenance_relations = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT source_memory_id, target_memory_id, kind, created_at
+                     FROM knowledge_provenance_relations
+                     ORDER BY created_at, source_memory_id, target_memory_id, kind",
+                )
+                .map_err(|e| format!("Prepare snapshot provenance: {e}"))?;
+            let rows = stmt
+                .query_map([], |row| {
+                    let kind: String = row.get(2)?;
+                    let kind = match kind.as_str() {
+                        "DerivedFrom" => ProvenanceRelationKind::DerivedFrom,
+                        "RevisedFrom" => ProvenanceRelationKind::RevisedFrom,
+                        "Supersedes" => ProvenanceRelationKind::Supersedes,
+                        "Contradicts" => ProvenanceRelationKind::Contradicts,
+                        "Corroborates" => ProvenanceRelationKind::Corroborates,
+                        "RepresentationOf" => ProvenanceRelationKind::RepresentationOf,
+                        _ => return Err(rusqlite::Error::InvalidColumnType(
+                            2,
+                            "kind".into(),
+                            rusqlite::types::Type::Text,
+                        )),
+                    };
+                    Ok(ProvenanceRelationRecord {
+                        source_memory_id: row.get(0)?,
+                        target_memory_id: row.get(1)?,
+                        kind,
+                        created_at: row.get(3)?,
+                    })
+                })
+                .map_err(|e| format!("Query snapshot provenance: {e}"))?;
+
+            let mut loaded = Vec::new();
+            for row in rows {
+                let record = row.map_err(|e| format!("Load snapshot provenance row: {e}"))?;
+                ProvenanceRelation::from(record.clone())
+                    .validate()
+                    .map_err(|e| format!("Invalid persisted provenance relation: {e}"))?;
+                loaded.push(record);
+            }
+            loaded
+        };
+
+        let causal_edges = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT cause, effect, strength, is_inhibitory, cycle
+                     FROM knowledge_causal_edges
+                     ORDER BY cycle DESC, cause ASC, effect ASC",
+                )
+                .map_err(|e| format!("Prepare snapshot causal edges: {e}"))?;
+            let edges = stmt
+                .query_map([], |row| {
+                    Ok(CausalEdgeRecord {
+                        cause: row.get(0)?,
+                        effect: row.get(1)?,
+                        strength: row.get(2)?,
+                        is_inhibitory: row.get(3)?,
+                        cycle: u64::try_from(row.get::<_, i64>(4)?)
+                            .map_err(|_| rusqlite::Error::InvalidColumnType(4, "cycle".into(), rusqlite::types::Type::Integer))?,
+                    })
+                })
+                .map_err(|e| format!("Query snapshot causal edges: {e}"))?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| format!("Load snapshot causal edge row: {e}"))?;
+
+            for edge in &edges {
+                edge.validate()
+                    .map_err(|e| format!("Invalid persisted causal edge snapshot: {e}"))?;
+            }
+            edges
+        };
+
+        let ontology = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle, is_a_parent
+                     FROM knowledge_ontology
+                     ORDER BY utility DESC, name ASC, created_at_cycle ASC, last_used_cycle ASC",
+                )
+                .map_err(|e| format!("Prepare snapshot ontology: {e}"))?;
+            stmt.query_map([], |row| {
+                Ok(OntologyRecord {
+                    name: row.get(0)?,
+                    vector_bytes: row.get(1)?,
+                    usage_count: u64::try_from(row.get::<_, i64>(2)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(2, "usage_count".into(), rusqlite::types::Type::Integer))?,
+                    utility: row.get(3)?,
+                    created_at_cycle: u64::try_from(row.get::<_, i64>(4)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(4, "created_at_cycle".into(), rusqlite::types::Type::Integer))?,
+                    last_used_cycle: u64::try_from(row.get::<_, i64>(5)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(5, "last_used_cycle".into(), rusqlite::types::Type::Integer))?,
+                    is_a_parent: row.get(6)?,
+                })
+            })
+            .map_err(|e| format!("Query snapshot ontology: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load snapshot ontology row: {e}"))?
+        };
+
+        let snapshot = KnowledgePersistenceSnapshot {
+            facts,
+            provenance_relations,
+            causal_edges,
+            ontology,
+        };
+        let actual_digest = snapshot.canonical_digest_hex();
+        if actual_digest != receipt.canonical_digest_hex {
+            return Err(format!(
+                "Snapshot receipt digest mismatch: generation {} records {}, observed {}",
+                receipt.generation, receipt.canonical_digest_hex, actual_digest
+            ));
+        }
+
+        tx.commit()
+            .map_err(|e| format!("Commit verified persistence snapshot read: {e}"))?;
+
+        self.total_loaded +=
+            snapshot.facts.len() as u64
+            + snapshot.provenance_relations.len() as u64
+            + snapshot.causal_edges.len() as u64
+            + snapshot.ontology.len() as u64;
+
+        Ok(Some((snapshot, receipt)))
+    }
+
     /// Load all persistence domains from one SQLite read transaction.
     ///
     /// The returned records are all observed from a single database snapshot.
@@ -2592,6 +2801,50 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+
+    #[test]
+    fn test_load_snapshot_with_receipt_atomically_binds_digest() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_verified_snapshot_read_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "verified-fact".into(),
+            canonical_identity: Some("verified-canonical".into()),
+            provenance_family: Some("verified-family".into()),
+            vector_bytes: vec![0x33; BinaryHV::BYTES],
+            source_text: "verified".into(),
+            confidence: 0.75,
+            domain: Some("test".into()),
+            cycle: 3,
+            is_causal: false,
+        };
+
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+
+        let (snapshot, receipt) = p.load_snapshot_with_receipt().unwrap().unwrap();
+        assert_eq!(receipt.generation, 1);
+        assert_eq!(receipt.canonical_digest_hex, snapshot.canonical_digest_hex());
+
+        // A complete-snapshot receipt becomes stale if a legacy individual-domain
+        // API mutates the projection afterwards. The verified API must detect that
+        // rather than pairing the new graph with the old admission event.
+        let changed = FactRecord {
+            source_text: "mutated after receipt".into(),
+            ..fact
+        };
+        p.save_facts(std::slice::from_ref(&changed)).unwrap();
+
+        let err = p.load_snapshot_with_receipt().unwrap_err();
+        assert!(err.starts_with("Snapshot receipt digest mismatch: generation 1"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
     #[test]
     fn test_snapshot_receipt_generation_tracks_only_committed_complete_snapshots() {
         let dir = std::env::temp_dir().join(format!(
