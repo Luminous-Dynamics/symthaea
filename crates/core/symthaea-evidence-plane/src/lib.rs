@@ -523,7 +523,24 @@ fn validate_git_object_id(field: &str, value: &str) -> Result<(), String> {
 }
 
 fn validate_digest(value: &str) -> Result<(), String> {
-    let payload = value.split_once(':').map_or(value, |(_, payload)| payload);
+    let payload = if let Some((algorithm, payload)) = value.split_once(':') {
+        let mut bytes = algorithm.bytes();
+        let valid_first = matches!(bytes.next(), Some(b'a'..=b'z'));
+        let valid_rest = bytes.all(|b| {
+            b.is_ascii_lowercase()
+                || b.is_ascii_digit()
+                || matches!(b, b'-' | b'_' | b'.')
+        });
+        if !valid_first || !valid_rest {
+            return Err(format!(
+                "invalid or non-canonical digest algorithm prefix: {value:?}"
+            ));
+        }
+        payload
+    } else {
+        value
+    };
+
     if payload.len() < 16
         || payload.len() % 2 != 0
         || !payload
@@ -1384,6 +1401,32 @@ mod tests {
             "sha256:0123456789abcdef0123456789abcdef".into(),
         );
         assert!(prefixed.validate().is_ok());
+
+        prefixed.immutable_input_digests.insert(
+            "third.bin".into(),
+            "blake3:0123456789abcdef0123456789abcdef".into(),
+        );
+        assert!(prefixed.validate().is_ok());
+    }
+
+    #[test]
+    fn execution_lineage_validation_rejects_non_canonical_digest_prefix() {
+        let mut lineage = lineage_fixture();
+
+        for (name, value) in [
+            ("empty-prefix", ":0123456789abcdef"),
+            ("uppercase-prefix", "SHA256:0123456789abcdef"),
+            ("digit-prefix", "3sha256:0123456789abcdef"),
+            ("space-prefix", "sha 256:0123456789abcdef"),
+        ] {
+            lineage
+                .immutable_input_digests
+                .insert(name.into(), value.into());
+            assert!(
+                lineage.validate().is_err(),
+                "digest should reject non-canonical algorithm prefix: {value}"
+            );
+        }
     }
 
     #[test]
