@@ -528,7 +528,8 @@ pub fn App() -> impl IntoView {
                     }
                 >
                     <h2 style="font-size:0.9em;opacity:0.7;">"self-portrait"</h2>
-                    <canvas node_ref=webgpu_canvas
+                    <canvas id="webgpu-cognitive-canvas" node_ref=webgpu_canvas
+                        aria-label="WebGPU cognitive projection"
                         style="width:220px;height:220px;border-radius:8px;"
                         style:display=move || if webgpu_ready.get() { "block" } else { "none" }
                         width="512" height="512"
@@ -542,12 +543,14 @@ pub fn App() -> impl IntoView {
                     style:display=move || if movie.with(|m| m.is_some()) { "block" } else { "none" }
                 >
                     <h2 style="font-size:0.9em;opacity:0.7;">"imagination"</h2>
-                    <canvas node_ref=movie_webgpu_canvas
+                    <canvas id="webgpu-movie-canvas" node_ref=movie_webgpu_canvas
+                        aria-label="WebGPU mental movie"
                         style:display=move || if movie_webgpu_ready.get() { "block" } else { "none" }
                         style="width:192px;height:192px;image-rendering:pixelated;border-radius:8px;"
                         width="192" height="192"
                     ></canvas>
-                    <canvas node_ref=movie_canvas
+                    <canvas id="canvas2d-movie-fallback" node_ref=movie_canvas
+                        aria-label="Canvas 2D mental movie fallback"
                         style:display=move || if movie_webgpu_ready.get() { "none" } else { "block" }
                         style="width:192px;height:192px;image-rendering:pixelated;border-radius:8px;"
                     ></canvas>
