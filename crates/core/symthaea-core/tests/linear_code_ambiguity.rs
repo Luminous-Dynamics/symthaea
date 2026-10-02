@@ -35,10 +35,7 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
     let mut combined_basis = left.basis().to_vec();
     combined_basis.extend(right.basis().iter().cloned());
     assert_eq!(combined_basis, parent.basis());
-    assert_eq!(
-        basis_rank(&combined_basis, 96),
-        parent.rank()
-    );
+    assert_eq!(basis_rank(&combined_basis, 96), parent.rank());
 
     let left_message = [true, false, true, false, true, false];
     let right_message = [false, true, true, false, false, true];
@@ -408,8 +405,7 @@ fn exhaustive_overlapping_recovery_preserves_valid_factorization() {
 #[test]
 fn general_recovery_rejects_target_outside_union_span() {
     let parent = RandomLinearCode::generate(16, 5, 0xBADA);
-    let left =
-        RandomLinearCode::from_basis(parent.basis()[..3].to_vec()).expect("left subcode");
+    let left = RandomLinearCode::from_basis(parent.basis()[..3].to_vec()).expect("left subcode");
     let right = RandomLinearCode::from_basis(parent.basis()[3..].to_vec()).expect("right subcode");
 
     let mut outsider = BinaryCodeword::zero(16);
