@@ -11,4 +11,5 @@ repository = "https://github.com/luminous-dynamics/symthaea"
 blake3 = { workspace = true }
 ed25519-dalek = { workspace = true }
 serde = { workspace = true }
+thiserror = { workspace = true }
 symthaea-core = { path = "../symthaea-core" }
