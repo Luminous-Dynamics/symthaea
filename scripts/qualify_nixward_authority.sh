@@ -9,8 +9,19 @@ echo "HEAD: $(git rev-parse HEAD)"
 echo "Rust: $(rustc --version)"
 echo "Cargo: $(cargo --version)"
 
-echo "-- formatting --"
-cargo fmt --all -- --check
+echo "-- Nixward formatting (workspace-independent) --"
+# The repository workspace is intentionally broader than Nixward and can be
+# structurally divergent on long-lived safety branches. Running cargo fmt
+# --all therefore makes this focused lane depend on unrelated workspace member
+# presence. Format the governed crate sources directly instead.
+mapfile -d '' nixward_rust_files < <(
+  find crates/core/nixward/src crates/core/nixward/tests -type f -name '*.rs' -print0
+)
+if ((${#nixward_rust_files[@]} == 0)); then
+  echo "no Nixward Rust sources found" >&2
+  exit 1
+fi
+rustfmt --edition 2024 --check "${nixward_rust_files[@]}"
 
 echo "-- source boundary --"
 bash scripts/check-nixward-observation-boundary.sh
