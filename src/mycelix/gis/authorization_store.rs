@@ -242,6 +242,18 @@ impl SqliteAuthorizationStore {
                 action_id: action_id.clone(),
                 authorization_instance: instance.clone(),
                 action_digest: action_digest.clone(),
+                provider_idempotency_key: {
+                    let lease = AuthorizationLease::new_with_instance(
+                        instance.clone(),
+                        action_id.clone(),
+                        action_digest.clone(),
+                        String::new(),
+                        String::new(),
+                        *authority_epoch,
+                        1,
+                    );
+                    lease.provider_idempotency_key()
+                },
                 attempt_id: attempt_id.clone(),
                 authority_epoch: *authority_epoch,
                 outcome: ExecutionOutcome::Indeterminate,
@@ -448,9 +460,28 @@ fn load_receipt(
                 "indeterminate" => ExecutionOutcome::Indeterminate,
                 _ => return Err(rusqlite::Error::InvalidQuery),
             };
+            let authorization_instance: String = r.get(0)?;
+            let action_id: String = r.get(1)?;
+            let attempt_id: String = r.get(2)?;
+            let action_digest: String = r.get(4)?;
+            let authority_epoch = r.get::<_,i64>(5)? as u64;
+            let lease = AuthorizationLease::new_with_instance(
+                authorization_instance.clone(),
+                action_id.clone(),
+                action_digest.clone(),
+                String::new(),
+                String::new(),
+                authority_epoch,
+                1,
+            );
             Ok(ExecutionReceipt {
-                authorization_instance:r.get(0)?, action_id:r.get(1)?, attempt_id:r.get(2)?, outcome,
-                action_digest:r.get(4)?, authority_epoch:r.get::<_,i64>(5)? as u64,
+                authorization_instance,
+                action_id,
+                attempt_id,
+                outcome,
+                action_digest,
+                provider_idempotency_key: lease.provider_idempotency_key(),
+                authority_epoch,
             })
         },
     ).optional().map_err(Into::into)
