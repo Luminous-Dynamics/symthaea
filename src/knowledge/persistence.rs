@@ -977,15 +977,16 @@ impl KnowledgePersistence {
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
-        let verify_tx = conn
+        // Keep verification and retrieval in the same transaction snapshot.
+        // A second transaction after verification would re-open a TOCTOU window in
+        // which another writer could mutate validation history between the integrity
+        // check and the returned rows.
+        let tx = conn
             .unchecked_transaction()
             .map_err(|e| format!("Begin latest validation verification: {e}"))?;
-        verify_snapshot_validation_receipts_in_tx(&verify_tx)?;
-        verify_tx
-            .commit()
-            .map_err(|e| format!("Commit latest validation verification: {e}"))?;
+        verify_snapshot_validation_receipts_in_tx(&tx)?;
 
-        let mut stmt = conn
+        let mut stmt = tx
             .prepare(
                 "SELECT validation_event, generation, snapshot_digest_hex, validator_ref,
                         validator_version, validation_profile, conforms, report_digest_hex
@@ -1000,24 +1001,30 @@ impl KnowledgePersistence {
             )
             .map_err(|e| format!("Prepare latest snapshot validations: {e}"))?;
 
-        stmt.query_map([], |row| {
-            let generation = row.get::<_, i64>(1)?;
-            Ok(KnowledgeSnapshotValidationReceipt {
-                validation_event: row.get(0)?,
-                generation: u64::try_from(generation).map_err(|_| {
-                    rusqlite::Error::IntegralValueOutOfRange(1, generation)
-                })?,
-                snapshot_digest_hex: row.get(2)?,
-                validator_ref: row.get(3)?,
-                validator_version: row.get(4)?,
-                validation_profile: row.get(5)?,
-                conforms: row.get(6)?,
-                report_digest_hex: row.get(7)?,
+        let validations = stmt
+            .query_map([], |row| {
+                let generation = row.get::<_, i64>(1)?;
+                Ok(KnowledgeSnapshotValidationReceipt {
+                    validation_event: row.get(0)?,
+                    generation: u64::try_from(generation).map_err(|_| {
+                        rusqlite::Error::IntegralValueOutOfRange(1, generation)
+                    })?,
+                    snapshot_digest_hex: row.get(2)?,
+                    validator_ref: row.get(3)?,
+                    validator_version: row.get(4)?,
+                    validation_profile: row.get(5)?,
+                    conforms: row.get(6)?,
+                    report_digest_hex: row.get(7)?,
+                })
             })
-        })
-        .map_err(|e| format!("Query latest snapshot validations: {e}"))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Load latest snapshot validation row: {e}"))
+            .map_err(|e| format!("Query latest snapshot validations: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load latest snapshot validation row: {e}"))?;
+
+        tx.commit()
+            .map_err(|e| format!("Commit latest validation verification: {e}"))?;
+
+        Ok(validations)
     }
 
     /// Load all persistence domains from one SQLite read transaction.
