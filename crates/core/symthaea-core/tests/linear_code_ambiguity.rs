@@ -323,6 +323,54 @@ fn exhaustive_bounded_distance_oracle_separates_detection_from_correction() {
     assert!(observed_out_of_span > 0);
 }
 
+
+#[test]
+fn minimum_distance_boundary_can_map_one_valid_codeword_to_another() {
+    // At d_min, a corruption can itself be a non-zero codeword. The observed
+    // vector is then another valid codeword, so an exact span solver has no
+    // information with which to recover the originally transmitted word.
+    let code = RandomLinearCode::generate(16, 5, 0xE770);
+    let clean_message = [true, false, true, false, true];
+    let clean = code.encode(&clean_message);
+
+    let mut min_distance = usize::MAX;
+    let mut min_error = BinaryCodeword::zero(16);
+    let mut min_error_mask = 0usize;
+
+    for mask in 1..(1usize << code.rank()) {
+        let error: BinaryCodeword = code.encode(
+            &(0..code.rank())
+                .map(|bit| (mask >> bit) & 1 == 1)
+                .collect::<Vec<_>>(),
+        );
+        if error.weight() < min_distance {
+            min_distance = error.weight();
+            min_error = error;
+            min_error_mask = mask;
+        }
+    }
+
+    assert!(min_distance >= 3);
+    let corrupted = clean.bound(&min_error);
+    assert!(code.contains(&min_error));
+    assert!(code.contains(&corrupted));
+
+    let recovered = solve_linear_combination(&corrupted, code.basis())
+        .expect("a codeword corruption remains in the exact span");
+
+    let expected_message: Vec<bool> = (0..code.rank())
+        .map(|bit| {
+            let clean_bit = clean_message[bit];
+            let error_bit = (min_error_mask >> bit) & 1 == 1;
+            clean_bit ^ error_bit
+        })
+        .collect();
+
+    assert_eq!(recovered, expected_message);
+    assert_ne!(recovered, clean_message);
+    assert_eq!(min_error.weight(), min_distance);
+}
+
 #[test]
 fn independent_bound_recovery_rejects_overlapping_factor_bases() {
     let parent = RandomLinearCode::generate(96, 8, 0x4444);
