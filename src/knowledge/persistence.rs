@@ -3276,6 +3276,30 @@ mod tests {
             "Snapshot validation receipt self-digest mismatch: validation:digest"
         );
 
+        let second_validation = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:blocked-by-corruption".into(),
+            generation: committed.generation,
+            snapshot_digest_hex: committed.canonical_digest_hex.clone(),
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        };
+        let err = p
+            .record_snapshot_validation(second_validation)
+            .unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot validation receipt self-digest mismatch: validation:digest"
+        );
+
+        let err = p.latest_snapshot_validation_receipts().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot validation receipt self-digest mismatch: validation:digest"
+        );
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
