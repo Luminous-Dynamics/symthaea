@@ -22,6 +22,9 @@ pub const RFC9942_VDS_HEADER_LABEL: i64 = 395;
 /// implementation resource limits, not changes to the RFC wire format.
 pub const MAX_RFC9942_PROOFS: usize = 256;
 pub const MAX_RFC9942_PROOF_BYTES: usize = 8 * 1024;
+/// A u64-sized RFC 9162 tree cannot require more than 64 authentication-path
+/// hashes. Enforce this before allocating from an attacker-controlled CBOR length.
+pub const MAX_RFC9162_PROOF_PATH: usize = 64;
 /// Defensive bounds for the RFC 9942 receipts header value. These limits
 /// constrain decoding/allocation without changing the RFC wire representation.
 pub const MAX_RFC9942_RECEIPTS: usize = 16;
@@ -1725,7 +1728,7 @@ impl<'a> CborReader<'a> {
 impl Rfc9162ConsistencyProof {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
         let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-        let first=r.read_u64()?; let second=r.read_u64()?; let n=r.read_array_len()?; let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
+        let first=r.read_u64()?; let second=r.read_u64()?; let n=r.read_array_len()?; if n>MAX_RFC9162_PROOF_PATH{return Err(Rfc9162ProofDecodeError::InvalidStructure)} let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
         if first==0 || first>=second || path.is_empty(){return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         Ok(Self::new(first,second,path))
     }
@@ -1734,7 +1737,7 @@ impl Rfc9162ConsistencyProof {
 impl Rfc9162InclusionProof {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
         let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-        let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?; let n=r.read_array_len()?; let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
+        let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?; let n=r.read_array_len()?; if n>MAX_RFC9162_PROOF_PATH{return Err(Rfc9162ProofDecodeError::InvalidStructure)} let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
         if tree_size==0 || leaf_index>=tree_size{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         Ok(Self::new(tree_size,leaf_index,path))
     }
@@ -2215,6 +2218,27 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn rfc9162_proof_decoder_rejects_path_length_before_allocation() {
+        let inclusion = vec![0x83, 0x01, 0x00, 0x1a, 0xff, 0xff, 0xff, 0xff];
+        assert_eq!(
+            Rfc9162InclusionProof::from_cbor(&inclusion),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        let consistency = vec![0x83, 0x01, 0x02, 0x1a, 0xff, 0xff, 0xff, 0xff];
+        assert_eq!(
+            Rfc9162ConsistencyProof::from_cbor(&consistency),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        let mut edge = vec![0x83, 0x01, 0x00, 0x18, MAX_RFC9162_PROOF_PATH as u8 + 1];
+        assert_eq!(
+            Rfc9162InclusionProof::from_cbor(&edge),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
     fn rfc9942_proof_decoder_rejects_noncanonical_and_trailing_input() {
         let inclusion = Rfc9162InclusionProof::new(20, 17, vec![[0x11; 32]]);
         let mut encoded = inclusion.to_cbor();
