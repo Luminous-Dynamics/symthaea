@@ -310,6 +310,101 @@ impl EvaluationProcedure {
     }
 }
 
+/// Immutable result for one typed verification check.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvaluationCheckResult {
+    pub sequence: u32,
+    pub check: EvaluationCheck,
+    pub stage: VerificationStage,
+}
+
+impl EvaluationCheckResult {
+    pub fn id(&self) -> &'static str {
+        self.check.id()
+    }
+
+    fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&self.sequence.to_be_bytes());
+        bytes.extend_from_slice(&(self.id().len() as u64).to_be_bytes());
+        bytes.extend_from_slice(self.id().as_bytes());
+        match self.stage {
+            VerificationStage::Passed => bytes.push(0),
+            VerificationStage::Failed(outcome) => {
+                bytes.push(1);
+                bytes.push(verification_outcome_tag(outcome));
+            }
+            VerificationStage::NotEvaluated => bytes.push(2),
+        }
+        bytes
+    }
+}
+
+/// Durable execution trace for an evaluation procedure.
+///
+/// The trace contains only checks that executed. Its order is explicit and its
+/// procedure fingerprint binds the trace to the procedure that defined the check
+/// semantics. The legacy report remains the compatibility projection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvaluationTrace {
+    pub procedure_fingerprint: String,
+    pub results: Vec<EvaluationCheckResult>,
+}
+
+impl EvaluationTrace {
+    pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
+        let procedure = EvaluationProcedure::attestation_ed25519();
+        let results = procedure
+            .checks
+            .iter()
+            .copied()
+            .enumerate()
+            .filter_map(|(index, check)| {
+                let stage = check.stage(report);
+                (!matches!(stage, VerificationStage::NotEvaluated)).then_some(
+                    EvaluationCheckResult {
+                        sequence: index as u32,
+                        check,
+                        stage,
+                    },
+                )
+            })
+            .collect();
+        Self {
+            procedure_fingerprint: report.procedure_fingerprint.clone(),
+            results,
+        }
+    }
+
+    pub fn executed_check_ids(&self) -> Vec<&'static str> {
+        self.results.iter().map(EvaluationCheckResult::id).collect()
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea:observation-evaluation-trace:v1\n");
+        write_string(&mut bytes, &self.procedure_fingerprint);
+        bytes.extend_from_slice(&(self.results.len() as u64).to_be_bytes());
+        for result in &self.results {
+            let encoded = result.canonical_bytes();
+            bytes.extend_from_slice(&(encoded.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(&encoded);
+        }
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-evaluation-trace:v1\n");
+        hasher.update(&self.canonical_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
 /// Structured stage-by-stage verification evidence. This deliberately does not
 /// collapse evidence into an aggregate trust score.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -475,7 +570,7 @@ impl ReceiptAttestationVerificationReport {
 pub const VERIFICATION_CONTEXT_VERSION: &str =
     "symthaea-observation-verification-context-v2";
 pub const EVIDENCE_EVALUATION_VERSION: &str =
-    "symthaea-observation-evaluation-v3";
+    "symthaea-observation-evaluation-v4";
 pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
     "receipt-attestation-verification";
 
@@ -754,8 +849,8 @@ pub struct EvidenceEvaluation {
     pub evaluation_type: &'static str,
     pub context: VerificationContext,
     pub context_fingerprint: String,
-    /// The procedure checks that actually executed for this evaluation.
-    pub executed_check_ids: Vec<&'static str>,
+    /// Immutable execution trace; this is the authoritative record of checks that ran.
+    pub execution_trace: EvaluationTrace,
     pub verification_report_fingerprint: String,
     pub outcome: ReceiptAttestationVerificationOutcome,
     pub structural_validation: VerificationStage,
@@ -768,19 +863,20 @@ pub struct EvidenceEvaluation {
     pub proof_policy: VerificationStage,
     pub cryptographic_proof: VerificationStage,
     pub limitations: Vec<EvaluationLimitation>,
+    pub boundary: EvaluationBoundary,
 }
 
 impl EvidenceEvaluation {
     pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
         let context = VerificationContext::from_report(report);
-        let procedure = EvaluationProcedure::attestation_ed25519();
+        let execution_trace = EvaluationTrace::from_report(report);
         Self {
             evaluation_version: EVIDENCE_EVALUATION_VERSION,
             subject_fingerprint: report.receipt_fingerprint.clone(),
             evaluation_type: ATTESTATION_VERIFICATION_EVALUATION_TYPE,
             context_fingerprint: context.fingerprint(),
             context,
-            executed_check_ids: procedure.executed_check_ids(report),
+            execution_trace,
             verification_report_fingerprint: report.fingerprint(),
             outcome: report.outcome,
             structural_validation: report.structural_validation,
@@ -841,15 +937,14 @@ impl EvidenceEvaluation {
             }
         }
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v3\n");
+        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v4\n");
         write_string(&mut bytes, self.evaluation_version);
         write_string(&mut bytes, &self.subject_fingerprint);
         write_string(&mut bytes, self.evaluation_type);
         write_string(&mut bytes, &self.context_fingerprint);
-        bytes.extend_from_slice(&(self.executed_check_ids.len() as u64).to_be_bytes());
-        for check_id in &self.executed_check_ids {
-            write_string(&mut bytes, check_id);
-        }
+        let trace_bytes = self.execution_trace.canonical_bytes();
+        bytes.extend_from_slice(&(trace_bytes.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(&trace_bytes);
         write_string(&mut bytes, &self.verification_report_fingerprint);
         bytes.push(verification_outcome_tag(self.outcome));
         write_stage(&mut bytes, self.structural_validation);
@@ -2041,7 +2136,7 @@ mod tests {
     }
 
     #[test]
-    fn evidence_evaluation_uses_v2_fingerprint_domain() {
+    fn evidence_evaluation_uses_v4_fingerprint_domain() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
@@ -2068,7 +2163,7 @@ mod tests {
         let evaluation = report.to_evidence_evaluation();
 
         assert_eq!(
-            evaluation.executed_check_ids,
+            evaluation.execution_trace.executed_check_ids(),
             vec!["envelope-structural-validation"]
         );
     }
@@ -2196,6 +2291,53 @@ mod tests {
         };
 
         assert_ne!(procedure.fingerprint(), reordered.fingerprint());
+    }
+
+    #[test]
+    fn evaluation_trace_binds_check_results_and_procedure() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        envelope.proof.proof_value[0] ^= 0x01;
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+
+        assert_eq!(
+            evaluation.execution_trace.procedure_fingerprint,
+            report.procedure_fingerprint
+        );
+        assert_eq!(evaluation.execution_trace.results.len(), 9);
+        let last = evaluation.execution_trace.results.last().expect("trace has a result");
+        assert_eq!(last.check, EvaluationCheck::CryptographicProof);
+        assert_eq!(
+            last.stage,
+            VerificationStage::Failed(
+                ReceiptAttestationVerificationOutcome::InvalidSignature
+            )
+        );
+        assert_eq!(
+            evaluation.execution_trace.results.iter().map(|r| r.sequence).collect::<Vec<_>>(),
+            (0..9).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn evaluation_trace_changes_when_check_result_changes() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let mut trace = EvaluationTrace::from_report(&report);
+        let original = trace.fingerprint();
+        trace.results.last_mut().expect("trace has a result").stage =
+            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::InvalidSignature);
+        assert_ne!(original, trace.fingerprint());
     }
 
     #[test]
