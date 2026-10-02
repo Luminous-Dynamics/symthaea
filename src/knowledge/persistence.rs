@@ -12,6 +12,7 @@
 //! - knowledge_causal_edges: cause, effect, strength, cycle
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
 //! - knowledge_snapshot_receipts: generation, canonical_digest_hex
+//! - knowledge_snapshot_validation_receipts: validation_event, generation, validator/profile metadata, outcome
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
@@ -1393,10 +1394,12 @@ impl KnowledgePersistence {
                 validator_ref TEXT NOT NULL,
                 validator_version TEXT NOT NULL,
                 validation_profile TEXT NOT NULL,
-                conforms INTEGER NOT NULL,
+                conforms INTEGER NOT NULL CHECK (conforms IN (0, 1)),
                 report_digest_hex TEXT,
                 FOREIGN KEY (generation) REFERENCES knowledge_snapshot_receipts(generation)
             );
+            CREATE INDEX IF NOT EXISTS idx_snapshot_validation_receipts_generation
+                ON knowledge_snapshot_validation_receipts(generation, validation_event);
             CREATE INDEX IF NOT EXISTS idx_facts_domain ON knowledge_facts(domain);
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
         )
@@ -3084,6 +3087,75 @@ mod tests {
             "Snapshot validation digest does not match committed receipt"
         ));
         assert!(p.latest_snapshot_validation_receipts().unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_validation_receipt_rejects_duplicate_event_and_invalid_input() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_validation_input_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "validation-input".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x66; BinaryHV::BYTES],
+            source_text: "input".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        let committed = p.latest_snapshot_receipt().unwrap().unwrap();
+
+        let base = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:duplicate-event".into(),
+            generation: committed.generation,
+            snapshot_digest_hex: committed.canonical_digest_hex.clone(),
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        };
+        p.record_snapshot_validation(base.clone()).unwrap();
+        let err = p.record_snapshot_validation(base).unwrap_err();
+        assert!(err.contains("UNIQUE") || err.contains("unique"));
+
+        let empty_event = KnowledgeSnapshotValidationReceipt {
+            validation_event: " ".into(),
+            generation: committed.generation,
+            snapshot_digest_hex: committed.canonical_digest_hex.clone(),
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        };
+        assert_eq!(
+            p.record_snapshot_validation(empty_event).unwrap_err(),
+            "Snapshot validation event must be non-empty"
+        );
+
+        let empty_report_digest = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:empty-report-digest".into(),
+            report_digest_hex: Some(" ".into()),
+            ..base
+        };
+        assert_eq!(
+            p.record_snapshot_validation(empty_report_digest).unwrap_err(),
+            "Snapshot validation report digest must be non-empty when present"
+        );
+
+        assert_eq!(p.latest_snapshot_validation_receipts().unwrap().len(), 1);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
