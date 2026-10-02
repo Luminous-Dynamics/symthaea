@@ -51,7 +51,8 @@ pub fn run_case(gate: &RegenerativeHealthGate, case: CrucibleCase) -> CrucibleRe
     let recovery = recovery(case);
     let action = action(case);
 
-    let decision = gate.assess(&observation, recovery.as_ref(), action, 1_000);
+    let now_ms = if case == CrucibleCase::StaleRecovery { 1_001 } else { 1_000 };
+    let decision = gate.assess(&observation, recovery.as_ref(), action, now_ms);
 
     CrucibleResult {
         case,
