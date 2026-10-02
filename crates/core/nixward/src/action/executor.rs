@@ -259,7 +259,8 @@ impl NixOSCommand {
             Self::HomeManagerSwitch { .. } => {
                 Some(NixOSCommand::Custom {
                     command: "sh".to_string(),
-                    args: vec![                        "-c".to_string(),
+                    args: vec![
+                        "-c".to_string(),
                         "home-manager generations | head -2 | tail -1 | awk '{print $NF}' | xargs -I {} {}/activate".to_string(),
                     ],
                     safety_level: SafetyLevel::UserModify,
@@ -509,6 +510,7 @@ impl NixOSExecutor {
             .stderr(Stdio::piped())
             .output()
             .await?;
+
         let stdout = String::from_utf8_lossy(&output.stdout);
 
         for line in stdout.lines() {
@@ -1049,7 +1051,8 @@ mod tests {
             result,
             ExecutionResult::Blocked {
                 safety_level: SafetyLevel::SystemModify,
-                ..            }
+                ..
+            }
         ));
     }
 
