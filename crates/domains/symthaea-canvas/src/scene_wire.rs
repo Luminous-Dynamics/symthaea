@@ -406,6 +406,51 @@ mod tests {
     }
 
     #[test]
+    fn gradient_fill_is_flattened_to_first_stop() {
+        let gradient = SceneNode {
+            kind: NodeKind::RadialGradient {
+                id: "bg".to_string(),
+                stops: vec![
+                    crate::scene_graph::GradientStop {
+                        offset: 0.0,
+                        color: Color::rgb(0.1, 0.2, 0.3),
+                    },
+                    crate::scene_graph::GradientStop {
+                        offset: 1.0,
+                        color: Color::rgb(0.9, 0.8, 0.7),
+                    },
+                ],
+            },
+            transform: Transform::identity(),
+            style: Style::default(),
+            children: vec![],
+        };
+        let rect = SceneNode::rect(0.0, 0.0, 10.0, 10.0).with_style(Style {
+            fill_url: Some("bg".to_string()),
+            ..Style::default()
+        });
+        let root = SceneNode::group(None)
+            .with_child(gradient)
+            .with_child(rect);
+        let wire = RemoteScene::from_scene(&root);
+        match &wire.root.children[0].primitive {
+            WirePrimitive::Group => {}
+            _ => panic!("expected root group child"),
+        }
+        match &wire.root.children[1].style.fill {
+            Some(color) => assert_eq!(*color, Color::rgb(0.1, 0.2, 0.3)),
+            None => panic!("gradient fill was not flattened"),
+        }
+    }
+
+    #[test]
+    fn unsupported_protocol_version_is_rejected() {
+        let mut scene = RemoteScene::from_scene(&SceneNode::circle(1.0, 1.0, 1.0));
+        scene.version = RemoteScene::VERSION + 1;
+        assert!(!scene.is_supported());
+    }
+
+    #[test]
     fn hostile_scene_is_bounded_and_effect_free() {
         let mut root = SceneNode::group(None);
         for _ in 0..600 {
