@@ -89,8 +89,10 @@ jobs:
           EOF
 
           cat > "$HARNESS/src/lib.rs" <<EOF
-          #[path = "${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/linear_code.rs"]
-          pub mod linear_code;
+          pub mod hdc {
+              #[path = "${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/linear_code.rs"]
+              pub mod linear_code;
+          }
           EOF
 
           cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" \
