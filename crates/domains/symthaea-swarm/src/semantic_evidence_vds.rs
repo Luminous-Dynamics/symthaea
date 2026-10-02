@@ -18,6 +18,10 @@ pub const RFC9162_INCLUSION_PROOF_ID: i64 = -1;
 pub const RFC9162_CONSISTENCY_PROOF_ID: i64 = -2;
 pub const RFC9942_RECEIPTS_HEADER_LABEL: i64 = 394;
 pub const RFC9942_VDS_HEADER_LABEL: i64 = 395;
+/// Defensive decoding bounds for hostile RFC 9942 VDP containers. These are
+/// implementation resource limits, not changes to the RFC wire format.
+pub const MAX_RFC9942_PROOFS: usize = 256;
+pub const MAX_RFC9942_PROOF_BYTES: usize = 8 * 1024;
 pub const RFC9942_VDP_HEADER_LABEL: i64 = 396;
 
 /// RFC 9942 proof type carried in the vdp header map.
@@ -59,6 +63,8 @@ pub struct Rfc9942Vdp {
 pub enum Rfc9942VdpError {
     #[error("proof collection must contain at least one proof")]
     EmptyProofCollection,
+    #[error("RFC 9942 VDP exceeds its defensive resource bound")]
+    ResourceLimitExceeded,
     #[error("RFC 9942 receipt payload must be exactly 32 bytes for SHA-256")]
     InvalidPayloadLength,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
@@ -81,6 +87,9 @@ impl Rfc9942Vdp {
     pub fn new(kind: Rfc9942ProofKind, proofs: Vec<Vec<u8>>) -> Result<Self, Rfc9942VdpError> {
         if proofs.is_empty() {
             return Err(Rfc9942VdpError::EmptyProofCollection);
+        }
+        if proofs.len() > MAX_RFC9942_PROOFS || proofs.iter().any(|proof| proof.len() > MAX_RFC9942_PROOF_BYTES) {
+            return Err(Rfc9942VdpError::ResourceLimitExceeded);
         }
         for proof in &proofs {
             match kind {
@@ -245,9 +254,13 @@ impl Rfc9942Vdp {
         let kind = Rfc9942ProofKind::from_label(label).ok_or(Rfc9942VdpError::InvalidStructure)?;
         let count = reader.read_array_len().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
         if count == 0 { return Err(Rfc9942VdpError::EmptyProofCollection); }
+        if count > MAX_RFC9942_PROOFS { return Err(Rfc9942VdpError::ResourceLimitExceeded); }
         let mut proofs = Vec::with_capacity(count);
         for _ in 0..count {
-            proofs.push(reader.read_bstr().map_err(|_| Rfc9942VdpError::InvalidEncoding)?);
+            proofs.push(reader.read_bstr_bounded(MAX_RFC9942_PROOF_BYTES).map_err(|e| match e {
+                Rfc9162ProofDecodeError::InvalidStructure => Rfc9942VdpError::ResourceLimitExceeded,
+                _ => Rfc9942VdpError::InvalidEncoding,
+            })?);
         }
         match reader.finish() {
             Ok(()) => Self::new(kind, proofs),
@@ -429,6 +442,30 @@ impl<'a> CborReader<'a> {
             _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
         };
         usize::try_from(n).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)
+    }
+
+    fn read_bstr_bounded(&mut self, max_len: usize) -> Result<Vec<u8>, Rfc9162ProofDecodeError> {
+        let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        self.offset+=1;
+        if initial>>5!=2 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
+        let ai=initial&0x1f;
+        let n=match ai {
+            0..=23=>ai as u64,
+            24=>self.read_uint(1,24)?,
+            25=>self.read_uint(2,256)?,
+            26=>self.read_uint(4,65_536)?,
+            27=>self.read_uint(8,4_294_967_296)?,
+            _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        };
+        let n=usize::try_from(n).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
+        if n > max_len {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+        if end>self.bytes.len() { return Err(Rfc9162ProofDecodeError::UnexpectedEof); }
+        let bytes=self.bytes[self.offset..end].to_vec();
+        self.offset=end;
+        Ok(bytes)
     }
 
     fn read_bstr(&mut self) -> Result<Vec<u8>, Rfc9162ProofDecodeError> {
@@ -970,6 +1007,29 @@ mod tests {
         assert_eq!(&encoded[..3],&[0xa1,0x21,0x81]);
         assert_eq!(encoded[3],0x58);
         assert_eq!(encoded[4],0x26);
+    }
+
+    #[test]
+    fn rfc9942_vdp_enforces_defensive_resource_bounds() {
+        let valid=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let too_many=vec![valid.clone();MAX_RFC9942_PROOFS+1];
+        assert_eq!(
+            Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,too_many),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
+        );
+        let oversized=vec![0u8;MAX_RFC9942_PROOF_BYTES+1];
+        assert_eq!(
+            Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![oversized]),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
+        );
+
+        let mut encoded=vec![0xa1,0x20,0x81,0x59];
+        encoded.extend_from_slice(&(MAX_RFC9942_PROOF_BYTES as u16+1).to_be_bytes());
+        encoded.extend(std::iter::repeat_n(0u8,MAX_RFC9942_PROOF_BYTES+1));
+        assert_eq!(
+            Rfc9942Vdp::from_cbor(&encoded),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
+        );
     }
 
     #[test]
