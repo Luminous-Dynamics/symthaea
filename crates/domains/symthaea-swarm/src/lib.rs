@@ -810,6 +810,8 @@ pub mod semantic_transition;
 pub mod semantic_evidence_digest;
 #[cfg(feature = "semantic-digest")]
 pub mod semantic_evidence_history;
+#[cfg(feature = "semantic-digest")]
+pub mod semantic_evidence_anchor;
 
 pub mod fault;
 #[cfg(feature = "networking")]
