@@ -149,6 +149,20 @@ mod tests {
     }
 
     #[test]
+    fn accepts_and_rejects_exact_service_unit_length_boundary() {
+        let max_name = format!("{}.service", "a".repeat(247));
+        assert_eq!(max_name.len(), 255);
+        assert!(NixServiceOperationV1::new(max_name, NixServiceOperationKindV1::Start).is_ok());
+
+        let oversized = format!("{}.service", "a".repeat(248));
+        assert_eq!(oversized.len(), 256);
+        assert_eq!(
+            NixServiceOperationV1::new(oversized, NixServiceOperationKindV1::Start).unwrap_err(),
+            NixServiceOperationErrorV1::TooLong
+        );
+    }
+
+    #[test]
     fn rejects_option_like_and_oversized_units() {
         assert_eq!(
             NixServiceOperationV1::new("--now.service", NixServiceOperationKindV1::Start)
