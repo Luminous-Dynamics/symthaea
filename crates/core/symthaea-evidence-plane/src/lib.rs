@@ -551,25 +551,22 @@ pub struct EvidenceLineageGuardV1 {
 }
 
 impl EvidenceLineageGuardV1 {
-    /// Prepare an evidence guard only after validating the lineage.
+    /// Prepare an evidence guard only after validating the supplied lineage.
     ///
-    /// This is the preferred admission path for untrusted or parser-derived
-    /// lineage values. The infallible `prepare` constructor remains available
-    /// for trusted callers, but it also validates and therefore fails closed
-    /// rather than creating a guard around an invalid lineage.
-    pub fn try_prepare(lineage: &ExecutionLineageV1) -> Result<Self, String> {
+    /// Preparation is intentionally fallible so invalid lineage cannot reach
+    /// the guard through a panic-based admission path.
+    pub fn prepare(lineage: &ExecutionLineageV1) -> Result<Self, String> {
         lineage.validate()?;
-        Ok(Self::prepare(lineage))
-    }
-
-    pub fn prepare(lineage: &ExecutionLineageV1) -> Self {
-        if let Err(error) = lineage.validate() {
-            panic!("cannot prepare invalid execution lineage: {error}");
-        }
-        Self {
+        Ok(Self {
             prepared_digest: lineage.digest(),
             evidence_committed: false,
-        }
+        })
+    }
+
+    /// Compatibility alias for callers that explicitly prefer a fallible
+    /// constructor name.
+    pub fn try_prepare(lineage: &ExecutionLineageV1) -> Result<Self, String> {
+        Self::prepare(lineage)
     }
 
     /// Commit claim-bearing evidence only when the current lineage is valid
@@ -1036,7 +1033,7 @@ mod tests {
     #[test]
     fn execution_lineage_guard_commits_only_stable_valid_lineage() {
         let base = lineage_fixture();
-        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        let mut guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
 
         guard
             .commit_evidence(&base)
@@ -1051,7 +1048,7 @@ mod tests {
         let mut changed = base.clone();
         changed.source_revision = "def456".into();
 
-        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        let mut guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
         let error = guard
             .commit_evidence(&changed)
             .expect_err("drifted lineage must not commit");
@@ -1073,7 +1070,7 @@ mod tests {
             .immutable_input_digests
             .insert("fixture.json".into(), "not-a-digest".into());
 
-        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        let mut guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
         let error = guard
             .commit_evidence(&invalid)
             .expect_err("invalid current lineage must be rejected");
@@ -1086,15 +1083,13 @@ mod tests {
     }
 
     #[test]
-    fn execution_lineage_guard_does_not_allow_invalid_preparation() {
+    fn execution_lineage_guard_rejects_invalid_preparation() {
         let mut invalid = lineage_fixture();
-        invalid.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
+        invalid
+            .immutable_input_digests
+            .insert("fixture.json".into(), "not-a-digest".into());
 
-        let panic = std::panic::catch_unwind(|| {
-            EvidenceLineageGuardV1::prepare(&invalid);
-        });
-
-        assert!(panic.is_err(), "invalid lineage preparation must fail closed");
+        assert!(EvidenceLineageGuardV1::prepare(&invalid).is_err());
     }
 
     #[test]
@@ -1103,7 +1098,7 @@ mod tests {
         let mut changed = base.clone();
         changed.source_revision = "def456".into();
 
-        let guard = EvidenceLineageGuardV1::prepare(&base);
+        let guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
         assert_eq!(
             guard.check(&changed),
             EvidenceLineageDecision::ReprepareBeforeEvidence
@@ -1116,7 +1111,7 @@ mod tests {
         let mut changed = base.clone();
         changed.source_revision = "def456".into();
 
-        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        let mut guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
         guard
             .commit_evidence(&base)
             .expect("stable lineage commits evidence");
@@ -1129,7 +1124,7 @@ mod tests {
     #[test]
     fn execution_lineage_guard_allows_same_lineage_after_evidence() {
         let base = lineage_fixture();
-        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        let mut guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
         guard.commit_evidence(&base).expect("stable lineage commits evidence");
         assert_eq!(
             guard.check(&base),
