@@ -157,6 +157,8 @@ pub struct ReceiptAttestationVerificationReport {
     pub policy_fingerprint: String,
     pub environment_identity: VerifierEnvironmentIdentity,
     pub environment_fingerprint: String,
+    /// Fingerprint of the resolver's durable view, when resolution was performed.
+    pub resolution_snapshot_fingerprint: Option<String>,
     pub resolved_verification_method: Option<String>,
     pub structural_validation: VerificationStage,
     pub receipt_commitment: VerificationStage,
@@ -187,8 +189,10 @@ impl ReceiptAttestationVerificationReport {
             evaluated_at_unix_ns,
             policy_fingerprint: policy_inputs.fingerprint(),
             environment_fingerprint: environment_identity.fingerprint(),
+            resolution_snapshot_fingerprint: None,
             policy_inputs,
             environment_identity,
+            resolution_snapshot_fingerprint: None,
             resolved_verification_method,
             structural_validation: VerificationStage::NotEvaluated,
             receipt_commitment: VerificationStage::NotEvaluated,
@@ -321,6 +325,10 @@ impl ReceiptAttestationVerificationReport {
         bytes.extend_from_slice(&self.evaluated_at_unix_ns.to_be_bytes());
         write_string(&mut bytes, &self.policy_fingerprint);
         write_string(&mut bytes, &self.environment_fingerprint);
+        match &self.resolution_snapshot_fingerprint {
+            Some(value) => { bytes.push(1); write_string(&mut bytes, value); }
+            None => bytes.push(0),
+        }
         match &self.resolved_verification_method {
             Some(method) => {
                 bytes.push(1);
@@ -429,6 +437,7 @@ pub struct Ed25519ReceiptVerifier {
     now_unix_ns: i128,
     policy_inputs: VerificationPolicyInputs,
     environment_identity: VerifierEnvironmentIdentity,
+    resolution_snapshot_fingerprint: Option<String>,
 }
 
 impl Ed25519ReceiptVerifier {
@@ -453,6 +462,7 @@ impl Ed25519ReceiptVerifier {
                 require_active_verification_method: true,
             },
             environment_identity: VerifierEnvironmentIdentity::new("unspecified"),
+            resolution_snapshot_fingerprint: None,
         }
     }
 
@@ -484,6 +494,14 @@ impl Ed25519ReceiptVerifier {
         self
     }
 
+    /// Bind the exact resolver snapshot used for verification.
+    /// The snapshot is represented by a content-derived fingerprint so the
+    /// durable report does not depend on mutable remote resolver state.
+    pub fn with_resolution_snapshot_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
+        self.resolution_snapshot_fingerprint = Some(fingerprint.into());
+        self
+    }
+
     /// Verify structure, receipt commitment, temporal status, policy bindings,
     /// and the detached Ed25519 proof. This does not perform issuer
     /// authorization, credential validation, revocation/status resolution,
@@ -501,9 +519,11 @@ impl Ed25519ReceiptVerifier {
         envelope: &ReceiptAttestationEnvelope,
         receipt: &IndependenceVerificationReceipt,
     ) -> ReceiptAttestationVerificationReport {
-        self.verify_with_resolved_key_report(
+        let mut report = self.verify_with_resolved_key_report(
             envelope, receipt, &self.verification_method, &self.verifying_key,
-        )
+        );
+        report.resolution_snapshot_fingerprint = self.resolution_snapshot_fingerprint.clone();
+        report
     }
 
     /// Verify using an application-controlled resolver.
@@ -526,12 +546,23 @@ impl Ed25519ReceiptVerifier {
         receipt: &IndependenceVerificationReceipt,
         resolver: &R,
     ) -> ReceiptAttestationVerificationReport {
+        let mut report = self.verify_with_resolver_report_inner(envelope, receipt, resolver);
+        report.resolution_snapshot_fingerprint = self.resolution_snapshot_fingerprint.clone();
+        report
+    }
+
+    pub fn verify_with_resolver_report_inner<R: VerificationMethodResolver>(
+        &self,
+        envelope: &ReceiptAttestationEnvelope,
+        receipt: &IndependenceVerificationReceipt,
+        resolver: &R,
+    ) -> ReceiptAttestationVerificationReport {
         if envelope.validate().is_err() {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::InvalidEnvelope,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                None,,
+                None,
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
@@ -542,7 +573,7 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                None,,
+                None,
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
@@ -565,7 +596,7 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::Expired,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
-                    None,,
+                    None,
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
@@ -578,7 +609,7 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                None,,
+                None,
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
@@ -590,7 +621,7 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                None,,
+                None,
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
@@ -615,7 +646,7 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                Some(method.to_string()),,
+                Some(method.to_string()),
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
@@ -628,7 +659,7 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
-                    Some(method.to_string()),,
+                    Some(method.to_string()),
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
@@ -639,7 +670,7 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
-                    Some(method.to_string()),,
+                    Some(method.to_string()),
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
@@ -650,7 +681,7 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
-                    Some(method.to_string()),,
+                    Some(method.to_string()),
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
@@ -662,7 +693,7 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                Some(method.to_string()),,
+                Some(method.to_string()),
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
@@ -699,7 +730,7 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
-                    self.now_unix_ns,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
             );
@@ -710,7 +741,7 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
-                    self.now_unix_ns,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
             );
@@ -722,8 +753,8 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::NotYetValid,
                     VerificationStage::Failed,
                     fingerprint,
-                    method,
-                    self.now_unix_ns,
+                method,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
                 );
@@ -733,8 +764,8 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::Expired,
                     VerificationStage::Failed,
                     fingerprint,
-                    method,
-                    self.now_unix_ns,
+                method,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
                 );
@@ -748,7 +779,7 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
-                    self.now_unix_ns,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
             );
@@ -759,7 +790,7 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
-                    self.now_unix_ns,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
             );
@@ -770,8 +801,8 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::ProofPurposeMismatch,
                     VerificationStage::Failed,
                     fingerprint,
-                    method,
-                    self.now_unix_ns,
+                method,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
                 );
@@ -783,8 +814,8 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::DomainMismatch,
                     VerificationStage::Failed,
                     fingerprint,
-                    method,
-                    self.now_unix_ns,
+                method,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
                 );
@@ -796,8 +827,8 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::ChallengeMismatch,
                     VerificationStage::Failed,
                     fingerprint,
-                    method,
-                    self.now_unix_ns,
+                method,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
                 );
@@ -810,7 +841,7 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
-                    self.now_unix_ns,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
             );
@@ -821,7 +852,7 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
-                    self.now_unix_ns,
+                self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
             );
@@ -1206,6 +1237,31 @@ mod tests {
             base.verify_report(&envelope, &receipt).fingerprint(),
             environment.verify_report(&envelope, &receipt).fingerprint()
         );
+    }
+
+    #[test]
+    fn verification_report_binds_resolution_snapshot() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let method = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([method]);
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            signing_key.verifying_key(),
+            150,
+        )
+        .with_resolution_snapshot_fingerprint("resolver-snapshot-a");
+        let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
+        assert_eq!(report.resolution_snapshot_fingerprint.as_deref(), Some("resolver-snapshot-a"));
+        let other = verifier
+            .clone()
+            .with_resolution_snapshot_fingerprint("resolver-snapshot-b")
+            .verify_with_resolver_report(&envelope, &receipt, &resolver);
+        assert_ne!(report.fingerprint(), other.fingerprint());
     }
 
     #[test]
