@@ -1862,12 +1862,12 @@ mod tests {
             action_digest:action_b.canonical_action_digest(), support_digest:"support-b".into(),
             current_frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
         };
-        store.register_lease(&AuthorizationLease::new(
+        store.register_lease(&AuthorizationLease::new_with_instance(
             witness_a.authorization_instance.clone(), witness_a.action_id.clone(),
             witness_a.action_digest.clone(), witness_a.support_digest.clone(),
             witness_a.policy.clone(), witness_a.authority_epoch, 1
         )).unwrap();
-        store.register_lease(&AuthorizationLease::new(
+        store.register_lease(&AuthorizationLease::new_with_instance(
             witness_b.authorization_instance.clone(), witness_b.action_id.clone(),
             witness_b.action_digest.clone(), witness_b.support_digest.clone(),
             witness_b.policy.clone(), witness_b.authority_epoch, 1
