@@ -368,18 +368,25 @@ impl AdaptiveOntology {
 
     /// Import a primitive from a persistence record loaded from SQLite.
     ///
-    /// Silently skips records whose vector bytes are the wrong length.
-    pub fn import_ontology_record(&mut self, record: &OntologyRecord) {
-        if record.vector_bytes.len() < BinaryHV::BYTES {
-            return;
+    /// Returns false when the vector is malformed or the primitive cannot be
+    /// retained. A record merged into an existing similar primitive is handled,
+    /// not rejected.
+    pub fn import_ontology_record(&mut self, record: &OntologyRecord) -> bool {
+        if record.name.trim().is_empty() || record.vector_bytes.len() < BinaryHV::BYTES {
+            return false;
         }
         let mut arr = [0u8; BinaryHV::BYTES];
         arr.copy_from_slice(&record.vector_bytes[..BinaryHV::BYTES]);
         let vector = BinaryHV(arr);
-        // Use `learn` to insert without overwriting existing primitives
-        // (it merges via Hebbian update if a similar primitive already exists).
-        self.learn(&record.name, vector, Vec::new(), record.created_at_cycle);
-        // Restore persisted statistics if the primitive was inserted (not merged).
+        let merged = self.primitives.values().any(|usage| {
+            vector.similarity(&usage.vector) > self.config.match_threshold
+        });
+        let inserted = self.learn(
+            &record.name,
+            vector,
+            Vec::new(),
+            record.created_at_cycle,
+        );
         if let Some(u) = self.primitives.get_mut(&record.name) {
             u.usage_count = u.usage_count.max(record.usage_count);
             u.utility = record.utility;
@@ -387,10 +394,11 @@ impl AdaptiveOntology {
             if record.is_a_parent.is_some() {
                 u.is_a_parent = record.is_a_parent.clone();
             }
+            true
+        } else {
+            inserted || merged
         }
-        true
-    }
-}
+    }}
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
