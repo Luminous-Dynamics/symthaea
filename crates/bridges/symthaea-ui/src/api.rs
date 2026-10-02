@@ -22,6 +22,11 @@ use web_sys::Url;
 /// separate from the WebSocket budget because service queries/status should
 /// remain small even though telemetry may carry a bounded mental movie.
 const MAX_HTTP_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+/// Outbound chat/query content is bounded independently of response limits so
+/// an oversized local input cannot create an unbounded JSON request body.
+const MAX_QUERY_CONTENT_BYTES: usize = 256 * 1024;
+/// Request discriminators are protocol tokens, not arbitrary user content.
+const MAX_REQUEST_TYPE_BYTES: usize = 128;
 /// The telemetry budget covers the maximum 64 MiB RGBA movie projection plus
 /// base64 expansion and JSON framing, while remaining finite before parsing.
 const MAX_WS_TEXT_BYTES: usize = 72 * 1024 * 1024;
@@ -31,6 +36,30 @@ fn parse_json_with_limit(text: &str, max_bytes: usize) -> Result<Value, String> 
         return Err(format!("JSON payload exceeds {max_bytes} byte limit"));
     }
     serde_json::from_str::<Value>(text).map_err(|e| format!("failed to parse response: {e}"))
+}
+
+/// Read an HTTP response body with a cheap header-level rejection when the
+/// server provides a numeric Content-Length. The body-size check remains
+/// mandatory because chunked responses and browser/CORS conditions may omit
+/// or hide the header.
+async fn read_json_response(
+    resp: gloo_net::http::Response,
+    max_bytes: usize,
+) -> Result<Value, String> {
+    if let Some(content_length) = resp.headers().get("content-length") {
+        if let Ok(length) = content_length.trim().parse::<u64>() {
+            if length > max_bytes as u64 {
+                return Err(format!(
+                    "HTTP response Content-Length exceeds {max_bytes} byte limit"
+                ));
+            }
+        }
+    }
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| format!("failed to read response: {e}"))?;
+    parse_json_with_limit(&text, max_bytes)
 }
 
 /// Parse and canonicalize the user-configured service gateway before it is
@@ -76,6 +105,9 @@ fn gateway_endpoint(gateway: &str, path: &str) -> Result<String, String> {
 /// and return the parsed JSON response (a `Response::QueryResponse` or
 /// `Response::Error` per the wire protocol).
 pub async fn send_query(gateway: &str, content: &str) -> Result<Value, String> {
+    if content.len() > MAX_QUERY_CONTENT_BYTES {
+        return Err(format!("query content exceeds {MAX_QUERY_CONTENT_BYTES} byte limit"));
+    }
     let url = gateway_endpoint(gateway, "v1/service")?;
     let body = serde_json::json!({ "type": "query", "content": content });
     let resp = Request::post(&url)
@@ -85,16 +117,15 @@ pub async fn send_query(gateway: &str, content: &str) -> Result<Value, String> {
         .send()
         .await
         .map_err(|e| format!("request failed: {e}"))?;
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| format!("failed to read response: {e}"))?;
-    parse_json_with_limit(&text, MAX_HTTP_RESPONSE_BYTES)
+    read_json_response(resp, MAX_HTTP_RESPONSE_BYTES).await
 }
 
 /// One request/response round-trip for status/introspect/etc — same shape
 /// as `send_query` but for the request types that take no `content`.
 pub async fn send_simple(gateway: &str, request_type: &str) -> Result<Value, String> {
+    if request_type.len() > MAX_REQUEST_TYPE_BYTES {
+        return Err(format!("request type exceeds {MAX_REQUEST_TYPE_BYTES} byte limit"));
+    }
     let url = gateway_endpoint(gateway, "v1/service")?;
     let body = serde_json::json!({ "type": request_type });
     let resp = Request::post(&url)
@@ -104,11 +135,7 @@ pub async fn send_simple(gateway: &str, request_type: &str) -> Result<Value, Str
         .send()
         .await
         .map_err(|e| format!("request failed: {e}"))?;
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| format!("failed to read response: {e}"))?;
-    parse_json_with_limit(&text, MAX_HTTP_RESPONSE_BYTES)
+    read_json_response(resp, MAX_HTTP_RESPONSE_BYTES).await
 }
 
 /// Open the live telemetry WebSocket and invoke `on_message` for each
@@ -187,5 +214,12 @@ mod tests {
     #[test]
     fn json_limit_rejects_malformed_payload() {
         assert!(parse_json_with_limit("{", MAX_HTTP_RESPONSE_BYTES).is_err());
+    }
+
+    #[test]
+    fn outbound_query_and_request_type_limits_are_explicit() {
+        assert!("x".repeat(MAX_QUERY_CONTENT_BYTES).len() <= MAX_QUERY_CONTENT_BYTES);
+        assert!("x".repeat(MAX_QUERY_CONTENT_BYTES + 1).len() > MAX_QUERY_CONTENT_BYTES);
+        assert!("x".repeat(MAX_REQUEST_TYPE_BYTES + 1).len() > MAX_REQUEST_TYPE_BYTES);
     }
 }
