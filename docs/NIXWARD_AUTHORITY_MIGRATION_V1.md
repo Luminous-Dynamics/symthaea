@@ -29,7 +29,9 @@ As of the branch base, the relevant code behaves as follows:
 - `NixOSExecutor::execute(command, phi)` returns `PendingConfirmation` below that threshold and otherwise executes;
 - the function documentation already warns that caller-supplied or hard-coded Phi can become a rubber stamp;
 - `NixOSExecutor::execute_confirmed(command, phi)` bypasses the threshold after a real upstream confirmation;
-- the daemon active-healing path already uses an explicit human `Approved` verdict that is one-shot-consumed before `execute_confirmed`;
+- the daemon active-healing path routes modifying commands through typed V1 action intent and the live Linux local-approval V2 runtime before `execute_confirmed`;
+- generated NixOS configuration hardening uses a typed `ConfigPatch` action identity containing the exact option path, value, and observed `configuration.nix` digest; the write path revalidates that digest before applying the patch;
+- the legacy `watchdog_verdict.txt` file remains a compatibility/observability surface but is not an authority source for daemon modifying execution;
 - `action/phi_gate.rs` presently provides command-risk/destructiveness classification and rollback lookup despite its historical authority-oriented name;
 - `PlanExecutor` stores one Phi value for the whole plan, applies it to each step, and uses `execute_confirmed` for rollback.
 
@@ -223,6 +225,8 @@ Rollback deserves explicit semantics. Starting a plan does not automatically imp
 After callers migrate:
 
 - governed remote/system-critical/destructive paths require the typed boundary;
+- daemon active-healing modifying execution cannot use `NixOSCommand::Custom` or a legacy verdict file as authority;
+- generated configuration mutations are bounded by typed `ConfigPatch` identity plus observed-file currentness;
 - legacy Phi-only execution receives an explicit low-authority/local ceiling or is deprecated;
 - `execute_confirmed` cannot be a generic bypass for high-impact paths;
 - read-only/local diagnostic paths may retain low-friction policy where appropriate.
