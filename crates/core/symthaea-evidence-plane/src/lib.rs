@@ -350,6 +350,11 @@ impl ExecutionLineageV1 {
         append_str(hasher, "source_tree", &self.source_tree);
         append_str(
             hasher,
+            "repository_source_snapshot_schema",
+            RepositorySourceSnapshotId::SCHEMA,
+        );
+        append_str(
+            hasher,
             "repository_source_snapshot_id",
             self.repository_source_snapshot_id.as_str(),
         );
@@ -1038,6 +1043,22 @@ mod tests {
     #[test]
     fn execution_lineage_validation_rejects_invalid_repository_source_snapshot_id() {
         assert!(RepositorySourceSnapshotId::parse("not-a-sha256").is_err());
+    }
+
+    #[test]
+    fn lineage_digest_binds_repository_source_snapshot_schema() {
+        let lineage = lineage_fixture();
+        let digest = lineage.digest();
+
+        let mut manual = blake3::Hasher::new();
+        manual.update(ExecutionLineageV1::DOMAIN_SEPARATOR);
+        lineage.write_canonical(&mut manual);
+        assert_eq!(digest, manual.finalize().to_hex().to_string());
+
+        assert_eq!(
+            RepositorySourceSnapshotId::SCHEMA,
+            "symthaea.repository-source-snapshot.v2"
+        );
     }
 
     #[test]
