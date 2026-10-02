@@ -14,6 +14,7 @@
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
+use std::collections::HashSet;
 use std::path::Path;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 use symthaea_epistemic_types::{ProvenanceRelation, ProvenanceRelationKind};
@@ -152,6 +153,13 @@ impl KnowledgePersistence {
         if facts.iter().any(|fact| fact.memory_id.trim().is_empty()) {
             return Err("FactRecord memory_id must be non-empty".into());
         }
+        let mut fact_ids = HashSet::with_capacity(facts.len());
+        if facts
+            .iter()
+            .any(|fact| !fact_ids.insert(fact.memory_id.as_str()))
+        {
+            return Err("Snapshot contains duplicate FactRecord memory_id".into());
+        }
         if facts.iter().any(|fact| fact.vector_bytes.len() != BinaryHV::BYTES) {
             return Err(format!(
                 "FactRecord vector_bytes must be exactly {} bytes",
@@ -248,12 +256,26 @@ impl KnowledgePersistence {
         if edges.iter().any(|edge| !edge.strength.is_finite()) {
             return Err("CausalEdgeRecord strength must be finite".into());
         }
+        let mut causal_keys = HashSet::with_capacity(edges.len());
+        if edges
+            .iter()
+            .any(|edge| !causal_keys.insert((edge.cause.as_str(), edge.effect.as_str())))
+        {
+            return Err("Snapshot contains duplicate CausalEdgeRecord key".into());
+        }
         if edges.iter().any(|edge| edge.cycle > i64::MAX as u64) {
             return Err("CausalEdgeRecord cycle exceeds SQLite INTEGER range".into());
         }
 
         if ontology.iter().any(|record| record.name.trim().is_empty()) {
             return Err("OntologyRecord name must be non-empty".into());
+        }
+        let mut ontology_names = HashSet::with_capacity(ontology.len());
+        if ontology
+            .iter()
+            .any(|record| !ontology_names.insert(record.name.as_str()))
+        {
+            return Err("Snapshot contains duplicate OntologyRecord name".into());
         }
         if ontology
             .iter()
@@ -1216,6 +1238,62 @@ mod tests {
         assert_eq!(ontology[0].name, "new-primitive");
         assert_eq!(relations.len(), 1);
         assert_eq!(relations[0].source_memory_id, "old-fact");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_snapshot_rejects_duplicate_identity_keys() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_duplicate_keys_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "duplicate".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; BinaryHV::BYTES],
+            source_text: "fact".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        let duplicate_fact = fact.clone();
+        let edge = CausalEdgeRecord {
+            cause: "cause".into(),
+            effect: "effect".into(),
+            strength: 0.5,
+            is_inhibitory: false,
+            cycle: 1,
+        };
+        let duplicate_edge = edge.clone();
+        let ontology = OntologyRecord {
+            name: "primitive".into(),
+            vector_bytes: vec![0u8; BinaryHV::BYTES],
+            usage_count: 1,
+            utility: 0.5,
+            created_at_cycle: 1,
+            last_used_cycle: 1,
+            is_a_parent: None,
+        };
+        let duplicate_ontology = ontology.clone();
+
+        let err = p
+            .save_snapshot(
+                &[fact, duplicate_fact],
+                &[],
+                &[edge, duplicate_edge],
+                &[ontology, duplicate_ontology],
+            )
+            .unwrap_err();
+        assert!(err.contains("duplicate"));
+        assert_eq!(p.total_saved(), 0);
+        assert!(!db_path.exists());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
