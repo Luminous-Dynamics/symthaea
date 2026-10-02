@@ -16,11 +16,13 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nixward::NixParser;
-use nixward::action::authorization::{NixActionIntentV1, NixAuthorizationErrorV1};
+use nixward::action::authorization::{NixActionIntentV1, NixAuthorizationErrorV1, NixLocalExecutionAuthorityV1};
 use nixward::action::local_approval::LocalApprovalDecisionKindV1;
 use nixward::action::temporal::UnixMillisV1;
 #[cfg(target_os = "linux")]
 use nixward::action::local_approval_runtime::LocalApprovalRuntimeV1;
+#[cfg(target_os = "linux")]
+use nixward::action::local_approval_store::ConsumedLocalApprovalDecisionV1;
 use nixward::action::service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
 use nixward::action::service_manager::ServiceManager;
 use nixward::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
@@ -138,8 +140,8 @@ struct DaemonState {
     /// Exact request identifiers presented to the local operator.
     pending_local_approval: Option<PendingLocalApprovalViewV1>,
     #[cfg(target_os = "linux")]
-    /// Exact typed intent digest whose V2 approval has been consumed.
-    local_approved_intent_digest: Option<String>,
+    /// Exact live local approval token consumed by this daemon incarnation.
+    local_approval_consumed: Option<ConsumedLocalApprovalDecisionV1>,
     /// The currently pending conversational response from Ollama.
     pending_response: Option<String>,
     /// Custom user goal set via natural language input: (goal_description, target_name, expected_value)
@@ -241,7 +243,7 @@ impl DaemonState {
             #[cfg(target_os = "linux")]
             pending_local_approval: None,
             #[cfg(target_os = "linux")]
-            local_approved_intent_digest: None,
+            local_approval_consumed: None,
             pending_response: None,
             custom_user_goal: None,
             stable_baseline_hv: None,
@@ -866,14 +868,14 @@ impl DaemonState {
                             request_id,
                             consumed.projection_digest()
                         );
-                        self.local_approved_intent_digest = Some(digest);
+                        self.local_approval_consumed = Some(consumed);
                     }
                     LocalApprovalDecisionKindV1::Denied => {
                         eprintln!(
                             "nixward-daemon: local V2 veto consumed for intent {} (request {}).",
                             digest, request_id
                         );
-                        self.local_approved_intent_digest = None;
+                        self.local_approval_consumed = None;
                     }
                 }
                 self.pending_local_approval = None;
@@ -1282,8 +1284,14 @@ impl DaemonState {
                             // Every modifying command must have a governed V1 semantic
                             // identity and an approval consumed from the live V2 runtime.
                             // The legacy watchdog verdict file is not an authority source.
-                            let is_approved = self.local_approved_intent_digest.as_deref()
-                                == Some(intent_digest.as_str())
+                            let is_approved = self
+                                .local_approval_consumed
+                                .as_ref()
+                                .is_some_and(|approval| {
+                                    approval.decision_kind() == LocalApprovalDecisionKindV1::Approved
+                                        && approval.decision_evidence().action_intent_digest
+                                            == intent_digest
+                                })
                                 && self.pending_action_intent_digest.as_deref()
                                     == Some(intent_digest.as_str());
 
@@ -1291,7 +1299,11 @@ impl DaemonState {
                                 // Modifying commands are authorized only through the live V2
                                 // local-approval runtime bound to this exact V1 intent.
                                 self.watchdog_status = None;
-                                self.local_approved_intent_digest = None;
+                                if self.local_approval_consumed.as_ref().is_some_and(|approval| {
+                                    approval.decision_evidence().action_intent_digest != intent_digest
+                                }) {
+                                    self.local_approval_consumed = None;
+                                }
                                 self.pending_action = Some(cmd_str.clone());
                                 self.pending_action_intent_digest = intent_digest.clone();
 
@@ -1361,13 +1373,69 @@ impl DaemonState {
                                     self.pending_action = Some(cmd_str.clone());
                                     self.pending_action_intent_digest = intent_digest.clone();
                                     self.pending_local_approval = None;
-                                    self.local_approved_intent_digest = None;
+                                    self.local_approval_consumed = None;
                                     self.watchdog_status = None;
                                     return (
                                         dynamic_threshold,
                                         Some(best_action.expected_free_energy),
                                     );
                                 }
+
+                                let intent = match NixActionIntentV1::from_command(
+                                    "nixward:daemon",
+                                    self.prev_snapshot.as_ref().and_then(|snapshot| {
+                                        snapshot
+                                            .generation
+                                            .map(|generation| format!("generation:{generation}"))
+                                    }),
+                                    &cmd,
+                                ) {
+                                    Ok(intent) => intent,
+                                    Err(error) => {
+                                        eprintln!(
+                                            "nixward-daemon: refusing approved action that cannot reconstruct governed intent: {error}"
+                                        );
+                                        self.local_approval_consumed = None;
+                                        self.pending_action = None;
+                                        self.pending_action_intent_digest = None;
+                                        return (
+                                            dynamic_threshold,
+                                            Some(best_action.expected_free_energy),
+                                        );
+                                    }
+                                };
+                                let consumed_approval = match self.local_approval_consumed.take() {
+                                    Some(approval) => approval,
+                                    None => {
+                                        eprintln!(
+                                            "nixward-daemon: approved action lost its live approval token; refusing execution"
+                                        );
+                                        self.pending_action = None;
+                                        self.pending_action_intent_digest = None;
+                                        return (
+                                            dynamic_threshold,
+                                            Some(best_action.expected_free_energy),
+                                        );
+                                    }
+                                };
+                                let execution_authority =
+                                    match NixLocalExecutionAuthorityV1::from_consumed_local_approval(
+                                        intent,
+                                        consumed_approval,
+                                    ) {
+                                        Ok(authority) => authority,
+                                        Err(error) => {
+                                            eprintln!(
+                                                "nixward-daemon: approved action could not be promoted to execution authority: {error}"
+                                            );
+                                            self.pending_action = None;
+                                            self.pending_action_intent_digest = None;
+                                            return (
+                                                dynamic_threshold,
+                                                Some(best_action.expected_free_energy),
+                                            );
+                                        }
+                                    };
 
                                 eprintln!(
                                     "nixward-daemon: Watchdog APPROVED action: {}{}",
@@ -1475,17 +1543,11 @@ impl DaemonState {
                                 .expect("Failed to build executor runtime");
                             rt.block_on(async {
                                 let mut executor = NixOSExecutor::new();
-                                // By the time we reach this point, `cmd` has already
-                                // cleared the real safety gate above (lines ~997-1074):
-                                // ReadOnly commands skip approval entirely (safe by
-                                // design), and every modifying command required an
-                                // explicit human "Approved" verdict via the TUI
-                                // watchdog (`is_approved`, one-shot-consumed). Calling
-                                // `execute()` with a hardcoded `phi` here would just be
-                                // re-litigating an already-satisfied gate with a fake
-                                // number — `execute_confirmed` says what actually
-                                // happened: this command was already confirmed.
-                                let result = executor.execute_confirmed(cmd, 1.0).await;
+                                // The daemon gate has consumed an exact local approval
+                                // and promoted it to a live execution-authority object.
+                                // execute_authorized verifies the exact command identity
+                                // and consumes that authority object by value.
+                                let result = executor.execute_authorized(cmd, execution_authority).await;
                                 eprintln!("nixward-daemon: Active healing execution finished. Result: {:?}", result);
                             });
                         });
