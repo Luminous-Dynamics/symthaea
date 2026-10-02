@@ -166,11 +166,13 @@ async function runBrowser({ name, args, requireWebGpu, requireFallback }) {
         { timeout: 15000 },
       );
       await waitVisible(page, '#canvas2d-movie-fallback');
+      await waitVisible(page, '#svg-cognitive-fallback');
       if (await visible(page, '#webgpu-movie-canvas')) {
         throw new Error('WebGPU movie canvas is visible during forced fallback');
       }
       result.fallback = await page.evaluate(() => ({
         cognitive_webgpu_hidden: getComputedStyle(document.querySelector('#webgpu-cognitive-canvas')).display === 'none',
+        cognitive_svg_visible: getComputedStyle(document.querySelector('#svg-cognitive-fallback')).display !== 'none',
         movie_webgpu_hidden: getComputedStyle(document.querySelector('#webgpu-movie-canvas')).display === 'none',
         movie_canvas2d_visible: getComputedStyle(document.querySelector('#canvas2d-movie-fallback')).display !== 'none',
       }));
