@@ -138,6 +138,48 @@ pub struct ExecutionLineageV1 {
 impl ExecutionLineageV1 {
     pub const DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:execution-lineage:v1\n";
 
+    /// Validate semantic identifiers before a lineage is admitted.
+    ///
+    /// Digest values may be bare hexadecimal or explicitly prefixed
+    /// (for example, "sha256:..." or "blake3:..."). Named collections are
+    /// represented by BTreeMaps, so duplicate names cannot survive the typed
+    /// representation; untrusted list inputs should reject duplicates before
+    /// constructing the map.
+    pub fn validate(&self) -> Result<(), String> {
+        for (name, value) in self.lock_digests.iter().chain(self.immutable_input_digests.iter()) {
+            validate_name(name)?;
+            validate_digest(value)?;
+        }
+        for (name, value) in &self.toolchain_versions {
+            validate_name(name)?;
+            if value.trim().is_empty() {
+                return Err(format!("empty toolchain version for {name}"));
+            }
+        }
+        for (name, value) in &self.allowed_env {
+            validate_name(name)?;
+            if value.contains('\0') {
+                return Err(format!("NUL in environment value for {name}"));
+            }
+        }
+        for (name, value) in [
+            ("source_repository", self.source_repository.as_str()),
+            ("source_revision", self.source_revision.as_str()),
+            ("source_tree", self.source_tree.as_str()),
+            ("host_target", self.host_target.as_str()),
+            ("nix_identity", self.nix_identity.as_str()),
+            ("cwd", self.cwd.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                return Err(format!("empty lineage field {name}"));
+            }
+        }
+        if self.argv.iter().any(|arg| arg.contains('\0')) {
+            return Err("NUL in argv".into());
+        }
+        Ok(())
+    }
+
     pub fn digest(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(Self::DOMAIN_SEPARATOR);
@@ -159,6 +201,22 @@ impl ExecutionLineageV1 {
         append_map(hasher, "allowed_env", &self.allowed_env);
         append_map(hasher, "immutable_input_digests", &self.immutable_input_digests);
     }
+}
+
+fn validate_name(name: &str) -> Result<(), String> {
+    if name.trim().is_empty() || name.chars().any(|c| c == '\0' || c.is_control()) {
+        Err(format!("invalid empty/control identifier: {name:?}"))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_digest(value: &str) -> Result<(), String> {
+    let payload = value.split_once(':').map_or(value, |(_, payload)| payload);
+    if payload.len() < 16 || payload.len() % 2 != 0 || !payload.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(format!("invalid digest syntax: {value:?}"));
+    }
+    Ok(())
 }
 
 fn append_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
@@ -568,6 +626,25 @@ mod tests {
         b.lock_digests.insert("a".into(), "1".into());
         b.lock_digests.insert("z".into(), "2".into());
         assert_eq!(a.digest(), b.digest());
+    }
+
+    #[test]
+    fn execution_lineage_validation_rejects_invalid_digest() {
+        let mut lineage = lineage_fixture();
+        lineage.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
+        assert!(lineage.validate().is_err());
+    }
+
+    #[test]
+    fn execution_lineage_validation_accepts_prefixed_digest() {
+        let lineage = lineage_fixture();
+        assert!(lineage.validate().is_ok());
+        let mut prefixed = lineage.clone();
+        prefixed.immutable_input_digests.insert(
+            "other.bin".into(),
+            "sha256:0123456789abcdef0123456789abcdef".into(),
+        );
+        assert!(prefixed.validate().is_ok());
     }
 
     #[test]
