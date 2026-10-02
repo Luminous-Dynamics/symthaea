@@ -533,9 +533,17 @@ mod tests {
     use base64::Engine as _;
 
     fn movie_json(width: u64, height: u64, channels: u64, frames: usize) -> Value {
-        let px = width.checked_mul(height).unwrap_or(0) as usize;
-        let bytes_per_pixel = channels as usize;
-        let raw = vec![7_u8; px.saturating_mul(bytes_per_pixel)];
+        // Keep malformed-dimension fixtures tiny: the parser must reject them
+        // before any payload-sized allocation becomes possible.
+        let raw_len = if width <= 64 && height <= 64 {
+            width
+                .checked_mul(height)
+                .and_then(|px| px.checked_mul(channels))
+                .unwrap_or(0) as usize
+        } else {
+            0
+        };
+        let raw = vec![7_u8; raw_len];
         let encoded = base64::engine::general_purpose::STANDARD.encode(raw);
         serde_json::json!({
             "mental_movie": {
