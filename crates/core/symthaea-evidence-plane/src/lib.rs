@@ -417,6 +417,16 @@ impl ExecutionLineageV1 {
         Ok(hasher.finalize().to_hex().to_string())
     }
 
+    /// Compute the lineage commitment after validating the complete input set.
+    ///
+    /// This is the preferred boundary for callers admitting untrusted or
+    /// externally deserialized lineage data. The infallible digest method
+    /// remains available for compatibility with already-validated callers.
+    pub fn validated_digest(&self) -> Result<String, String> {
+        self.validate()?;
+        Ok(self.digest())
+    }
+
     pub fn digest(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(Self::DOMAIN_SEPARATOR);
@@ -495,7 +505,8 @@ impl ExecutionLineageV1 {
 /// the evidence-plane contract and downstream R4.5 work.
 pub mod execution_lineage {
     pub use super::{
-        qualify_lineage_perturbation, EvidenceLineageCommitError, EvidenceLineageDecision,
+        qualify_lineage_perturbation, try_qualify_lineage_perturbation, EvidenceLineageCommitError,
+        EvidenceLineageDecision,
         ExecutionLineageDriftFieldV1, ExecutionLineageDriftV1, EvidenceLineageGuardV1,
         ExecutionLineageV1, LineagePerturbationResult, RepositorySourceSnapshotId,
     };
@@ -790,8 +801,8 @@ impl ExecutionLineageDriftV1 {
         prepared.validate()?;
         observed.validate()?;
 
-        let prepared_digest = prepared.digest();
-        let observed_digest = observed.digest();
+        let prepared_digest = prepared.validated_digest()?;
+        let observed_digest = observed.validated_digest()?;
         if prepared_digest == observed_digest {
             return Ok(None);
         }
@@ -895,9 +906,9 @@ impl EvidenceLineageGuardV1 {
     /// Preparation is intentionally fallible so invalid lineage cannot reach
     /// the guard through a panic-based admission path.
     pub fn prepare(lineage: &ExecutionLineageV1) -> Result<Self, String> {
-        lineage.validate()?;
+        let prepared_digest = lineage.validated_digest()?;
         Ok(Self {
-            prepared_digest: lineage.digest(),
+            prepared_digest,
             evidence_committed: false,
         })
     }
@@ -955,6 +966,21 @@ pub enum LineagePerturbationResult {
     UnexpectedCollateralChange,
     /// A declared dependency changed but the lineage stayed stable.
     UnexpectedInvariance,
+}
+
+/// Validate both lineage subjects before classifying a declared perturbation.
+pub fn try_qualify_lineage_perturbation(
+    before: &ExecutionLineageV1,
+    after: &ExecutionLineageV1,
+    dependency_changed: bool,
+) -> Result<LineagePerturbationResult, String> {
+    let changed = before.validated_digest()? != after.validated_digest()?;
+    Ok(match (dependency_changed, changed) {
+        (false, false) => LineagePerturbationResult::InvariantPreserved,
+        (true, true) => LineagePerturbationResult::ExpectedDependencyChanged,
+        (false, true) => LineagePerturbationResult::UnexpectedCollateralChange,
+        (true, false) => LineagePerturbationResult::UnexpectedInvariance,
+    })
 }
 
 pub fn qualify_lineage_perturbation(
@@ -1211,6 +1237,41 @@ mod tests {
 
     /// Reproduces `TemporalStateMode::HdcLtc`'s requirement: the active
     /// mechanism's predict counter must be positive. A passing case.
+
+    #[test]
+    fn validated_digest_rejects_invalid_direct_construction() {
+        let mut lineage = valid_lineage();
+        lineage.argv.clear();
+
+        let error = lineage
+            .validated_digest()
+            .expect_err("invalid lineage must not admit a validated digest");
+        assert!(error.contains("empty lineage argv"));
+    }
+
+    #[test]
+    fn checked_perturbation_qualifier_rejects_invalid_lineages() {
+        let before = valid_lineage();
+        let mut after = before.clone();
+        after.argv.clear();
+
+        let error = try_qualify_lineage_perturbation(&before, &after, false)
+            .expect_err("invalid perturbation subjects must fail validation");
+        assert!(error.contains("empty lineage argv"));
+    }
+
+    #[test]
+    fn checked_perturbation_qualifier_preserves_four_way_classification() {
+        let before = valid_lineage();
+        let mut after = before.clone();
+        after.target_triple = "aarch64-unknown-linux-gnu".into();
+
+        assert_eq!(
+            try_qualify_lineage_perturbation(&before, &after, false)
+                .expect("valid lineages classify successfully"),
+            LineagePerturbationResult::UnexpectedCollateralChange
+        );
+    }
 
     #[test]
     fn raw_named_entries_reject_duplicate_map_keys_before_canonicalization() {
