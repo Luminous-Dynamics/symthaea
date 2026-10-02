@@ -748,8 +748,14 @@ impl Ed25519ReceiptVerifier {
                 );
             }
         };
+        let resolution_snapshot_fingerprint = resolved.snapshot_fingerprint();
+        let with_resolution_fingerprint = |mut report: ReceiptAttestationVerificationReport| {
+            report.resolution_snapshot_fingerprint = Some(resolution_snapshot_fingerprint.clone());
+            report
+        };
+
         if resolved.verification_method != method {
-            return ReceiptAttestationVerificationReport::failed(
+            return with_resolution_fingerprint(ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
@@ -757,10 +763,9 @@ impl Ed25519ReceiptVerifier {
                     self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
-            );
+            ));
         }
-        let resolution_snapshot_fingerprint = resolved.snapshot_fingerprint();
-        let with_resolution_fingerprint = |mut report: ReceiptAttestationVerificationReport| {
+
             report.resolution_snapshot_fingerprint = Some(resolution_snapshot_fingerprint.clone());
             report
         };
