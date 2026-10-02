@@ -53,18 +53,22 @@ jobs:
           components: rustfmt,clippy
 
       - name: Focused formatting
+        id: format
         run: |
           rustfmt --check --edition 2024 \
             crates/core/symthaea-core/src/hdc/linear_code.rs \
             crates/core/symthaea-core/tests/linear_code_ambiguity.rs
 
       - name: Linear-code unit tests
+        id: unit_tests
         run: cargo test -p symthaea-core --lib linear_code
 
       - name: Linear-code ambiguity integration test
+        id: integration_tests
         run: cargo test -p symthaea-core --test linear_code_ambiguity
 
       - name: Strict Clippy
+        id: clippy
         run: cargo clippy -p symthaea-core --lib --features simd -- -D warnings
 
       - name: Emit qualification receipt
@@ -82,6 +86,12 @@ jobs:
           decoder_oracle=exhaustive-bounded-distance
           decoder_oracle_is_production=false
           production_default_changed=false
+          qualification_status=${{ steps.format.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          focused_formatting=${{ steps.format.outcome }}
+          linear_code_unit_tests=${{ steps.unit_tests.outcome }}
+          ambiguity_integration_test=${{ steps.integration_tests.outcome }}
+          strict_clippy=${{ steps.clippy.outcome }}
+          receipt_semantics=descriptive-only
           EOF
 
       - name: Upload qualification receipt
