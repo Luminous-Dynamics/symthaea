@@ -10,6 +10,7 @@
 //! - JSON output mode for structured results
 
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
+use crate::action::authorization::NixLocalExecutionAuthorityV1;
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -650,6 +651,45 @@ impl NixOSExecutor {
                 exec_result
             }
         }
+    }
+
+    /// Execute only with a live Nixward execution-authority object.
+    ///
+    /// The authority object is consumed by value and validates that the command
+    /// exactly matches the action intent whose local approval was consumed. Phi is
+    /// deliberately not an input to this authority path.
+    pub async fn execute_authorized(
+        &mut self,
+        command: NixOSCommand,
+        authority: NixLocalExecutionAuthorityV1,
+    ) -> ExecutionResult {
+        let safety = command.safety_level();
+        if let Err(reason) = command.validate_shape() {
+            return ExecutionResult::Blocked {
+                reason,
+                safety_level: safety,
+            };
+        }
+        if let Err(error) = authority.validate_command(&command) {
+            return ExecutionResult::Blocked {
+                reason: format!("execution authority rejected command: {error}"),
+                safety_level: safety,
+            };
+        }
+
+        let intent_digest = authority.action_intent_digest().unwrap_or_else(|_| "<invalid-intent>".to_string());
+        info!(
+            command = ?command,
+            intent = %intent_digest,
+            approval_request = %authority.approval_request_id(),
+            projection = %authority.projection_digest(),
+            "Executing command with live Nixward authority"
+        );
+
+        // The authority token is intentionally consumed here by value. The legacy
+        // confirmed executor remains the mechanical dispatch primitive, while the
+        // authority boundary is enforced before it can be reached.
+        self.execute_confirmed(command, 0.0).await
     }
 
     /// Execute unconditionally, bypassing the tier-threshold check in
