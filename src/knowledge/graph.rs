@@ -643,7 +643,13 @@ impl EnhancedKnowledgeGraph {
 
     /// Iterate over all stored facts.
     pub fn all_facts(&self) -> impl Iterator<Item = &TemporalFact> {
-        self.facts.values()
+        let mut facts: Vec<&TemporalFact> = self.facts.values().collect();
+        facts.sort_by(|a, b| {
+            a.memory_id
+                .cmp(&b.memory_id)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        facts.into_iter()
     }
 
     /// Get per-domain distribution: (domain_name, avg_confidence, fact_count).
