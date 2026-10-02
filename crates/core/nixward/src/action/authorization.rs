@@ -865,6 +865,42 @@ mod tests {
     }
 
     #[test]
+    fn typed_service_identity_is_operation_and_unit_sensitive() {
+        let restart = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".to_string()),
+            &NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                unit: "nginx.service".to_string(),
+            },
+        )
+        .unwrap();
+
+        let enable = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".to_string()),
+            &NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Enable,
+                unit: "nginx.service".to_string(),
+            },
+        )
+        .unwrap();
+
+        let postgres = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".to_string()),
+            &NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                unit: "postgresql.service".to_string(),
+            },
+        )
+        .unwrap();
+
+        assert_ne!(restart.digest().unwrap(), enable.digest().unwrap());
+        assert_ne!(restart.digest().unwrap(), postgres.digest().unwrap());
+    }
+
+    #[test]
     fn invalid_typed_service_cannot_enter_governed_v1() {
         let command = NixOSCommand::Service {
             operation: NixServiceOperationKindV1::Restart,
