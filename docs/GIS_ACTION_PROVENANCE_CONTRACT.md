@@ -105,3 +105,17 @@ The current module includes focused tests for high-risk gating, ontology-only ty
 Recent work independently converges on several of these separations. Typed provenance research distinguishes stored material from supported claims and uses protected decision witnesses. Recent agent-authorization work separates per-action authorization from standing capability and mutable runtime state. Work on tool-using agents likewise separates action induction from execution authorization and warns against promoting historical context into current authority.
 
 GIS should therefore treat action provenance as a dependency-bearing temporal contract, not another scalar confidence score.
+
+### Authorization witness binding
+
+Current support is necessary but not sufficient for an effectful authorization. The authorization witness must also bind the decision to the exact action identity/digest, current frame, support assessment digest, policy identity, and issuance state. A support assessment that was valid for one action must not be reusable as permission for another action merely because the underlying conclusions are unchanged.
+
+The intended temporal boundary is therefore:
+
+    Support Assessment
+      ↓ exact-action + frame + policy binding
+    Authorization Witness
+      ↓ enforcement
+    Execution Receipt
+
+This follows the broader evidence/authorization separation seen in recent agent-security work: authorization evidence should be request-specific, and execution evidence should remain a separate record of what actually happened. citeturn0search0turn0search5
