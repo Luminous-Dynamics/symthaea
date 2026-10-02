@@ -433,11 +433,12 @@ mod tests {
             .with_child(gradient)
             .with_child(rect);
         let wire = RemoteScene::from_scene(&root);
+        assert_eq!(wire.root.children.len(), 1);
         match &wire.root.children[0].primitive {
-            WirePrimitive::Group => {}
-            _ => panic!("expected root group child"),
+            WirePrimitive::Rect { .. } => {}
+            _ => panic!("expected rectangle child"),
         }
-        match &wire.root.children[1].style.fill {
+        match &wire.root.children[0].style.fill {
             Some(color) => assert_eq!(*color, Color::rgb(0.1, 0.2, 0.3)),
             None => panic!("gradient fill was not flattened"),
         }
