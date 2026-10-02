@@ -159,19 +159,21 @@ The literature supports treating this as a distinct recovery family. Raviv repor
 
 ## Stage-C algebraic kernel status
 
-The research-only GF(2) kernel now has a clean two-factor and generalized independent-F recovery path.
+The research-only GF(2) kernel now has both a general representative-recovery path and a stricter independent-factor path.
 
 Implemented:
 
 - solve_linear_combination performs packed-u64 Gaussian elimination over GF(2).
-- recover_direct_sum_bound is the two-factor specialization.
-- recover_independent_bound generalizes the same construction to F factor codebooks when the concatenated generator bases are jointly independent.
-- The API preserves factor order and rejects dimension mismatch or overlapping/dependent factor bases rather than implying uniqueness where the algebra does not provide it.
+- recover_linear_bound follows Raviv's Theorem 2 construction: it forms a maximal linearly independent subset of the union of factor generator bases, solves the resulting system, and deterministically assigns retained generators to their first owning factor.
+- recover_direct_sum_bound is the two-factor specialization for structurally disjoint subcodes.
+- recover_independent_bound generalizes direct-sum recovery to F factor codebooks when the concatenated generator bases are jointly independent.
+- The general API preserves factor order and returns a valid representative factorization without labeling it unique.
+- The independent API remains fail-closed on overlapping/dependent factors when a uniqueness-guaranteed decomposition is required.
 - The existing exhaustive two-factor oracle remains the ground truth.
-- A new three-factor parent-basis-partition fixture validates exact recovery against exhaustive truth.
-- An overlap fixture explicitly verifies the conservative rejection path.
+- A three-factor parent-basis-partition fixture validates exact recovery against exhaustive truth.
+- An overlap fixture now validates that representative recovery works while exhaustive enumeration demonstrates multiple valid decompositions.
 
-This is intentionally narrower than the fully general overlapping-code version of Raviv's Theorem 2. The paper's theorem constructs a maximal linearly independent subset of the union of the participating generator bases and solves the resulting GF(2) system. When the union is already independent, the maximal subset is simply the full union, which is the case implemented here. The paper also notes that overlapping factor subcodes can make recovery non-unique, so the current API does not convert that case into a false uniqueness guarantee.
+This now matches the scope of Raviv's Theorem 2 more closely: the theorem constructs a maximal linearly independent subset of the union of the participating generator bases and then solves a GF(2) system. The theorem also explicitly notes that factorization need not be unique for overlapping subcodes. The comparator therefore distinguishes **existence/representative recovery** from **global uniqueness**, rather than treating overlap as either impossible or uniquely solvable.
 
 ### Primary-text verification
 
