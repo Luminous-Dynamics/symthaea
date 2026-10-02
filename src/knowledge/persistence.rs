@@ -948,6 +948,99 @@ mod tests {
     }
 
     #[test]
+    fn test_save_snapshot_rolls_back_prior_writes_on_sql_failure() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_atomic_sql_failure_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id TEXT UNIQUE,
+                    canonical_identity TEXT,
+                    provenance_family TEXT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                CREATE TABLE knowledge_causal_edges (
+                    cause TEXT NOT NULL,
+                    effect TEXT NOT NULL,
+                    strength REAL NOT NULL,
+                    is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                    cycle INTEGER NOT NULL,
+                    PRIMARY KEY (cause, effect)
+                );
+                CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT NOT NULL
+                );",
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let fact = FactRecord {
+            memory_id: "fact-before-failure".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; BinaryHV::BYTES],
+            source_text: "must rollback".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        let ontology = OntologyRecord {
+            name: "fails-at-constraint".into(),
+            vector_bytes: vec![0u8; BinaryHV::BYTES],
+            usage_count: 1,
+            utility: 0.5,
+            created_at_cycle: 1,
+            last_used_cycle: 1,
+            is_a_parent: None,
+        };
+
+        let err = p
+            .save_snapshot(&[fact], &[], &[], &[ontology])
+            .unwrap_err();
+        assert!(err.contains("Snapshot ontology"));
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let fact_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM knowledge_facts", [], |row| row.get(0))
+            .unwrap();
+        let ontology_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM knowledge_ontology", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(fact_count, 0);
+        assert_eq!(ontology_count, 0);
+        assert_eq!(p.total_saved(), 0);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_save_snapshot_is_atomic_on_preflight_failure() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_snapshot_atomic_preflight_test_{}",
