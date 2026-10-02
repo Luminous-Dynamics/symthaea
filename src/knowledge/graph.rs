@@ -1336,6 +1336,31 @@ mod tests {
     }
 
     #[test]
+    fn test_all_facts_enumeration_is_stable_by_memory_identity() {
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        for memory_id in ["memory-z", "memory-a", "memory-m"] {
+            let encoding = make_encoding(memory_id, 0.8);
+            graph.import_fact_record(&super::super::persistence::FactRecord {
+                memory_id: memory_id.into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: encoding.vector.0.to_vec(),
+                source_text: memory_id.into(),
+                confidence: 0.8,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            });
+        }
+
+        let ids = graph
+            .all_facts()
+            .map(|fact| fact.memory_id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["memory-a", "memory-m", "memory-z"]);
+    }
+
+    #[test]
     fn test_graph_search_and_export_have_stable_tie_order() {
         let mut graph = EnhancedKnowledgeGraph::new(10);
         let vector = make_encoding("same-vector", 0.8).vector;
