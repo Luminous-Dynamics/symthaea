@@ -134,3 +134,14 @@ This boundary also keeps execution evidence non-authorizing: an ExecutionReceipt
 
 
 This follows the broader evidence/authorization separation seen in recent agent-security work: authorization evidence should be request-specific, and execution evidence should remain a separate record of what actually happened.
+
+
+## Canonical action identity and effect-boundary fencing
+
+Authorization must bind to a digest derived from the immutable executable action contract, not to an arbitrary caller-supplied digest string. GIS now derives a domain-separated SHA-256 action digest from the action ID, description, risk tier, and canonicalized typed dependencies. Lifecycle/history fields are deliberately excluded so recording execution does not mutate the identity of the action being authorized.
+
+Changing any executable action field changes the digest and invalidates the prior authorization witness. Reordering semantic dependencies does not change the digest. This makes action mutation an explicit authorization boundary rather than an implicit caller obligation.
+
+Revocation and expiry are also fenced at the effect boundary. A lease in Ready may be revoked or expired; a lease already Prepared cannot be silently converted to a terminal cancellation state. If an attempt has crossed far enough that its effect is uncertain, the lease must enter Indeterminate and be reconciled. This prevents a control-plane revocation from falsely asserting that no effect could have occurred.
+
+These rules align with current agent-authorization research: exact action hashing, a shared authorization instance/consumption key, terminal state transitions, and durable atomic consumption are being treated as distinct requirements rather than properties of a signed token alone. The relevant IETF work is still an Internet-Draft, not a final standard.
