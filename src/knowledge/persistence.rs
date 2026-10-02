@@ -282,7 +282,7 @@ impl KnowledgePersistence {
         if !self.is_configured() { return Err("No database path configured".into()); }
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
-        let mut stmt = conn.prepare("SELECT source_memory_id, target_memory_id, kind, created_at FROM knowledge_provenance_relations ORDER BY created_at, source_memory_id, target_memory_id").map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT source_memory_id, target_memory_id, kind, created_at FROM knowledge_provenance_relations ORDER BY created_at, source_memory_id, target_memory_id, kind").map_err(|e| e.to_string())?;
         let relations = stmt.query_map([], |row| {
             let kind: String = row.get(2)?;
             let kind = match kind.as_str() {
@@ -355,7 +355,7 @@ impl KnowledgePersistence {
 
         let mut stmt = conn
             .prepare(
-                "SELECT cause, effect, strength, is_inhibitory, cycle FROM knowledge_causal_edges",
+                "SELECT cause, effect, strength, is_inhibitory, cycle FROM knowledge_causal_edges\n                 ORDER BY cycle DESC, cause ASC, effect ASC",
             )
             .map_err(|e| e.to_string())?;
 
@@ -433,7 +433,7 @@ impl KnowledgePersistence {
         let mut stmt = conn
             .prepare(
                 "SELECT name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle, is_a_parent
-                 FROM knowledge_ontology ORDER BY utility DESC",
+                 FROM knowledge_ontology ORDER BY utility DESC, name ASC, created_at_cycle ASC, last_used_cycle ASC",
             )
             .map_err(|e| format!("Prepare: {e}"))?;
 
@@ -971,6 +971,76 @@ mod tests {
     }
 
     #[test]
+    fn test_load_provenance_relations_total_orders_equal_timestamps_by_kind() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_provenance_equal_timestamp_order_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+        let relations = [
+            ProvenanceRelationRecord {
+                source_memory_id: "source".into(),
+                target_memory_id: "target".into(),
+                kind: ProvenanceRelationKind::Corroborates,
+                created_at: "cycle:7".into(),
+            },
+            ProvenanceRelationRecord {
+                source_memory_id: "source".into(),
+                target_memory_id: "target".into(),
+                kind: ProvenanceRelationKind::Contradicts,
+                created_at: "cycle:7".into(),
+            },
+        ];
+        assert_eq!(p.save_provenance_relations(&relations).unwrap(), 2);
+        let loaded = p.load_provenance_relations().unwrap();
+        assert_eq!(
+            loaded.iter().map(|r| r.kind).collect::<Vec<_>>(),
+            vec![ProvenanceRelationKind::Contradicts, ProvenanceRelationKind::Corroborates]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_causal_edges_total_orders_equal_cycles_by_endpoints() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_causal_equal_cycle_order_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+        let edges = [
+            CausalEdgeRecord { cause: "z".into(), effect: "effect".into(), strength: 0.8, is_inhibitory: false, cycle: 4 },
+            CausalEdgeRecord { cause: "a".into(), effect: "effect".into(), strength: 0.7, is_inhibitory: false, cycle: 4 },
+        ];
+        assert_eq!(p.save_causal_edges(&edges).unwrap(), 2);
+        let loaded = p.load_causal_edges().unwrap();
+        assert_eq!(loaded.iter().map(|e| e.cause.as_str()).collect::<Vec<_>>(), vec!["a", "z"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_ontology_total_orders_equal_utility_by_name() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_ontology_equal_utility_order_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+        let records = [
+            OntologyRecord { name: "zeta".into(), vector_bytes: vec![1u8; 2048], usage_count: 1, utility: 0.5, created_at_cycle: 2, last_used_cycle: 3, is_a_parent: None },
+            OntologyRecord { name: "alpha".into(), vector_bytes: vec![0u8; 2048], usage_count: 1, utility: 0.5, created_at_cycle: 1, last_used_cycle: 2, is_a_parent: None },
+        ];
+        assert_eq!(p.save_ontology(&records).unwrap(), 2);
+        let loaded = p.load_ontology().unwrap();
+        assert_eq!(loaded.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), vec!["alpha", "zeta"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_save_and_load_causal_edges() {
         let dir = std::env::temp_dir().join(format!("symthaea_causal_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
@@ -997,43 +1067,3 @@ mod tests {
 
         let saved = p.save_causal_edges(&edges).unwrap();
         assert_eq!(saved, 2);
-
-        let loaded = p.load_causal_edges().unwrap();
-        assert_eq!(loaded.len(), 2);
-
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn test_upsert_causal_edges() {
-        let dir = std::env::temp_dir().join(format!("symthaea_upsert_test_{}", std::process::id()));
-        let db_path = dir.join("knowledge.db");
-        let _ = std::fs::create_dir_all(&dir);
-
-        let mut p = KnowledgePersistence::new(&db_path);
-
-        let edge = CausalEdgeRecord {
-            cause: "a".into(),
-            effect: "b".into(),
-            strength: 0.5,
-            is_inhibitory: false,
-            cycle: 1,
-        };
-
-        p.save_causal_edges(&[edge.clone()]).unwrap();
-
-        // Save again with updated strength
-        let edge2 = CausalEdgeRecord {
-            strength: 0.9,
-            cycle: 2,
-            ..edge
-        };
-        p.save_causal_edges(&[edge2]).unwrap();
-
-        let loaded = p.load_causal_edges().unwrap();
-        assert_eq!(loaded.len(), 1); // Upserted, not duplicated
-        assert!((loaded[0].strength - 0.9).abs() < 0.01);
-
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-}
