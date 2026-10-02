@@ -623,6 +623,45 @@ fn svg_transform_is_bounded(value: &str) -> bool {
     transform_count > 0
 }
 
+fn svg_color_is_bounded(value: &str) -> bool {
+    if value == "none" {
+        return true;
+    }
+
+    if value.starts_with('#')
+        && (value.len() == 4 || value.len() == 7)
+        && value[1..].chars().all(|c| c.is_ascii_hexdigit())
+    {
+        return true;
+    }
+
+    let Some(args) = value.strip_prefix("rgba(").and_then(|rest| rest.strip_suffix(')')) else {
+        return false;
+    };
+    let components = args.split(',').map(str::trim).collect::<Vec<_>>();
+    if components.len() != 4 {
+        return false;
+    }
+
+    let rgb_ok = components[..3].iter().all(|component| {
+        !component.is_empty()
+            && component.len() <= 3
+            && component.chars().all(|c| c.is_ascii_digit())
+            && component
+                .parse::<u16>()
+                .map(|value| value <= 255)
+                .unwrap_or(false)
+    });
+    let alpha_ok = !components[3].is_empty()
+        && components[3].len() <= 32
+        && components[3]
+            .parse::<f64>()
+            .map(|value| value.is_finite() && (0.0..=1.0).contains(&value))
+            .unwrap_or(false);
+
+    rgb_ok && alpha_ok
+}
+
 /// Extract the live cognitive self-portrait SVG as an image data URL.
 ///
 /// The gateway payload is remote data. Rendering it through an image element keeps
@@ -858,16 +897,7 @@ fn portrait_from_json(v: &Value) -> Option<String> {
                     }
                 }
                 "fill" | "stroke" => {
-                    let safe_color = value == "none"
-                        || (value.starts_with('#')
-                            && (value.len() == 4 || value.len() == 7)
-                            && value[1..].chars().all(|c| c.is_ascii_hexdigit()))
-                        || (value.starts_with("rgba(")
-                            && value.ends_with(')')
-                            && value[5..value.len() - 1]
-                                .chars()
-                                .all(|c| c.is_ascii_digit() || matches!(c, ',' | '.' | ' ')));
-                    if !safe_color {
+                    if !svg_color_is_bounded(value) {
                         return None;
                     }
                 }
@@ -1857,6 +1887,140 @@ mod tests {
                 "accepted: {svg}"
             );
         }
+    }
+
+    #[test]
+    fn portrait_enforces_canonical_color_grammar() {
+        for svg in [
+            r#"<svg><circle fill="rgba(256,0,0,0.5)" r="1"/></svg>"#,
+            r#"<svg><circle fill="rgba(1,2,3,1.5)" r="1"/></svg>"#,
+            r#"<svg><circle fill="rgba(1,2,3)" r="1"/></svg>"#,
+            r#"<svg><circle fill="rgba(1 2 3 0.5)" r="1"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(),
+                "accepted: {svg}"
+            );
+        }
+
+        for svg in [
+            r#"<svg><circle fill="#abc" r="1"/></svg>"#,
+            r#"<svg><circle fill="#aabbcc" stroke="rgba(12,34,56,0.25)" r="1"/></svg>"#,
+            r#"<svg><circle fill="none" r="1"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_some(),
+                "rejected: {svg}"
+            );
+        }
+    }
+
+    #[test]
+    fn remote_canvas_renderer_output_is_accepted_by_hostile_boundary() {
+        use symthaea_canvas::color::Color;
+        use symthaea_canvas::scene_graph::{
+            FilterType, GradientStop, NodeKind, SceneNode, Style, Transform,
+        };
+        use symthaea_canvas::svg_renderer::render_svg_for_remote_projection;
+
+        let gradient = SceneNode {
+            kind: NodeKind::RadialGradient {
+                id: "grad".into(),
+                stops: vec![GradientStop {
+                    offset: 0.0,
+                    color: Color::rgba(0.2, 0.4, 0.8, 0.75),
+                }],
+            },
+            transform: Transform::identity(),
+            style: Style::default(),
+            children: Vec::new(),
+        };
+        let filter = SceneNode {
+            kind: NodeKind::Filter {
+                id: "blur".into(),
+                filter_type: FilterType::Blur { std_dev: 12.0 },
+            },
+            transform: Transform::identity(),
+            style: Style::default(),
+            children: Vec::new(),
+        };
+        let use_filter = SceneNode {
+            kind: NodeKind::UseFilter {
+                filter_id: "blur".into(),
+            },
+            transform: Transform::identity(),
+            style: Style::default(),
+            children: Vec::new(),
+        };
+
+        let child_style = Style {
+            fill: Some(Color::rgba(0.1, 0.2, 0.3, 0.5)),
+            stroke: Some(Color::rgb(0.9, 0.8, 0.7)),
+            stroke_width: Some(2.0),
+            opacity: Some(0.8),
+            filter: Some("blur".into()),
+            ..Style::default()
+        };
+
+        let root = SceneNode::group(Some("root"))
+            .with_child(gradient)
+            .with_child(filter)
+            .with_child(use_filter)
+            .with_child(
+                SceneNode::circle(50.0, 50.0, 10.0)
+                    .with_style(child_style.clone())
+                    .with_transform(Transform {
+                        translate_x: 4.0,
+                        translate_y: -2.0,
+                        rotate_deg: 15.0,
+                        scale: 1.5,
+                    }),
+            )
+            .with_child(SceneNode::ellipse(100.0, 100.0, 20.0, 10.0))
+            .with_child(SceneNode::line(0.0, 0.0, 20.0, 30.0))
+            .with_child(SceneNode::polygon(
+                vec![(0.0, 0.0), (20.0, 0.0), (10.0, 20.0)],
+                true,
+            ))
+            .with_child(SceneNode::rect(5.0, 5.0, 15.0, 10.0))
+            .with_child(SceneNode::path(
+                "M 0 0 C 1 2 3 4 5 6 S 7 8 9 10 Q 11 12 13 14 T 15 16",
+            ))
+            .with_child(
+                SceneNode::path("M 10 10 A 4 4 0 0 1 18 18").with_style(Style {
+                    fill_url: Some("grad".into()),
+                    ..Style::default()
+                }),
+            );
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert!(!svg.contains("<radialGradient"));
+        assert!(!svg.contains("<filter"));
+        assert!(!svg.contains("<style"));
+        assert!(!svg.contains("url("));
+        assert!(svg.contains(r#"fill="rgba(51,102,204,0.75)""#));
+        assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_some());
+    }
+
+    #[test]
+    fn remote_canvas_renderer_drops_pathological_transforms_before_boundary() {
+        use symthaea_canvas::scene_graph::{SceneNode, Transform};
+        use symthaea_canvas::svg_renderer::render_svg_for_remote_projection;
+
+        let root = SceneNode::group(None)
+            .with_child(SceneNode::circle(1.0, 1.0, 1.0).with_transform(Transform {
+                scale: 9.0,
+                ..Transform::identity()
+            }))
+            .with_child(SceneNode::circle(2.0, 2.0, 1.0).with_transform(Transform {
+                translate_x: 1_000_001.0,
+                ..Transform::identity()
+            }));
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert!(!svg.contains(r#"scale(9.000)"#));
+        assert!(!svg.contains(r#"translate(1000001.0"#));
+        assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_some());
     }
 
     #[test]
