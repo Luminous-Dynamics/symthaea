@@ -1489,6 +1489,7 @@ mod tests {
         cbor_tag(&mut bytes,18); cbor_array_len(&mut bytes,4);
         cbor_bytes(&mut bytes,&protected); cbor_map_len(&mut bytes,2);
         cbor_int(&mut bytes,RFC9942_VDP_HEADER_LABEL); bytes.extend_from_slice(&vdp.to_cbor());
+        bytes.push(0x63); bytes.extend_from_slice(b"foo"); cbor_uint(&mut bytes,1);
         bytes.push(0xf6); cbor_bytes(&mut bytes,&[0xAA;64]);
         let decoded=Rfc9942ReceiptEnvelope::from_cbor(&bytes).unwrap();
         assert_eq!(decoded.algorithm_id(),-7); assert_eq!(decoded.vds_id(),1);
