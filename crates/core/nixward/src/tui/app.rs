@@ -133,6 +133,78 @@ pub struct App {
     mae_history: Vec<f64>,
 }
 
+#[cfg(target_os = "linux")]
+fn watchdog_v2_submission_for_snapshot(
+    snapshot: &DaemonSnapshot,
+    approved: bool,
+) -> Result<crate::action::LocalApprovalSubmissionV2, String> {
+    use crate::action::{
+        LocalApprovalDecisionKindV1, LocalApprovalSubmissionV2,
+        local_approval_socket::default_local_approval_runtime_dir_v1,
+        temporal::UnixMillisV1,
+    };
+
+    let request_id = snapshot
+        .pending_approval_request_id
+        .clone()
+        .ok_or_else(|| "pending approval request id is missing".to_string())?;
+    let daemon_incarnation_id = snapshot
+        .pending_approval_daemon_incarnation_ref
+        .clone()
+        .ok_or_else(|| "pending approval daemon incarnation is missing".to_string())?;
+    let action_intent_digest = snapshot
+        .pending_action_intent_digest
+        .clone()
+        .ok_or_else(|| "pending action intent digest is missing".to_string())?;
+    let projection_digest = snapshot
+        .pending_approval_projection_digest
+        .clone()
+        .ok_or_else(|| "pending approval projection digest is missing".to_string())?;
+
+    let decision = if approved {
+        LocalApprovalDecisionKindV1::Approved
+    } else {
+        LocalApprovalDecisionKindV1::Denied
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| "system clock is before Unix epoch".to_string())?;
+    let decided_at_unix_ms = now
+        .as_millis()
+        .try_into()
+        .map_err(|_| "system-clock milliseconds overflow u64".to_string())?;
+
+    let submission = LocalApprovalSubmissionV2 {
+        request_id,
+        daemon_incarnation_id,
+        action_intent_digest,
+        projection_digest,
+        decision,
+        decided_at_unix_ms: UnixMillisV1::new(decided_at_unix_ms).as_u64(),
+    };
+    let _runtime_dir = default_local_approval_runtime_dir_v1()
+        .map_err(|error| format!("cannot resolve local approval runtime directory: {error}"))?;
+    Ok(submission)
+}
+
+#[cfg(target_os = "linux")]
+fn submit_watchdog_v2_decision(
+    snapshot: &DaemonSnapshot,
+    approved: bool,
+) -> Result<crate::action::LocalApprovalAckV1, String> {
+    use crate::action::{
+        LocalApprovalAckV1,
+        LOCAL_APPROVAL_SOCKET_FILENAME_V1,
+        submit_local_approval_v2,
+    };
+    let submission = watchdog_v2_submission_for_snapshot(snapshot, approved)?;
+    let runtime_dir = crate::action::local_approval_socket::default_local_approval_runtime_dir_v1()
+        .map_err(|error| format!("cannot resolve local approval runtime directory: {error}"))?;
+    let socket_path = runtime_dir.join(LOCAL_APPROVAL_SOCKET_FILENAME_V1);
+    submit_local_approval_v2(&socket_path, &submission)
+        .map_err(|error| format!("local V2 approval submission failed: {error}"))
+}
+
 fn watchdog_verdict_for_snapshot(
     snapshot: &DaemonSnapshot,
     approved: bool,
@@ -233,40 +305,74 @@ impl App {
         if has_pending && (self.focus != FocusPanel::Input || self.input.is_empty()) {
             match key {
                 KeyCode::Char('a') | KeyCode::Char('A') => {
+                    let snapshot = self.daemon_snapshot.clone();
+                    #[cfg(target_os = "linux")]
+                    if snapshot
+                        .as_ref()
+                        .and_then(|snapshot| snapshot.pending_approval_request_id.as_ref())
+                        .is_some()
+                    {
+                        match submit_watchdog_v2_decision(
+                            snapshot.as_ref().expect("snapshot checked above"),
+                            true,
+                        ) {
+                            Ok(ack) => self.output.push(format!(
+                                "🧠 [Watchdog] Action APPROVED via protected V2 request {}.",
+                                ack.request_id
+                            )),
+                            Err(error) => self.output.push(format!(
+                                "🧠 [Watchdog] Approval NOT submitted: {}",
+                                error
+                            )),
+                        }
+                        self.refresh_data();
+                        return;
+                    }
+
                     let wd_path = self
                         .daemon_snapshot_path
                         .with_file_name("watchdog_verdict.txt");
-                    let verdict = self
-                        .daemon_snapshot
+                    let verdict = snapshot
                         .as_ref()
                         .map_or_else(|| "Approved".to_string(), |snapshot| watchdog_verdict_for_snapshot(snapshot, true));
                     let _ = std::fs::write(&wd_path, &verdict);
-                    self.output.push(match verdict.strip_prefix("Approved:") {
-                        Some(digest) => format!(
-                            "🧠 [Watchdog] Action APPROVED. Bound to intent {}. Sending to daemon...",
-                            digest
-                        ),
-                        None => "🧠 [Watchdog] Action APPROVED. Sending to daemon...".into(),
-                    });
+                    self.output.push("🧠 [Watchdog] Legacy action APPROVED.".into());
                     self.refresh_data();
                     return;
                 }
                 KeyCode::Char('v') | KeyCode::Char('V') => {
+                    let snapshot = self.daemon_snapshot.clone();
+                    #[cfg(target_os = "linux")]
+                    if snapshot
+                        .as_ref()
+                        .and_then(|snapshot| snapshot.pending_approval_request_id.as_ref())
+                        .is_some()
+                    {
+                        match submit_watchdog_v2_decision(
+                            snapshot.as_ref().expect("snapshot checked above"),
+                            false,
+                        ) {
+                            Ok(ack) => self.output.push(format!(
+                                "🧠 [Watchdog] Action VETOED via protected V2 request {}.",
+                                ack.request_id
+                            )),
+                            Err(error) => self.output.push(format!(
+                                "🧠 [Watchdog] Veto NOT submitted: {}",
+                                error
+                            )),
+                        }
+                        self.refresh_data();
+                        return;
+                    }
+
                     let wd_path = self
                         .daemon_snapshot_path
                         .with_file_name("watchdog_verdict.txt");
-                    let verdict = self
-                        .daemon_snapshot
+                    let verdict = snapshot
                         .as_ref()
                         .map_or_else(|| "Vetoed".to_string(), |snapshot| watchdog_verdict_for_snapshot(snapshot, false));
                     let _ = std::fs::write(&wd_path, &verdict);
-                    self.output.push(match verdict.strip_prefix("Vetoed:") {
-                        Some(digest) => format!(
-                            "🧠 [Watchdog] Action VETOED. Bound to intent {}. Notifying daemon...",
-                            digest
-                        ),
-                        None => "🧠 [Watchdog] Action VETOED. Notifying daemon...".into(),
-                    });
+                    self.output.push("🧠 [Watchdog] Legacy action VETOED.".into());
                     self.refresh_data();
                     return;
                 }
@@ -1112,6 +1218,29 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn watchdog_v2_submission_requires_full_binding() {
+        let mut snapshot = DaemonSnapshot::test_default();
+        snapshot.pending_action_intent_digest = Some("a".repeat(64));
+        snapshot.pending_approval_request_id = Some("b".repeat(64));
+        snapshot.pending_approval_daemon_incarnation_ref =
+            Some("nixward-daemon-incarnation-v1:".to_string() + &"c".repeat(64));
+        snapshot.pending_approval_projection_digest = Some("d".repeat(64));
+
+        let submission = watchdog_v2_submission_for_snapshot(&snapshot, true).unwrap();
+        assert_eq!(submission.request_id, "b".repeat(64));
+        assert_eq!(submission.action_intent_digest, "a".repeat(64));
+        assert_eq!(submission.projection_digest, "d".repeat(64));
+
+        snapshot.pending_approval_projection_digest = None;
+        assert!(
+            watchdog_v2_submission_for_snapshot(&snapshot, true)
+                .unwrap_err()
+                .contains("projection digest")
+        );
+    }
 
     #[test]
     fn watchdog_verdict_binds_typed_action_intent() {
