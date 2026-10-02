@@ -1103,36 +1103,94 @@ impl DaemonState {
                         let is_modifying = safety != SafetyLevel::ReadOnly;
 
                         if is_modifying {
-                            let is_approved = self
-                                .watchdog_status
+                            // Typed V1 actions are approved by exact semantic identity,
+                            // not by a reusable global approval bit. Bind approval to the
+                            // current pre-state generation when one is available.
+                            let pre_state_identity = self
+                                .prev_snapshot
                                 .as_ref()
-                                .map(|s| {
-                                    s.eq_ignore_ascii_case("approved")
-                                        || s.eq_ignore_ascii_case("a")
-                                        || s.eq_ignore_ascii_case("yes")
-                                })
-                                .unwrap_or(false);
+                                .and_then(|snapshot| snapshot.generation.map(|generation| format!("generation:{generation}")));
+                            let intent_digest = match action_intent_digest_for_command(
+                                pre_state_identity,
+                                &cmd,
+                            ) {
+                                Ok(digest) => digest,
+                                Err(error) => {
+                                    eprintln!(
+                                        "nixward-daemon: refusing modifying command that cannot enter governed action-intent V1: {error}"
+                                    );
+                                    self.watchdog_status = None;
+                                    self.pending_action = None;
+                                    self.pending_action_intent_digest = None;
+                                    return (
+                                        dynamic_threshold,
+                                        Some(best_action.expected_free_energy),
+                                    );
+                                }
+                            };
+
+                            let approved_digest = self
+                                .watchdog_status
+                                .as_deref()
+                                .and_then(approved_intent_digest);
+
+                            // Governed V1 commands require the digest-bearing approval
+                            // token produced by the TUI. Legacy Custom commands retain
+                            // their historical command-string gate until promoted.
+                            let is_approved = match intent_digest.as_deref() {
+                                Some(expected_digest) => {
+                                    approved_digest == Some(expected_digest)
+                                        && self.pending_action_intent_digest.as_deref()
+                                            == Some(expected_digest)
+                                }
+                                None => self
+                                    .watchdog_status
+                                    .as_ref()
+                                    .map(|s| {
+                                        s.eq_ignore_ascii_case("approved")
+                                            || s.eq_ignore_ascii_case("a")
+                                            || s.eq_ignore_ascii_case("yes")
+                                    })
+                                    .unwrap_or(false),
+                            };
 
                             if !is_approved {
+                                // A stale or malformed digest-bearing token must not
+                                // survive into a later plan with the same command string.
+                                if intent_digest.is_some() && self.watchdog_status.is_some() {
+                                    self.watchdog_status = None;
+                                }
                                 self.pending_action = Some(cmd_str.clone());
+                                self.pending_action_intent_digest = intent_digest.clone();
                                 eprintln!(
-                                    "nixward-daemon: Gating action [safety={:?}]. Waiting for watchdog approval: {}",
-                                    safety, cmd_str
+                                    "nixward-daemon: Gating action [safety={safety:?}]. Waiting for watchdog approval: {cmd_str}{}",
+                                    intent_digest
+                                        .as_deref()
+                                        .map_or(String::new(), |digest| format!(" [intent={digest}]"))
                                 );
                                 return (dynamic_threshold, Some(best_action.expected_free_energy));
                             } else {
-                                // TOCTOU guard: the operator approved a *specific*
-                                // command (the one stored in `pending_action` when we
-                                // requested approval). The plan can change between
-                                // cycles, so if the command we would run now differs
-                                // from what was approved, re-gate instead of executing
-                                // an unapproved action.
-                                if self.pending_action.as_deref() != Some(cmd_str.as_str()) {
+                                // TOCTOU guard: the semantic V1 identity and the
+                                // human-readable rendering must still match what was
+                                // presented for approval.
+                                let approved_action_still_matches = match intent_digest.as_deref() {
+                                    Some(expected_digest) => {
+                                        self.pending_action.as_deref() == Some(cmd_str.as_str())
+                                            && self.pending_action_intent_digest.as_deref()
+                                                == Some(expected_digest)
+                                    }
+                                    None => self.pending_action.as_deref() == Some(cmd_str.as_str()),
+                                };
+                                if !approved_action_still_matches {
                                     eprintln!(
-                                        "nixward-daemon: Plan changed since approval; re-gating (approved {:?}, now {}).",
-                                        self.pending_action, cmd_str
+                                        "nixward-daemon: Plan changed since approval; re-gating (approved command={:?}, approved intent={:?}, now command={}, now intent={:?}).",
+                                        self.pending_action,
+                                        self.pending_action_intent_digest,
+                                        cmd_str,
+                                        intent_digest
                                     );
                                     self.pending_action = Some(cmd_str.clone());
+                                    self.pending_action_intent_digest = intent_digest.clone();
                                     self.watchdog_status = None;
                                     return (
                                         dynamic_threshold,
@@ -1140,8 +1198,13 @@ impl DaemonState {
                                     );
                                 }
 
-                                eprintln!("nixward-daemon: Watchdog APPROVED action: {}", cmd_str);
-
+                                eprintln!(
+                                    "nixward-daemon: Watchdog APPROVED action: {}{}",
+                                    cmd_str,
+                                    intent_digest
+                                        .as_deref()
+                                        .map_or(String::new(), |digest| format!(" [intent={digest}]"))
+                                );
                                 // If it was an AST configuration patch, apply the configuration change before switching!
                                 if let Some((_, option_path, value)) = &patch_tweak {
                                     // Route through ConfigWriter -- both its write
