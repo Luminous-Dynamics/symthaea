@@ -399,11 +399,17 @@ impl EvaluationTrace {
         self.results.iter().map(EvaluationCheckResult::id).collect()
     }
 
-    /// Verify that the trace is the execution projection of the report's
-    /// compatibility stage fields.
+    /// Verify that this trace is the report's captured execution evidence.
+    ///
+    /// Current v4 reports carry the authoritative trace directly. Legacy reports
+    /// without that field use the compatibility stage projection.
     pub fn matches_report(&self, report: &ReceiptAttestationVerificationReport) -> bool {
         self.procedure_fingerprint == report.procedure_fingerprint
-            && self.results == EvaluationTrace::from_report(report).results
+            && if report.execution_trace.is_well_formed() {
+                self == &report.execution_trace
+            } else {
+                self.results == EvaluationTrace::from_report(report).results
+            }
     }
 
     /// Return the aggregate outcome represented by this trace.
@@ -677,7 +683,12 @@ impl ReceiptAttestationVerificationReport {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-attestation-report:v4\n");
+        let domain = if self.verifier_version == "symthaea-observation-attestation-report-v3" {
+            REPORT_DOMAIN_SEPARATOR_V3
+        } else {
+            REPORT_DOMAIN_SEPARATOR
+        };
+        hasher.update(domain);
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -2361,6 +2372,41 @@ mod tests {
         assert!(v3.starts_with(b"symthaea:observation-attestation-report:v3\n"));
         assert!(v4.starts_with(b"symthaea:observation-attestation-report:v4\n"));
         assert_ne!(v3, v4);
+    }
+
+    #[test]
+    fn legacy_v3_report_fingerprint_uses_v3_hash_domain() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        report.verifier_version = "symthaea-observation-attestation-report-v3";
+        report.execution_trace = EvaluationTrace::default();
+
+        let expected = {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(REPORT_DOMAIN_SEPARATOR_V3);
+            hasher.update(&report.canonical_bytes());
+            hasher.finalize().to_hex().to_string()
+        };
+        assert_eq!(report.fingerprint(), expected);
+    }
+
+    #[test]
+    fn current_report_uses_captured_trace_as_evaluation_source() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+        assert_eq!(evaluation.execution_trace, report.execution_trace);
+        assert!(evaluation.is_consistent_with_report(&report));
     }
 
     #[test]
