@@ -502,13 +502,33 @@ pub struct AuthorizedExecutionRecordV1 {
 }
 
 impl AuthorizedExecutionRecordV1 {
-    pub fn command(&self) -> &NixOSCommand { &self.command }
-    pub fn action_intent_digest(&self) -> &str { &self.action_intent_digest }
-    pub fn approval_request_id(&self) -> &str { &self.approval_request_id }
-    pub fn projection_digest(&self) -> &str { &self.projection_digest }
-    pub fn pre_state_identity(&self) -> Option<&str> { self.pre_state_identity.as_deref() }
-    pub fn result(&self) -> &ExecutionResult { &self.result }
-    pub fn timestamp_ms(&self) -> u64 { self.timestamp_ms }
+    pub fn command(&self) -> &NixOSCommand {
+        &self.command
+    }
+
+    pub fn action_intent_digest(&self) -> &str {
+        &self.action_intent_digest
+    }
+
+    pub fn approval_request_id(&self) -> &str {
+        &self.approval_request_id
+    }
+
+    pub fn projection_digest(&self) -> &str {
+        &self.projection_digest
+    }
+
+    pub fn pre_state_identity(&self) -> Option<&str> {
+        self.pre_state_identity.as_deref()
+    }
+
+    pub fn result(&self) -> &ExecutionResult {
+        &self.result
+    }
+
+    pub fn timestamp_ms(&self) -> u64 {
+        self.timestamp_ms
+    }
 }
 
 /// NixOS-aware command executor with Φ integration
@@ -519,6 +539,7 @@ pub struct NixOSExecutor {
     authorized_history: VecDeque<AuthorizedExecutionRecordV1>,
     dry_run: bool,
 }
+
 /// Record of an execution for learning
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionRecord {
