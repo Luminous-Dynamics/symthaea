@@ -161,6 +161,75 @@ fn extends_span(basis: &[BinaryCodeword], candidate: &BinaryCodeword) -> bool {
     basis_rank(&extended, candidate.dimension) > before
 }
 
+/// Solve target = XOR_i(coefficients[i] * basis[i]) over GF(2).
+///
+/// This is the algebraic core of the research bound-recovery comparator.
+/// It returns one coefficient vector when a solution exists. Callers that
+/// require unique factorization must independently verify that the supplied
+/// basis is linearly independent (for example, by checking
+/// basis_rank(basis, dimension) == basis.len()).
+pub fn solve_linear_combination(
+    target: &BinaryCodeword,
+    basis: &[BinaryCodeword],
+) -> Option<Vec<bool>> {
+    let dimension = target.dimension();
+    if basis.iter().any(|vector| vector.dimension() != dimension) {
+        return None;
+    }
+
+    // Augmented rows: [basis coefficients | target bit], represented as a
+    // packed vector so Gaussian elimination remains entirely in GF(2).
+    let width = basis.len() + 1;
+    let mut rows: Vec<Vec<bool>> = (0..dimension)
+        .map(|row| {
+            let mut equation = Vec::with_capacity(width);
+            for vector in basis {
+                equation.push(vector.bit(row));
+            }
+            equation.push(target.bit(row));
+            equation
+        })
+        .collect();
+
+    let mut pivot_row = 0usize;
+    let mut pivot_columns = Vec::with_capacity(basis.len());
+
+    for column in 0..basis.len() {
+        let Some(found) = (pivot_row..rows.len()).find(|&row| rows[row][column]) else {
+            continue;
+        };
+        rows.swap(pivot_row, found);
+
+        for row in 0..rows.len() {
+            if row != pivot_row && rows[row][column] {
+                for bit in column..width {
+                    rows[row][bit] ^= rows[pivot_row][bit];
+                }
+            }
+        }
+
+        pivot_columns.push((pivot_row, column));
+        pivot_row += 1;
+        if pivot_row == rows.len() {
+            break;
+        }
+    }
+
+    // 0 = 1 means the target is outside the span.
+    if rows.iter().any(|row| row[..basis.len()].iter().all(|bit| !*bit) && row[basis.len()]) {
+        return None;
+    }
+
+    // With a full-rank basis this is the unique coefficient vector. If the
+    // basis is dependent, leave free variables at zero and return one valid
+    // solution; callers needing uniqueness must check rank separately.
+    let mut coefficients = vec![false; basis.len()];
+    for &(row, column) in &pivot_columns {
+        coefficients[column] = rows[row][basis.len()];
+    }
+    Some(coefficients)
+}
+
 pub fn basis_rank(vectors: &[BinaryCodeword], dimension: usize) -> usize {
     let mut rows: Vec<BinaryCodeword> = vectors.iter()
         .filter(|vector| vector.dimension == dimension)
