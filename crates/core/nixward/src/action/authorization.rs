@@ -97,6 +97,10 @@ impl TryFrom<&NixOSCommand> for NixActionDescriptorV1 {
     type Error = NixAuthorizationErrorV1;
 
     fn try_from(value: &NixOSCommand) -> Result<Self, Self::Error> {
+        value
+            .validate_shape()
+            .map_err(NixAuthorizationErrorV1::InvalidTypedCommand)?;
+
         Ok(match value {
             NixOSCommand::RebuildSwitch { flake, extra_args } => Self::RebuildSwitch {
                 flake: flake.clone(),
@@ -845,6 +849,18 @@ mod tests {
                 operation: NixServiceOperationKindV1::Restart,
                 ref unit,
             } if unit == "nginx.service"
+        ));
+    }
+
+    #[test]
+    fn direct_descriptor_conversion_rejects_invalid_typed_service() {
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx*.service".to_string(),
+        };
+        assert!(matches!(
+            NixActionDescriptorV1::try_from(&command),
+            Err(NixAuthorizationErrorV1::InvalidTypedCommand(_))
         ));
     }
 
