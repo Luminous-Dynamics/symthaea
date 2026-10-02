@@ -13,6 +13,23 @@ use sha2::{Digest, Sha256};
 pub const VERSION: u16 = 1;
 pub const DOMAIN: &[u8] = b"symthaea-swarm/semantic-evidence-vds";
 pub const RFC9162_VDS_NAME: &str = "RFC9162_SHA256";
+pub const RFC9162_VDS_ID: u64 = 1;
+pub const RFC9162_INCLUSION_PROOF_ID: i64 = -1;
+pub const RFC9162_CONSISTENCY_PROOF_ID: i64 = -2;
+
+/// A VDS-native tree head binds an ordered tree size to its Merkle root.
+/// It is intentionally independent of the local chained HistoryCheckpoint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VdsTreeHead {
+    tree_size: u64,
+    root: [u8; 32],
+}
+
+impl VdsTreeHead {
+    pub fn new(tree_size: u64, root: [u8; 32]) -> Self { Self { tree_size, root } }
+    pub fn tree_size(&self) -> u64 { self.tree_size }
+    pub fn root(&self) -> [u8; 32] { self.root }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConsistencyStatus {
@@ -146,6 +163,10 @@ impl Rfc9162Sha256Vds {
     pub fn vds_name(&self) -> &'static str { RFC9162_VDS_NAME }
     pub fn root(&self, leaves: &[Vec<u8>]) -> [u8; 32] { merkle_tree_hash(leaves) }
 
+    pub fn tree_head(&self, leaves: &[Vec<u8>]) -> VdsTreeHead {
+        VdsTreeHead::new(leaves.len() as u64, self.root(leaves))
+    }
+
     /// Generate the RFC 9162 minimal consistency proof for the first `first`
     /// leaves of the supplied ordered sequence.
     pub fn prove(&self, leaves: &[Vec<u8>], first: usize) -> Option<Rfc9162ConsistencyProof> {
@@ -186,6 +207,12 @@ impl Rfc9162Sha256Vds {
         proof: &Rfc9162ConsistencyProof,
     ) -> bool {
         verify_rfc9162_consistency(first_root, second_root, proof)
+    }
+
+    pub fn verify_tree_heads(&self, older: VdsTreeHead, newer: VdsTreeHead, proof: &Rfc9162ConsistencyProof) -> bool {
+        older.tree_size() == proof.first
+            && newer.tree_size() == proof.second
+            && self.verify(older.root(), newer.root(), proof)
     }
 }
 
@@ -386,6 +413,19 @@ mod tests {
         let leaves = vec![b"a".to_vec(), b"b".to_vec()];
         let expected = node_hash(&leaf_hash(b"a"), &leaf_hash(b"b"));
         assert_eq!(vds.root(&leaves), expected);
+    }
+
+    #[test]
+    #[test]
+    fn tree_heads_bind_size_to_root_and_verify_consistency() {
+        let vds = Rfc9162Sha256Vds;
+        let leaves: Vec<Vec<u8>> = (0..8).map(|i| format!("leaf-{i}").into_bytes()).collect();
+        let older = vds.tree_head(&leaves[..4].to_vec());
+        let newer = vds.tree_head(&leaves);
+        let proof = vds.prove(&leaves, 4).expect("proof");
+        assert!(vds.verify_tree_heads(older, newer, &proof));
+        assert!(!vds.verify_tree_heads(VdsTreeHead::new(3, older.root()), newer, &proof));
+        assert!(!vds.verify_tree_heads(older, VdsTreeHead::new(9, newer.root()), &proof));
     }
 
     #[test]
