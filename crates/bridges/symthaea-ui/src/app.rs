@@ -208,47 +208,266 @@ impl Movie {
 
 /// Extract the live cognitive self-portrait SVG as an image data URL.
 ///
-/// The gateway payload is remote data. Rendering it through an `<img>` keeps
-/// SVG markup out of the application DOM and prevents script/event attributes
-/// from executing with page privileges.
+/// The gateway payload is remote data. Rendering it through an image element keeps
+/// SVG markup out of the application DOM. The validator below is deliberately
+/// stricter than a denylist: only inert geometric tags and explicitly safe
+/// attributes are accepted, and the XML structure must be well formed.
 fn portrait_from_json(v: &Value) -> Option<String> {
     let svg = v.get("canvas_svg")?.as_str()?.trim();
-    if svg.len() > 512 * 1024 || !svg.starts_with("<svg") || !svg.ends_with("</svg>") {
+    if svg.len() > 512 * 1024
+        || !svg.starts_with("<svg")
+        || !svg.ends_with("</svg>")
+    {
         return None;
     }
 
-    // This is deliberately a narrow image grammar, not an HTML/SVG sanitizer.
-    // The producer currently emits geometric self-portraits; accepting only
-    // inert drawing primitives makes the browser rendering contract explicit.
-    const ALLOWED_TAGS: &[&str] = &[
-        "svg", "g", "path", "rect", "circle", "ellipse", "line", "polyline",
-        "polygon", "title", "desc",
-    ];
-    const FORBIDDEN_MARKERS: &[&str] = &[
-        "<script", "<style", "<animate", "<set", "<foreignobject", "<iframe",
-        "<object", "<embed", "<use", "<a", "<image", "javascript:", "data:",
-        "url(", "onload=", "onclick=", "onerror=", "onmouseover=", "xlink:",
-    ];
+    let mut stack = Vec::<String>::new();
+    let mut seen_root = false;
+    let mut cursor = 0usize;
 
-    let lower = svg.to_ascii_lowercase();
-    if FORBIDDEN_MARKERS.iter().any(|marker| lower.contains(marker)) {
-        return None;
-    }
+    while cursor < svg.len() {
+        let open = svg[cursor..].find('<')? + cursor;
 
-    let mut rest = lower.as_str();
-    while let Some(open) = rest.find('<') {
-        let tag = &rest[open..];
-        let end = tag.find('>')?;
-        let token = tag[..=end].trim();
-        let closing = token.starts_with("</");
-        let name_start = if closing { 2 } else { 1 };
-        let name = token[name_start..]
-            .split(|c: char| c.is_ascii_whitespace() || c == '/' || c == '>')
-            .next()?;
-        if !ALLOWED_TAGS.contains(&name) {
+        // Text is permitted only inside the descriptive elements. Elsewhere
+        // only whitespace is accepted, preventing hidden markup-like payloads
+        // from being smuggled through the scanner.
+        let text = &svg[cursor..open];
+        if !text.trim().is_empty()
+            && !matches!(stack.last().map(String::as_str), Some("title" | "desc"))
+        {
             return None;
         }
-        rest = &tag[end + 1..];
+
+        let remainder = &svg[open..];
+        let mut quote = None;
+        let mut end = None;
+        for (offset, byte) in remainder.bytes().enumerate().skip(1) {
+            match quote {
+                Some(q) if byte == q => quote = None,
+                None if byte == b'"' || byte == b'\'' => quote = Some(byte),
+                None if byte == b'>' => {
+                    end = Some(offset);
+                    break;
+                }
+                _ => {}
+            }
+        }
+        let end = end?;
+        let token = &remainder[..=end];
+        if token.starts_with("<!--")
+            || token.starts_with("<![")
+            || token.starts_with("<?")
+            || token.starts_with("<!")
+        {
+            return None;
+        }
+
+        let mut body = token[1..token.len() - 1].trim();
+        let closing = body.starts_with('/');
+        if closing {
+            body = body[1..].trim_start();
+        }
+        let self_closing = !closing && body.ends_with('/');
+        if self_closing {
+            body = body[..body.len() - 1].trim_end();
+        }
+
+        let name_end = body
+            .find(|c: char| c.is_ascii_whitespace() || c == '/')
+            .unwrap_or(body.len());
+        let name = &body[..name_end];
+        if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphabetic()) {
+            return None;
+        }
+        let name = name.to_ascii_lowercase();
+
+        const ALLOWED_TAGS: &[&str] = &[
+            "svg", "g", "path", "rect", "circle", "ellipse", "line", "polyline",
+            "polygon", "title", "desc",
+        ];
+        if !ALLOWED_TAGS.contains(&name.as_str()) {
+            return None;
+        }
+
+        if closing {
+            if self_closing || !body[name_end..].trim().is_empty() {
+                return None;
+            }
+            if stack.pop().as_deref() != Some(name.as_str()) {
+                return None;
+            }
+            cursor = open + end + 1;
+            continue;
+        }
+
+        if name == "svg" {
+            if seen_root || !stack.is_empty() {
+                return None;
+            }
+            seen_root = true;
+        } else if stack.is_empty() {
+            return None;
+        }
+
+        let attrs = &body[name_end..];
+        let mut rest = attrs.trim();
+        let mut seen_attrs = Vec::<String>::new();
+        while !rest.is_empty() {
+            let key_end = rest
+                .find(|c: char| c.is_ascii_whitespace() || c == '=')
+                .unwrap_or(rest.len());
+            let key = &rest[..key_end];
+            if key.is_empty() || key.contains(':') || key.starts_with("on") {
+                return None;
+            }
+            let key = key.to_ascii_lowercase();
+            if seen_attrs.iter().any(|existing| existing == &key) {
+                return None;
+            }
+            seen_attrs.push(key.clone());
+            rest = rest[key_end..].trim_start();
+            if !rest.starts_with('=') {
+                return None;
+            }
+            rest = rest[1..].trim_start();
+            let quote = rest.as_bytes().first().copied()?;
+            if quote != b'"' && quote != b'\'' {
+                return None;
+            }
+            rest = &rest[1..];
+            let value_end = rest.find(quote as char)?;
+            let value = &rest[..value_end];
+            rest = rest[value_end + 1..].trim_start();
+
+            let allowed = match name.as_str() {
+                "svg" => matches!(key.as_str(), "viewbox" | "width" | "height" | "xmlns"),
+                "g" | "path" | "rect" | "circle" | "ellipse" | "line"
+                | "polyline" | "polygon" => matches!(
+                    key.as_str(),
+                    "id"
+                        | "transform"
+                        | "fill"
+                        | "stroke"
+                        | "stroke-width"
+                        | "opacity"
+                        | "d"
+                        | "x"
+                        | "y"
+                        | "width"
+                        | "height"
+                        | "rx"
+                        | "ry"
+                        | "cx"
+                        | "cy"
+                        | "r"
+                        | "x1"
+                        | "y1"
+                        | "x2"
+                        | "y2"
+                        | "points"
+                ),
+                "title" | "desc" => false,
+                _ => false,
+            };
+            if !allowed || value.len() > 16 * 1024 {
+                return None;
+            }
+
+            // No URL-valued attributes are part of the portrait contract.
+            // This also rejects javascript:, data:, fragment indirection,
+            // CSS url(), and namespace-based resource references.
+            let lower_value = value.to_ascii_lowercase();
+            if lower_value.contains("url(")
+                || lower_value.contains("javascript:")
+                || lower_value.contains("data:")
+                || lower_value.contains("http:")
+                || lower_value.contains("https:")
+                || lower_value.contains("xlink:")
+            {
+                return None;
+            }
+
+            match key.as_str() {
+                "id" => {
+                    if value.is_empty()
+                        || value.len() > 64
+                        || !value
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
+                    {
+                        return None;
+                    }
+                }
+                "xmlns" => {
+                    if value != "http://www.w3.org/2000/svg" {
+                        return None;
+                    }
+                }
+                "fill" | "stroke" => {
+                    let safe_color = value == "none"
+                        || (value.starts_with('#')
+                            && (value.len() == 4 || value.len() == 7)
+                            && value[1..].chars().all(|c| c.is_ascii_hexdigit()))
+                        || (value.starts_with("rgba(")
+                            && value.ends_with(')')
+                            && value[5..value.len() - 1]
+                                .chars()
+                                .all(|c| c.is_ascii_digit() || matches!(c, ',' | '.' | ' ')));
+                    if !safe_color {
+                        return None;
+                    }
+                }
+                "transform" => {
+                    if !value.chars().all(|c| {
+                        c.is_ascii_digit()
+                            || matches!(c, 'e' | 'E' | '+' | '-' | '.' | ',' | '(' | ')' | ' ')
+                    }) {
+                        return None;
+                    }
+                    if !(value.contains("translate(")
+                        || value.contains("rotate(")
+                        || value.contains("scale("))
+                    {
+                        return None;
+                    }
+                }
+                "viewbox" | "width" | "height" | "rx" | "ry" | "cx" | "cy" | "r"
+                | "x" | "y" | "x1" | "y1" | "x2" | "y2" | "stroke-width" | "opacity" => {
+                    if !value.chars().all(|c| {
+                        c.is_ascii_digit()
+                            || matches!(c, 'e' | 'E' | '+' | '-' | '.' | ',' | ' ')
+                    }) {
+                        return None;
+                    }
+                }
+                "points" | "d" => {
+                    if !value.chars().all(|c| {
+                        c.is_ascii_digit()
+                            || matches!(
+                                c,
+                                'e' | 'E' | '+' | '-' | '.' | ',' | ' ' | 'M' | 'm' | 'L'
+                                    | 'l' | 'H' | 'h' | 'V' | 'v' | 'C' | 'c' | 'S' | 's'
+                                    | 'Q' | 'q' | 'T' | 't' | 'A' | 'a' | 'Z' | 'z'
+                            )
+                    }) {
+                        return None;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if !seen_root {
+            return None;
+        }
+        if !self_closing {
+            stack.push(name);
+        }
+        cursor = open + end + 1;
+    }
+
+    if !seen_root || !stack.is_empty() {
+        return None;
     }
 
     let encoded = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
@@ -942,9 +1161,25 @@ mod tests {
     #[test]
     fn portrait_accepts_inert_geometric_svg() {
         let payload = serde_json::json!({
-            "canvas_svg": r#"<svg viewBox="0 0 10 10"><g><circle cx="5" cy="5" r="4"/></g></svg>"#
+            "canvas_svg": r#"<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><g id="root" opacity="0.8"><circle cx="5" cy="5" r="4" fill="#fff"/></g></svg>"#
         });
         assert!(portrait_from_json(&payload).is_some());
+    }
+
+    #[test]
+    fn portrait_rejects_unsafe_or_malformed_attributes() {
+        for svg in [
+            r#"<svg><circle cx="1" onload="alert(1)" r="2"/></svg>"#,
+            r#"<svg><circle cx="1" style="fill:red" r="2"/></svg>"#,
+            r#"<svg><circle cx="1" fill="url(#evil)" r="2"/></svg>"#,
+            r#"<svg><circle cx="1" fill="https://attacker.example/x.svg" r="2"/></svg>"#,
+            r#"<svg><circle cx="1" cx="2" r="2"/></svg>"#,
+            r#"<svg><circle cx="1" r="2"></svg>"#,
+            r#"<svg><circle cx="1" r="2>"#,
+        ] {
+            let payload = serde_json::json!({ "canvas_svg": svg });
+            assert!(portrait_from_json(&payload).is_none(), "accepted: {svg}");
+        }
     }
 
     #[test]
