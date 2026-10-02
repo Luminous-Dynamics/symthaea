@@ -2526,6 +2526,67 @@ mod tests {
     }
 
     #[test]
+    fn test_saved_and_loaded_snapshot_share_canonical_digest() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_digest_round_trip_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "digest-fact".into(),
+            canonical_identity: Some("digest-canonical".into()),
+            provenance_family: Some("digest-family".into()),
+            vector_bytes: vec![0x11; BinaryHV::BYTES],
+            source_text: "digest fact".into(),
+            confidence: 0.75,
+            domain: Some("test".into()),
+            cycle: 4,
+            is_causal: true,
+        };
+        let relation = ProvenanceRelationRecord {
+            source_memory_id: "digest-fact".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:4".into(),
+        };
+        let edge = CausalEdgeRecord {
+            cause: "digest-fact".into(),
+            effect: "digest-effect".into(),
+            strength: 0.5,
+            is_inhibitory: false,
+            cycle: 4,
+        };
+        let ontology = OntologyRecord {
+            name: "digest-primitive".into(),
+            vector_bytes: vec![0x22; BinaryHV::BYTES],
+            usage_count: 2,
+            utility: 0.4,
+            created_at_cycle: 4,
+            last_used_cycle: 4,
+            is_a_parent: None,
+        };
+
+        p.save_snapshot(&[fact], &[relation], &[edge], &[ontology])
+            .unwrap();
+        let loaded = p.load_snapshot().unwrap();
+        assert_eq!(loaded.canonical_digest_hex().len(), 64);
+
+        let mut equivalent = loaded.clone();
+        equivalent.facts.reverse();
+        equivalent.provenance_relations.reverse();
+        equivalent.causal_edges.reverse();
+        equivalent.ontology.reverse();
+        assert_eq!(
+            loaded.canonical_digest(),
+            equivalent.canonical_digest()
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
     fn test_load_snapshot_returns_all_domains_from_one_read() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_load_snapshot_test_{}",
