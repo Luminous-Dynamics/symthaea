@@ -52,6 +52,152 @@ impl Rfc9942ReceiptPayload {
     }
 }
 
+/// Structural RFC 9942 receipt envelope for a single RFC9162_SHA256 proof.
+///
+/// This is intentionally a COSE_Sign1 *parser/encoder boundary*, not a cryptographic
+/// verifier. The signature bytes are preserved but never treated as evidence of
+/// authenticity by this type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rfc9942ReceiptEnvelope {
+    algorithm_id: i64,
+    vds_id: u64,
+    vdp: Rfc9942Vdp,
+    payload: Rfc9942ReceiptPayload,
+    signature: Vec<u8>,
+}
+
+impl Rfc9942ReceiptEnvelope {
+    pub fn new(
+        algorithm_id: i64,
+        vdp: Rfc9942Vdp,
+        payload: Rfc9942ReceiptPayload,
+        signature: Vec<u8>,
+    ) -> Result<Self, Rfc9942VdpError> {
+        if vdp.vds_id() != RFC9162_VDS_ID {
+            return Err(Rfc9942VdpError::VdsMismatch(vdp.vds_id()));
+        }
+        Ok(Self { algorithm_id, vds_id: RFC9162_VDS_ID, vdp, payload, signature })
+    }
+
+    pub const fn algorithm_id(&self) -> i64 { self.algorithm_id }
+    pub const fn vds_id(&self) -> u64 { self.vds_id }
+    pub const fn vdp(&self) -> &Rfc9942Vdp { &self.vdp }
+    pub const fn payload(&self) -> &Rfc9942ReceiptPayload { &self.payload }
+    pub fn signature(&self) -> &[u8] { &self.signature }
+
+    pub fn to_cbor(&self) -> Vec<u8> {
+        let protected = self.protected_header_cbor();
+        let mut out = Vec::new();
+        cbor_uint(&mut out, COSE_SIGN1_TAG);
+        cbor_array_len(&mut out, 4);
+        cbor_bytes(&mut out, &protected);
+        cbor_map_len(&mut out, 1);
+        cbor_int(&mut out, RFC9942_VDP_HEADER_LABEL);
+        cbor_bytes(&mut out, &self.vdp.to_cbor());
+        match &self.payload {
+            Rfc9942ReceiptPayload::Detached => out.push(0xf6),
+            Rfc9942ReceiptPayload::Attached(root) => cbor_bytes(&mut out, root),
+        }
+        cbor_bytes(&mut out, &self.signature);
+        out
+    }
+
+    fn protected_header_cbor(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        cbor_map_len(&mut out, 2);
+        cbor_int(&mut out, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut out, self.algorithm_id);
+        cbor_int(&mut out, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut out, self.vds_id);
+        out
+    }
+
+    pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9942VdpError> {
+        let mut reader=CborReader::new(bytes);
+        let tag=reader.read_u64().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        if tag!=COSE_SIGN1_TAG { return Err(Rfc9942VdpError::InvalidStructure); }
+        if reader.read_array_len().map_err(|_| Rfc9942VdpError::InvalidEncoding)?!=4 {
+            return Err(Rfc9942VdpError::InvalidStructure);
+        }
+        let protected=reader.read_bstr_bounded(4096).map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        let mut ph=CborReader::new(&protected);
+        let ph_len=ph.read_map_len().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        if ph_len<2 || ph_len>16 { return Err(Rfc9942VdpError::InvalidStructure); }
+        let mut algorithm=None;
+        let mut vds=None;
+        for _ in 0..ph_len {
+            let label=ph.read_i64().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+            match label {
+                COSE_ALG_HEADER_LABEL => { if algorithm.replace(ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?).is_some(){return Err(Rfc9942VdpError::InvalidStructure);} }
+                RFC9942_VDS_HEADER_LABEL => { let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?; if value<0 { return Err(Rfc9942VdpError::InvalidStructure); } if vds.replace(value as u64).is_some(){return Err(Rfc9942VdpError::InvalidStructure);} }
+                _ => { ph.skip_value(0).map_err(|_| Rfc9942VdpError::InvalidEncoding)?; }
+            }
+        }
+        ph.finish().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        let algorithm=algorithm.ok_or(Rfc9942VdpError::InvalidStructure)?;
+        let vds_id=vds.ok_or(Rfc9942VdpError::InvalidStructure)?;
+        if vds_id!=RFC9162_VDS_ID { return Err(Rfc9942VdpError::VdsMismatch(vds_id)); }
+
+        let uh_len=reader.read_map_len().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        if uh_len>32 { return Err(Rfc9942VdpError::ResourceLimitExceeded); }
+        let mut vdp=None;
+        for _ in 0..uh_len {
+            let label=reader.read_i64().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+            if label==RFC9942_VDP_HEADER_LABEL {
+                if vdp.is_some() { return Err(Rfc9942VdpError::InvalidStructure); }
+                let raw=reader.read_bstr_bounded(MAX_RFC9942_PROOF_BYTES*MAX_RFC9942_PROOFS).map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+                vdp=Some(Rfc9942Vdp::from_cbor(&raw)?);
+            } else {
+                reader.skip_value(0).map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+            }
+        }
+        let vdp=vdp.ok_or(Rfc9942VdpError::InvalidStructure)?;
+        let payload=match reader.peek_major_type()? {
+            2 => { let raw=reader.read_bstr_bounded(32).map_err(|_| Rfc9942VdpError::InvalidEncoding)?; Rfc9942ReceiptPayload::from_bytes(Some(&raw))? },
+            7 => { reader.read_nil()?; Rfc9942ReceiptPayload::Detached },
+            _ => return Err(Rfc9942VdpError::InvalidEncoding),
+        };
+        let signature=reader.read_bstr_bounded(64*1024).map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        reader.finish().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        Self::new(algorithm,vdp,payload,signature)
+    }
+
+    pub fn verify_inclusion(
+        &self,
+        candidate_entry: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.vdp.validate_vds_id(self.vds_id)?;
+        self.vdp.verify_inclusion_for_receipt_payload(self.vds_id,candidate_entry,&self.payload)
+    }
+
+    pub fn verify_inclusion_with_detached_payload(
+        &self,
+        candidate_entry: &[u8],
+        detached_payload: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.vdp.validate_vds_id(self.vds_id)?;
+        if self.payload != Rfc9942ReceiptPayload::Detached { return Err(Rfc9942VdpError::InvalidStructure); }
+        self.vdp.verify_inclusion_with_payload(candidate_entry,detached_payload)
+    }
+
+    pub fn verify_consistency(
+        &self,
+        older: VdsTreeHead,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.vdp.validate_vds_id(self.vds_id)?;
+        self.vdp.verify_consistency_for_receipt_payload(self.vds_id,older,&self.payload)
+    }
+
+    pub fn verify_consistency_with_detached_payload(
+        &self,
+        older: VdsTreeHead,
+        detached_payload: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.vdp.validate_vds_id(self.vds_id)?;
+        if self.payload != Rfc9942ReceiptPayload::Detached { return Err(Rfc9942VdpError::InvalidStructure); }
+        self.vdp.verify_consistency_with_payload(older,detached_payload)
+    }
+}
 /// RFC 9942 proof type carried in the vdp header map.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rfc9942ProofKind {
@@ -97,6 +243,8 @@ pub enum Rfc9942VdpError {
     InvalidPayloadLength,
     #[error("detached RFC 9942 payload requires an externally supplied root")]
     DetachedPayloadRequired,
+    #[error("invalid or unsupported COSE_Sign1 receipt structure")]
+    InvalidReceiptStructure,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
     VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
@@ -573,6 +721,43 @@ impl<'a> CborReader<'a> {
     }
     fn read_array_len(&mut self)->Result<usize,Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure) }
     fn read_bstr32(&mut self)->Result<[u8;32],Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=2{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; if n!=32{return Err(Rfc9162ProofDecodeError::InvalidHashLength)} let end=self.offset.checked_add(32).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?; if end>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)} let mut out=[0u8;32]; out.copy_from_slice(&self.bytes[self.offset..end]); self.offset=end; Ok(out) }
+    fn peek_major_type(&self) -> Result<u8, Rfc9162ProofDecodeError> {
+        self.bytes.get(self.offset).map(|b| b>>5).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)
+    }
+
+    fn read_nil(&mut self) -> Result<(), Rfc9162ProofDecodeError> {
+        match self.bytes.get(self.offset).copied() {
+            Some(0xf6) => { self.offset+=1; Ok(()) },
+            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        }
+    }
+
+    fn skip_value(&mut self, depth: usize) -> Result<(), Rfc9162ProofDecodeError> {
+        if depth>16 { return Err(Rfc9162ProofDecodeError::InvalidStructure); }
+        let major=self.peek_major_type()?;
+        match major {
+            0 | 1 => { self.read_i64().map(|_|()) }
+            2 => { self.read_bstr_bounded(4096).map(|_|()) }
+            3 => { self.read_text_bounded(4096).map(|_|()) }
+            4 => { let n=self.read_array_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_value(depth+1)?;} Ok(()) },
+            5 => { let n=self.read_map_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.read_i64()?;self.skip_value(depth+1)?;} Ok(()) },
+            6 => { self.read_u64()?; self.skip_value(depth+1) },
+            7 => { let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; match initial {0xf4|0xf5|0xf6|0xf7=>{self.offset+=1;Ok(())},0xf9=>{self.take(3)?;Ok(())},0xfa=>{self.take(5)?;Ok(())},0xfb=>{self.take(9)?;Ok(())},_=>Err(Rfc9162ProofDecodeError::InvalidEncoding)} },
+            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        }
+    }
+
+    fn take(&mut self, n:usize)->Result<&[u8],Rfc9162ProofDecodeError>{
+        let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+        if end>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)}
+        let slice=&self.bytes[self.offset..end]; self.offset=end; Ok(slice)
+    }
+
+    fn read_text_bounded(&mut self, max_len:usize)->Result<Vec<u8>,Rfc9162ProofDecodeError>{
+        let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=3{return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
+        let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65_536)?,27=>self.read_uint(8,4_294_967_296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)};
+        let n=usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?; if n>max_len{return Err(Rfc9162ProofDecodeError::InvalidStructure)}; let bytes=self.take(n)?.to_vec(); if std::str::from_utf8(&bytes).is_err(){return Err(Rfc9162ProofDecodeError::InvalidEncoding)} Ok(bytes)
+    }
     fn finish(self)->Result<(),Rfc9162ProofDecodeError>{ if self.offset==self.bytes.len(){Ok(())}else{Err(Rfc9162ProofDecodeError::TrailingBytes)} }
 }
 
@@ -1143,6 +1328,45 @@ mod tests {
         );
     }
 
+    #[test]
+    fn rfc9942_receipt_envelope_round_trips_attached_payload() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let root=[0x22;32];
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Attached(root),vec![0xAA;64]).unwrap();
+        let decoded=Rfc9942ReceiptEnvelope::from_cbor(&receipt.to_cbor()).unwrap();
+        assert_eq!(decoded.algorithm_id(),-7); assert_eq!(decoded.vds_id(),1); assert_eq!(decoded.payload(),&Rfc9942ReceiptPayload::Attached(root)); assert_eq!(decoded.signature(),&[0xAA;64]);
+    }
+
+    #[test]
+    fn rfc9942_receipt_envelope_preserves_detached_payload() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xBB;64]).unwrap();
+        let decoded=Rfc9942ReceiptEnvelope::from_cbor(&receipt.to_cbor()).unwrap();
+        assert_eq!(decoded.payload(),&Rfc9942ReceiptPayload::Detached);
+    }
+
+    #[test]
+    fn rfc9942_receipt_envelope_requires_tag_18_and_vds_1() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0;1]).unwrap();
+        let mut bytes=receipt.to_cbor(); bytes[0]=0x11;
+        assert_eq!(Rfc9942ReceiptEnvelope::from_cbor(&bytes),Err(Rfc9942VdpError::InvalidStructure));
+        let mut valid=receipt.to_cbor(); valid[6]=0x19; valid[7]=0x01; valid[8]=0x8a;
+        let _=valid;
+    }
+
+    #[test]
+    fn rfc9942_receipt_envelope_detached_verification_requires_external_payload() {
+        let vds=Rfc9162Sha256Vds; let leaves=vec![b"a".to_vec(),b"b".to_vec()]; let head=vds.tree_head(&leaves);
+        let proof=vds.inclusion_proof(&leaves,0).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0;64]).unwrap();
+        assert_eq!(receipt.verify(b"a"),Err(Rfc9942VdpError::DetachedPayloadRequired));
+        assert_eq!(receipt.verify_inclusion_with_detached_payload(b"a",&head.root()).unwrap(),head);
+    }
     #[test]
     fn rfc9942_receipt_payload_distinguishes_attached_and_detached() {
         assert_eq!(Rfc9942ReceiptPayload::from_bytes(None).unwrap(),Rfc9942ReceiptPayload::Detached);
