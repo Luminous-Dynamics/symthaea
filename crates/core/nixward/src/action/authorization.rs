@@ -247,8 +247,7 @@ impl NixActionIntentV1 {
         let mut h = Hasher::new();
         h.update(ACTION_INTENT_DOMAIN);
         put_str(&mut h, &self.subject_identity);
-        put_opt_str(&mut h, self.pre_state_identity.as_deref());
-        put_action(&mut h, &self.action);
+        put_opt_str(&mut h, self.pre_state_identity.as_deref());        put_action(&mut h, &self.action);
         put_u8(&mut h, scope_tag(self.maximum_scope));
         put_str_vec(&mut h, &self.preconditions);
         put_str_vec(&mut h, &self.required_postconditions);
@@ -314,7 +313,6 @@ impl NixExecutionAuthorizationRecordV1 {
 ///
 /// This type intentionally does not implement `Serialize`, `Deserialize`, or `Clone`.
 /// Persisted audit records therefore cannot be deserialized back into live authority.
-/// It is crate-private until an independently verified external-permit adapter exists.
 /// Live execution authority minted from one already-consumed local approval.
 ///
 /// This object is intentionally non-serializable and non-cloneable. Possession
@@ -358,6 +356,14 @@ impl NixLocalExecutionAuthorityV1 {
 
     pub(crate) fn action_intent_digest(&self) -> Result<String, NixAuthorizationErrorV1> {
         self.intent.digest()
+    }
+
+    /// Return the pre-state identity bound into the approved intent.
+    ///
+    /// The executor may use this only for execution-time freshness validation;
+    /// it does not grant or expand authority.
+    pub(crate) fn pre_state_identity(&self) -> Option<&str> {
+        self.intent.pre_state_identity.as_deref()
     }
 
     pub(crate) fn approval_request_id(&self) -> &str {
@@ -497,8 +503,7 @@ impl NixExecutionReceiptV1 {
         put_str(&mut h, &self.action_intent_digest);
         put_str(&mut h, &self.authorization_record_digest);
         put_str(&mut h, &self.executor_identity);
-        put_opt_str(&mut h, self.actual_pre_state_ref.as_deref());
-        put_u64(&mut h, self.started_at_unix_ms);
+        put_opt_str(&mut h, self.actual_pre_state_ref.as_deref());        put_u64(&mut h, self.started_at_unix_ms);
         put_u64(&mut h, self.finished_at_unix_ms);
         put_u8(&mut h, mechanical_result_tag(self.mechanical_result));
         put_opt_str(&mut h, self.actual_post_state_ref.as_deref());
@@ -747,8 +752,7 @@ fn put_action(h: &mut Hasher, action: &NixActionDescriptorV1) {
         NixActionDescriptorV1::EnvRollback => put_u8(h, 5),
         NixActionDescriptorV1::Search { query, json } => {
             put_u8(h, 6);
-            put_str(h, query);
-            put_bool(h, *json);
+            put_str(h, query);            put_bool(h, *json);
         }
         NixActionDescriptorV1::ChannelUpdate { channel } => {
             put_u8(h, 7);
@@ -997,8 +1001,7 @@ mod tests {
             "host:x",
             Some("generation:42".to_string()),
             &NixOSCommand::Service {
-                operation: NixServiceOperationKindV1::Restart,
-                unit: "nginx.service".to_string(),
+                operation: NixServiceOperationKindV1::Restart,                unit: "nginx.service".to_string(),
             },
         )
         .unwrap();
@@ -1050,6 +1053,17 @@ mod tests {
             NixActionIntentV1::from_command("host:x", None, &command).unwrap_err(),
             NixAuthorizationErrorV1::UnsupportedCustomCommand,
         );
+    }
+
+    #[test]
+    fn live_authority_preserves_bound_pre_state_identity() {
+        let intent = NixActionIntentV1::from_command(
+            "host:x",
+            Some("generation:42".to_string()),
+            &rebuild(),
+        )
+        .unwrap();
+        assert_eq!(intent.pre_state_identity.as_deref(), Some("generation:42"));
     }
 
     #[test]
