@@ -2345,6 +2345,37 @@ mod tests {
     }
 
     #[test]
+    fn resolver_snapshot_binds_key_and_authorization_state() {
+        let (_, signing_key, _) = envelope_and_key();
+        let alternate_key = SigningKey::from_bytes(&[0x42; 32]);
+
+        let base = InMemoryVerificationMethodResolver::new([ResolvedVerificationMethod {
+            verification_method: "did:example:key".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        }]);
+        let changed_key = InMemoryVerificationMethodResolver::new([ResolvedVerificationMethod {
+            verification_method: "did:example:key".into(),
+            verifying_key: alternate_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        }]);
+        let changed_authorization = InMemoryVerificationMethodResolver::new([ResolvedVerificationMethod {
+            verification_method: "did:example:key".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["different-purpose".into()],
+        }]);
+
+        assert_ne!(base.snapshot_fingerprint(), changed_key.snapshot_fingerprint());
+        assert_ne!(
+            base.snapshot_fingerprint(),
+            changed_authorization.snapshot_fingerprint()
+        );
+    }
+
+    #[test]
     fn resolver_snapshot_is_bound_to_the_resolution_result() {
         struct AtomicResolver {
             method: ResolvedVerificationMethod,
