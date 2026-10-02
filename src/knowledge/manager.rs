@@ -1664,6 +1664,44 @@ mod tests {
     }
 
     #[test]
+    fn test_manager_zero_capacity_fact_restore_remains_healthy() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_zero_capacity_fact_restore_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let mut persistence = KnowledgePersistence::new(&db_path);
+            let record = super::persistence::FactRecord {
+                memory_id: "policy-limited".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: "policy limited".into(),
+                confidence: 0.9,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            };
+            assert_eq!(persistence.save_facts(&[record]).unwrap(), 1);
+        }
+
+        let manager = KnowledgeManager::new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            graph_capacity: 0,
+            ..Default::default()
+        });
+        let health = manager.persistence_health();
+        assert!(!health.is_degraded());
+        assert_eq!(health.fact_rejections, 0);
+        assert_eq!(health.fact_restore_evictions, 0);
+        assert!(manager.graph().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
     fn test_manager_bounded_fact_restore_is_order_invariant_and_healthy() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_manager_bounded_fact_restore_test_{}",
