@@ -22,7 +22,7 @@ use symthaea_core::observation_fabric::{
 };
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
-pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v3";
+pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v4";
 
 pub const EVALUATION_PROCEDURE_VERSION: &str =
     "symthaea-observation-evaluation-procedure-v1";
@@ -120,7 +120,7 @@ impl VerifierEnvironmentIdentity {
     }
 }
 
-const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v3\n";
+const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v4\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReceiptAttestationVerificationOutcome {
@@ -278,6 +278,7 @@ impl EvaluationProcedure {
             && self.verification_report_fingerprint == report.fingerprint()
             && self.context_fingerprint == self.context.fingerprint()
             && self.execution_trace.procedure_fingerprint == report.procedure_fingerprint
+            && self.execution_trace.matches_report(report)
             && self.execution_trace.terminal_outcome() == Some(self.outcome)
             && self.execution_trace.is_well_formed()
             && self.boundary.is_well_formed()
@@ -362,7 +363,7 @@ impl EvaluationCheckResult {
 /// The trace contains only checks that executed. Its order is explicit and its
 /// procedure fingerprint binds the trace to the procedure that defined the check
 /// semantics. The legacy report remains the compatibility projection.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvaluationTrace {
     pub procedure_fingerprint: String,
     pub results: Vec<EvaluationCheckResult>,
@@ -395,6 +396,13 @@ impl EvaluationTrace {
 
     pub fn executed_check_ids(&self) -> Vec<&'static str> {
         self.results.iter().map(EvaluationCheckResult::id).collect()
+    }
+
+    /// Verify that the trace is the execution projection of the report's
+    /// compatibility stage fields.
+    pub fn matches_report(&self, report: &ReceiptAttestationVerificationReport) -> bool {
+        self.procedure_fingerprint == report.procedure_fingerprint
+            && self.results == EvaluationTrace::from_report(report).results
     }
 
     /// Return the aggregate outcome represented by this trace.
@@ -479,6 +487,12 @@ pub struct ReceiptAttestationVerificationReport {
     pub environment_fingerprint: String,
     /// Fingerprint of the exact verification procedure executed to produce this report.
     pub procedure_fingerprint: String,
+    /// Execution evidence captured while verification actually ran.
+    ///
+    /// Legacy serialized reports may deserialize this with the default empty trace;
+    /// current verifier-produced reports always contain the populated trace.
+    #[serde(default)]
+    pub execution_trace: EvaluationTrace,
     /// Fingerprint of the resolver's durable view, when resolution was performed.
     pub resolution_snapshot_fingerprint: Option<String>,
     pub resolved_verification_method: Option<String>,
@@ -504,6 +518,7 @@ impl ReceiptAttestationVerificationReport {
         environment_identity: VerifierEnvironmentIdentity,
     ) -> Self {
         let procedure = EvaluationProcedure::attestation_ed25519();
+        let mut execution_results = Vec::new();
         let mut report = Self {
             outcome,
             verifier_version: VERIFIER_VERSION,
@@ -512,6 +527,7 @@ impl ReceiptAttestationVerificationReport {
             policy_fingerprint: policy_inputs.fingerprint(),
             environment_fingerprint: environment_identity.fingerprint(),
             procedure_fingerprint: procedure.fingerprint(),
+            execution_trace: EvaluationTrace::default(),
             policy_inputs,
             environment_identity,
             resolution_snapshot_fingerprint: None,
@@ -527,14 +543,29 @@ impl ReceiptAttestationVerificationReport {
             cryptographic_proof: VerificationStage::NotEvaluated,
         };
 
-        for check in procedure.checks {
+        for (index, check) in procedure.checks.iter().copied().enumerate() {
             let stage = check.stage_mut(&mut report);
-            if *check == failed_check {
-                *stage = VerificationStage::Failed(outcome);
+            if check == failed_check {
+                let result = VerificationStage::Failed(outcome);
+                *stage = result;
+                execution_results.push(EvaluationCheckResult {
+                    sequence: index as u32,
+                    check,
+                    stage: result,
+                });
                 break;
             }
             *stage = VerificationStage::Passed;
+            execution_results.push(EvaluationCheckResult {
+                sequence: index as u32,
+                check,
+                stage: VerificationStage::Passed,
+            });
         }
+        report.execution_trace = EvaluationTrace {
+            procedure_fingerprint: report.procedure_fingerprint.clone(),
+            results: execution_results,
+        };
         report
     }
 
@@ -545,6 +576,21 @@ impl ReceiptAttestationVerificationReport {
         policy_inputs: VerificationPolicyInputs,
         environment_identity: VerifierEnvironmentIdentity,
     ) -> Self {
+        let procedure = EvaluationProcedure::attestation_ed25519();
+        let execution_trace = EvaluationTrace {
+            procedure_fingerprint: procedure.fingerprint(),
+            results: procedure
+                .checks
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, check)| EvaluationCheckResult {
+                    sequence: index as u32,
+                    check,
+                    stage: VerificationStage::Passed,
+                })
+                .collect(),
+        };
         Self {
             outcome: ReceiptAttestationVerificationOutcome::Verified,
             verifier_version: VERIFIER_VERSION,
@@ -552,7 +598,8 @@ impl ReceiptAttestationVerificationReport {
             evaluated_at_unix_ns,
             policy_fingerprint: policy_inputs.fingerprint(),
             environment_fingerprint: environment_identity.fingerprint(),
-            procedure_fingerprint: EvaluationProcedure::attestation_ed25519().fingerprint(),
+            procedure_fingerprint: procedure.fingerprint(),
+            execution_trace,
             policy_inputs,
             environment_identity,
             resolution_snapshot_fingerprint: None,
@@ -593,6 +640,9 @@ impl ReceiptAttestationVerificationReport {
         write_string(&mut bytes, &self.policy_fingerprint);
         write_string(&mut bytes, &self.environment_fingerprint);
         write_string(&mut bytes, &self.procedure_fingerprint);
+        let trace_bytes = self.execution_trace.canonical_bytes();
+        bytes.extend_from_slice(&(trace_bytes.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(&trace_bytes);
         match &self.resolution_snapshot_fingerprint {
             Some(value) => { bytes.push(1); write_string(&mut bytes, value); }
             None => bytes.push(0),
@@ -619,7 +669,7 @@ impl ReceiptAttestationVerificationReport {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-attestation-report:v3\n");
+        hasher.update(b"symthaea:observation-attestation-report:v4\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -948,7 +998,13 @@ pub struct EvidenceEvaluation {
 impl EvidenceEvaluation {
     pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
         let context = VerificationContext::from_report(report);
-        let execution_trace = EvaluationTrace::from_report(report);
+        let execution_trace = if report.execution_trace.is_well_formed() {
+            report.execution_trace.clone()
+        } else {
+            // Compatibility path for legacy serialized reports that predate
+            // first-class execution traces.
+            EvaluationTrace::from_report(report)
+        };
         Self {
             evaluation_version: EVIDENCE_EVALUATION_VERSION,
             subject_fingerprint: report.receipt_fingerprint.clone(),
