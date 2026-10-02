@@ -129,9 +129,12 @@ impl Rfc9942ReceiptEnvelope {
         if ph_len<2||ph_len>16{return Err(Rfc9942VdpError::InvalidStructure);}
         let mut algorithm=None; let mut vds=None;
         let mut protected_extensions=Vec::new();
+        let mut protected_labels=std::collections::HashSet::new();
         for _ in 0..ph_len{
             let entry_start=ph.offset;
-            let label=ph.read_cose_label().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            let label_key=ph.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            if !protected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
+            let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Text(_)=>None };
             match label{
                 Some(COSE_ALG_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if algorithm.replace(value).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
                 Some(RFC9942_VDS_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if value<0{return Err(Rfc9942VdpError::InvalidStructure);}if vds.replace(value as u64).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
@@ -147,9 +150,12 @@ impl Rfc9942ReceiptEnvelope {
         let uh_len=reader.read_map_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?; if uh_len>32{return Err(Rfc9942VdpError::ResourceLimitExceeded);}
         let mut vdp=None;
         let mut unprotected_extensions=Vec::new();
+        let mut unprotected_labels=std::collections::HashSet::new();
         for _ in 0..uh_len{
             let entry_start=reader.offset;
-            let label=reader.read_cose_label().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            let label_key=reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            if !unprotected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
+            let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Text(_)=>None };
             if label==Some(RFC9942_VDP_HEADER_LABEL){
                 if vdp.is_some(){return Err(Rfc9942VdpError::InvalidStructure);}
                 vdp=Some(Rfc9942Vdp::from_reader(&mut reader)?);
@@ -341,10 +347,18 @@ impl Rfc9942SignatureWithReceipts {
 
         let mut protected_extensions = Vec::new();
         let mut protected_receipts = None;
+        let mut protected_labels = std::collections::HashSet::new();
         for _ in 0..protected_len {
             let start = protected_reader.offset;
-            let label = protected_reader.read_cose_label()
+            let label_key = protected_reader.read_cose_label_key()
                 .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            if !protected_labels.insert(label_key.clone()) {
+                return Err(Rfc9942VdpError::InvalidStructure);
+            }
+            let label = match &label_key {
+                CborLabelKey::Integer(value) => Some(*value),
+                CborLabelKey::Text(_) => None,
+            };
             if label == Some(RFC9942_RECEIPTS_HEADER_LABEL) {
                 if protected_receipts.is_some() {
                     return Err(Rfc9942VdpError::InvalidStructure);
@@ -366,10 +380,18 @@ impl Rfc9942SignatureWithReceipts {
 
         let mut unprotected_extensions = Vec::new();
         let mut unprotected_receipts = None;
+        let mut unprotected_labels = std::collections::HashSet::new();
         for _ in 0..unprotected_len {
             let start = reader.offset;
-            let label = reader.read_cose_label()
+            let label_key = reader.read_cose_label_key()
                 .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            if !unprotected_labels.insert(label_key.clone()) {
+                return Err(Rfc9942VdpError::InvalidStructure);
+            }
+            let label = match &label_key {
+                CborLabelKey::Integer(value) => Some(*value),
+                CborLabelKey::Text(_) => None,
+            };
             if label == Some(RFC9942_RECEIPTS_HEADER_LABEL) {
                 if protected_receipts.is_some() || unprotected_receipts.is_some() {
                     return Err(Rfc9942VdpError::InvalidStructure);
@@ -958,6 +980,12 @@ pub enum Rfc9162ProofDecodeError {
     TrailingBytes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum CborLabelKey {
+    Integer(i64),
+    Text(Vec<u8>),
+}
+
 struct CborReader<'a> { bytes: &'a [u8], offset: usize }
 impl<'a> CborReader<'a> {
     fn new(bytes: &'a [u8]) -> Self { Self { bytes, offset: 0 } }
@@ -1073,21 +1101,21 @@ impl<'a> CborReader<'a> {
     }
 
     fn skip_label(&mut self) -> Result<(), Rfc9162ProofDecodeError> {
+        self.read_cose_label_key().map(|_|())
+    }
+
+    fn read_cose_label_key(&mut self) -> Result<CborLabelKey, Rfc9162ProofDecodeError> {
         match self.peek_major_type()? {
-            0|1=>self.read_i64().map(|_|()),
-            3=>self.read_text_bounded(256).map(|_|()),
-            _=>Err(Rfc9162ProofDecodeError::InvalidEncoding),
+            0 | 1 => self.read_i64().map(CborLabelKey::Integer),
+            3 => self.read_text_bounded(256).map(CborLabelKey::Text),
+            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
     }
 
     fn read_cose_label(&mut self) -> Result<Option<i64>, Rfc9162ProofDecodeError> {
-        match self.peek_major_type()? {
-            0 | 1 => self.read_i64().map(Some),
-            3 => {
-                self.read_text_bounded(256)?;
-                Ok(None)
-            }
-            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        match self.read_cose_label_key()? {
+            CborLabelKey::Integer(value) => Ok(Some(value)),
+            CborLabelKey::Text(_) => Ok(None),
         }
     }
 
@@ -1881,6 +1909,29 @@ mod tests {
         assert!(decoded.protected_receipts().is_some());
         assert!(decoded.unprotected_receipts().is_none());
         assert_eq!(decoded.to_cbor(),outer);
+    }
+
+    #[test]
+    fn rfc9942_signature_with_receipts_rejects_duplicate_unknown_header_labels() {
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,2);
+        cbor_int(&mut protected,7); cbor_uint(&mut protected,1);
+        cbor_int(&mut protected,7); cbor_uint(&mut protected,2);
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG); cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected); cbor_map_len(&mut bytes,0);
+        bytes.push(0xf6); cbor_bytes(&mut bytes,&[0xBB]);
+        assert_eq!(Rfc9942SignatureWithReceipts::from_cbor(&bytes),Err(Rfc9942VdpError::InvalidStructure));
+
+        let mut unprotected=Vec::new();
+        cbor_map_len(&mut unprotected,2);
+        cbor_int(&mut unprotected,7); cbor_uint(&mut unprotected,1);
+        cbor_int(&mut unprotected,7); cbor_uint(&mut unprotected,2);
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG); cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&[]); bytes.extend_from_slice(&unprotected);
+        bytes.push(0xf6); cbor_bytes(&mut bytes,&[0xBB]);
+        assert_eq!(Rfc9942SignatureWithReceipts::from_cbor(&bytes),Err(Rfc9942VdpError::InvalidStructure));
     }
 
     #[test]
