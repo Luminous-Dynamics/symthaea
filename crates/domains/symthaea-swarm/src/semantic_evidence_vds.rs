@@ -23,6 +23,34 @@ pub const RFC9942_VDS_HEADER_LABEL: i64 = 395;
 pub const MAX_RFC9942_PROOFS: usize = 256;
 pub const MAX_RFC9942_PROOF_BYTES: usize = 8 * 1024;
 pub const RFC9942_VDP_HEADER_LABEL: i64 = 396;
+pub const COSE_SIGN1_TAG: u64 = 18;
+pub const COSE_ALG_HEADER_LABEL: i64 = 1;
+
+/// RFC 9942 receipt payload representation after structural parsing.
+///
+/// `Detached` corresponds to COSE_Sign1 `payload: nil`; the caller must supply
+/// the externally transported payload before proof verification. `Attached`
+/// represents an in-receipt bstr and is validated as a SHA-256 Merkle root.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Rfc9942ReceiptPayload {
+    Detached,
+    Attached([u8; 32]),
+}
+
+impl Rfc9942ReceiptPayload {
+    pub fn from_bytes(payload: Option<&[u8]>) -> Result<Self, Rfc9942VdpError> {
+        match payload {
+            None => Ok(Self::Detached),
+            Some(bytes) if bytes.len() == 32 => {
+                let mut root=[0u8;32]; root.copy_from_slice(bytes); Ok(Self::Attached(root))
+            }
+            Some(_) => Err(Rfc9942VdpError::InvalidPayloadLength),
+        }
+    }
+    pub const fn attached_root(&self) -> Option<[u8;32]> {
+        match self { Self::Detached => None, Self::Attached(root) => Some(*root) }
+    }
+}
 
 /// RFC 9942 proof type carried in the vdp header map.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,6 +95,8 @@ pub enum Rfc9942VdpError {
     ResourceLimitExceeded,
     #[error("RFC 9942 receipt payload must be exactly 32 bytes for SHA-256")]
     InvalidPayloadLength,
+    #[error("detached RFC 9942 payload requires an externally supplied root")]
+    DetachedPayloadRequired,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
     VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
@@ -1068,6 +1098,15 @@ mod tests {
         );
     }
 
+    #[test]
+    fn rfc9942_receipt_payload_distinguishes_attached_and_detached() {
+        assert_eq!(Rfc9942ReceiptPayload::from_bytes(None).unwrap(),Rfc9942ReceiptPayload::Detached);
+        let root=[0x11;32];
+        assert_eq!(Rfc9942ReceiptPayload::from_bytes(Some(&root)).unwrap(),Rfc9942ReceiptPayload::Attached(root));
+        assert_eq!(Rfc9942ReceiptPayload::from_bytes(Some(&[0x11;31])),Err(Rfc9942VdpError::InvalidPayloadLength));
+        assert_eq!(Rfc9942ReceiptPayload::Detached.attached_root(),None);
+        assert_eq!(Rfc9942ReceiptPayload::Attached(root).attached_root(),Some(root));
+    }
     #[test]
     fn rfc9942_proof_kind_labels_are_exact() {
         assert_eq!(Rfc9942ProofKind::Inclusion.label(), -1);
