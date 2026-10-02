@@ -17,6 +17,8 @@ use serde_json::Value;
 use std::cell::RefCell;
 use std::rc::Rc;
 use symthaea_canvas::{GpuScene, RemoteScene, WebGpuMovieRenderer, WebGpuRenderer};
+#[cfg(feature = "browser-qualification")]
+use symthaea_canvas::{Color, SceneNode, Style, Transform};
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
@@ -92,6 +94,81 @@ struct Movie {
 const MAX_MOVIE_PIXELS: usize = 2048 * 2048;
 const MAX_MOVIE_FRAMES: usize = 24;
 const MAX_MOVIE_RGBA_BYTES: usize = 32 * 1024 * 1024;
+
+#[cfg(feature = "browser-qualification")]
+fn browser_qualification_scene() -> RemoteScene {
+    let background = SceneNode::rect(0.0, 0.0, 512.0, 512.0).with_style(Style {
+        fill: Some(Color::rgb(0.04, 0.06, 0.10)),
+        ..Style::default()
+    });
+    let concave = SceneNode::polygon(
+        vec![
+            (52.0, 72.0),
+            (420.0, 72.0),
+            (420.0, 180.0),
+            (246.0, 180.0),
+            (246.0, 430.0),
+            (52.0, 430.0),
+        ],
+        true,
+    )
+    .with_style(Style {
+        fill: Some(Color::rgba(0.92, 0.48, 0.16, 0.9)),
+        stroke: Some(Color::rgb(0.95, 0.9, 0.75)),
+        stroke_width: Some(3.0),
+        ..Style::default()
+    });
+    let circle = SceneNode::circle(360.0, 350.0, 70.0).with_style(Style {
+        fill: Some(Color::rgba(0.18, 0.72, 0.92, 0.75)),
+        ..Style::default()
+    });
+    let transform_group = SceneNode::group(Some("transformed"))
+        .with_transform(Transform {
+            translate_x: 18.0,
+            translate_y: -14.0,
+            rotate_deg: 7.0,
+            scale: 0.82,
+        })
+        .with_style(Style {
+            opacity: Some(0.65),
+            ..Style::default()
+        })
+        .with_child(
+            SceneNode::line(80.0, 470.0, 450.0, 120.0).with_style(Style {
+                stroke: Some(Color::rgb(0.9, 0.96, 1.0)),
+                stroke_width: Some(4.0),
+                ..Style::default()
+            }),
+        );
+    RemoteScene::from_scene(
+        &SceneNode::group(Some("browser-qualification"))
+            .with_child(background)
+            .with_child(concave)
+            .with_child(circle)
+            .with_child(transform_group),
+    )
+}
+
+#[cfg(feature = "browser-qualification")]
+fn browser_qualification_movie() -> Movie {
+    let width = 32u32;
+    let height = 24u32;
+    let mut rgba = Vec::with_capacity((width * height * 4) as usize);
+    for y in 0..height {
+        for x in 0..width {
+            let r = ((x * 255) / (width - 1)) as u8;
+            let g = ((y * 255) / (height - 1)) as u8;
+            let b = (((x + y) * 255) / (width + height - 2)) as u8;
+            rgba.extend_from_slice(&[r, g, b, 255]);
+        }
+    }
+    Movie {
+        frames_rgba: vec![rgba],
+        width,
+        height,
+        semantic_coherence: 1.0,
+    }
+}
 
 impl Movie {
     fn from_json(v: &Value) -> Option<Movie> {
@@ -208,6 +285,17 @@ pub fn App() -> impl IntoView {
     let movie_webgpu_canvas = NodeRef::<leptos::html::Canvas>::new();
     let webgpu_canvas = NodeRef::<leptos::html::Canvas>::new();
     let gpu_scene = RwSignal::new(Option::<RemoteScene>::None);
+
+    #[cfg(feature = "browser-qualification")]
+    {
+        let enabled = web_sys::window()
+            .and_then(|window| window.location().search().ok())
+            .is_some_and(|search| search.contains("symthaea_webgpu_fixture=1"));
+        if enabled {
+            gpu_scene.set(Some(browser_qualification_scene()));
+            movie.set(Some(browser_qualification_movie()));
+        }
+    }
     let webgpu_ready = RwSignal::new(false);
     let movie_webgpu_ready = RwSignal::new(false);
     let webgpu_renderer: Rc<RefCell<Option<WebGpuRenderer>>> = Rc::new(RefCell::new(None));
