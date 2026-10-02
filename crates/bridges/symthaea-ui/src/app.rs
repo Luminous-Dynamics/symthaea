@@ -135,20 +135,28 @@ impl Movie {
     fn from_json(v: &Value) -> Option<Movie> {
         use base64::Engine as _;
         let m = v.get("mental_movie")?;
-        let width = m["width"].as_u64()? as u32;
-        let height = m["height"].as_u64()? as u32;
-        let channels = m["channels"].as_u64()? as usize;
+        // Decode dimensions without truncating hostile u64 JSON values into
+        // the wasm32 u32/usize domain. Truncation here could turn an enormous
+        // remote dimension into a small allocation and then leave indexing
+        // arithmetic inconsistent with the declared wire shape.
+        let width = u32::try_from(m["width"].as_u64()?).ok()?;
+        let height = u32::try_from(m["height"].as_u64()?).ok()?;
+        let channels = usize::try_from(m["channels"].as_u64()?).ok()?;
+        if channels != 1 && channels < 3 {
+            return None;
+        }
         let engine = base64::engine::general_purpose::STANDARD;
         let px = (width as usize).checked_mul(height as usize)?;
         if px == 0 || px > MAX_MOVIE_PIXELS {
             return None;
         }
+        let bytes_per_frame = px.checked_mul(channels)?;
         let rgba_capacity = px.checked_mul(4)?;
         let frames_rgba: Vec<Vec<u8>> = m["frames_b64"]
             .as_array()?
             .iter()
             .filter_map(|f| engine.decode(f.as_str()?).ok())
-            .filter(|raw| raw.len() >= px * channels.max(1))
+            .filter(|raw| raw.len() >= bytes_per_frame)
             .map(|raw| {
                 let mut rgba = Vec::with_capacity(rgba_capacity);
                 for i in 0..px {
@@ -849,6 +857,37 @@ mod tests {
     #[test]
     fn telemetry_requires_finite_cognitive_measurements() {
         assert!(Vitals::from_json(&valid_payload()).is_some());
+    }
+
+    #[test]
+    fn movie_dimensions_and_channels_fail_closed_without_integer_truncation() {
+        let mut payload = serde_json::json!({
+            "mental_movie": {
+                "width": (u32::MAX as u64) + 1,
+                "height": 1,
+                "channels": 1,
+                "frames_b64": ["AA=="]
+            }
+        });
+        assert!(Movie::from_json(&payload).is_none());
+
+        payload["mental_movie"]["width"] = 1;
+        payload["mental_movie"]["height"] = 1;
+        payload["mental_movie"]["channels"] = 2;
+        assert!(Movie::from_json(&payload).is_none());
+    }
+
+    #[test]
+    fn movie_frame_byte_count_is_checked_before_filtering() {
+        let payload = serde_json::json!({
+            "mental_movie": {
+                "width": 2,
+                "height": 2,
+                "channels": u64::MAX,
+                "frames_b64": ["AA=="]
+            }
+        });
+        assert!(Movie::from_json(&payload).is_none());
     }
 
     #[test]
