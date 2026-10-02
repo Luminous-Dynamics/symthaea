@@ -793,24 +793,35 @@ impl KnowledgePersistence {
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
-        conn.query_row(
-            "SELECT generation, canonical_digest_hex
-             FROM knowledge_snapshot_receipts
-             ORDER BY generation DESC
-             LIMIT 1",
-            [],
-            |row| {
-                let generation = row.get::<_, i64>(0)?;
-                Ok(KnowledgeSnapshotReceipt {
-                    generation: u64::try_from(generation).map_err(|_| {
-                        rusqlite::Error::IntegralValueOutOfRange(0, generation)
-                    })?,
-                    canonical_digest_hex: row.get(1)?,
-                })
-            },
-        )
-        .optional()
-        .map_err(|e| format!("Load latest snapshot receipt: {e}"))
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Begin latest snapshot receipt verification: {e}"))?;
+        verify_snapshot_receipts_in_tx(&tx)?;
+
+        let receipt = tx
+            .query_row(
+                "SELECT generation, canonical_digest_hex, receipt_digest_hex
+                 FROM knowledge_snapshot_receipts
+                 ORDER BY generation DESC
+                 LIMIT 1",
+                [],
+                |row| {
+                    let generation = row.get::<_, i64>(0)?;
+                    Ok(KnowledgeSnapshotReceipt {
+                        generation: u64::try_from(generation).map_err(|_| {
+                            rusqlite::Error::IntegralValueOutOfRange(0, generation)
+                        })?,
+                        canonical_digest_hex: row.get(1)?,
+                        receipt_digest_hex: row.get(2)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|e| format!("Load latest snapshot receipt: {e}"))?;
+
+        tx.commit()
+            .map_err(|e| format!("Commit latest snapshot receipt verification: {e}"))?;
+        Ok(receipt)
     }
 
     /// Load the latest committed complete snapshot together with the receipt that
@@ -843,9 +854,11 @@ impl KnowledgePersistence {
             .unchecked_transaction()
             .map_err(|e| format!("Begin verified persistence snapshot read: {e}"))?;
 
+        verify_snapshot_receipts_in_tx(&tx)?;
+
         let receipt = tx
             .query_row(
-                "SELECT generation, canonical_digest_hex
+                "SELECT generation, canonical_digest_hex, receipt_digest_hex
                  FROM knowledge_snapshot_receipts
                  ORDER BY generation DESC
                  LIMIT 1",
@@ -857,6 +870,7 @@ impl KnowledgePersistence {
                             rusqlite::Error::IntegralValueOutOfRange(0, generation)
                         })?,
                         canonical_digest_hex: row.get(1)?,
+                        receipt_digest_hex: row.get(2)?,
                     })
                 },
             )
@@ -912,11 +926,12 @@ impl KnowledgePersistence {
             .unchecked_transaction()
             .map_err(|e| format!("Begin snapshot validation transaction: {e}"))?;
 
+        verify_snapshot_receipts_in_tx(&tx)?;
         verify_snapshot_validation_receipts_in_tx(&tx)?;
 
         let latest = tx
             .query_row(
-                "SELECT generation, canonical_digest_hex
+                "SELECT generation, canonical_digest_hex, receipt_digest_hex
                  FROM knowledge_snapshot_receipts
                  ORDER BY generation DESC
                  LIMIT 1",
@@ -928,6 +943,7 @@ impl KnowledgePersistence {
                             rusqlite::Error::IntegralValueOutOfRange(0, generation)
                         })?,
                         canonical_digest_hex: row.get(1)?,
+                        receipt_digest_hex: row.get(2)?,
                     })
                 },
             )
