@@ -295,12 +295,20 @@ impl KnowledgeManager {
                 Ok(facts) => {
                     persistence_health.facts_loaded = true;
                     for record in &facts {
-                        if !graph.import_fact_record(record) {
+                        let outcome = graph.import_fact_record_with_outcome(record);
+                        persistence_health.fact_restore_evictions += outcome.policy_evictions;
+                        if !outcome.accepted {
                             persistence_health.fact_rejections += 1;
                             tracing::warn!(
                                 memory_id = %record.memory_id,
                                 rejected = persistence_health.fact_rejections,
                                 "Knowledge: rejected persisted fact during graph restore"
+                            );
+                        } else if outcome.policy_evictions > 0 {
+                            tracing::debug!(
+                                memory_id = %record.memory_id,
+                                evicted = outcome.policy_evictions,
+                                "Knowledge: fact restore was limited by graph retention policy"
                             );
                         }
                     }
@@ -1418,6 +1426,9 @@ pub struct KnowledgePersistenceHealth {
     pub facts_loaded: bool,
     /// Decoded fact rows rejected by graph admission during restore.
     pub fact_rejections: usize,
+    /// Number of persisted facts admitted only after bounded graph retention evicted
+    /// an existing resident. This is a policy outcome, not a persistence failure.
+    pub fact_restore_evictions: usize,
     /// SQLite rows were decoded successfully. This does not imply every row was
     /// admitted into the graph; see the admission rejection counters.
     pub provenance_loaded: bool,
