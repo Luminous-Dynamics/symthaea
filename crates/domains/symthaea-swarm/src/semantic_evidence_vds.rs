@@ -100,7 +100,7 @@ pub struct Rfc9942ReceiptEnvelope {
     algorithm_id: i64,
     vds_id: u64,
     vdp: Rfc9942Vdp,
-    payload: Rfc9942SignaturePayload,
+    payload: Rfc9942ReceiptPayload,
     signature: Vec<u8>,
     /// Exact serialized protected-header map from parsed receipts. Keeping this
     /// byte-for-byte preserves the COSE Sig_structure input on re-encoding.
