@@ -214,6 +214,21 @@ impl SqliteAuthorizationStore {
                marker TEXT NOT NULL,
                PRIMARY KEY(authorization_instance, attempt_id, marker)
              );
+             CREATE TABLE IF NOT EXISTS authorization_terminal_evidence (
+               authorization_instance TEXT NOT NULL,
+               attempt_id TEXT NOT NULL,
+               boundary_id TEXT NOT NULL,
+               action_digest TEXT NOT NULL,
+               provider_idempotency_key TEXT NOT NULL,
+               target_identity TEXT NOT NULL,
+               audience TEXT NOT NULL,
+               outcome TEXT NOT NULL,
+               evidence_id TEXT NOT NULL,
+               evidence_digest TEXT NOT NULL,
+               verifier_id TEXT NOT NULL,
+               verification_digest TEXT NOT NULL,
+               PRIMARY KEY(authorization_instance, attempt_id)
+             );
              CREATE TABLE IF NOT EXISTS authorization_dispatches (
                authorization_instance TEXT NOT NULL,
                attempt_id TEXT NOT NULL,
