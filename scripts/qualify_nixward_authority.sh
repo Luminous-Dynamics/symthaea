@@ -27,6 +27,9 @@ cargo test -p nixward --lib action::service_domain::tests
 echo "-- service-manager boundary tests --"
 cargo test -p nixward --lib action::service_manager::tests
 
+echo "-- executor typed-service tests --"
+cargo test -p nixward --lib action::executor::tests
+
 echo "-- temporal tests --"
 cargo test -p nixward --lib action::temporal::tests
 
