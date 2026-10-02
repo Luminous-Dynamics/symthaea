@@ -35,6 +35,7 @@ pub struct AdversarialCrucibleResult {
     pub temporal_state: TemporalFusionState,
     pub trusted_sensor_count: usize,
     pub temporal_disagreement: bool,
+    pub observed_current_consensus: Option<f64>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -42,11 +43,14 @@ struct SensorModel {
     offset: f64,
     stuck: bool,
     drift: f64,
+    override_current: Option<f64>,
 }
 
 impl SensorModel {
     fn observe(self, latent: f64) -> f64 {
-        if self.stuck {
+        if let Some(value) = self.override_current {
+            value
+        } else if self.stuck {
             self.offset
         } else {
             latent + self.offset + self.drift
@@ -115,7 +119,7 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
             0.2,
             0.2,
             vec![
-                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
+                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0, override_current: None }),
                 ("b", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
                 ("c", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
             ],
@@ -125,8 +129,8 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
             1.5,
             vec![
                 ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
-                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0 }),
-                ("c", SensorModel { offset: -0.05, stuck: false, drift: 0.0 }),
+                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0, override_current: None }),
+                ("c", SensorModel { offset: -0.05, stuck: false, drift: 0.0, override_current: None }),
             ],
         ),
         AdversarialScenario::StuckSensor => (
@@ -135,7 +139,7 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
             vec![
                 ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
                 ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0 }),
-                ("c", SensorModel { offset: 0.0, stuck: true, drift: 0.0 }),
+                ("c", SensorModel { offset: 0.0, stuck: true, drift: 0.0, override_current: None }),
             ],
         ),
         AdversarialScenario::GradualDrift => (
@@ -144,7 +148,7 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
             vec![
                 ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
                 ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0 }),
-                ("c", SensorModel { offset: 0.0, stuck: false, drift: -0.45 }),
+                ("c", SensorModel { offset: 0.0, stuck: false, drift: -0.45, override_current: None }),
             ],
         ),
         AdversarialScenario::MissingSensor => (
@@ -157,11 +161,11 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
         ),
         AdversarialScenario::CoordinatedFalseTrajectory => (
             0.5,
-            1.5,
+            0.8,
             vec![
-                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
-                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0 }),
-                ("c", SensorModel { offset: -0.05, stuck: false, drift: 0.0 }),
+                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0, override_current: Some(1.5) }),
+                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0, override_current: Some(1.55) }),
+                ("c", SensorModel { offset: -0.05, stuck: false, drift: 0.0, override_current: Some(1.45) }),
             ],
         ),
         AdversarialScenario::RecoveryAfterRepair => (
@@ -187,6 +191,12 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
         latent_current,
         temporal_state: decision.state,
         trusted_sensor_count: decision.trusted_sensor_ids.len(),
+        observed_current_consensus: decision
+            .sensor_deltas
+            .iter()
+            .map(|(_, delta)| delta)
+            .next()
+            .map(|delta| latent_previous + delta + 0.0),
         temporal_disagreement: !decision.issues.is_empty()
             && decision
                 .issues
@@ -250,7 +260,8 @@ mod tests {
         let result = run_scenario(AdversarialScenario::CoordinatedFalseTrajectory);
         assert_eq!(result.temporal_state, TemporalFusionState::Corroborated);
         assert!(!result.temporal_disagreement);
-        assert_eq!(result.latent_current, 1.5);
+        assert_eq!(result.latent_current, 0.8);
+        assert_eq!(result.observed_current_consensus, Some(1.5));
     }
 
     #[test]
