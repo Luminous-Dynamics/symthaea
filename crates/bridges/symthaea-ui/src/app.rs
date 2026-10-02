@@ -503,7 +503,7 @@ fn portrait_from_json(v: &Value) -> Option<String> {
             "svg", "g", "path", "rect", "circle", "ellipse", "line", "polyline",
             "polygon", "title", "desc",
         ];
-        if !ALLOWED_TAGS.contains(&name.as_str()) {
+        if !ALLOWED_TAGS.contains(&name) {
             return None;
         }
 
@@ -511,7 +511,7 @@ fn portrait_from_json(v: &Value) -> Option<String> {
             if self_closing || !body[name_end..].trim().is_empty() {
                 return None;
             }
-            if stack.pop().as_deref() != Some(name.as_str()) {
+            if stack.pop().as_deref() != Some(name) {
                 return None;
             }
             cursor = open + end + 1;
@@ -579,7 +579,7 @@ fn portrait_from_json(v: &Value) -> Option<String> {
                 return None;
             }
 
-            let allowed = match name.as_str() {
+            let allowed = match name {
                 "svg" => matches!(key, "viewBox" | "width" | "height" | "xmlns"),
                 "g" | "path" | "rect" | "circle" | "ellipse" | "line"
                 | "polyline" | "polygon" => matches!(
