@@ -148,63 +148,54 @@ The literature supports treating this as a distinct recovery family. Raviv repor
 
 ## Stage-C algebraic kernel status
 
-A first research-only recovery primitive is now implemented: `solve_linear_combination` solves a target codeword as a GF(2) linear combination of supplied basis vectors. The executable Stage-B fixture concatenates the two factor bases, verifies full column rank via the direct-sum condition, recovers the coefficient vector, and then compares that result against exhaustive factor-pair truth.
+The research-only GF(2) kernel now has a clean two-factor and generalized independent-F recovery path.
 
-This is deliberately a **kernel validation**, not yet a paper-fidelity claim. The implementation currently establishes:
+Implemented:
 
-- clean bound recovery is exactly reducible to GF(2) linear algebra when the participating factor bases are jointly independent;
-- the recovered coefficient vector can be split back into the two factor domains;
-- the exhaustive oracle returns exactly one matching pair for the validated direct-sum fixture;
-- an outsider target is rejected when it is outside the supplied span.
+- solve_linear_combination performs packed-u64 Gaussian elimination over GF(2).
+- recover_direct_sum_bound is the two-factor specialization.
+- recover_independent_bound generalizes the same construction to F factor codebooks when the concatenated generator bases are jointly independent.
+- The API preserves factor order and rejects dimension mismatch or overlapping/dependent factor bases rather than implying uniqueness where the algebra does not provide it.
+- The existing exhaustive two-factor oracle remains the ground truth.
+- A new three-factor parent-basis-partition fixture validates exact recovery against exhaustive truth.
+- An overlap fixture explicitly verifies the conservative rejection path.
 
-The remaining research obligation is to match the paper's precise multi-code/subcode construction and prove that the fixture used for the benchmark has the same structural assumptions. The GF(2) solver now uses packed `u64` elimination rows rather than `Vec<bool>` equations, with an explicit 64/65-coefficient boundary regression test. This is a representation-preserving implementation improvement only; it does not change the paper-fidelity status or introduce a production dependency. The published paper states that bound recovery uses the subspace structure of the participating linear codes for provably correct factorization; the public abstract does not by itself specify every construction detail needed to label this fixture paper-faithful.
+This is intentionally narrower than the fully general overlapping-code version of Raviv's Theorem 2. The paper's theorem constructs a maximal linearly independent subset of the union of the participating generator bases and solves the resulting GF(2) system. When the union is already independent, the maximal subset is simply the full union, which is the case implemented here. The paper also notes that overlapping factor subcodes can make recovery non-unique, so the current API does not convert that case into a false uniqueness guarantee.
 
-### Stage-B construction constraint
-The bound-recovery comparator must not use arbitrary factors from a single common linear code as its primary recovery fixture. Such factors are generally non-identifiable from XOR alone because multiple decompositions can exist within the same subspace. The paper's bound-recovery framework instead uses factors associated with participating linear-code subspaces and exploits their basis/subspace structure. Therefore Stage B requires an explicit fixture in which the participating factor domains are defined and the intended factorization is uniquely identifiable (or all valid ambiguity classes are exhaustively enumerated). No recovery-performance claim is valid until that construction is verified.
+### Primary-text verification
 
-The literature review of the paper provides a more concrete interpretation of this condition: it describes a key/value construction using subcodes (K) and (V) of a parent code (C), with (C = K 	imes V) meaning each parent codeword has a unique XOR decomposition into one key-subcode word and one value-subcode word. A separate description of bound recovery likewise says the factors are drawn from different linear-code subspaces and recovered by solving against a basis of the participating codes. These are secondary descriptions, so they strengthen the construction hypothesis but are not being treated as substitutes for the paper's full derivation.
+Raviv's 2024 paper defines the parent-code product/direct-sum construction using subcodes whose XOR decomposition is unique, and Section IV-A Theorem 2 gives the generator-basis GF(2) recovery construction for bound representations. The current two-factor and F-factor independent-basis implementations are faithful specializations of that algebraic path; they do not yet reproduce the paper's full benchmark harness or parameterization.
 
-The first executable fixture now derives two factor subcodes from a single generated parent code, partitioning its independent generator basis into K and V. It still **checks** the direct-sum condition algebraically rather than trusting construction:
-[
-\operatorname{rank}(C_1 + C_2)=\operatorname{rank}(C_1)+\operatorname{rank}(C_2).
-]
-For such a direct sum, the decomposition of any element of (C_1+C_2) into one element of each factor subspace is unique. The test then exhaustively enumerates both small codebooks and requires exactly one pair to reproduce the clean bound. This is an algebraic validation fixture, not yet a claim that it reproduces Raviv's exact benchmark construction; the paper-specific construction still needs to be matched before Stage C.
+The implementation deliberately keeps the representation research-only. No Symthaea production default, resonator path, or cleanup rule is changed.
 
-The bound-recovery comparator must not use arbitrary factors from a single common linear code as its primary recovery fixture. Such factors are generally non-identifiable from XOR alone because multiple decompositions can exist within the same subspace. The paper's bound-recovery framework instead uses factors associated with participating linear-code subspaces and exploits their basis/subspace structure. Therefore Stage B requires an explicit fixture in which the participating factor domains are defined and the intended factorization is uniquely identifiable (or all valid ambiguity classes are exhaustively enumerated). No recovery-performance claim is valid until that construction is verified.
+### Next research axis: noisy recovery
 
-The first executable fixture now uses two independently generated factor subspaces (C_1,C_2) in the same 96-bit ambient space and **checks** the direct-sum condition algebraically:
-[
-\operatorname{rank}(C_1 + C_2)=\operatorname{rank}(C_1)+\operatorname{rank}(C_2).
-]
-For such a direct sum, the decomposition of any element of (C_1+C_2) into one element of each factor subspace is unique. The test then exhaustively enumerates both small codebooks and requires exactly one pair to reproduce the clean bound. This is an algebraic validation fixture, not yet a claim that it reproduces Raviv's exact benchmark construction; the paper-specific construction still needs to be matched before Stage C.
- (C_1,C_2) in the same 96-bit ambient space and **checks** the direct-sum condition algebraically:
-[
-\operatorname{rank}(C_1 + C_2)=\operatorname{rank}(C_1)+\operatorname{rank}(C_2).
-]
-For such a direct sum, the decomposition of any element of (C_1+C_2) into one element of each factor subspace is unique. The test then exhaustively enumerates both small codebooks and requires exactly one pair to reproduce the clean bound. This is an algebraic validation fixture, not yet a claim that it reproduces Raviv's exact benchmark construction; the paper-specific construction still needs to be matched before Stage C.
+A 2026 Deng–Raviv result, Efficient Vector Symbolic Architectures from Histogram Recovery, identifies noisy decoding as a central limitation of random linear-code VSA and develops a different coding-theoretic construction based on Reed-Solomon/Hadamard concatenation and histogram recovery. The work provides a useful warning for this branch: clean GF(2) exact recovery is not sufficient evidence for noise robustness, and a noisy-recovery study should not be presented as a trivial extension of the current random-linear-code comparator.
 
-The bound-recovery comparator must not use arbitrary factors from a single common linear code as its primary recovery fixture. Such factors are generally non-identifiable from XOR alone because multiple decompositions can exist within the same subspace. The paper's bound-recovery framework instead uses factors associated with participating linear-code subspaces and exploits their basis/subspace structure. Therefore Stage B requires an explicit fixture in which the participating factor domains are defined and the intended factorization is uniquely identifiable (or all valid ambiguity classes are exhaustively enumerated). No recovery-performance claim is valid until that construction is verified.
+For Symthaea, the next controlled experiment should therefore remain representation-explicit:
 
-The first executable fixture now uses two independently generated factor subspaces (C_1,C_2) in the same 96-bit ambient space and **checks** the direct-sum condition algebraically:
-[
-\operatorname{rank}(C_1 + C_2)=\operatorname{rank}(C_1)+\operatorname{rank}(C_2).
-]
-For such a direct sum, the decomposition of any element of (C_1+C_2) into one element of each factor subspace is unique. The test then exhaustively enumerates both small codebooks and requires exactly one pair to reproduce the clean bound. This is an algebraic validation fixture, not yet a claim that it reproduces Raviv's exact benchmark construction; the paper-specific construction still needs to be matched before Stage C.
+1. finish deterministic clean recovery qualification for the independent F-factor path;
+2. add a research-only corruption taxonomy for the Boolean code representation;
+3. investigate whether a genuine decoder for the selected linear-code family can correct bounded corruption without changing the clean-recovery semantics;
+4. compare that decoder against the existing resonator control only after the representations and corruption models are matched.
 
+The 2026 histogram-recovery construction should be treated as a separate comparator family unless its encoding and observation model are intentionally adopted; it should not be silently substituted into this experiment.
 
-## Primary-text construction verification
+### Acceptance gates
 
-A direct read of Raviv's primary text resolved the key Stage-B ambiguity. The paper defines C = K × V when K and V are subcodes of a parent linear code C and every parent codeword has a unique XOR decomposition into one K word and one V word; equivalently, the two subcodes intersect trivially. It also defines bound recovery as factoring a bound whose factors are drawn from different codebooks. cite0†Raviv 2024 primary text, lines 65-73 and 111-112 in the retrieved source
+The branch is ready for a benchmark-producing Stage-C/Stage-D experiment only when:
 
-Accordingly, the executable fixture now constructs one parent [n,k]_2 code and partitions its independent generator basis into the K and V factor bases. This is materially closer to the paper's stated construction than independently sampling two unrelated factor codes. The test still verifies the resulting direct-sum rank invariant and exhaustive uniqueness.
+- the focused Rust qualification workflow is green on the exact PR head;
+- every generated code is full-rank and reproducible;
+- two-factor and three-factor clean recovery match exhaustive truth;
+- overlap/dependence is classified as non-unique or rejected rather than mislabeled as exact recovery;
+- corrupted targets have explicit in-span/out-of-span classification;
+- the resonator control uses a separately validated, representation-matched fixture;
+- evidence records representation family, factor count, code ranks, seed, corruption model, and revision.
 
-The remaining gap is narrower now: the direct-sum two-factor recovery API is implemented as a faithful specialization of the paper's Theorem 2, while the fully generic multi-code maximal-independent-union case and the paper's benchmark parameterization remain to be reconstructed before performance claims.
+No production integration is proposed by this document.
 
+## References
 
-### Primary-text theorem verification
-
-The primary paper's Section IV-A defines bound recovery as finding factors from separate codebooks whose XOR equals the query. Theorem 2 states that when the factor codebooks are linear, recovery can be performed from their generator bases by forming a maximal linearly independent subset of the union of those bases and solving a Boolean linear system. The paper gives an O(Δ^3 n) upper bound for this general construction, where Δ is the sum of the factor-code dimensions. It also explicitly notes that recovery need not be unique when factor subcodes overlap, and motivates product/direct-sum subcodes to guarantee unique decomposition.
-
-For the current two-factor product fixture, the concatenated generator bases are already independent. Therefore recover_direct_sum_bound is a faithful specialization of the paper's Theorem 2: construct the combined basis, verify independence, solve the GF(2) system, and split the recovered coefficients by factor domain. The code does not yet claim the fully general overlapping-code path.
-
-Source checked: Netanel Raviv, Linear Codes for Hyperdimensional Computing, arXiv:2403.03278v1, Section IV-A, Theorem 2 and Remark 7; primary HTML version.
+- Raviv, N. (2024), Linear Codes for Hyperdimensional Computing, Neural Computation 36(6), 1084–1120. DOI: 10.1162/neco_a_01665; arXiv:2403.03278.
+- Deng, Z. K., & Raviv, N. (2026), Efficient Vector Symbolic Architectures from Histogram Recovery, ISIT 2026, DOI: 10.1109/ISIT62367.2026.11654060.
