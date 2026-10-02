@@ -789,9 +789,17 @@ impl EvidenceEvaluation {
         report: &ReceiptAttestationVerificationReport,
         context: VerificationContext,
     ) -> Self {
+        // Only supplemental trust/authorization roots may be supplied here.
+        // Procedure, policy, verifier, environment, resolver snapshot, and
+        // evaluation time are execution facts already bound by the report and
+        // therefore cannot be replaced after the evaluation occurred.
         let mut evaluation = Self::from_report(report);
-        evaluation.context_fingerprint = context.fingerprint();
-        evaluation.context = context;
+        let mut merged_context = VerificationContext::from_report(report);
+        merged_context.trust_root_fingerprint = context.trust_root_fingerprint;
+        merged_context.authorization_policy_fingerprint =
+            context.authorization_policy_fingerprint;
+        evaluation.context_fingerprint = merged_context.fingerprint();
+        evaluation.context = merged_context;
         evaluation
     }
 
@@ -2038,7 +2046,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluation_context_binds_procedure_identity() {
+    fn evaluation_context_cannot_rebind_execution_facts() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
@@ -2047,28 +2055,60 @@ mod tests {
         )
         .verify_report(&envelope, &receipt);
 
-        let base = VerificationContext::from_report(&report);
-        let mut changed = base.clone();
-        changed.procedure_fingerprint = "procedure-alternate".into();
+        let mut attempted_rebinding = VerificationContext::from_report(&report);
+        attempted_rebinding.procedure_fingerprint = "procedure-alternate".into();
+        attempted_rebinding.evaluated_at_unix_ns = 999;
+
+        let evaluation =
+            EvidenceEvaluation::from_report_with_context(&report, attempted_rebinding);
 
         assert_eq!(
-            base.context_version,
-            "symthaea-observation-verification-context-v2"
+            evaluation.context.procedure_fingerprint,
+            report.procedure_fingerprint
         );
+        assert_eq!(
+            evaluation.context.evaluated_at_unix_ns,
+            report.evaluated_at_unix_ns
+        );
+        assert_eq!(
+            evaluation.context.policy_fingerprint,
+            report.policy_fingerprint
+        );
+        assert_eq!(
+            evaluation.context.environment_fingerprint,
+            report.environment_fingerprint
+        );
+    }
+
+    #[test]
+    fn evaluation_context_allows_supplemental_trust_and_authorization_roots() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let base = report.to_evidence_evaluation();
+        let changed = EvidenceEvaluation::from_report_with_context(
+            &report,
+            VerificationContext::from_report(&report)
+                .with_trust_root_fingerprint("trust-root-a")
+                .with_authorization_policy_fingerprint("authorization-policy-a"),
+        );
+
+        assert_eq!(base.subject_fingerprint, changed.subject_fingerprint);
+        assert_ne!(base.context_fingerprint, changed.context_fingerprint);
         assert_ne!(base.fingerprint(), changed.fingerprint());
-
-        let base_evaluation = EvidenceEvaluation::from_report_with_context(&report, base);
-        let changed_evaluation =
-            EvidenceEvaluation::from_report_with_context(&report, changed);
         assert_eq!(
-            base_evaluation.subject_fingerprint,
-            changed_evaluation.subject_fingerprint
+            changed.context.trust_root_fingerprint.as_deref(),
+            Some("trust-root-a")
         );
-        assert_ne!(
-            base_evaluation.context_fingerprint,
-            changed_evaluation.context_fingerprint
+        assert_eq!(
+            changed.context.authorization_policy_fingerprint.as_deref(),
+            Some("authorization-policy-a")
         );
-        assert_ne!(base_evaluation.fingerprint(), changed_evaluation.fingerprint());
     }
 
     #[test]
