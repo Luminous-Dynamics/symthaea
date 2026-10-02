@@ -16,12 +16,52 @@ use gloo_net::http::Request;
 use gloo_net::websocket::Message;
 use gloo_net::websocket::futures::WebSocket;
 use serde_json::Value;
+use web_sys::Url;
+
+/// Parse and canonicalize the user-configured service gateway before it is
+/// used for either HTTP or WebSocket traffic.
+///
+/// The gateway is a trust boundary: the UI is allowed to talk to a configured
+/// service, but arbitrary URL syntax must not silently change the destination
+/// or acquire credentials/query/fragment semantics when endpoint paths are
+/// appended. WHATWG URL parsing is used so normalization follows the browser's
+/// own URL model rather than a second ad-hoc parser.
+fn gateway_base(gateway: &str) -> Result<Url, String> {
+    let gateway = gateway.trim();
+    let url = Url::new(gateway).map_err(|_| "gateway must be a valid absolute URL".to_string())?;
+    match url.protocol().as_str() {
+        "http:" | "https:" => {}
+        _ => return Err("gateway must use http or https".to_string()),
+    }
+    if url.hostname().is_empty() {
+        return Err("gateway must include a hostname".to_string());
+    }
+    if !url.username().is_empty() || !url.password().is_empty() {
+        return Err("gateway credentials are not permitted".to_string());
+    }
+    if !url.search().is_empty() || !url.hash().is_empty() {
+        return Err("gateway query and fragment are not permitted".to_string());
+    }
+    Ok(url)
+}
+
+/// Build one endpoint from the same canonical gateway representation used by
+/// HTTP and WebSocket callers. This prevents the two transports from drifting
+/// apart when a gateway contains a path prefix or non-default port.
+fn gateway_endpoint(gateway: &str, path: &str) -> Result<String, String> {
+    let url = gateway_base(gateway)?;
+    let mut base = url.to_string();
+    while base.ends_with('/') {
+        base.pop();
+    }
+    Ok(format!("{base}/{path}"))
+}
 
 /// Send one `{"type":"query","content":...}` request to `POST /v1/service`
 /// and return the parsed JSON response (a `Response::QueryResponse` or
 /// `Response::Error` per the wire protocol).
 pub async fn send_query(gateway: &str, content: &str) -> Result<Value, String> {
-    let url = format!("{}/v1/service", gateway.trim_end_matches('/'));
+    let url = gateway_endpoint(gateway, "v1/service")?;
     let body = serde_json::json!({ "type": "query", "content": content });
     let resp = Request::post(&url)
         .header("content-type", "application/json")
@@ -64,13 +104,14 @@ pub async fn stream_telemetry(
     mut on_message: impl FnMut(Value),
     on_connected: impl FnOnce(),
 ) -> bool {
-    let ws_url = format!(
-        "{}/v1/ws/live",
-        gateway
-            .trim_end_matches('/')
-            .replacen("http://", "ws://", 1)
-            .replacen("https://", "wss://", 1)
-    );
+    let mut ws_url = gateway_endpoint(gateway, "v1/ws/live")?;
+    if ws_url.starts_with("http://") {
+        ws_url.replace_range(..7, "ws://");
+    } else if ws_url.starts_with("https://") {
+        ws_url.replace_range(..8, "wss://");
+    } else {
+        return Err("gateway protocol could not be mapped to WebSocket".to_string());
+    }
     let ws = match WebSocket::open(&ws_url) {
         Ok(ws) => ws,
         Err(e) => {
