@@ -702,8 +702,12 @@ impl EnhancedKnowledgeGraph {
         // parents can yield different activation values. Instead, collect every
         // candidate at a hop and retain the strongest activation for each node.
         // This makes the traversal path-independent and reproducible.
-        let mut facts: Vec<&TemporalFact> = self.facts.values().collect();
-        facts.sort_by_key(|fact| fact.id);
+        let mut facts: Vec<(FactId, BinaryHV)> = self
+            .facts
+            .values()
+            .map(|fact| (fact.id, fact.encoding.vector.clone()))
+            .collect();
+        facts.sort_by_key(|(id, _)| *id);
 
         for hop in 0..hops {
             let hop_decay = decay_factor.powi(hop as i32 + 1);
@@ -717,15 +721,15 @@ impl EnhancedKnowledgeGraph {
                     None => continue,
                 };
 
-                for fact in &facts {
-                    if activated.contains_key(&fact.id) {
+                for (fact_id, vector) in &facts {
+                    if activated.contains_key(fact_id) {
                         continue;
                     }
-                    let sim = fact.encoding.vector.similarity(&query_vec);
+                    let sim = vector.similarity(&query_vec);
                     if sim > 0.1 {
                         let decayed_sim = sim * hop_decay;
                         candidates
-                            .entry(fact.id)
+                            .entry(*fact_id)
                             .and_modify(|existing| *existing = existing.max(decayed_sim))
                             .or_insert(decayed_sim);
                     }
