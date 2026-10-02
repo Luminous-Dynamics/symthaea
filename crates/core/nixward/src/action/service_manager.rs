@@ -263,6 +263,27 @@ mod tests {
     use super::*;
 
     #[test]
+    #[test]
+    fn rendered_legacy_service_command_cannot_reenter_v1_authority() {
+        use super::super::authorization::{
+            NixActionIntentV1, NixAuthorizationErrorV1,
+        };
+        use super::super::service_domain::{
+            NixServiceOperationKindV1, NixServiceOperationV1,
+        };
+
+        let typed =
+            NixServiceOperationV1::new("nginx", NixServiceOperationKindV1::Restart).unwrap();
+        let legacy = ServiceManager::render_legacy_command(&typed).unwrap();
+
+        // The compatibility representation is intentionally not a semantic
+        // authority input. It must be rejected rather than reconstructed.
+        assert_eq!(
+            NixActionIntentV1::from_command("host:x", None, &legacy).unwrap_err(),
+            NixAuthorizationErrorV1::UnsupportedCustomCommand
+        );
+    }
+
     fn typed_operation_renders_to_legacy_command_one_way() {
         use super::super::service_domain::{
             NixServiceOperationKindV1, NixServiceOperationV1,
