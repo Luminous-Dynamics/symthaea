@@ -55,6 +55,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{MapAccess, SeqAccess, Visitor};
 
 /// Caller-labeled identity for one evidence-bearing run.
 ///
@@ -161,6 +162,7 @@ impl<'de> Deserialize<'de> for RepositorySourceSnapshotId {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionLineageV1 {
+
     pub source_repository: String,
     pub source_revision: String,
     pub source_tree: String,
@@ -169,14 +171,19 @@ pub struct ExecutionLineageV1 {
     /// This is distinct from Git HEAD/tree metadata: staged, unstaged, deleted,
     /// and explicitly included ignored source bytes can all belong to the exact source subject.
     pub repository_source_snapshot_id: RepositorySourceSnapshotId,
+    #[serde(deserialize_with = "deserialize_unique_string_map")]
     pub lock_digests: BTreeMap<String, String>,
+    #[serde(deserialize_with = "deserialize_unique_string_map")]
     pub toolchain_versions: BTreeMap<String, String>,
     pub host_target: String,
     pub nix_identity: String,
+    #[serde(deserialize_with = "deserialize_unique_string_set")]
     pub feature_flags: BTreeSet<String>,
     pub cwd: String,
     pub argv: Vec<String>,
+    #[serde(deserialize_with = "deserialize_unique_string_map")]
     pub allowed_env: BTreeMap<String, String>,
+    #[serde(deserialize_with = "deserialize_unique_string_map")]
     pub immutable_input_digests: BTreeMap<String, String>,
 }
 
@@ -304,6 +311,74 @@ impl ExecutionLineageV1 {
         append_map(hasher, "allowed_env", &self.allowed_env);
         append_map(hasher, "immutable_input_digests", &self.immutable_input_digests);
     }
+}
+
+fn deserialize_unique_string_map<'de, D>(
+    deserializer: D,
+) -> Result<BTreeMap<String, String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct UniqueMapVisitor;
+
+    impl<'de> Visitor<'de> for UniqueMapVisitor {
+        type Value = BTreeMap<String, String>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a map with unique string keys")
+        }
+
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: MapAccess<'de>,
+        {
+            let mut result = BTreeMap::new();
+            while let Some((key, value)) = map.next_entry::<String, String>()? {
+                if result.insert(key.clone(), value).is_some() {
+                    return Err(serde::de::Error::custom(format!(
+                        "duplicate map key {key:?}"
+                    )));
+                }
+            }
+            Ok(result)
+        }
+    }
+
+    deserializer.deserialize_map(UniqueMapVisitor)
+}
+
+fn deserialize_unique_string_set<'de, D>(
+    deserializer: D,
+) -> Result<BTreeSet<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct UniqueSetVisitor;
+
+    impl<'de> Visitor<'de> for UniqueSetVisitor {
+        type Value = BTreeSet<String>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a sequence with unique string members")
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let mut result = BTreeSet::new();
+            while let Some(value) = seq.next_element::<String>()? {
+                if !result.insert(value.clone()) {
+                    return Err(serde::de::Error::custom(format!(
+                        "duplicate set member {value:?}"
+                    )));
+                }
+            }
+            Ok(result)
+        }
+    }
+
+    deserializer.deserialize_seq(UniqueSetVisitor)
 }
 
 fn unique_named_map(
@@ -814,6 +889,28 @@ mod tests {
             allowed_env: [("RUST_BACKTRACE".into(), "0".into())].into_iter().collect(),
             immutable_input_digests: [("fixture.json".into(), "sha256:1234".into())].into_iter().collect(),
         }
+    }
+
+    #[test]
+    fn execution_lineage_serde_rejects_duplicate_map_keys() {
+        let json = format!(
+            r#"{{"source_repository":"repo","source_revision":"rev","source_tree":"tree","repository_source_snapshot_id":"{}","lock_digests":{{"Cargo.lock":"sha256:0011223344556677","Cargo.lock":"sha256:8899aabbccddeeff"}},"toolchain_versions":{{"rustc":"1.96.0"}},"host_target":"target","nix_identity":"nix","feature_flags":["default"],"cwd":"/work","argv":["cargo","test"],"allowed_env":{{"RUST_BACKTRACE":"0"}},"immutable_input_digests":{{"fixture":"sha256:0011223344556677"}}}}"#,
+            "a".repeat(64)
+        );
+        let error = serde_json::from_str::<ExecutionLineageV1>(&json)
+            .expect_err("duplicate JSON map keys must fail closed");
+        assert!(error.to_string().contains("duplicate map key"));
+    }
+
+    #[test]
+    fn execution_lineage_serde_rejects_duplicate_set_members() {
+        let json = format!(
+            r#"{{"source_repository":"repo","source_revision":"rev","source_tree":"tree","repository_source_snapshot_id":"{}","lock_digests":{{"Cargo.lock":"sha256:0011223344556677"}},"toolchain_versions":{{"rustc":"1.96.0"}},"host_target":"target","nix_identity":"nix","feature_flags":["default","default"],"cwd":"/work","argv":["cargo","test"],"allowed_env":{{"RUST_BACKTRACE":"0"}},"immutable_input_digests":{{"fixture":"sha256:0011223344556677"}}}}"#,
+            "a".repeat(64)
+        );
+        let error = serde_json::from_str::<ExecutionLineageV1>(&json)
+            .expect_err("duplicate feature members must fail closed");
+        assert!(error.to_string().contains("duplicate set member"));
     }
 
     #[test]
