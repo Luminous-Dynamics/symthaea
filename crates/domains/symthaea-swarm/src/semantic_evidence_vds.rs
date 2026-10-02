@@ -422,6 +422,24 @@ impl Rfc9942Vdp {
         out
     }
 
+    fn from_reader(reader: &mut CborReader<'_>) -> Result<Self, Rfc9942VdpError> {
+        let map_len=reader.read_map_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        if map_len!=1{return Err(Rfc9942VdpError::InvalidStructure);}
+        let label=reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        let kind=Rfc9942ProofKind::from_label(label).ok_or(Rfc9942VdpError::InvalidStructure)?;
+        let count=reader.read_array_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        if count==0{return Err(Rfc9942VdpError::EmptyProofCollection);}
+        if count>MAX_RFC9942_PROOFS{return Err(Rfc9942VdpError::ResourceLimitExceeded);}
+        let mut proofs=Vec::with_capacity(count);
+        for _ in 0..count{
+            proofs.push(reader.read_bstr_bounded(MAX_RFC9942_PROOF_BYTES).map_err(|e|match e{
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                _=>Rfc9942VdpError::InvalidEncoding,
+            })?);
+        }
+        Self::new(kind,proofs)
+    }
+
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9942VdpError> {
         let mut reader = CborReader::new(bytes);
         let map_len = reader.read_map_len().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
@@ -685,6 +703,14 @@ impl<'a> CborReader<'a> {
         }
     }
 
+    fn skip_label(&mut self) -> Result<(), Rfc9162ProofDecodeError> {
+        match self.peek_major_type()? {
+            0|1=>self.read_i64().map(|_|()),
+            3=>self.read_text_bounded(256).map(|_|()),
+            _=>Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        }
+    }
+
     fn skip_value(&mut self, depth: usize) -> Result<(), Rfc9162ProofDecodeError> {
         if depth>16 { return Err(Rfc9162ProofDecodeError::InvalidStructure); }
         let major=self.peek_major_type()?;
@@ -693,7 +719,7 @@ impl<'a> CborReader<'a> {
             2 => { self.read_bstr_bounded(4096).map(|_|()) }
             3 => { self.read_text_bounded(4096).map(|_|()) }
             4 => { let n=self.read_array_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_value(depth+1)?;} Ok(()) },
-            5 => { let n=self.read_map_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.read_i64()?;self.skip_value(depth+1)?;} Ok(()) },
+            5 => { let n=self.read_map_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_label()?;self.skip_value(depth+1)?;} Ok(()) },
             6 => { self.read_u64()?; self.skip_value(depth+1) },
             7 => { let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; match initial {0xf4|0xf5|0xf6|0xf7=>{self.offset+=1;Ok(())},0xf9=>{self.take(3)?;Ok(())},0xfa=>{self.take(5)?;Ok(())},0xfb=>{self.take(9)?;Ok(())},_=>Err(Rfc9162ProofDecodeError::InvalidEncoding)} },
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
