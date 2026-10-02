@@ -1309,6 +1309,20 @@ impl ResolvedVerificationMethod {
     }
 }
 
+/// A resolved verification method paired with the resolver snapshot that
+/// produced it.
+///
+/// The pairing is intentional: a bare resolved key plus a separately queried
+/// snapshot fingerprint can describe two different resolver states when the
+/// backing registry is mutable. Implementations with mutable or remote state
+/// should override the resolver's resolve_with_snapshot method so this pair
+/// is captured atomically from one durable view.
+#[derive(Debug, Clone)]
+pub struct ResolvedVerificationMethodSnapshot {
+    pub resolved: ResolvedVerificationMethod,
+    pub snapshot_fingerprint: Option<String>,
+}
+
 /// Application-supplied verification-method resolver.
 ///
 /// Resolution, controller authorization, key lifecycle, and status are deliberately
@@ -1318,6 +1332,25 @@ pub trait VerificationMethodResolver {
         &self,
         verification_method: &str,
     ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError>;
+
+    /// Resolve a verification method and bind it to the resolver snapshot that
+    /// produced the result.
+    ///
+    /// The default implementation preserves backwards compatibility for existing
+    /// resolvers, but performs the snapshot lookup separately. Resolvers backed by
+    /// mutable or remote state should override this method and obtain both values
+    /// from the same atomic/durable view.
+    fn resolve_with_snapshot(
+        &self,
+        verification_method: &str,
+    ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+        let resolved = self.resolve(verification_method)?;
+        let snapshot_fingerprint = self.snapshot_fingerprint();
+        Ok(ResolvedVerificationMethodSnapshot {
+            resolved,
+            snapshot_fingerprint,
+        })
+    }
 
     /// Return a deterministic fingerprint of the resolver state consulted by verification.
     ///
@@ -1508,10 +1541,12 @@ impl Ed25519ReceiptVerifier {
         resolver: &R,
     ) -> ReceiptAttestationVerificationReport {
         let mut report = self.verify_with_resolver_report_inner(envelope, receipt, resolver);
-        report.resolution_snapshot_fingerprint = self
-            .resolution_snapshot_fingerprint
-            .clone()
-            .or_else(|| resolver.snapshot_fingerprint());
+        if report.resolution_snapshot_fingerprint.is_none() {
+            report.resolution_snapshot_fingerprint = self
+                .resolution_snapshot_fingerprint
+                .clone()
+                .or_else(|| resolver.snapshot_fingerprint());
+        }
         report
     }
 
@@ -1591,8 +1626,8 @@ impl Ed25519ReceiptVerifier {
                     self.environment_identity.clone(),
             );
         };
-        let resolved = match resolver.resolve(method) {
-            Ok(resolved) => resolved,
+        let resolved_snapshot = match resolver.resolve_with_snapshot(method) {
+            Ok(resolved_snapshot) => resolved_snapshot,
             Err(_) => {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
@@ -1605,6 +1640,7 @@ impl Ed25519ReceiptVerifier {
                 );
             }
         };
+        let resolved = resolved_snapshot.resolved;
         if resolved.verification_method != method {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
@@ -1663,7 +1699,13 @@ impl Ed25519ReceiptVerifier {
                     self.environment_identity.clone(),
             );
         }
-        self.verify_with_resolved_key_report(envelope, receipt, method, &resolved.verifying_key)
+        let mut report =
+            self.verify_with_resolved_key_report(envelope, receipt, method, &resolved.verifying_key);
+        report.resolution_snapshot_fingerprint = self
+            .resolution_snapshot_fingerprint
+            .clone()
+            .or(resolved_snapshot.snapshot_fingerprint);
+        report
     }
 
     fn verify_with_resolved_key(
@@ -2300,6 +2342,59 @@ mod tests {
             ],
         }]);
         assert_eq!(first.snapshot_fingerprint(), second.snapshot_fingerprint());
+    }
+
+    #[test]
+    fn resolver_snapshot_is_bound_to_the_resolution_result() {
+        struct AtomicResolver {
+            method: ResolvedVerificationMethod,
+            snapshot: String,
+        }
+
+        impl VerificationMethodResolver for AtomicResolver {
+            fn resolve(
+                &self,
+                _verification_method: &str,
+            ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
+                Ok(self.method.clone())
+            }
+
+            fn resolve_with_snapshot(
+                &self,
+                _verification_method: &str,
+            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+                Ok(ResolvedVerificationMethodSnapshot {
+                    resolved: self.method.clone(),
+                    snapshot_fingerprint: Some(self.snapshot.clone()),
+                })
+            }
+
+            fn snapshot_fingerprint(&self) -> Option<String> {
+                Some("separately-observed-state".into())
+            }
+        }
+
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let resolver = AtomicResolver {
+            method: ResolvedVerificationMethod {
+                verification_method: "did:example:attester-a#key-1".into(),
+                verifying_key: signing_key.verifying_key(),
+                status: VerificationMethodStatus::Active,
+                allowed_proof_purposes: vec!["observation-independence".into()],
+            },
+            snapshot: "atomic-snapshot".into(),
+        };
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
+
+        assert_eq!(
+            report.resolution_snapshot_fingerprint.as_deref(),
+            Some("atomic-snapshot")
+        );
     }
 
     #[test]
