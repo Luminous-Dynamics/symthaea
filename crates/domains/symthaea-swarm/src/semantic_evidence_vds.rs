@@ -479,8 +479,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
-    #[test]
     fn rfc9942_inclusion_and_consistency_cbor_shapes_are_deterministic() {
         let inclusion = Rfc9162InclusionProof::new(20, 17, vec![[0x11; 32], [0x22; 32]]);
         assert_eq!(
@@ -502,7 +500,7 @@ mod tests {
     }
 
     #[test]
-        fn tree_heads_bind_size_to_root_and_verify_consistency() {
+    fn tree_heads_bind_size_to_root_and_verify_consistency() {
         let vds = Rfc9162Sha256Vds;
         let leaves: Vec<Vec<u8>> = (0..8).map(|i| format!("leaf-{i}").into_bytes()).collect();
         let older = vds.tree_head(&leaves[..4].to_vec());
