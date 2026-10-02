@@ -221,15 +221,18 @@ impl AuthorizationLease {
         Ok(format!("sha256:{}", hex::encode(hasher.finalize())))
     }
 
-    /// Legacy authorization-instance based derivation retained only for
-    /// compatibility with non-effectful callers. Effectful execution MUST use
-    /// provider_idempotency_key_for_native_replay.
+    /// Legacy authorization-instance based derivation retained exactly for
+    /// backward-compatible reconstruction of historical unbound receipts.
+    /// Effectful execution MUST use `provider_idempotency_key_for_native_replay`.
     #[deprecated(note = "effectful execution must derive provider idempotency from native replay identity")]
     pub fn provider_idempotency_key(&self) -> String {
-        self.provider_idempotency_key_for_native_replay(
-            &self.authorization_instance,
-            "legacy-compat-target",
-        ).expect("authorization lease contains a non-empty action digest")
+        let mut hasher = Sha256::new();
+        hasher.update(b"symthaea:gis:provider-idempotency:v1\n");
+        hasher.update((self.authorization_instance.len() as u64).to_be_bytes());
+        hasher.update(self.authorization_instance.as_bytes());
+        hasher.update((self.action_digest.len() as u64).to_be_bytes());
+        hasher.update(self.action_digest.as_bytes());
+        format!("sha256:{}", hex::encode(hasher.finalize()))
     }
 
     pub fn new(
