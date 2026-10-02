@@ -865,10 +865,11 @@ impl SqliteAuthorizationStore {
     ///
     /// The durable dispatch record and current lease must name the same boundary
     /// before this operation can consume the authorization budget.
-    pub fn reconcile_indeterminate_bound(
+    fn reconcile_indeterminate_bound_verified_inner(
         &self,
         record: &DurableDispatchRecord,
         outcome: ExecutionOutcome,
+        verified: &VerifiedProviderOutcome,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
         if matches!(outcome, ExecutionOutcome::Indeterminate) {
             return Err(AuthorizationConsumptionError::AttemptMismatch.into());
@@ -932,8 +933,49 @@ impl SqliteAuthorizationStore {
             return Err(AuthorizationConsumptionError::AttemptMismatch.into());
         }
         insert_receipt_with_boundary(&tx, &receipt, "reconciled", Some(&record.boundary_id))?;
+        tx.execute(
+            "INSERT OR REPLACE INTO authorization_terminal_evidence
+             (authorization_instance,attempt_id,boundary_id,action_digest,provider_idempotency_key,
+              target_identity,audience,outcome,evidence_id,evidence_digest,verifier_id,verification_digest)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
+            params![
+                record.authorization_instance, record.attempt_id, record.boundary_id,
+                record.action_digest, record.provider_idempotency_key, record.target_identity,
+                record.audience,
+                if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
+                verified.evidence.evidence_id, verified.evidence.evidence_digest,
+                verified.verifier_id, verified.verification_digest,
+            ],
+        )?;
         tx.commit()?;
         Ok(receipt)
+    }
+
+    /// Terminal reconciliation requires authenticated provider evidence. The legacy
+    /// outcome-only API is deliberately fenced so a local enum cannot masquerade
+    /// as provider truth.
+    pub fn reconcile_indeterminate_bound(
+        &self,
+        _record: &DurableDispatchRecord,
+        _outcome: ExecutionOutcome,
+    ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
+        Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into())
+    }
+
+    pub fn reconcile_indeterminate_bound_verified<V: ProviderEvidenceVerifier>(
+        &self,
+        record: &DurableDispatchRecord,
+        evidence: &ProviderTerminalEvidence,
+        verifier: &V,
+    ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
+        let verified = verifier
+            .verify_terminal_outcome(record, evidence)
+            .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
+        Self::validate_verified_terminal_outcome(record, &verified)?;
+        if !matches!(verified.evidence.outcome, ExecutionOutcome::Succeeded | ExecutionOutcome::Failed) {
+            return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
+        }
+        self.reconcile_indeterminate_bound_verified_inner(record, verified.evidence.outcome, &verified)
     }
 
     /// Crash recovery is deliberately conservative: a process may have reached
