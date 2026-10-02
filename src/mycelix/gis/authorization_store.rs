@@ -1831,6 +1831,20 @@ mod tests {
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
         ));
 
+        let wrong_policy=RecoveryAuthorizationWitness {
+            authorization_instance:"approval-pre-fence".into(),
+            attempt_id:"attempt-pre-fence".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:"sha256:action".into(),
+            policy:"forged-recovery-policy".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:16:00Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&wrong_policy),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
         let wrong_digest=RecoveryAuthorizationWitness {
             authorization_instance:"approval-pre-fence".into(),
             attempt_id:"attempt-pre-fence".into(),
