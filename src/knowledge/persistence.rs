@@ -3314,6 +3314,11 @@ mod tests {
         let (snapshot, receipt) = p.load_snapshot_with_receipt().unwrap().unwrap();
         assert_eq!(receipt.generation, 1);
         assert_eq!(receipt.canonical_digest_hex, snapshot.canonical_digest_hex());
+        assert_eq!(receipt.receipt_digest_hex.len(), 64);
+        assert_eq!(
+            receipt.receipt_digest_hex,
+            receipt.canonical_receipt_digest_hex()
+        );
 
         // Provenance is append-only, so omitting an existing historical relation
         // must not silently admit a narrower snapshot as the current committed state.
@@ -3355,6 +3360,80 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&dir);
     }
+    #[test]
+    fn test_snapshot_receipt_self_digest_binds_generation_and_append_only_storage() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_receipt_integrity_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "snapshot-integrity".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x33; BinaryHV::BYTES],
+            source_text: "snapshot integrity".into(),
+            confidence: 0.7,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+
+        let receipt = p.latest_snapshot_receipt().unwrap().unwrap();
+        assert_eq!(receipt.generation, 1);
+        assert_eq!(
+            receipt.receipt_digest_hex,
+            receipt.canonical_receipt_digest_hex()
+        );
+
+        let conn = p.open_connection().unwrap();
+        let blocked_update = conn
+            .execute(
+                "UPDATE knowledge_snapshot_receipts
+                 SET generation = generation + 10
+                 WHERE generation = 1",
+                [],
+            )
+            .unwrap_err();
+        assert!(blocked_update.to_string().contains("UPDATE prohibited"));
+
+        let blocked_delete = conn
+            .execute(
+                "DELETE FROM knowledge_snapshot_receipts WHERE generation = 1",
+                [],
+            )
+            .unwrap_err();
+        assert!(blocked_delete.to_string().contains("DELETE prohibited"));
+
+        // Simulate privileged database tampering by removing the UPDATE guard.
+        conn.execute_batch(
+            "DROP TRIGGER trg_knowledge_snapshot_receipts_no_update;
+             UPDATE knowledge_snapshot_receipts
+             SET generation = 11
+             WHERE generation = 1;",
+        )
+        .unwrap();
+
+        let err = p.latest_snapshot_receipt().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot receipt self-digest mismatch: generation 11"
+        );
+
+        let err = p.load_snapshot_with_receipt().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot receipt self-digest mismatch: generation 11"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn test_record_snapshot_validation_binds_current_generation_and_digest() {
         let dir = std::env::temp_dir().join(format!(
@@ -3454,11 +3533,23 @@ mod tests {
         assert!(p.verify_snapshot_validation_receipts().is_ok());
 
         let conn = p.open_connection().unwrap();
-        conn.execute(
-            "UPDATE knowledge_snapshot_validation_receipts
+        let blocked = conn
+            .execute(
+                "UPDATE knowledge_snapshot_validation_receipts
+                 SET validator_version = 'blocked'
+                 WHERE validation_event = 'validation:digest'",
+                [],
+            )
+            .unwrap_err();
+        assert!(blocked.to_string().contains("UPDATE prohibited"));
+
+        // Simulate a privileged schema-level actor removing the application guard.
+        // The receipt self-digest remains the independent corruption detector.
+        conn.execute_batch(
+            "DROP TRIGGER trg_knowledge_snapshot_validation_receipts_no_update;
+             UPDATE knowledge_snapshot_validation_receipts
              SET validator_version = 'tampered'
-             WHERE validation_event = 'validation:digest'",
-            [],
+             WHERE validation_event = 'validation:digest';",
         )
         .unwrap();
 
