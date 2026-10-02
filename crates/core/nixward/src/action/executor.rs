@@ -9,8 +9,8 @@
 //! - Command classification and safety scoring
 //! - JSON output mode for structured results
 
-use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::authorization::NixLocalExecutionAuthorityV1;
+use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -40,11 +40,13 @@ fn parse_current_generation(stdout: &str) -> Result<u32, String> {
     let records: Vec<NixOSGenerationRecordV1> = serde_json::from_str(stdout)
         .map_err(|error| format!("invalid nixos-rebuild generation JSON: {error}"))?;
     let mut current = records.iter().filter(|record| record.current);
-    let record = current
-        .next()
-        .ok_or_else(|| "nixos-rebuild generation JSON contained no current generation".to_string())?;
+    let record = current.next().ok_or_else(|| {
+        "nixos-rebuild generation JSON contained no current generation".to_string()
+    })?;
     if current.next().is_some() {
-        return Err("nixos-rebuild generation JSON contained multiple current generations".to_string());
+        return Err(
+            "nixos-rebuild generation JSON contained multiple current generations".to_string(),
+        );
     }
     Ok(record.generation)
 }
@@ -184,8 +186,7 @@ impl NixOSCommand {
                     .map_err(|error| error.to_string())?;
                 if typed.unit() != unit {
                     return Err(
-                        "typed service unit must be canonical at the command boundary"
-                            .to_string(),
+                        "typed service unit must be canonical at the command boundary".to_string(),
                     );
                 }
                 Ok(())
@@ -202,9 +203,13 @@ impl NixOSCommand {
                     return Err("config patch value must not be blank".to_string());
                 }
                 if expected_config_digest.len() != 64
-                    || !expected_config_digest.bytes().all(|b| b.is_ascii_hexdigit())
+                    || !expected_config_digest
+                        .bytes()
+                        .all(|b| b.is_ascii_hexdigit())
                 {
-                    return Err("config patch expected config digest must be 64 hex characters".to_string());
+                    return Err(
+                        "config patch expected config digest must be 64 hex characters".to_string(),
+                    );
                 }
                 Ok(())
             }
@@ -441,10 +446,7 @@ impl NixOSCommand {
                     unit.clone(),
                 ],
             ),
-            Self::ConfigPatch { .. } => (
-                "nixos-rebuild".to_string(),
-                vec!["switch".to_string()],
-            ),
+            Self::ConfigPatch { .. } => ("nixos-rebuild".to_string(), vec!["switch".to_string()]),
             Self::Custom { command, args, .. } => (command.clone(), args.clone()),
         }
     }
@@ -479,7 +481,9 @@ pub enum ExecutionResult {
 }
 
 enum ExecutionBasisV1 {
-    Phi { phi: f32 },
+    Phi {
+        phi: f32,
+    },
     LiveAuthority {
         intent_digest: String,
         approval_request_id: String,
@@ -761,7 +765,10 @@ impl NixOSExecutor {
                 safety_level: safety,
             };
         }
-        if let Err(reason) = self.validate_authorized_pre_state_identity(&authority).await {
+        if let Err(reason) = self
+            .validate_authorized_pre_state_identity(&authority)
+            .await
+        {
             return ExecutionResult::Blocked {
                 reason,
                 safety_level: safety,
@@ -969,18 +976,19 @@ impl NixOSExecutor {
         pre_state_identity: Option<String>,
         result: &ExecutionResult,
     ) {
-        self.authorized_history.push_back(AuthorizedExecutionRecordV1 {
-            command,
-            action_intent_digest,
-            approval_request_id,
-            projection_digest,
-            pre_state_identity,
-            result: result.clone(),
-            timestamp_ms: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0),
-        });
+        self.authorized_history
+            .push_back(AuthorizedExecutionRecordV1 {
+                command,
+                action_intent_digest,
+                approval_request_id,
+                projection_digest,
+                pre_state_identity,
+                result: result.clone(),
+                timestamp_ms: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0),
+            });
 
         if self.authorized_history.len() > 1000 {
             self.authorized_history.pop_front();
@@ -1021,7 +1029,10 @@ mod tests {
 
     #[test]
     fn generation_pre_state_identity_parser_is_strict() {
-        assert_eq!(parse_generation_pre_state_identity("generation:42").unwrap(), 42);
+        assert_eq!(
+            parse_generation_pre_state_identity("generation:42").unwrap(),
+            42
+        );
         assert!(parse_generation_pre_state_identity("generation:").is_err());
         assert!(parse_generation_pre_state_identity("generation:-1").is_err());
         assert!(parse_generation_pre_state_identity("host:workstation").is_err());
@@ -1029,7 +1040,8 @@ mod tests {
 
     #[test]
     fn current_generation_parser_accepts_structured_json() {
-        let json = r#"[{"generation": 874, "current": true}, {"generation": 873, "current": false}]"#;
+        let json =
+            r#"[{"generation": 874, "current": true}, {"generation": 873, "current": false}]"#;
         assert_eq!(parse_current_generation(json).unwrap(), 874);
     }
 
@@ -1041,7 +1053,8 @@ mod tests {
 
     #[test]
     fn current_generation_parser_rejects_multiple_current_generations() {
-        let json = r#"[{"generation": 874, "current": true}, {"generation": 873, "current": true}]"#;
+        let json =
+            r#"[{"generation": 874, "current": true}, {"generation": 873, "current": true}]"#;
         assert!(parse_current_generation(json).is_err());
     }
 
