@@ -5,6 +5,7 @@
 //! without rewriting the historical record of an action that already happened.
 
 use super::ignorance_types::{ConclusionDependencyGraph, EpistemicFrameImpact, EpistemicFrameRevision};
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ActionRisk {
@@ -115,7 +116,7 @@ impl ActionAuthorizationWitness {
         expected_policy: &str,
     ) -> bool {
         self.action_id == action.id
-            && !self.action_digest.is_empty()
+            && self.action_digest == action.canonical_action_digest()
             && self.frame == current_frame
             && self.support_digest == expected_support_digest
             && self.policy == expected_policy
@@ -363,6 +364,59 @@ pub struct EpistemicAction {
 }
 
 impl EpistemicAction {
+    /// Digest the immutable action contract, excluding lifecycle/history fields.
+    /// Dependency order is canonicalized because the dependency set is semantic.
+    pub fn canonical_action_digest(&self) -> String {
+        let mut dependencies: Vec<_> = self
+            .dependencies
+            .iter()
+            .map(|dependency| {
+                (
+                    dependency.conclusion_id.as_str(),
+                    match dependency.kind {
+                        ActionDependencyKind::ConclusionSupport => 0u8,
+                        ActionDependencyKind::CausalBasis => 1,
+                        ActionDependencyKind::OntologyBasis => 2,
+                        ActionDependencyKind::EvidenceBasis => 3,
+                        ActionDependencyKind::AssumptionBasis => 4,
+                    },
+                )
+            })
+            .collect();
+        dependencies.sort_unstable();
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"SYMTHEA-GIS-ACTION-V1");
+        fn append_field(bytes: &mut Vec<u8>, value: &[u8]) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value);
+        }
+        append_field(&mut bytes, self.id.as_bytes());
+        append_field(&mut bytes, self.description.as_bytes());
+        append_field(
+            &mut bytes,
+            &[match self.risk {
+                ActionRisk::Informational => 0,
+                ActionRisk::Low => 1,
+                ActionRisk::High => 2,
+                ActionRisk::Critical => 3,
+            }],
+        );
+        for (conclusion_id, kind) in dependencies {
+            append_field(&mut bytes, conclusion_id.as_bytes());
+            append_field(&mut bytes, &[kind]);
+        }
+
+        let digest = Sha256::digest(bytes);
+        let mut encoded = String::with_capacity(71);
+        encoded.push_str("sha256:");
+        for byte in digest {
+            use std::fmt::Write as _;
+            write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
+        }
+        encoded
+    }
+
     pub fn new(id: impl Into<String>, description: impl Into<String>, risk: ActionRisk) -> Self {
         Self {
             id: id.into(),
@@ -643,9 +697,10 @@ mod tests {
     #[test]
     fn authorization_witness_is_bound_to_exact_action_frame_support_and_policy() {
         let action = EpistemicAction::new("a-bound", "intervention", ActionRisk::High);
+        let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
             action_id: "a-bound".into(),
-            action_digest: "sha256:action".into(),
+            action_digest: action_digest.clone(),
             frame: "f2".into(),
             support_digest: "sha256:support".into(),
             policy: "policy-v2".into(),
@@ -690,9 +745,10 @@ mod tests {
     #[test]
     fn authorization_lease_blocks_replay_and_fresh_witness_reissuance() {
         let action = EpistemicAction::new("a-lease", "intervention", ActionRisk::Critical);
+        let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
             action_id: "a-lease".into(),
-            action_digest: "sha256:canonical-action".into(),
+            action_digest: action_digest.clone(),
             frame: "f1".into(),
             support_digest: "sha256:support".into(),
             policy: "policy-v1".into(),
@@ -701,7 +757,7 @@ mod tests {
             expires_at: None,
             authority_epoch: 7,
         };
-        let mut lease = AuthorizationLease::new("a-lease", "sha256:canonical-action", "sha256:support", "policy-v1", 7, 1);
+        let mut lease = AuthorizationLease::new("a-lease", action_digest.clone(), "sha256:support", "policy-v1", 7, 1);
         lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
         let receipt = lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap();
         assert_eq!(receipt.outcome, ExecutionOutcome::Succeeded);
@@ -716,13 +772,14 @@ mod tests {
     #[test]
     fn authorization_lease_serializes_prepare_and_commit() {
         let action = EpistemicAction::new("a-concurrent", "intervention", ActionRisk::High);
+        let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            action_id: "a-concurrent".into(), action_digest: "sha256:canonical".into(),
+            action_id: "a-concurrent".into(), action_digest: action_digest.clone(),
             frame: "f1".into(), support_digest: "sha256:support".into(),
             policy: "policy-v1".into(), decision: "execute".into(),
             issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 1,
         };
-        let mut lease = AuthorizationLease::new("a-concurrent", "sha256:canonical", "sha256:support", "policy-v1", 1, 1);
+        let mut lease = AuthorizationLease::new("a-concurrent", action_digest.clone(), "sha256:support", "policy-v1", 1, 1);
         lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
         assert_eq!(
             lease.prepare_for_execution(&witness, &action, "f1", "attempt-2"),
@@ -733,13 +790,14 @@ mod tests {
     #[test]
     fn indeterminate_commit_requires_reconciliation_before_retry() {
         let action = EpistemicAction::new("a-crash", "intervention", ActionRisk::Critical);
+        let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            action_id: "a-crash".into(), action_digest: "sha256:canonical".into(),
+            action_id: "a-crash".into(), action_digest: action_digest.clone(),
             frame: "f1".into(), support_digest: "sha256:support".into(),
             policy: "policy-v1".into(), decision: "execute".into(),
             issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 3,
         };
-        let mut lease = AuthorizationLease::new("a-crash", "sha256:canonical", "sha256:support", "policy-v1", 3, 1);
+        let mut lease = AuthorizationLease::new("a-crash", action_digest.clone(), "sha256:support", "policy-v1", 3, 1);
         lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
         let receipt = lease.commit("attempt-1", ExecutionOutcome::Indeterminate).unwrap();
         assert_eq!(receipt.outcome, ExecutionOutcome::Indeterminate);
@@ -755,8 +813,9 @@ mod tests {
     #[test]
     fn authorization_lease_rejects_frame_support_policy_or_epoch_changes() {
         let action = EpistemicAction::new("a-binding", "intervention", ActionRisk::High);
+        let action_digest = action.canonical_action_digest();
         let base = ActionAuthorizationWitness {
-            action_id: "a-binding".into(), action_digest: "sha256:canonical".into(),
+            action_id: "a-binding".into(), action_digest: action_digest.clone(),
             frame: "f1".into(), support_digest: "sha256:support".into(),
             policy: "policy-v1".into(), decision: "execute".into(),
             issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 9,
@@ -767,7 +826,7 @@ mod tests {
             ActionAuthorizationWitness { policy: "policy-v2".into(), ..base.clone() },
             ActionAuthorizationWitness { authority_epoch: 10, ..base.clone() },
         ] {
-            let mut lease = AuthorizationLease::new("a-binding", "sha256:canonical", "sha256:support", "policy-v1", 9, 1);
+            let mut lease = AuthorizationLease::new("a-binding", action_digest.clone(), "sha256:support", "policy-v1", 9, 1);
             assert_eq!(
                 lease.prepare_for_execution(&witness, &action, "f1", "attempt"),
                 Err(AuthorizationConsumptionError::InvalidBinding)
@@ -778,15 +837,16 @@ mod tests {
     #[test]
     fn revoked_or_expired_leases_cannot_be_resurrected() {
         let action = EpistemicAction::new("a-terminal", "intervention", ActionRisk::High);
+        let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            action_id: "a-terminal".into(), action_digest: "sha256:canonical".into(),
+            action_id: "a-terminal".into(), action_digest: action_digest.clone(),
             frame: "f1".into(), support_digest: "sha256:support".into(),
             policy: "policy-v1".into(), decision: "execute".into(),
             issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 1,
         };
 
         let mut revoked = AuthorizationLease::new(
-            "a-terminal", "sha256:canonical", "sha256:support", "policy-v1", 1, 1,
+            "a-terminal", action_digest.clone(), "sha256:support", "policy-v1", 1, 1,
         );
         revoked.revoke().unwrap();
         assert_eq!(
@@ -809,10 +869,51 @@ mod tests {
     #[test]
     fn execution_receipt_is_not_an_authorization_witness() {
         let receipt = ExecutionReceipt {
-            action_id: "a-receipt".into(), action_digest: "sha256:canonical".into(),
+            action_id: "a-receipt".into(), action_digest: action_digest.clone(),
             attempt_id: "attempt-1".into(), authority_epoch: 1, outcome: ExecutionOutcome::Succeeded,
         };
         assert_eq!(receipt.outcome, ExecutionOutcome::Succeeded);
+    }
+
+    #[test]
+    fn canonical_action_digest_changes_when_executable_contract_changes() {
+        let mut action = EpistemicAction::new("a-canonical", "intervention", ActionRisk::High);
+        let original = action.canonical_action_digest();
+
+        action.description = "different intervention".into();
+        assert_ne!(original, action.canonical_action_digest());
+
+        action.description = "intervention".into();
+        action.dependencies.push(ActionDependency {
+            conclusion_id: "c1".into(),
+            kind: ActionDependencyKind::CausalBasis,
+        });
+        assert_ne!(original, action.canonical_action_digest());
+
+        let with_dependency = action.canonical_action_digest();
+        action.dependencies.reverse();
+        assert_eq!(with_dependency, action.canonical_action_digest());
+    }
+
+    #[test]
+    fn authorization_rejects_witness_for_mutated_action_contract() {
+        let mut action = EpistemicAction::new("a-mutation", "intervention", ActionRisk::Critical);
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            action_id: "a-mutation".into(),
+            action_digest: digest,
+            frame: "f1".into(),
+            support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(),
+            expires_at: None,
+            authority_epoch: 1,
+        };
+        assert!(witness.is_bound_to(&action, "f1", "sha256:support", "policy-v1"));
+
+        action.description = "mutated intervention".into();
+        assert!(!witness.is_bound_to(&action, "f1", "sha256:support", "policy-v1"));
     }
 
     #[test]
