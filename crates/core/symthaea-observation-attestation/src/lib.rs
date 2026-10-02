@@ -531,7 +531,10 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::InvalidEnvelope,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                None,
+                None,,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         }
         if !envelope.verify_against_receipt(receipt) {
@@ -539,7 +542,10 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                None,
+                None,,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         }
         match envelope.temporal_status_at(self.now_unix_ns) {
@@ -559,7 +565,10 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::Expired,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
-                    None,
+                    None,,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
             ReceiptAttestationTemporalStatus::Valid => {}
@@ -569,7 +578,10 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                None,
+                None,,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         }
 
@@ -578,7 +590,10 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                None,
+                None,,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         };
         let resolved = match resolver.resolve(method) {
@@ -600,7 +615,10 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                Some(method.to_string()),
+                Some(method.to_string()),,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         }
         match resolved.status {
@@ -610,7 +628,10 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
-                    Some(method.to_string()),
+                    Some(method.to_string()),,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
             VerificationMethodStatus::Expired => {
@@ -618,7 +639,10 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
-                    Some(method.to_string()),
+                    Some(method.to_string()),,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
             VerificationMethodStatus::Unknown => {
@@ -626,7 +650,10 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
                     VerificationStage::Failed,
                     receipt.fingerprint(),
-                    Some(method.to_string()),
+                    Some(method.to_string()),,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
         }
@@ -635,7 +662,10 @@ impl Ed25519ReceiptVerifier {
                 ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
                 VerificationStage::Failed,
                 receipt.fingerprint(),
-                Some(method.to_string()),
+                Some(method.to_string()),,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         }
         self.verify_with_resolved_key_report(envelope, receipt, method, &resolved.verifying_key)
@@ -669,6 +699,9 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         }
         if !envelope.verify_against_receipt(receipt) {
@@ -677,6 +710,9 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         }
 
@@ -698,6 +734,9 @@ impl Ed25519ReceiptVerifier {
                     VerificationStage::Failed,
                     fingerprint,
                     method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
             ReceiptAttestationTemporalStatus::Valid => {}
@@ -709,6 +748,9 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         }
         if envelope.verification_method.as_deref() != Some(verification_method) {
@@ -717,6 +759,9 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         }
         if let Some(expected) = &self.expected_proof_purpose {
@@ -726,6 +771,9 @@ impl Ed25519ReceiptVerifier {
                     VerificationStage::Failed,
                     fingerprint,
                     method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
         }
@@ -736,6 +784,9 @@ impl Ed25519ReceiptVerifier {
                     VerificationStage::Failed,
                     fingerprint,
                     method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
         }
@@ -746,6 +797,9 @@ impl Ed25519ReceiptVerifier {
                     VerificationStage::Failed,
                     fingerprint,
                     method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
         }
@@ -756,6 +810,9 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         };
         let Ok(proof_bytes) = <[u8; 64]>::try_from(proof) else {
@@ -764,6 +821,9 @@ impl Ed25519ReceiptVerifier {
                 VerificationStage::Failed,
                 fingerprint,
                 method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
             );
         };
         let signature = Signature::from_bytes(&proof_bytes);
