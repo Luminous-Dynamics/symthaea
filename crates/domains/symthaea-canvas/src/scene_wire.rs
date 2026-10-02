@@ -267,13 +267,43 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
     }
     *count += 1;
 
-    if let WirePrimitive::Polygon { points, .. } = &node.primitive {
-        if points.len() < 2 || points.len() > MAX_POLYGON_POINTS {
-            return false;
+    let primitive_valid = match &node.primitive {
+        WirePrimitive::Group => true,
+        WirePrimitive::Circle { cx, cy, r } => {
+            valid_coordinate(*cx)
+                && valid_coordinate(*cy)
+                && valid_nonnegative(*r)
         }
-    }
+        WirePrimitive::Ellipse { cx, cy, rx, ry } => {
+            valid_coordinate(*cx)
+                && valid_coordinate(*cy)
+                && valid_nonnegative(*rx)
+                && valid_nonnegative(*ry)
+        }
+        WirePrimitive::Line { x1, y1, x2, y2 } => {
+            valid_coordinate(*x1)
+                && valid_coordinate(*y1)
+                && valid_coordinate(*x2)
+                && valid_coordinate(*y2)
+        }
+        WirePrimitive::Polygon { points, .. } => {
+            points.len() >= 2
+                && points.len() <= MAX_POLYGON_POINTS
+                && points
+                    .iter()
+                    .all(|point| valid_coordinate(point[0]) && valid_coordinate(point[1]))
+        }
+        WirePrimitive::Rect { x, y, w, h, rx } => {
+            valid_coordinate(*x)
+                && valid_coordinate(*y)
+                && valid_nonnegative(*w)
+                && valid_nonnegative(*h)
+                && valid_nonnegative(*rx)
+        }
+    };
 
-    if !node.transform.translate_x.is_finite()
+    if !primitive_valid
+        || !node.transform.translate_x.is_finite()
         || !node.transform.translate_y.is_finite()
         || !node.transform.rotate_deg.is_finite()
         || !node.transform.scale.is_finite()
@@ -286,6 +316,14 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
         || node.style.stroke_width.is_some_and(|width| {
             !width.is_finite() || width.is_sign_negative() || width > MAX_ABS_COORDINATE
         })
+        || node
+            .style
+            .fill
+            .is_some_and(|color| !valid_color(color))
+        || node
+            .style
+            .stroke
+            .is_some_and(|color| !valid_color(color))
     {
         return false;
     }
@@ -368,6 +406,20 @@ fn wire_to_scene_node(node: &WireNode) -> SceneNode {
         style,
         children: node.children.iter().map(wire_to_scene_node).collect(),
     }
+}
+
+fn valid_coordinate(value: f32) -> bool {
+    value.is_finite() && value.abs() <= MAX_ABS_COORDINATE
+}
+
+fn valid_nonnegative(value: f32) -> bool {
+    valid_coordinate(value) && !value.is_sign_negative()
+}
+
+fn valid_color(color: Color) -> bool {
+    [color.r, color.g, color.b, color.a]
+        .into_iter()
+        .all(|value| value.is_finite() && (0.0..=1.0).contains(&value))
 }
 
 fn finite(value: f32, fallback: f32) -> f32 {
@@ -513,6 +565,41 @@ mod tests {
         let scene = RemoteScene {
             version: RemoteScene::VERSION,
             root,
+        };
+        assert!(!scene.is_supported());
+    }
+
+    #[test]
+    fn externally_constructed_scene_rejects_out_of_bounds_primitives() {
+        let scene = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Circle {
+                    cx: MAX_ABS_COORDINATE + 1.0,
+                    cy: 0.0,
+                    r: 1.0,
+                },
+                transform: WireTransform::default(),
+                style: WireStyle::default(),
+                children: vec![],
+            },
+        };
+        assert!(!scene.is_supported());
+    }
+
+    #[test]
+    fn externally_constructed_scene_rejects_invalid_colors() {
+        let scene = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Group,
+                transform: WireTransform::default(),
+                style: WireStyle {
+                    fill: Some(Color::rgba(2.0, 0.0, 0.0, 1.0)),
+                    ..WireStyle::default()
+                },
+                children: vec![],
+            },
         };
         assert!(!scene.is_supported());
     }
