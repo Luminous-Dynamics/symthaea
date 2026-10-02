@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-observation-attestation"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "External detached-proof verification adapter for Symthaea observation-fabric receipts"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-core = { workspace = true }
