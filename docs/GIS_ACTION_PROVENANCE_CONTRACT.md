@@ -201,6 +201,14 @@ The durable execution lifecycle now makes the external-effect boundary explicit:
 
 `Prepared` is a reservation, not permission to enter an external effect sink. An executor must durably transition the same authorization instance and attempt to `DispatchPending` before provider entry. The transition is serialized in the shared consumption domain and is fenced by the exact authorization instance plus attempt identity.
 
+The execution identities remain deliberately non-interchangeable:
+
+- **Authorization instance** identifies the durable grant of authority.
+- **Attempt ID** identifies one executor attempt and may change across recovery/replacement.
+- **Provider idempotency key** identifies the downstream replay unit for the same authorized action. It is derived deterministically from the authorization instance and canonical action digest, and intentionally excludes the attempt ID.
+
+Consequently, a crash or executor replacement must not manufacture a new provider idempotency key merely because it has a new attempt ID. A freshly issued authorization instance receives a distinct provider identity. The provider key is a downstream replay-control identity, not a substitute for authorization and not evidence that the effect occurred.
+
 `DispatchPending` is therefore an evidence boundary, not an execution receipt. It proves that the local executor durably recorded its intent immediately before the effect boundary; it does not prove that the provider accepted the effect.
 
 On restart, both `Prepared` and `DispatchPending` non-terminal reservations are conservatively recovered to `Indeterminate`. This deliberately fails closed because local durable state cannot prove whether a crash occurred before or after an external sink accepted the effect. The recovered attempt remains occupied and cannot be retried until explicit reconciliation establishes a terminal outcome. Reconciliation consumes the existing authorization budget; it does not create a new authorization.
