@@ -16,8 +16,8 @@ echo "-- source boundary --"
 bash scripts/check-nixward-observation-boundary.sh
 
 echo "-- legacy custom mutation fence --"
-if rg -n -U "let is_approved = match intent_digest\\.as_deref\\(\\)" crates/core/nixward/src/bin/nixward_daemon.rs; then
-  echo "forbidden legacy digest/Custom approval branch detected" >&2
+if rg -n "approved_intent_digest" crates/core/nixward/src/bin/nixward_daemon.rs; then
+  echo "legacy verdict-file parser still feeds daemon authority" >&2
   exit 1
 fi
 rg -n "NixOSCommand::ConfigPatch" crates/core/nixward/src/{action/executor.rs,bin/nixward_daemon.rs}
