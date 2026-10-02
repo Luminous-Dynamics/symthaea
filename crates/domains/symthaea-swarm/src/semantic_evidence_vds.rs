@@ -101,7 +101,7 @@ impl Rfc9942ReceiptEnvelope {
         if ph_len<2||ph_len>16{return Err(Rfc9942VdpError::InvalidStructure);}
         let mut algorithm=None; let mut vds=None;
         for _ in 0..ph_len{
-            let label=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            let label=ph.read_cose_label().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             match label{
                 COSE_ALG_HEADER_LABEL=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if algorithm.replace(value).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
                 RFC9942_VDS_HEADER_LABEL=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if value<0{return Err(Rfc9942VdpError::InvalidStructure);}if vds.replace(value as u64).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
@@ -114,8 +114,8 @@ impl Rfc9942ReceiptEnvelope {
         let uh_len=reader.read_map_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?; if uh_len>32{return Err(Rfc9942VdpError::ResourceLimitExceeded);}
         let mut vdp=None;
         for _ in 0..uh_len{
-            let label=reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-            if label==RFC9942_VDP_HEADER_LABEL{if vdp.is_some(){return Err(Rfc9942VdpError::InvalidStructure);}vdp=Some(Rfc9942Vdp::from_reader(&mut reader)?);}else{reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;}
+            let label=reader.read_cose_label().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            if label==Some(RFC9942_VDP_HEADER_LABEL){if vdp.is_some(){return Err(Rfc9942VdpError::InvalidStructure);}vdp=Some(Rfc9942Vdp::from_reader(&mut reader)?);}else{reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;}
         }
         let vdp=vdp.ok_or(Rfc9942VdpError::InvalidStructure)?;
         let payload=match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)?{
@@ -441,27 +441,15 @@ impl Rfc9942Vdp {
     }
 
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9942VdpError> {
-        let mut reader = CborReader::new(bytes);
-        let map_len = reader.read_map_len().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
-        if map_len != 1 { return Err(Rfc9942VdpError::InvalidStructure); }
-        let label = reader.read_i64().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
-        let kind = Rfc9942ProofKind::from_label(label).ok_or(Rfc9942VdpError::InvalidStructure)?;
-        let count = reader.read_array_len().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
-        if count == 0 { return Err(Rfc9942VdpError::EmptyProofCollection); }
-        if count > MAX_RFC9942_PROOFS { return Err(Rfc9942VdpError::ResourceLimitExceeded); }
-        let mut proofs = Vec::with_capacity(count);
-        for _ in 0..count {
-            proofs.push(reader.read_bstr_bounded(MAX_RFC9942_PROOF_BYTES).map_err(|e| match e {
-                Rfc9162ProofDecodeError::InvalidStructure => Rfc9942VdpError::ResourceLimitExceeded,
-                _ => Rfc9942VdpError::InvalidEncoding,
-            })?);
-        }
+        let mut reader=CborReader::new(bytes);
+        let value=Self::from_reader(&mut reader)?;
         match reader.finish() {
-            Ok(()) => Self::new(kind, proofs),
-            Err(Rfc9162ProofDecodeError::TrailingBytes) => Err(Rfc9942VdpError::TrailingBytes),
-            Err(_) => Err(Rfc9942VdpError::InvalidEncoding),
+            Ok(())=>Ok(value),
+            Err(Rfc9162ProofDecodeError::TrailingBytes)=>Err(Rfc9942VdpError::TrailingBytes),
+            Err(_)=>Err(Rfc9942VdpError::InvalidEncoding),
         }
     }
+
 }
 
 /// A VDS-native tree head binds an ordered tree size to its Merkle root.
@@ -708,6 +696,17 @@ impl<'a> CborReader<'a> {
             0|1=>self.read_i64().map(|_|()),
             3=>self.read_text_bounded(256).map(|_|()),
             _=>Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        }
+    }
+
+    fn read_cose_label(&mut self) -> Result<Option<i64>, Rfc9162ProofDecodeError> {
+        match self.peek_major_type()? {
+            0 | 1 => self.read_i64().map(Some),
+            3 => {
+                self.read_text_bounded(256)?;
+                Ok(None)
+            }
+            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
     }
 
@@ -1337,8 +1336,6 @@ mod tests {
         let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0;1]).unwrap();
         let mut bytes=receipt.to_cbor(); bytes[0]=0x11;
         assert_eq!(Rfc9942ReceiptEnvelope::from_cbor(&bytes),Err(Rfc9942VdpError::InvalidStructure));
-        let mut valid=receipt.to_cbor(); valid[6]=0x19; valid[7]=0x01; valid[8]=0x8a;
-        let _=valid;
     }
 
     #[test]
