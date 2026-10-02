@@ -653,9 +653,8 @@ impl WebGpuRenderer {
                 self.vertex_buffer_bytes
             ));
         }
-        let bytes = &self.upload_bytes;
-
         let frame = self.acquire_surface_frame()?;
+        let bytes = &self.upload_bytes;
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
