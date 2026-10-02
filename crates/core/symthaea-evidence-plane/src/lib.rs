@@ -161,6 +161,7 @@ impl<'de> Deserialize<'de> for RepositorySourceSnapshotId {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "ExecutionLineageV1Wire")]
 pub struct ExecutionLineageV1 {
     pub source_repository: String,
     pub source_revision: String,
@@ -184,6 +185,57 @@ pub struct ExecutionLineageV1 {
     pub allowed_env: BTreeMap<String, String>,
     #[serde(deserialize_with = "deserialize_unique_string_map")]
     pub immutable_input_digests: BTreeMap<String, String>,
+}
+
+/// Serde-only wire form whose conversion validates the complete lineage.
+///
+/// Keeping this separate from the public representation means JSON/binary
+/// inputs cannot bypass the semantic admission check merely by deserializing
+/// into the same field shape.
+#[derive(Debug, Deserialize)]
+struct ExecutionLineageV1Wire {
+    pub source_repository: String,
+    pub source_revision: String,
+    pub source_tree: String,
+    pub repository_source_snapshot_id: RepositorySourceSnapshotId,
+    #[serde(deserialize_with = "deserialize_unique_string_map")]
+    pub lock_digests: BTreeMap<String, String>,
+    #[serde(deserialize_with = "deserialize_unique_string_map")]
+    pub toolchain_versions: BTreeMap<String, String>,
+    pub host_target: String,
+    pub nix_identity: String,
+    #[serde(deserialize_with = "deserialize_unique_string_set")]
+    pub feature_flags: BTreeSet<String>,
+    pub cwd: String,
+    pub argv: Vec<String>,
+    #[serde(deserialize_with = "deserialize_unique_string_map")]
+    pub allowed_env: BTreeMap<String, String>,
+    #[serde(deserialize_with = "deserialize_unique_string_map")]
+    pub immutable_input_digests: BTreeMap<String, String>,
+}
+
+impl TryFrom<ExecutionLineageV1Wire> for ExecutionLineageV1 {
+    type Error = String;
+
+    fn try_from(wire: ExecutionLineageV1Wire) -> Result<Self, Self::Error> {
+        let lineage = Self {
+            source_repository: wire.source_repository,
+            source_revision: wire.source_revision,
+            source_tree: wire.source_tree,
+            repository_source_snapshot_id: wire.repository_source_snapshot_id,
+            lock_digests: wire.lock_digests,
+            toolchain_versions: wire.toolchain_versions,
+            host_target: wire.host_target,
+            nix_identity: wire.nix_identity,
+            feature_flags: wire.feature_flags,
+            cwd: wire.cwd,
+            argv: wire.argv,
+            allowed_env: wire.allowed_env,
+            immutable_input_digests: wire.immutable_input_digests,
+        };
+        lineage.validate()?;
+        Ok(lineage)
+    }
 }
 
 impl ExecutionLineageV1 {
@@ -888,6 +940,16 @@ mod tests {
             allowed_env: [("RUST_BACKTRACE".into(), "0".into())].into_iter().collect(),
             immutable_input_digests: [("fixture.json".into(), "sha256:1234".into())].into_iter().collect(),
         }
+    }
+
+    #[test]
+    fn execution_lineage_serde_rejects_semantically_invalid_lineage() {
+        let mut lineage = serde_json::to_value(lineage_fixture()).expect("serialize fixture");
+        lineage["source_repository"] = serde_json::Value::String("".into());
+
+        let error = serde_json::from_value::<ExecutionLineageV1>(lineage)
+            .expect_err("invalid lineage must be rejected during deserialization");
+        assert!(error.to_string().contains("empty lineage field source_repository"));
     }
 
     #[test]
