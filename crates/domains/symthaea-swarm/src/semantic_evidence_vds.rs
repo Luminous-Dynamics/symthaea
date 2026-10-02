@@ -1536,15 +1536,15 @@ fn validate_cose_crit(
         let understood = match context {
             CoseCritContext::Receipt => matches!(
                 label,
-                CborLabelKey::Integer(
-                    COSE_ALG_HEADER_LABEL | COSE_CRIT_HEADER_LABEL | RFC9942_VDS_HEADER_LABEL
-                )
+                CborLabelKey::Integer(COSE_ALG_HEADER_LABEL)
+                    | CborLabelKey::Integer(COSE_CRIT_HEADER_LABEL)
+                    | CborLabelKey::Integer(RFC9942_VDS_HEADER_LABEL)
             ),
             CoseCritContext::Outer => matches!(
                 label,
-                CborLabelKey::Integer(
-                    COSE_ALG_HEADER_LABEL | COSE_CRIT_HEADER_LABEL | RFC9942_RECEIPTS_HEADER_LABEL
-                )
+                CborLabelKey::Integer(COSE_ALG_HEADER_LABEL)
+                    | CborLabelKey::Integer(COSE_CRIT_HEADER_LABEL)
+                    | CborLabelKey::Integer(RFC9942_RECEIPTS_HEADER_LABEL)
             ),
         };
         if !understood {
@@ -3049,6 +3049,38 @@ mod tests {
             Rfc9942ReceiptEnvelope::from_cbor(&bytes),
             Err(Rfc9942VdpError::CriticalHeaderNotUnderstood)
         );
+    }
+
+    #[test]
+    fn rfc9942_outer_signature_accepts_supported_critical_receipts_header() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp,
+            Rfc9942ReceiptPayload::Attached([0x22;32]),
+            vec![0xAA;64],
+        ).unwrap();
+        let collection=Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
+
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,2);
+        cbor_int(&mut protected,COSE_CRIT_HEADER_LABEL);
+        cbor_array_len(&mut protected,1);
+        cbor_int(&mut protected,RFC9942_RECEIPTS_HEADER_LABEL);
+        cbor_int(&mut protected,RFC9942_RECEIPTS_HEADER_LABEL);
+        cbor_array_len(&mut protected,1);
+        let encoded_receipt=collection.receipts()[0].to_cbor();
+        cbor_bytes(&mut protected,&encoded_receipt);
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,0);
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes,&[0xBB;64]);
+        assert!(Rfc9942SignatureWithReceipts::from_cbor(&bytes).is_ok());
     }
 
     #[test]
