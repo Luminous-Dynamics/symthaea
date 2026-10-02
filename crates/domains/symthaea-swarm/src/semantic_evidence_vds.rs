@@ -69,6 +69,9 @@ pub struct Rfc9942ReceiptEnvelope {
     vdp: Rfc9942Vdp,
     payload: Rfc9942ReceiptPayload,
     signature: Vec<u8>,
+    /// Exact serialized protected-header map from parsed receipts. Keeping this
+    /// byte-for-byte preserves the COSE Sig_structure input on re-encoding.
+    protected_bytes: Option<Vec<u8>>,
     /// Raw encoded protected-header extension entries. These are preserved so
     /// accepted COSE extensions are not silently discarded on re-encoding.
     protected_extensions: Vec<Vec<u8>>,
@@ -85,6 +88,7 @@ impl Rfc9942ReceiptEnvelope {
             vdp,
             payload,
             signature,
+            protected_bytes:None,
             protected_extensions:Vec::new(),
             unprotected_extensions:Vec::new(),
         })
@@ -94,9 +98,11 @@ impl Rfc9942ReceiptEnvelope {
     pub const fn vdp(&self)->&Rfc9942Vdp{&self.vdp}
     pub const fn payload(&self)->&Rfc9942ReceiptPayload{&self.payload}
     pub fn signature(&self)->&[u8]{&self.signature}
+    pub fn protected_header_bytes(&self)->Vec<u8>{self.protected_bytes.as_deref().map_or_else(||self.protected_header_cbor(),ToOwned::to_owned)}
 
     pub fn to_cbor(&self)->Vec<u8>{
-        let protected=self.protected_header_cbor(); let mut out=Vec::new();
+        let protected=self.protected_bytes.as_deref().map_or_else(||self.protected_header_cbor(),ToOwned::to_owned);
+        let mut out=Vec::new();
         cbor_tag(&mut out,COSE_SIGN1_TAG); cbor_array_len(&mut out,4);
         cbor_bytes(&mut out,&protected);
         cbor_map_len(&mut out,(1+self.unprotected_extensions.len()) as u64);
@@ -161,6 +167,7 @@ impl Rfc9942ReceiptEnvelope {
         let signature=reader.read_bstr_bounded(64*1024).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         let mut receipt=Self::new(algorithm,vdp,payload,signature)?;
+        receipt.protected_bytes=Some(protected);
         receipt.protected_extensions=protected_extensions;
         receipt.unprotected_extensions=unprotected_extensions;
         Ok(receipt)
@@ -194,6 +201,9 @@ impl Rfc9942ReceiptEnvelope {
 /// is intentionally external.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rfc9942SignatureWithReceipts {
+    /// Exact serialized protected-header map when parsed; `None` means the
+    /// object was newly constructed and is encoded from its typed fields.
+    protected_bytes: Option<Vec<u8>>,
     protected_extensions: Vec<Vec<u8>>,
     protected_receipts: Option<Rfc9942ReceiptCollection>,
     unprotected_extensions: Vec<Vec<u8>>,
@@ -210,6 +220,7 @@ impl Rfc9942SignatureWithReceipts {
         receipts: Option<Rfc9942ReceiptCollection>,
     ) -> Self {
         Self {
+            protected_bytes: None,
             protected_extensions: Vec::new(),
             protected_receipts: None,
             unprotected_extensions: Vec::new(),
@@ -235,6 +246,27 @@ impl Rfc9942SignatureWithReceipts {
         &self.payload
     }
 
+    pub fn protected_header_bytes(&self) -> Vec<u8> {
+        self.protected_bytes.as_deref().map_or_else(
+            || {
+                let mut bytes = Vec::new();
+                cbor_map_len(
+                    &mut bytes,
+                    (self.protected_extensions.len() + usize::from(self.protected_receipts.is_some())) as u64,
+                );
+                if let Some(receipts) = &self.protected_receipts {
+                    cbor_int(&mut bytes, RFC9942_RECEIPTS_HEADER_LABEL);
+                    bytes.extend_from_slice(&receipts.to_cbor());
+                }
+                for entry in &self.protected_extensions {
+                    bytes.extend_from_slice(entry);
+                }
+                bytes
+            },
+            ToOwned::to_owned,
+        )
+    }
+
     pub fn signature(&self) -> &[u8] {
         &self.signature
     }
@@ -242,18 +274,24 @@ impl Rfc9942SignatureWithReceipts {
     /// Encode the tagged COSE_Sign1 object, preserving receipt placement and
     /// unrelated header entries already represented by this structural type.
     pub fn to_cbor(&self) -> Vec<u8> {
-        let mut protected = Vec::new();
-        cbor_map_len(
-            &mut protected,
-            (self.protected_extensions.len() + usize::from(self.protected_receipts.is_some())) as u64,
+        let protected = self.protected_bytes.as_deref().map_or_else(
+            || {
+                let mut bytes = Vec::new();
+                cbor_map_len(
+                    &mut bytes,
+                    (self.protected_extensions.len() + usize::from(self.protected_receipts.is_some())) as u64,
+                );
+                if let Some(receipts) = &self.protected_receipts {
+                    cbor_int(&mut bytes, RFC9942_RECEIPTS_HEADER_LABEL);
+                    bytes.extend_from_slice(&receipts.to_cbor());
+                }
+                for entry in &self.protected_extensions {
+                    bytes.extend_from_slice(entry);
+                }
+                bytes
+            },
+            ToOwned::to_owned,
         );
-        if let Some(receipts) = &self.protected_receipts {
-            cbor_int(&mut protected, RFC9942_RECEIPTS_HEADER_LABEL);
-            protected.extend_from_slice(&receipts.to_cbor());
-        }
-        for entry in &self.protected_extensions {
-            protected.extend_from_slice(entry);
-        }
 
         let mut out = Vec::new();
         cbor_tag(&mut out, COSE_SIGN1_TAG);
@@ -360,6 +398,7 @@ impl Rfc9942SignatureWithReceipts {
         reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
 
         Ok(Self {
+            protected_bytes: Some(protected_bytes),
             protected_extensions,
             protected_receipts,
             unprotected_extensions,
@@ -1670,9 +1709,9 @@ mod tests {
         let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
         let mut protected=Vec::new();
         cbor_map_len(&mut protected,3);
-        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL); cbor_int(&mut protected,-7);
-        cbor_int(&mut protected,RFC9942_VDS_HEADER_LABEL); cbor_uint(&mut protected,1);
         cbor_int(&mut protected,4); cbor_bytes(&mut protected,&[0x01]);
+        cbor_int(&mut protected,RFC9942_VDS_HEADER_LABEL); cbor_uint(&mut protected,1);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL); cbor_int(&mut protected,-7);
         let mut bytes=Vec::new();
         cbor_tag(&mut bytes,18); cbor_array_len(&mut bytes,4);
         cbor_bytes(&mut bytes,&protected); cbor_map_len(&mut bytes,2);
@@ -1787,6 +1826,21 @@ mod tests {
             Rfc9942ReceiptCollection::from_cbor(&not_bstr),
             Err(Rfc9942VdpError::InvalidEncoding)
         );
+    }
+
+    #[test]
+    fn rfc9942_signature_with_receipts_preserves_protected_bytes() {
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,2);
+        cbor_int(&mut protected,7); cbor_bytes(&mut protected,&[0x01]);
+        cbor_int(&mut protected,1); cbor_int(&mut protected,-7);
+        let mut outer=Vec::new();
+        cbor_tag(&mut outer,COSE_SIGN1_TAG); cbor_array_len(&mut outer,4);
+        cbor_bytes(&mut outer,&protected); cbor_map_len(&mut outer,0);
+        outer.push(0xf6); cbor_bytes(&mut outer,&[0xBB]);
+        let decoded=Rfc9942SignatureWithReceipts::from_cbor(&outer).unwrap();
+        assert_eq!(decoded.protected_header_bytes(),protected);
+        assert_eq!(decoded.to_cbor(),outer);
     }
 
     #[test]
