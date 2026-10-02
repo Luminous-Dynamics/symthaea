@@ -147,6 +147,161 @@ pub struct KnowledgePersistenceSnapshot {
     pub ontology: Vec<OntologyRecord>,
 }
 
+impl KnowledgePersistenceSnapshot {
+    /// Compute a versioned, order-independent digest of the complete persisted
+    /// cognitive snapshot. This is an integrity/evidence identifier, not a claim
+    /// about epistemic truth or semantic correctness.
+    pub fn canonical_digest(&self) -> blake3::Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.epf-011.knowledge-snapshot.v1");
+
+        let mut facts: Vec<&FactRecord> = self.facts.iter().collect();
+        facts.sort_by(|a, b| {
+            a.memory_id
+                .cmp(&b.memory_id)
+                .then_with(|| a.canonical_identity.cmp(&b.canonical_identity))
+                .then_with(|| a.provenance_family.cmp(&b.provenance_family))
+                .then_with(|| a.vector_bytes.cmp(&b.vector_bytes))
+                .then_with(|| a.source_text.cmp(&b.source_text))
+                .then_with(|| a.confidence.to_bits().cmp(&b.confidence.to_bits()))
+                .then_with(|| a.domain.cmp(&b.domain))
+                .then_with(|| a.cycle.cmp(&b.cycle))
+                .then_with(|| a.is_causal.cmp(&b.is_causal))
+        });
+        digest_section_tag(&mut hasher, b"facts");
+        digest_u64(&mut hasher, facts.len() as u64);
+        for fact in facts {
+            digest_str(&mut hasher, &fact.memory_id);
+            digest_opt_str(&mut hasher, fact.canonical_identity.as_deref());
+            digest_opt_str(&mut hasher, fact.provenance_family.as_deref());
+            digest_bytes(&mut hasher, &fact.vector_bytes);
+            digest_str(&mut hasher, &fact.source_text);
+            digest_f32(&mut hasher, fact.confidence);
+            digest_opt_str(&mut hasher, fact.domain.as_deref());
+            digest_u64(&mut hasher, fact.cycle);
+            digest_bool(&mut hasher, fact.is_causal);
+        }
+
+        let mut relations: Vec<&ProvenanceRelationRecord> =
+            self.provenance_relations.iter().collect();
+        relations.sort_by(|a, b| {
+            a.source_memory_id
+                .cmp(&b.source_memory_id)
+                .then_with(|| a.target_memory_id.cmp(&b.target_memory_id))
+                .then_with(|| provenance_kind_tag(a.kind).cmp(provenance_kind_tag(b.kind)))
+                .then_with(|| a.created_at.cmp(&b.created_at))
+        });
+        digest_section_tag(&mut hasher, b"provenance");
+        digest_u64(&mut hasher, relations.len() as u64);
+        for relation in relations {
+            digest_str(&mut hasher, &relation.source_memory_id);
+            digest_str(&mut hasher, &relation.target_memory_id);
+            digest_str(&mut hasher, provenance_kind_tag(relation.kind));
+            digest_str(&mut hasher, &relation.created_at);
+        }
+
+        let mut edges: Vec<&CausalEdgeRecord> = self.causal_edges.iter().collect();
+        edges.sort_by(|a, b| {
+            a.cause
+                .cmp(&b.cause)
+                .then_with(|| a.effect.cmp(&b.effect))
+                .then_with(|| a.cycle.cmp(&b.cycle))
+                .then_with(|| a.strength.to_bits().cmp(&b.strength.to_bits()))
+                .then_with(|| a.is_inhibitory.cmp(&b.is_inhibitory))
+        });
+        digest_section_tag(&mut hasher, b"causal");
+        digest_u64(&mut hasher, edges.len() as u64);
+        for edge in edges {
+            digest_str(&mut hasher, &edge.cause);
+            digest_str(&mut hasher, &edge.effect);
+            digest_f32(&mut hasher, edge.strength);
+            digest_bool(&mut hasher, edge.is_inhibitory);
+            digest_u64(&mut hasher, edge.cycle);
+        }
+
+        let mut ontology: Vec<&OntologyRecord> = self.ontology.iter().collect();
+        ontology.sort_by(|a, b| {
+            a.name
+                .cmp(&b.name)
+                .then_with(|| a.vector_bytes.cmp(&b.vector_bytes))
+                .then_with(|| a.usage_count.cmp(&b.usage_count))
+                .then_with(|| a.utility.to_bits().cmp(&b.utility.to_bits()))
+                .then_with(|| a.created_at_cycle.cmp(&b.created_at_cycle))
+                .then_with(|| a.last_used_cycle.cmp(&b.last_used_cycle))
+                .then_with(|| a.is_a_parent.cmp(&b.is_a_parent))
+        });
+        digest_section_tag(&mut hasher, b"ontology");
+        digest_u64(&mut hasher, ontology.len() as u64);
+        for record in ontology {
+            digest_str(&mut hasher, &record.name);
+            digest_bytes(&mut hasher, &record.vector_bytes);
+            digest_u64(&mut hasher, record.usage_count);
+            digest_f64(&mut hasher, record.utility);
+            digest_u64(&mut hasher, record.created_at_cycle);
+            digest_u64(&mut hasher, record.last_used_cycle);
+            digest_opt_str(&mut hasher, record.is_a_parent.as_deref());
+        }
+
+        hasher.finalize()
+    }
+
+    /// Return the canonical snapshot digest as lowercase hexadecimal.
+    pub fn canonical_digest_hex(&self) -> String {
+        self.canonical_digest().to_hex().to_string()
+    }
+}
+
+fn digest_section_tag(hasher: &mut blake3::Hasher, tag: &[u8]) {
+    hasher.update(&[0xA5]);
+    digest_bytes(hasher, tag);
+}
+
+fn digest_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
+}
+
+fn digest_str(hasher: &mut blake3::Hasher, value: &str) {
+    digest_bytes(hasher, value.as_bytes());
+}
+
+fn digest_opt_str(hasher: &mut blake3::Hasher, value: Option<&str>) {
+    match value {
+        Some(value) => {
+            hasher.update(&[1]);
+            digest_str(hasher, value);
+        }
+        None => hasher.update(&[0]),
+    }
+}
+
+fn digest_bool(hasher: &mut blake3::Hasher, value: bool) {
+    hasher.update(&[u8::from(value)]);
+}
+
+fn digest_u64(hasher: &mut blake3::Hasher, value: u64) {
+    hasher.update(&value.to_le_bytes());
+}
+
+fn digest_f32(hasher: &mut blake3::Hasher, value: f32) {
+    digest_u64(hasher, value.to_bits() as u64);
+}
+
+fn digest_f64(hasher: &mut blake3::Hasher, value: f64) {
+    digest_u64(hasher, value.to_bits());
+}
+
+fn provenance_kind_tag(kind: ProvenanceRelationKind) -> &'static str {
+    match kind {
+        ProvenanceRelationKind::DerivedFrom => "DerivedFrom",
+        ProvenanceRelationKind::RevisedFrom => "RevisedFrom",
+        ProvenanceRelationKind::Supersedes => "Supersedes",
+        ProvenanceRelationKind::Contradicts => "Contradicts",
+        ProvenanceRelationKind::Corroborates => "Corroborates",
+        ProvenanceRelationKind::RepresentationOf => "RepresentationOf",
+    }
+}
+
 impl Default for KnowledgePersistence {
     fn default() -> Self {
         Self {
@@ -2295,6 +2450,77 @@ mod tests {
         assert_eq!(loaded[0].is_a_parent.as_deref(), Some("concept"));
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_digest_is_order_invariant_and_sensitive() {
+        let fact_a = FactRecord {
+            memory_id: "a".into(),
+            canonical_identity: Some("canon-a".into()),
+            provenance_family: Some("family".into()),
+            vector_bytes: vec![0xAA; BinaryHV::BYTES],
+            source_text: "A".into(),
+            confidence: 0.25,
+            domain: Some("test".into()),
+            cycle: 4,
+            is_causal: false,
+        };
+        let fact_b = FactRecord {
+            memory_id: "b".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0xBB; BinaryHV::BYTES],
+            source_text: "B".into(),
+            confidence: 0.75,
+            domain: None,
+            cycle: 8,
+            is_causal: true,
+        };
+        let relation = ProvenanceRelationRecord {
+            source_memory_id: "b".into(),
+            target_memory_id: "a".into(),
+            kind: ProvenanceRelationKind::Corroborates,
+            created_at: "cycle:8".into(),
+        };
+        let edge = CausalEdgeRecord {
+            cause: "b".into(),
+            effect: "c".into(),
+            strength: -0.5,
+            is_inhibitory: true,
+            cycle: 8,
+        };
+        let ontology = OntologyRecord {
+            name: "primitive".into(),
+            vector_bytes: vec![0xCC; BinaryHV::BYTES],
+            usage_count: 2,
+            utility: 0.5,
+            created_at_cycle: 7,
+            last_used_cycle: 8,
+            is_a_parent: None,
+        };
+
+        let snapshot_a = KnowledgePersistenceSnapshot {
+            facts: vec![fact_a.clone(), fact_b.clone()],
+            provenance_relations: vec![relation.clone()],
+            causal_edges: vec![edge.clone()],
+            ontology: vec![ontology.clone()],
+        };
+        let snapshot_b = KnowledgePersistenceSnapshot {
+            facts: vec![fact_b, fact_a],
+            provenance_relations: vec![relation],
+            causal_edges: vec![edge],
+            ontology: vec![ontology],
+        };
+
+        assert_eq!(
+            snapshot_a.canonical_digest(),
+            snapshot_b.canonical_digest()
+        );
+
+        let mut changed = snapshot_b.clone();
+        changed.facts[0].confidence = 0.5;
+        assert_ne!(snapshot_a.canonical_digest(), changed.canonical_digest());
+        assert_eq!(snapshot_a.canonical_digest_hex().len(), 64);
     }
 
     #[test]
