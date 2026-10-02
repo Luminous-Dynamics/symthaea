@@ -1624,7 +1624,17 @@ mod tests {
             store.commit_bound(&wrong_key,ExecutionOutcome::Succeeded),
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
         ));
-        let receipt=store.commit_bound(&record,ExecutionOutcome::Succeeded).unwrap();
+        assert!(matches!(
+            store.commit_bound(&record,ExecutionOutcome::Succeeded),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
+            ))
+        ));
+        let receipt=store.commit_bound_verified(
+            &record,
+            &verified_evidence(&record,ExecutionOutcome::Succeeded),
+            &TestProviderVerifier,
+        ).unwrap();
         assert_eq!(receipt.provider_idempotency_key,record.provider_idempotency_key);
         let _=std::fs::remove_file(path);
     }
