@@ -13,6 +13,7 @@
 //! does NOT execute system commands, it only produces modified config text
 //! and backup/restore operations.
 
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -288,6 +289,34 @@ impl ConfigWriter {
         Ok(())
     }
 
+    /// Apply a patch only when the currently locked file matches the approved digest.
+    ///
+    /// The target is opened read/write and exclusively locked before its content is
+    /// re-read. This closes the check/read split between approval and the write for
+    /// cooperating writers.
+    pub fn apply_patch_if_current(
+        &self,
+        patch: &ConfigPatch,
+        expected_original_digest: &str,
+    ) -> Result<WriteResult, std::io::Error> {
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&patch.target)?;
+        file.lock()?;
+
+        let mut current = String::new();
+        file.read_to_string(&mut current)?;
+        let current_digest = blake3::hash(current.as_bytes()).to_hex().to_string();
+        if current_digest != expected_original_digest || current != patch.original {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::StaleData,
+                "configuration.nix changed after the approved state was captured",
+            ));
+        }
+
+        self.apply_patch(patch)
+    }
     /// Apply a patch: create backup, validate, write atomically.
     pub fn apply_patch(&self, patch: &ConfigPatch) -> Result<WriteResult, std::io::Error> {
         if patch.is_noop() {
