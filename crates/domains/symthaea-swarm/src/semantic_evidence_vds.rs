@@ -60,6 +60,12 @@ pub enum Rfc9942VdpError {
     InvalidEncoding,
     #[error("trailing bytes after RFC 9942 VDP")]
     TrailingBytes,
+    #[error("RFC 9942 VDP proof kind does not match the requested verification")]
+    WrongProofKind,
+    #[error("none of the supplied RFC 9942 proofs verifies against the expected VDS state")]
+    NoMatchingProof,
+    #[error("RFC 9942 proof verification failed: {0}")]
+    Verification(#[from] Rfc9162ProofVerificationError),
 }
 
 impl Rfc9942Vdp {
@@ -79,6 +85,44 @@ impl Rfc9942Vdp {
     pub const fn vds_id(&self) -> u64 { RFC9162_VDS_ID }
     pub const fn kind(&self) -> Rfc9942ProofKind { self.kind }
     pub fn proofs(&self) -> &[Vec<u8>] { &self.proofs }
+
+    /// Verify an RFC 9942 inclusion VDP collection against a candidate entry.
+    /// The collection may contain multiple proofs; at least one must verify.
+    pub fn verify_inclusion(
+        &self,
+        candidate_entry: &[u8],
+        expected_head: VdsTreeHead,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        if self.kind != Rfc9942ProofKind::Inclusion {
+            return Err(Rfc9942VdpError::WrongProofKind);
+        }
+        let vds = Rfc9162Sha256Vds;
+        for proof in &self.proofs {
+            if vds.verify_rfc9942_inclusion_cbor(candidate_entry, expected_head, proof).is_ok() {
+                return Ok(expected_head);
+            }
+        }
+        Err(Rfc9942VdpError::NoMatchingProof)
+    }
+
+    /// Verify an RFC 9942 consistency VDP collection against both tree heads.
+    /// The collection may contain multiple proofs; at least one must verify.
+    pub fn verify_consistency(
+        &self,
+        older: VdsTreeHead,
+        newer: VdsTreeHead,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        if self.kind != Rfc9942ProofKind::Consistency {
+            return Err(Rfc9942VdpError::WrongProofKind);
+        }
+        let vds = Rfc9162Sha256Vds;
+        for proof in &self.proofs {
+            if vds.verify_rfc9942_consistency_cbor(older, newer, proof).is_ok() {
+                return Ok(newer);
+            }
+        }
+        Err(Rfc9942VdpError::NoMatchingProof)
+    }
 
     pub fn to_cbor(&self) -> Vec<u8> {
         let mut out = Vec::new();
@@ -841,8 +885,38 @@ mod tests {
     #[test]
     fn rfc9942_vdp_rejects_noncanonical_negative_label_encoding() {
         let encoded=vec![0xa1,0x38,0x00,0x81,0x40];
-        assert_eq!(Rfc9942Vdp::from_cbor(&encoded),Err(Rfc9942VdpError::InvalidStructure));
+        assert_eq!(Rfc9942Vdp::from_cbor(&encoded),Err(Rfc9942VdpError::InvalidEncoding));
     }
+
+    #[test]
+    fn rfc9942_vdp_verification_binds_kind_and_tree_head() {
+        let vds=Rfc9162Sha256Vds;
+        let leaves: Vec<Vec<u8>>=(0..4).map(|i|format!("leaf-{i}").into_bytes()).collect();
+        let head=vds.tree_head(&leaves);
+        let proof=vds.inclusion_proof(&leaves,2).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        assert_eq!(vdp.verify_inclusion(&leaves[2],head).unwrap(),head);
+        assert_eq!(vdp.verify_inclusion(b"tampered",head),Err(Rfc9942VdpError::NoMatchingProof));
+        let consistency=Rfc9942Vdp::new(
+            Rfc9942ProofKind::Consistency,
+            vec![vds.prove(&leaves,2).unwrap().to_cbor()],
+        ).unwrap();
+        assert_eq!(consistency.verify_inclusion(&leaves[2],head),Err(Rfc9942VdpError::WrongProofKind));
+    }
+
+    #[test]
+    fn rfc9942_vdp_consistency_verification_accepts_append_only_transition() {
+        let vds=Rfc9162Sha256Vds;
+        let leaves: Vec<Vec<u8>>=(0..8).map(|i|format!("leaf-{i}").into_bytes()).collect();
+        let older=vds.tree_head(&leaves[..4].to_vec());
+        let newer=vds.tree_head(&leaves);
+        let proof=vds.prove(&leaves,4).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Consistency,vec![proof]).unwrap();
+        assert_eq!(vdp.verify_consistency(older,newer).unwrap(),newer);
+        let forged=VdsTreeHead::new(newer.tree_size(),[0xAA;32]);
+        assert_eq!(vdp.verify_consistency(older,forged),Err(Rfc9942VdpError::NoMatchingProof));
+    }
+
     #[test]
     fn rfc9942_inclusion_verification_binds_candidate_and_tree_head() {
         let vds = Rfc9162Sha256Vds;
