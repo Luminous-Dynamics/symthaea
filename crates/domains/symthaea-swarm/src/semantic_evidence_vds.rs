@@ -131,6 +131,18 @@ impl Rfc9942Vdp {
         self.verify_inclusion(candidate_entry, expected_head)
     }
 
+    /// Verify an RFC 9942 inclusion proof with both required external bindings:
+    /// the protected-header VDS identifier and the receipt payload root.
+    pub fn verify_inclusion_for_vds_with_payload(
+        &self,
+        vds_id: u64,
+        candidate_entry: &[u8],
+        payload: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.validate_vds_id(vds_id)?;
+        self.verify_inclusion_with_payload(candidate_entry, payload)
+    }
+
     /// Verify inclusion against the 32-byte signed/detached receipt payload root.
     /// COSE signature verification and detached-payload resolution remain external.
     pub fn verify_inclusion_with_payload(
@@ -184,6 +196,18 @@ impl Rfc9942Vdp {
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
         self.validate_vds_id(vds_id)?;
         self.verify_consistency(older, newer)
+    }
+
+    /// Verify an RFC 9942 consistency proof with both required external
+    /// bindings: the protected-header VDS identifier and newer-tree payload root.
+    pub fn verify_consistency_for_vds_with_payload(
+        &self,
+        vds_id: u64,
+        older: VdsTreeHead,
+        payload: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.validate_vds_id(vds_id)?;
+        self.verify_consistency_with_payload(older, payload)
     }
 
     /// Verify consistency against the 32-byte signed/detached newer-tree root.
@@ -1007,6 +1031,18 @@ mod tests {
         assert_eq!(&encoded[..3],&[0xa1,0x21,0x81]);
         assert_eq!(encoded[3],0x58);
         assert_eq!(encoded[4],0x26);
+    }
+
+    #[test]
+    fn rfc9942_vdp_safe_verification_path_binds_vds_and_payload() {
+        let vds=Rfc9162Sha256Vds;
+        let leaves=vec![b"a".to_vec(),b"b".to_vec()];
+        let head=vds.tree_head(&leaves);
+        let proof=vds.inclusion_proof(&leaves,0).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        assert_eq!(vdp.verify_inclusion_for_vds_with_payload(1,b"a",&head.root()).unwrap(),head);
+        assert_eq!(vdp.verify_inclusion_for_vds_with_payload(2,b"a",&head.root()),Err(Rfc9942VdpError::VdsMismatch(2)));
+        assert_eq!(vdp.verify_inclusion_for_vds_with_payload(1,b"a",&[0xAA;32]),Err(Rfc9942VdpError::NoMatchingProof));
     }
 
     #[test]
