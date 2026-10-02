@@ -108,6 +108,9 @@ fn run_pair(
         previous_decision,
         current,
         current_decision,
+        independence_group: format!("group-{sensor_id}"),
+        independence_topology_digest: "topology-v1".into(),
+        independence_evidence_id: format!("independence-{sensor_id}"),
     }
 }
 
