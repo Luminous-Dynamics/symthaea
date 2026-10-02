@@ -1,1 +1,84 @@
-name: HDC Linear-Code Recovery Qualification\n\non:\n  pull_request:\n    paths:\n      - "crates/core/symthaea-core/src/hdc/linear_code.rs"\n      - "crates/core/symthaea-core/tests/linear_code_ambiguity.rs"\n      - "docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md"\n      - ".github/workflows/hdc-linear-code-qualify.yml"\n  workflow_dispatch:\n\nconcurrency:\n  group: hdc-linear-code-${{ github.event.pull_request.head.sha || github.sha }}\n  cancel-in-progress: true\n\nenv:\n  CARGO_TERM_COLOR: always\n  RUST_BACKTRACE: 1\n\njobs:\n  qualify:\n    name: Exact-head linear-code qualification\n    runs-on: ubuntu-latest\n    timeout-minutes: 20\n\n    steps:\n      - name: Checkout exact PR head\n        uses: actions/checkout@v4\n        with:\n          ref: ${{ github.event.pull_request.head.sha || github.sha }}\n          fetch-depth: 1\n\n      - name: Record exact head\n        id: head\n        run: |\n          ACTUAL_SHA="$(git rev-parse HEAD)"\n          echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"\n          if [ "${{ github.event_name }}" = "pull_request" ]; then\n            test "$ACTUAL_SHA" = "${{ github.event.pull_request.head.sha }}"\n          fi\n\n      - name: Install pinned Rust toolchain\n        uses: dtolnay/rust-toolchain@1.96.0\n        with:\n          components: rustfmt,clippy\n\n      - name: Focused formatting\n        run: |\n          rustfmt --check --edition 2024 \\n            crates/core/symthaea-core/src/hdc/linear_code.rs \\n            crates/core/symthaea-core/tests/linear_code_ambiguity.rs\n\n      - name: Linear-code unit tests\n        run: cargo test -p symthaea-core --lib linear_code\n\n      - name: Linear-code ambiguity integration test\n        run: cargo test -p symthaea-core --test linear_code_ambiguity\n\n      - name: Strict Clippy\n        run: cargo clippy -p symthaea-core --lib --features simd -- -D warnings\n\n      - name: Emit qualification receipt\n        if: always()\n        run: |\n          cat > hdc-linear-code-qualification.txt <<EOF\n          HDC Linear-Code Recovery Qualification\n          ======================================\n          exact_head=${{ steps.head.outputs.sha }}\n          rust_toolchain=1.96.0\n          representation=gf2_random_linear_code\n          stage=A-algebraic-kernel\n          stage_b_paper_fidelity=not-claimed\n          factor_identifiability=ambiguity-explicit\n          production_default_changed=false\n          EOF\n\n      - name: Upload qualification receipt\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: hdc-linear-code-qualification-${{ steps.head.outputs.sha }}\n          path: hdc-linear-code-qualification.txt\n
+name: HDC Linear-Code Recovery Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-core/src/hdc/linear_code.rs"
+      - "crates/core/symthaea-core/tests/linear_code_ambiguity.rs"
+      - "docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md"
+      - ".github/workflows/hdc-linear-code-qualify.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: hdc-linear-code-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    name: Exact-head linear-code qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Record exact head
+        id: head
+        run: |
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$ACTUAL_SHA" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Focused formatting
+        run: |
+          rustfmt --check --edition 2024 \
+            crates/core/symthaea-core/src/hdc/linear_code.rs \
+            crates/core/symthaea-core/tests/linear_code_ambiguity.rs
+
+      - name: Linear-code unit tests
+        run: cargo test -p symthaea-core --lib linear_code
+
+      - name: Linear-code ambiguity integration test
+        run: cargo test -p symthaea-core --test linear_code_ambiguity
+
+      - name: Strict Clippy
+        run: cargo clippy -p symthaea-core --lib --features simd -- -D warnings
+
+      - name: Emit qualification receipt
+        if: always()
+        run: |
+          cat > hdc-linear-code-qualification.txt <<EOF
+          HDC Linear-Code Recovery Qualification
+          ======================================
+          exact_head=${{ steps.head.outputs.sha }}
+          rust_toolchain=1.96.0
+          representation=gf2_random_linear_code
+          stage=A-algebraic-kernel+E-decoder-oracle
+          stage_b_paper_fidelity=not-claimed
+          factor_identifiability=ambiguity-explicit
+          decoder_oracle=exhaustive-bounded-distance
+          decoder_oracle_is_production=false
+          production_default_changed=false
+          EOF
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdc-linear-code-qualification-${{ steps.head.outputs.sha }}
+          path: hdc-linear-code-qualification.txt
