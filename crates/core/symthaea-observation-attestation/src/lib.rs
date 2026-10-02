@@ -1639,4 +1639,56 @@ mod tests {
     }
 
 
+
+
+    #[test]
+    fn evidence_evaluation_preserves_context_and_boundaries() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .with_environment_identity(VerifierEnvironmentIdentity::new("build-a"))
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+        assert_eq!(evaluation.subject_fingerprint, receipt.fingerprint());
+        assert_eq!(evaluation.context_fingerprint, evaluation.context.fingerprint());
+        assert_eq!(evaluation.verification_report_fingerprint, report.fingerprint());
+        assert!(evaluation.limitations.contains(&EvaluationLimitation::UnderlyingObservationTruthNotEvaluated));
+        assert!(evaluation.limitations.contains(&EvaluationLimitation::SemanticValidityNotEvaluated));
+    }
+
+    #[test]
+    fn evidence_evaluation_context_changes_identity_without_changing_subject() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let base = report.to_evidence_evaluation();
+        let changed = base.clone().with_context(
+            VerificationContext::from_report(&report).with_trust_root_fingerprint("trust-root-a"),
+        );
+        assert_eq!(base.subject_fingerprint, changed.subject_fingerprint);
+        assert_ne!(base.context_fingerprint, changed.context_fingerprint);
+        assert_ne!(base.fingerprint(), changed.fingerprint());
+    }
+
+    #[test]
+    fn evidence_evaluation_fingerprint_is_order_independent_for_limitations() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let first = report.to_evidence_evaluation();
+        let mut second = first.clone();
+        second.limitations.reverse();
+        assert_eq!(first.fingerprint(), second.fingerprint());
+    }
 }
