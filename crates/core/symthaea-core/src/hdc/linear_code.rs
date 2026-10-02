@@ -334,6 +334,45 @@ mod tests {
     }
 
     #[test]
+    fn linear_combination_solver_recovers_unique_coefficients() {
+        let left = RandomLinearCode::generate(96, 6, 0x1111);
+        let right = RandomLinearCode::generate(96, 6, 0x2222);
+        let mut basis = left.basis().to_vec();
+        basis.extend(right.basis().iter().cloned());
+
+        assert_eq!(basis_rank(&basis, 96), basis.len());
+
+        let left_message = [true, false, true, false, true, false];
+        let right_message = [false, true, true, false, false, true];
+        let left_word = left.encode(&left_message);
+        let right_word = right.encode(&right_message);
+        let composite = left_word.bound(&right_word);
+
+        let coefficients = solve_linear_combination(&composite, &basis).expect("composite must be in span");
+        let expected: Vec<bool> = left_message
+            .into_iter()
+            .chain(right_message)
+            .collect();
+        assert_eq!(coefficients, expected);
+
+        let mut reconstructed = BinaryCodeword::zero(96);
+        for (coefficient, generator) in coefficients.iter().zip(&basis) {
+            if *coefficient {
+                reconstructed.xor_assign(generator);
+            }
+        }
+        assert_eq!(reconstructed, composite);
+    }
+
+    #[test]
+    fn linear_combination_solver_rejects_outside_span() {
+        let code = RandomLinearCode::generate(64, 5, 0x5151);
+        let outsider = BinaryCodeword::from_words(64, vec![u64::MAX]);
+        assert!(!code.contains(&outsider));
+        assert!(solve_linear_combination(&outsider, code.basis()).is_none());
+    }
+
+    #[test]
     fn boolean_binding_preserves_code_membership() {
         let code = RandomLinearCode::generate(80, 7, 0xBADA55);
         let a = code.encode(&[true, false, true, false, false, true, false]);
