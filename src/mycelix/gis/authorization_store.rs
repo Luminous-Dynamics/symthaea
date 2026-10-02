@@ -1461,6 +1461,59 @@ mod tests {
     }
 
     #[test]
+    fn current_instance_store_is_upgraded_with_boundary_columns_and_indexes() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-migrate-{}.db",std::process::id()));
+        {
+            let connection=Connection::open(&path).unwrap();
+            connection.execute_batch(
+                "CREATE TABLE authorization_leases (
+                   authorization_instance TEXT PRIMARY KEY, action_id TEXT NOT NULL,
+                   action_digest TEXT NOT NULL, support_digest TEXT NOT NULL,
+                   policy TEXT NOT NULL, authority_epoch INTEGER NOT NULL,
+                   remaining_executions INTEGER NOT NULL, state TEXT NOT NULL, attempt_id TEXT
+                 );
+                 CREATE TABLE authorization_receipts (
+                   authorization_instance TEXT NOT NULL, action_id TEXT NOT NULL,
+                   attempt_id TEXT NOT NULL, phase TEXT NOT NULL, outcome TEXT NOT NULL,
+                   action_digest TEXT NOT NULL, authority_epoch INTEGER NOT NULL,
+                   PRIMARY KEY(authorization_instance,attempt_id,phase)
+                 );
+                 CREATE TABLE authorization_dispatches (
+                   authorization_instance TEXT NOT NULL, attempt_id TEXT NOT NULL,
+                   action_id TEXT NOT NULL, action_digest TEXT NOT NULL,
+                   provider_idempotency_key TEXT NOT NULL, target_identity TEXT NOT NULL,
+                   audience TEXT NOT NULL, adapter TEXT NOT NULL, boundary_id TEXT NOT NULL,
+                   state TEXT NOT NULL, PRIMARY KEY(authorization_instance,attempt_id)
+                 );",
+            ).unwrap();
+        }
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let lease=store.connection().unwrap();
+
+        let lease_boundary:String=lease.query_row(
+            "SELECT name FROM pragma_table_info('authorization_leases')
+             WHERE name='boundary_id'",
+            [], |row| row.get(0)
+        ).unwrap();
+        let receipt_boundary:String=lease.query_row(
+            "SELECT name FROM pragma_table_info('authorization_receipts')
+             WHERE name='boundary_id'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(lease_boundary,"boundary_id");
+        assert_eq!(receipt_boundary,"boundary_id");
+
+        let index_count:i64=lease.query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type='index' AND name IN
+             ('authorization_lease_attempt_id_uq','authorization_dispatch_attempt_id_uq')",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(index_count,2);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn legacy_action_keyed_store_is_migrated_to_explicit_instances() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-migrate-{}.db",std::process::id()));
         {
