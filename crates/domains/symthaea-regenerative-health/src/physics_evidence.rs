@@ -28,6 +28,7 @@ pub enum PhysicsConsistencyState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PhysicsConsistencyIssue {
     EmptyComponentIdentity,
+    ComponentMismatch,
     EmptyModelIdentity,
     EmptyModelVersion,
     EmptyEvidence,
@@ -107,6 +108,12 @@ impl PhysicsConsistencyGate {
 
         if component_id.trim().is_empty() {
             issues.push(PhysicsConsistencyIssue::EmptyComponentIdentity);
+        }
+        if prediction.component_id != component_id
+            && !prediction.component_id.trim().is_empty()
+            && !component_id.trim().is_empty()
+        {
+            issues.push(PhysicsConsistencyIssue::ComponentMismatch);
         }
         if prediction.model_id.trim().is_empty() {
             issues.push(PhysicsConsistencyIssue::EmptyModelIdentity);
@@ -315,6 +322,21 @@ mod tests {
         );
         assert_eq!(d.state, PhysicsConsistencyState::Quarantined);
         assert!(d.issues.contains(&PhysicsConsistencyIssue::FuturePrediction));
+    }
+
+    #[test]
+    fn component_mismatch_is_quarantined() {
+        let mut p = prediction(1.0);
+        p.component_id = "tail-root".into();
+        let d = gate().assess(
+            "wing-root",
+            "cfg-wing-root",
+            &temporal(TemporalFusionState::Corroborated, Some(1.0)),
+            &p,
+            2_000,
+        );
+        assert_eq!(d.state, PhysicsConsistencyState::Quarantined);
+        assert!(d.issues.contains(&PhysicsConsistencyIssue::ComponentMismatch));
     }
 
     #[test]
