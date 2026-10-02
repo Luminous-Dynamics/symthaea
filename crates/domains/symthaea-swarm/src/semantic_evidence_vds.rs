@@ -2102,6 +2102,66 @@ mod tests {
 
     #[cfg(feature = "semantic-receipts")]
     #[test]
+    fn rfc9942_ed25519_consistency_verification_is_signature_then_proof() {
+        use ed25519_dalek::{Signer, SigningKey};
+        let signing_key=SigningKey::from_bytes(&[11u8;32]);
+        let vds=Rfc9162Sha256Vds;
+        let leaves:Vec<Vec<u8>>=(0..4).map(|i|format!("leaf-{i}").into_bytes()).collect();
+        let older=vds.tree_head(&leaves[..2].to_vec());
+        let newer=vds.tree_head(&leaves);
+        let proof=vds.prove(&leaves,2).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Consistency,vec![proof]).unwrap();
+
+        let unsigned=Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,vdp,Rfc9942ReceiptPayload::Attached(newer.root()),Vec::new()
+        ).unwrap();
+        let signature=signing_key.sign(&unsigned.signature1_tbs(b"",None).unwrap()).to_bytes().to_vec();
+        let receipt=Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,unsigned.vdp().clone(),unsigned.payload().clone(),signature
+        ).unwrap();
+        assert_eq!(
+            receipt.verify_ed25519_consistency(
+                older,signing_key.verifying_key().as_bytes(),b"",None
+            ).unwrap(),
+            newer
+        );
+
+        let wrong_root=[0xAA;32];
+        let invalid_unsigned=Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,
+            receipt.vdp().clone(),
+            Rfc9942ReceiptPayload::Attached(wrong_root),
+            Vec::new(),
+        ).unwrap();
+        let invalid_signature=signing_key.sign(&invalid_unsigned.signature1_tbs(b"",None).unwrap()).to_bytes().to_vec();
+        let cryptographically_valid_but_inconsistent=Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,
+            invalid_unsigned.vdp().clone(),
+            invalid_unsigned.payload().clone(),
+            invalid_signature,
+        ).unwrap();
+        assert_eq!(
+            cryptographically_valid_but_inconsistent.verify_ed25519_consistency(
+                older,signing_key.verifying_key().as_bytes(),b"",None
+            ),
+            Err(Rfc9942VdpError::NoMatchingProof)
+        );
+
+        let mut forged_signature=receipt.signature().to_vec();
+        forged_signature[0]^=0x01;
+        let forged=Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,receipt.vdp().clone(),receipt.payload().clone(),forged_signature
+        ).unwrap();
+        assert_eq!(
+            forged.verify_ed25519_consistency(
+                older,signing_key.verifying_key().as_bytes(),b"",None
+            ),
+            Err(Rfc9942VdpError::InvalidEd25519Signature)
+        );
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
     fn rfc9942_ed25519_signature_verification_binds_tbs() {
         use ed25519_dalek::{Signer, SigningKey};
         let signing_key=SigningKey::from_bytes(&[7u8;32]);
