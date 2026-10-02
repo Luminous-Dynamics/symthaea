@@ -345,10 +345,10 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
     // allowlisting alone would accept incomplete commands, wrong arities, or
     // numbers in places where a command is required. Parse only the supported
     // command vocabulary and require each parameter group to be complete.
-    #[derive(Clone, Copy)]
+    #[derive(Clone)]
     enum Token {
         Command(char),
-        Number,
+        Number(String),
     }
 
     fn parameter_count(command: char) -> Option<usize> {
@@ -375,7 +375,10 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
         if number.is_empty() {
             return true;
         }
-        if tokens.iter().filter(|token| matches!(token, Token::Number)).count()
+        if tokens
+            .iter()
+            .filter(|token| matches!(token, Token::Number(_)))
+            .count()
             >= MAX_PORTRAIT_NUMBER_TOKENS
         {
             return false;
@@ -383,7 +386,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
         if !svg_number_is_bounded(number) {
             return false;
         }
-        tokens.push(Token::Number);
+        tokens.push(Token::Number(number.clone()));
         number.clear();
         true
     };
@@ -449,7 +452,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
                 index += 1;
                 command
             }
-            Token::Number => {
+            Token::Number(_) => {
                 if active_command.is_none() {
                     return false;
                 }
@@ -470,7 +473,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
         if arity == 0 {
             // ClosePath never consumes parameters; another number before the
             // next command would therefore be malformed.
-            if index < tokens.len() && matches!(tokens[index], Token::Number) {
+            if index < tokens.len() && matches!(tokens[index], Token::Number(_)) {
                 return false;
             }
             active_command = None;
@@ -483,8 +486,24 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
         let mut consumed = 0usize;
         let mut completed_group = false;
 
-        while index < tokens.len() && matches!(tokens[index], Token::Number) {
+        while index < tokens.len() && matches!(tokens[index], Token::Number(_)) {
+            let raw_number = match &tokens[index] {
+                Token::Number(raw) => raw.as_str(),
+                Token::Command(_) => return false,
+            };
             consumed += 1;
+
+            // SVG's elliptical-arc grammar makes the fourth and fifth
+            // parameters flags, not general reals: each must be the exact
+            // lexical token "0" or "1". Do not normalize arbitrary bounded
+            // numerics such as "0.0", "+0", or "2" into an accepted flag.
+            if matches!(command, 'A' | 'a')
+                && matches!(consumed, 4 | 5)
+                && !matches!(raw_number, "0" | "1")
+            {
+                return false;
+            }
+
             index += 1;
 
             if consumed == arity {
@@ -1623,6 +1642,36 @@ mod tests {
             r#"<svg><path d="M 0 0 1"/></svg>"#,
         ] {
             assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(), "accepted: {svg}");
+        }
+    }
+
+    #[test]
+    fn portrait_rejects_non_binary_arc_flags() {
+        for svg in [
+            r#"<svg><path d="M0 0 A5 5 0 2 0 10 10"/></svg>"#,
+            r#"<svg><path d="M0 0 A5 5 0 0.0 1 10 10"/></svg>"#,
+            r#"<svg><path d="M0 0 A5 5 0 +0 1 10 10"/></svg>"#,
+            r#"<svg><path d="M0 0 A5 5 0 0 1.0 10 10"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(),
+                "accepted: {svg}"
+            );
+        }
+    }
+
+    #[test]
+    fn portrait_accepts_canonical_binary_arc_flags() {
+        for svg in [
+            r#"<svg><path d="M0 0 A5 5 0 0 0 10 10"/></svg>"#,
+            r#"<svg><path d="M0 0 A5 5 0 0 1 10 10"/></svg>"#,
+            r#"<svg><path d="M0 0 A5 5 0 1 0 10 10"/></svg>"#,
+            r#"<svg><path d="M0 0 A5 5 0 1 1 10 10"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_some(),
+                "rejected: {svg}"
+            );
         }
     }
 
