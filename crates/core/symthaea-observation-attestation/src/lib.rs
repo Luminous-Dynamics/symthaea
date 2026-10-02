@@ -271,6 +271,15 @@ impl EvaluationProcedure {
         }
     }
 
+    /// Historical v1 procedure definition retained for legacy report evidence.
+    pub const fn attestation_ed25519_v1() -> Self {
+        Self {
+            procedure_version: "symthaea-observation-evaluation-procedure-v1",
+            procedure_id: EVALUATION_PROCEDURE_ID,
+            checks: EvaluationCheck::ALL,
+        }
+    }
+
     /// Validate that this evaluation remains consistent with the report that
     /// materialized it. This catches post-hoc mutation of outcome, subject,
     /// context identity, execution evidence, or epistemic boundary.
@@ -297,20 +306,33 @@ impl EvaluationProcedure {
         }
 
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:observation-evaluation-procedure:v2\n");
+        let legacy_v1 =
+            self.procedure_version == "symthaea-observation-evaluation-procedure-v1";
+        bytes.extend_from_slice(if legacy_v1 {
+            b"symthaea:observation-evaluation-procedure:v1\n"
+        } else {
+            b"symthaea:observation-evaluation-procedure:v2\n"
+        });
         write_string(&mut bytes, self.procedure_version);
         write_string(&mut bytes, self.procedure_id);
         bytes.extend_from_slice(&(self.checks.len() as u64).to_be_bytes());
         for check in self.checks {
             write_string(&mut bytes, check.id());
-            write_string(&mut bytes, check.definition_version());
+            if !legacy_v1 {
+                write_string(&mut bytes, check.definition_version());
+            }
         }
         bytes
     }
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-evaluation-procedure:v2\n");
+        let domain = if self.procedure_version == "symthaea-observation-evaluation-procedure-v1" {
+            b"symthaea:observation-evaluation-procedure:v1\n"
+        } else {
+            b"symthaea:observation-evaluation-procedure:v2\n"
+        };
+        hasher.update(domain);
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -387,7 +409,7 @@ impl EvaluationTrace {
     }
 
     fn from_report_legacy(report: &ReceiptAttestationVerificationReport) -> Self {
-        let procedure = EvaluationProcedure::attestation_ed25519();
+        let procedure = EvaluationProcedure::attestation_ed25519_v1();
         let results = procedure
             .checks
             .iter()
@@ -448,8 +470,11 @@ impl EvaluationTrace {
     /// Validate the structural invariants of the durable execution trace.
     pub fn is_well_formed(&self) -> bool {
         let procedure = EvaluationProcedure::attestation_ed25519();
+        let legacy_procedure = EvaluationProcedure::attestation_ed25519_v1();
+        let procedure_matches = self.procedure_fingerprint == procedure.fingerprint()
+            || self.procedure_fingerprint == legacy_procedure.fingerprint();
         !self.results.is_empty()
-            && self.procedure_fingerprint == procedure.fingerprint()
+            && procedure_matches
             && self.results.iter().enumerate().all(|(index, result)| {
                 result.sequence == index as u32
                     && procedure.checks.get(index).copied() == Some(result.check)
@@ -2687,6 +2712,53 @@ mod tests {
             changed.context.authorization_policy_fingerprint.as_deref(),
             Some("authorization-policy-a")
         );
+    }
+
+    #[test]
+    fn legacy_v1_execution_trace_remains_well_formed() {
+        let procedure = EvaluationProcedure::attestation_ed25519_v1();
+        let trace = EvaluationTrace {
+            procedure_fingerprint: procedure.fingerprint(),
+            results: procedure
+                .checks
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, check)| EvaluationCheckResult {
+                    sequence: index as u32,
+                    check,
+                    stage: VerificationStage::Passed,
+                })
+                .collect(),
+        };
+        assert!(trace.is_well_formed());
+        assert_eq!(
+            trace.terminal_outcome(),
+            Some(ReceiptAttestationVerificationOutcome::Verified)
+        );
+        assert_ne!(
+            procedure.fingerprint(),
+            EvaluationProcedure::attestation_ed25519().fingerprint()
+        );
+    }
+
+    #[test]
+    fn legacy_v3_report_can_materialize_current_evidence_evaluation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        report.verifier_version = "symthaea-observation-attestation-report-v3";
+        report.procedure_fingerprint =
+            EvaluationProcedure::attestation_ed25519_v1().fingerprint();
+        report.execution_trace = EvaluationTrace::default();
+
+        let evaluation = report.to_evidence_evaluation();
+        assert!(evaluation.execution_trace.is_well_formed());
+        assert!(evaluation.is_consistent_with_report(&report));
     }
 
     #[test]
