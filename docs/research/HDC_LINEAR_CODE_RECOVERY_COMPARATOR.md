@@ -181,6 +181,23 @@ For Symthaea, the next controlled experiment should therefore remain representat
 
 The 2026 histogram-recovery construction should be treated as a separate comparator family unless its encoding and observation model are intentionally adopted; it should not be silently substituted into this experiment.
 
+
+### Noise phase diagram: exact-recovery boundary
+
+The first executable noise study intentionally uses a small exact Boolean space so every corruption pattern can be enumerated. Each error vector is classified by whether the error itself belongs to the generated linear-code subspace.
+
+This distinguishes:
+
+- **clean**: zero error; recovery returns the original codeword/message;
+- **nonzero in-span corruption**: the observation remains an exact codeword, so algebraic recovery succeeds but generally identifies a different codeword/message;
+- **out-of-span corruption**: the observation leaves the code, so the clean GF(2) solver rejects it.
+
+For a rank-`r` binary linear code embedded in `n` Boolean coordinates, exactly `2^r` of the `2^n` possible error vectors are in the code. The exhaustive fixture verifies this invariant and verifies the semantic distinction between algebraic solvability and recovery correctness.
+
+This is deliberately **not** presented as an error-correction result. It establishes the identifiability boundary that a genuine decoder must cross. The next decoder experiment should therefore introduce an explicit noise model and decoder objective, rather than adding a nearest-codeword heuristic to the exact solver.
+
+The recent Deng–Raviv noisy-VSA construction is a separate comparator family: it changes the code construction to a Reed–Solomon/Hadamard concatenation and uses histogram recovery/list-decoding machinery to obtain formal noise resilience. It should remain separate from the current random-linear-code exact-recovery implementation unless that representation is intentionally adopted.
+
 ### Acceptance gates
 
 The branch is ready for a benchmark-producing Stage-C/Stage-D experiment only when:
