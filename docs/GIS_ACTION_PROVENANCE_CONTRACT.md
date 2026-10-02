@@ -147,6 +147,20 @@ Revocation and expiry are also fenced at the effect boundary. A lease in Ready m
 These rules align with current agent-authorization research: exact action hashing, a shared authorization instance/consumption key, terminal state transitions, and durable atomic consumption are being treated as distinct requirements rather than properties of a signed token alone. The relevant IETF work is still an Internet-Draft, not a final standard.
 
 
+## Exact effect-boundary binding
+
+For actions that cross an external effect sink, the immutable executable contract may carry an `ActionEffectBinding` containing:
+
+- executor-observed target identity;
+- intended audience/environment;
+- exact adapter/finality-sink identity.
+
+The effect binding is included in the canonical action digest. Consequently, changing the target, audience, or adapter changes the authorized action identity rather than silently rebinding an already-authorized action at execution time.
+
+The effectful execution API requires the expected effect binding to match the action before admission. The authorization witness still binds to the resulting canonical action digest, so the binding is enforced transitively through the existing authorization boundary.
+
+This is deliberately stronger than checking effect fields earlier in a workflow and trusting a later reconstruction. Current reconstruction-aware agent-security research identifies that pattern as a residual authorization risk: the representation inspected for approval can differ from the object ultimately consumed by the sink. Current IETF work similarly calls for a frozen observed action, exact target identity, durable pre-dispatch state, and effect-boundary verification. These documents are Internet-Drafts and research, not final standards.
+
 ## Authorization instance and semantic replay
 
 The authorization instance is the durable identity of one issuance of authority. It is intentionally distinct from the canonical action identity:
