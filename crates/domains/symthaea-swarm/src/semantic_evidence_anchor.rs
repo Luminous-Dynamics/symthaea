@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use blake3::Hasher;
 
 use crate::semantic_evidence_history::{
-    HistoryCheckpoint, HISTORY_VERSION,
+    HistoryCheckpoint, VERSION as HISTORY_VERSION,
 };
 
 pub const ALGORITHM: &str = "BLAKE3-256";
