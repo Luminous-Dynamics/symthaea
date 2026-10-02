@@ -353,7 +353,7 @@ impl NixLocalExecutionAuthorityV1 {
         intent: NixActionIntentV1,
         approval: ConsumedLocalApprovalDecisionV1,
     ) -> Result<Self, NixAuthorizationErrorV1> {
-        if approval.decision_kind() != NixAuthorizationDecisionV1::Approved {
+        if approval.decision_kind() != LocalApprovalDecisionKindV1::Approved {
             return Err(NixAuthorizationErrorV1::NotApproved);
         }
         let digest = intent.digest()?;
