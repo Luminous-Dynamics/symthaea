@@ -2292,6 +2292,60 @@ mod tests {
 
     #[cfg(feature = "semantic-receipts")]
     #[test]
+    fn rfc9942_es256_inclusion_verification_enforces_proof_then_signature() {
+        use ring::{rand::SystemRandom, signature::{EcdsaKeyPair, KeyPair}};
+        let rng=SystemRandom::new();
+        let pkcs8=EcdsaKeyPair::generate_pkcs8(&ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,&rng).unwrap();
+        let keypair=EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,pkcs8.as_ref(),&rng).unwrap();
+        let vds=Rfc9162Sha256Vds;
+        let leaves=vec![b"a".to_vec(),b"b".to_vec()];
+        let head=vds.tree_head(&leaves);
+        let proof=vds.inclusion_proof(&leaves,0).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let unsigned=Rfc9942ReceiptEnvelope::new(COSE_ES256_ALGORITHM_ID,vdp,Rfc9942ReceiptPayload::Attached(head.root()),Vec::new()).unwrap();
+        let sig=keypair.sign(&rng,&unsigned.signature1_tbs(b"",None).unwrap()).unwrap().as_ref().to_vec();
+        let receipt=Rfc9942ReceiptEnvelope::new(COSE_ES256_ALGORITHM_ID,unsigned.vdp().clone(),unsigned.payload().clone(),sig).unwrap();
+        assert_eq!(receipt.verify_es256_inclusion(b"a",keypair.public_key().as_ref(),b"",None).unwrap(),head);
+        assert_eq!(
+            receipt.verify_es256_inclusion(b"tampered",keypair.public_key().as_ref(),b"",None),
+            Err(Rfc9942VdpError::NoMatchingProof)
+        );
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn rfc9942_es256_consistency_verification_returns_one_result() {
+        use ring::{rand::SystemRandom, signature::{EcdsaKeyPair, KeyPair}};
+        let rng=SystemRandom::new();
+        let pkcs8=EcdsaKeyPair::generate_pkcs8(&ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,&rng).unwrap();
+        let keypair=EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,pkcs8.as_ref(),&rng).unwrap();
+        let vds=Rfc9162Sha256Vds;
+        let leaves:Vec<Vec<u8>>=(0..4).map(|i|format!("leaf-{i}").into_bytes()).collect();
+        let older=vds.tree_head(&leaves[..2].to_vec());
+        let newer=vds.tree_head(&leaves);
+        let proof=vds.prove(&leaves,2).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Consistency,vec![proof]).unwrap();
+        let unsigned=Rfc9942ReceiptEnvelope::new(COSE_ES256_ALGORITHM_ID,vdp,Rfc9942ReceiptPayload::Attached(newer.root()),Vec::new()).unwrap();
+        let sig=keypair.sign(&rng,&unsigned.signature1_tbs(b"",None).unwrap()).unwrap().as_ref().to_vec();
+        let receipt=Rfc9942ReceiptEnvelope::new(COSE_ES256_ALGORITHM_ID,unsigned.vdp().clone(),unsigned.payload().clone(),sig).unwrap();
+        assert_eq!(receipt.verify_es256_consistency(older,keypair.public_key().as_ref(),b"",None).unwrap(),newer);
+
+        let wrong_payload=Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            receipt.vdp().clone(),
+            Rfc9942ReceiptPayload::Attached([0xAA;32]),
+            Vec::new(),
+        ).unwrap();
+        let wrong_sig=keypair.sign(&rng,&wrong_payload.signature1_tbs(b"",None).unwrap()).unwrap().as_ref().to_vec();
+        let wrong=Rfc9942ReceiptEnvelope::new(COSE_ES256_ALGORITHM_ID,wrong_payload.vdp().clone(),wrong_payload.payload().clone(),wrong_sig).unwrap();
+        assert_eq!(
+            wrong.verify_es256_consistency(older,keypair.public_key().as_ref(),b"",None),
+            Err(Rfc9942VdpError::NoMatchingProof)
+        );
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
     fn rfc9942_ed25519_consistency_verification_is_signature_then_proof() {
         use ed25519_dalek::{Signer, SigningKey};
         let signing_key=SigningKey::from_bytes(&[11u8;32]);
