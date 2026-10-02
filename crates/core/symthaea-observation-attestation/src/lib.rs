@@ -398,29 +398,46 @@ impl EvaluationTrace {
     }
 
     /// Return the aggregate outcome represented by this trace.
+    ///
+    /// A successful outcome is terminal only when the full procedure executed.
+    /// A partial prefix of passing checks is intentionally outcome-less.
     pub fn terminal_outcome(&self) -> Option<ReceiptAttestationVerificationOutcome> {
         match self.results.last().map(|result| result.stage) {
-            Some(VerificationStage::Passed) => Some(ReceiptAttestationVerificationOutcome::Verified),
             Some(VerificationStage::Failed(outcome)) => Some(outcome),
-            Some(VerificationStage::NotEvaluated) | None => None,
+            Some(VerificationStage::Passed)
+                if self.results.len() == EvaluationProcedure::attestation_ed25519().checks.len() =>
+            {
+                Some(ReceiptAttestationVerificationOutcome::Verified)
+            }
+            Some(VerificationStage::Passed)
+            | Some(VerificationStage::NotEvaluated)
+            | None => None,
         }
     }
 
     /// Validate the structural invariants of the durable execution trace.
     pub fn is_well_formed(&self) -> bool {
-        self.procedure_fingerprint
-            == EvaluationProcedure::attestation_ed25519().fingerprint()
+        let procedure = EvaluationProcedure::attestation_ed25519();
+        !self.results.is_empty()
+            && self.procedure_fingerprint == procedure.fingerprint()
             && self.results.iter().enumerate().all(|(index, result)| {
                 result.sequence == index as u32
+                    && procedure.checks.get(index).copied() == Some(result.check)
                     && !matches!(result.stage, VerificationStage::NotEvaluated)
             })
             && self
                 .results
                 .windows(2)
                 .all(|pair| {
-                    pair[0].check != pair[1].check
-                        && !matches!(pair[0].stage, VerificationStage::Failed(_))
+                    !matches!(pair[0].stage, VerificationStage::Failed(_))
                 })
+            && match self.results.last().map(|result| result.stage) {
+                Some(VerificationStage::Failed(_)) => true,
+                Some(VerificationStage::Passed) => {
+                    self.results.len() == procedure.checks.len()
+                }
+                _ => false,
+            }
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -2178,10 +2195,27 @@ mod tests {
     #[test]
     fn evaluation_trace_empty_has_no_terminal_outcome() {
         let trace = EvaluationTrace {
-            procedure_fingerprint: "procedure-a".into(),
+            procedure_fingerprint:
+                EvaluationProcedure::attestation_ed25519().fingerprint(),
             results: Vec::new(),
         };
         assert_eq!(trace.terminal_outcome(), None);
+        assert!(!trace.is_well_formed());
+    }
+
+    #[test]
+    fn evaluation_trace_partial_success_has_no_terminal_outcome() {
+        let procedure = EvaluationProcedure::attestation_ed25519();
+        let trace = EvaluationTrace {
+            procedure_fingerprint: procedure.fingerprint(),
+            results: vec![EvaluationCheckResult {
+                sequence: 0,
+                check: EvaluationCheck::EnvelopeStructuralValidation,
+                stage: VerificationStage::Passed,
+            }],
+        };
+        assert_eq!(trace.terminal_outcome(), None);
+        assert!(!trace.is_well_formed());
     }
 
     #[test]
