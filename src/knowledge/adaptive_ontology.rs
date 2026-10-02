@@ -386,36 +386,79 @@ impl AdaptiveOntology {
 
     /// Import a primitive from a persistence record loaded from SQLite.
     ///
-    /// Returns false when the vector is malformed or the primitive cannot be
-    /// retained. A record merged into an existing similar primitive is handled,
-    /// not rejected.
+    /// Persistence restore reconstructs the persisted identity and statistics;
+    /// it deliberately does not re-run online similarity learning. Two persisted
+    /// primitives may be similar while still having distinct stable names.
+    ///
+    /// When capacity is reached, the retained set is selected by the same
+    /// utility/name ordering used by online capacity eviction, making restore
+    /// order independent without applying an online Hebbian update.
     pub fn import_ontology_record(&mut self, record: &OntologyRecord) -> bool {
         if record.name.trim().is_empty() || record.vector_bytes.len() != BinaryHV::BYTES {
             return false;
         }
+
         let mut arr = [0u8; BinaryHV::BYTES];
-        arr.copy_from_slice(&record.vector_bytes[..BinaryHV::BYTES]);
+        arr.copy_from_slice(&record.vector_bytes);
         let vector = BinaryHV(arr);
-        let merged = self.primitives.values().any(|usage| {
-            vector.similarity(&usage.vector) > self.config.match_threshold
-        });
-        let inserted = self.learn(
-            &record.name,
-            vector,
-            Vec::new(),
-            record.created_at_cycle,
-        );
-        if let Some(u) = self.primitives.get_mut(&record.name) {
-            u.usage_count = u.usage_count.max(record.usage_count);
-            u.utility = record.utility;
-            u.last_used_cycle = record.last_used_cycle;
-            if record.is_a_parent.is_some() {
-                u.is_a_parent = record.is_a_parent.clone();
+
+        if self.primitives.contains_key(&record.name) {
+            if let Some(usage) = self.primitives.get_mut(&record.name) {
+                usage.vector = vector;
+                usage.usage_count = record.usage_count;
+                usage.utility = record.utility;
+                usage.created_at_cycle = record.created_at_cycle;
+                usage.last_used_cycle = record.last_used_cycle;
+                usage.is_a_parent = record.is_a_parent.clone();
             }
-            true
-        } else {
-            inserted || merged
+            return true;
         }
+
+        if self.config.max_primitives == 0 {
+            return false;
+        }
+
+        if self.primitives.len() >= self.config.max_primitives {
+            let lowest = self
+                .primitives
+                .iter()
+                .min_by(|(_, a), (_, b)| {
+                    a.utility
+                        .partial_cmp(&b.utility)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| b.name.cmp(&a.name))
+                })
+                .map(|(name, usage)| (name.clone(), usage.utility));
+
+            let Some((lowest_name, lowest_utility)) = lowest else {
+                return false;
+            };
+
+            let incoming_is_better = record.utility > lowest_utility
+                || (record.utility == lowest_utility && record.name < lowest_name);
+            if !incoming_is_better {
+                return false;
+            }
+
+            self.primitives.remove(&lowest_name);
+            self.total_pruned += 1;
+        }
+
+        self.primitives.insert(
+            record.name.clone(),
+            PrimitiveUsage {
+                name: record.name.clone(),
+                vector,
+                usage_count: record.usage_count,
+                utility: record.utility,
+                created_at_cycle: record.created_at_cycle,
+                last_used_cycle: record.last_used_cycle,
+                parent_names: Vec::new(),
+                is_a_parent: record.is_a_parent.clone(),
+            },
+        );
+        self.total_created += 1;
+        true
     }
 }
 
@@ -448,10 +491,22 @@ mod tests {
         let similar_record = OntologyRecord {
             name: "alternate_label".to_string(),
             vector_bytes: vector.0.to_vec(),
-            ..record.clone()
+            usage_count: 2,
+            utility: 0.1,
+            created_at_cycle: 4,
+            last_used_cycle: 8,
+            is_a_parent: None,
         };
         assert!(ontology.import_ontology_record(&similar_record));
-        assert_eq!(ontology.count(), 1);
+        assert_eq!(ontology.count(), 2);
+        assert_eq!(
+            ontology.primitives.get("persisted_concept").unwrap().usage_count,
+            7
+        );
+        assert_eq!(
+            ontology.primitives.get("alternate_label").unwrap().usage_count,
+            2
+        );
 
         let malformed_record = OntologyRecord {
             vector_bytes: vec![0],
@@ -464,6 +519,50 @@ mod tests {
             ..similar_record
         };
         assert!(!ontology.import_ontology_record(&oversized_record));
+    }
+
+    #[test]
+    fn test_import_preserves_similar_persisted_primitives_independently() {
+        let vector = BinaryHV::random(42);
+        let first = OntologyRecord {
+            name: "alpha".to_string(),
+            vector_bytes: vector.0.to_vec(),
+            usage_count: 7,
+            utility: 0.9,
+            created_at_cycle: 3,
+            last_used_cycle: 9,
+            is_a_parent: Some("animal".to_string()),
+        };
+        let second = OntologyRecord {
+            name: "beta".to_string(),
+            vector_bytes: vector.0.to_vec(),
+            usage_count: 2,
+            utility: 0.1,
+            created_at_cycle: 4,
+            last_used_cycle: 8,
+            is_a_parent: None,
+        };
+
+        let mut forward = AdaptiveOntology::default();
+        assert!(forward.import_ontology_record(&first));
+        assert!(forward.import_ontology_record(&second));
+
+        let mut reverse = AdaptiveOntology::default();
+        assert!(reverse.import_ontology_record(&second));
+        assert!(reverse.import_ontology_record(&first));
+
+        assert_eq!(forward.count(), 2);
+        assert_eq!(reverse.count(), 2);
+        for name in ["alpha", "beta"] {
+            let a = forward.primitives().get(name).unwrap();
+            let b = reverse.primitives().get(name).unwrap();
+            assert_eq!(a.vector, b.vector);
+            assert_eq!(a.usage_count, b.usage_count);
+            assert_eq!(a.utility, b.utility);
+            assert_eq!(a.created_at_cycle, b.created_at_cycle);
+            assert_eq!(a.last_used_cycle, b.last_used_cycle);
+            assert_eq!(a.is_a_parent, b.is_a_parent);
+        }
     }
 
     #[test]
