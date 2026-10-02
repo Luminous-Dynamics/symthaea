@@ -271,7 +271,9 @@ fn digest_opt_str(hasher: &mut blake3::Hasher, value: Option<&str>) {
             hasher.update(&[1]);
             digest_str(hasher, value);
         }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        }
     }
 }
 
