@@ -408,6 +408,41 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_import_ontology_record_reports_handled_vs_rejected() {
+        let mut ontology = AdaptiveOntology::default();
+        let vector = BinaryHV::random(42);
+        let record = OntologyRecord {
+            name: "persisted_concept".to_string(),
+            vector_bytes: vector.0.to_vec(),
+            usage_count: 7,
+            utility: 0.4,
+            created_at_cycle: 3,
+            last_used_cycle: 9,
+            is_a_parent: None,
+        };
+
+        assert!(ontology.import_ontology_record(&record));
+        assert_eq!(ontology.count(), 1);
+        let restored = ontology.primitives.get("persisted_concept").unwrap();
+        assert_eq!(restored.usage_count, 7);
+        assert_eq!(restored.last_used_cycle, 9);
+
+        let similar_record = OntologyRecord {
+            name: "alternate_label".to_string(),
+            vector_bytes: vector.0.to_vec(),
+            ..record.clone()
+        };
+        assert!(ontology.import_ontology_record(&similar_record));
+        assert_eq!(ontology.count(), 1);
+
+        let malformed_record = OntologyRecord {
+            vector_bytes: vec![0],
+            ..record
+        };
+        assert!(!ontology.import_ontology_record(&malformed_record));
+    }
+
+    #[test]
     fn test_learn_new_primitive() {
         let mut ontology = AdaptiveOntology::default();
         let vec = BinaryHV::random(42);
