@@ -36,24 +36,14 @@ pub struct HistoryAnchor {
 impl HistoryAnchor {
     pub fn new(history_id: [u8; 32], checkpoint: HistoryCheckpoint) -> Self {
         let commitment = anchor_commitment(history_id, checkpoint);
-        Self {
-            history_id,
-            checkpoint,
-            commitment,
-        }
+        Self { history_id, checkpoint, commitment }
     }
 
-    pub fn history_id(&self) -> &[u8; 32] {
-        &self.history_id
-    }
+    pub fn history_id(&self) -> &[u8; 32] { &self.history_id }
 
-    pub fn checkpoint(&self) -> HistoryCheckpoint {
-        self.checkpoint
-    }
+    pub fn checkpoint(&self) -> HistoryCheckpoint { self.checkpoint }
 
-    pub fn commitment(&self) -> HistoryAnchorCommitment {
-        self.commitment
-    }
+    pub fn commitment(&self) -> HistoryAnchorCommitment { self.commitment }
 
     pub fn verify(&self) -> bool {
         self.checkpoint.verify()
@@ -68,10 +58,7 @@ pub enum HistoryAnchorError {
     #[error(
         "conflicting checkpoints observed for history position {history_id:?} at length {length}"
     )]
-    ConflictingCheckpoint {
-        history_id: [u8; 32],
-        length: u64,
-    },
+    ConflictingCheckpoint { history_id: [u8; 32], length: u64 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,17 +73,9 @@ pub struct HistoryAnchorRegistry {
 }
 
 impl HistoryAnchorRegistry {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn len(&self) -> usize {
-        self.observations.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.observations.is_empty()
-    }
+    pub fn new() -> Self { Self::default() }
+    pub fn len(&self) -> usize { self.observations.len() }
+    pub fn is_empty(&self) -> bool { self.observations.is_empty() }
 
     pub fn get(&self, history_id: &[u8; 32], length: u64) -> Option<HistoryAnchor> {
         self.observations.get(&(*history_id, length)).copied()
@@ -149,6 +128,16 @@ fn anchor_commitment(
     HistoryAnchorCommitment(*hasher.finalize().as_bytes())
 }
 
+// The VDS boundary lives in a separate file so its proof format can evolve
+// independently. This path keeps the boundary compiled without pretending
+// that the chained history itself implements a Merkle consistency proof.
+#[cfg(feature = "semantic-digest")]
+#[path = "../semantic_evidence_vds.rs"]
+pub mod vds;
+
+#[cfg(feature = "semantic-digest")]
+pub use vds::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,9 +188,7 @@ mod tests {
         .unwrap()
     }
 
-    fn history_id(seed: u8) -> [u8; 32] {
-        [seed; 32]
-    }
+    fn history_id(seed: u8) -> [u8; 32] { [seed; 32] }
 
     fn checkpoint(seed: u128) -> HistoryCheckpoint {
         let mut history = crate::semantic_evidence_history::EvidenceHistory::new();
@@ -220,9 +207,9 @@ mod tests {
 
     #[test]
     fn tampered_checkpoint_is_rejected() {
-        let mut checkpoint = checkpoint(1);
-        checkpoint.snapshot = crate::semantic_evidence_history::HistoryEntryCommitment([0; 32]);
-        let mut anchor = HistoryAnchor::new(history_id(1), checkpoint);
+        let mut cp = checkpoint(1);
+        cp.snapshot = crate::semantic_evidence_history::HistoryEntryCommitment([0; 32]);
+        let mut anchor = HistoryAnchor::new(history_id(1), cp);
         anchor.commitment = anchor_commitment(anchor.history_id, anchor.checkpoint);
         let mut registry = HistoryAnchorRegistry::new();
         assert_eq!(
@@ -322,9 +309,6 @@ mod tests {
     #[test]
     fn evidence_digest_remains_the_underlying_history_witness() {
         let ev = evidence(9);
-        assert_eq!(
-            evidence_digest(&ev).unwrap(),
-            evidence_digest(&ev).unwrap()
-        );
+        assert_eq!(evidence_digest(&ev).unwrap(), evidence_digest(&ev).unwrap());
     }
 }
