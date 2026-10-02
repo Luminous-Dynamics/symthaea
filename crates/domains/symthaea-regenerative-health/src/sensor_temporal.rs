@@ -29,6 +29,8 @@ pub enum TemporalFusionIssue {
     EmptyInput,
     InsufficientTrustedSensors,
     InsufficientIndependentGroups,
+    InvalidIndependenceProvenance,
+    IndependenceConfigurationMismatch,
     DuplicateSensor,
     NonMonotonicTime,
     TemporalDisagreement,
@@ -113,6 +115,20 @@ impl TemporalFusionGate {
                 continue;
             }
 
+            if pair.independence_group.trim().is_empty()
+                || pair.independence_topology_digest.trim().is_empty()
+                || pair.independence_evidence_id.trim().is_empty()
+            {
+                issues.push(TemporalFusionIssue::InvalidIndependenceProvenance);
+                continue;
+            }
+            if pair.previous.configuration_digest != pair.current.configuration_digest
+                || !pair.current.configuration_digest.eq(&pair.current_decision.configuration_digest)
+            {
+                issues.push(TemporalFusionIssue::IndependenceConfigurationMismatch);
+                continue;
+            }
+
             if pair.previous_decision.state == SensorHealthState::Trusted
                 && pair.current_decision.state == SensorHealthState::Trusted
             {
@@ -172,6 +188,8 @@ impl TemporalFusionGate {
             matches!(
                 issue,
                 TemporalFusionIssue::DuplicateSensor
+                    | TemporalFusionIssue::InvalidIndependenceProvenance
+                    | TemporalFusionIssue::IndependenceConfigurationMismatch
                     | TemporalFusionIssue::NonMonotonicTime
                     | TemporalFusionIssue::TemporalDisagreement
             )
