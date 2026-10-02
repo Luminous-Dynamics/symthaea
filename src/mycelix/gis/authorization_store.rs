@@ -778,11 +778,17 @@ mod tests {
     #[test]
     fn bound_dispatch_record_freezes_effect_and_boundary_identity() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-bound-dispatch-{}.db",std::process::id()));
-        let (store,mut action,witness)=fixture(&path);
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
         let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
-        action=action.with_effect_binding(effect.clone());
+        let action=EpistemicAction::new("bound-dispatch-action","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
-        let witness=ActionAuthorizationWitness { action_digest:digest.clone(), ..witness };
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(), authorization_instance:action.id.clone(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:00:00Z".into(), expires_at:None, authority_epoch:1,
+        };
         store.register_lease(&AuthorizationLease::new(action.id.clone(),digest,"sha256:support","policy-v1",1,1)).unwrap();
         store.prepare_for_execution(&witness,&action,"frame@1","attempt-bound").unwrap();
         let record=store.mark_dispatch_pending_bound(&witness.authorization_instance,"attempt-bound",&action,&effect,"boundary-A").unwrap();
