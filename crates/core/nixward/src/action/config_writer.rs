@@ -359,7 +359,7 @@ impl ConfigWriter {
         let current_digest = blake3::hash(current.as_bytes()).to_hex().to_string();
         if current_digest != expected_original_digest || current != patch.original {
             return Err(std::io::Error::new(
-                std::io::ErrorKind::StaleData,
+                std::io::ErrorKind::Other,
                 "configuration.nix changed after the approved state was captured",
             ));
         }
