@@ -119,7 +119,6 @@ pub fn config_hash<T: fmt::Debug>(config: &T) -> String {
 ///
 /// Canonicalization is explicit and domain-separated so the digest is stable
 /// across map insertion order and does not rely on Debug formatting.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// Canonical identity of a validated repository source snapshot.
 ///
 /// The inner value is private so callers cannot bypass canonicalization. The
@@ -792,7 +791,6 @@ mod tests {
 
     #[test]
     fn execution_lineage_validation_rejects_invalid_repository_source_snapshot_id() {
-        let mut lineage = lineage_fixture();
         assert!(RepositorySourceSnapshotId::parse("not-a-sha256").is_err());
     }
 
