@@ -2473,6 +2473,64 @@ mod tests {
     }
 
     #[test]
+    fn test_save_snapshot_rejects_duplicate_fact_identity_before_reconciliation() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_duplicate_fact_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "duplicate".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x11; BinaryHV::BYTES],
+            source_text: "duplicate".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+
+        let err = p
+            .save_snapshot(&[fact.clone(), fact], &[], &[], &[])
+            .unwrap_err();
+        assert_eq!(err, "Snapshot contains duplicate FactRecord memory_id");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_snapshot_rejects_duplicate_provenance_identity_before_reconciliation() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_duplicate_provenance_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let relation = ProvenanceRelationRecord {
+            source_memory_id: "source".into(),
+            target_memory_id: "target".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:1".into(),
+        };
+
+        let err = p
+            .save_snapshot(&[], &[relation.clone(), relation], &[], &[])
+            .unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot contains duplicate ProvenanceRelationRecord key"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_snapshot_digest_is_order_invariant_and_sensitive() {
         let fact_a = FactRecord {
             memory_id: "a".into(),
