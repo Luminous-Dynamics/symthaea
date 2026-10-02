@@ -27,6 +27,8 @@ pub const MAX_RFC9942_PROOF_BYTES: usize = 8 * 1024;
 pub const MAX_RFC9942_RECEIPTS: usize = 16;
 pub const MAX_RFC9942_RECEIPT_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_RFC9942_RECEIPTS_BYTES_TOTAL: usize = 32 * 1024 * 1024;
+/// Defensive bound for generic outer COSE_Sign1 payloads.
+pub const MAX_RFC9942_SIGNATURE_PAYLOAD_BYTES: usize = 8 * 1024 * 1024;
 pub const RFC9942_VDP_HEADER_LABEL: i64 = 396;
 pub const COSE_SIGN1_TAG: u64 = 18;
 pub const COSE_ALG_HEADER_LABEL: i64 = 1;
@@ -57,6 +59,37 @@ impl Rfc9942ReceiptPayload {
     }
 }
 
+/// Generic COSE_Sign1 payload representation for the outer
+/// RFC9942 Signature_With_Receipt object.
+///
+/// Unlike the payload of an RFC9162_SHA256 Receipt, the outer signed object's
+/// payload is not required to be a 32-byte Merkle root. It may carry arbitrary
+/// application content or be detached.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Rfc9942SignaturePayload {
+    Detached,
+    Attached(Vec<u8>),
+}
+
+impl Rfc9942SignaturePayload {
+    pub fn from_bytes(payload: Option<&[u8]>) -> Result<Self, Rfc9942VdpError> {
+        match payload {
+            None => Ok(Self::Detached),
+            Some(bytes) if bytes.len() <= MAX_RFC9942_SIGNATURE_PAYLOAD_BYTES => {
+                Ok(Self::Attached(bytes.to_vec()))
+            }
+            Some(_) => Err(Rfc9942VdpError::SignaturePayloadResourceLimitExceeded),
+        }
+    }
+
+    pub fn attached(&self) -> Option<&[u8]> {
+        match self {
+            Self::Detached => None,
+            Self::Attached(bytes) => Some(bytes),
+        }
+    }
+}
+
 /// Structural RFC 9942 receipt envelope for a single RFC9162_SHA256 proof.
 ///
 /// This is intentionally a COSE_Sign1 parser/encoder boundary, not a cryptographic
@@ -67,7 +100,7 @@ pub struct Rfc9942ReceiptEnvelope {
     algorithm_id: i64,
     vds_id: u64,
     vdp: Rfc9942Vdp,
-    payload: Rfc9942ReceiptPayload,
+    payload: Rfc9942SignaturePayload,
     signature: Vec<u8>,
     /// Exact serialized protected-header map from parsed receipts. Keeping this
     /// byte-for-byte preserves the COSE Sig_structure input on re-encoding.
@@ -221,7 +254,7 @@ pub struct Rfc9942SignatureWithReceipts {
 impl Rfc9942SignatureWithReceipts {
     /// Construct the canonical unprotected-header form used by RFC9942 examples.
     pub fn new(
-        payload: Rfc9942ReceiptPayload,
+        payload: Rfc9942SignaturePayload,
         signature: Vec<u8>,
         receipts: Option<Rfc9942ReceiptCollection>,
     ) -> Self {
@@ -317,8 +350,8 @@ impl Rfc9942SignatureWithReceipts {
         }
 
         match &self.payload {
-            Rfc9942ReceiptPayload::Detached => out.push(0xf6),
-            Rfc9942ReceiptPayload::Attached(root) => cbor_bytes(&mut out, root),
+            Rfc9942SignaturePayload::Detached => out.push(0xf6),
+            Rfc9942SignaturePayload::Attached(bytes) => cbor_bytes(&mut out, bytes),
         }
         cbor_bytes(&mut out, &self.signature);
         out
@@ -406,12 +439,17 @@ impl Rfc9942SignatureWithReceipts {
 
         let payload = match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
             2 => {
-                let raw = reader.read_bstr_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-                Rfc9942ReceiptPayload::from_bytes(Some(&raw))?
+                let raw = reader.read_bstr_bounded(MAX_RFC9942_SIGNATURE_PAYLOAD_BYTES)
+                    .map_err(|error| match error {
+                        Rfc9162ProofDecodeError::InvalidStructure =>
+                            Rfc9942VdpError::SignaturePayloadResourceLimitExceeded,
+                        _ => Rfc9942VdpError::InvalidEncoding,
+                    })?;
+                Rfc9942SignaturePayload::from_bytes(Some(&raw))?
             }
             7 => {
                 reader.read_nil().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-                Rfc9942ReceiptPayload::Detached
+                Rfc9942SignaturePayload::Detached
             }
             _ => return Err(Rfc9942VdpError::InvalidEncoding),
         };
@@ -593,6 +631,8 @@ pub enum Rfc9942VdpError {
     EmptyReceiptCollection,
     #[error("RFC 9942 receipts collection exceeds its defensive resource bound")]
     ReceiptCollectionResourceLimitExceeded,
+    #[error("outer RFC 9942 COSE_Sign1 payload exceeds its defensive resource bound")]
+    SignaturePayloadResourceLimitExceeded,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
     VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
@@ -1877,14 +1917,27 @@ mod tests {
         let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
         let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA;64]).unwrap();
         let collection=Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
-        let outer=Rfc9942SignatureWithReceipts::new(Rfc9942ReceiptPayload::Attached([0x22;32]),vec![0xBB;64],Some(collection));
+        let outer=Rfc9942SignatureWithReceipts::new(Rfc9942SignaturePayload::Attached(b"signed-statement".to_vec()),vec![0xBB;64],Some(collection));
         let encoded=outer.to_cbor();
         assert_eq!(encoded[0],0xd2);
         let decoded=Rfc9942SignatureWithReceipts::from_cbor(&encoded).unwrap();
         assert_eq!(decoded.receipts().unwrap().len(),1);
-        assert_eq!(decoded.payload(),&Rfc9942ReceiptPayload::Attached([0x22;32]));
+        assert_eq!(decoded.payload(),&Rfc9942SignaturePayload::Attached(b"signed-statement".to_vec()));
         assert_eq!(decoded.signature(),&[0xBB;64]);
         assert_eq!(decoded.to_cbor(),encoded);
+    }
+
+    #[test]
+    fn rfc9942_signature_payload_is_not_constrained_to_a_merkle_root() {
+        let payload=Rfc9942SignaturePayload::from_bytes(Some(b"arbitrary signed application content")).unwrap();
+        assert_eq!(payload.attached(),Some(&b"arbitrary signed application content"[..]));
+        let decoded=Rfc9942SignaturePayload::from_bytes(payload.attached()).unwrap();
+        assert_eq!(decoded,payload);
+        let oversized=vec![0u8;MAX_RFC9942_SIGNATURE_PAYLOAD_BYTES+1];
+        assert_eq!(
+            Rfc9942SignaturePayload::from_bytes(Some(&oversized)),
+            Err(Rfc9942VdpError::SignaturePayloadResourceLimitExceeded)
+        );
     }
 
     #[test]
