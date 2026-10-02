@@ -174,7 +174,8 @@ pub struct ExecutionLineageV1 {
     pub lock_digests: BTreeMap<String, String>,
     #[serde(deserialize_with = "deserialize_unique_string_map")]
     pub toolchain_versions: BTreeMap<String, String>,
-    pub host_target: String,
+    pub host_triple: String,
+    pub target_triple: String,
     pub nix_identity: String,
     #[serde(deserialize_with = "deserialize_unique_string_set")]
     pub feature_flags: BTreeSet<String>,
@@ -202,7 +203,8 @@ struct ExecutionLineageV1Wire {
     pub lock_digests: BTreeMap<String, String>,
     #[serde(deserialize_with = "deserialize_unique_string_map")]
     pub toolchain_versions: BTreeMap<String, String>,
-    pub host_target: String,
+    pub host_triple: String,
+    pub target_triple: String,
     pub nix_identity: String,
     #[serde(deserialize_with = "deserialize_unique_string_set")]
     pub feature_flags: BTreeSet<String>,
@@ -225,7 +227,8 @@ impl TryFrom<ExecutionLineageV1Wire> for ExecutionLineageV1 {
             repository_source_snapshot_id: wire.repository_source_snapshot_id,
             lock_digests: wire.lock_digests,
             toolchain_versions: wire.toolchain_versions,
-            host_target: wire.host_target,
+            host_triple: wire.host_triple,
+            target_triple: wire.target_triple,
             nix_identity: wire.nix_identity,
             feature_flags: wire.feature_flags,
             cwd: wire.cwd,
@@ -252,7 +255,8 @@ impl Serialize for ExecutionLineageV1 {
             repository_source_snapshot_id: self.repository_source_snapshot_id.clone(),
             lock_digests: self.lock_digests.clone(),
             toolchain_versions: self.toolchain_versions.clone(),
-            host_target: self.host_target.clone(),
+            host_triple: self.host_triple.clone(),
+            target_triple: self.target_triple.clone(),
             nix_identity: self.nix_identity.clone(),
             feature_flags: self.feature_flags.clone(),
             cwd: self.cwd.clone(),
@@ -279,7 +283,8 @@ impl ExecutionLineageV1 {
         repository_source_snapshot_id: String,
         lock_digests: Vec<(String, String)>,
         toolchain_versions: Vec<(String, String)>,
-        host_target: String,
+        host_triple: String,
+        target_triple: String,
         nix_identity: String,
         feature_flags: Vec<String>,
         cwd: String,
@@ -303,7 +308,8 @@ impl ExecutionLineageV1 {
             )?,
             lock_digests,
             toolchain_versions,
-            host_target,
+            host_triple,
+            target_triple,
             nix_identity,
             feature_flags,
             cwd,
@@ -347,7 +353,8 @@ impl ExecutionLineageV1 {
             ("source_repository", self.source_repository.as_str()),
             ("source_revision", self.source_revision.as_str()),
             ("source_tree", self.source_tree.as_str()),
-            ("host_target", self.host_target.as_str()),
+            ("host_triple", self.host_triple.as_str()),
+            ("target_triple", self.target_triple.as_str()),
             ("nix_identity", self.nix_identity.as_str()),
             ("cwd", self.cwd.as_str()),
         ] {
@@ -396,7 +403,8 @@ impl ExecutionLineageV1 {
         );
         append_map(hasher, "lock_digests", &self.lock_digests);
         append_map(hasher, "toolchain_versions", &self.toolchain_versions);
-        append_str(hasher, "host_target", &self.host_target);
+        append_str(hasher, "host_triple", &self.host_triple);
+        append_str(hasher, "target_triple", &self.target_triple);
         append_str(hasher, "nix_identity", &self.nix_identity);
         append_set(hasher, "feature_flags", &self.feature_flags);
         append_str(hasher, "cwd", &self.cwd);
@@ -972,7 +980,8 @@ mod tests {
                 ("cargo".into(), "sha256:8899aabbccddeeff".into()),
             ],
             vec![("rustc".into(), "1.96".into())],
-            "host/target".into(),
+            "x86_64-unknown-linux-gnu".into(),
+            "wasm32-unknown-unknown".into(),
             "nix".into(),
             vec!["feature".into()],
             "/work".into(),
@@ -993,7 +1002,7 @@ mod tests {
             "a".repeat(64),
             vec![("cargo".into(), "sha256:0011223344556677".into())],
             vec![("rustc".into(), "1.96".into())],
-            "host/target".into(), "nix".into(), vec!["feature".into(), "feature".into()],
+            "x86_64-unknown-linux-gnu".into(), "wasm32-unknown-unknown".into(), "nix".into(), vec!["feature".into(), "feature".into()],
             "/work".into(), vec!["cargo".into(), "test".into()],
             vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
             vec![("input".into(), "blake3:0011223344556677".into())],
@@ -1011,7 +1020,8 @@ mod tests {
             "a".repeat(64),
             vec![("cargo".into(), "sha256:0011223344556677".into())],
             vec![("rustc".into(), "1.96".into())],
-            "host/target".into(),
+            "x86_64-unknown-linux-gnu".into(),
+            "wasm32-unknown-unknown".into(),
             "nix".into(),
             vec!["feature".into()],
             "/work".into(),
@@ -1040,7 +1050,8 @@ mod tests {
             .into_iter()
             .collect(),
             toolchain_versions: [("rustc".into(), "1.96.0".into())].into_iter().collect(),
-            host_target: "x86_64-unknown-linux-gnu".into(),
+            host_triple: "x86_64-unknown-linux-gnu".into(),
+            target_triple: "x86_64-unknown-linux-gnu".into(),
             nix_identity: "nixpkgs:deadbeef".into(),
             feature_flags: ["default".into()].into_iter().collect(),
             cwd: "/workspace/symthaea".into(),
@@ -1134,7 +1145,7 @@ mod tests {
     #[test]
     fn execution_lineage_serde_rejects_duplicate_map_keys() {
         let json = format!(
-            r#"{{"source_repository":"repo","source_revision":"rev","source_tree":"tree","repository_source_snapshot_id":"{}","lock_digests":{{"Cargo.lock":"sha256:0011223344556677","Cargo.lock":"sha256:8899aabbccddeeff"}},"toolchain_versions":{{"rustc":"1.96.0"}},"host_target":"target","nix_identity":"nix","feature_flags":["default"],"cwd":"/work","argv":["cargo","test"],"allowed_env":{{"RUST_BACKTRACE":"0"}},"immutable_input_digests":{{"fixture":"sha256:0011223344556677"}}}}"#,
+            r#"{{"source_repository":"repo","source_revision":"rev","source_tree":"tree","repository_source_snapshot_id":"{}","lock_digests":{{"Cargo.lock":"sha256:0011223344556677","Cargo.lock":"sha256:8899aabbccddeeff"}},"toolchain_versions":{{"rustc":"1.96.0"}},"host_triple":"target","nix_identity":"nix","feature_flags":["default"],"cwd":"/work","argv":["cargo","test"],"allowed_env":{{"RUST_BACKTRACE":"0"}},"immutable_input_digests":{{"fixture":"sha256:0011223344556677"}}}}"#,
             "a".repeat(64)
         );
         let error = serde_json::from_str::<ExecutionLineageV1>(&json)
@@ -1145,7 +1156,7 @@ mod tests {
     #[test]
     fn execution_lineage_serde_rejects_duplicate_set_members() {
         let json = format!(
-            r#"{{"source_repository":"repo","source_revision":"rev","source_tree":"tree","repository_source_snapshot_id":"{}","lock_digests":{{"Cargo.lock":"sha256:0011223344556677"}},"toolchain_versions":{{"rustc":"1.96.0"}},"host_target":"target","nix_identity":"nix","feature_flags":["default","default"],"cwd":"/work","argv":["cargo","test"],"allowed_env":{{"RUST_BACKTRACE":"0"}},"immutable_input_digests":{{"fixture":"sha256:0011223344556677"}}}}"#,
+            r#"{{"source_repository":"repo","source_revision":"rev","source_tree":"tree","repository_source_snapshot_id":"{}","lock_digests":{{"Cargo.lock":"sha256:0011223344556677"}},"toolchain_versions":{{"rustc":"1.96.0"}},"host_triple":"target","nix_identity":"nix","feature_flags":["default","default"],"cwd":"/work","argv":["cargo","test"],"allowed_env":{{"RUST_BACKTRACE":"0"}},"immutable_input_digests":{{"fixture":"sha256:0011223344556677"}}}}"#,
             "a".repeat(64)
         );
         let error = serde_json::from_str::<ExecutionLineageV1>(&json)
@@ -1219,7 +1230,7 @@ mod tests {
             "toolchain_versions",
             &lineage.toolchain_versions,
         );
-        append_str(&mut legacy, "host_target", &lineage.host_target);
+        append_str(&mut legacy, "host_target", &lineage.host_triple);
         append_str(&mut legacy, "nix_identity", &lineage.nix_identity);
         append_set(&mut legacy, "feature_flags", &lineage.feature_flags);
         append_str(&mut legacy, "cwd", &lineage.cwd);
@@ -1443,6 +1454,26 @@ mod tests {
         assert_ne!(base.digest(), revision.digest());
         assert_ne!(base.digest(), lock.digest());
         assert_ne!(base.digest(), argv.digest());
+    }
+
+    #[test]
+    fn execution_lineage_host_and_target_are_independently_material() {
+        let base = lineage_fixture();
+
+        let mut host = base.clone();
+        host.host_triple = "aarch64-unknown-linux-gnu".into();
+        assert_ne!(base.digest(), host.digest());
+
+        let mut target = base.clone();
+        target.target_triple = "wasm32-unknown-unknown".into();
+        assert_ne!(base.digest(), target.digest());
+
+        let mut swapped = base.clone();
+        swapped.host_triple = base.target_triple.clone();
+        swapped.target_triple = base.host_triple.clone();
+        assert_eq!(swapped.host_triple, base.target_triple);
+        assert_eq!(swapped.target_triple, base.host_triple);
+        assert_ne!(base.digest(), swapped.digest());
     }
 
     #[test]
