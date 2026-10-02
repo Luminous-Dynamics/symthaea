@@ -59,6 +59,8 @@ pub struct Rfc9942Vdp {
 pub enum Rfc9942VdpError {
     #[error("proof collection must contain at least one proof")]
     EmptyProofCollection,
+    #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
+    VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
     InvalidProof(#[from] Rfc9162ProofDecodeError),
     #[error("invalid RFC 9942 VDP structure")]
@@ -90,7 +92,17 @@ impl Rfc9942Vdp {
     /// The VDS identifier this concrete VDP implementation is defined for.
     /// It is metadata, not part of this VDP's CBOR bytes; callers must bind it
     /// to the separate RFC 9942 `vds` protected-header value.
+    /// The VDS identifier this concrete VDP implementation is defined for.
+    /// It is metadata, not part of this VDP's CBOR bytes; callers must bind it
+    /// to the separate RFC 9942 vds protected-header value.
     pub const fn vds_id(&self) -> u64 { RFC9162_VDS_ID }
+
+    /// Bind the VDP to the RFC 9942 vds protected-header value before proof
+    /// verification. The actual protected-header/COSE parser remains external.
+    pub fn validate_vds_id(&self, vds_id: u64) -> Result<(), Rfc9942VdpError> {
+        if vds_id == self.vds_id() { Ok(()) } else { Err(Rfc9942VdpError::VdsMismatch(vds_id)) }
+    }
+
     pub const fn kind(&self) -> Rfc9942ProofKind { self.kind }
     pub fn proofs(&self) -> &[Vec<u8>] { &self.proofs }
 
@@ -890,6 +902,14 @@ mod tests {
         let decoded=Rfc9942Vdp::from_cbor(&vdp.to_cbor()).unwrap();
         assert_eq!(decoded.kind(),Rfc9942ProofKind::Consistency);
         assert_eq!(decoded.proofs(),&[consistency]);
+    }
+
+    #[test]
+    fn rfc9942_vdp_requires_explicit_vds_binding() {
+        let inclusion=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![inclusion]).unwrap();
+        assert_eq!(vdp.validate_vds_id(RFC9162_VDS_ID),Ok(()));
+        assert_eq!(vdp.validate_vds_id(2),Err(Rfc9942VdpError::VdsMismatch(2)));
     }
 
     #[test]
