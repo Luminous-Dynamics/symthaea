@@ -509,15 +509,6 @@ pub fn App() -> impl IntoView {
         if text.trim().is_empty() || sending.get_untracked() {
             return;
         }
-        draft.set(String::new());
-        sending.set(true);
-        last_error.set(None);
-        history.update(|h| {
-            h.push(Turn {
-                role: "you",
-                text: text.clone(),
-            })
-        });
         let gw = gateway.get_untracked();
         let request_id = {
             let mut generation = request_generation.get();
@@ -533,6 +524,15 @@ pub fn App() -> impl IntoView {
             request_generation.set(generation);
             next
         };
+        draft.set(String::new());
+        sending.set(true);
+        last_error.set(None);
+        history.update(|h| {
+            h.push(Turn {
+                role: "you",
+                text: text.clone(),
+            })
+        });
         let request_generation = Rc::clone(&request_generation);
         spawn_local_scoped_with_cancellation(async move {
             let response = api::send_query(&gw, &text).await;
