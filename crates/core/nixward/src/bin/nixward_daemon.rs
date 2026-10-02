@@ -16,6 +16,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nixward::NixParser;
+use nixward::action::authorization::{NixActionIntentV1, NixAuthorizationErrorV1};
 use nixward::action::service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
 use nixward::action::service_manager::ServiceManager;
 use nixward::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
@@ -54,6 +55,26 @@ fn render_typed_service_action(
 ) -> Result<nixward::action::executor::NixOSCommand, NixServiceOperationErrorV1> {
     let typed = NixServiceOperationV1::new(unit, operation)?;
     ServiceManager::typed_command(&typed)
+}
+
+fn action_intent_digest_for_command(
+    pre_state_identity: Option<String>,
+    command: &nixward::action::executor::NixOSCommand,
+) -> Result<Option<String>, NixAuthorizationErrorV1> {
+    match NixActionIntentV1::from_command("nixward:daemon", pre_state_identity, command) {
+        Ok(intent) => intent.digest().map(Some),
+        Err(NixAuthorizationErrorV1::UnsupportedCustomCommand) => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+fn approved_intent_digest(status: &str) -> Option<&str> {
+    let (verdict, digest) = status.trim().split_once(':')?;
+    if !verdict.eq_ignore_ascii_case("approved") {
+        return None;
+    }
+    let digest = digest.trim();
+    (!digest.is_empty()).then_some(digest)
 }
 
 /// Mutable daemon state collected across cycles.
@@ -112,6 +133,8 @@ struct DaemonState {
     active_healing: bool,
     /// The currently pending system command waiting for watchdog approval.
     pending_action: Option<String>,
+    /// Canonical V1 action-intent digest bound to the pending command, when governed.
+    pending_action_intent_digest: Option<String>,
     /// The currently pending conversational response from Ollama.
     pending_response: Option<String>,
     /// Custom user goal set via natural language input: (goal_description, target_name, expected_value)
@@ -198,6 +221,7 @@ impl DaemonState {
             metacognitive_journal: Vec::new(),
             active_healing: config.active_healing,
             pending_action: None,
+            pending_action_intent_digest: None,
             pending_response: None,
             custom_user_goal: None,
             stable_baseline_hv: None,
@@ -1404,6 +1428,7 @@ impl DaemonState {
             curiosity_weight: self.active_inference.curiosity_weight(),
             causal_learning_rate: self.causal_graph.learning_rate(),
             pending_action: self.pending_action.clone(),
+            pending_action_intent_digest: self.pending_action_intent_digest.clone(),
             pending_response: self.pending_response.clone(),
         }
     }
