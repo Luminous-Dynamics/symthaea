@@ -223,6 +223,11 @@ impl Rfc9942Vdp {
         Err(Rfc9942VdpError::NoMatchingProof)
     }
 
+    /// Encode the value carried by RFC 9942 header parameter 396 (vdp).
+    ///
+    /// This returns the VDP value map itself, not an enclosing COSE header map
+    /// and not the header key 396. The separate protected header parameter 395
+    /// must bind this value to RFC9162_SHA256.
     pub fn to_cbor(&self) -> Vec<u8> {
         let mut out = Vec::new();
         cbor_map_len(&mut out, 1);
@@ -965,6 +970,15 @@ mod tests {
         assert_eq!(&encoded[..3],&[0xa1,0x21,0x81]);
         assert_eq!(encoded[3],0x58);
         assert_eq!(encoded[4],0x26);
+    }
+
+    #[test]
+    fn rfc9942_proof_kind_labels_are_exact() {
+        assert_eq!(Rfc9942ProofKind::Inclusion.label(), -1);
+        assert_eq!(Rfc9942ProofKind::Consistency.label(), -2);
+        assert_eq!(Rfc9942ProofKind::from_label(-1), Some(Rfc9942ProofKind::Inclusion));
+        assert_eq!(Rfc9942ProofKind::from_label(-2), Some(Rfc9942ProofKind::Consistency));
+        assert_eq!(Rfc9942ProofKind::from_label(1), None);
     }
 
     #[test]
