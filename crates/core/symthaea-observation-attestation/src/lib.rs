@@ -1146,6 +1146,7 @@ impl EvidenceEvaluation {
             && self.execution_trace.matches_report(report)
             && self.execution_trace.terminal_outcome() == Some(self.outcome)
             && self.execution_trace.is_well_formed()
+            && self.boundary == EvaluationBoundary::from_report(report)
             && self.boundary.is_well_formed()
     }
 
@@ -2896,6 +2897,24 @@ mod tests {
         second.boundary.not_established.reverse();
         second.boundary.indeterminate.reverse();
         assert_eq!(first.fingerprint(), second.fingerprint());
+    }
+
+    #[test]
+    fn evidence_evaluation_rejects_post_hoc_boundary_inflation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let mut evaluation = report.to_evidence_evaluation();
+        assert!(evaluation.is_consistent_with_report(&report));
+        evaluation
+            .boundary
+            .established
+            .push(EvaluationClaim::UnderlyingObservationTruth);
+        assert!(!evaluation.is_consistent_with_report(&report));
     }
 
     #[test]
