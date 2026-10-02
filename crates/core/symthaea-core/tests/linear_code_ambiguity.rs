@@ -1,4 +1,4 @@
-use symthaea_core::hdc::linear_code::{basis_rank, recover_direct_sum_bound, solve_linear_combination, BinaryCodeword, RandomLinearCode};
+use symthaea_core::hdc::linear_code::{basis_rank, recover_direct_sum_bound, recover_independent_bound, solve_linear_combination, BinaryCodeword, RandomLinearCode};
 
 #[test]
 fn arbitrary_same_subspace_bound_is_not_uniquely_identifiable() {
@@ -142,4 +142,67 @@ fn solver_rejects_dimension_mismatch_without_panicking() {
     let code = RandomLinearCode::generate(96, 4, 0x5151);
     let target = BinaryCodeword::zero(95);
     assert!(solve_linear_combination(&target, code.basis()).is_none());
+}
+
+
+#[test]
+fn three_partitioned_factor_subcodes_recover_exactly() {
+    // Extend the paper's parent-code partition construction to F=3 while
+    // keeping the combined basis independent. This validates the generalized
+    // implementation without introducing overlap ambiguity.
+    let parent = RandomLinearCode::generate(96, 12, 0x3333);
+    let left = RandomLinearCode::from_basis(parent.basis()[..4].to_vec()).expect("left subcode");
+    let middle =
+        RandomLinearCode::from_basis(parent.basis()[4..8].to_vec()).expect("middle subcode");
+    let right =
+        RandomLinearCode::from_basis(parent.basis()[8..12].to_vec()).expect("right subcode");
+
+    let left_message = [true, false, true, true];
+    let middle_message = [false, true, true, false];
+    let right_message = [true, true, false, true];
+    let left_word = left.encode(&left_message);
+    let middle_word = middle.encode(&middle_message);
+    let right_word = right.encode(&right_message);
+
+    let target = left_word.bound(&middle_word).bound(&right_word);
+    let recovered = recover_independent_bound(&target, &[&left, &middle, &right])
+        .expect("independent factor subcodes must recover");
+
+    assert_eq!(recovered, vec![left_word.clone(), middle_word.clone(), right_word.clone()]);
+
+    let exhaustive_matches: Vec<_> = left
+        .enumerate()
+        .into_iter()
+        .flat_map(|a| {
+            let target = target.clone();
+            let middle_words = middle.enumerate();
+            let right_words = right.enumerate();
+            middle_words.into_iter().flat_map(move |b| {
+                let target = target.clone();
+                let a = a.clone();
+                right_words.clone().into_iter().filter_map(move |c| {
+                    (a.bound(&b).bound(&c) == target).then_some((a.clone(), b.clone(), c))
+                })
+            })
+        })
+        .collect();
+
+    assert_eq!(exhaustive_matches, vec![(left_word, middle_word, right_word)]);
+}
+
+#[test]
+fn independent_bound_recovery_rejects_overlapping_factor_bases() {
+    let parent = RandomLinearCode::generate(96, 8, 0x4444);
+    let left = RandomLinearCode::from_basis(parent.basis()[..4].to_vec()).expect("left subcode");
+    let overlapping =
+        RandomLinearCode::from_basis(parent.basis()[2..6].to_vec()).expect("overlapping subcode");
+
+    let left_word = left.encode(&[true, false, true, false]);
+    let overlapping_word = overlapping.encode(&[false, true, true, false]);
+    let target = left_word.bound(&overlapping_word);
+
+    // The generic paper theorem permits overlapping codebooks but explicitly
+    // warns that factorization may then be non-unique. This API is deliberately
+    // conservative: it refuses to manufacture a uniqueness claim.
+    assert!(recover_independent_bound(&target, &[&left, &overlapping]).is_none());
 }
