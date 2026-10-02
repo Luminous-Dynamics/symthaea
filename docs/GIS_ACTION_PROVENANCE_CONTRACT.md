@@ -26,6 +26,12 @@ The core invariant is:
 
 > Historical authorization is evidence of what authorized an action then; it is not automatically current authorization for executing the action again now.
 
+### Current support is not the conclusion lifecycle
+
+A conclusion's lifecycle state is not a generic trust score. In particular, `Active` means the conclusion has not been reopened or superseded; it does not establish that its support is fresh, conflict-free, or provenance-complete.
+
+Current High/Critical authorization therefore evaluates these dimensions separately: frame binding, explicit dependency coverage, lifecycle state, freshness, conflict state, and provenance completeness. A current-support assessment must fail closed when any required dimension is unresolved. This preserves the distinction between historical epistemic state and current authorization while avoiding the false equivalence `Active == authoritative`.
+
 ## Revision propagation
 
 The deterministic path is:
