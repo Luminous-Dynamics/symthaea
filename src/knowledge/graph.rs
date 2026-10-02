@@ -395,10 +395,17 @@ impl EnhancedKnowledgeGraph {
 
     /// Get all facts with causal relations (for DAG construction)
     pub fn causal_facts(&self) -> Vec<&TemporalFact> {
-        self.facts
+        let mut facts: Vec<&TemporalFact> = self
+            .facts
             .values()
             .filter(|f| f.has_causal_relations)
-            .collect()
+            .collect();
+        facts.sort_by(|a, b| {
+            a.memory_id
+                .cmp(&b.memory_id)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        facts
     }
 
     /// Drain pending contradiction alerts
@@ -662,7 +669,12 @@ impl EnhancedKnowledgeGraph {
             })
             .collect();
 
-        distribution.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        distribution.sort_by(|a, b| {
+            a.1
+                .partial_cmp(&b.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
         distribution
     }
 
