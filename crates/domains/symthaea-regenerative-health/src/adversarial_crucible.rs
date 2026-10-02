@@ -74,6 +74,7 @@ fn temporal_gate() -> TemporalFusionGate {
         schema_version: "0.1".into(),
         policy_id: "adversarial-temporal-v1".into(),
         minimum_trusted_sensors: 2,
+        minimum_independent_groups: 2,
         maximum_delta_disagreement_milli: 250,
     })
     .expect("valid temporal policy")
