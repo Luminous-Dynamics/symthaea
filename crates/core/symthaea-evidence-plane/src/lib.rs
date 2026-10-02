@@ -950,7 +950,6 @@ mod tests {
             "/work".into(), vec!["cargo".into(), "test".into()],
             vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
             vec![("input".into(), "blake3:0011223344556677".into())],
-        );
         )
         .expect_err("duplicate feature must fail");
         assert!(result.contains("duplicate name"));
