@@ -29,8 +29,9 @@ As of the branch base, the relevant code behaves as follows:
 - `NixOSExecutor::execute(command, phi)` returns `PendingConfirmation` below that threshold and otherwise executes;
 - the function documentation already warns that caller-supplied or hard-coded Phi can become a rubber stamp;
 - `NixOSExecutor::execute_confirmed(command, phi)` bypasses the threshold after a real upstream confirmation;
-- the daemon active-healing path routes modifying commands through typed V1 action intent and the live Linux local-approval V2 runtime before `execute_confirmed`;
-- generated NixOS configuration hardening uses a typed `ConfigPatch` action identity containing the exact option path, value, and observed `configuration.nix` digest; the write path revalidates that digest before applying the patch;
+- the daemon active-healing path routes modifying commands through typed V1 action intent and the live Linux local-approval V2 runtime;
+- a consumed local approval is promoted to a non-serializable `NixLocalExecutionAuthorityV1` and passed by value to the executor, which revalidates the exact typed command before dispatch;
+- generated NixOS configuration hardening uses a typed `ConfigPatch` action identity containing the exact option path, value, and observed `configuration.nix` digest; the locked writer revalidates that digest while holding an exclusive file lock before applying the patch;
 - the legacy `watchdog_verdict.txt` file remains a compatibility/observability surface but is not an authority source for daemon modifying execution;
 - `action/phi_gate.rs` presently provides command-risk/destructiveness classification and rollback lookup despite its historical authority-oriented name;
 - `PlanExecutor` stores one Phi value for the whole plan, applies it to each step, and uses `execute_confirmed` for rollback.
