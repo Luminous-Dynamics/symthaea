@@ -155,11 +155,19 @@ impl RemoteScene {
     }
 
     pub fn is_supported(&self) -> bool {
-        if self.version != Self::VERSION || self.serialized_len() > MAX_SCENE_BYTES {
+        if self.version != Self::VERSION {
             return false;
         }
+
+        // Validate the bounded graph before serializing it. This keeps a
+        // caller-supplied oversized object from forcing a large temporary JSON
+        // allocation merely to discover that it is structurally invalid.
         let mut count = 0usize;
-        validate_node(&self.root, 0, &mut count)
+        if !validate_node(&self.root, 0, &mut count) {
+            return false;
+        }
+
+        self.serialized_len() <= MAX_SCENE_BYTES
     }
 
     pub fn is_within_budget(&self) -> bool {
