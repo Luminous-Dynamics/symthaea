@@ -2,13 +2,12 @@
 name = "symthaea-observation-attestation"
 version = "0.1.0"
 edition = "2024"
+description = "Evidence-calibrated cryptographic attestation verification for Symthaea observation receipts"
 license = "AGPL-3.0-or-later"
-description = "Detached cryptographic attestation adapter for Symthaea observation-fabric receipts."
-repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [dependencies]
 blake3 = { workspace = true }
 ed25519-dalek = { workspace = true }
 serde = { workspace = true }
-symthaea-core = { path = "../symthaea-core" }
+symthaea-core = { workspace = true }
 thiserror = { workspace = true }
