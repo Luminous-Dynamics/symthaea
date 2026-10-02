@@ -381,15 +381,12 @@ impl EvaluationTrace {
     }
 
     /// Return the aggregate outcome represented by this trace.
-    pub fn terminal_outcome(&self) -> ReceiptAttestationVerificationOutcome {
-        self.results
-            .last()
-            .and_then(|result| match result.stage {
-                VerificationStage::Passed => None,
-                VerificationStage::Failed(outcome) => Some(outcome),
-                VerificationStage::NotEvaluated => None,
-            })
-            .unwrap_or(ReceiptAttestationVerificationOutcome::Verified)
+    pub fn terminal_outcome(&self) -> Option<ReceiptAttestationVerificationOutcome> {
+        match self.results.last().map(|result| result.stage) {
+            Some(VerificationStage::Passed) => Some(ReceiptAttestationVerificationOutcome::Verified),
+            Some(VerificationStage::Failed(outcome)) => Some(outcome),
+            Some(VerificationStage::NotEvaluated) | None => None,
+        }
     }
 
     /// Validate the structural invariants of the durable execution trace.
@@ -956,7 +953,7 @@ impl EvidenceEvaluation {
             && self.verification_report_fingerprint == report.fingerprint()
             && self.context_fingerprint == self.context.fingerprint()
             && self.execution_trace.procedure_fingerprint == report.procedure_fingerprint
-            && self.execution_trace.terminal_outcome() == self.outcome
+            && self.execution_trace.terminal_outcome() == Some(self.outcome)
             && self.execution_trace.is_well_formed()
     }
 
@@ -2144,6 +2141,15 @@ mod tests {
         assert!(evaluation
             .canonical_bytes()
             .starts_with(b"symthaea:evidence-evaluation:v5\n"));
+    }
+
+    #[test]
+    fn evaluation_trace_empty_has_no_terminal_outcome() {
+        let trace = EvaluationTrace {
+            procedure_fingerprint: "procedure-a".into(),
+            results: Vec::new(),
+        };
+        assert_eq!(trace.terminal_outcome(), None);
     }
 
     #[test]
