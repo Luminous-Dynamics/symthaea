@@ -247,7 +247,8 @@ impl NixActionIntentV1 {
         let mut h = Hasher::new();
         h.update(ACTION_INTENT_DOMAIN);
         put_str(&mut h, &self.subject_identity);
-        put_opt_str(&mut h, self.pre_state_identity.as_deref());        put_action(&mut h, &self.action);
+        put_opt_str(&mut h, self.pre_state_identity.as_deref());
+        put_action(&mut h, &self.action);
         put_u8(&mut h, scope_tag(self.maximum_scope));
         put_str_vec(&mut h, &self.preconditions);
         put_str_vec(&mut h, &self.required_postconditions);
@@ -503,7 +504,8 @@ impl NixExecutionReceiptV1 {
         put_str(&mut h, &self.action_intent_digest);
         put_str(&mut h, &self.authorization_record_digest);
         put_str(&mut h, &self.executor_identity);
-        put_opt_str(&mut h, self.actual_pre_state_ref.as_deref());        put_u64(&mut h, self.started_at_unix_ms);
+        put_opt_str(&mut h, self.actual_pre_state_ref.as_deref());
+        put_u64(&mut h, self.started_at_unix_ms);
         put_u64(&mut h, self.finished_at_unix_ms);
         put_u8(&mut h, mechanical_result_tag(self.mechanical_result));
         put_opt_str(&mut h, self.actual_post_state_ref.as_deref());
@@ -752,7 +754,8 @@ fn put_action(h: &mut Hasher, action: &NixActionDescriptorV1) {
         NixActionDescriptorV1::EnvRollback => put_u8(h, 5),
         NixActionDescriptorV1::Search { query, json } => {
             put_u8(h, 6);
-            put_str(h, query);            put_bool(h, *json);
+            put_str(h, query);
+            put_bool(h, *json);
         }
         NixActionDescriptorV1::ChannelUpdate { channel } => {
             put_u8(h, 7);
@@ -1001,7 +1004,8 @@ mod tests {
             "host:x",
             Some("generation:42".to_string()),
             &NixOSCommand::Service {
-                operation: NixServiceOperationKindV1::Restart,                unit: "nginx.service".to_string(),
+                operation: NixServiceOperationKindV1::Restart,
+                unit: "nginx.service".to_string(),
             },
         )
         .unwrap();
