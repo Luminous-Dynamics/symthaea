@@ -1012,6 +1012,11 @@ impl EnhancedKnowledgeGraph {
             }
         }
 
+        alerts.sort_by(|a, b| {
+            a.existing_fact_id
+                .cmp(&b.existing_fact_id)
+                .then_with(|| a.similarity.total_cmp(&b.similarity))
+        });
         alerts
     }
 
