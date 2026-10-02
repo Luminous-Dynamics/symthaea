@@ -780,10 +780,22 @@ impl EnhancedKnowledgeGraph {
 
     // ── Persistence Support ─────────────────────────────────────────────
 
-    /// Import a fact from a persistence record.
-    pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) -> bool {
-        if record.vector_bytes.len() != 2048 {
-            return false;
+    /// Result of restoring one persisted fact into the bounded graph.
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub struct FactRestoreOutcome {
+        /// Whether the persisted fact was admitted into the graph.
+        pub accepted: bool,
+        /// Number of existing facts evicted by graph retention policy while admitting it.
+        pub policy_evictions: usize,
+    }
+
+    /// Import a fact from a persistence record, exposing retention-policy outcomes.
+    pub fn import_fact_record_with_outcome(
+        &mut self,
+        record: &super::persistence::FactRecord,
+    ) -> FactRestoreOutcome {
+        if record.vector_bytes.len() != 2048 || self.capacity == 0 {
+            return FactRestoreOutcome::default();
         }
         let mut arr = [0u8; 2048];
         arr.copy_from_slice(&record.vector_bytes);
@@ -793,6 +805,12 @@ impl EnhancedKnowledgeGraph {
             source_text: record.source_text.clone(),
             confidence: record.confidence,
         };
+
+        let mut policy_evictions = 0;
+        if self.facts.len() >= self.capacity && self.evict_lowest_confidence() {
+            policy_evictions = 1;
+        }
+
         let id: FactId = self.next_id;
         self.next_id += 1;
         let fact = TemporalFact {
@@ -817,7 +835,15 @@ impl EnhancedKnowledgeGraph {
                 .push(id);
         }
         self.facts.insert(id, fact);
-        true
+        FactRestoreOutcome {
+            accepted: true,
+            policy_evictions,
+        }
+    }
+
+    /// Import a fact from a persistence record.
+    pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) -> bool {
+        self.import_fact_record_with_outcome(record).accepted
     }
 
     /// Export all facts as persistence records.
@@ -946,14 +972,19 @@ impl EnhancedKnowledgeGraph {
         alerts
     }
 
-    fn evict_lowest_confidence(&mut self) {
+    fn evict_lowest_confidence(&mut self) -> bool {
         if let Some((&id, _)) = self.facts.iter().min_by(|(_, a), (_, b)| {
             a.confidence
                 .partial_cmp(&b.confidence)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.memory_id.cmp(&b.memory_id))
+                .then_with(|| a.id.cmp(&b.id))
         }) {
             self.remove_fact(id);
             self.total_evictions += 1;
+            true
+        } else {
+            false
         }
     }
 
