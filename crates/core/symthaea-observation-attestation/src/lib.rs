@@ -396,7 +396,7 @@ impl ReceiptAttestationVerificationReport {
 pub const VERIFICATION_CONTEXT_VERSION: &str =
     "symthaea-observation-verification-context-v1";
 pub const EVIDENCE_EVALUATION_VERSION: &str =
-    "symthaea-observation-evaluation-v1";
+    "symthaea-observation-evaluation-v2";
 pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
     "receipt-attestation-verification";
 
@@ -469,6 +469,181 @@ impl VerificationContext {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvaluationClaim {
+    ReceiptIntegrity,
+    AttestationAuthenticity,
+    TemporalValidity,
+    CryptosuiteConformance,
+    VerificationMethodResolution,
+    VerificationMethodLifecycle,
+    ProofPurposeAuthorization,
+    ProofPolicyConformance,
+    CryptographicProofValidity,
+    UnderlyingObservationTruth,
+    SemanticValidity,
+    ExternalWorldCorrespondence,
+    AttesterIntent,
+    EvaluatorIndependence,
+}
+
+fn evaluation_claim_tag(claim: EvaluationClaim) -> u8 {
+    match claim {
+        EvaluationClaim::ReceiptIntegrity => 0,
+        EvaluationClaim::AttestationAuthenticity => 1,
+        EvaluationClaim::TemporalValidity => 2,
+        EvaluationClaim::CryptosuiteConformance => 3,
+        EvaluationClaim::VerificationMethodResolution => 4,
+        EvaluationClaim::VerificationMethodLifecycle => 5,
+        EvaluationClaim::ProofPurposeAuthorization => 6,
+        EvaluationClaim::ProofPolicyConformance => 7,
+        EvaluationClaim::CryptographicProofValidity => 8,
+        EvaluationClaim::UnderlyingObservationTruth => 9,
+        EvaluationClaim::SemanticValidity => 10,
+        EvaluationClaim::ExternalWorldCorrespondence => 11,
+        EvaluationClaim::AttesterIntent => 12,
+        EvaluationClaim::EvaluatorIndependence => 13,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvaluationBoundary {
+    pub established: Vec<EvaluationClaim>,
+    pub not_established: Vec<EvaluationClaim>,
+    pub indeterminate: Vec<EvaluationClaim>,
+}
+
+impl EvaluationBoundary {
+    pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
+        fn classify(
+            stage: VerificationStage,
+            claim: EvaluationClaim,
+            established: &mut Vec<EvaluationClaim>,
+            indeterminate: &mut Vec<EvaluationClaim>,
+        ) {
+            match stage {
+                VerificationStage::Passed => established.push(claim),
+                VerificationStage::Failed(_) | VerificationStage::NotEvaluated => {
+                    indeterminate.push(claim)
+                }
+            }
+        }
+
+        let mut established = Vec::new();
+        let mut indeterminate = Vec::new();
+        classify(
+            report.receipt_commitment,
+            EvaluationClaim::ReceiptIntegrity,
+            &mut established,
+            &mut indeterminate,
+        );
+        classify(
+            report.verification_method,
+            EvaluationClaim::VerificationMethodResolution,
+            &mut established,
+            &mut indeterminate,
+        );
+        classify(
+            report.temporal_validity,
+            EvaluationClaim::TemporalValidity,
+            &mut established,
+            &mut indeterminate,
+        );
+        classify(
+            report.cryptosuite,
+            EvaluationClaim::CryptosuiteConformance,
+            &mut established,
+            &mut indeterminate,
+        );
+        classify(
+            report.lifecycle,
+            EvaluationClaim::VerificationMethodLifecycle,
+            &mut established,
+            &mut indeterminate,
+        );
+        classify(
+            report.proof_purpose_authorization,
+            EvaluationClaim::ProofPurposeAuthorization,
+            &mut established,
+            &mut indeterminate,
+        );
+        classify(
+            report.proof_policy,
+            EvaluationClaim::ProofPolicyConformance,
+            &mut established,
+            &mut indeterminate,
+        );
+        classify(
+            report.cryptographic_proof,
+            EvaluationClaim::CryptographicProofValidity,
+            &mut established,
+            &mut indeterminate,
+        );
+
+        // A structurally valid, signed attestation is still not a truth oracle.
+        // These claims require separate domain-specific evidence or procedures.
+        established.push(EvaluationClaim::AttestationAuthenticity);
+        for claim in [
+            EvaluationClaim::UnderlyingObservationTruth,
+            EvaluationClaim::SemanticValidity,
+            EvaluationClaim::ExternalWorldCorrespondence,
+            EvaluationClaim::AttesterIntent,
+            EvaluationClaim::EvaluatorIndependence,
+        ] {
+            // These are deliberately represented as not-established rather than
+            // indeterminate: this verifier does not claim to evaluate them at all.
+            //
+            // Keeping this distinction prevents "not checked" from being confused
+            // with "checked but failed" in downstream evidence reasoning.
+            //
+            // The lists are normalized during canonicalization.
+            //
+            // (The report's stage failures remain indeterminate for the claims
+            // represented by actual verification procedures.)
+            //
+            // This is an explicit boundary of the evidence type.
+            //
+            // Push below after the loop to keep the construction readable.
+            let _ = claim;
+        }
+
+        let not_established = vec![
+            EvaluationClaim::UnderlyingObservationTruth,
+            EvaluationClaim::SemanticValidity,
+            EvaluationClaim::ExternalWorldCorrespondence,
+            EvaluationClaim::AttesterIntent,
+            EvaluationClaim::EvaluatorIndependence,
+        ];
+
+        Self {
+            established,
+            not_established,
+            indeterminate,
+        }
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut established = self.established.clone();
+        let mut not_established = self.not_established.clone();
+        let mut indeterminate = self.indeterminate.clone();
+        established.sort_by_key(|v| evaluation_claim_tag(*v));
+        established.dedup();
+        not_established.sort_by_key(|v| evaluation_claim_tag(*v));
+        not_established.dedup();
+        indeterminate.sort_by_key(|v| evaluation_claim_tag(*v));
+        indeterminate.dedup();
+
+        let mut bytes = Vec::new();
+        for claims in [&established, &not_established, &indeterminate] {
+            bytes.extend_from_slice(&(claims.len() as u64).to_be_bytes());
+            for claim in claims.iter().copied() {
+                bytes.push(evaluation_claim_tag(claim));
+            }
+        }
+        bytes
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvaluationLimitation {
     UnderlyingObservationTruthNotEvaluated,
     SemanticValidityNotEvaluated,
@@ -532,6 +707,7 @@ impl EvidenceEvaluation {
                 EvaluationLimitation::ExternalWorldStateNotEvaluated,
                 EvaluationLimitation::AttesterIntentNotEvaluated,
             ],
+            boundary: EvaluationBoundary::from_report(report),
         }
     }
 
@@ -580,6 +756,7 @@ impl EvidenceEvaluation {
         for limitation in limitations {
             bytes.push(evaluation_limitation_tag(limitation));
         }
+        bytes.extend_from_slice(&self.boundary.canonical_bytes());
         bytes
     }
 
@@ -1640,6 +1817,53 @@ mod tests {
 
 
 
+
+    #[test]
+    fn evidence_evaluation_boundary_distinguishes_established_from_not_established() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+
+        assert!(evaluation
+            .boundary
+            .established
+            .contains(&EvaluationClaim::ReceiptIntegrity));
+        assert!(evaluation
+            .boundary
+            .established
+            .contains(&EvaluationClaim::CryptographicProofValidity));
+        assert!(evaluation
+            .boundary
+            .not_established
+            .contains(&EvaluationClaim::UnderlyingObservationTruth));
+        assert!(evaluation
+            .boundary
+            .not_established
+            .contains(&EvaluationClaim::SemanticValidity));
+        assert!(evaluation.boundary.indeterminate.is_empty());
+    }
+
+    #[test]
+    fn evidence_evaluation_boundary_changes_identity() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let mut first = report.to_evidence_evaluation();
+        let mut second = first.clone();
+        second.boundary.established.clear();
+        assert_ne!(first.fingerprint(), second.fingerprint());
+        first.boundary.not_established.reverse();
+        assert_eq!(first.fingerprint(), report.to_evidence_evaluation().fingerprint());
+    }
 
     #[test]
     fn evidence_evaluation_preserves_context_and_boundaries() {
