@@ -155,7 +155,11 @@ impl RemoteScene {
     }
 
     pub fn is_supported(&self) -> bool {
-        self.version == Self::VERSION && self.serialized_len() <= MAX_SCENE_BYTES
+        if self.version != Self::VERSION || self.serialized_len() > MAX_SCENE_BYTES {
+            return false;
+        }
+        let mut count = 0usize;
+        validate_node(&self.root, 0, &mut count)
     }
 
     pub fn is_within_budget(&self) -> bool {
@@ -255,6 +259,40 @@ fn compile_node(
         style: wire_style,
         children,
     })
+}
+
+fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
+    if depth > MAX_SCENE_DEPTH || *count >= MAX_SCENE_NODES {
+        return false;
+    }
+    *count += 1;
+
+    if let WirePrimitive::Polygon { points, .. } = &node.primitive {
+        if points.len() < 2 || points.len() > MAX_POLYGON_POINTS {
+            return false;
+        }
+    }
+
+    if !node.transform.translate_x.is_finite()
+        || !node.transform.translate_y.is_finite()
+        || !node.transform.rotate_deg.is_finite()
+        || !node.transform.scale.is_finite()
+        || node.transform.translate_x.abs() > MAX_ABS_COORDINATE
+        || node.transform.translate_y.abs() > MAX_ABS_COORDINATE
+        || node.transform.rotate_deg.abs() > MAX_ABS_COORDINATE
+        || node.transform.scale.abs() > MAX_ABS_SCALE
+        || !node.style.opacity.is_finite()
+        || !(0.0..=1.0).contains(&node.style.opacity)
+        || node.style.stroke_width.is_some_and(|width| {
+            !width.is_finite() || width.is_sign_negative() || width > MAX_ABS_COORDINATE
+        })
+    {
+        return false;
+    }
+
+    node.children
+        .iter()
+        .all(|child| validate_node(child, depth + 1, count))
 }
 
 fn collect_first_gradient_colors(root: &SceneNode) -> std::collections::HashMap<&str, Color> {
@@ -401,6 +439,28 @@ mod tests {
             }
             _ => panic!("unexpected primitive"),
         }
+    }
+
+    #[test]
+    fn externally_constructed_scene_rejects_node_budget_overrun() {
+        let root = WireNode {
+            primitive: WirePrimitive::Group,
+            transform: WireTransform::default(),
+            style: WireStyle::default(),
+            children: (0..300)
+                .map(|_| WireNode {
+                    primitive: WirePrimitive::Group,
+                    transform: WireTransform::default(),
+                    style: WireStyle::default(),
+                    children: vec![],
+                })
+                .collect(),
+        };
+        let scene = RemoteScene {
+            version: RemoteScene::VERSION,
+            root,
+        };
+        assert!(!scene.is_supported());
     }
 
     #[test]
