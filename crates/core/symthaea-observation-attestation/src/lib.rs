@@ -472,6 +472,7 @@ impl EvaluationTrace {
         bytes
     }
 
+    /// Stable content identity for the executed verification trace.
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea:observation-evaluation-trace:v1\n");
@@ -679,6 +680,11 @@ impl ReceiptAttestationVerificationReport {
         write_stage(&mut bytes, self.proof_policy);
         write_stage(&mut bytes, self.cryptographic_proof);
         bytes
+    }
+
+    /// Stable content identity of the captured execution trace.
+    pub fn execution_trace_fingerprint(&self) -> String {
+        self.execution_trace.fingerprint()
     }
 
     pub fn fingerprint(&self) -> String {
@@ -981,6 +987,11 @@ impl EvaluationBoundary {
     }
 }
 
+/// Legacy limitation summary retained for source compatibility.
+///
+/// New evidence should use `EvaluationBoundary`, which distinguishes
+/// established, not-established, and indeterminate claims.
+#[deprecated(note = "use EvaluationBoundary instead")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvaluationLimitation {
     UnderlyingObservationTruthNotEvaluated,
@@ -989,6 +1000,7 @@ pub enum EvaluationLimitation {
     AttesterIntentNotEvaluated,
 }
 
+#[deprecated(note = "use EvaluationBoundary instead")]
 fn evaluation_limitation_tag(limitation: EvaluationLimitation) -> u8 {
     match limitation {
         EvaluationLimitation::UnderlyingObservationTruthNotEvaluated => 0,
@@ -1079,6 +1091,11 @@ impl EvidenceEvaluation {
         bytes.push(verification_outcome_tag(self.outcome));
         bytes.extend_from_slice(&self.boundary.canonical_bytes());
         bytes
+    }
+
+    /// Stable content identity of the execution evidence referenced by this evaluation.
+    pub fn execution_trace_fingerprint(&self) -> String {
+        self.execution_trace.fingerprint()
     }
 
     pub fn fingerprint(&self) -> String {
@@ -2407,6 +2424,27 @@ mod tests {
         let evaluation = report.to_evidence_evaluation();
         assert_eq!(evaluation.execution_trace, report.execution_trace);
         assert!(evaluation.is_consistent_with_report(&report));
+    }
+
+    #[test]
+    fn trace_fingerprint_is_exposed_by_report_and_evaluation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+
+        assert_eq!(
+            report.execution_trace_fingerprint(),
+            report.execution_trace.fingerprint()
+        );
+        assert_eq!(
+            evaluation.execution_trace_fingerprint(),
+            report.execution_trace.fingerprint()
+        );
     }
 
     #[test]
