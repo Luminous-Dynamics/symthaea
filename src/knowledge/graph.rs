@@ -1089,6 +1089,64 @@ fn contains_negation(text: &str) -> bool {
 // ── Tests ──────────────────────────────────────────────────────────────────
 
     #[test]
+    fn test_domain_distribution_is_restore_order_invariant() {
+        let records = [
+            super::persistence::FactRecord {
+                memory_id: "memory-a".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: "a".into(),
+                confidence: 0.1,
+                domain: Some("shared".into()),
+                cycle: 1,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "memory-b".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![1u8; 2048],
+                source_text: "b".into(),
+                confidence: 0.2,
+                domain: Some("shared".into()),
+                cycle: 1,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "memory-c".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![2u8; 2048],
+                source_text: "c".into(),
+                confidence: 0.7,
+                domain: Some("shared".into()),
+                cycle: 1,
+                is_causal: false,
+            },
+        ];
+
+        let mut forward = EnhancedKnowledgeGraph::new(10);
+        let mut reverse = EnhancedKnowledgeGraph::new(10);
+        for record in &records {
+            assert!(forward.import_fact_record_with_outcome(record).accepted);
+        }
+        for record in records.iter().rev() {
+            assert!(reverse.import_fact_record_with_outcome(record).accepted);
+        }
+
+        let forward_distribution = forward.domain_distribution();
+        let reverse_distribution = reverse.domain_distribution();
+        assert_eq!(forward_distribution.len(), 1);
+        assert_eq!(reverse_distribution.len(), 1);
+        assert_eq!(
+            forward_distribution[0].1.to_bits(),
+            reverse_distribution[0].1.to_bits()
+        );
+        assert_eq!(forward_distribution[0].2, reverse_distribution[0].2);
+    }
+
+    #[test]
     fn test_average_confidence_is_restore_order_invariant() {
         let records = [
             super::persistence::FactRecord {
