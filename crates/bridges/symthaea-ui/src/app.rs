@@ -447,8 +447,9 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
     let mut first_multiplicity = true;
 
     while index < tokens.len() {
-        let command = match tokens[index] {
+        let command = match &tokens[index] {
             Token::Command(command) => {
+                let command = *command;
                 index += 1;
                 command
             }
@@ -473,7 +474,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
         if arity == 0 {
             // ClosePath never consumes parameters; another number before the
             // next command would therefore be malformed.
-            if index < tokens.len() && matches!(tokens[index], Token::Number(_)) {
+            if index < tokens.len() && matches!(&tokens[index], Token::Number(_)) {
                 return false;
             }
             active_command = None;
@@ -486,7 +487,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
         let mut consumed = 0usize;
         let mut completed_group = false;
 
-        while index < tokens.len() && matches!(tokens[index], Token::Number(_)) {
+        while index < tokens.len() && matches!(&tokens[index], Token::Number(_)) {
             let raw_number = match &tokens[index] {
                 Token::Number(raw) => raw.as_str(),
                 Token::Command(_) => return false,
@@ -520,7 +521,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
                 consumed = 0;
                 completed_group = true;
 
-                if index < tokens.len() && matches!(tokens[index], Token::Command(_)) {
+                if index < tokens.len() && matches!(&tokens[index], Token::Command(_)) {
                     break;
                 }
             }
@@ -1856,10 +1857,27 @@ mod tests {
         );
         assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none());
 
-        let many_attrs = "<g ".to_string()
-            + &(0..1024).map(|i| format!("id{}=\"x\" ", i)).collect::<String>()
-            + "/></svg>";
-        let many_attrs = "<svg>".to_string() + &many_attrs;
+        let allowed_attrs = [
+            ("id", "x"),
+            ("transform", "translate(1)"),
+            ("fill", "none"),
+            ("stroke", "none"),
+            ("stroke-width", "1"),
+            ("opacity", "1"),
+        ];
+        let mut many_attrs = String::new();
+        for i in 0..171 {
+            many_attrs.push_str("<g ");
+            for (key, value) in allowed_attrs {
+                if key == "id" {
+                    many_attrs.push_str(&format!("id="g{i}" "));
+                } else {
+                    many_attrs.push_str(&format!("{key}="{value}" "));
+                }
+            }
+            many_attrs.push_str("/>");
+        }
+        let many_attrs = "<svg>".to_string() + &many_attrs + "</svg>";
         assert!(portrait_from_json(&serde_json::json!({
             "canvas_svg": many_attrs
         })).is_none());
@@ -1878,6 +1896,7 @@ mod tests {
         assert!(Movie::from_json(&payload).is_none());
     }
 
+    #[test]
     fn movie_rejects_any_malformed_frame_instead_of_silently_dropping_it() {
         let payload = serde_json::json!({
             "mental_movie": {
