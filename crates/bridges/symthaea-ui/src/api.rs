@@ -99,9 +99,11 @@ pub async fn send_simple(gateway: &str, request_type: &str) -> Result<Value, Str
         .send()
         .await
         .map_err(|e| format!("request failed: {e}"))?;
-    resp.json::<Value>()
+    let text = resp
+        .text()
         .await
-        .map_err(|e| format!("failed to parse response: {e}"))
+        .map_err(|e| format!("failed to read response: {e}"))?;
+    parse_json_with_limit(&text, MAX_HTTP_RESPONSE_BYTES)
 }
 
 /// Open the live telemetry WebSocket and invoke `on_message` for each
