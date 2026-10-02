@@ -151,7 +151,7 @@ fn cose_key_rejects_wrong_coordinate_length() {
     bytes.remove(pos + 4);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
-        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+        Err(Rfc9942VdpError::InvalidEncoding)
     );
 }
 
@@ -162,7 +162,7 @@ fn cose_key_rejects_duplicate_labels() {
     bytes.extend_from_slice(&[0x01, 0x02]);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
-        Err(Rfc9942VdpError::InvalidEncoding)
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
     );
 }
 
