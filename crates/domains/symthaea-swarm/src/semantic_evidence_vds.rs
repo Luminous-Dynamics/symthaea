@@ -133,6 +133,22 @@ impl Rfc9942ReceiptEnvelope {
     pub fn signature(&self)->&[u8]{&self.signature}
     pub fn protected_header_bytes(&self)->Vec<u8>{self.protected_bytes.as_deref().map_or_else(||self.protected_header_cbor(),ToOwned::to_owned)}
 
+    /// Build the RFC 9052 `Sig_structure` bytes used by COSE_Sign1
+    /// verification. The signature algorithm itself is intentionally external.
+    pub fn signature1_tbs(
+        &self,
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<Vec<u8>, Rfc9942VdpError> {
+        let payload = match (&self.payload, detached_payload) {
+            (Rfc9942ReceiptPayload::Attached(bytes), None) => bytes.as_slice(),
+            (Rfc9942ReceiptPayload::Attached(_), Some(_)) => return Err(Rfc9942VdpError::InvalidStructure),
+            (Rfc9942ReceiptPayload::Detached, Some(bytes)) => bytes,
+            (Rfc9942ReceiptPayload::Detached, None) => return Err(Rfc9942VdpError::DetachedPayloadRequired),
+        };
+        Ok(cose_sign1_signature1_tbs(&self.protected_header_bytes(), external_aad, payload))
+    }
+
     pub fn to_cbor(&self)->Vec<u8>{
         let protected=self.protected_bytes.as_deref().map_or_else(||self.protected_header_cbor(),ToOwned::to_owned);
         let mut out=Vec::new();
@@ -304,6 +320,22 @@ impl Rfc9942SignatureWithReceipts {
             },
             ToOwned::to_owned,
         )
+    }
+
+    /// Build the RFC 9052 `Sig_structure` bytes used by the outer
+    /// COSE_Sign1 signature. Detached payload resolution remains explicit.
+    pub fn signature1_tbs(
+        &self,
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<Vec<u8>, Rfc9942VdpError> {
+        let payload = match (&self.payload, detached_payload) {
+            (Rfc9942SignaturePayload::Attached(bytes), None) => bytes.as_slice(),
+            (Rfc9942SignaturePayload::Attached(_), Some(_)) => return Err(Rfc9942VdpError::InvalidStructure),
+            (Rfc9942SignaturePayload::Detached, Some(bytes)) => bytes,
+            (Rfc9942SignaturePayload::Detached, None) => return Err(Rfc9942VdpError::DetachedPayloadRequired),
+        };
+        Ok(cose_sign1_signature1_tbs(&self.protected_header_bytes(), external_aad, payload))
     }
 
     pub fn signature(&self) -> &[u8] {
@@ -1291,6 +1323,20 @@ impl Rfc9162InclusionProof {
     }
 }
 
+fn cose_sign1_signature1_tbs(
+    protected: &[u8],
+    external_aad: &[u8],
+    payload: &[u8],
+) -> Vec<u8> {
+    let mut out = Vec::with_capacity(32 + protected.len() + external_aad.len() + payload.len());
+    cbor_array_len(&mut out, 4);
+    cbor_text(&mut out, b"Signature1");
+    cbor_bytes(&mut out, protected);
+    cbor_bytes(&mut out, external_aad);
+    cbor_bytes(&mut out, payload);
+    out
+}
+
 fn cbor_tag(out: &mut Vec<u8>, tag: u64) {
     match tag { 0..=23=>out.push(0xc0|tag as u8), 24..=255=>out.extend_from_slice(&[0xd8,tag as u8]), 256..=65_535=>{out.push(0xd9);out.extend_from_slice(&(tag as u16).to_be_bytes());}, 65_536..=4_294_967_295=>{out.push(0xda);out.extend_from_slice(&(tag as u32).to_be_bytes());}, _=>{out.push(0xdb);out.extend_from_slice(&tag.to_be_bytes());} }
 }
@@ -1335,6 +1381,17 @@ fn cbor_array_len(out: &mut Vec<u8>, len: u64) {
         65_536..=4_294_967_295 => { out.push(0x9a); out.extend_from_slice(&(len as u32).to_be_bytes()); }
         _ => { out.push(0x9b); out.extend_from_slice(&len.to_be_bytes()); }
     }
+}
+
+fn cbor_text(out: &mut Vec<u8>, bytes: &[u8]) {
+    match bytes.len() as u64 {
+        0..=23 => out.push(0x60 | bytes.len() as u8),
+        24..=255 => out.extend_from_slice(&[0x78, bytes.len() as u8]),
+        256..=65_535 => { out.push(0x79); out.extend_from_slice(&(bytes.len() as u16).to_be_bytes()); }
+        65_536..=4_294_967_295 => { out.push(0x7a); out.extend_from_slice(&(bytes.len() as u32).to_be_bytes()); }
+        _ => { out.push(0x7b); out.extend_from_slice(&(bytes.len() as u64).to_be_bytes()); }
+    }
+    out.extend_from_slice(bytes);
 }
 
 fn cbor_bytes(out: &mut Vec<u8>, bytes: &[u8]) {
@@ -1925,6 +1982,43 @@ mod tests {
         assert_eq!(decoded.payload(),&Rfc9942SignaturePayload::Attached(b"signed-statement".to_vec()));
         assert_eq!(decoded.signature(),&[0xBB;64]);
         assert_eq!(decoded.to_cbor(),encoded);
+    }
+
+    #[test]
+    fn rfc9942_receipt_signature1_tbs_matches_cose_shape() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Attached([0x22;32]),vec![0xAA]).unwrap();
+        let tbs=receipt.signature1_tbs(&[],None).unwrap();
+        assert_eq!(&tbs[..2],&[0x84,0x6a]);
+        assert_eq!(&tbs[2..12],b"Signature1");
+        assert_eq!(tbs[12],0x43);
+        assert!(tbs.ends_with(&[0x58,0x20].into_iter().chain([0x22;32]).collect::<Vec<_>>()));
+    }
+
+    #[test]
+    fn rfc9942_detached_signature1_tbs_requires_explicit_payload() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA]).unwrap();
+        assert_eq!(
+            receipt.signature1_tbs(&[],None),
+            Err(Rfc9942VdpError::DetachedPayloadRequired)
+        );
+        let tbs=receipt.signature1_tbs(b"aad",Some(&[0x33;32])).unwrap();
+        assert!(tbs.windows(3).any(|w|w==[0x63,b'a',b'a']));
+    }
+
+    #[test]
+    fn rfc9942_outer_signature1_tbs_uses_generic_payload() {
+        let outer=Rfc9942SignatureWithReceipts::new(
+            Rfc9942SignaturePayload::Attached(b"arbitrary-payload".to_vec()),
+            vec![0xAA],
+            None,
+        );
+        let tbs=outer.signature1_tbs(b"aad",None).unwrap();
+        assert!(tbs.windows(3).any(|w|w==[0x63,b'a',b'a']));
+        assert!(tbs.ends_with(&[0x51, b'a', b'r', b'b', b'i', b't', b'r', b'a', b'r', b'y', b'-', b'p', b'a', b'y', b'l', b'o', b'a', b'd']));
     }
 
     #[test]
