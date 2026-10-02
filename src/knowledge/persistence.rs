@@ -160,6 +160,48 @@ pub struct KnowledgeSnapshotReceipt {
     pub canonical_digest_hex: String,
 }
 
+/// Immutable record that a named validator evaluated the currently committed
+/// complete knowledge snapshot under a specific validator/profile version.
+///
+/// This records validation provenance only. A conforming result is not a claim
+/// that the underlying knowledge is true, and a validator is not implicitly granted
+/// authority to assign canonical identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnowledgeSnapshotValidationReceipt {
+    pub validation_event: String,
+    pub generation: u64,
+    pub snapshot_digest_hex: String,
+    pub validator_ref: String,
+    pub validator_version: String,
+    pub validation_profile: String,
+    pub conforms: bool,
+    pub report_digest_hex: Option<String>,
+}
+
+impl KnowledgeSnapshotValidationReceipt {
+    fn validate_input(&self) -> Result<(), String> {
+        if self.validation_event.trim().is_empty() {
+            return Err("Snapshot validation event must be non-empty".into());
+        }
+        if self.snapshot_digest_hex.trim().is_empty() {
+            return Err("Snapshot validation digest must be non-empty".into());
+        }
+        if self.validator_ref.trim().is_empty() {
+            return Err("Snapshot validator reference must be non-empty".into());
+        }
+        if self.validator_version.trim().is_empty() {
+            return Err("Snapshot validator version must be non-empty".into());
+        }
+        if self.validation_profile.trim().is_empty() {
+            return Err("Snapshot validation profile must be non-empty".into());
+        }
+        if self.report_digest_hex.as_deref().is_some_and(|d| d.trim().is_empty()) {
+            return Err("Snapshot validation report digest must be non-empty when present".into());
+        }
+        Ok(())
+    }
+}
+
 impl KnowledgePersistenceSnapshot {
     /// Compute a versioned, order-independent digest of the complete persisted
     /// cognitive snapshot. This is an integrity/evidence identifier, not a claim
@@ -794,6 +836,143 @@ impl KnowledgePersistence {
         Ok(Some((snapshot, receipt)))
     }
 
+    /// Record validation of the currently committed complete snapshot.
+    ///
+    /// Validation is intentionally fail-closed against temporal drift: the requested
+    /// generation must still be the latest committed generation, and the current
+    /// snapshot digest must equal that generation's receipt. Historical generations
+    /// are not reconstructable from the projection tables alone.
+    pub fn record_snapshot_validation(
+        &mut self,
+        validation: KnowledgeSnapshotValidationReceipt,
+    ) -> Result<(), String> {
+        validation.validate_input()?;
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Begin snapshot validation transaction: {e}"))?;
+
+        let latest = tx
+            .query_row(
+                "SELECT generation, canonical_digest_hex
+                 FROM knowledge_snapshot_receipts
+                 ORDER BY generation DESC
+                 LIMIT 1",
+                [],
+                |row| {
+                    let generation = row.get::<_, i64>(0)?;
+                    Ok(KnowledgeSnapshotReceipt {
+                        generation: u64::try_from(generation).map_err(|_| {
+                            rusqlite::Error::IntegralValueOutOfRange(0, generation)
+                        })?,
+                        canonical_digest_hex: row.get(1)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|e| format!("Load latest snapshot receipt for validation: {e}"))?;
+
+        let Some(latest) = latest else {
+            return Err("Cannot validate snapshot without a committed receipt".into());
+        };
+
+        if validation.generation != latest.generation {
+            return Err(format!(
+                "Snapshot validation generation is not current: requested {}, current {}",
+                validation.generation, latest.generation
+            ));
+        }
+
+        if validation.snapshot_digest_hex != latest.canonical_digest_hex {
+            return Err(format!(
+                "Snapshot validation digest does not match committed receipt: requested {}, current {}",
+                validation.snapshot_digest_hex, latest.canonical_digest_hex
+            ));
+        }
+
+        let snapshot = read_snapshot_from_transaction(&tx)?;
+        let actual_digest = snapshot.canonical_digest_hex();
+        if actual_digest != latest.canonical_digest_hex {
+            return Err(format!(
+                "Snapshot validation digest mismatch: committed {}, observed {}",
+                latest.canonical_digest_hex, actual_digest
+            ));
+        }
+
+        tx.execute(
+            "INSERT INTO knowledge_snapshot_validation_receipts
+             (validation_event, generation, snapshot_digest_hex, validator_ref,
+              validator_version, validation_profile, conforms, report_digest_hex)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            rusqlite::params![
+                validation.validation_event,
+                i64::try_from(validation.generation)
+                    .map_err(|_| "Snapshot validation generation exceeds SQLite INTEGER range")?,
+                validation.snapshot_digest_hex,
+                validation.validator_ref,
+                validation.validator_version,
+                validation.validation_profile,
+                validation.conforms,
+                validation.report_digest_hex,
+            ],
+        )
+        .map_err(|e| format!("Persist snapshot validation receipt: {e}"))?;
+
+        tx.commit()
+            .map_err(|e| format!("Commit snapshot validation receipt: {e}"))?;
+        Ok(())
+    }
+
+    /// Load validation receipts for the latest committed snapshot generation.
+    pub fn latest_snapshot_validation_receipts(
+        &mut self,
+    ) -> Result<Vec<KnowledgeSnapshotValidationReceipt>, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT validation_event, generation, snapshot_digest_hex, validator_ref,
+                        validator_version, validation_profile, conforms, report_digest_hex
+                 FROM knowledge_snapshot_validation_receipts
+                 WHERE generation = (
+                     SELECT generation
+                     FROM knowledge_snapshot_receipts
+                     ORDER BY generation DESC
+                     LIMIT 1
+                 )
+                 ORDER BY validation_event ASC",
+            )
+            .map_err(|e| format!("Prepare latest snapshot validations: {e}"))?;
+
+        stmt.query_map([], |row| {
+            let generation = row.get::<_, i64>(1)?;
+            Ok(KnowledgeSnapshotValidationReceipt {
+                validation_event: row.get(0)?,
+                generation: u64::try_from(generation).map_err(|_| {
+                    rusqlite::Error::IntegralValueOutOfRange(1, generation)
+                })?,
+                snapshot_digest_hex: row.get(2)?,
+                validator_ref: row.get(3)?,
+                validator_version: row.get(4)?,
+                validation_profile: row.get(5)?,
+                conforms: row.get(6)?,
+                report_digest_hex: row.get(7)?,
+            })
+        })
+        .map_err(|e| format!("Query latest snapshot validations: {e}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Load latest snapshot validation row: {e}"))
+    }
+
     /// Load all persistence domains from one SQLite read transaction.
     ///
     /// The returned records are all observed from a single database snapshot.
@@ -1206,6 +1385,17 @@ impl KnowledgePersistence {
             CREATE TABLE IF NOT EXISTS knowledge_snapshot_receipts (
                 generation INTEGER PRIMARY KEY AUTOINCREMENT,
                 canonical_digest_hex TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_snapshot_validation_receipts (
+                validation_event TEXT PRIMARY KEY,
+                generation INTEGER NOT NULL,
+                snapshot_digest_hex TEXT NOT NULL,
+                validator_ref TEXT NOT NULL,
+                validator_version TEXT NOT NULL,
+                validation_profile TEXT NOT NULL,
+                conforms INTEGER NOT NULL,
+                report_digest_hex TEXT,
+                FOREIGN KEY (generation) REFERENCES knowledge_snapshot_receipts(generation)
             );
             CREATE INDEX IF NOT EXISTS idx_facts_domain ON knowledge_facts(domain);
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
@@ -2767,6 +2957,137 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&dir);
     }
+    #[test]
+    fn test_record_snapshot_validation_binds_current_generation_and_digest() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_validation_receipt_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "validated-fact".into(),
+            canonical_identity: None,
+            provenance_family: Some("validation-family".into()),
+            vector_bytes: vec![0x44; BinaryHV::BYTES],
+            source_text: "validated".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 5,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+
+        let committed = p.latest_snapshot_receipt().unwrap().unwrap();
+        let validation = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:event-1".into(),
+            generation: committed.generation,
+            snapshot_digest_hex: committed.canonical_digest_hex.clone(),
+            validator_ref: "validator:structural-v1".into(),
+            validator_version: "structural-validator-v1".into(),
+            validation_profile: "epf-011-knowledge-snapshot".into(),
+            conforms: true,
+            report_digest_hex: Some("report-digest-1".into()),
+        };
+        p.record_snapshot_validation(validation.clone()).unwrap();
+
+        assert_eq!(
+            p.latest_snapshot_validation_receipts().unwrap(),
+            vec![validation]
+        );
+
+        let second = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:event-2".into(),
+            conforms: false,
+            ..validation
+        };
+        p.record_snapshot_validation(second.clone()).unwrap();
+
+        let receipts = p.latest_snapshot_validation_receipts().unwrap();
+        assert_eq!(receipts.len(), 2);
+        assert_eq!(receipts[0].validation_event, "validation:event-1");
+        assert_eq!(receipts[1].validation_event, "validation:event-2");
+        assert!(receipts[0].conforms);
+        assert!(!receipts[1].conforms);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_record_snapshot_validation_rejects_stale_generation_and_digest() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_stale_snapshot_validation_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "stale-validation".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x55; BinaryHV::BYTES],
+            source_text: "stale".into(),
+            confidence: 0.6,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        let first = p.latest_snapshot_receipt().unwrap().unwrap();
+
+        let new_fact = FactRecord {
+            source_text: "new generation".into(),
+            cycle: 2,
+            ..fact
+        };
+        p.save_snapshot(std::slice::from_ref(&new_fact), &[], &[], &[])
+            .unwrap();
+        let second = p.latest_snapshot_receipt().unwrap().unwrap();
+
+        let stale = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:stale".into(),
+            generation: first.generation,
+            snapshot_digest_hex: first.canonical_digest_hex,
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        };
+        let err = p.record_snapshot_validation(stale).unwrap_err();
+        assert_eq!(
+            err,
+            format!(
+                "Snapshot validation generation is not current: requested {}, current {}",
+                first.generation, second.generation
+            )
+        );
+
+        let bad_digest = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:bad-digest".into(),
+            generation: second.generation,
+            snapshot_digest_hex: first.canonical_digest_hex,
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        };
+        let err = p.record_snapshot_validation(bad_digest).unwrap_err();
+        assert!(err.starts_with(
+            "Snapshot validation digest does not match committed receipt"
+        ));
+        assert!(p.latest_snapshot_validation_receipts().unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn test_snapshot_receipt_generation_tracks_only_committed_complete_snapshots() {
         let dir = std::env::temp_dir().join(format!(
