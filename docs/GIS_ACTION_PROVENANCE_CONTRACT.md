@@ -184,3 +184,25 @@ Reservation and consumption transitions execute inside SQLite write transactions
 This still does not make an external side effect transactionally atomic with the authorization database. The prepare/effect/commit gap remains an explicit failure boundary: an uncertain external effect becomes Indeterminate, and reconciliation is required before another attempt can be admitted.
 
 SQLite is appropriate as a durable local/shared-node implementation where writer concurrency is bounded; deployments requiring many concurrent writers or multiple independent servers should use an equivalent client/server transactional domain rather than treating SQLite as a universal distributed-consensus layer.
+
+
+## Durable dispatch boundary and crash recovery
+
+The durable execution lifecycle now makes the external-effect boundary explicit:
+
+    AUTHORIZATION
+      ↓
+    PREPARED
+      ↓ durable commit
+    DISPATCH_PENDING
+      ↓ provider entry
+    EXECUTED | FAILED
+      └────────→ INDETERMINATE → authenticated reconciliation
+
+`Prepared` is a reservation, not permission to enter an external effect sink. An executor must durably transition the same authorization instance and attempt to `DispatchPending` before provider entry. The transition is serialized in the shared consumption domain and is fenced by the exact authorization instance plus attempt identity.
+
+`DispatchPending` is therefore an evidence boundary, not an execution receipt. It proves that the local executor durably recorded its intent immediately before the effect boundary; it does not prove that the provider accepted the effect.
+
+On restart, both `Prepared` and `DispatchPending` non-terminal reservations are conservatively recovered to `Indeterminate`. This deliberately fails closed because local durable state cannot prove whether a crash occurred before or after an external sink accepted the effect. The recovered attempt remains occupied and cannot be retried until explicit reconciliation establishes a terminal outcome. Reconciliation consumes the existing authorization budget; it does not create a new authorization.
+
+The store therefore does not claim atomicity between SQLite and an external provider. The safety property is narrower and auditable: authority is durably reserved before dispatch, dispatch intent is durably recorded before provider entry, ambiguous outcomes are preserved rather than guessed, and replay is blocked until authenticated reconciliation. This matches current distributed-systems analysis that a crashed executor cannot infer sink acceptance from its own database alone, and current agent-effect boundary work that requires a durable pre-dispatch state and an explicit indeterminate path. The cited IETF material is an Internet-Draft, not a final standard.
