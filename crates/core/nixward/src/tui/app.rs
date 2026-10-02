@@ -222,9 +222,22 @@ impl App {
                     let wd_path = self
                         .daemon_snapshot_path
                         .with_file_name("watchdog_verdict.txt");
-                    let _ = std::fs::write(&wd_path, "Approved");
-                    self.output
-                        .push("🧠 [Watchdog] Action APPROVED. Sending to daemon...".into());
+                    let verdict = self
+                        .daemon_snapshot
+                        .as_ref()
+                        .and_then(|snapshot| snapshot.pending_action_intent_digest.as_deref())
+                        .map_or_else(
+                            || "Approved".to_string(),
+                            |digest| format!("Approved:{digest}"),
+                        );
+                    let _ = std::fs::write(&wd_path, &verdict);
+                    self.output.push(match verdict.strip_prefix("Approved:") {
+                        Some(digest) => format!(
+                            "🧠 [Watchdog] Action APPROVED. Bound to intent {}. Sending to daemon...",
+                            digest
+                        ),
+                        None => "🧠 [Watchdog] Action APPROVED. Sending to daemon...".into(),
+                    });
                     self.refresh_data();
                     return;
                 }
@@ -232,9 +245,22 @@ impl App {
                     let wd_path = self
                         .daemon_snapshot_path
                         .with_file_name("watchdog_verdict.txt");
-                    let _ = std::fs::write(&wd_path, "Vetoed");
-                    self.output
-                        .push("🧠 [Watchdog] Action VETOED. Notifying daemon...".into());
+                    let verdict = self
+                        .daemon_snapshot
+                        .as_ref()
+                        .and_then(|snapshot| snapshot.pending_action_intent_digest.as_deref())
+                        .map_or_else(
+                            || "Vetoed".to_string(),
+                            |digest| format!("Vetoed:{digest}"),
+                        );
+                    let _ = std::fs::write(&wd_path, &verdict);
+                    self.output.push(match verdict.strip_prefix("Vetoed:") {
+                        Some(digest) => format!(
+                            "🧠 [Watchdog] Action VETOED. Bound to intent {}. Notifying daemon...",
+                            digest
+                        ),
+                        None => "🧠 [Watchdog] Action VETOED. Notifying daemon...".into(),
+                    });
                     self.refresh_data();
                     return;
                 }
@@ -983,9 +1009,16 @@ impl App {
                         .add_modifier(Modifier::BOLD),
                 )
                 .title(" ⚠️ Gated Autonomic Action (Watchdog Veto Required) ");
+            let intent_hint = self
+                .daemon_snapshot
+                .as_ref()
+                .and_then(|snapshot| snapshot.pending_action_intent_digest.as_deref())
+                .map_or(String::new(), |digest| {
+                    format!(" Intent: {}…", &digest[..16.min(digest.len())])
+                });
             let content = format!(
-                " The daemon wants to execute: `{}`. Press [A] to Approve or [V] to Veto.",
-                action
+                " The daemon wants to execute: `{}`.{} Press [A] to Approve or [V] to Veto.",
+                action, intent_hint
             );
             frame.render_widget(
                 Paragraph::new(content).block(banner_block),
