@@ -1390,7 +1390,7 @@ impl DaemonState {
                                     format!(" [intent={intent_digest}]")
                                 );
                                 // If it was an AST configuration patch, apply the configuration change before switching!
-                                if let Some((_, option_path, value)) = &patch_tweak {
+                                if let Some((_, option_path, value, expected_config_digest)) = &patch_tweak {
                                     // Route through ConfigWriter -- both its write
                                     // mechanics (apply_patch: atomicity via temp+
                                     // rename, a git backup so restore_last_backup()
@@ -1411,6 +1411,14 @@ impl DaemonState {
                                         let apply_result = writer
                                             .set_option(option_path, value)
                                             .and_then(|patch| {
+                                                let observed_digest =
+                                                    blake3::hash(patch.original.as_bytes()).to_hex().to_string();
+                                                if &observed_digest != expected_config_digest {
+                                                    return Err(std::io::Error::new(
+                                                        std::io::ErrorKind::StaleData,
+                                                        "approved configuration digest no longer matches current configuration.nix",
+                                                    ));
+                                                }
                                                 let modified = patch.modified.clone();
                                                 writer.apply_patch(&patch)?;
                                                 Ok(modified)
