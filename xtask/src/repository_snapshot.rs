@@ -6,8 +6,8 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Output};
 
-const SNAPSHOT_SCHEMA: &str = "symthaea.repository-source-snapshot.v1";
-const SNAPSHOT_HASH_DOMAIN: &[u8] = b"symthaea.repository-source-snapshot.v1\0";
+const SNAPSHOT_SCHEMA: &str = "symthaea.repository-source-snapshot.v2";
+const SNAPSHOT_HASH_DOMAIN: &[u8] = b"symthaea.repository-source-snapshot.v2\0";
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct RepositorySourceSnapshot {
@@ -177,8 +177,7 @@ pub fn build_snapshot(
     }
 
     for path in untracked {
-        let normalized = normalize_relative_path(Path::new(&path))?;
-        let entry = snapshot_path(
+        let normalized = normalize_relative_path(Path::new(&path))?;        let entry = snapshot_path(
             root,
             &normalized,
             SourceClass::UntrackedNonIgnored,
@@ -357,8 +356,7 @@ fn snapshot_path(
     allow_missing: bool,
 ) -> anyhow::Result<SnapshotEntry> {
     validate_no_symlink_ancestors(root, relative)?;
-    let path = root.join(relative);
-    let metadata = match fs::symlink_metadata(&path) {
+    let path = root.join(relative);    let metadata = match fs::symlink_metadata(&path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound && allow_missing => {
             return Ok(SnapshotEntry {
@@ -507,7 +505,7 @@ fn validate_git_mode(mode: &str) -> anyhow::Result<()> {
 }
 
 fn validate_git_object_id(value: &str) -> anyhow::Result<()> {
-    if value.len() < 40 || value.len() > 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if !matches!(value.len(), 40 | 64) || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         bail!("invalid Git object id: {value}");
     }
     Ok(())
@@ -537,8 +535,7 @@ fn git_bytes(root: &Path, args: &[&str]) -> anyhow::Result<Vec<u8>> {
         .current_dir(root)
         .args(args)
         .output()
-        .with_context(|| format!("run git {}", args.join(" ")))?;
-    if !output.status.success() {
+        .with_context(|| format!("run git {}", args.join(" ")))?;    if !output.status.success() {
         return Err(command_failure(&format!("git {}", args.join(" ")), &output));
     }
     Ok(output.stdout)
