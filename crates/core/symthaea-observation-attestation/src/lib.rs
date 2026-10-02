@@ -2560,6 +2560,36 @@ mod tests {
     }
 
     #[test]
+    fn evidence_evaluation_rejects_mutated_resolution_snapshot() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let method = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([method]);
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
+        let mut evaluation = report.to_evidence_evaluation();
+
+        assert!(evaluation.is_consistent_with_report(&report));
+
+        evaluation.verification_report_fingerprint = {
+            let mut mutated = report.clone();
+            mutated.resolution_snapshot_fingerprint =
+                Some("different-resolution-state".into());
+            mutated.fingerprint()
+        };
+
+        assert!(!evaluation.is_consistent_with_report(&report));
+    }
+
+    #[test]
     fn verification_report_fingerprint_is_deterministic_and_binds_receipt() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let verifier = Ed25519ReceiptVerifier::new(
