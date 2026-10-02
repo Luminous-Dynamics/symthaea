@@ -351,7 +351,7 @@ fn load_receipt(
         "SELECT authorization_instance,action_id,attempt_id,outcome,action_digest,authority_epoch
          FROM authorization_receipts
          WHERE authorization_instance=?1 AND attempt_id=?2 AND phase=?3",
-        params![action_id,attempt_id,phase],
+        params![authorization_instance,attempt_id,phase],
         |r| {
             let outcome = match r.get::<_,String>(3)?.as_str() {
                 "succeeded" => ExecutionOutcome::Succeeded,
