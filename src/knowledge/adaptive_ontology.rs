@@ -74,6 +74,24 @@ impl Default for AdaptiveOntologyConfig {
 
 // ── Adaptive Ontology ──────────────────────────────────────────────────────
 
+/// Result of restoring one persisted ontology record into the bounded ontology.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OntologyRestoreOutcome {
+    /// Whether the persisted record is represented in the restored ontology.
+    pub accepted: bool,
+    /// Number of existing persisted primitives evicted by restore capacity policy.
+    pub policy_evictions: usize,
+    /// Whether the record was rejected solely because the restore retention policy
+    /// preferred the already-retained set.
+    pub rejected_by_policy: bool,
+}
+
+impl OntologyRestoreOutcome {
+    pub fn was_policy_limited(self) -> bool {
+        self.policy_evictions > 0 || self.rejected_by_policy
+    }
+}
+
 /// Manages the growing set of learned primitives
 pub struct AdaptiveOntology {
     /// Configuration
@@ -390,35 +408,50 @@ impl AdaptiveOntology {
     /// it deliberately does not re-run online similarity learning. Two persisted
     /// primitives may be similar while still having distinct stable names.
     ///
-    /// When capacity is reached, the retained set is selected by the same
-    /// utility/name ordering used by online capacity eviction, making restore
-    /// order independent without applying an online Hebbian update.
+    /// Capacity retention uses the same rank exposed by SQLite restore ordering:
+    /// higher utility is retained first; equal utility is resolved by lower name.
+    /// Restore does not mutate online learning/pruning counters.
     pub fn import_ontology_record(&mut self, record: &OntologyRecord) -> bool {
+        self.import_ontology_record_with_outcome(record).accepted
+    }
+
+    /// Restore a persisted ontology record with structured admission telemetry.
+    pub fn import_ontology_record_with_outcome(
+        &mut self,
+        record: &OntologyRecord,
+    ) -> OntologyRestoreOutcome {
         if record.name.trim().is_empty() || record.vector_bytes.len() != BinaryHV::BYTES {
-            return false;
+            return OntologyRestoreOutcome::default();
         }
 
         let mut arr = [0u8; BinaryHV::BYTES];
         arr.copy_from_slice(&record.vector_bytes);
         let vector = BinaryHV(arr);
 
-        if self.primitives.contains_key(&record.name) {
-            if let Some(usage) = self.primitives.get_mut(&record.name) {
-                usage.vector = vector;
-                usage.usage_count = record.usage_count;
-                usage.utility = record.utility;
-                usage.created_at_cycle = record.created_at_cycle;
-                usage.last_used_cycle = record.last_used_cycle;
-                usage.is_a_parent = record.is_a_parent.clone();
-            }
-            return true;
+        if let Some(usage) = self.primitives.get_mut(&record.name) {
+            usage.vector = vector;
+            usage.usage_count = record.usage_count;
+            usage.utility = record.utility;
+            usage.created_at_cycle = record.created_at_cycle;
+            usage.last_used_cycle = record.last_used_cycle;
+            usage.parent_names.clear();
+            usage.is_a_parent = record.is_a_parent.clone();
+            return OntologyRestoreOutcome {
+                accepted: true,
+                ..Default::default()
+            };
         }
 
         if self.config.max_primitives == 0 {
-            return false;
+            return OntologyRestoreOutcome {
+                rejected_by_policy: true,
+                ..Default::default()
+            };
         }
 
         if self.primitives.len() >= self.config.max_primitives {
+            // Worst retained record = lowest utility; equal utility loses by
+            // lexicographically larger name because load_ontology orders names ASC.
             let lowest = self
                 .primitives
                 .iter()
@@ -431,17 +464,40 @@ impl AdaptiveOntology {
                 .map(|(name, usage)| (name.clone(), usage.utility));
 
             let Some((lowest_name, lowest_utility)) = lowest else {
-                return false;
+                return OntologyRestoreOutcome {
+                    rejected_by_policy: true,
+                    ..Default::default()
+                };
             };
 
             let incoming_is_better = record.utility > lowest_utility
                 || (record.utility == lowest_utility && record.name < lowest_name);
             if !incoming_is_better {
-                return false;
+                return OntologyRestoreOutcome {
+                    rejected_by_policy: true,
+                    ..Default::default()
+                };
             }
 
             self.primitives.remove(&lowest_name);
-            self.total_pruned += 1;
+            self.primitives.insert(
+                record.name.clone(),
+                PrimitiveUsage {
+                    name: record.name.clone(),
+                    vector,
+                    usage_count: record.usage_count,
+                    utility: record.utility,
+                    created_at_cycle: record.created_at_cycle,
+                    last_used_cycle: record.last_used_cycle,
+                    parent_names: Vec::new(),
+                    is_a_parent: record.is_a_parent.clone(),
+                },
+            );
+            return OntologyRestoreOutcome {
+                accepted: true,
+                policy_evictions: 1,
+                rejected_by_policy: false,
+            };
         }
 
         self.primitives.insert(
@@ -457,8 +513,10 @@ impl AdaptiveOntology {
                 is_a_parent: record.is_a_parent.clone(),
             },
         );
-        self.total_created += 1;
-        true
+        OntologyRestoreOutcome {
+            accepted: true,
+            ..Default::default()
+        }
     }
 }
 
@@ -563,6 +621,118 @@ mod tests {
             assert_eq!(a.last_used_cycle, b.last_used_cycle);
             assert_eq!(a.is_a_parent, b.is_a_parent);
         }
+    }
+
+    #[test]
+    fn test_restore_does_not_mutate_learning_counters() {
+        let mut ontology = AdaptiveOntology::new(AdaptiveOntologyConfig {
+            max_primitives: 1,
+            ..Default::default()
+        });
+        let vector = BinaryHV::random(42);
+        let low = OntologyRecord {
+            name: "zeta".to_string(),
+            vector_bytes: vector.0.to_vec(),
+            usage_count: 1,
+            utility: 0.1,
+            created_at_cycle: 1,
+            last_used_cycle: 1,
+            is_a_parent: None,
+        };
+        let high = OntologyRecord {
+            name: "alpha".to_string(),
+            vector_bytes: vector.0.to_vec(),
+            usage_count: 9,
+            utility: 0.9,
+            created_at_cycle: 2,
+            last_used_cycle: 2,
+            is_a_parent: Some("animal".to_string()),
+        };
+
+        let first = ontology.import_ontology_record_with_outcome(&low);
+        let second = ontology.import_ontology_record_with_outcome(&high);
+        assert!(first.accepted);
+        assert!(second.accepted);
+        assert_eq!(second.policy_evictions, 1);
+        assert_eq!(ontology.count(), 1);
+        assert!(ontology.primitives().contains_key("alpha"));
+        assert_eq!(ontology.total_created(), 0);
+        assert_eq!(ontology.total_pruned(), 0);
+    }
+
+    #[test]
+    fn test_restore_capacity_rejection_is_policy_limited() {
+        let mut ontology = AdaptiveOntology::new(AdaptiveOntologyConfig {
+            max_primitives: 1,
+            ..Default::default()
+        });
+        let first = OntologyRecord {
+            name: "alpha".to_string(),
+            vector_bytes: BinaryHV::random(1).0.to_vec(),
+            usage_count: 1,
+            utility: 0.9,
+            created_at_cycle: 1,
+            last_used_cycle: 1,
+            is_a_parent: None,
+        };
+        let lower = OntologyRecord {
+            name: "beta".to_string(),
+            vector_bytes: BinaryHV::random(2).0.to_vec(),
+            usage_count: 1,
+            utility: 0.1,
+            created_at_cycle: 2,
+            last_used_cycle: 2,
+            is_a_parent: None,
+        };
+
+        assert!(ontology.import_ontology_record(&first));
+        let outcome = ontology.import_ontology_record_with_outcome(&lower);
+        assert!(!outcome.accepted);
+        assert!(outcome.rejected_by_policy);
+        assert!(outcome.was_policy_limited());
+        assert!(ontology.primitives().contains_key("alpha"));
+    }
+
+    #[test]
+    fn test_restore_equal_utility_retention_is_name_stable() {
+        let vector = BinaryHV::random(7);
+        let alpha = OntologyRecord {
+            name: "alpha".to_string(),
+            vector_bytes: vector.0.to_vec(),
+            usage_count: 2,
+            utility: 0.5,
+            created_at_cycle: 1,
+            last_used_cycle: 1,
+            is_a_parent: None,
+        };
+        let zeta = OntologyRecord {
+            name: "zeta".to_string(),
+            vector_bytes: vector.0.to_vec(),
+            usage_count: 3,
+            utility: 0.5,
+            created_at_cycle: 2,
+            last_used_cycle: 2,
+            is_a_parent: None,
+        };
+
+        let mut forward = AdaptiveOntology::new(AdaptiveOntologyConfig {
+            max_primitives: 1,
+            ..Default::default()
+        });
+        forward.import_ontology_record(&zeta);
+        forward.import_ontology_record(&alpha);
+
+        let mut reverse = AdaptiveOntology::new(AdaptiveOntologyConfig {
+            max_primitives: 1,
+            ..Default::default()
+        });
+        reverse.import_ontology_record(&alpha);
+        reverse.import_ontology_record(&zeta);
+
+        assert_eq!(forward.count(), 1);
+        assert_eq!(reverse.count(), 1);
+        assert!(forward.primitives().contains_key("alpha"));
+        assert!(reverse.primitives().contains_key("alpha"));
     }
 
     #[test]
