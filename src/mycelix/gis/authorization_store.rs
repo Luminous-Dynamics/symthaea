@@ -547,6 +547,107 @@ impl SqliteAuthorizationStore {
     /// Commit an outcome only through the frozen dispatch record. The record
     /// is revalidated immediately before the lease transition so the provider
     /// outcome cannot be attached to a different sink contract.
+    fn validate_verified_terminal_outcome(
+        record: &DurableDispatchRecord,
+        verified: &VerifiedProviderOutcome,
+    ) -> Result<(), AuthorizationStoreError> {
+        let evidence = &verified.evidence;
+        if !matches!(evidence.kind, ProviderEvidenceKind::TerminalOutcome)
+            || matches!(evidence.outcome, ExecutionOutcome::Indeterminate)
+        {
+            return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
+        }
+        if verified.verifier_id.is_empty() || verified.verification_digest.is_empty()
+            || evidence.evidence_id.is_empty() || evidence.evidence_digest.is_empty()
+            || evidence.attempt_id != record.attempt_id
+            || evidence.action_digest != record.action_digest
+            || evidence.provider_idempotency_key != record.provider_idempotency_key
+            || evidence.target_identity != record.target_identity
+            || evidence.audience != record.audience
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        Ok(())
+    }
+
+    /// Commit a terminal provider outcome only after a relying-party configured
+    /// verifier has authenticated and semantically bound the provider evidence
+    /// to this exact frozen dispatch record.
+    pub fn commit_bound_verified<V: ProviderEvidenceVerifier>(
+        &self,
+        record: &DurableDispatchRecord,
+        evidence: &ProviderTerminalEvidence,
+        verifier: &V,
+    ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
+        let verified = verifier
+            .verify_terminal_outcome(record, evidence)
+            .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
+        Self::validate_verified_terminal_outcome(record, &verified)?;
+
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let row = tx.query_row(
+            "SELECT state FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+            params![record.authorization_instance, record.attempt_id, record.boundary_id],
+            |r| r.get::<_, String>(0),
+        ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
+        if !matches!(row.as_str(), "dispatch_pending" | "invoked" | "indeterminate") {
+            if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
+                return Ok(receipt);
+            }
+            return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+        }
+
+        let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
+        if current_boundary != record.boundary_id {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        let mut lease = load_lease(&tx, &record.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
+        if lease.action_id != record.action_id
+            || lease.action_digest != record.action_digest
+            || lease.provider_idempotency_key() != record.provider_idempotency_key
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
+            return Ok(receipt);
+        }
+        if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "indeterminate")? {
+            return Err(AuthorizationConsumptionError::IndeterminateRequiresReconciliation.into());
+        }
+
+        let receipt = lease.commit(&record.attempt_id, evidence.outcome)?;
+        update_lease_with_boundary(&tx, &lease, Some(&record.boundary_id))?;
+        tx.execute(
+            "INSERT OR REPLACE INTO authorization_terminal_evidence
+             (authorization_instance,attempt_id,boundary_id,action_digest,provider_idempotency_key,
+              target_identity,audience,outcome,evidence_id,evidence_digest,verifier_id,verification_digest)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
+            params![
+                record.authorization_instance, record.attempt_id, record.boundary_id,
+                record.action_digest, record.provider_idempotency_key, record.target_identity,
+                record.audience,
+                if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
+                evidence.evidence_id, evidence.evidence_digest, verified.verifier_id,
+                verified.verification_digest,
+            ],
+        )?;
+        insert_receipt_with_boundary(&tx, &receipt, "final", Some(&record.boundary_id))?;
+        tx.execute(
+            "UPDATE authorization_dispatches SET state=?3
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?4
+               AND state IN ('dispatch_pending','invoked','indeterminate')",
+            params![record.authorization_instance, record.attempt_id,
+                if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
+                record.boundary_id],
+        )?;
+        tx.commit()?;
+        Ok(receipt)
+    }
+
     pub fn commit_bound(
         &self, record: &DurableDispatchRecord, outcome: ExecutionOutcome,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
