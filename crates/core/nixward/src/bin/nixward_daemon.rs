@@ -17,6 +17,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nixward::NixParser;
 use nixward::action::authorization::{NixActionIntentV1, NixAuthorizationErrorV1};
+use nixward::action::local_approval::LocalApprovalDecisionKindV1;
+use nixward::action::temporal::UnixMillisV1;
+#[cfg(target_os = "linux")]
+use nixward::action::local_approval_runtime::LocalApprovalRuntimeV1;
 use nixward::action::service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
 use nixward::action::service_manager::ServiceManager;
 use nixward::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
@@ -135,6 +139,15 @@ struct DaemonState {
     pending_action: Option<String>,
     /// Canonical V1 action-intent digest bound to the pending command, when governed.
     pending_action_intent_digest: Option<String>,
+    #[cfg(target_os = "linux")]
+    /// Live local-approval runtime owned by this daemon incarnation.
+    local_approval_runtime: Option<LocalApprovalRuntimeV1>,
+    #[cfg(target_os = "linux")]
+    /// Exact request identifiers presented to the local operator.
+    pending_local_approval: Option<PendingLocalApprovalViewV1>,
+    #[cfg(target_os = "linux")]
+    /// Exact typed intent digest whose V2 approval has been consumed.
+    local_approved_intent_digest: Option<String>,
     /// The currently pending conversational response from Ollama.
     pending_response: Option<String>,
     /// Custom user goal set via natural language input: (goal_description, target_name, expected_value)
@@ -158,6 +171,15 @@ struct AlertTracking {
     first_seen: u64,
     consecutive_cycles: u32,
     prev_predicted_value: f64,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PendingLocalApprovalViewV1 {
+    request_id: String,
+    daemon_incarnation_ref: String,
+    action_intent_digest: String,
+    projection_digest: String,
 }
 
 impl DaemonState {
@@ -222,6 +244,12 @@ impl DaemonState {
             active_healing: config.active_healing,
             pending_action: None,
             pending_action_intent_digest: None,
+            #[cfg(target_os = "linux")]
+            local_approval_runtime: None,
+            #[cfg(target_os = "linux")]
+            pending_local_approval: None,
+            #[cfg(target_os = "linux")]
+            local_approved_intent_digest: None,
             pending_response: None,
             custom_user_goal: None,
             stable_baseline_hv: None,
@@ -811,6 +839,124 @@ impl DaemonState {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    fn poll_local_approval(&mut self) {
+        let Some(runtime) = self.local_approval_runtime.as_ref() else {
+            return;
+        };
+        match runtime.try_accept_and_consume() {
+            Ok(Some(consumed)) => {
+                let digest = consumed.decision_evidence().action_intent_digest.clone();
+                let request_id = consumed.request_id().to_string();
+                let matches_pending = self
+                    .pending_local_approval
+                    .as_ref()
+                    .is_some_and(|pending| {
+                        pending.request_id == request_id
+                            && pending.action_intent_digest == digest
+                            && self.pending_action_intent_digest.as_deref()
+                                == Some(digest.as_str())
+                    });
+                if !matches_pending {
+                    eprintln!(
+                        "nixward-daemon: ignoring local approval for unexpected request {} / intent {}",
+                        request_id, digest
+                    );
+                    return;
+                }
+
+                match consumed.decision_kind() {
+                    LocalApprovalDecisionKindV1::Approved => {
+                        eprintln!(
+                            "nixward-daemon: local V2 approval consumed for intent {} (request {}, projection {}).",
+                            digest,
+                            request_id,
+                            consumed.projection_digest()
+                        );
+                        self.local_approved_intent_digest = Some(digest);
+                    }
+                    LocalApprovalDecisionKindV1::Denied => {
+                        eprintln!(
+                            "nixward-daemon: local V2 veto consumed for intent {} (request {}).",
+                            digest, request_id
+                        );
+                        self.local_approved_intent_digest = None;
+                    }
+                }
+                self.pending_local_approval = None;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                eprintln!("nixward-daemon: local V2 approval poll failed: {error}");
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn poll_local_approval(&mut self) {}
+
+    #[cfg(target_os = "linux")]
+    fn ensure_local_approval_request(
+        &mut self,
+        intent: &NixActionIntentV1,
+        displayed_action: &str,
+    ) -> Result<(), String> {
+        let intent_digest = intent.digest().map_err(|error| error.to_string())?;
+        if self
+            .pending_local_approval
+            .as_ref()
+            .is_some_and(|pending| {
+                pending.action_intent_digest == intent_digest
+                    && self.pending_action.as_deref() == Some(displayed_action)
+            })
+        {
+            return Ok(());
+        }
+
+        if self.local_approval_runtime.is_none() {
+            self.local_approval_runtime = Some(
+                LocalApprovalRuntimeV1::bind_default()
+                    .map_err(|error| format!("cannot bind local approval runtime: {error}"))?,
+            );
+        }
+        let runtime = self
+            .local_approval_runtime
+            .as_ref()
+            .expect("local approval runtime just initialized");
+
+        let created_at = UnixMillisV1::new(now_secs().saturating_mul(1_000));
+        let expires_at = UnixMillisV1::new(created_at.as_u64().saturating_add(60_000));
+        let installed = runtime
+            .create_pending_request(
+                intent,
+                displayed_action,
+                "same-uid-process-v1",
+                created_at,
+                expires_at,
+            )
+            .map_err(|error| format!("cannot create local approval request: {error}"))?;
+        let projection = installed
+            .operator_projection()
+            .map_err(|error| format!("cannot create local approval projection: {error}"))?;
+
+        self.pending_local_approval = Some(PendingLocalApprovalViewV1 {
+            request_id: installed.request_id().to_string(),
+            daemon_incarnation_ref: installed.request().daemon_incarnation_id.clone(),
+            action_intent_digest: installed.request().action_intent_digest.clone(),
+            projection_digest: projection.projection_digest,
+        });
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn ensure_local_approval_request(
+        &mut self,
+        _intent: &NixActionIntentV1,
+        _displayed_action: &str,
+    ) -> Result<(), String> {
+        Err("typed local approval runtime is only implemented on Linux".to_string())
+    }
+
     /// Read the latest watchdog verdict from disk (written by `nixward watch`).
     fn refresh_watchdog_status(&mut self, state_dir: &std::path::Path) {
         let wd_path = state_dir.with_file_name("watchdog_verdict.txt");
@@ -903,6 +1049,7 @@ impl DaemonState {
     ///
     /// Returns `(active_threshold, last_plan_efe)` for TUI observability.
     fn run_active_inference_plans(&mut self, alerts: &[AlertEntry]) -> (f64, Option<f64>) {
+        self.poll_local_approval();
         let now = now_secs();
         let mut candidates = Vec::new();
 
@@ -1139,7 +1286,9 @@ impl DaemonState {
                             // their historical command-string gate until promoted.
                             let is_approved = match intent_digest.as_deref() {
                                 Some(expected_digest) => {
-                                    approved_digest == Some(expected_digest)
+                                    approved_digest.is_none()
+                                        && self.local_approved_intent_digest.as_deref()
+                                            == Some(expected_digest)
                                         && self.pending_action_intent_digest.as_deref()
                                             == Some(expected_digest)
                                 }
@@ -1155,13 +1304,64 @@ impl DaemonState {
                             };
 
                             if !is_approved {
-                                // A stale or malformed digest-bearing token must not
-                                // survive into a later plan with the same command string.
-                                if intent_digest.is_some() && self.watchdog_status.is_some() {
+                                // Typed commands must use the live V2 local-approval
+                                // runtime. Legacy Custom commands retain the historical
+                                // verdict-file gate until independently promoted.
+                                if intent_digest.is_some() {
                                     self.watchdog_status = None;
+                                    self.local_approved_intent_digest = None;
                                 }
                                 self.pending_action = Some(cmd_str.clone());
                                 self.pending_action_intent_digest = intent_digest.clone();
+
+                                if let Some(expected_digest) = intent_digest.as_deref() {
+                                    let intent = match NixActionIntentV1::from_command(
+                                        "nixward:daemon",
+                                        self.prev_snapshot.as_ref().and_then(|snapshot| {
+                                            snapshot
+                                                .generation
+                                                .map(|generation| format!("generation:{generation}"))
+                                        }),
+                                        &cmd,
+                                    ) {
+                                        Ok(intent) => intent,
+                                        Err(error) => {
+                                            eprintln!(
+                                                "nixward-daemon: refusing modifying command that cannot construct governed intent: {error}"
+                                            );
+                                            self.pending_action = None;
+                                            self.pending_action_intent_digest = None;
+                                            self.pending_local_approval = None;
+                                            return (
+                                                dynamic_threshold,
+                                                Some(best_action.expected_free_energy),
+                                            );
+                                        }
+                                    };
+                                    if let Err(error) =
+                                        self.ensure_local_approval_request(&intent, &cmd_str)
+                                    {
+                                        eprintln!(
+                                            "nixward-daemon: refusing typed action because local approval runtime is unavailable: {error}"
+                                        );
+                                        self.pending_action = None;
+                                        self.pending_action_intent_digest = None;
+                                        self.pending_local_approval = None;
+                                        return (
+                                            dynamic_threshold,
+                                            Some(best_action.expected_free_energy),
+                                        );
+                                    }
+                                    debug_assert_eq!(
+                                        intent.digest().ok().as_deref(),
+                                        Some(expected_digest)
+                                    );
+                                } else {
+                                    if self.watchdog_status.is_none() {
+                                        self.pending_local_approval = None;
+                                    }
+                                }
+
                                 eprintln!(
                                     "nixward-daemon: Gating action [safety={safety:?}]. Waiting for watchdog approval: {cmd_str}{}",
                                     intent_digest
@@ -1191,6 +1391,8 @@ impl DaemonState {
                                     );
                                     self.pending_action = Some(cmd_str.clone());
                                     self.pending_action_intent_digest = intent_digest.clone();
+                                    self.pending_local_approval = None;
+                                    self.local_approved_intent_digest = None;
                                     self.watchdog_status = None;
                                     return (
                                         dynamic_threshold,
@@ -1269,6 +1471,11 @@ impl DaemonState {
                                 self.watchdog_status = None;
                                 self.pending_action = None;
                                 self.pending_action_intent_digest = None;
+                                #[cfg(target_os = "linux")]
+                                {
+                                    self.pending_local_approval = None;
+                                    self.local_approved_intent_digest = None;
+                                }
                             }
                         } else {
                             self.pending_action = None;
@@ -1495,6 +1702,42 @@ impl DaemonState {
             causal_learning_rate: self.causal_graph.learning_rate(),
             pending_action: self.pending_action.clone(),
             pending_action_intent_digest: self.pending_action_intent_digest.clone(),
+            pending_approval_request_id: {
+                #[cfg(target_os = "linux")]
+                {
+                    self.pending_local_approval
+                        .as_ref()
+                        .map(|pending| pending.request_id.clone())
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    None
+                }
+            },
+            pending_approval_daemon_incarnation_ref: {
+                #[cfg(target_os = "linux")]
+                {
+                    self.pending_local_approval
+                        .as_ref()
+                        .map(|pending| pending.daemon_incarnation_ref.clone())
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    None
+                }
+            },
+            pending_approval_projection_digest: {
+                #[cfg(target_os = "linux")]
+                {
+                    self.pending_local_approval
+                        .as_ref()
+                        .map(|pending| pending.projection_digest.clone())
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    None
+                }
+            },
             pending_response: self.pending_response.clone(),
         }
     }
