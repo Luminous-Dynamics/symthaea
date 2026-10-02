@@ -154,6 +154,12 @@ pub struct ExecutionReceipt {
     pub action_id: String,
     pub authorization_instance: String,
     pub action_digest: String,
+    /// Stable downstream replay identity for the exact authorized action.
+    ///
+    /// This intentionally excludes the executor attempt ID: retrying or
+    /// replacing an executor must reuse the same provider identity, while a
+    /// freshly issued authorization instance gets a distinct identity.
+    pub provider_idempotency_key: String,
     pub attempt_id: String,
     pub authority_epoch: u64,
     pub outcome: ExecutionOutcome,
@@ -184,6 +190,22 @@ pub struct AuthorizationLease {
 }
 
 impl AuthorizationLease {
+    /// Derive the stable idempotency identity presented to a provider.
+    ///
+    /// The authorization instance is the native replay unit; the canonical
+    /// action digest additionally fences the exact material action/effect.
+    /// Attempt IDs are deliberately excluded so executor retries cannot create
+    /// a fresh downstream effect identity.
+    pub fn provider_idempotency_key(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"symthaea:gis:provider-idempotency:v1\n");
+        hasher.update((self.authorization_instance.len() as u64).to_be_bytes());
+        hasher.update(self.authorization_instance.as_bytes());
+        hasher.update((self.action_digest.len() as u64).to_be_bytes());
+        hasher.update(self.action_digest.as_bytes());
+        format!("sha256:{}", hex::encode(hasher.finalize()))
+    }
+
     pub fn new(
         action_id: impl Into<String>,
         action_digest: impl Into<String>,
@@ -334,6 +356,7 @@ impl AuthorizationLease {
             action_id: self.action_id.clone(),
             authorization_instance: self.authorization_instance.clone(),
             action_digest: self.action_digest.clone(),
+            provider_idempotency_key: self.provider_idempotency_key(),
             attempt_id: attempt_id.to_owned(),
             authority_epoch: self.authority_epoch,
             outcome,
@@ -917,6 +940,40 @@ mod tests {
             lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap().outcome,
             ExecutionOutcome::Succeeded
         );
+    }
+
+    #[test]
+    fn provider_idempotency_identity_is_stable_across_attempts() {
+        let lease = AuthorizationLease::new_with_instance(
+            "approval-1", "action-1", "sha256:action", "sha256:support", "policy-v1", 1, 3,
+        );
+        let first = lease.provider_idempotency_key();
+        let second = lease.provider_idempotency_key();
+        assert_eq!(first, second);
+        assert!(first.starts_with("sha256:"));
+    }
+
+    #[test]
+    fn provider_idempotency_identity_changes_with_authorization_instance() {
+        let old = AuthorizationLease::new_with_instance(
+            "approval-old", "action-1", "sha256:action", "sha256:support", "policy-v1", 1, 1,
+        );
+        let fresh = AuthorizationLease::new_with_instance(
+            "approval-new", "action-1", "sha256:action", "sha256:support", "policy-v1", 1, 1,
+        );
+        assert_ne!(old.provider_idempotency_key(), fresh.provider_idempotency_key());
+    }
+
+    #[test]
+    fn provider_idempotency_identity_does_not_depend_on_attempt_id() {
+        let mut lease = AuthorizationLease::new_with_instance(
+            "approval-1", "action-1", "sha256:action", "sha256:support", "policy-v1", 1, 1,
+        );
+        let key = lease.provider_idempotency_key();
+        lease.state = AuthorizationLeaseState::Prepared { attempt_id: "attempt-a".into() };
+        assert_eq!(lease.provider_idempotency_key(), key);
+        lease.state = AuthorizationLeaseState::DispatchPending { attempt_id: "attempt-b".into() };
+        assert_eq!(lease.provider_idempotency_key(), key);
     }
 
     #[test]
