@@ -76,7 +76,6 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
         })
         .collect();
 
-
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0], (a, b));
 
