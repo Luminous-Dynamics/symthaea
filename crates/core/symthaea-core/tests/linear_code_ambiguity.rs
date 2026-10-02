@@ -1,6 +1,6 @@
 use symthaea_core::hdc::linear_code::{
     BinaryCodeword, RandomLinearCode, basis_rank, recover_direct_sum_bound,
-    recover_independent_bound, solve_linear_combination,
+    recover_independent_bound, recover_linear_bound, solve_linear_combination,
 };
 
 #[test]
@@ -380,18 +380,39 @@ fn minimum_distance_boundary_can_map_one_valid_codeword_to_another() {
 }
 
 #[test]
-fn independent_bound_recovery_rejects_overlapping_factor_bases() {
+fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
     let parent = RandomLinearCode::generate(96, 8, 0x4444);
     let left = RandomLinearCode::from_basis(parent.basis()[..4].to_vec()).expect("left subcode");
     let overlapping =
         RandomLinearCode::from_basis(parent.basis()[2..6].to_vec()).expect("overlapping subcode");
 
-    let left_word = left.encode(&[true, false, true, false]);
-    let overlapping_word = overlapping.encode(&[false, true, true, false]);
-    let target = left_word.bound(&overlapping_word);
+    // The shared generator is intentionally present in both factor bases.
+    // Its observation therefore has at least two valid decompositions:
+    // (shared, 0) and (0, shared). The general theorem permits recovery of
+    // a representative factorization, but does not imply uniqueness.
+    let target = parent.basis()[2].clone();
 
-    // The generic paper theorem permits overlapping codebooks but explicitly
-    // warns that factorization may then be non-unique. This API is deliberately
-    // conservative: it refuses to manufacture a uniqueness claim.
+    let recovered =
+        recover_linear_bound(&target, &[&left, &overlapping]).expect("target is in the union span");
+    assert_eq!(recovered.len(), 2);
+    assert!(left.contains(&recovered[0]));
+    assert!(overlapping.contains(&recovered[1]));
+    assert_eq!(recovered[0].bound(&recovered[1]), target);
+
+    let matches: Vec<_> = left
+        .enumerate()
+        .into_iter()
+        .flat_map(|a| {
+            let target = target.clone();
+            overlapping
+                .enumerate()
+                .into_iter()
+                .filter_map(move |b| (a.bound(&b) == target).then_some((a.clone(), b)))
+        })
+        .collect();
+    assert!(matches.len() > 1);
+
+    // The stricter API intentionally refuses to label this overlapping basis
+    // pair as an independent/direct-sum recovery problem.
     assert!(recover_independent_bound(&target, &[&left, &overlapping]).is_none());
 }
