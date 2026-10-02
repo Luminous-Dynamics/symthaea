@@ -948,7 +948,9 @@ mod tests {
             authority_epoch: 7,
         };
         let mut lease = AuthorizationLease::new("a-lease", action_digest.clone(), "sha256:support", "policy-v1", 7, 1);
-        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
+        lease.&witness, &action, "f1", "attempt-1").unwrap();
+
+        lease.mark_dispatch_pending("attempt-1").unwrap();
         let receipt = lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap();
         assert_eq!(receipt.outcome, ExecutionOutcome::Succeeded);
         assert_eq!(lease.state, AuthorizationLeaseState::Exhausted);
@@ -970,7 +972,9 @@ mod tests {
             issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 1,
         };
         let mut lease = AuthorizationLease::new("a-concurrent", action_digest.clone(), "sha256:support", "policy-v1", 1, 1);
-        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
+        lease.&witness, &action, "f1", "attempt-1").unwrap();
+
+        lease.mark_dispatch_pending("attempt-1").unwrap();
         assert_eq!(
             lease.prepare_for_execution(&witness, &action, "f1", "attempt-2"),
             Err(AuthorizationConsumptionError::NotReady)
@@ -988,7 +992,9 @@ mod tests {
             issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 3,
         };
         let mut lease = AuthorizationLease::new("a-crash", action_digest.clone(), "sha256:support", "policy-v1", 3, 1);
-        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
+        lease.&witness, &action, "f1", "attempt-1").unwrap();
+
+        lease.mark_dispatch_pending("attempt-1").unwrap();
         let receipt = lease.commit("attempt-1", ExecutionOutcome::Indeterminate).unwrap();
         assert_eq!(receipt.outcome, ExecutionOutcome::Indeterminate);
         assert_eq!(
@@ -1020,7 +1026,9 @@ mod tests {
             "approval-2026-10-02-001", action.id.clone(), digest,
             "sha256:support", "policy-v1", 1, 1,
         );
-        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
+        lease.&witness, &action, "f1", "attempt-1").unwrap();
+
+        lease.mark_dispatch_pending("attempt-1").unwrap();
         lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap();
 
         let replay = ActionAuthorizationWitness {
@@ -1053,7 +1061,9 @@ mod tests {
             "approval-old", action.id.clone(), digest.clone(),
             "sha256:support", "policy-v1", 1, 1,
         );
-        old.prepare_for_execution(&witness, &action, "f1", "attempt-old").unwrap();
+        old.&witness, &action, "f1", "attempt-old").unwrap();
+
+        old.mark_dispatch_pending("attempt-old").unwrap();
         old.commit("attempt-old", ExecutionOutcome::Succeeded).unwrap();
 
         let fresh_witness = ActionAuthorizationWitness {
@@ -1147,7 +1157,9 @@ mod tests {
             1,
             1,
         );
-        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
+        lease.&witness, &action, "f1", "attempt-1").unwrap();
+
+        lease.mark_dispatch_pending("attempt-1").unwrap();
 
         assert_eq!(
             lease.revoke(),
@@ -1196,7 +1208,9 @@ mod tests {
             "approval-effect-1", action.id.clone(), digest,
             "sha256:support", "policy-v1", 1, 1,
         );
-        lease.prepare_for_effect_execution(&witness, &action, &effect, "f1", "attempt-1").unwrap();
+        lease.&witness, &action, &effect, "f1", "attempt-1").unwrap();
+
+        lease.mark_dispatch_pending("attempt-1").unwrap();
 
         let wrong_effect = ActionEffectBinding::new("target:payments/ledger-8", "audience:ledger", "adapter:ledger-v2");
         assert_eq!(
