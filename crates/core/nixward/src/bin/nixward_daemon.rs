@@ -1180,7 +1180,7 @@ impl DaemonState {
                         // Try to generate a NixOS configuration AST hardening patch (Proposal 2)
                         let patch_tweak = self.generate_nixos_hardening_patch(&target_name_clone);
 
-                        let (cmd, cmd_str, patch_tweak) = if let Some((
+                        let (cmd, cmd_str, _patch_tweak) = if let Some((
                             tweak,
                             option_path,
                             value,
@@ -1442,67 +1442,7 @@ impl DaemonState {
                                     cmd_str,
                                     format!(" [intent={intent_digest}]")
                                 );
-                                // If it was an AST configuration patch, apply the configuration change before switching!
-                                if let Some((_, option_path, value, expected_config_digest)) = &patch_tweak {
-                                    // Route through ConfigWriter -- both its write
-                                    // mechanics (apply_patch: atomicity via temp+
-                                    // rename, a git backup so restore_last_backup()
-                                    // can undo it, syntax validation before anything
-                                    // touches disk) AND its patch-construction logic
-                                    // (set_option: read the freshest on-disk content
-                                    // and splice in the option, rather than the
-                                    // daemon hand-rolling an equivalent-but-separate
-                                    // rfind('}') insert that could only ever drift
-                                    // out of sync with ConfigWriter's own copy of the
-                                    // same logic). See
-                                    // SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md
-                                    // Phase 2.
-                                    use nixward::action::config_writer::ConfigWriter;
-                                    let path = std::path::Path::new("/etc/nixos/configuration.nix");
-                                    if path.exists() {
-                                        let writer = ConfigWriter::new();
-                                        let apply_result = writer
-                                            .set_option(option_path, value)
-                                            .and_then(|patch| {
-                                                let modified = patch.modified.clone();
-                                                writer.apply_patch_if_current(&patch, expected_config_digest)?;
-                                                Ok(modified)
-                                            });
-                                        // Do NOT proceed to `nixos-rebuild switch` if the
-                                        // config write failed — a partial/unwritten/invalid
-                                        // config would rebuild the wrong system.
-                                        match apply_result {
-                                            Ok(modified) => {
-                                                let local_harden = default_snapshot_path()
-                                                    .with_file_name("symthaea_hardening.nix");
-                                                if let Err(e) =
-                                                    std::fs::write(&local_harden, &modified)
-                                                {
-                                                    eprintln!(
-                                                        "nixward-daemon: warning: failed to write local hardening snapshot ({e})."
-                                                    );
-                                                }
-                                            }
-                                            Err(e) => {
-                                                eprintln!(
-                                                    "nixward-daemon: FAILED to apply /etc/nixos/configuration.nix patch ({e}); aborting rebuild."
-                                                );
-                                                self.watchdog_status = None;
-                                                self.pending_action = None;
-                                                self.pending_action_intent_digest = None;
-                                                #[cfg(target_os = "linux")]
-                                                {
-                                                    self.pending_local_approval = None;
-                                                    self.local_approval_consumed = None;
-                                                }
-                                                return (
-                                                    dynamic_threshold,
-                                                    Some(best_action.expected_free_energy),
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
+
 
                                 // Clear verdict file
                                 let wd_path =
