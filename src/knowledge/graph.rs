@@ -850,7 +850,7 @@ impl EnhancedKnowledgeGraph {
         &mut self,
         record: &super::persistence::FactRecord,
     ) -> FactRestoreOutcome {
-        if record.vector_bytes.len() != 2048
+        if record.vector_bytes.len() != BinaryHV::BYTES
             || record.memory_id.trim().is_empty()
             || !record.confidence.is_finite()
             || !(0.0..=1.0).contains(&record.confidence)
@@ -864,10 +864,10 @@ impl EnhancedKnowledgeGraph {
                 policy_evictions: 0,
             };
         }
-        let mut arr = [0u8; 2048];
+        let mut arr = [0u8; BinaryHV::BYTES];
         arr.copy_from_slice(&record.vector_bytes);
         let encoding = super::encoding::FactEncoding {
-            vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
+            vector: BinaryHV(arr),
             role_vectors: std::collections::HashMap::new(),
             source_text: record.source_text.clone(),
             confidence: record.confidence,
@@ -1422,6 +1422,23 @@ mod tests {
         assert!(outcome.rejected_by_policy);
         assert_eq!(outcome.policy_evictions, 0);
         assert!(graph.is_empty());
+    }
+    #[test]
+    fn test_fact_restore_uses_binary_hv_contract_width() {
+        let mut graph = EnhancedKnowledgeGraph::new(1);
+        let record = super::persistence::FactRecord {
+            memory_id: "dimension-contract".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; BinaryHV::BYTES],
+            source_text: "dimension contract".into(),
+            confidence: 0.9,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        assert!(graph.import_fact_record_with_outcome(&record).accepted);
+        assert_eq!(graph.export_fact_records()[0].vector_bytes.len(), BinaryHV::BYTES);
     }
     #[test]
     fn test_bounded_fact_restore_is_order_invariant() {
