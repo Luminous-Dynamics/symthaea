@@ -133,6 +133,9 @@ impl ActionAuthorizationWitness {
 pub enum AuthorizationLeaseState {
     Ready,
     Prepared { attempt_id: String },
+    /// The durable pre-dispatch fence. No effect sink may be entered until
+    /// this state is durably recorded.
+    DispatchPending { attempt_id: String },
     Indeterminate { attempt_id: String },
     Exhausted,
     Revoked,
@@ -284,6 +287,30 @@ impl AuthorizationLease {
         self.prepare_for_execution(witness, action, current_frame, attempt_id)
     }
 
+    /// Cross the durable effect boundary. The caller must persist this state
+    /// before invoking any external effect sink.
+    pub fn mark_dispatch_pending(
+        &mut self,
+        attempt_id: &str,
+    ) -> Result<(), AuthorizationConsumptionError> {
+        if matches!(
+            &self.state,
+            AuthorizationLeaseState::Prepared { attempt_id: id } if id == attempt_id
+        ) {
+            self.state = AuthorizationLeaseState::DispatchPending {
+                attempt_id: attempt_id.to_owned(),
+            };
+            Ok(())
+        } else if matches!(
+            &self.state,
+            AuthorizationLeaseState::DispatchPending { attempt_id: id } if id == attempt_id
+        ) {
+            Ok(())
+        } else {
+            Err(AuthorizationConsumptionError::AttemptMismatch)
+        }
+    }
+
     pub fn commit(
         &mut self,
         attempt_id: &str,
@@ -291,7 +318,7 @@ impl AuthorizationLease {
     ) -> Result<ExecutionReceipt, AuthorizationConsumptionError> {
         let prepared = matches!(
             &self.state,
-            AuthorizationLeaseState::Prepared { attempt_id: id } if id == attempt_id
+            AuthorizationLeaseState::DispatchPending { attempt_id: id } if id == attempt_id
         );
         if !prepared {
             return if matches!(self.state, AuthorizationLeaseState::Indeterminate { .. }) {
@@ -859,6 +886,51 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn dispatch_pending_is_the_only_effect_entry_state() {
+        let mut action = EpistemicAction::new("dispatch-action", "effect", ActionRisk::Critical);
+        action = action.with_effect_binding(ActionEffectBinding::new("target-a", "prod", "adapter-a"));
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            action_id: action.id.clone(),
+            authorization_instance: "approval-1".into(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(),
+            expires_at: None,
+            authority_epoch: 1,
+        };
+        let mut lease = AuthorizationLease::new_with_instance(
+            "approval-1", action.id.clone(), digest, "sha256:support", "policy-v1", 1, 1,
+        );
+        lease.prepare_for_effect_execution(
+            &witness, &action, action.effect_binding().unwrap(), "frame@1", "attempt-1",
+        ).unwrap();
+        assert!(matches!(lease.state, AuthorizationLeaseState::Prepared { .. }));
+        lease.mark_dispatch_pending("attempt-1").unwrap();
+        assert!(matches!(lease.state, AuthorizationLeaseState::DispatchPending { .. }));
+        assert_eq!(
+            lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap().outcome,
+            ExecutionOutcome::Succeeded
+        );
+    }
+
+    #[test]
+    fn dispatch_pending_wrong_attempt_cannot_cross_effect_boundary() {
+        let mut lease = AuthorizationLease::new_with_instance(
+            "approval-1", "action-1", "sha256:action", "sha256:support", "policy-v1", 1, 1,
+        );
+        lease.state = AuthorizationLeaseState::Prepared { attempt_id: "attempt-1".into() };
+        assert_eq!(
+            lease.mark_dispatch_pending("attempt-2"),
+            Err(AuthorizationConsumptionError::AttemptMismatch)
+        );
+        assert!(matches!(lease.state, AuthorizationLeaseState::Prepared { .. }));
+    }
 
     #[test]
     fn authorization_lease_blocks_replay_and_fresh_witness_reissuance() {
