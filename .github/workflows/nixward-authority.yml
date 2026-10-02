@@ -23,7 +23,6 @@ on:
       - "crates/core/nixward/src/action/plan_executor.rs"
       - "crates/core/nixward/src/bin/nixward_daemon.rs"
       - "crates/core/nixward/Cargo.toml"
-      - "scripts/qualify_nixward_authority.sh"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/nixward-authority.yml"
