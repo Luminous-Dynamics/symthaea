@@ -41,6 +41,36 @@ impl From<AuthorizationConsumptionError> for AuthorizationStoreError {
     fn from(e: AuthorizationConsumptionError) -> Self { Self::Consumption(e) }
 }
 
+/// Relying-party authorization for recovering one exact attempt.
+///
+/// The authority/authentication layer is responsible for validating the issuer
+/// and policy. The durable store enforces only the non-negotiable structural
+/// binding: one authorization instance, one attempt, one boundary, one action
+/// digest, and one authority epoch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryAuthorizationWitness {
+    pub authorization_instance: String,
+    pub attempt_id: String,
+    pub boundary_id: String,
+    pub action_digest: String,
+    pub policy: String,
+    pub authority_epoch: u64,
+    pub issued_at: String,
+}
+
+impl RecoveryAuthorizationWitness {
+    pub fn is_bound_to(&self, lease: &AuthorizationLease) -> bool {
+        !self.authorization_instance.is_empty()
+            && !self.attempt_id.is_empty()
+            && !self.boundary_id.is_empty()
+            && !self.policy.is_empty()
+            && !self.issued_at.is_empty()
+            && self.authorization_instance == lease.authorization_instance
+            && self.action_digest == lease.action_digest
+            && self.authority_epoch == lease.authority_epoch
+    }
+}
+
 /// A durable shared consumption domain. Each operation uses a fresh connection,
 /// allowing independent processes to contend on the same SQLite state machine.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,6 +152,15 @@ impl SqliteAuthorizationStore {
                authority_epoch INTEGER NOT NULL,
                boundary_id TEXT,
                PRIMARY KEY(authorization_instance, attempt_id, phase)
+             );
+             CREATE TABLE IF NOT EXISTS authorization_recovery_markers (
+               authorization_instance TEXT NOT NULL,
+               attempt_id TEXT NOT NULL,
+               boundary_id TEXT NOT NULL,
+               action_digest TEXT NOT NULL,
+               authority_epoch INTEGER NOT NULL,
+               marker TEXT NOT NULL,
+               PRIMARY KEY(authorization_instance, attempt_id, marker)
              );
              CREATE TABLE IF NOT EXISTS authorization_dispatches (
                authorization_instance TEXT NOT NULL,
@@ -568,6 +607,89 @@ impl SqliteAuthorizationStore {
         Ok(receipt)
     }
 
+    /// Recover one exact Prepared attempt that is proven to have stopped
+    /// before DispatchPending.
+    ///
+    /// This is not outcome reconciliation. It atomically marks the attempt as
+    /// not entered, releases its reservation back to Ready, and records the
+    /// explicit not-entered marker. A later dispatch using the old attempt ID
+    /// therefore fails rather than continuing after recovery.
+    pub fn recover_pre_dispatch_attempt(
+        &self,
+        witness: &RecoveryAuthorizationWitness,
+    ) -> Result<bool, AuthorizationStoreError> {
+        if witness.boundary_id.is_empty() || witness.attempt_id.is_empty() {
+            return Err(AuthorizationConsumptionError::PreDispatchRecoveryNotAllowed.into());
+        }
+
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut lease = load_lease(&tx, &witness.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
+
+        if !witness.is_bound_to(&lease) {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        if let Some((boundary_id, action_digest)) = tx
+            .query_row(
+                "SELECT boundary_id,action_digest
+                 FROM authorization_recovery_markers
+                 WHERE authorization_instance=?1 AND attempt_id=?2 AND marker='not_entered'",
+                params![witness.authorization_instance.as_str(), witness.attempt_id.as_str()],
+                |row| Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?)),
+            )
+            .optional()?
+        {
+            if boundary_id == witness.boundary_id && action_digest == witness.action_digest {
+                return Ok(false);
+            }
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        if !matches!(
+            &lease.state,
+            AuthorizationLeaseState::Prepared { attempt_id } if attempt_id == &witness.attempt_id
+        ) {
+            return Err(AuthorizationConsumptionError::PreDispatchRecoveryNotAllowed.into());
+        }
+
+        if dispatch_boundary(&tx, &witness.authorization_instance, &witness.attempt_id)?.is_some() {
+            return Err(AuthorizationConsumptionError::PreDispatchRecoveryNotAllowed.into());
+        }
+
+        let changed = tx.execute(
+            "UPDATE authorization_leases
+             SET state='ready', attempt_id=NULL, boundary_id=NULL
+             WHERE authorization_instance=?1 AND state='prepared'
+               AND attempt_id=?2 AND boundary_id=?3",
+            params![
+                witness.authorization_instance.as_str(),
+                witness.attempt_id.as_str(),
+                witness.boundary_id.as_str()
+            ],
+        )?;
+        if changed != 1 {
+            return Err(AuthorizationConsumptionError::PreDispatchRecoveryNotAllowed.into());
+        }
+
+        tx.execute(
+            "INSERT INTO authorization_recovery_markers
+             (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
+             VALUES (?1,?2,?3,?4,?5,'not_entered')",
+            params![
+                witness.authorization_instance.as_str(),
+                witness.attempt_id.as_str(),
+                witness.boundary_id.as_str(),
+                witness.action_digest.as_str(),
+                witness.authority_epoch as i64
+            ],
+        )?;
+
+        tx.commit()?;
+        Ok(true)
+    }
+
     /// Reconcile an indeterminate effect using its exact frozen dispatch record.
     ///
     /// The durable dispatch record and current lease must name the same boundary
@@ -697,7 +819,7 @@ impl SqliteAuthorizationStore {
                     tx.prepare(
                         "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
                          FROM authorization_leases
-                         WHERE state IN ('prepared','dispatch_pending','invoked')
+                         WHERE state IN ('dispatch_pending','invoked')
                            AND boundary_id=?1 AND attempt_id=?2",
                     )?,
                     vec![
@@ -718,7 +840,7 @@ impl SqliteAuthorizationStore {
                     tx.prepare(
                         "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
                          FROM authorization_leases
-                         WHERE state IN ('prepared','dispatch_pending','invoked')
+                         WHERE state IN ('dispatch_pending','invoked')
                            AND boundary_id IS NULL AND attempt_id=?1",
                     )?,
                     vec![attempt_filter.unwrap().to_owned()],
@@ -727,7 +849,7 @@ impl SqliteAuthorizationStore {
                     tx.prepare(
                         "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
                          FROM authorization_leases
-                         WHERE state IN ('prepared','dispatch_pending','invoked')
+                         WHERE state IN ('dispatch_pending','invoked')
                            AND boundary_id IS NULL",
                     )?,
                     Vec::new(),
@@ -753,7 +875,6 @@ impl SqliteAuthorizationStore {
                 match dispatch_boundary(&tx, instance, attempt_id)? {
                     Some(dispatch_boundary_id) if dispatch_boundary_id == boundary_id => {}
                     Some(_) => return Err(AuthorizationConsumptionError::InvalidBinding.into()),
-                    None if is_pre_dispatch_state(&tx, instance, attempt_id)? => {}
                     None => return Err(AuthorizationConsumptionError::InvalidBinding.into()),
                 }
             }
@@ -1000,22 +1121,6 @@ fn load_lease_boundary(
     )
     .optional()
     .map_err(Into::into)
-}
-
-fn is_pre_dispatch_state(
-    tx: &Transaction<'_>,
-    authorization_instance: &str,
-    attempt_id: &str,
-) -> Result<bool, AuthorizationStoreError> {
-    let state: Option<String> = tx
-        .query_row(
-            "SELECT state FROM authorization_leases
-             WHERE authorization_instance=?1 AND attempt_id=?2",
-            params![authorization_instance, attempt_id],
-            |row| row.get(0),
-        )
-        .optional()?;
-    Ok(matches!(state.as_deref(), Some("prepared")))
 }
 
 fn update_lease(tx: &Transaction<'_>, lease: &AuthorizationLease) -> Result<(), AuthorizationStoreError> {
@@ -1296,6 +1401,53 @@ mod tests {
     }
 
     #[test]
+    fn pre_dispatch_recovery_releases_prepared_attempt_and_records_marker() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-pre-recovery-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new("pre-recovery","intervention",super::super::ActionRisk::Critical);
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(), authorization_instance:"approval-pre-recovery".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:13:00Z".into(), expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-pre-recovery",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-pre","boundary-A"
+        ).unwrap();
+
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt-pre".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest,
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:14:00Z".into(),
+        };
+        assert!(store.recover_pre_dispatch_attempt(&recovery).unwrap());
+        assert!(!store.recover_pre_dispatch_attempt(&recovery).unwrap());
+        assert_eq!(store.recover_incomplete_attempts().unwrap(),0);
+        assert_eq!(store.recover_incomplete_attempts_for_boundary("boundary-A").unwrap(),0);
+
+        let old_attempt=store.mark_dispatch_pending_bound(
+            &witness.authorization_instance,"attempt-pre",&action,
+            &super::super::ActionEffectBinding::new("target-A","prod","adapter-A"),
+            "boundary-A"
+        );
+        assert!(old_attempt.is_err());
+
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-pre-retry","boundary-A"
+        ).unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn boundary_scoped_recovery_cannot_claim_another_boundary() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-recovery-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
@@ -1358,12 +1510,12 @@ mod tests {
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
             action_id:action.id.clone(), authorization_instance:"approval-prepared".into(),
-            action_digest:digest, frame:"frame@1".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
             issued_at:"2026-10-02T20:12:00Z".into(), expires_at:None, authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
-            "approval-prepared",action.id.clone(),action.canonical_action_digest(),
+            "approval-prepared",action.id.clone(),digest.clone(),
             "sha256:support","policy-v1",1,1
         )).unwrap();
         store.prepare_for_execution_bound(
@@ -1377,18 +1529,30 @@ mod tests {
             reopened
                 .recover_incomplete_attempt_for_boundary("boundary-A","attempt-prepared")
                 .unwrap(),
-            1
+            0
         );
+
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt-prepared".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest,
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:12:30Z".into(),
+        };
+        assert!(reopened.recover_pre_dispatch_attempt(&recovery).unwrap());
         assert!(matches!(
-            reopened.prepare_for_execution_bound(
-                &witness,&action,"frame@1","attempt-retry","boundary-A"
+            reopened.mark_dispatch_pending_bound(
+                &witness.authorization_instance,"attempt-prepared",&action,
+                &super::super::ActionEffectBinding::new("target-A","prod","adapter-A"),
+                "boundary-A"
             ),
-            Err(AuthorizationStoreError::Consumption(
-                AuthorizationConsumptionError::IndeterminateRequiresReconciliation
-            ))
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::AttemptMismatch))
         ));
         let _=std::fs::remove_file(path);
     }
+
 
     #[test]
     fn bound_attempt_id_cannot_be_reused_across_boundaries() {
