@@ -293,31 +293,58 @@ impl CausalKnowledgeBridge {
         self.export_edges()
     }
 
-    /// Export persistence metadata without coupling this module to persistence types.
+    /// Export the canonical current-state persistence projection.
     ///
-    /// Strength remains signed for the serialized representation; the bridge itself
-    /// retains magnitude and explicit inhibitory state independently.
+    /// SQLite identifies a causal relation by `(cause, effect)`, so repeated
+    /// observations of the same relation must collapse to one persisted record.
+    /// The latest observation wins, with a deterministic semantic tie-break when
+    /// multiple observations share the same discovery cycle.
     pub fn export_edge_records_with_metadata(
         &self,
     ) -> Vec<(String, String, f32, bool, u64)> {
-        self.edges
-            .iter()
-            .filter(|e| !e.is_negated)
-            .map(|e| {
-                let strength = if e.is_inhibitory {
-                    -e.strength.abs()
+        let mut selected: HashMap<(String, String), &CausalEdge> = HashMap::new();
+
+        for edge in self.edges.iter().filter(|e| !e.is_negated) {
+            let key = (edge.cause.clone(), edge.effect.clone());
+            match selected.get(&key) {
+                None => {
+                    selected.insert(key, edge);
+                }
+                Some(previous) => {
+                    let take_new = edge
+                        .discovered_at_cycle
+                        .cmp(&previous.discovered_at_cycle)
+                        .then_with(|| edge.is_inhibitory.cmp(&previous.is_inhibitory))
+                        .then_with(|| edge.strength.total_cmp(&previous.strength))
+                        .then_with(|| edge.source_text.cmp(&previous.source_text))
+                        .is_gt();
+                    if take_new {
+                        selected.insert(key, edge);
+                    }
+                }
+            }
+        }
+
+        let mut records: Vec<_> = selected
+            .into_iter()
+            .map(|((cause, effect), edge)| {
+                let strength = if edge.is_inhibitory {
+                    -edge.strength.abs()
                 } else {
-                    e.strength.abs()
+                    edge.strength.abs()
                 };
                 (
-                    e.cause.clone(),
-                    e.effect.clone(),
+                    cause,
+                    effect,
                     strength,
-                    e.is_inhibitory,
-                    e.discovered_at_cycle,
+                    edge.is_inhibitory,
+                    edge.discovered_at_cycle,
                 )
             })
-            .collect()
+            .collect();
+
+        records.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        records
     }
 
     /// Update the strength of an existing causal edge based on prediction outcome.
@@ -799,6 +826,40 @@ mod tests {
         assert_eq!(bridge.effects_of("strong").len(), 1);
     }
 
+    #[test]
+    fn test_persistence_projection_collapses_duplicate_endpoints_deterministically() {
+        let mut bridge = CausalKnowledgeBridge::new(100);
+
+        bridge.add_edge(CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.4,
+            is_inhibitory: false,
+            is_negated: false,
+            source_text: "early".into(),
+            discovered_at_cycle: 3,
+        });
+        bridge.add_edge(CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.8,
+            is_inhibitory: true,
+            is_negated: false,
+            source_text: "latest".into(),
+            discovered_at_cycle: 9,
+        });
+
+        assert_eq!(
+            bridge.export_edge_records_with_metadata(),
+            vec![(
+                "policy".to_string(),
+                "growth".to_string(),
+                -0.8,
+                true,
+                9
+            )]
+        );
+    }
     #[test]
     fn test_import_preserves_inhibitory_metadata_and_normalizes_strength() {
         let mut bridge = CausalKnowledgeBridge::new(100);
