@@ -105,6 +105,7 @@ const MAX_REMOTE_PROJECTION_ELEMENTS: usize = 120;
 const MAX_REMOTE_PROJECTION_NESTING: usize = 24;
 const MAX_REMOTE_POLYGON_POINTS: usize = 128;
 const MAX_REMOTE_PATH_DATA_BYTES: usize = 12 * 1024;
+const MAX_REMOTE_NUMERIC_ABS: f32 = 1_000_000.0;
 
 fn write_remote_projection_node(
     buf: &mut String,
@@ -151,7 +152,11 @@ fn write_remote_projection_node(
             let _ = writeln!(buf, "{indent}</g>");
         }
         NodeKind::Circle { cx, cy, r } => {
-            let (cx, cy, r) = (finite(*cx, 0.0), finite(*cy, 0.0), nonnegative(*r));
+            let (cx, cy, r) = (
+                remote_finite(*cx, 0.0),
+                remote_finite(*cy, 0.0),
+                remote_nonnegative(*r),
+            );
             let _ = write!(
                 buf,
                 r#"{indent}<circle cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}""#,
@@ -162,10 +167,10 @@ fn write_remote_projection_node(
         }
         NodeKind::Ellipse { cx, cy, rx, ry } => {
             let (cx, cy, rx, ry) = (
-                finite(*cx, 0.0),
-                finite(*cy, 0.0),
-                nonnegative(*rx),
-                nonnegative(*ry),
+                remote_finite(*cx, 0.0),
+                remote_finite(*cy, 0.0),
+                remote_nonnegative(*rx),
+                remote_nonnegative(*ry),
             );
             let _ = write!(
                 buf,
@@ -177,10 +182,10 @@ fn write_remote_projection_node(
         }
         NodeKind::Line { x1, y1, x2, y2 } => {
             let (x1, y1, x2, y2) = (
-                finite(*x1, 0.0),
-                finite(*y1, 0.0),
-                finite(*x2, 0.0),
-                finite(*y2, 0.0),
+                remote_finite(*x1, 0.0),
+                remote_finite(*y1, 0.0),
+                remote_finite(*x2, 0.0),
+                remote_finite(*y2, 0.0),
             );
             let _ = write!(
                 buf,
@@ -197,7 +202,12 @@ fn write_remote_projection_node(
                 if i > 0 {
                     buf.push(' ');
                 }
-                let _ = write!(buf, "{:.1},{:.1}", finite(*x, 0.0), finite(*y, 0.0));
+                let _ = write!(
+                    buf,
+                    "{:.1},{:.1}",
+                    remote_finite(*x, 0.0),
+                    remote_finite(*y, 0.0),
+                );
             }
             buf.push('"');
             write_remote_transform(buf, node);
@@ -206,11 +216,11 @@ fn write_remote_projection_node(
         }
         NodeKind::Rect { x, y, w, h, rx } => {
             let (x, y, w, h, rx) = (
-                finite(*x, 0.0),
-                finite(*y, 0.0),
-                nonnegative(*w),
-                nonnegative(*h),
-                nonnegative(*rx),
+                remote_finite(*x, 0.0),
+                remote_finite(*y, 0.0),
+                remote_nonnegative(*w),
+                remote_nonnegative(*h),
+                remote_nonnegative(*rx),
             );
             let _ = write!(
                 buf,
@@ -253,11 +263,23 @@ fn write_remote_style_attrs(
         let _ = write!(buf, r#" stroke="{}""#, stroke.to_css());
     }
     if let Some(sw) = style.stroke_width {
-        let _ = write!(buf, r#" stroke-width="{:.2}""#, nonnegative(sw));
+        let _ = write!(buf, r#" stroke-width="{:.2}""#, remote_nonnegative(sw));
     }
     if let Some(opacity) = style.opacity {
         let _ = write!(buf, r#" opacity="{:.2}""#, unit(opacity));
     }
+}
+
+fn remote_finite(value: f32, fallback: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(-MAX_REMOTE_NUMERIC_ABS, MAX_REMOTE_NUMERIC_ABS)
+    } else {
+        fallback
+    }
+}
+
+fn remote_nonnegative(value: f32) -> f32 {
+    remote_finite(value, 0.0).max(0.0)
 }
 
 fn write_remote_transform(buf: &mut String, node: &SceneNode) {
@@ -677,19 +699,28 @@ mod tests {
     }
 
     #[test]
-    fn remote_projection_omits_pathological_transforms() {
-        let root = SceneNode::group(None).with_child(
-            SceneNode::circle(5.0, 5.0, 1.0).with_transform(Transform {
-                translate_x: f32::MAX,
-                translate_y: 0.0,
-                rotate_deg: 0.0,
-                scale: 1.0,
-            }),
-        );
+    fn remote_projection_bounds_pathological_geometry_numbers() {
+        let root = SceneNode::group(None)
+            .with_child(
+                SceneNode::circle(f32::MAX, f32::MIN_POSITIVE, f32::MAX).with_style(Style {
+                    stroke_width: Some(f32::MAX),
+                    ..Style::default()
+                }),
+            )
+            .with_child(SceneNode::line(
+                -f32::MAX,
+                f32::MAX,
+                f32::NEG_INFINITY,
+                f32::INFINITY,
+            ));
 
         let svg = render_svg_for_remote_projection(&root);
-        assert!(!svg.contains("transform="));
-        assert!(svg.contains(r#"cx="5.0""#));
+        assert!(svg.contains(r#"cx="1000000.0""#));
+        assert!(svg.contains(r#"cy="0.0""#) || svg.contains(r#"cy="0.0"#));
+        assert!(svg.contains(r#"r="1000000.0""#));
+        assert!(svg.contains(r#"stroke-width="1000000.00""#));
+        assert!(!svg.contains("NaN"));
+        assert!(!svg.contains("inf"));
     }
 
     #[test]
