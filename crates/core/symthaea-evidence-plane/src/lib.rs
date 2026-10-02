@@ -1329,12 +1329,12 @@ mod tests {
         let mut lineage = lineage_fixture();
         lineage
             .immutable_input_digests
-            .insert("uppercase".into(), "sha256:0011223344556677A".into());
+            .insert("uppercase".into(), "sha256:0011223344556677Aa".into());
         assert!(lineage.validate().is_err());
 
         lineage
             .immutable_input_digests
-            .insert("uppercase".into(), "sha256:0011223344556677".into());
+            .insert("uppercase".into(), "sha256:0011223344556677aa".into());
         assert!(lineage.validate().is_ok());
     }
 
