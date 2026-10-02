@@ -239,6 +239,8 @@ pub struct ReceiptAttestationVerificationReport {
     pub policy_fingerprint: String,
     pub environment_identity: VerifierEnvironmentIdentity,
     pub environment_fingerprint: String,
+    /// Fingerprint of the exact verification procedure executed to produce this report.
+    pub procedure_fingerprint: String,
     /// Fingerprint of the resolver's durable view, when resolution was performed.
     pub resolution_snapshot_fingerprint: Option<String>,
     pub resolved_verification_method: Option<String>,
