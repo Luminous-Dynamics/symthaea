@@ -11,9 +11,7 @@ use std::collections::BTreeMap;
 
 use blake3::Hasher;
 
-use crate::semantic_evidence_history::{
-    HistoryCheckpoint, VERSION as HISTORY_VERSION,
-};
+use crate::semantic_evidence_history::{HistoryCheckpoint, VERSION as HISTORY_VERSION};
 
 pub const ALGORITHM: &str = "BLAKE3-256";
 pub const VERSION: u16 = 1;
@@ -28,11 +26,6 @@ impl HistoryAnchorCommitment {
     }
 }
 
-/// A deterministic observation binding an opaque logical history identity to
-/// one local checkpoint.
-///
-/// history_id is caller-supplied. Replicas must derive it from stable
-/// stream/namespace semantics if they want observations to be comparable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HistoryAnchor {
     history_id: [u8; 32],
@@ -63,7 +56,8 @@ impl HistoryAnchor {
     }
 
     pub fn verify(&self) -> bool {
-        self.commitment == anchor_commitment(self.history_id, self.checkpoint)
+        self.checkpoint.verify()
+            && self.commitment == anchor_commitment(self.history_id, self.checkpoint)
     }
 }
 
@@ -86,11 +80,6 @@ pub enum AnchorObservation {
     AlreadyKnown,
 }
 
-/// Local conflict detector for observed history checkpoints.
-///
-/// The registry keys by (history_id, checkpoint.length). A longer checkpoint
-/// is not treated as a proven extension of a shorter checkpoint: proving that
-/// relationship belongs to a VDS-specific consistency-proof layer.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HistoryAnchorRegistry {
     observations: BTreeMap<([u8; 32], u64), HistoryAnchor>,
@@ -227,6 +216,19 @@ mod tests {
         let second = HistoryAnchor::new(history_id(7), cp);
         assert_eq!(first, second);
         assert!(first.verify());
+    }
+
+    #[test]
+    fn tampered_checkpoint_is_rejected() {
+        let mut checkpoint = checkpoint(1);
+        checkpoint.snapshot = crate::semantic_evidence_history::HistoryEntryCommitment([0; 32]);
+        let mut anchor = HistoryAnchor::new(history_id(1), checkpoint);
+        anchor.commitment = anchor_commitment(anchor.history_id, anchor.checkpoint);
+        let mut registry = HistoryAnchorRegistry::new();
+        assert_eq!(
+            registry.observe(anchor),
+            Err(HistoryAnchorError::CommitmentMismatch)
+        );
     }
 
     #[test]
