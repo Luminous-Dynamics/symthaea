@@ -1664,6 +1664,75 @@ mod tests {
     }
 
     #[test]
+    fn test_manager_bounded_fact_restore_is_order_invariant_and_healthy() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_bounded_fact_restore_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let mut persistence = KnowledgePersistence::new(&db_path);
+            let records = [
+                FactRecord {
+                    memory_id: "alpha".into(),
+                    canonical_identity: None,
+                    provenance_family: None,
+                    vector_bytes: vec![0u8; 2048],
+                    source_text: "alpha".into(),
+                    confidence: 0.8,
+                    domain: None,
+                    cycle: 3,
+                    is_causal: false,
+                },
+                FactRecord {
+                    memory_id: "beta".into(),
+                    canonical_identity: None,
+                    provenance_family: None,
+                    vector_bytes: vec![1u8; 2048],
+                    source_text: "beta".into(),
+                    confidence: 0.7,
+                    domain: None,
+                    cycle: 2,
+                    is_causal: false,
+                },
+                FactRecord {
+                    memory_id: "gamma".into(),
+                    canonical_identity: None,
+                    provenance_family: None,
+                    vector_bytes: vec![2u8; 2048],
+                    source_text: "gamma".into(),
+                    confidence: 0.1,
+                    domain: None,
+                    cycle: 1,
+                    is_causal: false,
+                },
+            ];
+            assert_eq!(persistence.save_facts(&records).unwrap(), 3);
+        }
+
+        let manager = KnowledgeManager::new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            memory_capacity: 2,
+            ..Default::default()
+        });
+        let health = manager.persistence_health();
+        assert!(!health.is_degraded());
+        assert_eq!(health.fact_rejections, 0);
+        assert_eq!(health.fact_restore_evictions, 1);
+        assert_eq!(
+            manager
+                .graph()
+                .all_facts()
+                .map(|fact| fact.memory_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["alpha", "beta"]
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
     fn test_manager_persistence_collapses_repeated_causal_observations() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_manager_repeated_causal_persistence_test_{}",
