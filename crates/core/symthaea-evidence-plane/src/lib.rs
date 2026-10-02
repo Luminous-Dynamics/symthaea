@@ -500,9 +500,13 @@ fn validate_digest(value: &str) -> Result<(), String> {
     let payload = value.split_once(':').map_or(value, |(_, payload)| payload);
     if payload.len() < 16
         || payload.len() % 2 != 0
-        || !payload.bytes().all(|b| b.is_ascii_hexdigit())
+        || !payload
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
     {
-        return Err(format!("invalid digest syntax: {value:?}"));
+        return Err(format!(
+            "invalid or non-canonical digest syntax: {value:?}"
+        ));
     }
     Ok(())
 }
@@ -1318,6 +1322,20 @@ mod tests {
         let mut lineage = lineage_fixture();
         lineage.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
         assert!(lineage.validate().is_err());
+    }
+
+    #[test]
+    fn execution_lineage_validation_rejects_uppercase_digest_payload() {
+        let mut lineage = lineage_fixture();
+        lineage
+            .immutable_input_digests
+            .insert("uppercase".into(), "sha256:0011223344556677A".into());
+        assert!(lineage.validate().is_err());
+
+        lineage
+            .immutable_input_digests
+            .insert("uppercase".into(), "sha256:0011223344556677".into());
+        assert!(lineage.validate().is_ok());
     }
 
     #[test]
