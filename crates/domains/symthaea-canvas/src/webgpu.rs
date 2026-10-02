@@ -741,6 +741,27 @@ mod tests {
     }
 
     #[test]
+    fn canonical_cognitive_scene_uses_gpu_supported_primitives() {
+        let snapshot = crate::CognitiveSnapshot::dormant();
+        let mut engine = crate::AestheticEngine::new();
+        let state = engine.process_frame(
+            &snapshot,
+            crate::FrameContext::from_cycle_count(snapshot.cycle_count),
+        );
+        let scene = crate::build_scene(&state);
+        let gpu = GpuScene::from_scene(&scene);
+        assert!(
+            gpu.skipped_nodes == 0,
+            "canonical cognitive scene emitted unsupported GPU nodes: {}",
+            gpu.skipped_nodes
+        );
+        assert!(
+            gpu.vertex_count() > 0,
+            "canonical cognitive scene must produce visible GPU geometry"
+        );
+    }
+
+    #[test]
     fn pathological_scene_is_bounded() {
         let mut root = SceneNode::group(None);
         for _ in 0..600 {
