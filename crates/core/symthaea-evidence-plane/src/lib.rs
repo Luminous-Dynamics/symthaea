@@ -50,11 +50,11 @@ pub mod seed_plan;
 pub mod task_validator;
 
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Caller-labeled identity for one evidence-bearing run.
 ///
@@ -104,6 +104,367 @@ pub fn config_hash<T: fmt::Debug>(config: &T) -> String {
     format!("{config:?}").hash(&mut hasher);
     format!("{:x}", hasher.finish())
 }
+
+
+/// Canonical execution identity for evidence admission and replay.
+///
+/// This v1 identity contains only computational inputs that can change what
+/// was executed: source snapshot, dependency locks, toolchains, host/target,
+/// Nix identity, feature selection, working directory, exact argv, allow-listed
+/// environment, and immutable input digests.
+///
+/// Run timestamps, generated run IDs, wall-clock outcomes, and other runtime
+/// bookkeeping are intentionally outside this identity. They may belong in an
+/// evidence envelope, but must not silently create a new computational lineage.
+///
+/// Canonical identity of a validated repository source snapshot.
+///
+/// The inner value is private so callers cannot bypass canonicalization. The
+/// serde representation remains a plain string for wire compatibility, while
+/// deserialization and construction normalize hexadecimal to lowercase.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RepositorySourceSnapshotId(String);
+
+impl RepositorySourceSnapshotId {
+    pub const SCHEMA: &'static str = "symthaea.repository-source-snapshot.v2";
+
+    pub fn parse(value: &str) -> Result<Self, String> {
+        if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(format!("invalid repository_source_snapshot_id: {value:?}"));
+        }
+        Ok(Self(value.to_ascii_lowercase()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Serialize for RepositorySourceSnapshotId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for RepositorySourceSnapshotId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::parse(&value).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionLineageV1 {
+    pub source_repository: String,
+    pub source_revision: String,
+    pub source_tree: String,
+    /// Exact identity of the validated repository source subject used for this execution.
+    ///
+    /// This is distinct from Git HEAD/tree metadata: staged, unstaged, deleted,
+    /// and explicitly included ignored source bytes can all belong to the exact source subject.
+    pub repository_source_snapshot_id: RepositorySourceSnapshotId,
+    pub lock_digests: BTreeMap<String, String>,
+    pub toolchain_versions: BTreeMap<String, String>,
+    pub host_target: String,
+    pub nix_identity: String,
+    pub feature_flags: BTreeSet<String>,
+    pub cwd: String,
+    pub argv: Vec<String>,
+    pub allowed_env: BTreeMap<String, String>,
+    pub immutable_input_digests: BTreeMap<String, String>,
+}
+
+impl ExecutionLineageV1 {
+    pub const DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:execution-lineage:v1\n";
+
+    /// Construct a lineage from untrusted named-entry sequences without first
+    /// collapsing them into maps/sets. Duplicate names are rejected before
+    /// canonical collection construction, preventing silent overwrite or
+    /// deduplication at the admission boundary.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_raw_entries(
+        source_repository: String,
+        source_revision: String,
+        source_tree: String,
+        repository_source_snapshot_id: String,
+        lock_digests: Vec<(String, String)>,
+        toolchain_versions: Vec<(String, String)>,
+        host_target: String,
+        nix_identity: String,
+        feature_flags: Vec<String>,
+        cwd: String,
+        argv: Vec<String>,
+        allowed_env: Vec<(String, String)>,
+        immutable_input_digests: Vec<(String, String)>,
+    ) -> Result<Self, String> {
+        let lock_digests = unique_named_map("lock_digests", lock_digests)?;
+        let toolchain_versions = unique_named_map("toolchain_versions", toolchain_versions)?;
+        let allowed_env = unique_named_map("allowed_env", allowed_env)?;
+        let immutable_input_digests =
+            unique_named_map("immutable_input_digests", immutable_input_digests)?;
+        let feature_flags = unique_named_set("feature_flags", feature_flags)?;
+
+        let lineage = Self {
+            source_repository,
+            source_revision,
+            source_tree,
+            repository_source_snapshot_id: RepositorySourceSnapshotId::parse(
+                &repository_source_snapshot_id,
+            )?,
+            lock_digests,
+            toolchain_versions,
+            host_target,
+            nix_identity,
+            feature_flags,
+            cwd,
+            argv,
+            allowed_env,
+            immutable_input_digests,
+        };
+        lineage.validate()?;
+        Ok(lineage)
+    }
+
+    /// Validate semantic identifiers before a lineage is admitted.
+    ///
+    /// Digest values may be bare hexadecimal or explicitly prefixed
+    /// (for example, "sha256:..." or "blake3:..."). Named collections are
+    /// represented by BTreeMaps, so duplicate names cannot survive the typed
+    /// representation; untrusted list inputs should reject duplicates before
+    /// constructing the map.
+    pub fn validate(&self) -> Result<(), String> {
+        for (name, value) in self.lock_digests.iter().chain(self.immutable_input_digests.iter()) {
+            validate_name(name)?;
+            validate_digest(value)?;
+        }
+        for (name, value) in &self.toolchain_versions {
+            validate_name(name)?;
+            if value.trim().is_empty() {
+                return Err(format!("empty toolchain version for {name}"));
+            }
+        }
+        for (name, value) in &self.allowed_env {
+            validate_name(name)?;
+            if value.contains('\0') {
+                return Err(format!("NUL in environment value for {name}"));
+            }
+        }
+        for (name, value) in [
+            ("source_repository", self.source_repository.as_str()),
+            ("source_revision", self.source_revision.as_str()),
+            ("source_tree", self.source_tree.as_str()),
+            ("host_target", self.host_target.as_str()),
+            ("nix_identity", self.nix_identity.as_str()),
+            ("cwd", self.cwd.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                return Err(format!("empty lineage field {name}"));
+            }
+        }
+        if self.repository_source_snapshot_id.as_str()
+            != self.repository_source_snapshot_id.as_str().to_ascii_lowercase()
+        {
+            return Err("repository_source_snapshot_id must be canonical lowercase hex".into());
+        }
+        if self.argv.iter().any(|arg| arg.contains('\0')) {
+            return Err("NUL in argv".into());
+        }
+        Ok(())
+    }
+
+    pub fn digest(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_SEPARATOR);
+        self.write_canonical(&mut hasher);
+        hasher.finalize().to_hex().to_string()
+    }
+
+    fn write_canonical(&self, hasher: &mut blake3::Hasher) {
+        append_str(hasher, "source_repository", &self.source_repository);
+        append_str(hasher, "source_revision", &self.source_revision);
+        append_str(hasher, "source_tree", &self.source_tree);
+        append_str(
+            hasher,
+            "repository_source_snapshot_id",
+            self.repository_source_snapshot_id.as_str(),
+        );
+        append_map(hasher, "lock_digests", &self.lock_digests);
+        append_map(hasher, "toolchain_versions", &self.toolchain_versions);
+        append_str(hasher, "host_target", &self.host_target);
+        append_str(hasher, "nix_identity", &self.nix_identity);
+        append_set(hasher, "feature_flags", &self.feature_flags);
+        append_str(hasher, "cwd", &self.cwd);
+        append_sequence(hasher, "argv", &self.argv);
+        append_map(hasher, "allowed_env", &self.allowed_env);
+        append_map(hasher, "immutable_input_digests", &self.immutable_input_digests);
+    }
+}
+
+fn unique_named_map(
+    field: &str,
+    entries: Vec<(String, String)>,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut map = BTreeMap::new();
+    for (name, value) in entries {
+        validate_name(&name)?;
+        if map.insert(name.clone(), value).is_some() {
+            return Err(format!("duplicate name {name:?} in {field}"));
+        }
+    }
+    Ok(map)
+}
+
+fn unique_named_set(field: &str, entries: Vec<String>) -> Result<BTreeSet<String>, String> {
+    let mut set = BTreeSet::new();
+    for name in entries {
+        validate_name(&name)?;
+        if !set.insert(name.clone()) {
+            return Err(format!("duplicate name {name:?} in {field}"));
+        }
+    }
+    Ok(set)
+}
+
+fn validate_name(name: &str) -> Result<(), String> {
+    if name.trim().is_empty() || name.chars().any(|c| c == '\0' || c.is_control()) {
+        Err(format!("invalid empty/control identifier: {name:?}"))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_digest(value: &str) -> Result<(), String> {
+    let payload = value.split_once(':').map_or(value, |(_, payload)| payload);
+    if payload.len() < 16 || payload.len() % 2 != 0 || !payload.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(format!("invalid digest syntax: {value:?}"));
+    }
+    Ok(())
+}
+
+fn append_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
+    hasher.update(&(bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
+}
+
+fn append_str(hasher: &mut blake3::Hasher, field: &str, value: &str) {
+    append_bytes(hasher, field.as_bytes());
+    append_bytes(hasher, value.as_bytes());
+}
+
+fn append_sequence(hasher: &mut blake3::Hasher, field: &str, values: &[String]) {
+    append_bytes(hasher, field.as_bytes());
+    hasher.update(&(values.len() as u64).to_be_bytes());
+    for value in values {
+        append_bytes(hasher, value.as_bytes());
+    }
+}
+
+fn append_set(hasher: &mut blake3::Hasher, field: &str, values: &BTreeSet<String>) {
+    append_bytes(hasher, field.as_bytes());
+    hasher.update(&(values.len() as u64).to_be_bytes());
+    for value in values {
+        append_bytes(hasher, value.as_bytes());
+    }
+}
+
+fn append_map(hasher: &mut blake3::Hasher, field: &str, values: &BTreeMap<String, String>) {
+    append_bytes(hasher, field.as_bytes());
+    hasher.update(&(values.len() as u64).to_be_bytes());
+    for (key, value) in values {
+        append_bytes(hasher, key.as_bytes());
+        append_bytes(hasher, value.as_bytes());
+    }
+}
+
+/// Admission decision when an execution lineage is compared with a prepared lineage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceLineageDecision {
+    Stable,
+    ReprepareBeforeEvidence,
+    RefuseMixedLineageAfterEvidence,
+}
+
+/// Explicit guard against silently mixing evidence from different executions.
+///
+/// The guard never adopts a drifted lineage automatically. Callers must
+/// deliberately prepare a new lineage before committing any new claim-bearing
+/// evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidenceLineageGuardV1 {
+    prepared_digest: String,
+    evidence_committed: bool,
+}
+
+impl EvidenceLineageGuardV1 {
+    /// Prepare an evidence guard only after validating the lineage.
+    ///
+    /// This is the preferred admission path for untrusted or parser-derived
+    /// lineage values. The infallible `prepare` constructor remains available
+    /// for already-typed, trusted fixtures and compatibility with existing
+    /// callers.
+    pub fn try_prepare(lineage: &ExecutionLineageV1) -> Result<Self, String> {
+        lineage.validate()?;
+        Ok(Self::prepare(lineage))
+    }
+
+    pub fn prepare(lineage: &ExecutionLineageV1) -> Self {
+        Self {
+            prepared_digest: lineage.digest(),
+            evidence_committed: false,
+        }
+    }
+
+    pub fn mark_evidence_committed(&mut self) {
+        self.evidence_committed = true;
+    }
+
+    pub fn prepared_digest(&self) -> &str {
+        &self.prepared_digest
+    }
+
+    pub fn check(&self, current: &ExecutionLineageV1) -> EvidenceLineageDecision {
+        if self.prepared_digest == current.digest() {
+            EvidenceLineageDecision::Stable
+        } else if self.evidence_committed {
+            EvidenceLineageDecision::RefuseMixedLineageAfterEvidence
+        } else {
+            EvidenceLineageDecision::ReprepareBeforeEvidence
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineagePerturbationResult {
+    /// The declared dependency did not change and the lineage stayed stable.
+    InvariantPreserved,
+    /// The declared dependency changed and the lineage changed.
+    ExpectedDependencyChanged,
+    /// An undeclared dependency changed the lineage.
+    UnexpectedCollateralChange,
+    /// A declared dependency changed but the lineage stayed stable.
+    UnexpectedInvariance,
+}
+
+pub fn qualify_lineage_perturbation(
+    before: &ExecutionLineageV1,
+    after: &ExecutionLineageV1,
+    dependency_changed: bool,
+) -> LineagePerturbationResult {
+    let changed = before.digest() != after.digest();
+    match (dependency_changed, changed) {
+        (false, false) => LineagePerturbationResult::InvariantPreserved,
+        (true, true) => LineagePerturbationResult::ExpectedDependencyChanged,
+        (false, true) => LineagePerturbationResult::UnexpectedCollateralChange,
+        (true, false) => LineagePerturbationResult::UnexpectedInvariance,
+    }
+}
+
 
 /// A named bag of measured evidence values.
 ///
@@ -345,6 +706,248 @@ mod tests {
 
     /// Reproduces `TemporalStateMode::HdcLtc`'s requirement: the active
     /// mechanism's predict counter must be positive. A passing case.
+
+    #[test]
+    fn raw_named_entries_reject_duplicate_map_keys_before_canonicalization() {
+        let result = ExecutionLineageV1::from_raw_entries(
+            "repo".into(), "revision".into(), "tree".into(), "a".repeat(64),
+            vec![
+                ("cargo".into(), "sha256:0011223344556677".into()),
+                ("cargo".into(), "sha256:8899aabbccddeeff".into()),
+            ],
+            vec![("rustc".into(), "1.96".into())],
+            "host/target".into(), "nix".into(), vec!["feature".into()],
+            "/work".into(), vec!["cargo".into(), "test".into()],
+            vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
+            vec![("input".into(), "blake3:0011223344556677".into())],
+        );
+        assert!(result.expect_err("duplicate lock name must fail").contains("duplicate name"));
+    }
+
+    #[test]
+    fn raw_named_entries_reject_duplicate_set_members() {
+        let result = ExecutionLineageV1::from_raw_entries(
+            "repo".into(), "revision".into(), "tree".into(), "a".repeat(64),
+            vec![("cargo".into(), "sha256:0011223344556677".into())],
+            vec![("rustc".into(), "1.96".into())],
+            "host/target".into(), "nix".into(), vec!["feature".into(), "feature".into()],
+            "/work".into(), vec!["cargo".into(), "test".into()],
+            vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
+            vec![("input".into(), "blake3:0011223344556677".into())],
+        );
+        assert!(result.expect_err("duplicate feature must fail").contains("duplicate name"));
+    }
+
+    #[test]
+    fn raw_named_entries_validate_before_digest_is_available() {
+        let lineage = ExecutionLineageV1::from_raw_entries(
+            "repo".into(), "revision".into(), "tree".into(), "a".repeat(64),
+            vec![("cargo".into(), "sha256:0011223344556677".into())],
+            vec![("rustc".into(), "1.96".into())],
+            "host/target".into(), "nix".into(), vec!["feature".into()],
+            "/work".into(), vec!["cargo".into(), "test".into()],
+            vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
+            vec![("input".into(), "blake3:0011223344556677".into())],
+        ).expect("valid raw entries");
+        assert_eq!(lineage.lock_digests.get("cargo"), Some(&"sha256:0011223344556677".to_owned()));
+    }
+
+    fn lineage_fixture() -> ExecutionLineageV1 {
+        ExecutionLineageV1 {
+            source_repository: "github.com/Luminous-Dynamics/symthaea".into(),
+            source_revision: "abc123".into(),
+            source_tree: "tree456".into(),
+            repository_source_snapshot_id: RepositorySourceSnapshotId::parse(
+                &"A".repeat(64)
+            ).expect("valid snapshot id"),
+            lock_digests: [("Cargo.lock".into(), "lock789".into())].into_iter().collect(),
+            toolchain_versions: [("rustc".into(), "1.96.0".into())].into_iter().collect(),
+            host_target: "x86_64-unknown-linux-gnu".into(),
+            nix_identity: "nixpkgs:deadbeef".into(),
+            feature_flags: ["default".into()].into_iter().collect(),
+            cwd: "/workspace/symthaea".into(),
+            argv: vec!["cargo".into(), "test".into(), "-p".into(), "symthaea-evidence-plane".into()],
+            allowed_env: [("RUST_BACKTRACE".into(), "0".into())].into_iter().collect(),
+            immutable_input_digests: [("fixture.json".into(), "sha256:1234".into())].into_iter().collect(),
+        }
+    }
+
+    #[test]
+    fn repository_source_snapshot_id_is_canonicalized_to_lowercase() {
+        let id = RepositorySourceSnapshotId::parse(&"AB".repeat(32)).expect("valid snapshot id");
+        assert_eq!(id.as_str(), &"ab".repeat(32));
+        let json = serde_json::to_string(&id).expect("serialize snapshot id");
+        assert_eq!(json, format!("\"{}\"", "ab".repeat(32)));
+    }
+
+    #[test]
+    fn repository_source_snapshot_id_serde_canonicalizes_case() {
+        let upper = format!("\"{}\"", "CD".repeat(32));
+        let id: RepositorySourceSnapshotId =
+            serde_json::from_str(&upper).expect("deserialize snapshot id");
+        assert_eq!(id.as_str(), &"cd".repeat(32));
+    }
+
+    #[test]
+    fn lineage_digest_is_case_canonical_for_snapshot_id() {
+        let mut upper = lineage_fixture();
+        let lower = lineage_fixture();
+        upper.repository_source_snapshot_id =
+            RepositorySourceSnapshotId::parse(&"A".repeat(64)).expect("valid snapshot id");
+        assert_eq!(upper.digest(), lower.digest());
+    }
+
+    #[test]
+    fn execution_lineage_serde_roundtrip_preserves_canonical_snapshot_id() {
+        let lineage = lineage_fixture();
+        let json = serde_json::to_string(&lineage).expect("serialize lineage");
+        let restored: ExecutionLineageV1 =
+            serde_json::from_str(&json).expect("deserialize lineage");
+        assert_eq!(
+            restored.repository_source_snapshot_id.as_str(),
+            "a".repeat(64)
+        );
+        assert_eq!(restored.digest(), lineage.digest());
+    }
+
+    #[test]
+    fn execution_lineage_validation_rejects_invalid_repository_source_snapshot_id() {
+        assert!(RepositorySourceSnapshotId::parse("not-a-sha256").is_err());
+    }
+
+    #[test]
+    fn repository_source_snapshot_identity_changes_lineage_digest() {
+        let base = lineage_fixture();
+        let mut changed = base.clone();
+        changed.repository_source_snapshot_id =
+            RepositorySourceSnapshotId::parse(&"b".repeat(64)).expect("valid snapshot id");
+        assert_ne!(base.digest(), changed.digest());
+    }
+
+    #[test]
+    fn execution_lineage_guard_rejects_invalid_preparation() {
+        let mut lineage = lineage_fixture();
+        lineage.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
+        assert!(EvidenceLineageGuardV1::try_prepare(&lineage).is_err());
+    }
+
+    #[test]
+    fn execution_lineage_guard_requires_reprepare_before_evidence() {
+        let base = lineage_fixture();
+        let mut changed = base.clone();
+        changed.source_revision = "def456".into();
+
+        let guard = EvidenceLineageGuardV1::prepare(&base);
+        assert_eq!(
+            guard.check(&changed),
+            EvidenceLineageDecision::ReprepareBeforeEvidence
+        );
+    }
+
+    #[test]
+    fn execution_lineage_guard_refuses_mixing_after_evidence() {
+        let base = lineage_fixture();
+        let mut changed = base.clone();
+        changed.source_revision = "def456".into();
+
+        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        guard.mark_evidence_committed();
+        assert_eq!(
+            guard.check(&changed),
+            EvidenceLineageDecision::RefuseMixedLineageAfterEvidence
+        );
+    }
+
+    #[test]
+    fn execution_lineage_guard_allows_same_lineage_after_evidence() {
+        let base = lineage_fixture();
+        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        guard.mark_evidence_committed();
+        assert_eq!(
+            guard.check(&base),
+            EvidenceLineageDecision::Stable
+        );
+    }
+
+    #[test]
+    fn execution_lineage_digest_is_insertion_order_independent() {
+        let mut a = lineage_fixture();
+        let mut b = lineage_fixture();
+        a.lock_digests.insert("z".into(), "2".into());
+        a.lock_digests.insert("a".into(), "1".into());
+        b.lock_digests.insert("a".into(), "1".into());
+        b.lock_digests.insert("z".into(), "2".into());
+        assert_eq!(a.digest(), b.digest());
+    }
+
+    #[test]
+    fn execution_lineage_validation_rejects_invalid_digest() {
+        let mut lineage = lineage_fixture();
+        lineage.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
+        assert!(lineage.validate().is_err());
+    }
+
+    #[test]
+    fn execution_lineage_validation_accepts_prefixed_digest() {
+        let lineage = lineage_fixture();
+        assert!(lineage.validate().is_ok());
+        let mut prefixed = lineage.clone();
+        prefixed.immutable_input_digests.insert(
+            "other.bin".into(),
+            "sha256:0123456789abcdef0123456789abcdef".into(),
+        );
+        assert!(prefixed.validate().is_ok());
+    }
+
+    #[test]
+    fn execution_lineage_relevant_changes_change_identity() {
+        let base = lineage_fixture();
+        let mut revision = base.clone();
+        revision.source_revision = "def456".into();
+        let mut lock = base.clone();
+        lock.lock_digests.insert("Cargo.lock".into(), "lock999".into());
+        let mut argv = base.clone();
+        argv.argv.push("--nocapture".into());
+
+        assert_ne!(base.digest(), revision.digest());
+        assert_ne!(base.digest(), lock.digest());
+        assert_ne!(base.digest(), argv.digest());
+    }
+
+    #[test]
+    fn execution_lineage_qualification_distinguishes_all_perturbation_cases() {
+        let base = lineage_fixture();
+        let mut changed = base.clone();
+        changed.source_revision = "def456".into();
+
+        assert_eq!(
+            qualify_lineage_perturbation(&base, &base, false),
+            LineagePerturbationResult::InvariantPreserved
+        );
+        assert_eq!(
+            qualify_lineage_perturbation(&base, &changed, true),
+            LineagePerturbationResult::ExpectedDependencyChanged
+        );
+        assert_eq!(
+            qualify_lineage_perturbation(&base, &changed, false),
+            LineagePerturbationResult::UnexpectedCollateralChange
+        );
+        assert_eq!(
+            qualify_lineage_perturbation(&base, &base, true),
+            LineagePerturbationResult::UnexpectedInvariance
+        );
+    }
+
+    #[test]
+    fn execution_lineage_serde_round_trip_preserves_identity() {
+        let lineage = lineage_fixture();
+        let json = serde_json::to_string(&lineage).expect("serialize lineage");
+        let restored: ExecutionLineageV1 =
+            serde_json::from_str(&json).expect("deserialize lineage");
+        assert_eq!(restored, lineage);
+        assert_eq!(restored.digest(), lineage.digest());
+    }
+
     #[test]
     fn hdc_ltc_style_positive_case_passes() {
         let mut declared = HashMap::new();
