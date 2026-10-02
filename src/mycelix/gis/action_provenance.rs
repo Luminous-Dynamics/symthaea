@@ -60,6 +60,36 @@ pub struct ActionDependency {
     pub kind: ActionDependencyKind,
 }
 
+/// Orthogonal assessment of whether a conclusion is currently usable as support.
+///
+/// ConclusionStatus is lifecycle state only; it must not be treated as a generic
+/// authority or freshness signal. These dimensions remain explicit at the action gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CurrentConclusionSupport {
+    pub lifecycle: super::ignorance_types::ConclusionStatus,
+    pub stale: bool,
+    pub conflicted: bool,
+    pub provenance_complete: bool,
+}
+
+impl CurrentConclusionSupport {
+    pub const fn active() -> Self {
+        Self {
+            lifecycle: super::ignorance_types::ConclusionStatus::Active,
+            stale: false,
+            conflicted: false,
+            provenance_complete: true,
+        }
+    }
+
+    pub const fn is_currently_authoritative(self) -> bool {
+        matches!(self.lifecycle, super::ignorance_types::ConclusionStatus::Active)
+            && !self.stale
+            && !self.conflicted
+            && self.provenance_complete
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDecisionWitness {
     pub frame: String,
@@ -136,7 +166,7 @@ impl EpistemicAction {
         &mut self,
         witness: ActionDecisionWitness,
         current_frame: &str,
-        conclusion_statuses: &std::collections::HashMap<String, super::ignorance_types::ConclusionStatus>,
+        conclusion_support: &std::collections::HashMap<String, CurrentConclusionSupport>,
     ) -> Result<(), ActionStatus> {
         if self.risk.requires_current_support() {
             // The authorization witness must be bound to the frame that is current
@@ -146,8 +176,10 @@ impl EpistemicAction {
                 witness.conclusions.iter().any(|id| id == &dependency.conclusion_id)
             });
             let all_current = self.dependencies.iter().all(|dependency| {
-                conclusion_statuses.get(&dependency.conclusion_id)
-                    == Some(&super::ignorance_types::ConclusionStatus::Active)
+                conclusion_support
+                    .get(&dependency.conclusion_id)
+                    .copied()
+                    .is_some_and(CurrentConclusionSupport::is_currently_authoritative)
             });
 
             if !frame_matches || !dependencies_are_witnessed || !all_current {
@@ -306,7 +338,6 @@ mod tests {
 
     #[test]
     fn current_high_risk_decision_requires_active_prerequisites() {
-        use super::super::ignorance_types::ConclusionStatus;
         let mut action = EpistemicAction::new("a-current", "intervention", ActionRisk::Critical);
         action.dependencies.push(ActionDependency {
             conclusion_id: "c1".into(),
@@ -322,14 +353,19 @@ mod tests {
         };
 
         let mut statuses = std::collections::HashMap::new();
-        statuses.insert("c1".into(), ConclusionStatus::Reopened);
+        statuses.insert("c1".into(), CurrentConclusionSupport {
+            lifecycle: super::super::ignorance_types::ConclusionStatus::Reopened,
+            stale: false,
+            conflicted: false,
+            provenance_complete: true,
+        });
         assert_eq!(
             action.try_record_current_decision(witness.clone(), "f1", &statuses),
             Err(ActionStatus::Deferred)
         );
         assert!(action.historical_decisions.is_empty());
 
-        statuses.insert("c1".into(), ConclusionStatus::Active);
+        statuses.insert("c1".into(), CurrentConclusionSupport::active());
         assert_eq!(action.try_record_current_decision(witness, "f1", &statuses), Ok(()));
         assert_eq!(action.status, ActionStatus::Executed);
         assert_eq!(action.historical_decisions.len(), 1);
@@ -359,6 +395,33 @@ mod tests {
             Err(ActionStatus::Deferred)
         );
         assert!(action.historical_decisions.is_empty());
+    }
+
+
+    #[test]
+    fn current_support_does_not_collapse_staleness_conflict_or_provenance_into_lifecycle() {
+        let mut action = EpistemicAction::new("a-support", "intervention", ActionRisk::Critical);
+        action.dependencies.push(ActionDependency {
+            conclusion_id: "c1".into(),
+            kind: ActionDependencyKind::ConclusionSupport,
+        });
+        let witness = ActionDecisionWitness {
+            frame: "f1".into(),
+            conclusions: vec!["c1".into()],
+            evidence: vec!["e1".into()],
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+        };
+        for support in [
+            CurrentConclusionSupport { lifecycle: super::super::ignorance_types::ConclusionStatus::Active, stale: true, conflicted: false, provenance_complete: true },
+            CurrentConclusionSupport { lifecycle: super::super::ignorance_types::ConclusionStatus::Active, stale: false, conflicted: true, provenance_complete: true },
+            CurrentConclusionSupport { lifecycle: super::super::ignorance_types::ConclusionStatus::Active, stale: false, conflicted: false, provenance_complete: false },
+        ] {
+            let mut statuses = std::collections::HashMap::new();
+            statuses.insert("c1".into(), support);
+            assert_eq!(action.try_record_current_decision(witness.clone(), "f1", &statuses), Err(ActionStatus::Deferred));
+            assert!(action.historical_decisions.is_empty());
+        }
     }
 
     #[test]
