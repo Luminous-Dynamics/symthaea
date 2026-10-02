@@ -232,6 +232,20 @@ impl EvaluationCheck {
             Self::CryptographicProof => report.cryptographic_proof,
         }
     }
+
+    fn stage_mut(self, report: &mut ReceiptAttestationVerificationReport) -> &mut VerificationStage {
+        match self {
+            Self::EnvelopeStructuralValidation => &mut report.structural_validation,
+            Self::ReceiptCommitment => &mut report.receipt_commitment,
+            Self::TemporalValidity => &mut report.temporal_validity,
+            Self::CryptosuiteConformance => &mut report.cryptosuite,
+            Self::VerificationMethodResolution => &mut report.verification_method,
+            Self::VerificationMethodLifecycle => &mut report.lifecycle,
+            Self::ProofPurposeAuthorization => &mut report.proof_purpose_authorization,
+            Self::ProofPolicyConformance => &mut report.proof_policy,
+            Self::CryptographicProof => &mut report.cryptographic_proof,
+        }
+    }
 }
 
 /// Structured stage-by-stage verification evidence. This deliberately does not
@@ -327,14 +341,14 @@ pub struct ReceiptAttestationVerificationReport {
 impl ReceiptAttestationVerificationReport {
     fn failed(
         outcome: ReceiptAttestationVerificationOutcome,
-        stage: fn(ReceiptAttestationVerificationOutcome) -> VerificationStage,
+        failed_check: EvaluationCheck,
         receipt_fingerprint: String,
         resolved_verification_method: Option<String>,
         evaluated_at_unix_ns: i128,
         policy_inputs: VerificationPolicyInputs,
         environment_identity: VerifierEnvironmentIdentity,
     ) -> Self {
-        let failed = stage(outcome);
+        let procedure = EvaluationProcedure::attestation_ed25519();
         let mut report = Self {
             outcome,
             verifier_version: VERIFIER_VERSION,
@@ -342,7 +356,7 @@ impl ReceiptAttestationVerificationReport {
             evaluated_at_unix_ns,
             policy_fingerprint: policy_inputs.fingerprint(),
             environment_fingerprint: environment_identity.fingerprint(),
-            procedure_fingerprint: EvaluationProcedure::attestation_ed25519().fingerprint(),
+            procedure_fingerprint: procedure.fingerprint(),
             policy_inputs,
             environment_identity,
             resolution_snapshot_fingerprint: None,
@@ -358,78 +372,13 @@ impl ReceiptAttestationVerificationReport {
             cryptographic_proof: VerificationStage::NotEvaluated,
         };
 
-        match outcome {
-            ReceiptAttestationVerificationOutcome::InvalidEnvelope => {
-                report.structural_validation = failed;
+        for check in procedure.checks {
+            let stage = check.stage_mut(&mut report);
+            if *check == failed_check {
+                *stage = VerificationStage::Failed(outcome);
+                break;
             }
-            ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch => {
-                report.structural_validation = VerificationStage::Passed;
-                report.receipt_commitment = failed;
-            }
-            ReceiptAttestationVerificationOutcome::NotYetValid
-            | ReceiptAttestationVerificationOutcome::Expired => {
-                report.structural_validation = VerificationStage::Passed;
-                report.receipt_commitment = VerificationStage::Passed;
-                report.temporal_validity = failed;
-            }
-            ReceiptAttestationVerificationOutcome::CryptosuiteMismatch => {
-                report.structural_validation = VerificationStage::Passed;
-                report.receipt_commitment = VerificationStage::Passed;
-                report.temporal_validity = VerificationStage::Passed;
-                report.cryptosuite = failed;
-            }
-            ReceiptAttestationVerificationOutcome::VerificationMethodMismatch
-            | ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable => {
-                report.structural_validation = VerificationStage::Passed;
-                report.receipt_commitment = VerificationStage::Passed;
-                report.temporal_validity = VerificationStage::Passed;
-                report.cryptosuite = VerificationStage::Passed;
-                report.verification_method = failed;
-            }
-            ReceiptAttestationVerificationOutcome::VerificationMethodRevoked
-            | ReceiptAttestationVerificationOutcome::VerificationMethodExpired => {
-                report.structural_validation = VerificationStage::Passed;
-                report.receipt_commitment = VerificationStage::Passed;
-                report.temporal_validity = VerificationStage::Passed;
-                report.cryptosuite = VerificationStage::Passed;
-                report.verification_method = VerificationStage::Passed;
-                report.lifecycle = failed;
-            }
-            ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized => {
-                report.structural_validation = VerificationStage::Passed;
-                report.receipt_commitment = VerificationStage::Passed;
-                report.temporal_validity = VerificationStage::Passed;
-                report.cryptosuite = VerificationStage::Passed;
-                report.verification_method = VerificationStage::Passed;
-                report.lifecycle = VerificationStage::Passed;
-                report.proof_purpose_authorization = failed;
-            }
-            ReceiptAttestationVerificationOutcome::ProofPurposeMismatch
-            | ReceiptAttestationVerificationOutcome::DomainMismatch
-            | ReceiptAttestationVerificationOutcome::ChallengeMismatch => {
-                report.structural_validation = VerificationStage::Passed;
-                report.receipt_commitment = VerificationStage::Passed;
-                report.temporal_validity = VerificationStage::Passed;
-                report.cryptosuite = VerificationStage::Passed;
-                report.verification_method = VerificationStage::Passed;
-                report.lifecycle = VerificationStage::Passed;
-                report.proof_purpose_authorization = VerificationStage::Passed;
-                report.proof_policy = failed;
-            }
-            ReceiptAttestationVerificationOutcome::MissingProof
-            | ReceiptAttestationVerificationOutcome::InvalidProofEncoding
-            | ReceiptAttestationVerificationOutcome::InvalidSignature => {
-                report.structural_validation = VerificationStage::Passed;
-                report.receipt_commitment = VerificationStage::Passed;
-                report.temporal_validity = VerificationStage::Passed;
-                report.cryptosuite = VerificationStage::Passed;
-                report.verification_method = VerificationStage::Passed;
-                report.lifecycle = VerificationStage::Passed;
-                report.proof_purpose_authorization = VerificationStage::Passed;
-                report.proof_policy = VerificationStage::Passed;
-                report.cryptographic_proof = failed;
-            }
-            ReceiptAttestationVerificationOutcome::Verified => {}
+            *stage = VerificationStage::Passed;
         }
         report
     }
@@ -1176,7 +1125,7 @@ impl Ed25519ReceiptVerifier {
         if envelope.validate().is_err() {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::InvalidEnvelope,
-                VerificationStage::Failed,
+                EvaluationCheck::EnvelopeStructuralValidation,
                 receipt.fingerprint(),
                 None,
                     self.now_unix_ns,
@@ -1187,7 +1136,7 @@ impl Ed25519ReceiptVerifier {
         if !envelope.verify_against_receipt(receipt) {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
-                VerificationStage::Failed,
+                EvaluationCheck::ReceiptCommitment,
                 receipt.fingerprint(),
                 None,
                     self.now_unix_ns,
@@ -1199,7 +1148,7 @@ impl Ed25519ReceiptVerifier {
             ReceiptAttestationTemporalStatus::NotYetValid => {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::NotYetValid,
-                    VerificationStage::Failed,
+                    EvaluationCheck::TemporalValidity,
                     receipt.fingerprint(),
                     None,
                     self.now_unix_ns,
@@ -1210,7 +1159,7 @@ impl Ed25519ReceiptVerifier {
             ReceiptAttestationTemporalStatus::Expired => {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::Expired,
-                    VerificationStage::Failed,
+                    EvaluationCheck::TemporalValidity,
                     receipt.fingerprint(),
                     None,
                     self.now_unix_ns,
@@ -1223,7 +1172,7 @@ impl Ed25519ReceiptVerifier {
         if envelope.cryptosuite.as_deref() != Some(CRYPTOSUITE) {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
-                VerificationStage::Failed,
+                EvaluationCheck::CryptosuiteConformance,
                 receipt.fingerprint(),
                 None,
                     self.now_unix_ns,
@@ -1235,7 +1184,7 @@ impl Ed25519ReceiptVerifier {
         let Some(method) = envelope.verification_method.as_deref() else {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
-                VerificationStage::Failed,
+                EvaluationCheck::VerificationMethodResolution,
                 receipt.fingerprint(),
                 None,
                     self.now_unix_ns,
@@ -1248,7 +1197,7 @@ impl Ed25519ReceiptVerifier {
             Err(_) => {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
-                    VerificationStage::Failed,
+                    EvaluationCheck::VerificationMethodResolution,
                     receipt.fingerprint(),
                     Some(method.to_string()),
                     self.now_unix_ns,
@@ -1260,7 +1209,7 @@ impl Ed25519ReceiptVerifier {
         if resolved.verification_method != method {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
-                VerificationStage::Failed,
+                EvaluationCheck::VerificationMethodResolution,
                 receipt.fingerprint(),
                 Some(method.to_string()),
                     self.now_unix_ns,
@@ -1273,7 +1222,7 @@ impl Ed25519ReceiptVerifier {
             VerificationMethodStatus::Revoked => {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
-                    VerificationStage::Failed,
+                    EvaluationCheck::VerificationMethodLifecycle,
                     receipt.fingerprint(),
                     Some(method.to_string()),
                     self.now_unix_ns,
@@ -1284,7 +1233,7 @@ impl Ed25519ReceiptVerifier {
             VerificationMethodStatus::Expired => {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
-                    VerificationStage::Failed,
+                    EvaluationCheck::VerificationMethodLifecycle,
                     receipt.fingerprint(),
                     Some(method.to_string()),
                     self.now_unix_ns,
@@ -1295,7 +1244,7 @@ impl Ed25519ReceiptVerifier {
             VerificationMethodStatus::Unknown => {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
-                    VerificationStage::Failed,
+                    EvaluationCheck::VerificationMethodResolution,
                     receipt.fingerprint(),
                     Some(method.to_string()),
                     self.now_unix_ns,
@@ -1307,7 +1256,7 @@ impl Ed25519ReceiptVerifier {
         if !resolved.is_authorized_for(&envelope.proof_purpose) {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
-                VerificationStage::Failed,
+                EvaluationCheck::ProofPurposeAuthorization,
                 receipt.fingerprint(),
                 Some(method.to_string()),
                     self.now_unix_ns,
@@ -1343,7 +1292,7 @@ impl Ed25519ReceiptVerifier {
         if envelope.validate().is_err() {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::InvalidEnvelope,
-                VerificationStage::Failed,
+                EvaluationCheck::EnvelopeStructuralValidation,
                 fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1354,7 +1303,7 @@ impl Ed25519ReceiptVerifier {
         if !envelope.verify_against_receipt(receipt) {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
-                VerificationStage::Failed,
+                EvaluationCheck::ReceiptCommitment,
                 fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1367,7 +1316,7 @@ impl Ed25519ReceiptVerifier {
             ReceiptAttestationTemporalStatus::NotYetValid => {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::NotYetValid,
-                    VerificationStage::Failed,
+                    EvaluationCheck::TemporalValidity,
                     fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1378,7 +1327,7 @@ impl Ed25519ReceiptVerifier {
             ReceiptAttestationTemporalStatus::Expired => {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::Expired,
-                    VerificationStage::Failed,
+                    EvaluationCheck::TemporalValidity,
                     fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1392,7 +1341,7 @@ impl Ed25519ReceiptVerifier {
         if envelope.cryptosuite.as_deref() != Some(CRYPTOSUITE) {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
-                VerificationStage::Failed,
+                EvaluationCheck::CryptosuiteConformance,
                 fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1403,7 +1352,7 @@ impl Ed25519ReceiptVerifier {
         if envelope.verification_method.as_deref() != Some(verification_method) {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::VerificationMethodMismatch,
-                VerificationStage::Failed,
+                EvaluationCheck::VerificationMethodResolution,
                 fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1415,7 +1364,7 @@ impl Ed25519ReceiptVerifier {
             if envelope.proof_purpose != *expected {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::ProofPurposeMismatch,
-                    VerificationStage::Failed,
+                    EvaluationCheck::ProofPolicyConformance,
                     fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1428,7 +1377,7 @@ impl Ed25519ReceiptVerifier {
             if envelope.domain.as_deref() != Some(expected.as_str()) {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::DomainMismatch,
-                    VerificationStage::Failed,
+                    EvaluationCheck::ProofPolicyConformance,
                     fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1441,7 +1390,7 @@ impl Ed25519ReceiptVerifier {
             if envelope.challenge.as_deref() != Some(expected.as_str()) {
                 return ReceiptAttestationVerificationReport::failed(
                     ReceiptAttestationVerificationOutcome::ChallengeMismatch,
-                    VerificationStage::Failed,
+                    EvaluationCheck::ProofPolicyConformance,
                     fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1454,7 +1403,7 @@ impl Ed25519ReceiptVerifier {
         let Some(proof) = envelope.proof.as_deref() else {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::MissingProof,
-                VerificationStage::Failed,
+                EvaluationCheck::CryptographicProof,
                 fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1465,7 +1414,7 @@ impl Ed25519ReceiptVerifier {
         let Ok(proof_bytes) = <[u8; 64]>::try_from(proof) else {
             return ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::InvalidProofEncoding,
-                VerificationStage::Failed,
+                EvaluationCheck::CryptographicProof,
                 fingerprint,
                 method,
                 self.now_unix_ns,
@@ -1485,7 +1434,7 @@ impl Ed25519ReceiptVerifier {
             ),
             Err(_) => ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::InvalidSignature,
-                VerificationStage::Failed,
+                EvaluationCheck::CryptographicProof,
                 fingerprint,
                 method,
                 self.now_unix_ns,
