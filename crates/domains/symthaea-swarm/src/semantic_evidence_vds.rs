@@ -544,6 +544,9 @@ impl Rfc9942ReceiptEnvelope {
                 unprotected_extensions.push(reader.bytes[entry_start..reader.offset].to_vec());
             }
         }
+        if unprotected_labels.iter().any(|label| protected_labels.contains(label)) {
+            return Err(Rfc9942VdpError::InvalidStructure);
+        }
         let vdp=vdp.ok_or(Rfc9942VdpError::InvalidStructure)?;
         let payload=match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)?{
             2=>{let raw=reader.read_bstr_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;Rfc9942ReceiptPayload::from_bytes(Some(&raw))?}
@@ -906,6 +909,12 @@ impl Rfc9942SignatureWithReceipts {
                     .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                 unprotected_extensions.push(reader.bytes[start..reader.offset].to_vec());
             }
+        }
+
+        // RFC 9052 recommends rejecting a header label that appears in both
+        // protected and unprotected buckets rather than relying on precedence.
+        if unprotected_labels.iter().any(|label| protected_labels.contains(label)) {
+            return Err(Rfc9942VdpError::InvalidStructure);
         }
 
         let payload = match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
@@ -2366,6 +2375,60 @@ mod tests {
         let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xBB;64]).unwrap();
         let decoded=Rfc9942ReceiptEnvelope::from_cbor(&receipt.to_cbor()).unwrap();
         assert_eq!(decoded.payload(),&Rfc9942ReceiptPayload::Detached);
+    }
+
+    #[test]
+    fn rfc9942_receipt_rejects_same_header_in_both_buckets() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0;1]).unwrap();
+        let protected=receipt.protected_header_bytes();
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG); cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,2);
+        cbor_int(&mut bytes,RFC9942_VDP_HEADER_LABEL); bytes.extend_from_slice(&receipt.vdp().to_cbor());
+        cbor_int(&mut bytes,COSE_ALG_HEADER_LABEL); cbor_int(&mut bytes,-7);
+        bytes.push(0xf6); cbor_bytes(&mut bytes,&[0;1]);
+        assert_eq!(Rfc9942ReceiptEnvelope::from_cbor(&bytes),Err(Rfc9942VdpError::InvalidStructure));
+    }
+
+    #[test]
+    fn rfc9942_outer_rejects_generic_header_label_in_both_buckets() {
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,1);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL); cbor_int(&mut protected,-7);
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG); cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,1);
+        cbor_int(&mut bytes,COSE_ALG_HEADER_LABEL); cbor_int(&mut bytes,-7);
+        bytes.push(0xf6); cbor_bytes(&mut bytes,&[0;64]);
+
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&bytes),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+    }
+
+    #[test]
+    fn rfc9942_outer_rejects_same_header_in_both_buckets() {
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,1);
+        cbor_int(&mut protected,RFC9942_RECEIPTS_HEADER_LABEL);
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0;1]).unwrap();
+        let collection=Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
+        protected.extend_from_slice(&collection.to_cbor());
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG); cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,1);
+        cbor_int(&mut bytes,RFC9942_RECEIPTS_HEADER_LABEL); bytes.extend_from_slice(&collection.to_cbor());
+        bytes.push(0xf6); cbor_bytes(&mut bytes,&[0;1]);
+        assert_eq!(Rfc9942SignatureWithReceipts::from_cbor(&bytes),Err(Rfc9942VdpError::InvalidStructure));
     }
 
     #[test]
