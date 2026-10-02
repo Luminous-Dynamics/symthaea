@@ -583,7 +583,7 @@ impl ReceiptAttestationVerificationReport {
 pub const VERIFICATION_CONTEXT_VERSION: &str =
     "symthaea-observation-verification-context-v2";
 pub const EVIDENCE_EVALUATION_VERSION: &str =
-    "symthaea-observation-evaluation-v4";
+    "symthaea-observation-evaluation-v5";
 pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
     "receipt-attestation-verification";
 
@@ -865,17 +865,9 @@ pub struct EvidenceEvaluation {
     /// Immutable execution trace; this is the authoritative record of checks that ran.
     pub execution_trace: EvaluationTrace,
     pub verification_report_fingerprint: String,
+    /// Compatibility summary of the evaluation outcome. Detailed execution evidence
+    /// lives exclusively in `execution_trace`.
     pub outcome: ReceiptAttestationVerificationOutcome,
-    pub structural_validation: VerificationStage,
-    pub receipt_commitment: VerificationStage,
-    pub temporal_validity: VerificationStage,
-    pub cryptosuite: VerificationStage,
-    pub verification_method: VerificationStage,
-    pub lifecycle: VerificationStage,
-    pub proof_purpose_authorization: VerificationStage,
-    pub proof_policy: VerificationStage,
-    pub cryptographic_proof: VerificationStage,
-    pub limitations: Vec<EvaluationLimitation>,
     pub boundary: EvaluationBoundary,
 }
 
@@ -892,21 +884,6 @@ impl EvidenceEvaluation {
             execution_trace,
             verification_report_fingerprint: report.fingerprint(),
             outcome: report.outcome,
-            structural_validation: report.structural_validation,
-            receipt_commitment: report.receipt_commitment,
-            temporal_validity: report.temporal_validity,
-            cryptosuite: report.cryptosuite,
-            verification_method: report.verification_method,
-            lifecycle: report.lifecycle,
-            proof_purpose_authorization: report.proof_purpose_authorization,
-            proof_policy: report.proof_policy,
-            cryptographic_proof: report.cryptographic_proof,
-            limitations: vec![
-                EvaluationLimitation::UnderlyingObservationTruthNotEvaluated,
-                EvaluationLimitation::SemanticValidityNotEvaluated,
-                EvaluationLimitation::ExternalWorldStateNotEvaluated,
-                EvaluationLimitation::AttesterIntentNotEvaluated,
-            ],
             boundary: EvaluationBoundary::from_report(report),
         }
     }
@@ -950,7 +927,7 @@ impl EvidenceEvaluation {
             }
         }
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v4\n");
+        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v5\n");
         write_string(&mut bytes, self.evaluation_version);
         write_string(&mut bytes, &self.subject_fingerprint);
         write_string(&mut bytes, self.evaluation_type);
@@ -960,29 +937,16 @@ impl EvidenceEvaluation {
         bytes.extend_from_slice(&trace_bytes);
         write_string(&mut bytes, &self.verification_report_fingerprint);
         bytes.push(verification_outcome_tag(self.outcome));
-        write_stage(&mut bytes, self.structural_validation);
-        write_stage(&mut bytes, self.receipt_commitment);
-        write_stage(&mut bytes, self.temporal_validity);
-        write_stage(&mut bytes, self.cryptosuite);
-        write_stage(&mut bytes, self.verification_method);
-        write_stage(&mut bytes, self.lifecycle);
-        write_stage(&mut bytes, self.proof_purpose_authorization);
-        write_stage(&mut bytes, self.proof_policy);
-        write_stage(&mut bytes, self.cryptographic_proof);
-        let mut limitations = self.limitations.clone();
-        limitations.sort_by_key(|v| evaluation_limitation_tag(*v));
-        limitations.dedup();
-        bytes.extend_from_slice(&(limitations.len() as u64).to_be_bytes());
-        for limitation in limitations {
-            bytes.push(evaluation_limitation_tag(limitation));
-        }
+        let trace_bytes = self.execution_trace.canonical_bytes();
+        bytes.extend_from_slice(&(trace_bytes.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(&trace_bytes);
         bytes.extend_from_slice(&self.boundary.canonical_bytes());
         bytes
     }
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:evidence-evaluation:v4\n");
+        hasher.update(b"symthaea:evidence-evaluation:v5\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -2124,8 +2088,11 @@ mod tests {
         assert_eq!(evaluation.subject_fingerprint, receipt.fingerprint());
         assert_eq!(evaluation.context_fingerprint, evaluation.context.fingerprint());
         assert_eq!(evaluation.verification_report_fingerprint, report.fingerprint());
-        assert!(evaluation.limitations.contains(&EvaluationLimitation::UnderlyingObservationTruthNotEvaluated));
-        assert!(evaluation.limitations.contains(&EvaluationLimitation::SemanticValidityNotEvaluated));
+        assert!(evaluation.execution_trace.is_well_formed());
+        assert!(evaluation
+            .boundary
+            .not_established
+            .contains(&EvaluationClaim::UnderlyingObservationTruth));
     }
 
     #[test]
@@ -2149,7 +2116,7 @@ mod tests {
     }
 
     #[test]
-    fn evidence_evaluation_uses_v4_fingerprint_domain() {
+    fn evidence_evaluation_uses_v5_fingerprint_domain() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
@@ -2161,6 +2128,25 @@ mod tests {
         assert!(evaluation
             .canonical_bytes()
             .starts_with(b"symthaea:evidence-evaluation:v4\n"));
+    }
+
+    #[test]
+    fn evidence_evaluation_has_single_source_of_stage_results() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+
+        assert!(evaluation.execution_trace.is_well_formed());
+        assert_eq!(
+            evaluation.execution_trace.results.last().map(|result| result.stage),
+            Some(VerificationStage::Passed)
+        );
+        assert!(evaluation.boundary.established.contains(&EvaluationClaim::CryptographicProofValidity));
     }
 
     #[test]
