@@ -296,21 +296,29 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
 }
 
 fn collect_first_gradient_colors(root: &SceneNode) -> std::collections::HashMap<&str, Color> {
-    fn visit<'a>(node: &'a SceneNode, colors: &mut std::collections::HashMap<&'a str, Color>) {
+    let mut colors = std::collections::HashMap::new();
+    let mut stack = vec![(root, 0usize)];
+    let mut visited = 0usize;
+
+    while let Some((node, depth)) = stack.pop() {
+        if depth > MAX_SCENE_DEPTH || visited >= MAX_SCENE_NODES {
+            break;
+        }
+        visited += 1;
         if let NodeKind::RadialGradient { id, stops } = &node.kind {
             if let Some(stop) = stops.first() {
                 colors.entry(id.as_str()).or_insert(stop.color);
             }
         }
-        for child in &node.children {
-            visit(child, colors);
+        for child in node.children.iter().rev() {
+            if visited.saturating_add(stack.len()) >= MAX_SCENE_NODES {
+                break;
+            }
+            stack.push((child, depth + 1));
         }
     }
-    let mut colors = std::collections::HashMap::new();
-    visit(root, &mut colors);
     colors
 }
-
 fn wire_to_scene_node(node: &WireNode) -> SceneNode {
     let transform = Transform {
         translate_x: node.transform.translate_x,
