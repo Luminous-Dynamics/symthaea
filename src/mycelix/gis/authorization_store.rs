@@ -114,19 +114,12 @@ pub struct ProviderTerminalEvidence {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedProviderOutcome {
     pub evidence: ProviderTerminalEvidence,
-    /// Relying-party-pinned verifier configuration.
+    /// Relying-party-pinned verifier implementation, trust anchors, and evidence profile.
     pub configuration: ProviderVerifierConfiguration,
-    /// Relying-party configured verifier identity/revision.
-    pub verifier_id: String,
-    /// Digest of the pinned verifier implementation/profile configuration.
-    pub verifier_config_digest: String,
-    /// Digest/identifier of the configured trust-anchor set.
-    pub trust_anchor_digest: String,
-    /// Digest/identifier of the configured evidence schema/profile.
-    pub evidence_profile_digest: String,
     /// Digest of the verifier's authenticated verification statement.
     pub verification_digest: String,
 }
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderVerificationError {
