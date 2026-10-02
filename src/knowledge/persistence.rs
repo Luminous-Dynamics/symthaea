@@ -180,6 +180,20 @@ pub struct KnowledgeSnapshotValidationReceipt {
 }
 
 impl KnowledgeSnapshotValidationReceipt {
+    fn canonical_digest_hex(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.epf-011.snapshot-validation-receipt.v1");
+        digest_str(&mut hasher, &self.validation_event);
+        digest_u64(&mut hasher, self.generation);
+        digest_str(&mut hasher, &self.snapshot_digest_hex);
+        digest_str(&mut hasher, &self.validator_ref);
+        digest_str(&mut hasher, &self.validator_version);
+        digest_str(&mut hasher, &self.validation_profile);
+        digest_bool(&mut hasher, self.conforms);
+        digest_opt_str(&mut hasher, self.report_digest_hex.as_deref());
+        hasher.finalize().to_hex().to_string()
+    }
+
     fn validate_input(&self) -> Result<(), String> {
         if self.validation_event.trim().is_empty() {
             return Err("Snapshot validation event must be non-empty".into());
@@ -908,8 +922,8 @@ impl KnowledgePersistence {
         tx.execute(
             "INSERT INTO knowledge_snapshot_validation_receipts
              (validation_event, generation, snapshot_digest_hex, validator_ref,
-              validator_version, validation_profile, conforms, report_digest_hex)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+              validator_version, validation_profile, conforms, report_digest_hex, receipt_digest_hex)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             rusqlite::params![
                 validation.validation_event,
                 i64::try_from(validation.generation)
@@ -920,12 +934,80 @@ impl KnowledgePersistence {
                 validation.validation_profile,
                 validation.conforms,
                 validation.report_digest_hex,
+                validation.canonical_digest_hex(),
             ],
         )
         .map_err(|e| format!("Persist snapshot validation receipt: {e}"))?;
 
         tx.commit()
             .map_err(|e| format!("Commit snapshot validation receipt: {e}"))?;
+        Ok(())
+    }
+
+    /// Verify the self-digest of every persisted validation receipt.
+    ///
+    /// This detects accidental/corrupt mutation of validation-event fields. It is
+    /// tamper-evidence only: without a separate authenticated key, it does not prove
+    /// who made the mutation or establish validator authenticity.
+    pub fn verify_snapshot_validation_receipts(&mut self) -> Result<(), String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT validation_event, generation, snapshot_digest_hex, validator_ref,
+                        validator_version, validation_profile, conforms, report_digest_hex,
+                        receipt_digest_hex
+                 FROM knowledge_snapshot_validation_receipts
+                 ORDER BY rowid ASC",
+            )
+            .map_err(|e| format!("Prepare validation receipt verification: {e}"))?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                let generation = u64::try_from(row.get::<_, i64>(1)?).map_err(|_| {
+                    rusqlite::Error::InvalidColumnType(
+                        1,
+                        "generation".into(),
+                        rusqlite::types::Type::Integer,
+                    )
+                })?;
+                Ok((
+                    KnowledgeSnapshotValidationReceipt {
+                        validation_event: row.get(0)?,
+                        generation,
+                        snapshot_digest_hex: row.get(2)?,
+                        validator_ref: row.get(3)?,
+                        validator_version: row.get(4)?,
+                        validation_profile: row.get(5)?,
+                        conforms: row.get(6)?,
+                        report_digest_hex: row.get(7)?,
+                    },
+                    row.get::<_, Option<String>>(8)?,
+                ))
+            })
+            .map_err(|e| format!("Query validation receipts for verification: {e}"))?;
+
+        for row in rows {
+            let (receipt, stored_digest) =
+                row.map_err(|e| format!("Load validation receipt for verification: {e}"))?;
+            let Some(stored_digest) = stored_digest else {
+                return Err(format!(
+                    "Snapshot validation receipt missing self-digest: {}",
+                    receipt.validation_event
+                ));
+            };
+            let expected = receipt.canonical_digest_hex();
+            if stored_digest != expected {
+                return Err(format!(
+                    "Snapshot validation receipt self-digest mismatch: {}",
+                    receipt.validation_event
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -1398,6 +1480,7 @@ impl KnowledgePersistence {
                 validation_profile TEXT NOT NULL,
                 conforms INTEGER NOT NULL CHECK (conforms IN (0, 1)),
                 report_digest_hex TEXT,
+                receipt_digest_hex TEXT NOT NULL CHECK (length(receipt_digest_hex) = 64),
                 FOREIGN KEY (generation) REFERENCES knowledge_snapshot_receipts(generation)
             );
             CREATE INDEX IF NOT EXISTS idx_snapshot_validation_receipts_generation
@@ -1422,6 +1505,71 @@ impl KnowledgePersistence {
                 conn.execute(&format!("ALTER TABLE knowledge_facts ADD COLUMN {name} {ty}"), [])
                     .map_err(|e| format!("Schema migration {name}: {e}"))?;
             }
+        }
+
+        // Add validation-receipt self-digest support to databases created by the
+        // earlier validation-ledger tranche, then deterministically backfill legacy rows.
+        let validation_columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(knowledge_snapshot_validation_receipts)")
+            .map_err(|e| format!("Validation schema inspect: {e}"))?
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(|e| format!("Validation schema inspect query: {e}"))?
+            .filter_map(Result::ok)
+            .collect();
+        if !validation_columns.iter().any(|c| c == "receipt_digest_hex") {
+            conn.execute(
+                "ALTER TABLE knowledge_snapshot_validation_receipts
+                 ADD COLUMN receipt_digest_hex TEXT",
+                [],
+            )
+            .map_err(|e| format!("Validation schema migration receipt_digest_hex: {e}"))?;
+        }
+
+        let legacy_validation_rows = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT rowid, validation_event, generation, snapshot_digest_hex,
+                            validator_ref, validator_version, validation_profile,
+                            conforms, report_digest_hex
+                     FROM knowledge_snapshot_validation_receipts
+                     WHERE receipt_digest_hex IS NULL
+                     ORDER BY rowid ASC",
+                )
+                .map_err(|e| format!("Validation receipt backfill prepare: {e}"))?;
+            stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    KnowledgeSnapshotValidationReceipt {
+                        validation_event: row.get(1)?,
+                        generation: u64::try_from(row.get::<_, i64>(2)?).map_err(|_| {
+                            rusqlite::Error::InvalidColumnType(
+                                2,
+                                "generation".into(),
+                                rusqlite::types::Type::Integer,
+                            )
+                        })?,
+                        snapshot_digest_hex: row.get(3)?,
+                        validator_ref: row.get(4)?,
+                        validator_version: row.get(5)?,
+                        validation_profile: row.get(6)?,
+                        conforms: row.get(7)?,
+                        report_digest_hex: row.get(8)?,
+                    },
+                ))
+            })
+            .map_err(|e| format!("Validation receipt backfill query: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Validation receipt backfill row: {e}"))?
+        };
+
+        for (rowid, receipt) in legacy_validation_rows {
+            conn.execute(
+                "UPDATE knowledge_snapshot_validation_receipts
+                 SET receipt_digest_hex = ?1
+                 WHERE rowid = ?2",
+                rusqlite::params![receipt.canonical_digest_hex(), rowid],
+            )
+            .map_err(|e| format!("Validation receipt backfill update: {e}"))?;
         }
 
         // Create the identity index only after the additive columns exist on legacy databases.
@@ -3048,6 +3196,63 @@ mod tests {
         assert_eq!(receipts[1].validation_event, "validation:event-2");
         assert!(receipts[0].conforms);
         assert!(!receipts[1].conforms);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_validation_receipt_self_digest_detects_corruption() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_validation_digest_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "validation-digest".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x77; BinaryHV::BYTES],
+            source_text: "digest".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        let committed = p.latest_snapshot_receipt().unwrap().unwrap();
+
+        p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:digest".into(),
+            generation: committed.generation,
+            snapshot_digest_hex: committed.canonical_digest_hex,
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        })
+        .unwrap();
+
+        assert!(p.verify_snapshot_validation_receipts().is_ok());
+
+        let conn = p.open_connection().unwrap();
+        conn.execute(
+            "UPDATE knowledge_snapshot_validation_receipts
+             SET validator_version = 'tampered'
+             WHERE validation_event = 'validation:digest'",
+            [],
+        )
+        .unwrap();
+
+        let err = p.verify_snapshot_validation_receipts().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot validation receipt self-digest mismatch: validation:digest"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
