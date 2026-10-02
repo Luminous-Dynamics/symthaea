@@ -373,7 +373,6 @@ mod tests {
 
     #[test]
     fn current_witness_cannot_cross_frame_or_dependency_boundary() {
-        use super::super::ignorance_types::ConclusionStatus;
         let mut action = EpistemicAction::new("a-bound", "intervention", ActionRisk::High);
         action.dependencies.push(ActionDependency {
             conclusion_id: "c1".into(),
@@ -388,7 +387,7 @@ mod tests {
             decision: "execute".into(),
         };
         let mut statuses = std::collections::HashMap::new();
-        statuses.insert("c1".into(), ConclusionStatus::Active);
+        statuses.insert("c1".into(), CurrentConclusionSupport::active());
 
         assert_eq!(
             action.try_record_current_decision(witness, "frame@2", &statuses),
