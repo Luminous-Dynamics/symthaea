@@ -17,6 +17,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 use std::time::Duration;
+use rusqlite::OptionalExtension;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 use symthaea_epistemic_types::{ProvenanceRelation, ProvenanceRelationKind};
 
@@ -145,6 +146,17 @@ pub struct KnowledgePersistenceSnapshot {
     pub provenance_relations: Vec<ProvenanceRelationRecord>,
     pub causal_edges: Vec<CausalEdgeRecord>,
     pub ontology: Vec<OntologyRecord>,
+}
+
+/// Immutable admission metadata for a complete snapshot committed by `save_snapshot`.
+///
+/// The generation identifies the committed persistence event; the digest identifies
+/// the exact canonical content of the snapshot. This is provenance metadata, not
+/// an assertion that the snapshot is true or semantically correct.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnowledgeSnapshotReceipt {
+    pub generation: u64,
+    pub canonical_digest_hex: String,
 }
 
 impl KnowledgePersistenceSnapshot {
@@ -510,6 +522,14 @@ impl KnowledgePersistence {
             return Err("OntologyRecord integer field exceeds SQLite INTEGER range".into());
         }
 
+        let snapshot_digest_hex = KnowledgePersistenceSnapshot {
+            facts: facts.to_vec(),
+            provenance_relations: relations.to_vec(),
+            causal_edges: edges.to_vec(),
+            ontology: ontology.to_vec(),
+        }
+        .canonical_digest_hex();
+
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
         let tx = conn
@@ -642,10 +662,48 @@ impl KnowledgePersistence {
             }
         }
 
+        tx.execute(
+            "INSERT INTO knowledge_snapshot_receipts (canonical_digest_hex) VALUES (?1)",
+            rusqlite::params![snapshot_digest_hex],
+        )
+        .map_err(|e| format!("Snapshot receipt: {e}"))?;
+
         tx.commit()
             .map_err(|e| format!("Commit snapshot transaction: {e}"))?;
         self.total_saved += saved_count as u64;
         Ok(())
+    }
+
+    /// Load the latest committed complete-snapshot receipt.
+    ///
+    /// This receipt is append-only and is only advanced by successful
+    /// `save_snapshot` transactions. Individual-domain save methods do not
+    /// create receipts because they do not establish a complete snapshot boundary.
+    pub fn latest_snapshot_receipt(&mut self) -> Result<Option<KnowledgeSnapshotReceipt>, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        conn.query_row(
+            "SELECT generation, canonical_digest_hex
+             FROM knowledge_snapshot_receipts
+             ORDER BY generation DESC
+             LIMIT 1",
+            [],
+            |row| {
+                let generation = row.get::<_, i64>(0)?;
+                Ok(KnowledgeSnapshotReceipt {
+                    generation: u64::try_from(generation).map_err(|_| {
+                        rusqlite::Error::IntegralValueOutOfRange(0, generation)
+                    })?,
+                    canonical_digest_hex: row.get(1)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|e| format!("Load latest snapshot receipt: {e}"))
     }
 
     /// Load all persistence domains from one SQLite read transaction.
@@ -1183,6 +1241,10 @@ impl KnowledgePersistence {
                 created_at_cycle INTEGER NOT NULL,
                 last_used_cycle INTEGER NOT NULL,
                 is_a_parent TEXT
+            );
+            CREATE TABLE IF NOT EXISTS knowledge_snapshot_receipts (
+                generation INTEGER PRIMARY KEY AUTOINCREMENT,
+                canonical_digest_hex TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_facts_domain ON knowledge_facts(domain);
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
@@ -2526,6 +2588,68 @@ mod tests {
             err,
             "Snapshot contains duplicate ProvenanceRelationRecord key"
         );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_receipt_generation_tracks_only_committed_complete_snapshots() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_receipt_generation_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        assert_eq!(p.latest_snapshot_receipt().unwrap(), None);
+
+        let fact = FactRecord {
+            memory_id: "receipt-fact".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x11; BinaryHV::BYTES],
+            source_text: "receipt".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        let first = p.latest_snapshot_receipt().unwrap().unwrap();
+        assert_eq!(first.generation, 1);
+        let expected = KnowledgePersistenceSnapshot {
+            facts: vec![fact.clone()],
+            provenance_relations: vec![],
+            causal_edges: vec![],
+            ontology: vec![],
+        }
+        .canonical_digest_hex();
+        assert_eq!(first.canonical_digest_hex, expected);
+
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        let second = p.latest_snapshot_receipt().unwrap().unwrap();
+        assert_eq!(second.generation, 2);
+        assert_eq!(second.canonical_digest_hex, first.canonical_digest_hex);
+
+        let invalid = FactRecord {
+            memory_id: "invalid".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x22; BinaryHV::BYTES - 1],
+            source_text: "invalid".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 2,
+            is_causal: false,
+        };
+        assert!(p.save_snapshot(&[invalid], &[], &[], &[]).is_err());
+
+        let after_failure = p.latest_snapshot_receipt().unwrap().unwrap();
+        assert_eq!(after_failure, second);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
