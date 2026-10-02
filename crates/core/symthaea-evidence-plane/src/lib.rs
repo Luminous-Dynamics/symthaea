@@ -474,8 +474,14 @@ fn validate_name(name: &str) -> Result<(), String> {
 }
 
 fn validate_git_object_id(field: &str, value: &str) -> Result<(), String> {
-    if !matches!(value.len(), 40 | 64) || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(format!("invalid Git object identity for {field}: {value:?}"));
+    if !matches!(value.len(), 40 | 64)
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err(format!(
+            "invalid or non-canonical Git object identity for {field}: {value:?}"
+        ));
     }
     Ok(())
 }
@@ -976,11 +982,22 @@ mod tests {
     }
 
     #[test]
-    fn execution_lineage_validation_accepts_sha1_and_sha256_git_object_ids() {
+    fn execution_lineage_validation_accepts_canonical_sha1_and_sha256_git_object_ids() {
         let mut lineage = lineage_fixture();
         lineage.source_revision = "c".repeat(40);
         lineage.source_tree = "d".repeat(64);
         assert!(lineage.validate().is_ok());
+    }
+
+    #[test]
+    fn execution_lineage_validation_rejects_uppercase_git_object_ids() {
+        let mut lineage = lineage_fixture();
+        lineage.source_revision = "A".repeat(40);
+        assert!(lineage.validate().is_err());
+
+        lineage.source_revision = "c".repeat(40);
+        lineage.source_tree = "D".repeat(64);
+        assert!(lineage.validate().is_err());
     }
 
     #[test]
