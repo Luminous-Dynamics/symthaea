@@ -854,9 +854,15 @@ impl EnhancedKnowledgeGraph {
             || record.memory_id.trim().is_empty()
             || !record.confidence.is_finite()
             || !(0.0..=1.0).contains(&record.confidence)
-            || self.capacity == 0
         {
             return FactRestoreOutcome::default();
+        }
+        if self.capacity == 0 {
+            return FactRestoreOutcome {
+                accepted: false,
+                rejected_by_policy: true,
+                policy_evictions: 0,
+            };
         }
         let mut arr = [0u8; 2048];
         arr.copy_from_slice(&record.vector_bytes);
@@ -1396,6 +1402,27 @@ mod tests {
         assert!(graph.is_empty());
     }
 
+    #[test]
+    fn test_zero_capacity_fact_restore_is_policy_rejection() {
+        let mut graph = EnhancedKnowledgeGraph::new(0);
+        let record = super::persistence::FactRecord {
+            memory_id: "policy-limited".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; 2048],
+            source_text: "policy limited".into(),
+            confidence: 0.9,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+
+        let outcome = graph.import_fact_record_with_outcome(&record);
+        assert!(!outcome.accepted);
+        assert!(outcome.rejected_by_policy);
+        assert_eq!(outcome.policy_evictions, 0);
+        assert!(graph.is_empty());
+    }
     #[test]
     fn test_bounded_fact_restore_is_order_invariant() {
         let records = [
