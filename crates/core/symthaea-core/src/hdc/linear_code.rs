@@ -300,22 +300,57 @@ pub fn recover_direct_sum_bound(
     left: &RandomLinearCode,
     right: &RandomLinearCode,
 ) -> Option<(BinaryCodeword, BinaryCodeword)> {
-    if left.dimension() != right.dimension() || target.dimension() != left.dimension() {
+    let factors = recover_independent_bound(target, &[left, right])?;
+    let mut factors = factors.into_iter();
+    Some((factors.next()?, factors.next()?))
+}
+
+/// Recover factors from a clean XOR bound when the participating linear-code
+/// generator bases are jointly independent.
+///
+/// This is the F-factor specialization of Raviv's generator-basis
+/// bound-recovery construction in which the maximal independent subset of the
+/// union is the union itself. The caller receives one codeword per factor,
+/// preserving factor order. Overlapping/dependent factor bases are rejected
+/// rather than silently turning a non-unique recovery problem into a unique
+/// result.
+pub fn recover_independent_bound(
+    target: &BinaryCodeword,
+    factors: &[&RandomLinearCode],
+) -> Option<Vec<BinaryCodeword>> {
+    if factors.is_empty() {
         return None;
     }
 
-    let mut basis = left.basis().to_vec();
-    basis.extend(right.basis().iter().cloned());
-    if basis_rank(&basis, target.dimension()) != left.rank() + right.rank() {
+    let dimension = target.dimension();
+    if factors.iter().any(|factor| factor.dimension() != dimension) {
+        return None;
+    }
+
+    let total_rank = factors.iter().map(|factor| factor.rank()).sum::<usize>();
+    let mut basis = Vec::with_capacity(total_rank);
+    for factor in factors {
+        basis.extend(factor.basis().iter().cloned());
+    }
+
+    if basis.len() != total_rank
+        || basis_rank(&basis, dimension) != total_rank
+    {
         return None;
     }
 
     let coefficients = solve_linear_combination(target, &basis)?;
-    let left_coefficients = &coefficients[..left.rank()];
-    let right_coefficients = &coefficients[left.rank()..];
-    Some((left.encode(left_coefficients), right.encode(right_coefficients)))
-}
+    let mut offset = 0usize;
+    let mut recovered = Vec::with_capacity(factors.len());
 
+    for factor in factors {
+        let end = offset + factor.rank();
+        recovered.push(factor.encode(&coefficients[offset..end]));
+        offset = end;
+    }
+
+    Some(recovered)
+}
 pub fn basis_rank(vectors: &[BinaryCodeword], dimension: usize) -> usize {
     let mut rows: Vec<BinaryCodeword> = vectors.iter()
         .filter(|vector| vector.dimension == dimension)
