@@ -138,6 +138,50 @@ pub struct ExecutionLineageV1 {
 impl ExecutionLineageV1 {
     pub const DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:execution-lineage:v1\n";
 
+    /// Construct a lineage from untrusted named-entry sequences without first
+    /// collapsing them into maps/sets. Duplicate names are rejected before
+    /// canonical collection construction, preventing silent overwrite or
+    /// deduplication at the admission boundary.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_raw_entries(
+        source_repository: String,
+        source_revision: String,
+        source_tree: String,
+        lock_digests: Vec<(String, String)>,
+        toolchain_versions: Vec<(String, String)>,
+        host_target: String,
+        nix_identity: String,
+        feature_flags: Vec<String>,
+        cwd: String,
+        argv: Vec<String>,
+        allowed_env: Vec<(String, String)>,
+        immutable_input_digests: Vec<(String, String)>,
+    ) -> Result<Self, String> {
+        let lock_digests = unique_named_map("lock_digests", lock_digests)?;
+        let toolchain_versions = unique_named_map("toolchain_versions", toolchain_versions)?;
+        let allowed_env = unique_named_map("allowed_env", allowed_env)?;
+        let immutable_input_digests =
+            unique_named_map("immutable_input_digests", immutable_input_digests)?;
+        let feature_flags = unique_named_set("feature_flags", feature_flags)?;
+
+        let lineage = Self {
+            source_repository,
+            source_revision,
+            source_tree,
+            lock_digests,
+            toolchain_versions,
+            host_target,
+            nix_identity,
+            feature_flags,
+            cwd,
+            argv,
+            allowed_env,
+            immutable_input_digests,
+        };
+        lineage.validate()?;
+        Ok(lineage)
+    }
+
     /// Validate semantic identifiers before a lineage is admitted.
     ///
     /// Digest values may be bare hexadecimal or explicitly prefixed
@@ -201,6 +245,31 @@ impl ExecutionLineageV1 {
         append_map(hasher, "allowed_env", &self.allowed_env);
         append_map(hasher, "immutable_input_digests", &self.immutable_input_digests);
     }
+}
+
+fn unique_named_map(
+    field: &str,
+    entries: Vec<(String, String)>,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut map = BTreeMap::new();
+    for (name, value) in entries {
+        validate_name(&name)?;
+        if map.insert(name.clone(), value).is_some() {
+            return Err(format!("duplicate name {name:?} in {field}"));
+        }
+    }
+    Ok(map)
+}
+
+fn unique_named_set(field: &str, entries: Vec<String>) -> Result<BTreeSet<String>, String> {
+    let mut set = BTreeSet::new();
+    for name in entries {
+        validate_name(&name)?;
+        if !set.insert(name.clone()) {
+            return Err(format!("duplicate name {name:?} in {field}"));
+        }
+    }
+    Ok(set)
 }
 
 fn validate_name(name: &str) -> Result<(), String> {
@@ -561,6 +630,51 @@ mod tests {
 
     /// Reproduces `TemporalStateMode::HdcLtc`'s requirement: the active
     /// mechanism's predict counter must be positive. A passing case.
+
+    #[test]
+    fn raw_named_entries_reject_duplicate_map_keys_before_canonicalization() {
+        let result = ExecutionLineageV1::from_raw_entries(
+            "repo".into(), "revision".into(), "tree".into(),
+            vec![
+                ("cargo".into(), "sha256:0011223344556677".into()),
+                ("cargo".into(), "sha256:8899aabbccddeeff".into()),
+            ],
+            vec![("rustc".into(), "1.96".into())],
+            "host/target".into(), "nix".into(), vec!["feature".into()],
+            "/work".into(), vec!["cargo".into(), "test".into()],
+            vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
+            vec![("input".into(), "blake3:0011223344556677".into())],
+        );
+        assert!(result.expect_err("duplicate lock name must fail").contains("duplicate name"));
+    }
+
+    #[test]
+    fn raw_named_entries_reject_duplicate_set_members() {
+        let result = ExecutionLineageV1::from_raw_entries(
+            "repo".into(), "revision".into(), "tree".into(),
+            vec![("cargo".into(), "sha256:0011223344556677".into())],
+            vec![("rustc".into(), "1.96".into())],
+            "host/target".into(), "nix".into(), vec!["feature".into(), "feature".into()],
+            "/work".into(), vec!["cargo".into(), "test".into()],
+            vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
+            vec![("input".into(), "blake3:0011223344556677".into())],
+        );
+        assert!(result.expect_err("duplicate feature must fail").contains("duplicate name"));
+    }
+
+    #[test]
+    fn raw_named_entries_validate_before_digest_is_available() {
+        let lineage = ExecutionLineageV1::from_raw_entries(
+            "repo".into(), "revision".into(), "tree".into(),
+            vec![("cargo".into(), "sha256:0011223344556677".into())],
+            vec![("rustc".into(), "1.96".into())],
+            "host/target".into(), "nix".into(), vec!["feature".into()],
+            "/work".into(), vec!["cargo".into(), "test".into()],
+            vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
+            vec![("input".into(), "blake3:0011223344556677".into())],
+        ).expect("valid raw entries");
+        assert_eq!(lineage.lock_digests.get("cargo"), Some(&"sha256:0011223344556677".to_owned()));
+    }
 
     fn lineage_fixture() -> ExecutionLineageV1 {
         ExecutionLineageV1 {
