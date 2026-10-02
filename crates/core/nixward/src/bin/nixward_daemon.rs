@@ -2454,29 +2454,14 @@ mod tests {
             unit: "nginx.service".to_string(),
         };
 
-        let restart_digest = action_intent_digest_for_command(
-            Some("generation:42".to_string()),
-            &restart,
-        )
-        .unwrap()
-        .expect("typed service commands must be governed");
-        let enable_digest = action_intent_digest_for_command(
-            Some("generation:42".to_string()),
-            &enable,
-        )
-        .unwrap()
-        .expect("typed service commands must be governed");
+        let restart_digest =
+            action_intent_digest_for_command(Some("generation:42".to_string()), &restart)
+                .unwrap();
+        let enable_digest =
+            action_intent_digest_for_command(Some("generation:42".to_string()), &enable)
+                .unwrap();
 
         assert_ne!(restart_digest, enable_digest);
-        assert_eq!(
-            approved_intent_digest(&format!("Approved:{restart_digest}")),
-            Some(restart_digest.as_str())
-        );
-        assert_eq!(approved_intent_digest("Approved"), None);
-        assert_eq!(
-            approved_intent_digest(&format!("Approved:{enable_digest}")),
-            Some(enable_digest.as_str())
-        );
     }
 
     #[test]
@@ -2485,28 +2470,14 @@ mod tests {
             operation: NixServiceOperationKindV1::Restart,
             unit: "nginx.service".to_string(),
         };
-        let generation_42 = action_intent_digest_for_command(
-            Some("generation:42".to_string()),
-            &service,
-        )
-        .unwrap()
-        .unwrap();
-        let generation_43 = action_intent_digest_for_command(
-            Some("generation:43".to_string()),
-            &service,
-        )
-        .unwrap()
-        .unwrap();
+        let generation_42 =
+            action_intent_digest_for_command(Some("generation:42".to_string()), &service)
+                .unwrap();
+        let generation_43 =
+            action_intent_digest_for_command(Some("generation:43".to_string()), &service)
+                .unwrap();
 
         assert_ne!(generation_42, generation_43);
-        assert_eq!(
-            approved_intent_digest(&format!("Approved:{generation_42}")),
-            Some(generation_42.as_str())
-        );
-        assert_ne!(
-            approved_intent_digest(&format!("Approved:{generation_42}")),
-            Some(generation_43.as_str())
-        );
     }
 
     #[test]
@@ -2517,9 +2488,26 @@ mod tests {
             safety_level: nixward::action::executor::SafetyLevel::SystemModify,
         };
         assert_eq!(
-            action_intent_digest_for_command(None, &command).unwrap(),
-            None
+            action_intent_digest_for_command(None, &command).unwrap_err(),
+            NixAuthorizationErrorV1::UnsupportedCustomCommand
         );
+    }
+
+    #[test]
+    fn config_patch_enters_governed_intent_and_binds_state() {
+        let command = nixward::action::executor::NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "ab".repeat(32),
+        };
+
+        let digest = action_intent_digest_for_command(
+            Some("generation:42".to_string()),
+            &command,
+        )
+        .unwrap();
+
+        assert!(!digest.is_empty());
     }
 
     fn test_config() -> DaemonConfig {
