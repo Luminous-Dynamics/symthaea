@@ -15,6 +15,7 @@
 //! mint authorization here.
 
 use super::executor::{ChannelOperation, FlakeOperation, NixOSCommand, SafetyLevel};
+use super::local_approval_store::ConsumedLocalApprovalDecisionV1;
 use super::service_domain::{validate_canonical_service_operation_v1, NixServiceOperationKindV1};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
@@ -314,6 +315,60 @@ impl NixExecutionAuthorizationRecordV1 {
 /// This type intentionally does not implement `Serialize`, `Deserialize`, or `Clone`.
 /// Persisted audit records therefore cannot be deserialized back into live authority.
 /// It is crate-private until an independently verified external-permit adapter exists.
+/// Live execution authority minted from one already-consumed local approval.
+///
+/// This object is intentionally non-serializable and non-cloneable. Possession
+/// represents the exact semantic binding between the approved intent and the
+/// one-shot local approval evidence consumed by the live daemon runtime.
+pub struct NixLocalExecutionAuthorityV1 {
+    intent: NixActionIntentV1,
+    approval: ConsumedLocalApprovalDecisionV1,
+}
+
+impl NixLocalExecutionAuthorityV1 {
+    /// Promote one consumed approval into Nixward execution authority.
+    ///
+    /// The consumed approval token is moved into this object, preventing later
+    /// reconstruction or duplicate consumption by ordinary data copying.
+    pub fn from_consumed_local_approval(
+        intent: NixActionIntentV1,
+        approval: ConsumedLocalApprovalDecisionV1,
+    ) -> Result<Self, NixAuthorizationErrorV1> {
+        if approval.decision_kind() != NixAuthorizationDecisionV1::Approved {
+            return Err(NixAuthorizationErrorV1::NotApproved);
+        }
+        let digest = intent.digest()?;
+        if approval.decision_evidence().action_intent_digest != digest {
+            return Err(NixAuthorizationErrorV1::IntentMismatch);
+        }
+        Ok(Self { intent, approval })
+    }
+
+    /// Validate that the execution command is exactly the action that was approved.
+    pub(crate) fn validate_command(
+        &self,
+        command: &NixOSCommand,
+    ) -> Result<(), NixAuthorizationErrorV1> {
+        let descriptor = NixActionDescriptorV1::try_from(command)?;
+        if descriptor != self.intent.action {
+            return Err(NixAuthorizationErrorV1::IntentMismatch);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn action_intent_digest(&self) -> Result<String, NixAuthorizationErrorV1> {
+        self.intent.digest()
+    }
+
+    pub(crate) fn approval_request_id(&self) -> &str {
+        self.approval.request_id()
+    }
+
+    pub(crate) fn projection_digest(&self) -> &str {
+        self.approval.projection_digest()
+    }
+}
+
 pub(crate) struct LiveNixAuthorizationV1 {
     record: NixExecutionAuthorizationRecordV1,
     consumed: bool,
