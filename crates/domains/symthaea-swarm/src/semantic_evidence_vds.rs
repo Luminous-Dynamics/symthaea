@@ -911,6 +911,12 @@ impl Rfc9942SignatureWithReceipts {
             }
         }
 
+        // RFC 9052 recommends rejecting a header label that appears in both
+        // protected and unprotected buckets rather than relying on precedence.
+        if unprotected_labels.iter().any(|label| protected_labels.contains(label)) {
+            return Err(Rfc9942VdpError::InvalidStructure);
+        }
+
         let payload = match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
             2 => {
                 let raw = reader.read_bstr_bounded(MAX_RFC9942_SIGNATURE_PAYLOAD_BYTES)
@@ -2385,6 +2391,25 @@ mod tests {
         cbor_int(&mut bytes,COSE_ALG_HEADER_LABEL); cbor_int(&mut bytes,-7);
         bytes.push(0xf6); cbor_bytes(&mut bytes,&[0;1]);
         assert_eq!(Rfc9942ReceiptEnvelope::from_cbor(&bytes),Err(Rfc9942VdpError::InvalidStructure));
+    }
+
+    #[test]
+    fn rfc9942_outer_rejects_generic_header_label_in_both_buckets() {
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,1);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL); cbor_int(&mut protected,-7);
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG); cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,1);
+        cbor_int(&mut bytes,COSE_ALG_HEADER_LABEL); cbor_int(&mut bytes,-7);
+        bytes.push(0xf6); cbor_bytes(&mut bytes,&[0;64]);
+
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&bytes),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
     }
 
     #[test]
