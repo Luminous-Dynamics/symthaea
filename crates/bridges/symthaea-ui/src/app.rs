@@ -14,6 +14,9 @@ use base64::Engine as _;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use serde_json::Value;
+use std::cell::RefCell;
+use std::rc::Rc;
+use symthaea_canvas::{GpuScene, RemoteScene, WebGpuRenderer};
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
@@ -173,6 +176,11 @@ pub fn App() -> impl IntoView {
     let movie = RwSignal::new(Option::<Movie>::None);
     let movie_frame = RwSignal::new(0_usize);
     let movie_canvas = NodeRef::<leptos::html::Canvas>::new();
+    let webgpu_canvas = NodeRef::<leptos::html::Canvas>::new();
+    let gpu_scene = RwSignal::new(Option::<RemoteScene>::None);
+    let webgpu_ready = RwSignal::new(false);
+    let webgpu_renderer: Rc<RefCell<Option<WebGpuRenderer>>> = Rc::new(RefCell::new(None));
+    let webgpu_init_started = Rc::new(RefCell::new(false));
 
     // Open the telemetry stream once, on mount, against whatever gateway
     // URL is set at that moment. Reconnecting on URL change is a v1 nicety
@@ -188,6 +196,11 @@ pub fn App() -> impl IntoView {
                 if let Some(svg) = portrait_from_json(&payload) {
                     portrait.set(Some(svg));
                 }
+                if let Some(scene_value) = payload.get("canvas_scene") {
+                    if let Ok(scene) = serde_json::from_value::<RemoteScene>(scene_value.clone()) {
+                        gpu_scene.set(Some(scene));
+                    }
+                }
                 if let Some(m) = Movie::from_json(&payload) {
                     movie.set(Some(m));
                     movie_frame.set(0);
@@ -197,6 +210,55 @@ pub fn App() -> impl IntoView {
             ws_connected.set(false);
         });
     });
+
+    // Initialize WebGPU once after the browser canvas is mounted. Failure is
+    // non-fatal: the existing SVG projection remains the compatibility path.
+    {
+        let renderer = Rc::clone(&webgpu_renderer);
+        let started = Rc::clone(&webgpu_init_started);
+        Effect::new(move |_| {
+            if *started.borrow() {
+                return;
+            }
+            let Some(canvas) = webgpu_canvas.get() else {
+                return;
+            };
+            *started.borrow_mut() = true;
+            let renderer = Rc::clone(&renderer);
+            spawn_local(async move {
+                match WebGpuRenderer::new(canvas).await {
+                    Ok(gpu) => {
+                        *renderer.borrow_mut() = Some(gpu);
+                        webgpu_ready.set(true);
+                    }
+                    Err(error) => {
+                        leptos::logging::warn!("WebGPU unavailable: {error}");
+                    }
+                }
+            });
+        });
+    }
+
+    // Render each typed cognitive scene through WebGPU. The renderer-neutral
+    // scene is reconstructed into native scene nodes only at the backend edge.
+    {
+        let renderer = Rc::clone(&webgpu_renderer);
+        Effect::new(move |_| {
+            let _ready = webgpu_ready.get();
+            let Some(scene) = gpu_scene.get() else {
+                return;
+            };
+            let Some(renderer) = renderer.borrow().as_ref() else {
+                return;
+            };
+            let native = scene.to_scene_node();
+            let gpu = GpuScene::from_scene(&native);
+            if let Err(error) = renderer.render(&gpu) {
+                leptos::logging::warn!("WebGPU cognitive canvas render failed: {error}");
+                webgpu_ready.set(false);
+            }
+        });
+    }
 
     // Poll GET-equivalent /v1/service status every 5s. This is baseline
     // liveness feedback independent of the telemetry WS above, which stays
@@ -363,13 +425,23 @@ pub fn App() -> impl IntoView {
             // Projections: what she renders of herself. Panes appear only
             // once the corresponding stream has actually delivered content.
             <section class="projections" style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
-                {move || portrait.get().map(|portrait_src| view! {
-                    <div class="projection-pane">
-                        <h2 style="font-size:0.9em;opacity:0.7;">"self-portrait"</h2>
+                <div class="projection-pane"
+                    style:display=move || {
+                        let visible = webgpu_ready.get() || portrait.with(|p| p.is_some());
+                        if visible { "block" } else { "none" }
+                    }
+                >
+                    <h2 style="font-size:0.9em;opacity:0.7;">"self-portrait"</h2>
+                    {move || webgpu_ready.get().then(|| view! {
+                        <canvas node_ref=webgpu_canvas
+                            style="width:220px;height:220px;border-radius:8px;display:block;"
+                            width="512" height="512"
+                        ></canvas>
+                    }).or_else(|| portrait.get().map(|portrait_src| view! {
                         <img class="portrait" style="max-width:220px;" src=portrait_src
-                            alt="Live cognitive self-portrait" />
-                    </div>
-                })}
+                            alt="Live cognitive self-portrait (SVG fallback)" />
+                    }))}
+                </div>
                 <div class="projection-pane"
                     style:display=move || if movie.with(|m| m.is_some()) { "block" } else { "none" }
                 >
