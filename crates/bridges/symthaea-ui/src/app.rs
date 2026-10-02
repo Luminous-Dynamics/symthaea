@@ -142,7 +142,7 @@ impl Movie {
         let width = u32::try_from(m["width"].as_u64()?).ok()?;
         let height = u32::try_from(m["height"].as_u64()?).ok()?;
         let channels = usize::try_from(m["channels"].as_u64()?).ok()?;
-        if channels != 1 && channels < 3 {
+        if channels != 1 && channels != 3 {
             return None;
         }
         let engine = base64::engine::general_purpose::STANDARD;
@@ -152,11 +152,15 @@ impl Movie {
         }
         let bytes_per_frame = px.checked_mul(channels)?;
         let rgba_capacity = px.checked_mul(4)?;
-        let frames_rgba: Vec<Vec<u8>> = m["frames_b64"]
-            .as_array()?
+        const MAX_MOVIE_FRAMES: usize = 120;
+        let frames = m["frames_b64"].as_array()?;
+        if frames.len() > MAX_MOVIE_FRAMES {
+            return None;
+        }
+        let frames_rgba: Vec<Vec<u8>> = frames
             .iter()
             .filter_map(|f| engine.decode(f.as_str()?).ok())
-            .filter(|raw| raw.len() >= bytes_per_frame)
+            .filter(|raw| raw.len() == bytes_per_frame)
             .map(|raw| {
                 let mut rgba = Vec::with_capacity(rgba_capacity);
                 for i in 0..px {
