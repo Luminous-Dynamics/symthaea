@@ -22,9 +22,11 @@ pub const RFC9942_VDS_HEADER_LABEL: i64 = 395;
 /// implementation resource limits, not changes to the RFC wire format.
 pub const MAX_RFC9942_PROOFS: usize = 256;
 pub const MAX_RFC9942_PROOF_BYTES: usize = 8 * 1024;
-/// A u64-sized RFC 9162 tree cannot require more than 64 authentication-path
-/// hashes. Enforce this before allocating from an attacker-controlled CBOR length.
-pub const MAX_RFC9162_PROOF_PATH: usize = 64;
+/// Inclusion proofs for a u64-sized tree need at most 64 authentication-path
+/// hashes. Consistency proofs have RFC 9162's ceil(log2(n)) + 1 upper bound and
+/// can therefore reach 65 nodes for the largest representable tree size.
+/// Enforce this before allocating from an attacker-controlled CBOR length.
+pub const MAX_RFC9162_PROOF_PATH: usize = 65;
 /// Defensive bounds for the RFC 9942 receipts header value. These limits
 /// constrain decoding/allocation without changing the RFC wire representation.
 pub const MAX_RFC9942_RECEIPTS: usize = 16;
@@ -2275,6 +2277,25 @@ mod tests {
         assert_eq!(Rfc9162InclusionProof::from_cbor(&inclusion.to_cbor()).unwrap(), inclusion);
         let consistency = Rfc9162ConsistencyProof::new(20, 104, vec![[0x33; 32], [0x44; 32]]);
         assert_eq!(Rfc9162ConsistencyProof::from_cbor(&consistency.to_cbor()).unwrap(), consistency);
+    }
+
+    #[test]
+    fn rfc9162_consistency_decoder_accepts_maximal_u64_sized_path_bound() {
+        let mut bytes = vec![0x83, 0x01, 0x1b];
+        bytes.extend_from_slice(&u64::MAX.to_be_bytes());
+        bytes.push(0x98);
+        bytes.push(65);
+        for _ in 0..65 {
+            bytes.push(0x58);
+            bytes.push(0x20);
+            bytes.extend_from_slice(&[0xAA; 32]);
+        }
+
+        let decoded = Rfc9162ConsistencyProof::from_cbor(&bytes)
+            .expect("RFC 9162 permits up to ceil(log2(n)) + 1 consistency nodes");
+        assert_eq!(decoded.first, 1);
+        assert_eq!(decoded.second, u64::MAX);
+        assert_eq!(decoded.consistency_path.len(), 65);
     }
 
     #[test]
