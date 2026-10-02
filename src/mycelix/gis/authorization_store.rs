@@ -347,6 +347,7 @@ fn encode_state(s: &AuthorizationLeaseState) -> &'static str {
     match s {
         AuthorizationLeaseState::Ready => "ready",
         AuthorizationLeaseState::Prepared { .. } => "prepared",
+        AuthorizationLeaseState::DispatchPending { .. } => "dispatch_pending",
         AuthorizationLeaseState::Indeterminate { .. } => "indeterminate",
         AuthorizationLeaseState::Exhausted => "exhausted",
         AuthorizationLeaseState::Revoked => "revoked",
@@ -480,6 +481,7 @@ mod tests {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
         store.prepare_for_execution(&witness,&action,"frame@1","attempt-1").unwrap();
+        store.mark_dispatch_pending(&witness.authorization_instance,"attempt-1").unwrap();
         let first=store.commit(&action.id,"attempt-1",ExecutionOutcome::Succeeded).unwrap();
         let reopened=SqliteAuthorizationStore::open(&path).unwrap();
         assert!(matches!(
@@ -495,6 +497,7 @@ mod tests {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-instance-{}.db",std::process::id()));
         let (store,action,old_witness)=fixture(&path);
         store.prepare_for_execution(&old_witness,&action,"frame@1","old-attempt").unwrap();
+        store.mark_dispatch_pending(&old_witness.authorization_instance,"old-attempt").unwrap();
         store.commit(&action.id,"old-attempt",ExecutionOutcome::Succeeded).unwrap();
 
         let digest=action.canonical_action_digest();
@@ -508,8 +511,48 @@ mod tests {
         )).unwrap();
 
         store.prepare_for_execution(&fresh_witness,&action,"frame@1","new-attempt").unwrap();
+        store.mark_dispatch_pending("approval-new","new-attempt").unwrap();
         let receipt=store.commit("approval-new","new-attempt",ExecutionOutcome::Succeeded).unwrap();
         assert_eq!(receipt.authorization_instance,"approval-new");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reopen_converts_nonterminal_dispatch_to_indeterminate() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-recovery-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        store.prepare_for_execution(&witness,&action,"frame@1","attempt-crash").unwrap();
+        store.mark_dispatch_pending(&witness.authorization_instance,"attempt-crash").unwrap();
+        drop(store);
+
+        let reopened=SqliteAuthorizationStore::open(&path).unwrap();
+        assert!(matches!(
+            reopened.prepare_for_execution(&witness,&action,"frame@1","attempt-retry"),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::IndeterminateRequiresReconciliation
+            ))
+        ));
+        assert_eq!(
+            reopened.commit(&witness.authorization_instance,"attempt-crash",ExecutionOutcome::Succeeded)
+                .unwrap_err().to_string(),
+            "authorization consumption error: IndeterminateRequiresReconciliation"
+        );
+        let reconciled=reopened.reconcile_indeterminate(
+            &witness.authorization_instance,"attempt-crash",ExecutionOutcome::Succeeded
+        ).unwrap();
+        assert_eq!(reconciled.outcome,ExecutionOutcome::Succeeded);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn dispatch_pending_wrong_attempt_is_fenced() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-dispatch-fence-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        store.prepare_for_execution(&witness,&action,"frame@1","attempt-1").unwrap();
+        assert_eq!(
+            store.mark_dispatch_pending(&witness.authorization_instance,"attempt-2").unwrap_err().to_string(),
+            "authorization consumption error: AttemptMismatch"
+        );
         let _=std::fs::remove_file(path);
     }
 
