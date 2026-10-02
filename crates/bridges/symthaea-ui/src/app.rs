@@ -91,51 +91,82 @@ struct Movie {
 /// gateway URL is a user-editable text field, so a malicious or
 /// compromised gateway must not be able to drive an unbounded (or, on
 /// 32-bit wasm, integer-overflowing) allocation via `width`/`height`.
-const MAX_MOVIE_PIXELS: usize = 4096 * 4096;
+const MAX_MOVIE_PIXELS: usize = 2048 * 2048;
+const MAX_MOVIE_FRAMES: usize = 24;
+const MAX_MOVIE_RGBA_BYTES: usize = 32 * 1024 * 1024;
 
 impl Movie {
     fn from_json(v: &Value) -> Option<Movie> {
         use base64::Engine as _;
         let m = v.get("mental_movie")?;
-        let width = m["width"].as_u64()? as u32;
-        let height = m["height"].as_u64()? as u32;
+        let width_raw = m["width"].as_u64()?;
+        let height_raw = m["height"].as_u64()?;
+        if width_raw == 0
+            || height_raw == 0
+            || width_raw > 2048
+            || height_raw > 2048
+        {
+            return None;
+        }
+        let width = width_raw as u32;
+        let height = height_raw as u32;
         let channels = m["channels"].as_u64()? as usize;
+        if channels != 1 && channels != 3 {
+            return None;
+        }
         let engine = base64::engine::general_purpose::STANDARD;
         let px = (width as usize).checked_mul(height as usize)?;
         if px == 0 || px > MAX_MOVIE_PIXELS {
             return None;
         }
-        let rgba_capacity = px.checked_mul(4)?;
-        let frames_rgba: Vec<Vec<u8>> = m["frames_b64"]
-            .as_array()?
-            .iter()
-            .filter_map(|f| engine.decode(f.as_str()?).ok())
-            .filter(|raw| raw.len() >= px * channels.max(1))
-            .map(|raw| {
-                let mut rgba = Vec::with_capacity(rgba_capacity);
-                for i in 0..px {
-                    let (r, g, b) = if channels >= 3 {
-                        (
-                            raw[i * channels],
-                            raw[i * channels + 1],
-                            raw[i * channels + 2],
-                        )
-                    } else {
-                        (raw[i], raw[i], raw[i])
-                    };
-                    rgba.extend_from_slice(&[r, g, b, 255]);
-                }
-                rgba
-            })
-            .collect();
-        if frames_rgba.is_empty() {
+        let frame_bytes = px.checked_mul(4)?;
+        let frames = m["frames_b64"].as_array()?;
+        if frames.is_empty() || frames.len() > MAX_MOVIE_FRAMES {
             return None;
         }
+
+        let mut total_rgba_bytes = 0usize;
+        let mut frames_rgba = Vec::with_capacity(frames.len());
+        for encoded in frames {
+            let raw = engine.decode(encoded.as_str()?).ok()?;
+            let expected_raw_bytes = px.checked_mul(channels)?;
+            if raw.len() != expected_raw_bytes {
+                return None;
+            }
+            total_rgba_bytes = total_rgba_bytes.checked_add(frame_bytes)?;
+            if total_rgba_bytes > MAX_MOVIE_RGBA_BYTES {
+                return None;
+            }
+
+            let mut rgba = Vec::with_capacity(frame_bytes);
+            for i in 0..px {
+                let (r, g, b) = if channels == 3 {
+                    (
+                        raw[i * channels],
+                        raw[i * channels + 1],
+                        raw[i * channels + 2],
+                    )
+                } else {
+                    let value = raw[i];
+                    (value, value, value)
+                };
+                rgba.extend_from_slice(&[r, g, b, 255]);
+            }
+            frames_rgba.push(rgba);
+        }
+
+        let semantic_coherence = m["semantic_coherence"]
+            .as_f64()
+            .map(|value| value as f32)
+            .filter(|value| value.is_finite())
+            .unwrap_or(0.0)
+            .clamp(-1.0, 1.0);
+
         Some(Movie {
             frames_rgba,
             width,
             height,
-            semantic_coherence: m["semantic_coherence"].as_f64().unwrap_or(0.0) as f32,
+            semantic_coherence,
         })
     }
 }
