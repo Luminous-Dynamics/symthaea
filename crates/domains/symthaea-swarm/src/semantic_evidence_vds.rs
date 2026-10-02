@@ -44,7 +44,10 @@ impl Rfc9942ProofKind {
     }
 }
 
-/// RFC 9942 vdp value for the RFC9162_SHA256 VDS.
+/// RFC 9942 vdp (label 396) value for the RFC9162_SHA256 VDS.
+///
+/// The RFC 9942 `vds` parameter (label 395) is a separate protected-header
+/// field. This object intentionally does not serialize that identifier.
 /// This models the proof collection, not a COSE receipt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rfc9942Vdp {
@@ -84,6 +87,9 @@ impl Rfc9942Vdp {
         Ok(Self { kind, proofs })
     }
 
+    /// The VDS identifier this concrete VDP implementation is defined for.
+    /// It is metadata, not part of this VDP's CBOR bytes; callers must bind it
+    /// to the separate RFC 9942 `vds` protected-header value.
     pub const fn vds_id(&self) -> u64 { RFC9162_VDS_ID }
     pub const fn kind(&self) -> Rfc9942ProofKind { self.kind }
     pub fn proofs(&self) -> &[Vec<u8>] { &self.proofs }
