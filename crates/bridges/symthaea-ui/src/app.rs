@@ -400,16 +400,21 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
 
         let separator = ch == ',' || ch.is_ascii_whitespace();
         let sign_starts_number = matches!(ch, '+' | '-')
-            && !number.is_empty()
-            && !matches!(previous, Some('e' | 'E'));
+            && (number.is_empty() || !matches!(previous, Some('e' | 'E')));
 
-        if separator || sign_starts_number {
+        if separator {
             if !flush_number(&mut number, &mut tokens) {
                 return false;
             }
-            if sign_starts_number {
-                number.push(ch);
+            previous = Some(ch);
+            continue;
+        }
+
+        if sign_starts_number {
+            if !number.is_empty() && !flush_number(&mut number, &mut tokens) {
+                return false;
             }
+            number.push(ch);
             previous = Some(ch);
             continue;
         }
@@ -1596,6 +1601,14 @@ mod tests {
         ] {
             assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(), "accepted: {svg}");
         }
+    }
+
+    #[test]
+    fn portrait_accepts_leading_negative_path_coordinates() {
+        let payload = serde_json::json!({
+            "canvas_svg": r#"<svg><path d="M-10-20 L-1.5,-2.5 z"/></svg>"#
+        });
+        assert!(portrait_from_json(&payload).is_some());
     }
 
     #[test]
