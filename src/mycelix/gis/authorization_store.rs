@@ -149,6 +149,27 @@ impl SqliteAuthorizationStore {
         Ok(())
     }
 
+    /// Durably record provider entry after DispatchPending has committed.
+    pub fn mark_invoked(
+        &self, authorization_instance: &str, attempt_id: &str,
+    ) -> Result<(), AuthorizationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut lease = load_lease(&tx, authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
+        lease.mark_invoked(attempt_id)?;
+        let changed = tx.execute(
+            "UPDATE authorization_leases SET state='invoked', attempt_id=?2
+             WHERE authorization_instance=?1 AND state='dispatch_pending' AND attempt_id=?2",
+            params![authorization_instance, attempt_id],
+        )?;
+        if changed != 1 {
+            return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn commit(
         &self, authorization_instance: &str, attempt_id: &str, outcome: ExecutionOutcome,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
@@ -213,7 +234,7 @@ impl SqliteAuthorizationStore {
             let mut stmt = tx.prepare(
                 "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch
                  FROM authorization_leases
-                 WHERE state IN ('prepared','dispatch_pending')",
+                 WHERE state IN ('prepared','dispatch_pending','invoked')",
             )?;
             let rows = stmt.query_map([], |row| {
                 Ok((
@@ -234,7 +255,7 @@ impl SqliteAuthorizationStore {
                 "UPDATE authorization_leases
                  SET state='indeterminate', attempt_id=?2
                  WHERE authorization_instance=?1
-                   AND state IN ('prepared','dispatch_pending')
+                   AND state IN ('prepared','dispatch_pending','invoked')
                    AND attempt_id=?2",
                 params![instance, attempt_id],
             )?;
@@ -359,6 +380,7 @@ fn encode_state(s: &AuthorizationLeaseState) -> &'static str {
         AuthorizationLeaseState::Ready => "ready",
         AuthorizationLeaseState::Prepared { .. } => "prepared",
         AuthorizationLeaseState::DispatchPending { .. } => "dispatch_pending",
+        AuthorizationLeaseState::Invoked { .. } => "invoked",
         AuthorizationLeaseState::Indeterminate { .. } => "indeterminate",
         AuthorizationLeaseState::Exhausted => "exhausted",
         AuthorizationLeaseState::Revoked => "revoked",
@@ -369,6 +391,7 @@ fn state_attempt(s: &AuthorizationLeaseState) -> Option<&str> {
     match s {
         AuthorizationLeaseState::Prepared { attempt_id }
         | AuthorizationLeaseState::DispatchPending { attempt_id }
+        | AuthorizationLeaseState::Invoked { attempt_id }
         | AuthorizationLeaseState::Indeterminate { attempt_id } => Some(attempt_id),
         _ => None,
     }
@@ -388,6 +411,9 @@ fn load_lease(tx: &Transaction<'_>, id: &str) -> Result<Option<AuthorizationLeas
                     attempt_id: attempt.ok_or_else(|| rusqlite::Error::InvalidQuery)?,
                 },
                 "dispatch_pending" => AuthorizationLeaseState::DispatchPending {
+                    attempt_id: attempt.ok_or_else(|| rusqlite::Error::InvalidQuery)?,
+                },
+                "invoked" => AuthorizationLeaseState::Invoked {
                     attempt_id: attempt.ok_or_else(|| rusqlite::Error::InvalidQuery)?,
                 },
                 "indeterminate" => AuthorizationLeaseState::Indeterminate {
