@@ -1591,8 +1591,8 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Schema inspect: {e}"))?
             .query_map([], |row| row.get::<_, String>(1))
             .map_err(|e| format!("Schema inspect query: {e}"))?
-            .filter_map(Result::ok)
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Schema inspect row: {e}"))?;
         for (name, ty) in [("memory_id", "TEXT"), ("canonical_identity", "TEXT"), ("provenance_family", "TEXT")] {
             if !columns.iter().any(|c| c == name) {
                 tx.execute(&format!("ALTER TABLE knowledge_facts ADD COLUMN {name} {ty}"), [])
@@ -1607,8 +1607,8 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Snapshot receipt schema inspect: {e}"))?
             .query_map([], |row| row.get::<_, String>(1))
             .map_err(|e| format!("Snapshot receipt schema inspect query: {e}"))?
-            .filter_map(Result::ok)
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Schema inspect row: {e}"))?;
         if !snapshot_receipt_columns.iter().any(|c| c == "receipt_digest_hex") {
             tx.execute(
                 "ALTER TABLE knowledge_snapshot_receipts
@@ -1665,8 +1665,8 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Validation sequence schema inspect: {e}"))?
             .query_map([], |row| row.get::<_, String>(1))
             .map_err(|e| format!("Validation sequence schema inspect query: {e}"))?
-            .filter_map(Result::ok)
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Schema inspect row: {e}"))?;
         if !validation_sequence_columns.iter().any(|c| c == "validation_sequence") {
             tx.execute(
                 "ALTER TABLE knowledge_snapshot_validation_receipts
@@ -1728,8 +1728,8 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Validation schema inspect: {e}"))?
             .query_map([], |row| row.get::<_, String>(1))
             .map_err(|e| format!("Validation schema inspect query: {e}"))?
-            .filter_map(Result::ok)
-            .collect();
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Schema inspect row: {e}"))?;
         if !validation_columns.iter().any(|c| c == "receipt_digest_hex") {
             tx.execute(
                 "ALTER TABLE knowledge_snapshot_validation_receipts
