@@ -243,16 +243,22 @@ mod tests {
 
     #[test]
     fn strict_expiry_differs_from_inclusive_observation_only_at_endpoint() {
-        let before =
-            EvidenceTemporalEvaluationV1::evaluate_strict_expiry(observed(), UnixMillisV1::new(199_999));
+        let before = EvidenceTemporalEvaluationV1::evaluate_strict_expiry(
+            observed(),
+            UnixMillisV1::new(199_999),
+        );
         assert_eq!(before.status(), EvidenceTemporalStatusV1::Current);
 
-        let exact =
-            EvidenceTemporalEvaluationV1::evaluate_strict_expiry(observed(), UnixMillisV1::new(200_000));
+        let exact = EvidenceTemporalEvaluationV1::evaluate_strict_expiry(
+            observed(),
+            UnixMillisV1::new(200_000),
+        );
         assert_eq!(exact.status(), EvidenceTemporalStatusV1::Expired);
 
-        let after =
-            EvidenceTemporalEvaluationV1::evaluate_strict_expiry(observed(), UnixMillisV1::new(200_001));
+        let after = EvidenceTemporalEvaluationV1::evaluate_strict_expiry(
+            observed(),
+            UnixMillisV1::new(200_001),
+        );
         assert_eq!(after.status(), EvidenceTemporalStatusV1::Expired);
 
         // The generic observational evaluator remains intentionally inclusive.
@@ -263,11 +269,13 @@ mod tests {
 
     #[test]
     fn future_dated_and_expired_are_distinct() {
-        let future = EvidenceTemporalEvaluationV1::evaluate(observed(), UnixMillisV1::new(99_999));
+        let future =
+            EvidenceTemporalEvaluationV1::evaluate(observed(), UnixMillisV1::new(99_999));
         assert_eq!(future.status(), EvidenceTemporalStatusV1::NotYetValid);
         assert!(!future.is_current());
 
-        let expired = EvidenceTemporalEvaluationV1::evaluate(observed(), UnixMillisV1::new(200_001));
+        let expired =
+            EvidenceTemporalEvaluationV1::evaluate(observed(), UnixMillisV1::new(200_001));
         assert_eq!(expired.status(), EvidenceTemporalStatusV1::Expired);
         assert!(!expired.is_current());
     }
@@ -326,11 +334,17 @@ mod tests {
 
     #[test]
     fn historical_current_result_retains_original_evaluation_time() {
-        let result = EvidenceTemporalEvaluationV1::evaluate(observed(), UnixMillisV1::new(150_000));
+        let result = EvidenceTemporalEvaluationV1::evaluate(
+            observed(),
+            UnixMillisV1::new(150_000),
+        );
         assert_eq!(result.status(), EvidenceTemporalStatusV1::Current);
         assert_eq!(result.evaluated_at(), UnixMillisV1::new(150_000));
 
-        let later = EvidenceTemporalEvaluationV1::evaluate(result.currentness(), UnixMillisV1::new(250_000));
+        let later = EvidenceTemporalEvaluationV1::evaluate(
+            result.currentness(),
+            UnixMillisV1::new(250_000),
+        );
         assert_eq!(later.status(), EvidenceTemporalStatusV1::Expired);
         assert_eq!(result.status(), EvidenceTemporalStatusV1::Current);
     }
