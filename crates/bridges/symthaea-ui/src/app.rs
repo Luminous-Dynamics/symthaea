@@ -240,118 +240,248 @@ fn svg_number_is_bounded(token: &str) -> bool {
             .unwrap_or(false)
 }
 
+fn svg_numeric_tokens(value: &str) -> Option<Vec<f64>> {
+    let bytes = value.as_bytes();
+    let mut numbers = Vec::new();
+    let mut cursor = 0usize;
+
+    while cursor < bytes.len() {
+        while cursor < bytes.len()
+            && (bytes[cursor] == b',' || bytes[cursor].is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        if cursor == bytes.len() {
+            break;
+        }
+
+        let start = cursor;
+        if matches!(bytes[cursor], b'+' | b'-') {
+            cursor += 1;
+        }
+
+        let integer_start = cursor;
+        while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
+            cursor += 1;
+        }
+        let has_integer = cursor > integer_start;
+
+        let mut has_fraction = false;
+        if cursor < bytes.len() && bytes[cursor] == b'.' {
+            cursor += 1;
+            let fraction_start = cursor;
+            while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
+                cursor += 1;
+            }
+            has_fraction = cursor > fraction_start;
+        }
+
+        if !has_integer && !has_fraction {
+            return None;
+        }
+
+        if cursor < bytes.len() && matches!(bytes[cursor], b'e' | b'E') {
+            cursor += 1;
+            if cursor < bytes.len() && matches!(bytes[cursor], b'+' | b'-') {
+                cursor += 1;
+            }
+            let exponent_start = cursor;
+            while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
+                cursor += 1;
+            }
+            if cursor == exponent_start {
+                return None;
+            }
+        }
+
+        let token = &value[start..cursor];
+        if !svg_number_is_bounded(token) {
+            return None;
+        }
+        numbers.push(token.parse::<f64>().ok()?);
+        if numbers.len() > MAX_PORTRAIT_NUMBER_TOKENS {
+            return None;
+        }
+
+        if cursor < bytes.len()
+            && !bytes[cursor].is_ascii_whitespace()
+            && bytes[cursor] != b','
+            && bytes[cursor] != b'+'
+            && bytes[cursor] != b'-'
+        {
+            return None;
+        }
+    }
+
+    Some(numbers)
+}
+
 fn svg_numeric_list_is_bounded(value: &str) -> bool {
-    let mut token = String::new();
-    let mut token_count = 0usize;
-    let mut previous = None;
+    svg_numeric_tokens(value)
+        .map(|numbers| !numbers.is_empty())
+        .unwrap_or(false)
+}
 
-    let flush = |token: &mut String, token_count: &mut usize| -> bool {
-        if token.is_empty() {
-            return false;
-        }
-        *token_count = token_count.checked_add(1).unwrap_or(usize::MAX);
-        if *token_count > MAX_PORTRAIT_NUMBER_TOKENS || !svg_number_is_bounded(token) {
-            return false;
-        }
-        token.clear();
-        true
-    };
+fn svg_single_number_is_bounded(value: &str) -> bool {
+    svg_numeric_tokens(value)
+        .map(|numbers| numbers.len() == 1)
+        .unwrap_or(false)
+}
 
-    for ch in value.chars() {
-        let separator = ch == ',' || ch.is_ascii_whitespace();
-        let sign_starts_number = matches!(ch, '+' | '-')
-            && !token.is_empty()
-            && !matches!(previous, Some('e' | 'E'));
+fn svg_viewbox_is_bounded(value: &str) -> bool {
+    svg_numeric_tokens(value)
+        .map(|numbers| numbers.len() == 4)
+        .unwrap_or(false)
+}
 
-        if separator || sign_starts_number {
-            if !flush(&mut token, &mut token_count) {
-                return false;
-            }
-            if sign_starts_number {
-                token.push(ch);
-            }
-            previous = Some(ch);
-            continue;
-        }
-
-        token.push(ch);
-        previous = Some(ch);
-    }
-
-    if token.is_empty() {
-        return false;
-    }
-    flush(&mut token, &mut token_count)
+fn svg_points_is_bounded(value: &str) -> bool {
+    svg_numeric_tokens(value)
+        .map(|numbers| numbers.len() >= 2 && numbers.len() % 2 == 0)
+        .unwrap_or(false)
 }
 
 fn svg_path_data_is_bounded(value: &str) -> bool {
-    let mut token = String::new();
-    let mut number_count = 0usize;
+    let bytes = value.as_bytes();
+    let mut cursor = 0usize;
     let mut command_count = 0usize;
-    let mut previous = None;
+    let mut number_count = 0usize;
+    let mut first_command = true;
+    let mut pending_command: Option<u8> = None;
+    let mut saw_segment = false;
 
-    let flush = |token: &mut String, number_count: &mut usize| -> bool {
-        if token.is_empty() {
-            return true;
-        }
-        *number_count = number_count.checked_add(1).unwrap_or(usize::MAX);
-        if *number_count > MAX_PORTRAIT_NUMBER_TOKENS || !svg_number_is_bounded(token) {
-            return false;
-        }
-        token.clear();
-        true
-    };
+    const COMMANDS: &[u8] = b"MmZzLlHhVvCcSsQqTtAa";
 
-    for ch in value.chars() {
-        if matches!(
-            ch,
-            'M' | 'm'
-                | 'L' | 'l'
-                | 'H' | 'h'
-                | 'V' | 'v'
-                | 'C' | 'c'
-                | 'S' | 's'
-                | 'Q' | 'q'
-                | 'T' | 't'
-                | 'A' | 'a'
-                | 'Z' | 'z'
-        ) {
-            if !flush(&mut token, &mut number_count) {
-                return false;
-            }
+    loop {
+        while cursor < bytes.len()
+            && (bytes[cursor] == b',' || bytes[cursor].is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        if cursor >= bytes.len() {
+            break;
+        }
+
+        let command = if COMMANDS.contains(&bytes[cursor]) {
+            let command = bytes[cursor];
+            cursor += 1;
             command_count = command_count.checked_add(1).unwrap_or(usize::MAX);
             if command_count > MAX_PORTRAIT_PATH_COMMANDS {
                 return false;
             }
-            previous = Some(ch);
+            pending_command = Some(command);
+            command
+        } else {
+            match pending_command {
+                Some(command) if !matches!(command, b'Z' | b'z') => command,
+                _ => return false,
+            }
+        };
+
+        if first_command && !matches!(command, b'M' | b'm') {
+            return false;
+        }
+
+        if matches!(command, b'Z' | b'z') {
+            saw_segment = true;
+            pending_command = None;
+            first_command = false;
             continue;
         }
 
-        let separator = ch == ',' || ch.is_ascii_whitespace();
-        let sign_starts_number = matches!(ch, '+' | '-')
-            && !token.is_empty()
-            && !matches!(previous, Some('e' | 'E'));
+        let arity = match command {
+            b'M' | b'm' | b'L' | b'l' | b'T' | b't' => 2,
+            b'H' | b'h' | b'V' | b'v' => 1,
+            b'C' | b'c' => 6,
+            b'S' | b's' | b'Q' | b'q' => 4,
+            b'A' | b'a' => 7,
+            _ => return false,
+        };
 
-        if separator || sign_starts_number {
-            if !flush(&mut token, &mut number_count) {
+        let mut group_position = 0usize;
+        for _ in 0..arity {
+            while cursor < bytes.len()
+                && (bytes[cursor] == b',' || bytes[cursor].is_ascii_whitespace())
+            {
+                cursor += 1;
+            }
+            if cursor >= bytes.len() || COMMANDS.contains(&bytes[cursor]) {
                 return false;
             }
-            if sign_starts_number {
-                token.push(ch);
+
+            let start = cursor;
+            if matches!(bytes[cursor], b'+' | b'-') {
+                cursor += 1;
             }
-            previous = Some(ch);
-            continue;
+
+            let integer_start = cursor;
+            while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
+                cursor += 1;
+            }
+            let has_integer = cursor > integer_start;
+
+            let mut has_fraction = false;
+            if cursor < bytes.len() && bytes[cursor] == b'.' {
+                cursor += 1;
+                let fraction_start = cursor;
+                while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
+                    cursor += 1;
+                }
+                has_fraction = cursor > fraction_start;
+            }
+
+            if !has_integer && !has_fraction {
+                return false;
+            }
+
+            if cursor < bytes.len() && matches!(bytes[cursor], b'e' | b'E') {
+                cursor += 1;
+                if cursor < bytes.len() && matches!(bytes[cursor], b'+' | b'-') {
+                    cursor += 1;
+                }
+                let exponent_start = cursor;
+                while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
+                    cursor += 1;
+                }
+                if cursor == exponent_start {
+                    return false;
+                }
+            }
+
+            let token = &value[start..cursor];
+            if !svg_number_is_bounded(token) {
+                return false;
+            }
+            if matches!(command, b'A' | b'a') && matches!(group_position, 3 | 4) {
+                if !matches!(token, "0" | "1") {
+                    return false;
+                }
+            }
+
+            number_count = number_count.checked_add(1).unwrap_or(usize::MAX);
+            if number_count > MAX_PORTRAIT_NUMBER_TOKENS {
+                return false;
+            }
+            group_position += 1;
+
+            if cursor < bytes.len()
+                && !bytes[cursor].is_ascii_whitespace()
+                && bytes[cursor] != b','
+                && bytes[cursor] != b'+'
+                && bytes[cursor] != b'-'
+                && !COMMANDS.contains(&bytes[cursor])
+            {
+                return false;
+            }
         }
 
-        if ch == 'e' || ch == 'E' || ch == '.' || ch.is_ascii_digit() {
-            token.push(ch);
-            previous = Some(ch);
-        } else {
-            return false;
+        saw_segment = true;
+        first_command = false;
+        if matches!(command, b'M' | b'm') {
+            pending_command = Some(if command == b'M' { b'L' } else { b'l' });
         }
     }
 
-    flush(&mut token, &mut number_count)
+    saw_segment
 }
 
 fn svg_transform_is_bounded(value: &str) -> bool {
@@ -673,13 +803,23 @@ fn portrait_from_json(v: &Value) -> Option<String> {
                         return None;
                     }
                 }
-                "viewBox" | "width" | "height" | "rx" | "ry" | "cx" | "cy" | "r"
-                | "x" | "y" | "x1" | "y1" | "x2" | "y2" | "stroke-width" | "opacity" => {
-                    if !svg_numeric_list_is_bounded(value) {
+                "viewbox" => {
+                    if !svg_viewbox_is_bounded(value) {
                         return None;
                     }
                 }
-                "points" | "d" => {
+                "width" | "height" | "rx" | "ry" | "cx" | "cy" | "r" | "x" | "y" | "x1"
+                | "y1" | "x2" | "y2" | "stroke-width" | "opacity" => {
+                    if !svg_single_number_is_bounded(value) {
+                        return None;
+                    }
+                }
+                "points" => {
+                    if !svg_points_is_bounded(value) {
+                        return None;
+                    }
+                }
+                "d" => {
                     if !svg_path_data_is_bounded(value) {
                         return None;
                     }
@@ -1398,7 +1538,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn portrait_rejects_case_folded_svg_markup() {
         for svg in [
             r#"<SVG><circle cx="1" cy="1" r="1"/></SVG>"#,
@@ -1416,6 +1555,7 @@ mod tests {
         assert!(portrait_from_json(&payload).is_none());
     }
 
+    #[test]
     fn portrait_rejects_unbounded_numeric_geometry() {
         for svg in [
             r#"<svg><circle cx="1e9999" cy="0" r="1"/></svg>"#,
@@ -1441,7 +1581,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn portrait_preserves_svg_adjacent_sign_number_syntax() {
         let payload = serde_json::json!({
             "canvas_svg": r#"<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M10-5L2.5-3.25z"/></svg>"#
@@ -1449,6 +1588,7 @@ mod tests {
         assert!(portrait_from_json(&payload).is_some());
     }
 
+    #[test]
     fn portrait_accepts_bounded_numeric_and_transform_grammar() {
         let payload = serde_json::json!({
             "canvas_svg": r#"<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><g transform="translate(1,-2) rotate(3) scale(1,0.5)"><path d="M 0,0 L10-5 z"/></g></svg>"#
@@ -1470,6 +1610,14 @@ mod tests {
             let payload = serde_json::json!({ "canvas_svg": svg });
             assert!(portrait_from_json(&payload).is_none(), "accepted: {svg}");
         }
+    }
+
+    #[test]
+    fn portrait_accepts_valid_polyline_points() {
+        let payload = serde_json::json!({
+            "canvas_svg": r#"<svg viewBox="0 0 10 10"><polyline points="0,0 10,-5 10,10"/></svg>"#
+        });
+        assert!(portrait_from_json(&payload).is_some());
     }
 
     #[test]
