@@ -1003,7 +1003,7 @@ mod tests {
     fn test_frame_lineage_contiguity() {
         let mut record = IgnoranceRecord {
             id: "lineage".to_string(),
-            detection: super::IgnoranceDetection {
+            detection: IgnoranceDetection {
                 query: "q".to_string(),
                 ignorance_type: IgnoranceType::KnownUnknown,
                 uncertainty: Uncertainty3D::new(0.2, 0.2, 0.2),
