@@ -22,6 +22,9 @@ pub const RFC9942_VDS_HEADER_LABEL: i64 = 395;
 /// implementation resource limits, not changes to the RFC wire format.
 pub const MAX_RFC9942_PROOFS: usize = 256;
 pub const MAX_RFC9942_PROOF_BYTES: usize = 8 * 1024;
+/// A u64-sized RFC 9162 tree cannot require more than 64 authentication-path
+/// hashes. Enforce this before allocating from an attacker-controlled CBOR length.
+pub const MAX_RFC9162_PROOF_PATH: usize = 64;
 /// Defensive bounds for the RFC 9942 receipts header value. These limits
 /// constrain decoding/allocation without changing the RFC wire representation.
 pub const MAX_RFC9942_RECEIPTS: usize = 16;
@@ -103,6 +106,7 @@ impl Rfc9942Es256CoseKey {
         let mut y=None;
         let mut key_ops_seen=false;
         let mut key_ops_verify=false;
+        let mut key_ops_values=std::collections::HashSet::new();
         let mut seen=std::collections::HashSet::new();
 
         for _ in 0..len {
@@ -138,17 +142,31 @@ impl Rfc9942Es256CoseKey {
                     let count=reader.read_array_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                     if count==0 || count>16 { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
                     for _ in 0..count {
-                        match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
-                            0 | 1 => {
-                                if reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)? == COSE_KEY_OP_VERIFY {
-                                    key_ops_verify=true;
-                                }
-                            }
+                        let op=match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)? {
+                            0 | 1 => CborLabelKey::Integer(
+                                reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?,
+                            ),
                             3 => {
                                 let value=reader.read_text_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-                                if value==b"verify" { key_ops_verify=true; }
+                                match value.as_slice() {
+                                    b"sign" => CborLabelKey::Integer(1),
+                                    b"verify" => CborLabelKey::Integer(COSE_KEY_OP_VERIFY),
+                                    b"encrypt" => CborLabelKey::Integer(3),
+                                    b"decrypt" => CborLabelKey::Integer(4),
+                                    b"wrapKey" => CborLabelKey::Integer(5),
+                                    b"unwrapKey" => CborLabelKey::Integer(6),
+                                    b"deriveKey" => CborLabelKey::Integer(7),
+                                    b"deriveBits" => CborLabelKey::Integer(8),
+                                    _ => CborLabelKey::Text(value),
+                                }
                             }
                             _ => return Err(Rfc9942VdpError::InvalidEs256CoseKey),
+                        };
+                        if !key_ops_values.insert(op.clone()) {
+                            return Err(Rfc9942VdpError::InvalidEs256CoseKey);
+                        }
+                        if op == CborLabelKey::Integer(COSE_KEY_OP_VERIFY) {
+                            key_ops_verify=true;
                         }
                     }
                 }
@@ -1734,7 +1752,7 @@ impl<'a> CborReader<'a> {
 impl Rfc9162ConsistencyProof {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
         let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-        let first=r.read_u64()?; let second=r.read_u64()?; let n=r.read_array_len()?; let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
+        let first=r.read_u64()?; let second=r.read_u64()?; let n=r.read_array_len()?; if n>MAX_RFC9162_PROOF_PATH{return Err(Rfc9162ProofDecodeError::InvalidStructure)} let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
         if first==0 || first>=second || path.is_empty(){return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         Ok(Self::new(first,second,path))
     }
@@ -1743,7 +1761,7 @@ impl Rfc9162ConsistencyProof {
 impl Rfc9162InclusionProof {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
         let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-        let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?; let n=r.read_array_len()?; let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
+        let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?; let n=r.read_array_len()?; if n>MAX_RFC9162_PROOF_PATH{return Err(Rfc9162ProofDecodeError::InvalidStructure)} let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
         if tree_size==0 || leaf_index>=tree_size{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         Ok(Self::new(tree_size,leaf_index,path))
     }
@@ -2224,6 +2242,21 @@ mod tests {
     }
 
     #[test]
+    fn rfc9162_proof_decoder_rejects_path_length_before_allocation() {
+        let inclusion = vec![0x83, 0x01, 0x00, 0x1a, 0xff, 0xff, 0xff, 0xff];
+        assert_eq!(
+            Rfc9162InclusionProof::from_cbor(&inclusion),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        let consistency = vec![0x83, 0x01, 0x02, 0x1a, 0xff, 0xff, 0xff, 0xff];
+        assert_eq!(
+            Rfc9162ConsistencyProof::from_cbor(&consistency),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
+    #[test]
     fn rfc9942_proof_decoder_rejects_noncanonical_and_trailing_input() {
         let inclusion = Rfc9162InclusionProof::new(20, 17, vec![[0x11; 32]]);
         let mut encoded = inclusion.to_cbor();
@@ -2679,6 +2712,43 @@ mod tests {
 
     #[cfg(feature = "semantic-receipts")]
     #[test]
+    fn rfc9942_es256_cose_key_rejects_mixed_alias_duplicate() {
+        let x=[0x11;32];
+        let y=[0x22;32];
+        let mut cose=Vec::new();
+        cbor_map_len(&mut cose,5);
+        cbor_int(&mut cose,COSE_KTY_LABEL); cbor_int(&mut cose,COSE_EC2_KTY);
+        cbor_int(&mut cose,COSE_KEY_OPS_LABEL); cbor_array_len(&mut cose,2); cbor_int(&mut cose,1); cbor_text(&mut cose,b"sign");
+        cbor_int(&mut cose,-1); cbor_int(&mut cose,COSE_P256_CRV);
+        cbor_int(&mut cose,-2); cbor_bytes(&mut cose,&x);
+        cbor_int(&mut cose,-3); cbor_bytes(&mut cose,&y);
+
+        assert_eq!(
+            Rfc9942Es256CoseKey::from_cbor(&cose),
+            Err(Rfc9942VdpError::InvalidEs256CoseKey)
+        );
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn rfc9942_es256_cose_key_rejects_duplicate_key_ops() {
+        let x=[0x11;32];
+        let y=[0x22;32];
+        let mut cose=Vec::new();
+        cbor_map_len(&mut cose,5);
+        cbor_int(&mut cose,COSE_KTY_LABEL); cbor_int(&mut cose,COSE_EC2_KTY);
+        cbor_int(&mut cose,COSE_KEY_OPS_LABEL); cbor_array_len(&mut cose,2); cbor_int(&mut cose,COSE_KEY_OP_VERIFY); cbor_text(&mut cose,b"verify");
+        cbor_int(&mut cose,-1); cbor_int(&mut cose,COSE_P256_CRV);
+        cbor_int(&mut cose,-2); cbor_bytes(&mut cose,&x);
+        cbor_int(&mut cose,-3); cbor_bytes(&mut cose,&y);
+
+        assert_eq!(
+            Rfc9942Es256CoseKey::from_cbor(&cose),
+            Err(Rfc9942VdpError::InvalidEs256CoseKey)
+        );
+    }
+
+#[test]
     fn rfc9942_es256_cose_key_rejects_empty_key_ops() {
         let x=[0x11;32];
         let y=[0x22;32];
@@ -3323,6 +3393,53 @@ mod tests {
             vds.verify_rfc9942_consistency_cbor(wrong_size, newer, &proof),
             Err(Rfc9162ProofVerificationError::TreeSizeMismatch)
         );
+    }
+
+    #[test]
+    fn rfc9162_proof_decoders_reject_degenerate_metadata() {
+        let inclusion_zero_tree = vec![0x83, 0x00, 0x00, 0x80];
+        assert_eq!(
+            Rfc9162InclusionProof::from_cbor(&inclusion_zero_tree),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        let inclusion_leaf_out_of_range = vec![0x83, 0x01, 0x01, 0x80];
+        assert_eq!(
+            Rfc9162InclusionProof::from_cbor(&inclusion_leaf_out_of_range),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        let consistency_equal_sizes = vec![0x83, 0x02, 0x02, 0x01, 0x58, 0x20]
+            .into_iter()
+            .chain([0u8; 32])
+            .collect::<Vec<_>>();
+        assert_eq!(
+            Rfc9162ConsistencyProof::from_cbor(&consistency_equal_sizes),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        let consistency_empty_path = vec![0x83, 0x01, 0x02, 0x80];
+        assert_eq!(
+            Rfc9162ConsistencyProof::from_cbor(&consistency_empty_path),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
+    #[test]
+    fn rfc9162_verifiers_reject_extra_path_nodes() {
+        let vds = Rfc9162Sha256Vds;
+        let leaves = vec![b"a".to_vec(), b"b".to_vec()];
+        let root = vds.root(&leaves);
+
+        let mut inclusion = vds.inclusion_proof(&leaves, 0).expect("proof");
+        inclusion.inclusion_path.push([0xAA; 32]);
+        assert!(!vds.verify_inclusion(&leaves[0], root, &inclusion));
+
+        let older = vds.tree_head(&leaves[..1].to_vec());
+        let newer = vds.tree_head(&leaves);
+        let mut consistency = vds.prove(&leaves, 1).expect("proof");
+        consistency.consistency_path.push([0xBB; 32]);
+        assert!(!vds.verify_tree_heads(older, newer, &consistency));
     }
 
     #[test]

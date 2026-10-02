@@ -132,7 +132,7 @@ fn anchor_commitment(
 // independently. This path keeps the boundary compiled without pretending
 // that the chained history itself implements a Merkle consistency proof.
 #[cfg(feature = "semantic-digest")]
-#[path = "../semantic_evidence_vds.rs"]
+#[path = "semantic_evidence_vds.rs"]
 pub mod vds;
 
 #[cfg(feature = "semantic-digest")]
