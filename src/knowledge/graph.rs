@@ -1342,6 +1342,36 @@ mod tests {
     }
 
     #[test]
+    fn test_restore_rejects_invalid_fact_identity_and_confidence() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let valid_vector = vec![0u8; 2048];
+
+        for (memory_id, confidence) in [
+            ("", 0.8),
+            ("nan-confidence", f32::NAN),
+            ("high-confidence", 1.1),
+            ("negative-confidence", -0.1),
+        ] {
+            let record = super::persistence::FactRecord {
+                memory_id: memory_id.into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: valid_vector.clone(),
+                source_text: "invalid".into(),
+                confidence,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            };
+            let outcome = graph.import_fact_record_with_outcome(&record);
+            assert!(!outcome.accepted);
+            assert_eq!(outcome.policy_evictions, 0);
+        }
+
+        assert!(graph.is_empty());
+    }
+
+    #[test]
     fn test_memory_identity_survives_export_import() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
         let enc = make_encoding("stable claim", 0.8);
