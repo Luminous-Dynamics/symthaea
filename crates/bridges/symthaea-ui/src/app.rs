@@ -377,12 +377,13 @@ fn portrait_from_json(v: &Value) -> Option<String> {
             // This also rejects javascript:, data:, fragment indirection,
             // CSS url(), and namespace-based resource references.
             let lower_value = value.to_ascii_lowercase();
-            if lower_value.contains("url(")
-                || lower_value.contains("javascript:")
-                || lower_value.contains("data:")
-                || lower_value.contains("http:")
-                || lower_value.contains("https:")
-                || lower_value.contains("xlink:")
+            if key != "xmlns"
+                && (lower_value.contains("url(")
+                    || lower_value.contains("javascript:")
+                    || lower_value.contains("data:")
+                    || lower_value.contains("http:")
+                    || lower_value.contains("https:")
+                    || lower_value.contains("xlink:"))
             {
                 return None;
             }
@@ -418,16 +419,21 @@ fn portrait_from_json(v: &Value) -> Option<String> {
                     }
                 }
                 "transform" => {
-                    if !value.chars().all(|c| {
-                        c.is_ascii_digit()
-                            || matches!(c, 'e' | 'E' | '+' | '-' | '.' | ',' | '(' | ')' | ' ')
-                    }) {
-                        return None;
-                    }
                     if !(value.contains("translate(")
                         || value.contains("rotate(")
                         || value.contains("scale("))
+                        || value.matches('(').count() != value.matches(')').count()
                     {
+                        return None;
+                    }
+                    let mut numeric = value.to_string();
+                    for function_name in ["translate(", "rotate(", "scale("] {
+                        numeric = numeric.replace(function_name, "");
+                    }
+                    if !numeric.chars().all(|c| {
+                        c.is_ascii_digit()
+                            || matches!(c, 'e' | 'E' | '+' | '-' | '.' | ',' | '(' | ')' | ' ')
+                    }) {
                         return None;
                     }
                 }
@@ -1161,7 +1167,7 @@ mod tests {
     #[test]
     fn portrait_accepts_inert_geometric_svg() {
         let payload = serde_json::json!({
-            "canvas_svg": r#"<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><g id="root" opacity="0.8"><circle cx="5" cy="5" r="4" fill="#fff"/></g></svg>"#
+            "canvas_svg": r#"<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><g id="root" opacity="0.8" transform="translate(1,2) rotate(3) scale(1)"><circle cx="5" cy="5" r="4" fill="#fff"/></g></svg>"#
         });
         assert!(portrait_from_json(&payload).is_some());
     }
