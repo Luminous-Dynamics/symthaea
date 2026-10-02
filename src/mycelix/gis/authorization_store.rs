@@ -1463,6 +1463,52 @@ mod tests {
         (store,action,witness)
     }
 
+    struct TestProviderVerifier;
+
+    impl ProviderEvidenceVerifier for TestProviderVerifier {
+        fn verify_terminal_outcome(
+            &self,
+            record: &DurableDispatchRecord,
+            evidence: &ProviderTerminalEvidence,
+        ) -> Result<VerifiedProviderOutcome, ProviderVerificationError> {
+            if !matches!(evidence.kind, ProviderEvidenceKind::TerminalOutcome)
+                || evidence.action_id != record.action_id
+                || evidence.action_digest != record.action_digest
+                || evidence.attempt_id != record.attempt_id
+                || evidence.provider_idempotency_key != record.provider_idempotency_key
+                || evidence.target_identity != record.target_identity
+                || evidence.audience != record.audience
+                || evidence.adapter != record.adapter
+                || evidence.boundary_id != record.boundary_id
+                || matches!(evidence.outcome, ExecutionOutcome::Indeterminate)
+            {
+                return Err(ProviderVerificationError::VerificationFailed);
+            }
+            Ok(VerifiedProviderOutcome {
+                evidence: evidence.clone(),
+                verifier_id: "test-verifier/v1".into(),
+                verification_digest: "sha256:test-verification".into(),
+            })
+        }
+    }
+
+    fn verified_evidence(record: &DurableDispatchRecord, outcome: ExecutionOutcome) -> ProviderTerminalEvidence {
+        ProviderTerminalEvidence {
+            kind: ProviderEvidenceKind::TerminalOutcome,
+            outcome,
+            evidence_id: format!("provider-evidence:{}", record.attempt_id),
+            evidence_digest: "sha256:provider-evidence".into(),
+            action_id: record.action_id.clone(),
+            action_digest: record.action_digest.clone(),
+            attempt_id: record.attempt_id.clone(),
+            provider_idempotency_key: record.provider_idempotency_key.clone(),
+            target_identity: record.target_identity.clone(),
+            audience: record.audience.clone(),
+            adapter: record.adapter.clone(),
+            boundary_id: record.boundary_id.clone(),
+        }
+    }
+
     #[test]
     fn durable_state_survives_reopen_and_blocks_replay() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-{}.db",std::process::id()));
@@ -1809,7 +1855,7 @@ mod tests {
         let mut wrong=record.clone();
         wrong.boundary_id="boundary-B".into();
         assert!(matches!(
-            boundary_b.reconcile_indeterminate_bound(&wrong,ExecutionOutcome::Succeeded),
+            boundary_b.reconcile_indeterminate_bound_verified(&wrong,&verified_evidence(&wrong,ExecutionOutcome::Succeeded),&TestProviderVerifier),
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
         ));
 
@@ -1820,7 +1866,7 @@ mod tests {
                 .unwrap(),
             1
         );
-        let receipt=boundary_a.reconcile_indeterminate_bound(&record,ExecutionOutcome::Succeeded).unwrap();
+        let receipt=boundary_a.reconcile_indeterminate_bound_verified(&record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier).unwrap();
         assert_eq!(receipt.outcome,ExecutionOutcome::Succeeded);
         assert_eq!(receipt.authorization_instance,"approval-boundary");
         let _=std::fs::remove_file(path);
