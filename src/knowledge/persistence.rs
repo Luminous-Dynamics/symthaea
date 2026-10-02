@@ -3493,6 +3493,44 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn test_latest_snapshot_receipt_fails_closed_when_live_projection_drifts() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_latest_receipt_live_drift_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "latest-live-drift".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x21; BinaryHV::BYTES],
+            source_text: "original".into(),
+            confidence: 0.6,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        assert!(p.latest_snapshot_receipt().unwrap().is_some());
+
+        let changed = FactRecord {
+            source_text: "mutated outside snapshot boundary".into(),
+            ..fact
+        };
+        p.save_facts(std::slice::from_ref(&changed)).unwrap();
+
+        let err = p.latest_snapshot_receipt().unwrap_err();
+        assert!(err.starts_with("Snapshot receipt digest mismatch: generation 1"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_record_snapshot_validation_binds_current_generation_and_digest() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_snapshot_validation_receipt_test_{}",
@@ -3615,6 +3653,42 @@ mod tests {
         assert_eq!(
             err,
             "Snapshot validation receipt self-digest mismatch: validation:digest"
+        );
+
+        // Re-digesting a tampered record must not make it acceptable if it now
+        // points at a different persisted snapshot generation's digest.
+        conn.execute_batch(
+            "DROP TRIGGER IF EXISTS trg_knowledge_snapshot_validation_receipts_no_update;
+             UPDATE knowledge_snapshot_validation_receipts
+             SET validator_version = 'v1',
+                 snapshot_digest_hex = 'foreign-snapshot-digest',
+                 receipt_digest_hex = NULL
+             WHERE validation_event = 'validation:digest';",
+        )
+        .unwrap();
+        let mut tampered = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:digest".into(),
+            generation: committed.generation,
+            snapshot_digest_hex: "foreign-snapshot-digest".into(),
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        };
+        tampered.validate_input().unwrap();
+        conn.execute(
+            "UPDATE knowledge_snapshot_validation_receipts
+             SET receipt_digest_hex = ?1
+             WHERE validation_event = 'validation:digest'",
+            rusqlite::params![tampered.canonical_digest_hex()],
+        )
+        .unwrap();
+
+        let err = p.verify_snapshot_validation_receipts().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot validation receipt snapshot digest mismatch: validation:digest"
         );
 
         let second_validation = KnowledgeSnapshotValidationReceipt {
