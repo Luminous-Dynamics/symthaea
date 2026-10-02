@@ -178,11 +178,68 @@ pub enum VerificationStage {
 
 /// Structured stage-by-stage verification evidence. This deliberately does not
 /// collapse evidence into an aggregate trust score.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvaluationCheck {
+    EnvelopeStructuralValidation,
+    ReceiptCommitment,
+    TemporalValidity,
+    CryptosuiteConformance,
+    VerificationMethodResolution,
+    VerificationMethodLifecycle,
+    ProofPurposeAuthorization,
+    ProofPolicyConformance,
+    CryptographicProof,
+}
+
+impl EvaluationCheck {
+    pub const ALL: &'static [Self] = &[
+        Self::EnvelopeStructuralValidation,
+        Self::ReceiptCommitment,
+        Self::TemporalValidity,
+        Self::CryptosuiteConformance,
+        Self::VerificationMethodResolution,
+        Self::VerificationMethodLifecycle,
+        Self::ProofPurposeAuthorization,
+        Self::ProofPolicyConformance,
+        Self::CryptographicProof,
+    ];
+
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::EnvelopeStructuralValidation => "envelope-structural-validation",
+            Self::ReceiptCommitment => "receipt-commitment",
+            Self::TemporalValidity => "temporal-validity",
+            Self::CryptosuiteConformance => "cryptosuite-conformance",
+            Self::VerificationMethodResolution => "verification-method-resolution",
+            Self::VerificationMethodLifecycle => "verification-method-lifecycle",
+            Self::ProofPurposeAuthorization => "proof-purpose-authorization",
+            Self::ProofPolicyConformance => "proof-policy-conformance",
+            Self::CryptographicProof => "cryptographic-proof",
+        }
+    }
+
+    fn stage(self, report: &ReceiptAttestationVerificationReport) -> VerificationStage {
+        match self {
+            Self::EnvelopeStructuralValidation => report.structural_validation,
+            Self::ReceiptCommitment => report.receipt_commitment,
+            Self::TemporalValidity => report.temporal_validity,
+            Self::CryptosuiteConformance => report.cryptosuite,
+            Self::VerificationMethodResolution => report.verification_method,
+            Self::VerificationMethodLifecycle => report.lifecycle,
+            Self::ProofPurposeAuthorization => report.proof_purpose_authorization,
+            Self::ProofPolicyConformance => report.proof_policy,
+            Self::CryptographicProof => report.cryptographic_proof,
+        }
+    }
+}
+
+/// Structured stage-by-stage verification evidence. This deliberately does not
+/// collapse evidence into an aggregate trust score.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvaluationProcedure {
     pub procedure_version: &'static str,
     pub procedure_id: &'static str,
-    pub check_ids: &'static [&'static str],
+    pub checks: &'static [EvaluationCheck],
 }
 
 impl EvaluationProcedure {
@@ -190,17 +247,7 @@ impl EvaluationProcedure {
         Self {
             procedure_version: EVALUATION_PROCEDURE_VERSION,
             procedure_id: EVALUATION_PROCEDURE_ID,
-            check_ids: &[
-                "envelope-structural-validation",
-                "receipt-commitment",
-                "temporal-validity",
-                "cryptosuite-conformance",
-                "verification-method-resolution",
-                "verification-method-lifecycle",
-                "proof-purpose-authorization",
-                "proof-policy-conformance",
-                "cryptographic-proof",
-            ],
+            checks: EvaluationCheck::ALL,
         }
     }
 
@@ -214,9 +261,9 @@ impl EvaluationProcedure {
         bytes.extend_from_slice(b"symthaea:observation-evaluation-procedure:v1\n");
         write_string(&mut bytes, self.procedure_version);
         write_string(&mut bytes, self.procedure_id);
-        bytes.extend_from_slice(&(self.check_ids.len() as u64).to_be_bytes());
-        for check_id in self.check_ids {
-            write_string(&mut bytes, check_id);
+        bytes.extend_from_slice(&(self.checks.len() as u64).to_be_bytes());
+        for check in self.checks {
+            write_string(&mut bytes, check.id());
         }
         bytes
     }
@@ -230,36 +277,23 @@ impl EvaluationProcedure {
 
     /// Return the checks that actually executed for a report.
     ///
-    /// This is derived mechanically from the report's stage states rather than
-    /// being supplied by the caller. A failed stage is therefore executed and
-    /// failed; a NotEvaluated stage was not reached by the procedure.
+    /// Execution is interpreted through the typed check descriptors, so the
+    /// procedure ordering and the report stage mapping cannot silently diverge
+    /// through a second positional check-id list.
     pub fn executed_check_ids(
         &self,
         report: &ReceiptAttestationVerificationReport,
     ) -> Vec<&'static str> {
-        let stages = [
-            report.structural_validation,
-            report.receipt_commitment,
-            report.temporal_validity,
-            report.cryptosuite,
-            report.verification_method,
-            report.lifecycle,
-            report.proof_purpose_authorization,
-            report.proof_policy,
-            report.cryptographic_proof,
-        ];
-
-        self.check_ids
+        self.checks
             .iter()
             .copied()
-            .zip(stages)
-            .filter_map(|(check_id, stage)| {
-                (!matches!(stage, VerificationStage::NotEvaluated)).then_some(check_id)
+            .filter_map(|check| {
+                (!matches!(check.stage(report), VerificationStage::NotEvaluated))
+                    .then_some(check.id())
             })
             .collect()
     }
 }
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptAttestationVerificationReport {
     pub outcome: ReceiptAttestationVerificationOutcome,
@@ -2100,8 +2134,10 @@ mod tests {
         assert_eq!(
             evaluation.executed_check_ids,
             EvaluationProcedure::attestation_ed25519()
-                .check_ids
-                .to_vec()
+                .checks
+                .iter()
+                .map(|check| check.id())
+                .collect()
         );
     }
 
@@ -2193,16 +2229,16 @@ mod tests {
         let reordered = EvaluationProcedure {
             procedure_version: procedure.procedure_version,
             procedure_id: procedure.procedure_id,
-            check_ids: &[
-                "receipt-commitment",
-                "envelope-structural-validation",
-                "temporal-validity",
-                "cryptosuite-conformance",
-                "verification-method-resolution",
-                "verification-method-lifecycle",
-                "proof-purpose-authorization",
-                "proof-policy-conformance",
-                "cryptographic-proof",
+            checks: &[
+                EvaluationCheck::ReceiptCommitment,
+                EvaluationCheck::EnvelopeStructuralValidation,
+                EvaluationCheck::TemporalValidity,
+                EvaluationCheck::CryptosuiteConformance,
+                EvaluationCheck::VerificationMethodResolution,
+                EvaluationCheck::VerificationMethodLifecycle,
+                EvaluationCheck::ProofPurposeAuthorization,
+                EvaluationCheck::ProofPolicyConformance,
+                EvaluationCheck::CryptographicProof,
             ],
         };
 
