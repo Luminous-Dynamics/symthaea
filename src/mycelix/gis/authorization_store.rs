@@ -276,6 +276,9 @@ impl SqliteAuthorizationStore {
         )?;
         ensure_column(&mut connection, "authorization_leases", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "trust_anchor_digest", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "evidence_profile_digest", "TEXT NOT NULL DEFAULT ''")?;
         connection.execute_batch(
             "CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
                ON authorization_leases(attempt_id)
@@ -588,7 +591,11 @@ impl SqliteAuthorizationStore {
         {
             return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
         }
-        if verified.verifier_id.is_empty() || verified.verification_digest.is_empty()
+        if verified.verifier_id.is_empty()
+            || verified.verifier_config_digest.is_empty()
+            || verified.trust_anchor_digest.is_empty()
+            || verified.evidence_profile_digest.is_empty()
+            || verified.verification_digest.is_empty()
             || evidence.evidence_id.is_empty() || evidence.evidence_digest.is_empty()
             || evidence.action_id != record.action_id
             || evidence.action_digest != record.action_digest
@@ -658,7 +665,8 @@ impl SqliteAuthorizationStore {
         tx.execute(
             "INSERT OR REPLACE INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,boundary_id,action_digest,provider_idempotency_key,
-              target_identity,audience,outcome,evidence_id,evidence_digest,verifier_id,verification_digest)
+              target_identity,audience,outcome,evidence_id,evidence_digest,verifier_id,
+              verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
              VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
             params![
                 record.authorization_instance, record.attempt_id, record.boundary_id,
@@ -971,7 +979,8 @@ impl SqliteAuthorizationStore {
         tx.execute(
             "INSERT OR REPLACE INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,boundary_id,action_digest,provider_idempotency_key,
-              target_identity,audience,outcome,evidence_id,evidence_digest,verifier_id,verification_digest)
+              target_identity,audience,outcome,evidence_id,evidence_digest,verifier_id,
+              verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
              VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
             params![
                 record.authorization_instance, record.attempt_id, record.boundary_id,
