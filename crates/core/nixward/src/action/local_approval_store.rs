@@ -158,7 +158,6 @@ impl LocalApprovalRequestStoreV1 {
             verified_peer,
             evaluation,
         )?
-    })
     }
 
     /// Test-only legacy V1 admission, isolated from production callers.
@@ -199,7 +198,6 @@ impl LocalApprovalRequestStoreV1 {
             verified_peer,
             evaluation,
         )?
-    })
     }
 
     pub fn pending_count(&self) -> Result<usize, LocalApprovalRequestStoreErrorV1> {
