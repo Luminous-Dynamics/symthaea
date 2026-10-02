@@ -58,7 +58,8 @@ impl SqliteAuthorizationStore {
             "PRAGMA journal_mode=WAL;
              PRAGMA synchronous=FULL;
              CREATE TABLE IF NOT EXISTS authorization_leases (
-               action_id TEXT PRIMARY KEY,
+               authorization_instance TEXT PRIMARY KEY,
+               action_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
                support_digest TEXT NOT NULL,
                policy TEXT NOT NULL,
@@ -68,13 +69,14 @@ impl SqliteAuthorizationStore {
                attempt_id TEXT
              );
              CREATE TABLE IF NOT EXISTS authorization_receipts (
+               authorization_instance TEXT NOT NULL,
                action_id TEXT NOT NULL,
                attempt_id TEXT NOT NULL,
                phase TEXT NOT NULL,
                outcome TEXT NOT NULL,
                action_digest TEXT NOT NULL,
                authority_epoch INTEGER NOT NULL,
-               PRIMARY KEY(action_id, attempt_id, phase)
+               PRIMARY KEY(authorization_instance, attempt_id, phase)
              );",
         )?;
         Ok(store)
@@ -88,13 +90,14 @@ impl SqliteAuthorizationStore {
         let connection = self.connection()?;
         connection.execute(
             "INSERT INTO authorization_leases
-             (action_id, action_digest, support_digest, policy, authority_epoch,
+             (authorization_instance, action_id, action_digest, support_digest, policy, authority_epoch,
               remaining_executions, state, attempt_id)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
             params![
-                lease.action_id, lease.action_digest, lease.support_digest, lease.policy,
-                lease.authority_epoch as i64, lease.remaining_executions as i64,
-                encode_state(&lease.state), state_attempt(&lease.state)
+                lease.authorization_instance, lease.action_id, lease.action_digest,
+                lease.support_digest, lease.policy, lease.authority_epoch as i64,
+                lease.remaining_executions as i64, encode_state(&lease.state),
+                state_attempt(&lease.state)
             ],
         )?;
         Ok(())
@@ -106,13 +109,13 @@ impl SqliteAuthorizationStore {
     ) -> Result<(), AuthorizationStoreError> {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let mut lease = load_lease(&tx, &action.id)?
-            .ok_or_else(|| AuthorizationStoreError::NotFound(action.id.clone()))?;
+        let mut lease = load_lease(&tx, &witness.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
         lease.prepare_for_execution(witness, action, current_frame, attempt_id)?;
         tx.execute(
             "UPDATE authorization_leases SET state='prepared', attempt_id=?2
-             WHERE action_id=?1 AND state='ready' AND remaining_executions>0",
-            params![action.id, attempt_id],
+             WHERE authorization_instance=?1 AND state='ready' AND remaining_executions>0",
+            params![witness.authorization_instance, attempt_id],
         )?;
         if tx.changes() != 1 {
             return Err(AuthorizationConsumptionError::NotReady.into());
@@ -122,13 +125,13 @@ impl SqliteAuthorizationStore {
     }
 
     pub fn commit(
-        &self, action_id: &str, attempt_id: &str, outcome: ExecutionOutcome,
+        &self, authorization_instance: &str, attempt_id: &str, outcome: ExecutionOutcome,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
-        if let Some(r) = load_receipt(&tx, action_id, attempt_id, "final")? { return Ok(r); }
-        if let Some(r) = load_receipt(&tx, action_id, attempt_id, "indeterminate")? {
+        if let Some(r) = load_receipt(&tx, authorization_instance, attempt_id, "final")? { return Ok(r); }
+        if let Some(r) = load_receipt(&tx, authorization_instance, attempt_id, "indeterminate")? {
             return if matches!(outcome, ExecutionOutcome::Indeterminate) {
                 Ok(r)
             } else {
@@ -136,8 +139,8 @@ impl SqliteAuthorizationStore {
             };
         }
 
-        let mut lease = load_lease(&tx, action_id)?
-            .ok_or_else(|| AuthorizationStoreError::NotFound(action_id.to_owned()))?;
+        let mut lease = load_lease(&tx, authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
         let receipt = lease.commit(attempt_id, outcome)?;
         update_lease(&tx, &lease)?;
         let phase = if matches!(outcome, ExecutionOutcome::Indeterminate) { "indeterminate" } else { "final" };
@@ -147,21 +150,21 @@ impl SqliteAuthorizationStore {
     }
 
     pub fn reconcile_indeterminate(
-        &self, action_id: &str, attempt_id: &str, outcome: ExecutionOutcome,
+        &self, authorization_instance: &str, attempt_id: &str, outcome: ExecutionOutcome,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
         if matches!(outcome, ExecutionOutcome::Indeterminate) {
             return Err(AuthorizationConsumptionError::AttemptMismatch.into());
         }
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if let Some(r) = load_receipt(&tx, action_id, attempt_id, "reconciled")? { return Ok(r); }
+        if let Some(r) = load_receipt(&tx, authorization_instance, attempt_id, "reconciled")? { return Ok(r); }
 
-        let mut lease = load_lease(&tx, action_id)?
-            .ok_or_else(|| AuthorizationStoreError::NotFound(action_id.to_owned()))?;
+        let mut lease = load_lease(&tx, authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
         let receipt = lease.reconcile_indeterminate(attempt_id, outcome)?;
         let changed = tx.execute(
             "UPDATE authorization_leases SET state=?2, attempt_id=?3, remaining_executions=?4
-             WHERE action_id=?1 AND state='indeterminate' AND attempt_id=?5",
+             WHERE authorization_instance=?1 AND state='indeterminate' AND attempt_id=?5",
             params![
                 action_id, encode_state(&lease.state), state_attempt(&lease.state),
                 lease.remaining_executions as i64, attempt_id
@@ -193,12 +196,13 @@ fn state_attempt(s: &AuthorizationLeaseState) -> Option<&str> {
 }
 fn load_lease(tx: &Transaction<'_>, id: &str) -> Result<Option<AuthorizationLease>, rusqlite::Error> {
     tx.query_row(
-        "SELECT action_id,action_digest,support_digest,policy,authority_epoch,
-                remaining_executions,state,attempt_id FROM authorization_leases WHERE action_id=?1",
+        "SELECT authorization_instance,action_id,action_digest,support_digest,policy,authority_epoch,
+                remaining_executions,state,attempt_id FROM authorization_leases
+         WHERE authorization_instance=?1",
         params![id],
         |r| {
-            let state: String = r.get(6)?;
-            let attempt: Option<String> = r.get(7)?;
+            let state: String = r.get(7)?;
+            let attempt: Option<String> = r.get(8)?;
             let decoded = match state.as_str() {
                 "ready" => AuthorizationLeaseState::Ready,
                 "prepared" => AuthorizationLeaseState::Prepared {
@@ -213,22 +217,33 @@ fn load_lease(tx: &Transaction<'_>, id: &str) -> Result<Option<AuthorizationLeas
                 _ => return Err(rusqlite::Error::InvalidQuery),
             };
             Ok(AuthorizationLease {
-                action_id: r.get(0)?,
-                action_digest: r.get(1)?,
-                support_digest: r.get(2)?,
-                policy: r.get(3)?,
-                authority_epoch: r.get::<_,i64>(4)? as u64,
-                remaining_executions: r.get::<_,i64>(5)? as u32,
+                authorization_instance: r.get(0)?,
+                action_id: r.get(1)?,
+                action_digest: r.get(2)?,
+                support_digest: r.get(3)?,
+                policy: r.get(4)?,
+                authority_epoch: r.get::<_,i64>(5)? as u64,
+                remaining_executions: r.get::<_,i64>(6)? as u32,
                 state: decoded,
             })
         },
     ).optional()
 }
 fn update_lease(tx: &Transaction<'_>, lease: &AuthorizationLease) -> Result<(), AuthorizationStoreError> {
-    tx.execute(
-        "UPDATE authorization_leases SET state=?2,attempt_id=?3,remaining_executions=?4 WHERE action_id=?1",
-        params![lease.action_id,encode_state(&lease.state),state_attempt(&lease.state),lease.remaining_executions as i64],
+    let changed = tx.execute(
+        "UPDATE authorization_leases
+         SET state=?2,attempt_id=?3,remaining_executions=?4
+         WHERE authorization_instance=?1",
+        params![
+            lease.authorization_instance,
+            encode_state(&lease.state),
+            state_attempt(&lease.state),
+            lease.remaining_executions as i64,
+        ],
     )?;
+    if changed != 1 {
+        return Err(AuthorizationStoreError::NotFound(lease.authorization_instance.clone()));
+    }
     Ok(())
 }
 fn insert_receipt(tx: &Transaction<'_>, r: &ExecutionReceipt, phase: &str) -> Result<(), AuthorizationStoreError> {
@@ -239,29 +254,33 @@ fn insert_receipt(tx: &Transaction<'_>, r: &ExecutionReceipt, phase: &str) -> Re
     };
     tx.execute(
         "INSERT INTO authorization_receipts
-         (action_id,attempt_id,phase,outcome,action_digest,authority_epoch)
-         VALUES (?1,?2,?3,?4,?5,?6)",
-        params![r.action_id,r.attempt_id,phase,outcome,r.action_digest,r.authority_epoch as i64],
+         (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch)
+         VALUES (?1,?2,?3,?4,?5,?6,?7)",
+        params![
+            r.authorization_instance, r.action_id, r.attempt_id, phase, outcome,
+            r.action_digest, r.authority_epoch as i64
+        ],
     )?;
     Ok(())
 }
 fn load_receipt(
-    tx: &Transaction<'_>, action_id: &str, attempt_id: &str, phase: &str,
+    tx: &Transaction<'_>, authorization_instance: &str, attempt_id: &str, phase: &str,
 ) -> Result<Option<ExecutionReceipt>, AuthorizationStoreError> {
     tx.query_row(
-        "SELECT action_id,attempt_id,outcome,action_digest,authority_epoch
-         FROM authorization_receipts WHERE action_id=?1 AND attempt_id=?2 AND phase=?3",
+        "SELECT authorization_instance,action_id,attempt_id,outcome,action_digest,authority_epoch
+         FROM authorization_receipts
+         WHERE authorization_instance=?1 AND attempt_id=?2 AND phase=?3",
         params![action_id,attempt_id,phase],
         |r| {
-            let outcome = match r.get::<_,String>(2)?.as_str() {
+            let outcome = match r.get::<_,String>(3)?.as_str() {
                 "succeeded" => ExecutionOutcome::Succeeded,
                 "failed" => ExecutionOutcome::Failed,
                 "indeterminate" => ExecutionOutcome::Indeterminate,
                 _ => return Err(rusqlite::Error::InvalidQuery),
             };
             Ok(ExecutionReceipt {
-                action_id:r.get(0)?, attempt_id:r.get(1)?, outcome,
-                action_digest:r.get(3)?, authority_epoch:r.get::<_,i64>(4)? as u64,
+                authorization_instance:r.get(0)?, action_id:r.get(1)?, attempt_id:r.get(2)?, outcome,
+                action_digest:r.get(4)?, authority_epoch:r.get::<_,i64>(5)? as u64,
             })
         },
     ).optional().map_err(Into::into)
