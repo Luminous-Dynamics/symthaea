@@ -106,16 +106,27 @@ Run the existing two-factor resonator harness against an ordinary bipolar random
 
 Keep its existing cleanup-rule matrix separate from this comparator. The primary control should use the production-default Softmax configuration, with additional cleanup rules only as a secondary analysis if justified.
 
-### Stage E — noise and geometry
+### Stage E — decoder oracle and noise geometry
 
-Only after exact clean recovery is validated:
+First establish the coding-theoretic boundary with an exhaustive, research-only nearest-codeword oracle. This oracle is ground truth for small fixtures; it is not a production decoder and must not be described as an implementation of error correction.
 
-- query corruption: 0.0, 0.10, 0.20;
+For a code with minimum Hamming distance d_min, enumerate all corruption patterns with weight at most floor((d_min - 1) / 2) and verify that the clean codeword is the unique nearest codeword. In the same cases, the exact GF(2) span solver should generally reject the corrupted observation because a nonzero error below d_min is outside the code.
+
+This separates three contracts that must not be conflated:
+
+- **membership detection**: is the observed vector itself a codeword?
+- **exact algebraic recovery**: can the observation be represented in the code span?
+- **error correction**: can a decoder infer the intended nearby codeword when the observation is outside the span?
+
+Only after that oracle boundary is qualified:
+
+- query corruption: 0.0, 0.10, 0.20 and explicit weight-based profiles;
 - dimensions chosen from the smallest validated algebraic kernel through the existing HDC research scale;
 - codebook sizes chosen so exhaustive ground truth remains practical;
-- multiple deterministic seeds.
+- multiple deterministic seeds;
+- an actual decoder objective and algorithm must be named before any production-quality noise claim is made.
 
-Do not expand the matrix until the algebraic invariants pass.
+Do not expand the benchmark matrix until the algebraic invariants and oracle semantics pass.
 
 ## Acceptance gates
 
@@ -143,7 +154,7 @@ The literature supports treating this as a distinct recovery family. Raviv repor
 - no benchmark result in this design note;
 - no composite "best HDC" score;
 - no replacement of the resonator architecture;
-- no 3-factor expansion before the two-factor comparator is validated.
+- no production decoder or noise-tolerance claim from the exact span solver alone.
 
 
 ## Stage-C algebraic kernel status
@@ -175,8 +186,8 @@ A 2026 Deng–Raviv result, Efficient Vector Symbolic Architectures from Histogr
 For Symthaea, the next controlled experiment should therefore remain representation-explicit:
 
 1. finish deterministic clean recovery qualification for the independent F-factor path;
-2. add a research-only corruption taxonomy for the Boolean code representation;
-3. investigate whether a genuine decoder for the selected linear-code family can correct bounded corruption without changing the clean-recovery semantics;
+2. qualify the exhaustive corruption taxonomy and bounded-distance nearest-codeword oracle;
+3. implement a genuine decoder only after the noise objective and representation are explicit;
 4. compare that decoder against the existing resonator control only after the representations and corruption models are matched.
 
 The 2026 histogram-recovery construction should be treated as a separate comparator family unless its encoding and observation model are intentionally adopted; it should not be silently substituted into this experiment.
@@ -194,7 +205,13 @@ This distinguishes:
 
 For a rank-`r` binary linear code embedded in `n` Boolean coordinates, exactly `2^r` of the `2^n` possible error vectors are in the code. The exhaustive fixture verifies this invariant and verifies the semantic distinction between algebraic solvability and recovery correctness.
 
-This is deliberately **not** presented as an error-correction result. It establishes the identifiability boundary that a genuine decoder must cross. The next decoder experiment should therefore introduce an explicit noise model and decoder objective, rather than adding a nearest-codeword heuristic to the exact solver.
+This is deliberately **not** presented as an error-correction result. It establishes the exact-recovery boundary that a decoder must cross.
+
+### Bounded-distance decoder oracle
+
+The deterministic fixture now also defines a research-only nearest-codeword oracle. It exhaustively computes the minimum Hamming distance and checks the standard unique-decoding radius floor((d_min - 1) / 2). For every corruption pattern inside that radius, the oracle requires the original clean codeword to be the unique nearest codeword.
+
+The oracle is intentionally kept separate from solve_linear_combination: below the unique-decoding radius, a nonzero error can produce an observation outside the linear-code subspace even though the intended codeword is uniquely recoverable by Hamming distance. The test therefore asserts both facts simultaneously. This is an executable distinction between **detection/membership** and **correction**, not a heuristic claim about a production decoder.
 
 The recent Deng–Raviv noisy-VSA construction is a separate comparator family: it changes the code construction to a Reed–Solomon/Hadamard concatenation and uses histogram recovery/list-decoding machinery to obtain formal noise resilience. It should remain separate from the current random-linear-code exact-recovery implementation unless that representation is intentionally adopted.
 
