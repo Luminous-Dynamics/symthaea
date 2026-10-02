@@ -1187,17 +1187,27 @@ impl DaemonState {
                         // Try to generate a NixOS configuration AST hardening patch (Proposal 2)
                         let patch_tweak = self.generate_nixos_hardening_patch(&target_name_clone);
 
-                        let (cmd, cmd_str, _is_patch) = if let Some((tweak, _, _)) = &patch_tweak {
+                        let (cmd, cmd_str, patch_tweak) = if let Some((
+                            tweak,
+                            option_path,
+                            value,
+                            expected_config_digest,
+                        )) = &patch_tweak {
                             let command_str =
                                 format!("PATCH /etc/nixos/configuration.nix: {}", tweak);
                             (
-                                NixOSCommand::Custom {
-                                    command: "nixos-rebuild".into(),
-                                    args: vec!["switch".into()],
-                                    safety_level: SafetyLevel::SystemModify,
+                                NixOSCommand::ConfigPatch {
+                                    option_path: option_path.clone(),
+                                    value: value.clone(),
+                                    expected_config_digest: expected_config_digest.clone(),
                                 },
                                 command_str,
-                                true,
+                                Some((
+                                    tweak.clone(),
+                                    option_path.clone(),
+                                    value.clone(),
+                                    expected_config_digest.clone(),
+                                )),
                             )
                         } else {
                             let default_cmd = match &best_action.action {
@@ -1245,7 +1255,7 @@ impl DaemonState {
                             };
                             let (bin, args) = default_cmd.to_command();
                             let command_str = format!("{} {}", bin, args.join(" "));
-                            (default_cmd, command_str, false)
+                            (default_cmd, command_str, None)
                         };
 
                         let safety = cmd.safety_level();
