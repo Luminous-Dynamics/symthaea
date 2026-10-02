@@ -276,6 +276,7 @@ impl EnhancedKnowledgeGraph {
             score_b
                 .partial_cmp(&score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
         });
         results.truncate(k);
 
@@ -316,6 +317,7 @@ impl EnhancedKnowledgeGraph {
             score_b
                 .partial_cmp(&score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
         });
         results.truncate(k);
         results
@@ -747,6 +749,7 @@ impl EnhancedKnowledgeGraph {
             score_b
                 .partial_cmp(&score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
         });
         results.truncate(max_results);
 
@@ -848,8 +851,14 @@ impl EnhancedKnowledgeGraph {
 
     /// Export all facts as persistence records.
     pub fn export_fact_records(&self) -> Vec<super::persistence::FactRecord> {
-        self.facts
-            .values()
+        let mut facts: Vec<&TemporalFact> = self.facts.values().collect();
+        facts.sort_by(|a, b| {
+            a.memory_id
+                .cmp(&b.memory_id)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        facts
+            .into_iter()
             .map(|f| super::persistence::FactRecord {
                 memory_id: f.memory_id.clone(),
                 canonical_identity: f.canonical_identity.clone(),
