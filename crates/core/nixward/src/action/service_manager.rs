@@ -37,6 +37,21 @@ pub struct ServiceStatus {
 }
 
 impl ServiceManager {
+    /// Convert a validated service operation into the semantic executor command.
+    ///
+    /// Unlike the legacy renderer, this preserves the service operation as
+    /// structured NixOSCommand data so downstream authority and execution can
+    /// distinguish it from free-form Custom commands.
+    pub fn typed_command(
+        operation: &super::service_domain::NixServiceOperationV1,
+    ) -> Result<NixOSCommand, super::service_domain::NixServiceOperationErrorV1> {
+        operation.validate_shape()?;
+        Ok(NixOSCommand::Service {
+            operation: operation.operation(),
+            unit: operation.unit().to_string(),
+        })
+    }
+
     /// Render a typed service operation into the legacy command representation.
     ///
     /// This is a one-way compatibility projection only. The resulting
@@ -263,7 +278,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[test]
     fn rendered_legacy_service_commands_cannot_reenter_v1_authority() {
         use super::super::authorization::{NixActionIntentV1, NixAuthorizationErrorV1};
         use super::super::service_domain::{
@@ -288,6 +302,24 @@ mod tests {
                 NixAuthorizationErrorV1::UnsupportedCustomCommand
             );
         }
+    }
+
+    #[test]
+    fn typed_operation_produces_semantic_executor_command() {
+        use super::super::service_domain::{
+            NixServiceOperationKindV1, NixServiceOperationV1,
+        };
+
+        let typed =
+            NixServiceOperationV1::new("nginx", NixServiceOperationKindV1::Restart).unwrap();
+        let command = ServiceManager::typed_command(&typed).unwrap();
+        assert!(matches!(
+            command,
+            NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                unit,
+            } if unit == "nginx.service"
+        ));
     }
 
     fn typed_operation_renders_to_legacy_command_one_way() {
