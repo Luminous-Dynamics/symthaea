@@ -312,9 +312,9 @@ impl EvaluationProcedure {
 
     /// Return the checks that actually executed for a report.
     ///
-    /// Execution is interpreted through the typed check descriptors, so the
-    /// procedure ordering and the report stage mapping cannot silently diverge
-    /// through a second positional check-id list.
+    /// Compatibility helper retained for callers that only have a legacy report.
+    /// New code should consume `EvaluationTrace::executed_check_ids` instead.
+    #[deprecated(note = "use EvaluationTrace::executed_check_ids instead")]
     pub fn executed_check_ids(
         &self,
         report: &ReceiptAttestationVerificationReport,
@@ -372,7 +372,16 @@ pub struct EvaluationTrace {
 }
 
 impl EvaluationTrace {
+    /// Reconstruct an execution trace from compatibility report stages.
+    ///
+    /// Current reports capture the trace directly. This method exists for
+    /// historical reports serialized before `execution_trace` was introduced.
+    #[deprecated(note = "use the report's captured execution_trace; this is a legacy compatibility path")]
     pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
+        Self::from_report_legacy(report)
+    }
+
+    fn from_report_legacy(report: &ReceiptAttestationVerificationReport) -> Self {
         let procedure = EvaluationProcedure::attestation_ed25519();
         let results = procedure
             .checks
@@ -409,7 +418,7 @@ impl EvaluationTrace {
             && if report.execution_trace.is_well_formed() {
                 self == &report.execution_trace
             } else {
-                self.results == EvaluationTrace::from_report(report).results
+                self.results == EvaluationTrace::from_report_legacy(report).results
             }
     }
 
@@ -1071,7 +1080,7 @@ impl EvidenceEvaluation {
         } else {
             // Compatibility path for legacy serialized reports that predate
             // first-class execution traces.
-            EvaluationTrace::from_report(report)
+            EvaluationTrace::from_report_legacy(report)
         };
         Self {
             evaluation_version: EVIDENCE_EVALUATION_VERSION,
