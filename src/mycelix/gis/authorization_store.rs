@@ -996,22 +996,6 @@ fn update_lease_with_boundary(
     Ok(())
 }
 
-    let changed = tx.execute(
-        "UPDATE authorization_leases
-         SET state=?2,attempt_id=?3,remaining_executions=?4
-         WHERE authorization_instance=?1",
-        params![
-            lease.authorization_instance,
-            encode_state(&lease.state),
-            state_attempt(&lease.state),
-            lease.remaining_executions as i64,
-        ],
-    )?;
-    if changed != 1 {
-        return Err(AuthorizationStoreError::NotFound(lease.authorization_instance.clone()));
-    }
-    Ok(())
-}
 fn insert_receipt(tx: &Transaction<'_>, r: &ExecutionReceipt, phase: &str) -> Result<(), AuthorizationStoreError> {
     insert_receipt_with_boundary(tx, r, phase, None)
 }
