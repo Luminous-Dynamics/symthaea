@@ -295,6 +295,12 @@ impl KnowledgeManager {
             // startup from mixing rows committed by different snapshot generations.
             match p.load_snapshot() {
                 Ok(snapshot) => {
+                    let snapshot_digest = snapshot.canonical_digest_hex();
+                    tracing::debug!(
+                        %snapshot_digest,
+                        "Knowledge: loaded coherent persistence snapshot"
+                    );
+
                     let KnowledgePersistenceSnapshot {
                         facts,
                         provenance_relations,
