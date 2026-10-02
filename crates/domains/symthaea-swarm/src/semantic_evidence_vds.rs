@@ -2006,7 +2006,7 @@ mod tests {
             Err(Rfc9942VdpError::DetachedPayloadRequired)
         );
         let tbs=receipt.signature1_tbs(b"aad",Some(&[0x33;32])).unwrap();
-        assert!(tbs.windows(3).any(|w|w==[0x63,b'a',b'a']));
+        assert!(tbs.windows(4).any(|w|w==[0x43,b'a',b'a',b'd']));
     }
 
     #[test]
