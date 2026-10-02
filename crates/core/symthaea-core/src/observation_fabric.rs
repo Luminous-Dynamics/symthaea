@@ -256,6 +256,10 @@ pub struct ProcessingActivity {
     /// Observation IDs emitted by this activity.
     pub output_observation_ids: Vec<String>,
     /// Optional precise input-to-output derivation mappings.
+    ///
+    /// This is the compact core representation of qualified derivation.
+    /// Boundary adapters can expand each pair into explicit PROV Usage,
+    /// Generation, and Derivation records when event-level metadata exists.
     pub derivations: Vec<ProcessingDerivation>,
 }
 
@@ -263,7 +267,7 @@ impl ProcessingActivity {
     pub fn compute_execution_fingerprint(&self) -> Result<String, ObservationValidationError> {
         self.validate_without_execution_fingerprint()?;
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-processing-activity:v1\n");
+        hasher.update(b"symthaea:observation-processing-activity:v2\n");
         write_canonical_string(&mut hasher, &self.activity_id);
         write_canonical_string(&mut hasher, &self.process_id);
         write_canonical_string_option(
@@ -315,6 +319,14 @@ impl ProcessingActivity {
                 (Some(start), Some(end)) if end < start)
         {
             return Err(ObservationValidationError::InvalidProcessingActivity);
+        }
+        let mut input_ids = HashSet::with_capacity(self.input_observation_ids.len());
+        if self.input_observation_ids.iter().any(|id| !input_ids.insert(id)) {
+            return Err(ObservationValidationError::DuplicateActivityInput);
+        }
+        let mut output_ids = HashSet::with_capacity(self.output_observation_ids.len());
+        if self.output_observation_ids.iter().any(|id| !output_ids.insert(id)) {
+            return Err(ObservationValidationError::DuplicateActivityOutput);
         }
         Ok(())
     }
@@ -430,13 +442,13 @@ impl Observation {
 }
 
 /// Directed relationship between two observations in the evidence graph.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ObservationRelationKind {
     /// The source observation provides positive evidence for the target.
     Supports,
     /// The source observation provides evidence against the target.
     Contradicts,
-    /// The source independently agrees with the target observation.
+    /// The source agrees with the target observation; independence is tracked separately.
     Corroborates,
     /// The source was computationally derived from the target.
     DerivedFrom,
@@ -447,7 +459,7 @@ pub enum ObservationRelationKind {
 }
 
 /// Auditable edge between observations.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EvidenceIndependence {
     /// The observations have no declared shared upstream source.
     Independent,
@@ -483,6 +495,11 @@ impl ObservationRelation {
             && !matches!(self.independence, EvidenceIndependence::Derived | EvidenceIndependence::SharedUpstream)
         {
             return Err(ObservationValidationError::DerivedRelationIndependenceMismatch);
+        }
+        if matches!(self.kind, ObservationRelationKind::Corroborates)
+            && matches!(self.independence, EvidenceIndependence::Derived)
+        {
+            return Err(ObservationValidationError::CorroborationDerivedMismatch);
         }
         Ok(())
     }
@@ -617,8 +634,17 @@ impl ObservationGraph {
             }
         }
 
+        let mut relation_edges = HashSet::with_capacity(self.relations.len());
         for relation in &self.relations {
             relation.validate()?;
+            if !relation_edges.insert((
+                relation.source_observation_id.as_str(),
+                relation.target_observation_id.as_str(),
+                relation.kind,
+                &relation.independence,
+            )) {
+                return Err(ObservationValidationError::DuplicateObservationRelation);
+            }
             if !by_id.contains_key(relation.source_observation_id.as_str()) {
                 return Err(ObservationValidationError::MissingRelationEndpoint(
                     relation.source_observation_id.clone(),
@@ -684,12 +710,18 @@ pub enum ObservationValidationError {
     SelfRelation,
     #[error("derived-from relations require derived or shared-upstream independence")]
     DerivedRelationIndependenceMismatch,
+    #[error("corroboration relations cannot classify the source as derived evidence")]
+    CorroborationDerivedMismatch,
     #[error("verified provenance requires an attestation reference")]
     MissingVerificationAttestation,
     #[error("parent observation ids must be non-empty and cannot reference the observation itself")]
     InvalidParentObservation,
     #[error("processing activity has invalid identifiers, fingerprints, or time bounds")]
     InvalidProcessingActivity,
+    #[error("processing activity input observations must be unique")]
+    DuplicateActivityInput,
+    #[error("processing activity output observations must be unique")]
+    DuplicateActivityOutput,
     #[error("processing activity execution fingerprint must be 64 hexadecimal characters")]
     InvalidExecutionFingerprint,
     #[error("processing activity execution fingerprint does not match its canonical execution envelope")]
@@ -719,6 +751,8 @@ pub enum ObservationValidationError {
     MissingParentObservation(String),
     #[error("observation parent lineage contains a cycle")]
     LineageCycle,
+    #[error("relation edge is duplicated within the closed graph")]
+    DuplicateObservationRelation,
     #[error("relation endpoint is not present in the closed graph: {0}")]
     MissingRelationEndpoint(String),
 }
@@ -881,6 +915,20 @@ mod tests {
     }
 
     #[test]
+    fn corroboration_rejects_derived_independence() {
+        let relation = ObservationRelation {
+            source_observation_id: "derived".into(),
+            target_observation_id: "source".into(),
+            kind: ObservationRelationKind::Corroborates,
+            independence: EvidenceIndependence::Derived,
+        };
+        assert_eq!(
+            relation.validate(),
+            Err(ObservationValidationError::CorroborationDerivedMismatch)
+        );
+    }
+
+    #[test]
     fn verification_axes_remain_separate() {
         let mut observation = fixture();
         observation.provenance.verification = ProvenanceVerification::CredentialVerified;
@@ -972,6 +1020,16 @@ mod tests {
     }
 
     #[test]
+    fn processing_derivation_without_events_remains_activity_level_provenance() {
+        let derivation = ProcessingDerivation {
+            input_observation_id: "input".into(),
+            output_observation_id: "output".into(),
+        };
+        assert_eq!(derivation.input_observation_id, "input");
+        assert_eq!(derivation.output_observation_id, "output");
+    }
+
+    #[test]
     fn processing_derivation_requires_declared_endpoints() {
         let activity = ProcessingActivity {
             activity_id: "run-001".into(),
@@ -1024,6 +1082,114 @@ mod tests {
         });
         let second = activity.compute_execution_fingerprint().unwrap();
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn processing_derivation_accepts_precise_lineage() {
+        let mut input = fixture();
+        input.id = "input".into();
+        let mut output = fixture();
+        output.id = "output".into();
+        output.provenance.parent_observation_ids = vec!["input".into()];
+        output.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into()],
+            derivations: vec![ProcessingDerivation {
+                input_observation_id: "input".into(),
+                output_observation_id: "output".into(),
+            }],
+        });
+        let graph = ObservationGraph { observations: vec![input, output], relations: vec![] };
+        assert!(graph.validate().is_ok());
+    }
+
+    #[test]
+    fn processing_derivation_rejects_duplicate_edges() {
+        let mut output = fixture();
+        output.id = "output".into();
+        output.provenance.parent_observation_ids = vec!["input".into()];
+        output.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into()],
+            derivations: vec![
+                ProcessingDerivation {
+                    input_observation_id: "input".into(),
+                    output_observation_id: "output".into(),
+                },
+                ProcessingDerivation {
+                    input_observation_id: "input".into(),
+                    output_observation_id: "output".into(),
+                },
+            ],
+        });
+        let mut input = fixture();
+        input.id = "input".into();
+        let graph = ObservationGraph { observations: vec![input, output], relations: vec![] };
+        assert_eq!(graph.validate(), Err(ObservationValidationError::DuplicateProcessingDerivation));
+    }
+
+    #[test]
+    fn processing_activity_fingerprint_domain_version_changes_identity() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into()],
+            derivations: Vec::new(),
+        };
+        let fingerprint = activity.compute_execution_fingerprint().unwrap();
+        assert_eq!(fingerprint.len(), 64);
+    }
+
+    #[test]
+    fn processing_derivation_order_is_not_execution_identity() {
+        let mut first = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input-a".into(), "input-b".into()],
+            output_observation_ids: vec!["output-a".into(), "output-b".into()],
+            derivations: vec![
+                ProcessingDerivation {
+                    input_observation_id: "input-a".into(),
+                    output_observation_id: "output-a".into(),
+                },
+                ProcessingDerivation {
+                    input_observation_id: "input-b".into(),
+                    output_observation_id: "output-b".into(),
+                },
+            ],
+        };
+        let expected = first.compute_execution_fingerprint().unwrap();
+        first.derivations.reverse();
+        assert_eq!(expected, first.compute_execution_fingerprint().unwrap());
     }
 
     #[test]
@@ -1108,6 +1274,48 @@ mod tests {
     }
 
     #[test]
+    fn processing_activity_rejects_duplicate_input_ids() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into(), "input".into()],
+            output_observation_ids: vec!["output".into()],
+            derivations: Vec::new(),
+        };
+        assert_eq!(
+            activity.validate(),
+            Err(ObservationValidationError::DuplicateActivityInput)
+        );
+    }
+
+    #[test]
+    fn processing_activity_rejects_duplicate_output_ids() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into(), "output".into()],
+            derivations: Vec::new(),
+        };
+        assert_eq!(
+            activity.validate(),
+            Err(ObservationValidationError::DuplicateActivityOutput)
+        );
+    }
+
+    #[test]
     fn processing_activity_rejects_blank_process_id() {
         let activity = ProcessingActivity {
             activity_id: "run-001".into(),
@@ -1173,6 +1381,26 @@ mod tests {
         assert_eq!(
             graph.validate(),
             Err(ObservationValidationError::LineageCycle)
+        );
+    }
+
+    #[test]
+    fn graph_rejects_duplicate_relation() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        let relation = ObservationRelation {
+            source_observation_id: "obs-001".into(),
+            target_observation_id: "obs-002".into(),
+            kind: ObservationRelationKind::Supports,
+            independence: EvidenceIndependence::Unknown,
+        };
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![relation.clone(), relation],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::DuplicateObservationRelation)
         );
     }
 
