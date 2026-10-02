@@ -2215,6 +2215,38 @@ mod tests {
     use super::*;
 
     #[test]
+    fn rfc9162_generated_inclusion_and_consistency_proofs_cover_all_small_shapes() {
+        let vds = Rfc9162Sha256Vds;
+
+        for tree_size in 1usize..=64 {
+            let leaves: Vec<Vec<u8>> = (0..tree_size)
+                .map(|i| format!("leaf-{i}").into_bytes())
+                .collect();
+            let newer = vds.tree_head(&leaves);
+
+            for leaf_index in 0..tree_size {
+                let proof = vds
+                    .inclusion_proof(&leaves, leaf_index)
+                    .expect("in-range inclusion proof");
+                assert!(
+                    vds.verify_inclusion(&leaves[leaf_index], newer.root(), &proof),
+                    "inclusion failed for tree_size={tree_size}, leaf_index={leaf_index}"
+                );
+            }
+
+            for first in 1usize..tree_size {
+                let older = vds.tree_head(&leaves[..first].to_vec());
+                let proof = vds.prove(&leaves, first).expect("strict extension proof");
+                assert!(
+                    vds.verify_tree_heads(older, newer, &proof),
+                    "consistency failed for first={first}, second={tree_size}, path_len={}",
+                    proof.consistency_path.len()
+                );
+            }
+        }
+    }
+
+    #[test]
     fn rfc9162_root_is_deterministic_and_order_sensitive() {
         let vds = Rfc9162Sha256Vds;
         let a = vec![b"a".to_vec(), b"b".to_vec(), b"c".to_vec()];
