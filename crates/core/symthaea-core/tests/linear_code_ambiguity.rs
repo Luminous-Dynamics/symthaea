@@ -423,6 +423,52 @@ fn general_recovery_rejects_target_outside_union_span() {
 }
 
 #[test]
+fn overlapping_subspaces_without_shared_generators_still_recover_representatively() {
+    let parent = RandomLinearCode::generate(96, 4, 0x7A7A);
+    let left =
+        RandomLinearCode::from_basis(parent.basis()[..2].to_vec()).expect("left subcode");
+
+    // The right subcode intersects the left span, but shares no generator
+    // vector literally: its first basis vector is g0 XOR g1 from the left
+    // basis. This exercises overlap at the subspace level rather than only
+    // through duplicate generator identities.
+    let shared = parent.basis()[0].bound(&parent.basis()[1]);
+    let right_basis = vec![shared, parent.basis()[2].clone()];
+    let right = RandomLinearCode::from_basis(right_basis).expect("right subcode");
+
+    assert!(left.contains(&shared));
+    assert!(right.contains(&shared));
+    assert_ne!(left.basis()[0], right.basis()[0]);
+    assert_ne!(left.basis()[1], right.basis()[0]);
+
+    let target = shared.clone();
+    let recovered =
+        recover_linear_bound(&target, &[&left, &right]).expect("target is in the union span");
+
+    assert_eq!(recovered.len(), 2);
+    assert!(left.contains(&recovered[0]));
+    assert!(right.contains(&recovered[1]));
+    assert_eq!(recovered[0].bound(&recovered[1]), target);
+
+    // The factorization is not uniquely identifiable because the shared
+    // vector can be assigned to either factor through different valid pairs.
+    let matches: Vec<_> = left
+        .enumerate()
+        .into_iter()
+        .flat_map(|a| {
+            let target = target.clone();
+            right
+                .enumerate()
+                .into_iter()
+                .filter_map(move |b| (a.bound(&b) == target).then_some((a.clone(), b)))
+        })
+        .collect();
+    assert!(matches.len() > 1);
+
+    assert!(recover_independent_bound(&target, &[&left, &right]).is_none());
+}
+
+#[test]
 fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
     let parent = RandomLinearCode::generate(96, 8, 0x4444);
     let left = RandomLinearCode::from_basis(parent.basis()[..4].to_vec()).expect("left subcode");
