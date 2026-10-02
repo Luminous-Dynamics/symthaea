@@ -399,6 +399,15 @@ pub trait VerificationMethodResolver {
         &self,
         verification_method: &str,
     ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError>;
+
+    /// Return a deterministic fingerprint of the resolver state consulted by verification.
+    ///
+    /// Implementations backed by mutable or remote state should return a fingerprint of
+    /// the exact durable snapshot used for resolution. Returning `None` means the caller
+    /// must supply an explicit snapshot fingerprint when durable auditability is required.
+    fn snapshot_fingerprint(&self) -> Option<String> {
+        None
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -432,6 +441,28 @@ impl VerificationMethodResolver for InMemoryVerificationMethodResolver {
             .get(verification_method)
             .cloned()
             .ok_or(VerificationMethodResolutionError::Unavailable)
+    }
+
+    fn snapshot_fingerprint(&self) -> Option<String> {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:verification-method-resolver-snapshot:v1\\n");
+        for (method_id, method) in &self.methods {
+            hasher.update(&(method_id.len() as u64).to_be_bytes());
+            hasher.update(method_id.as_bytes());
+            hasher.update(&method.verifying_key.to_bytes());
+            hasher.update(&[match method.status {
+                VerificationMethodStatus::Active => 0,
+                VerificationMethodStatus::Revoked => 1,
+                VerificationMethodStatus::Expired => 2,
+                VerificationMethodStatus::Unknown => 3,
+            }]);
+            hasher.update(&(method.allowed_proof_purposes.len() as u64).to_be_bytes());
+            for purpose in &method.allowed_proof_purposes {
+                hasher.update(&(purpose.len() as u64).to_be_bytes());
+                hasher.update(purpose.as_bytes());
+            }
+        }
+        Some(hasher.finalize().to_hex().to_string())
     }
 }
 
@@ -555,7 +586,10 @@ impl Ed25519ReceiptVerifier {
         resolver: &R,
     ) -> ReceiptAttestationVerificationReport {
         let mut report = self.verify_with_resolver_report_inner(envelope, receipt, resolver);
-        report.resolution_snapshot_fingerprint = self.resolution_snapshot_fingerprint.clone();
+        report.resolution_snapshot_fingerprint = self
+            .resolution_snapshot_fingerprint
+            .clone()
+            .or_else(|| resolver.snapshot_fingerprint());
         report
     }
 
@@ -1244,6 +1278,39 @@ mod tests {
         assert_ne!(
             base.verify_report(&envelope, &receipt).fingerprint(),
             environment.verify_report(&envelope, &receipt).fingerprint()
+        );
+    }
+
+    #[test]
+    fn in_memory_resolver_binds_automatic_snapshot() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let method = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([method]);
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
+        assert!(report.resolution_snapshot_fingerprint.is_some());
+
+        let changed = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Revoked,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let changed_resolver = InMemoryVerificationMethodResolver::new([changed]);
+        let changed_report =
+            verifier.verify_with_resolver_report(&envelope, &receipt, &changed_resolver);
+        assert_ne!(
+            report.resolution_snapshot_fingerprint,
+            changed_report.resolution_snapshot_fingerprint
         );
     }
 
