@@ -1236,7 +1236,7 @@ mod tests {
 
     #[test]
     fn test_fact_restore_eviction_tie_break_is_deterministic() {
-        let mut graph = EnhancedKnowledgeGraph::new(1);
+        let mut graph = EnhancedKnowledgeGraph::new(2);
         let first = super::super::persistence::FactRecord {
             memory_id: "memory-z".into(),
             canonical_identity: None,
@@ -1259,14 +1259,26 @@ mod tests {
             cycle: 2,
             is_causal: false,
         };
+        let third = super::super::persistence::FactRecord {
+            memory_id: "memory-m".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![2u8; 2048],
+            source_text: "m".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 3,
+            is_causal: false,
+        };
 
         assert!(graph.import_fact_record_with_outcome(&first).accepted);
-        let outcome = graph.import_fact_record_with_outcome(&second);
+        assert!(graph.import_fact_record_with_outcome(&second).accepted);
+        let outcome = graph.import_fact_record_with_outcome(&third);
 
         assert_eq!(outcome.policy_evictions, 1);
         assert_eq!(
             graph.all_facts().map(|fact| fact.memory_id.as_str()).collect::<Vec<_>>(),
-            vec!["memory-z"]
+            vec!["memory-z", "memory-m"]
         );
     }
 
