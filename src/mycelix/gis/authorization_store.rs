@@ -74,6 +74,58 @@ impl RecoveryAuthorizationWitness {
 /// A durable shared consumption domain. Each operation uses a fresh connection,
 /// allowing independent processes to contend on the same SQLite state machine.
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// The purpose of provider evidence presented to the verifier. A pre-entry lookup
+/// is intentionally not interchangeable with terminal outcome evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderEvidenceKind {
+    TerminalOutcome,
+    PreEntryLookup,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderTerminalEvidence {
+    pub kind: ProviderEvidenceKind,
+    pub outcome: ExecutionOutcome,
+    /// Stable provider-side evidence identifier, if the provider exposes one.
+    pub evidence_id: String,
+    /// Digest of the authenticated provider evidence payload.
+    pub evidence_digest: String,
+    pub action_digest: String,
+    pub attempt_id: String,
+    pub provider_idempotency_key: String,
+    pub target_identity: String,
+    pub audience: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedProviderOutcome {
+    pub evidence: ProviderTerminalEvidence,
+    /// Relying-party configured verifier identity/revision.
+    pub verifier_id: String,
+    /// Digest of the verifier's authenticated verification statement.
+    pub verification_digest: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderVerificationError {
+    InvalidEvidenceKind,
+    InvalidBinding,
+    IndeterminateNotTerminal,
+    VerificationFailed,
+}
+
+/// The verifier owns provider authentication and semantic authority. The durable
+/// store deliberately does not pretend that an adapter's local enum is provider
+/// truth; it only accepts a verifier result that explicitly affirms terminal
+/// evidence for the exact frozen dispatch record.
+pub trait ProviderEvidenceVerifier {
+    fn verify_terminal_outcome(
+        &self,
+        record: &DurableDispatchRecord,
+        evidence: &ProviderTerminalEvidence,
+    ) -> Result<VerifiedProviderOutcome, ProviderVerificationError>;
+}
+
 pub struct DurableDispatchRecord {
     pub authorization_instance: String,
     pub attempt_id: String,
