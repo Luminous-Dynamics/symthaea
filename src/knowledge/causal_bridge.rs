@@ -248,16 +248,36 @@ impl CausalKnowledgeBridge {
 
     /// Import a causal edge directly from persistence (cause, effect, strength).
     ///
-    /// Used during startup to restore edges from SQLite.
+    /// This legacy entry point infers inhibitory state from a signed strength and
+    /// restores with a non-negative in-memory magnitude. New persistence callers
+    /// should use `import_edge_with_metadata` so cycle and explicit inhibitory
+    /// metadata survive the round trip.
     pub fn import_edge(&mut self, cause: String, effect: String, strength: f32) -> CausalRestoreOutcome {
+        self.import_edge_with_metadata(cause, effect, strength, strength < 0.0, 0)
+    }
+
+    /// Import a persisted causal edge while preserving its explicit metadata.
+    ///
+    /// Persisted inhibitory strength is represented with a negative sign, while
+    /// the bridge stores causal strength as a non-negative magnitude and keeps
+    /// inhibitory state in `is_inhibitory`. This boundary normalization prevents
+    /// valid inhibitory edges from being removed by the positive prune threshold.
+    pub fn import_edge_with_metadata(
+        &mut self,
+        cause: String,
+        effect: String,
+        strength: f32,
+        is_inhibitory: bool,
+        discovered_at_cycle: u64,
+    ) -> CausalRestoreOutcome {
         let edge = CausalEdge {
             cause,
             effect,
-            strength,
-            is_inhibitory: strength < 0.0,
+            strength: strength.abs(),
+            is_inhibitory,
             is_negated: false,
             source_text: String::new(),
-            discovered_at_cycle: 0,
+            discovered_at_cycle,
         };
         let before = self.edges.len();
         self.add_edge(edge);
@@ -271,6 +291,33 @@ impl CausalKnowledgeBridge {
     /// Alias for `export_edges()` used by the KnowledgeManager persistence snapshot.
     pub fn export_edge_records(&self) -> Vec<(String, String, f32)> {
         self.export_edges()
+    }
+
+    /// Export persistence metadata without coupling this module to persistence types.
+    ///
+    /// Strength remains signed for the serialized representation; the bridge itself
+    /// retains magnitude and explicit inhibitory state independently.
+    pub fn export_edge_records_with_metadata(
+        &self,
+    ) -> Vec<(String, String, f32, bool, u64)> {
+        self.edges
+            .iter()
+            .filter(|e| !e.is_negated)
+            .map(|e| {
+                let strength = if e.is_inhibitory {
+                    -e.strength.abs()
+                } else {
+                    e.strength.abs()
+                };
+                (
+                    e.cause.clone(),
+                    e.effect.clone(),
+                    strength,
+                    e.is_inhibitory,
+                    e.discovered_at_cycle,
+                )
+            })
+            .collect()
     }
 
     /// Update the strength of an existing causal edge based on prediction outcome.
@@ -750,6 +797,56 @@ mod tests {
         assert_eq!(bridge.edge_count(), 1);
         assert_eq!(bridge.effects_of("weak").len(), 0);
         assert_eq!(bridge.effects_of("strong").len(), 1);
+    }
+
+    #[test]
+    fn test_import_preserves_inhibitory_metadata_and_normalizes_strength() {
+        let mut bridge = CausalKnowledgeBridge::new(100);
+
+        let outcome = bridge.import_edge_with_metadata(
+            "ceasefire".into(),
+            "escalation".into(),
+            -0.6,
+            true,
+            42,
+        );
+
+        assert_eq!(outcome.pruned_edges, 0);
+        let edge = &bridge.effects_of("ceasefire")[0];
+        assert!((edge.strength - 0.6).abs() < f32::EPSILON);
+        assert!(edge.is_inhibitory);
+        assert_eq!(edge.discovered_at_cycle, 42);
+
+        let exported = bridge.export_edge_records_with_metadata();
+        assert_eq!(
+            exported,
+            vec![(
+                "ceasefire".to_string(),
+                "escalation".to_string(),
+                -0.6,
+                true,
+                42
+            )]
+        );
+    }
+
+    #[test]
+    fn test_inhibitory_restore_is_not_pruned_by_signed_strength() {
+        let mut bridge = CausalKnowledgeBridge::new(1);
+
+        let outcome = bridge.import_edge_with_metadata(
+            "blockade".into(),
+            "trade".into(),
+            -0.8,
+            true,
+            7,
+        );
+
+        assert!(!outcome.was_policy_limited());
+        assert_eq!(bridge.edge_count(), 1);
+        let edge = &bridge.effects_of("blockade")[0];
+        assert!((edge.strength - 0.8).abs() < f32::EPSILON);
+        assert!(edge.is_inhibitory);
     }
 
     #[test]
