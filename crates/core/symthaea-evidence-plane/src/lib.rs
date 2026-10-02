@@ -326,6 +326,8 @@ impl ExecutionLineageV1 {
                 return Err(format!("empty lineage field {name}"));
             }
         }
+        validate_git_object_id("source_revision", &self.source_revision)?;
+        validate_git_object_id("source_tree", &self.source_tree)?;
         if self.repository_source_snapshot_id.as_str()
             != self.repository_source_snapshot_id.as_str().to_ascii_lowercase()
         {
@@ -469,6 +471,13 @@ fn validate_name(name: &str) -> Result<(), String> {
     } else {
         Ok(())
     }
+}
+
+fn validate_git_object_id(field: &str, value: &str) -> Result<(), String> {
+    if !matches!(value.len(), 40 | 64) || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(format!("invalid Git object identity for {field}: {value:?}"));
+    }
+    Ok(())
 }
 
 fn validate_digest(value: &str) -> Result<(), String> {
@@ -928,8 +937,8 @@ mod tests {
     fn lineage_fixture() -> ExecutionLineageV1 {
         ExecutionLineageV1 {
             source_repository: "github.com/Luminous-Dynamics/symthaea".into(),
-            source_revision: "abc123".into(),
-            source_tree: "tree456".into(),
+            source_revision: "a".repeat(40),
+            source_tree: "b".repeat(40),
             repository_source_snapshot_id: RepositorySourceSnapshotId::parse(
                 &"A".repeat(64)
             ).expect("valid snapshot id"),
@@ -953,6 +962,25 @@ mod tests {
             .into_iter()
             .collect(),
         }
+    }
+
+    #[test]
+    fn execution_lineage_validation_rejects_invalid_git_object_identity() {
+        let mut lineage = lineage_fixture();
+        lineage.source_revision = "not-a-git-object".into();
+        assert!(lineage.validate().is_err());
+
+        lineage = lineage_fixture();
+        lineage.source_tree = "1234".into();
+        assert!(lineage.validate().is_err());
+    }
+
+    #[test]
+    fn execution_lineage_validation_accepts_sha1_and_sha256_git_object_ids() {
+        let mut lineage = lineage_fixture();
+        lineage.source_revision = "c".repeat(40);
+        lineage.source_tree = "d".repeat(64);
+        assert!(lineage.validate().is_ok());
     }
 
     #[test]
@@ -1120,7 +1148,7 @@ mod tests {
     fn execution_lineage_guard_does_not_commit_after_pre_evidence_drift() {
         let base = lineage_fixture();
         let mut changed = base.clone();
-        changed.source_revision = "def456".into();
+        changed.source_revision = "c".repeat(40);
 
         let mut guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
         let error = guard
@@ -1240,7 +1268,7 @@ mod tests {
     fn execution_lineage_relevant_changes_change_identity() {
         let base = lineage_fixture();
         let mut revision = base.clone();
-        revision.source_revision = "def456".into();
+        revision.source_revision = "c".repeat(40);
         let mut lock = base.clone();
         lock.lock_digests.insert("Cargo.lock".into(), "lock999".into());
         let mut argv = base.clone();
