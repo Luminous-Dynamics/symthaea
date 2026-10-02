@@ -1613,6 +1613,59 @@ mod tests {
     }
 
     #[test]
+    fn portrait_rejects_invalid_svg_path_grammar() {
+        for svg in [
+            r#"<svg><path d="M0"/></svg>"#,
+            r#"<svg><path d="M0 0 L1"/></svg>"#,
+            r#"<svg><path d="M0 0 A1 1 0 2 0 5 5"/></svg>"#,
+            r#"<svg><path d="L0 0"/></svg>"#,
+            r#"<svg><path d="M0 0 C1 2 3"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(),
+                "accepted: {svg}"
+            );
+        }
+    }
+
+    #[test]
+    fn portrait_accepts_implicit_moveto_line_repetition() {
+        let payload = serde_json::json!({
+            "canvas_svg": r#"<svg viewBox="0 0 10 10"><path d="M0 0 10 0 10 10 0 10z"/></svg>"#
+        });
+        assert!(portrait_from_json(&payload).is_some());
+    }
+
+    #[test]
+    fn portrait_rejects_invalid_points_arity() {
+        for svg in [
+            r#"<svg><polyline points="0,0 1"/></svg>"#,
+            r#"<svg><polygon points="0 0 1"/></svg>"#,
+            r#"<svg><polyline points="0,0 1,1 2"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(),
+                "accepted: {svg}"
+            );
+        }
+    }
+
+    #[test]
+    fn portrait_enforces_viewbox_and_scalar_numeric_arity() {
+        for svg in [
+            r#"<svg viewBox="0 0 10"/></svg>"#,
+            r#"<svg viewBox="0 0 10 10 20"/></svg>"#,
+            r#"<svg width="1 2"/></svg>"#,
+            r#"<svg><circle r="1 2"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(),
+                "accepted: {svg}"
+            );
+        }
+    }
+
+    #[test]
     fn portrait_accepts_valid_polyline_points() {
         let payload = serde_json::json!({
             "canvas_svg": r#"<svg viewBox="0 0 10 10"><polyline points="0,0 10,-5 10,10"/></svg>"#
