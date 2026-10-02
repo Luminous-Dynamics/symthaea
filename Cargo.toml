@@ -22,7 +22,8 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
-    # Observation attestation source currently targets the newer observation-fabric API; keep the incomplete adapter out of the workspace until its provider lands.\n    "crates/core/symthaea-observation-attestation",
+    # Observation attestation source currently targets the newer observation-fabric API; keep the incomplete adapter out of the workspace until its provider lands.
+    "crates/core/symthaea-observation-attestation",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
