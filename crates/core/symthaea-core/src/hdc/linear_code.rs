@@ -74,7 +74,7 @@ impl BinaryCodeword {
     /// to bipolar Hadamard binding.
     pub fn to_bipolar(&self) -> Vec<i8> {
         (0..self.dimension)
-            .map(|index| if self.bit(index) { 1 } else { -1 })
+            .map(|index| if self.bit(index) { -1 } else { 1 })
             .collect()
     }
 
@@ -590,6 +590,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn bipolar_binding_matches_boolean_xor() {
         let code = RandomLinearCode::generate(73, 8, 0xABCD);
         let left = code.encode(&[true, false, true, false, true, false, false, true]);
