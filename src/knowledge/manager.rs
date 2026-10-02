@@ -407,12 +407,27 @@ impl KnowledgeManager {
                     persistence_health.ontology_loaded = true;
                     let onto_count = records.len();
                     for record in &records {
-                        if !ontology.import_ontology_record(record) {
+                        let outcome = ontology.import_ontology_record_with_outcome(record);
+                        persistence_health.ontology_restore_evictions += outcome.policy_evictions;
+                        if outcome.rejected_by_policy {
+                            persistence_health.ontology_policy_rejections += 1;
+                            tracing::debug!(
+                                name = %record.name,
+                                rejected = persistence_health.ontology_policy_rejections,
+                                "Knowledge: ontology restore was limited by retention policy"
+                            );
+                        } else if !outcome.accepted {
                             persistence_health.ontology_rejections += 1;
                             tracing::warn!(
                                 name = %record.name,
                                 rejected = persistence_health.ontology_rejections,
-                                "Knowledge: rejected persisted ontology record during restore"
+                                "Knowledge: rejected malformed persisted ontology record during restore"
+                            );
+                        } else if outcome.policy_evictions > 0 {
+                            tracing::debug!(
+                                name = %record.name,
+                                evicted = outcome.policy_evictions,
+                                "Knowledge: ontology restore evicted an existing primitive by retention policy"
                             );
                         }
                     }
@@ -1464,8 +1479,16 @@ pub struct KnowledgePersistenceHealth {
     /// without falsely treating policy-limited capacity as persistence corruption.
     pub causal_restore_evictions: usize,
     pub ontology_loaded: bool,
-    /// Decoded ontology rows rejected during graph/ontology restore.
+    /// Decoded ontology rows rejected because the persisted record was malformed or invalid.
+    /// Policy-limited capacity is tracked separately and does not degrade persistence health.
     pub ontology_rejections: usize,
+ ontology_policy_rejections: 0,
+ ontology_restore_evictions: 0,
+    /// Persisted ontology rows rejected because the bounded restore retention policy
+    /// preferred the already-retained set.
+    pub ontology_policy_rejections: usize,
+    /// Number of existing ontology primitives evicted by restore retention policy.
+    pub ontology_restore_evictions: usize,
 }
 
 impl KnowledgePersistenceHealth {
@@ -1550,6 +1573,8 @@ mod tests {
             causal_restore_evictions: 0,
             ontology_loaded: false,
             ontology_rejections: 0,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
         };
 
         assert!(health.is_degraded());
@@ -1570,6 +1595,8 @@ mod tests {
             causal_restore_evictions: 0,
             ontology_loaded: true,
             ontology_rejections: 0,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
         };
 
         assert!(health.is_degraded());
@@ -1590,6 +1617,8 @@ mod tests {
             causal_restore_evictions: 2,
             ontology_loaded: true,
             ontology_rejections: 0,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
         };
 
         assert!(!health.is_degraded());
@@ -1611,6 +1640,8 @@ mod tests {
             causal_restore_evictions: 0,
             ontology_loaded: true,
             ontology_rejections: 0,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
         };
 
         assert!(!health.is_degraded());
@@ -1632,6 +1663,8 @@ mod tests {
             causal_restore_evictions: 0,
             ontology_loaded: true,
             ontology_rejections: 1,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
         };
 
         assert!(health.is_degraded());
@@ -1697,6 +1730,8 @@ mod tests {
             causal_restore_evictions: 0,
             ontology_loaded: true,
             ontology_rejections: 0,
+            ontology_policy_rejections: 0,
+            ontology_restore_evictions: 0,
         };
 
         assert!(health.is_degraded());
@@ -1789,6 +1824,61 @@ mod tests {
         assert!(health.is_degraded());
         assert_eq!(health.failed_domains(), vec!["ontology"]);
         assert!(mgr.ontology().primitives().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_persistence_restore_policy_limited_ontology_is_healthy() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_ontology_policy_restore_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT
+                );
+                INSERT INTO knowledge_ontology
+                    (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle)
+                VALUES ('alpha', zeroblob(2048), 9, 0.9, 1, 1);
+                INSERT INTO knowledge_ontology
+                    (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle)
+                VALUES ('beta', zeroblob(2048), 1, 0.1, 2, 2);",
+            )
+            .unwrap();
+        }
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ontology_config: AdaptiveOntologyConfig {
+                max_primitives: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mgr = KnowledgeManager::new(config);
+        let health = mgr.persistence_health();
+
+        assert!(health.ontology_loaded);
+        assert_eq!(health.ontology_rejections, 0);
+        assert_eq!(health.ontology_policy_rejections, 1);
+        assert_eq!(health.ontology_restore_evictions, 0);
+        assert!(!health.is_degraded());
+        assert!(health.failed_domains().is_empty());
+        assert_eq!(mgr.ontology().count(), 1);
+        assert!(mgr.ontology().primitives().contains_key("alpha"));
+        assert!(!mgr.ontology().primitives().contains_key("beta"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
