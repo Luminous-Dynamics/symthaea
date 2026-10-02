@@ -154,6 +154,15 @@ pub struct DaemonSnapshot {
     /// Canonical V1 action-intent digest required to approve a governed pending action.
     #[serde(default)]
     pub pending_action_intent_digest: Option<String>,
+    /// Opaque live local-approval request identifier for the pending governed action.
+    #[serde(default)]
+    pub pending_approval_request_id: Option<String>,
+    /// Live daemon incarnation reference for the pending approval request.
+    #[serde(default)]
+    pub pending_approval_daemon_incarnation_ref: Option<String>,
+    /// Digest committing the exact operator-visible approval projection.
+    #[serde(default)]
+    pub pending_approval_projection_digest: Option<String>,
     /// A conversational diagnostic response from Ollama.
     #[serde(default)]
     pub pending_response: Option<String>,
@@ -368,6 +377,9 @@ impl DaemonSnapshot {
             causal_learning_rate: 0.1,
             pending_action: None,
             pending_action_intent_digest: None,
+            pending_approval_request_id: None,
+            pending_approval_daemon_incarnation_ref: None,
+            pending_approval_projection_digest: None,
             pending_response: None,
         }
     }
