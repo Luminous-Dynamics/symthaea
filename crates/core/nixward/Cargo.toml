@@ -48,6 +48,7 @@ lru = { workspace = true }
 dashmap = { workspace = true }
 # `socket` supplies safe SO_PEERCRED; `user` supplies safe geteuid() for socket-path ownership checks.
 nix = { version = "0.27", optional = true, features = ["socket", "user"] }
+libc = { workspace = true }
 rusqlite = { workspace = true, optional = true }
 rnix = "0.11"
 
