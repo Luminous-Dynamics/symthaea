@@ -104,6 +104,10 @@ pub struct ProviderTerminalEvidence {
     pub action_id: String,
     pub action_digest: String,
     pub attempt_id: String,
+    /// Logical operation identity; distinct from the execution attempt.
+    pub operation_id: String,
+    /// Native authorization replay unit supplied by the native authorization path.
+    pub native_replay_identity: String,
     pub provider_idempotency_key: String,
     pub target_identity: String,
     pub audience: String,
@@ -146,6 +150,10 @@ pub trait ProviderEvidenceVerifier {
 pub struct DurableDispatchRecord {
     pub authorization_instance: String,
     pub attempt_id: String,
+    /// Logical operation identity supplied by the effect boundary.
+    pub operation_id: String,
+    /// Native replay identity derived by the native authorization path.
+    pub native_replay_identity: String,
     pub action_id: String,
     pub action_digest: String,
     pub provider_idempotency_key: String,
@@ -162,6 +170,8 @@ impl DurableDispatchRecord {
     pub fn new(
         authorization_instance: impl Into<String>,
         attempt_id: impl Into<String>,
+        operation_id: impl Into<String>,
+        native_replay_identity: impl Into<String>,
         action_id: impl Into<String>,
         action_digest: impl Into<String>,
         provider_idempotency_key: impl Into<String>,
@@ -171,6 +181,8 @@ impl DurableDispatchRecord {
         Self {
             authorization_instance: authorization_instance.into(),
             attempt_id: attempt_id.into(),
+            operation_id: operation_id.into(),
+            native_replay_identity: native_replay_identity.into(),
             action_id: action_id.into(),
             action_digest: action_digest.into(),
             provider_idempotency_key: provider_idempotency_key.into(),
@@ -234,6 +246,8 @@ impl SqliteAuthorizationStore {
              CREATE TABLE IF NOT EXISTS authorization_terminal_evidence (
                authorization_instance TEXT NOT NULL,
                attempt_id TEXT NOT NULL,
+               operation_id TEXT NOT NULL,
+               native_replay_identity TEXT NOT NULL,
                boundary_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
                provider_idempotency_key TEXT NOT NULL,
@@ -252,6 +266,8 @@ impl SqliteAuthorizationStore {
              CREATE TABLE IF NOT EXISTS authorization_dispatches (
                authorization_instance TEXT NOT NULL,
                attempt_id TEXT NOT NULL,
+               operation_id TEXT NOT NULL,
+               native_replay_identity TEXT NOT NULL,
                action_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
                provider_idempotency_key TEXT NOT NULL,
@@ -264,6 +280,10 @@ impl SqliteAuthorizationStore {
              );",
         )?;
         ensure_column(&mut connection, "authorization_leases", "boundary_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_dispatches", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "trust_anchor_digest", "TEXT NOT NULL DEFAULT ''")?;
@@ -274,7 +294,10 @@ impl SqliteAuthorizationStore {
                WHERE boundary_id IS NOT NULL AND attempt_id IS NOT NULL;
              CREATE UNIQUE INDEX IF NOT EXISTS authorization_dispatch_attempt_id_uq
                ON authorization_dispatches(attempt_id)
-               WHERE boundary_id IS NOT NULL AND attempt_id IS NOT NULL;",
+               WHERE boundary_id IS NOT NULL AND attempt_id IS NOT NULL;
+             CREATE UNIQUE INDEX IF NOT EXISTS authorization_dispatch_native_replay_uq
+               ON authorization_dispatches(native_replay_identity)
+               WHERE native_replay_identity <> '';",
         )?;
         Ok(store)
     }
@@ -421,8 +444,14 @@ impl SqliteAuthorizationStore {
         action: &EpistemicAction,
         expected_effect: &super::ActionEffectBinding,
         boundary_id: &str,
+        operation_id: &str,
+        native_replay_identity: &str,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
-        if action.effect_binding.as_ref() != Some(expected_effect) || boundary_id.is_empty() {
+        if action.effect_binding.as_ref() != Some(expected_effect)
+            || boundary_id.is_empty()
+            || operation_id.is_empty()
+            || native_replay_identity.is_empty()
+        {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
         let mut connection = self.connection()?;
@@ -457,6 +486,8 @@ impl SqliteAuthorizationStore {
         let record = DurableDispatchRecord::new(
             authorization_instance,
             attempt_id,
+            operation_id,
+            native_replay_identity,
             &action.id,
             &expected_digest,
             &lease.provider_idempotency_key(),
@@ -473,12 +504,13 @@ impl SqliteAuthorizationStore {
         }
         tx.execute(
             "INSERT INTO authorization_dispatches
-             (authorization_instance,attempt_id,action_id,action_digest,provider_idempotency_key,
-              target_identity,audience,adapter,boundary_id,state)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'dispatch_pending')",
-            params![record.authorization_instance, record.attempt_id, record.action_id,
-                record.action_digest, record.provider_idempotency_key, record.target_identity,
-                record.audience, record.adapter, record.boundary_id],
+             (authorization_instance,attempt_id,operation_id,native_replay_identity,action_id,
+              action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'dispatch_pending')",
+            params![record.authorization_instance, record.attempt_id, record.operation_id,
+                record.native_replay_identity, record.action_id, record.action_digest,
+                record.provider_idempotency_key, record.target_identity, record.audience,
+                record.adapter, record.boundary_id],
         )?;
         let changed = tx.execute(
             "UPDATE authorization_leases SET state='dispatch_pending', attempt_id=?2
@@ -502,19 +534,21 @@ impl SqliteAuthorizationStore {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let row = tx.query_row(
-            "SELECT action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
+            "SELECT operation_id,native_replay_identity,action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
              FROM authorization_dispatches WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
             |r| Ok((
                 r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
                 r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
-                r.get::<_,String>(6)?, r.get::<_,String>(7)?,
+                r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
+                r.get::<_,String>(9)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
-        if row.0 != record.action_id || row.1 != record.action_digest
-            || row.2 != record.provider_idempotency_key || row.3 != record.target_identity
-            || row.4 != record.audience || row.5 != record.adapter
-            || row.6 != record.boundary_id || row.7 != "dispatch_pending"
+        if row.0 != record.operation_id || row.1 != record.native_replay_identity
+            || row.2 != record.action_id || row.3 != record.action_digest
+            || row.4 != record.provider_idempotency_key || row.5 != record.target_identity
+            || row.6 != record.audience || row.7 != record.adapter
+            || row.8 != record.boundary_id || row.9 != "dispatch_pending"
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
@@ -589,6 +623,8 @@ impl SqliteAuthorizationStore {
             || evidence.action_id != record.action_id
             || evidence.action_digest != record.action_digest
             || evidence.attempt_id != record.attempt_id
+            || evidence.operation_id != record.operation_id
+            || evidence.native_replay_identity != record.native_replay_identity
             || evidence.provider_idempotency_key != record.provider_idempotency_key
             || evidence.target_identity != record.target_identity
             || evidence.audience != record.audience
@@ -653,14 +689,15 @@ impl SqliteAuthorizationStore {
         update_lease_with_boundary(&tx, &lease, Some(&record.boundary_id))?;
         tx.execute(
             "INSERT OR REPLACE INTO authorization_terminal_evidence
-             (authorization_instance,attempt_id,boundary_id,action_digest,provider_idempotency_key,
-              target_identity,audience,outcome,evidence_id,evidence_digest,verifier_id,
+             (authorization_instance,attempt_id,operation_id,native_replay_identity,boundary_id,
+              action_digest,provider_idempotency_key,target_identity,audience,outcome,evidence_id,
+              evidence_digest,verifier_id,
               verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
             params![
-                record.authorization_instance, record.attempt_id, record.boundary_id,
-                record.action_digest, record.provider_idempotency_key, record.target_identity,
-                record.audience,
+                record.authorization_instance, record.attempt_id, record.operation_id,
+                record.native_replay_identity, record.boundary_id, record.action_digest,
+                record.provider_idempotency_key, record.target_identity, record.audience,
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 evidence.evidence_id, evidence.evidence_digest, verified.configuration.verifier_id,
                 verified.configuration.verifier_config_digest, verified.configuration.trust_anchor_digest,
@@ -1504,6 +1541,8 @@ mod tests {
                 || evidence.action_id != record.action_id
                 || evidence.action_digest != record.action_digest
                 || evidence.attempt_id != record.attempt_id
+                || evidence.operation_id != record.operation_id
+                || evidence.native_replay_identity != record.native_replay_identity
                 || evidence.provider_idempotency_key != record.provider_idempotency_key
                 || evidence.target_identity != record.target_identity
                 || evidence.audience != record.audience
@@ -1535,6 +1574,8 @@ mod tests {
             action_id: record.action_id.clone(),
             action_digest: record.action_digest.clone(),
             attempt_id: record.attempt_id.clone(),
+            operation_id: record.operation_id.clone(),
+            native_replay_identity: record.native_replay_identity.clone(),
             provider_idempotency_key: record.provider_idempotency_key.clone(),
             target_identity: record.target_identity.clone(),
             audience: record.audience.clone(),
@@ -1568,7 +1609,9 @@ mod tests {
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-kind","boundary-A").unwrap();
         let record=store.mark_dispatch_pending_bound(
             &witness.authorization_instance,"attempt-kind",&action,&effect,"boundary-A"
-        ).unwrap();
+        ,
+            format!("operation:{}", "attempt-kind"),
+            format!("native-replay:{}", &witness.authorization_instance)).unwrap();
         let mut evidence=verified_evidence(&record,ExecutionOutcome::Failed);
         evidence.kind=ProviderEvidenceKind::PreEntryLookup;
         assert!(matches!(
@@ -1605,7 +1648,9 @@ mod tests {
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-exact","boundary-A").unwrap();
         let record=store.mark_dispatch_pending_bound(
             &witness.authorization_instance,"attempt-exact",&action,&effect,"boundary-A"
-        ).unwrap();
+        ,
+            format!("operation:{}", "attempt-exact"),
+            format!("native-replay:{}", &witness.authorization_instance)).unwrap();
         let mut evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
         evidence.provider_idempotency_key.push_str("-forged");
         assert!(matches!(
@@ -1720,7 +1765,9 @@ mod tests {
         };
         store.register_lease(&AuthorizationLease::new(action.id.clone(),digest,"sha256:support","policy-v1",1,1)).unwrap();
         store.prepare_for_execution(&witness,&action,"frame@1","attempt-bound").unwrap();
-        let record=store.mark_dispatch_pending_bound(&witness.authorization_instance,"attempt-bound",&action,&effect,"boundary-A").unwrap();
+        let record=store.mark_dispatch_pending_bound(&witness.authorization_instance,"attempt-bound",&action,&effect,"boundary-A",
+            format!("operation:{}", "attempt-bound"),
+            format!("native-replay:{}", &witness.authorization_instance)).unwrap();
         assert_eq!(record.target_identity,"target-A");
         let mut tampered=record.clone(); tampered.adapter="adapter-B".into();
         assert!(matches!(store.mark_invoked_bound(&tampered),Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))));
@@ -1774,7 +1821,9 @@ mod tests {
 
         let record=store.mark_dispatch_pending_bound(
             "approval-legacy-fence","attempt-legacy-fence",&action,&effect,"boundary-A"
-        ).unwrap();
+        ,
+            format!("operation:{}", "attempt-legacy-fence"),
+            format!("native-replay:{}", "approval-legacy-fence")).unwrap();
         assert!(matches!(
             store.mark_invoked("approval-legacy-fence","attempt-legacy-fence"),
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
@@ -1821,7 +1870,9 @@ mod tests {
             &witness.authorization_instance,"attempt-pre",&action,
             &super::super::ActionEffectBinding::new("target-A","prod","adapter-A"),
             "boundary-A"
-        );
+        ,
+            format!("operation:{}", "attempt-pre"),
+            format!("native-replay:{}", &witness.authorization_instance));
         assert!(old_attempt.is_err());
 
         store.prepare_for_execution_bound(
@@ -1928,7 +1979,9 @@ mod tests {
         ).unwrap();
         let record=store.mark_dispatch_pending_bound(
             "approval-after-dispatch","attempt-after-dispatch",&action,&effect,"boundary-A"
-        ).unwrap();
+        ,
+            format!("operation:{}", "attempt-after-dispatch"),
+            format!("native-replay:{}", "approval-after-dispatch")).unwrap();
 
         let recovery=RecoveryAuthorizationWitness {
             authorization_instance:"approval-after-dispatch".into(),
@@ -1972,7 +2025,9 @@ mod tests {
         ).unwrap();
         let record=store.mark_dispatch_pending_bound(
             &witness.authorization_instance,"attempt-boundary",&action,&effect,"boundary-A"
-        ).unwrap();
+        ,
+            format!("operation:{}", "attempt-boundary"),
+            format!("native-replay:{}", &witness.authorization_instance)).unwrap();
         drop(store);
 
         let boundary_b=SqliteAuthorizationStore::open(&path).unwrap();
@@ -2049,7 +2104,9 @@ mod tests {
                 &witness.authorization_instance,"attempt-prepared",&action,
                 &super::super::ActionEffectBinding::new("target-A","prod","adapter-A"),
                 "boundary-A"
-            ),
+            ,
+            format!("operation:{}", "attempt-prepared"),
+            format!("native-replay:{}", &witness.authorization_instance)),
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::AttemptMismatch))
         ));
         let _=std::fs::remove_file(path);
