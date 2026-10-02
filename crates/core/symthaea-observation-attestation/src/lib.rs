@@ -278,6 +278,7 @@ impl EvaluationProcedure {
             && self.subject_fingerprint == report.receipt_fingerprint
             && self.verification_report_fingerprint == report.fingerprint()
             && self.context_fingerprint == self.context.fingerprint()
+            && self.context.matches_report(report)
             && self.execution_trace.procedure_fingerprint == report.procedure_fingerprint
             && self.execution_trace.matches_report(report)
             && self.execution_trace.terminal_outcome() == Some(self.outcome)
@@ -703,7 +704,7 @@ impl ReceiptAttestationVerificationReport {
 
 
 pub const VERIFICATION_CONTEXT_VERSION: &str =
-    "symthaea-observation-verification-context-v3";
+    "symthaea-observation-verification-context-v4";
 pub const EVIDENCE_EVALUATION_VERSION: &str =
     "symthaea-observation-evaluation-v6";
 pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
@@ -713,8 +714,13 @@ pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
 pub struct VerificationContext {
     pub context_version: &'static str,
     pub policy_fingerprint: String,
+    /// Stable semantic identity of the verifier implementation.
+    pub verifier_id: &'static str,
+    /// Report/protocol version used by the verifier.
     pub verifier_version: &'static str,
     pub environment_fingerprint: String,
+    /// Stable semantic identity of the evaluation procedure family.
+    pub procedure_id: &'static str,
     pub procedure_fingerprint: String,
     /// Stable identity of the evaluator instance or organization, when available.
     ///
@@ -758,6 +764,21 @@ impl VerificationContext {
         self
     }
 
+    /// Verify that execution-bound context fields still correspond to the report.
+    /// Supplemental evaluator/trust/authorization identities are deliberately
+    /// excluded because they can be supplied by an external evaluation authority.
+    pub fn matches_report(&self, report: &ReceiptAttestationVerificationReport) -> bool {
+        self.context_version == VERIFICATION_CONTEXT_VERSION
+            && self.policy_fingerprint == report.policy_fingerprint
+            && self.verifier_id == VERIFIER_IMPLEMENTATION_ID
+            && self.verifier_version == report.verifier_version
+            && self.environment_fingerprint == report.environment_fingerprint
+            && self.procedure_id == EVALUATION_PROCEDURE_ID
+            && self.procedure_fingerprint == report.procedure_fingerprint
+            && self.resolution_snapshot_fingerprint == report.resolution_snapshot_fingerprint
+            && self.evaluated_at_unix_ns == report.evaluated_at_unix_ns
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         fn write_string(bytes: &mut Vec<u8>, value: &str) {
             bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
@@ -770,11 +791,13 @@ impl VerificationContext {
             }
         }
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:observation-verification-context:v3\n");
+        bytes.extend_from_slice(b"symthaea:observation-verification-context:v4\n");
         write_string(&mut bytes, self.context_version);
         write_string(&mut bytes, &self.policy_fingerprint);
+        write_string(&mut bytes, self.verifier_id);
         write_string(&mut bytes, self.verifier_version);
         write_string(&mut bytes, &self.environment_fingerprint);
+        write_string(&mut bytes, self.procedure_id);
         write_string(&mut bytes, &self.procedure_fingerprint);
         write_option(&mut bytes, self.evaluator_identity_fingerprint.as_deref());
         write_option(&mut bytes, self.resolution_snapshot_fingerprint.as_deref());
@@ -786,7 +809,7 @@ impl VerificationContext {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-verification-context:v3\n");
+        hasher.update(b"symthaea:observation-verification-context:v4\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -1076,6 +1099,8 @@ impl EvidenceEvaluation {
         // therefore cannot be replaced after the evaluation occurred.
         let mut evaluation = Self::from_report(report);
         let mut merged_context = VerificationContext::from_report(report);
+        merged_context.evaluator_identity_fingerprint =
+            context.evaluator_identity_fingerprint;
         merged_context.evaluator_identity_fingerprint =
             context.evaluator_identity_fingerprint;
         merged_context.trust_root_fingerprint = context.trust_root_fingerprint;
@@ -2438,6 +2463,27 @@ mod tests {
         let evaluation = report.to_evidence_evaluation();
         assert_eq!(evaluation.execution_trace, report.execution_trace);
         assert!(evaluation.is_consistent_with_report(&report));
+    }
+
+    #[test]
+    fn evaluation_context_binds_verifier_and_procedure_semantic_ids() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+
+        assert_eq!(evaluation.context.verifier_id, VERIFIER_IMPLEMENTATION_ID);
+        assert_eq!(evaluation.context.procedure_id, EVALUATION_PROCEDURE_ID);
+        assert!(evaluation.context.matches_report(&report));
+
+        let mut tampered = evaluation.clone();
+        tampered.context.procedure_id = "different-procedure";
+        tampered.context_fingerprint = tampered.context.fingerprint();
+        assert!(!tampered.is_consistent_with_report(&report));
     }
 
     #[test]
