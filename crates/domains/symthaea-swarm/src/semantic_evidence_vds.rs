@@ -88,12 +88,12 @@ impl Rfc9942ReceiptEnvelope {
     pub fn to_cbor(&self) -> Vec<u8> {
         let protected = self.protected_header_cbor();
         let mut out = Vec::new();
-        cbor_uint(&mut out, COSE_SIGN1_TAG);
+        cbor_tag(&mut out, COSE_SIGN1_TAG);
         cbor_array_len(&mut out, 4);
         cbor_bytes(&mut out, &protected);
         cbor_map_len(&mut out, 1);
         cbor_int(&mut out, RFC9942_VDP_HEADER_LABEL);
-        cbor_bytes(&mut out, &self.vdp.to_cbor());
+        out.extend_from_slice(&self.vdp.to_cbor());
         match &self.payload {
             Rfc9942ReceiptPayload::Detached => out.push(0xf6),
             Rfc9942ReceiptPayload::Attached(root) => cbor_bytes(&mut out, root),
@@ -114,7 +114,7 @@ impl Rfc9942ReceiptEnvelope {
 
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9942VdpError> {
         let mut reader=CborReader::new(bytes);
-        let tag=reader.read_u64().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        let tag=reader.read_tag().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
         if tag!=COSE_SIGN1_TAG { return Err(Rfc9942VdpError::InvalidStructure); }
         if reader.read_array_len().map_err(|_| Rfc9942VdpError::InvalidEncoding)?!=4 {
             return Err(Rfc9942VdpError::InvalidStructure);
@@ -145,8 +145,7 @@ impl Rfc9942ReceiptEnvelope {
             let label=reader.read_i64().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
             if label==RFC9942_VDP_HEADER_LABEL {
                 if vdp.is_some() { return Err(Rfc9942VdpError::InvalidStructure); }
-                let raw=reader.read_bstr_bounded(MAX_RFC9942_PROOF_BYTES*MAX_RFC9942_PROOFS).map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
-                vdp=Some(Rfc9942Vdp::from_cbor(&raw)?);
+                vdp=Some(Rfc9942Vdp::from_reader(&mut reader)?);
             } else {
                 reader.skip_value(0).map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
             }
