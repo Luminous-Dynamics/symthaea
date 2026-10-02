@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::{Component, Path, PathBuf};
 
-const SNAPSHOT_SCHEMA: &str = "symthaea.repository-source-snapshot.v1";
-const SNAPSHOT_HASH_DOMAIN: &[u8] = b"symthaea.repository-source-snapshot.v1\0";
+const SNAPSHOT_SCHEMA: &str = "symthaea.repository-source-snapshot.v2";
+const SNAPSHOT_HASH_DOMAIN: &[u8] = b"symthaea.repository-source-snapshot.v2\0";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -73,7 +73,6 @@ struct SnapshotPayload<'a> {
     schema: &'a str,
     git_head: &'a str,
     git_head_tree: &'a str,
-    git_version: &'a str,
     scope: &'a SnapshotScope,
     entries: &'a [SnapshotEntry],
     unknown_surfaces: &'a [UnknownSurface],
@@ -177,8 +176,7 @@ fn validate_entry_shape(entry: &SnapshotEntry) -> anyhow::Result<()> {
             if entry.content_sha256.is_none() || entry.size_bytes.is_none() {
                 bail!("entry {} is missing content identity", entry.path);
             }
-        }
-        EntryKind::MissingTracked => {
+        }        EntryKind::MissingTracked => {
             if !tracked
                 || entry.content_sha256.is_some()
                 || entry.size_bytes.is_some()
@@ -377,5 +375,4 @@ mod tests {
         snapshot.entries[0].kind = EntryKind::Gitlink;
         snapshot.snapshot_id = snapshot.computed_snapshot_id().unwrap();
         assert!(snapshot.validate().is_err());
-    }
-}
+    }}
