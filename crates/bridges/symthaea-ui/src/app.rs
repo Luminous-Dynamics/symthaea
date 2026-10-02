@@ -212,23 +212,45 @@ impl Movie {
 /// SVG markup out of the application DOM and prevents script/event attributes
 /// from executing with page privileges.
 fn portrait_from_json(v: &Value) -> Option<String> {
-    let svg = v.get("canvas_svg")?.as_str()?;
-    let start = svg.find("<svg")?;
-    let svg = &svg[start..];
-    if svg.len() > 512 * 1024 || !svg.trim_end().ends_with("</svg>") {
+    let svg = v.get("canvas_svg")?.as_str()?.trim();
+    if svg.len() > 512 * 1024 || !svg.starts_with("<svg") || !svg.ends_with("</svg>") {
         return None;
     }
-    // Keep the image-only rendering contract explicit at the trust boundary.
-    // The browser already disables scripting and external resource loading for
-    // SVG used through <img>, but rejecting active/resource-bearing SVG here
-    // makes the invariant independent of browser-specific behavior and avoids
-    // turning a future embedding change into a security regression.
+
+    // This is deliberately a narrow image grammar, not an HTML/SVG sanitizer.
+    // The producer currently emits geometric self-portraits; accepting only
+    // inert drawing primitives makes the browser rendering contract explicit.
+    const ALLOWED_TAGS: &[&str] = &[
+        "svg", "g", "path", "rect", "circle", "ellipse", "line", "polyline",
+        "polygon", "title", "desc",
+    ];
+    const FORBIDDEN_MARKERS: &[&str] = &[
+        "<script", "<style", "<animate", "<set", "<foreignobject", "<iframe",
+        "<object", "<embed", "<use", "<a", "<image", "javascript:", "data:",
+        "url(", "onload=", "onclick=", "onerror=", "onmouseover=", "xlink:",
+    ];
+
     let lower = svg.to_ascii_lowercase();
-    for marker in ["<script", "<foreignobject", "<iframe", "<object", "<embed", "<use", "href="http", "href='http", "xlink:href="http", "xlink:href='http"] {
-        if lower.contains(marker) {
+    if FORBIDDEN_MARKERS.iter().any(|marker| lower.contains(marker)) {
+        return None;
+    }
+
+    let mut rest = lower.as_str();
+    while let Some(open) = rest.find('<') {
+        let tag = &rest[open..];
+        let end = tag.find('>')?;
+        let token = tag[..=end].trim();
+        let closing = token.starts_with("</");
+        let name_start = if closing { 2 } else { 1 };
+        let name = token[name_start..]
+            .split(|c: char| c.is_ascii_whitespace() || c == '/' || c == '>')
+            .next()?;
+        if !ALLOWED_TAGS.contains(&name) {
             return None;
         }
+        rest = &tag[end + 1..];
     }
+
     let encoded = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
     Some(format!("data:image/svg+xml;base64,{encoded}"))
 }
@@ -909,10 +931,28 @@ mod tests {
             r#"<svg><use href="https://attacker.example/icon.svg#x"/></svg>"#,
             r#"<svg><image href="https://attacker.example/pixel.png"/></svg>"#,
             r#"<svg><rect style="fill:url(https://attacker.example/pixel.svg#x)"/></svg>"#,
+            r#"<svg><rect onclick="alert(1)"/></svg>"#,
+            r#"<svg><style>.x{fill:red}</style><rect/></svg>"#,
         ] {
             let payload = serde_json::json!({ "canvas_svg": svg });
             assert!(portrait_from_json(&payload).is_none(), "accepted: {svg}");
         }
+    }
+
+    #[test]
+    fn portrait_accepts_inert_geometric_svg() {
+        let payload = serde_json::json!({
+            "canvas_svg": r#"<svg viewBox="0 0 10 10"><g><circle cx="5" cy="5" r="4"/></g></svg>"#
+        });
+        assert!(portrait_from_json(&payload).is_some());
+    }
+
+    #[test]
+    fn portrait_rejects_unknown_markup_even_without_known_dangerous_markers() {
+        let payload = serde_json::json!({
+            "canvas_svg": r#"<svg><metadata><foo/></metadata></svg>"#
+        });
+        assert!(portrait_from_json(&payload).is_none());
     }
 
     #[test]
