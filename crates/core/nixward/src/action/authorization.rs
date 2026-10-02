@@ -15,6 +15,7 @@
 //! mint authorization here.
 
 use super::executor::{ChannelOperation, FlakeOperation, NixOSCommand, SafetyLevel};
+use super::service_domain::{validate_canonical_service_operation_v1, NixServiceOperationKindV1};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -86,6 +87,10 @@ pub enum NixActionDescriptorV1 {
         older_than_days: Option<u32>,
         delete_all: bool,
     },
+    Service {
+        operation: NixServiceOperationKindV1,
+        unit: String,
+    },
 }
 
 impl TryFrom<&NixOSCommand> for NixActionDescriptorV1 {
@@ -146,6 +151,10 @@ impl TryFrom<&NixOSCommand> for NixActionDescriptorV1 {
             } => Self::CollectGarbage {
                 older_than_days: *older_than_days,
                 delete_all: *delete_all,
+            },
+            NixOSCommand::Service { operation, unit } => Self::Service {
+                operation: *operation,
+                unit: unit.clone(),
             },
             NixOSCommand::Custom { .. } => {
                 return Err(NixAuthorizationErrorV1::UnsupportedCustomCommand)
@@ -435,6 +444,8 @@ pub enum NixAuthorizationErrorV1 {
     EmptyListItem { field: &'static str, index: usize },
     #[error("free-form custom commands are not supported by governed action-intent v1")]
     UnsupportedCustomCommand,
+    #[error("invalid typed command: {0}")]
+    InvalidTypedCommand(String),
     #[error("maximum scope {requested:?} is narrower than action minimum {minimum:?}")]
     ScopeTooNarrow {
         requested: NixActionScopeV1,
@@ -482,6 +493,10 @@ fn validate_action_shape(action: &NixActionDescriptorV1) -> Result<(), NixAuthor
         NixActionDescriptorV1::HomeManagerSwitch { flake } => {
             validate_optional_nonempty(flake.as_deref(), "home-manager flake ref")?
         }
+        NixActionDescriptorV1::Service { operation, unit } => {
+            validate_canonical_service_operation_v1(unit, *operation)
+                .map_err(|error| NixAuthorizationErrorV1::InvalidTypedCommand(error.to_string()))?;
+        }
         NixActionDescriptorV1::EnvRollback
         | NixActionDescriptorV1::ChannelList
         | NixActionDescriptorV1::FlakeShow
@@ -508,9 +523,9 @@ fn minimum_scope_for_action(action: &NixActionDescriptorV1) -> NixActionScopeV1 
         | NixActionDescriptorV1::FlakeLock { .. }
         | NixActionDescriptorV1::HomeManagerSwitch { .. } => NixActionScopeV1::UserModify,
 
-        NixActionDescriptorV1::RebuildTest { .. } | NixActionDescriptorV1::RebuildBoot { .. } => {
-            NixActionScopeV1::SystemModify
-        }
+        NixActionDescriptorV1::RebuildTest { .. }
+        | NixActionDescriptorV1::RebuildBoot { .. }
+        | NixActionDescriptorV1::Service { .. } => NixActionScopeV1::SystemModify
         NixActionDescriptorV1::RebuildSwitch { .. } => NixActionScopeV1::SystemCritical,
         NixActionDescriptorV1::CollectGarbage { .. } => NixActionScopeV1::Destructive,
     }
@@ -678,6 +693,21 @@ fn put_action(h: &mut Hasher, action: &NixActionDescriptorV1) {
             put_opt_u32(h, *older_than_days);
             put_bool(h, *delete_all);
         }
+        NixActionDescriptorV1::Service { operation, unit } => {
+            put_u8(h, 17);
+            put_u8(
+                h,
+                match operation {
+                    NixServiceOperationKindV1::Start => 0,
+                    NixServiceOperationKindV1::Stop => 1,
+                    NixServiceOperationKindV1::Restart => 2,
+                    NixServiceOperationKindV1::Reload => 3,
+                    NixServiceOperationKindV1::Enable => 4,
+                    NixServiceOperationKindV1::Disable => 5,
+                },
+            );
+            put_str(h, unit);
+        }
     }
 }
 
@@ -796,6 +826,38 @@ mod tests {
                 minimum: NixActionScopeV1::SystemCritical,
             }
         );
+    }
+
+    #[test]
+    fn typed_service_action_is_governed_and_exact() {
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        let intent =
+            NixActionIntentV1::from_command("host:x", Some("generation:42".to_string()), &command)
+                .unwrap();
+
+        assert_eq!(intent.maximum_scope, NixActionScopeV1::SystemModify);
+        assert!(matches!(
+            intent.action,
+            NixActionDescriptorV1::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                ref unit,
+            } if unit == "nginx.service"
+        ));
+    }
+
+    #[test]
+    fn invalid_typed_service_cannot_enter_governed_v1() {
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx*.service".to_string(),
+        };
+        assert!(matches!(
+            NixActionIntentV1::from_command("host:x", None, &command),
+            Err(NixAuthorizationErrorV1::InvalidTypedCommand(_))
+        ));
     }
 
     #[test]
