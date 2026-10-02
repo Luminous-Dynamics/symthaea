@@ -255,7 +255,7 @@ impl EvaluationCheck {
 
 /// Structured stage-by-stage verification evidence. This deliberately does not
 /// collapse evidence into an aggregate trust score.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct EvaluationProcedure {
     pub procedure_version: &'static str,
     pub procedure_id: &'static str,
@@ -422,12 +422,21 @@ impl EvaluationTrace {
     /// Current v4 reports carry the authoritative trace directly. Legacy reports
     /// without that field use the compatibility stage projection.
     pub fn matches_report(&self, report: &ReceiptAttestationVerificationReport) -> bool {
-        self.procedure_fingerprint == report.procedure_fingerprint
-            && if report.execution_trace.is_well_formed() {
-                self == &report.execution_trace
-            } else {
-                self.results == EvaluationTrace::from_report_legacy(report).results
-            }
+        if self.procedure_fingerprint != report.procedure_fingerprint {
+            return false;
+        }
+
+        let matches_trace = if report.execution_trace.is_well_formed() {
+            self == &report.execution_trace
+        } else {
+            self.results == EvaluationTrace::from_report_legacy(report).results
+        };
+        matches_trace
+            && self.terminal_outcome() == Some(report.outcome)
+            && self
+                .results
+                .iter()
+                .all(|result| result.check.stage(report) == result.stage)
     }
 
     /// Return the aggregate outcome represented by this trace.
@@ -1111,8 +1120,6 @@ impl EvidenceEvaluation {
         // therefore cannot be replaced after the evaluation occurred.
         let mut evaluation = Self::from_report(report);
         let mut merged_context = VerificationContext::from_report(report);
-        merged_context.evaluator_identity_fingerprint =
-            context.evaluator_identity_fingerprint;
         merged_context.evaluator_identity_fingerprint =
             context.evaluator_identity_fingerprint;
         merged_context.trust_root_fingerprint = context.trust_root_fingerprint;
@@ -2854,7 +2861,7 @@ mod tests {
     }
 
     #[test]
-    fn evidence_evaluation_fingerprint_is_order_independent_for_limitations() {
+    fn evidence_evaluation_fingerprint_is_order_independent_for_boundary_claims() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
@@ -2864,7 +2871,24 @@ mod tests {
         .verify_report(&envelope, &receipt);
         let first = report.to_evidence_evaluation();
         let mut second = first.clone();
-        second.limitations.reverse();
+        second.boundary.established.reverse();
+        second.boundary.not_established.reverse();
+        second.boundary.indeterminate.reverse();
         assert_eq!(first.fingerprint(), second.fingerprint());
+    }
+
+    #[test]
+    fn execution_trace_rejects_contradictory_report_stage_projection() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        assert!(report.execution_trace.matches_report(&report));
+        report.structural_validation =
+            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::InvalidEnvelope);
+        assert!(!report.execution_trace.matches_report(&report));
     }
 }
