@@ -177,16 +177,25 @@ pub fn solve_linear_combination(
         return None;
     }
 
-    // Augmented rows: [basis coefficients | target bit], represented as a
-    // packed vector so Gaussian elimination remains entirely in GF(2).
-    let width = basis.len() + 1;
-    let mut rows: Vec<Vec<bool>> = (0..dimension)
+    // Each equation row is stored as packed u64 words:
+    // [basis coefficients | target bit]. This keeps the research kernel's
+    // Gaussian elimination proportional to machine words rather than allocating
+    // one bool per coefficient/coordinate.
+    let coefficient_words = basis.len().div_ceil(64);
+    let augmented_column = basis.len();
+    let augmented_word = augmented_column / 64;
+    let augmented_mask = 1u64 << (augmented_column % 64);
+    let mut rows: Vec<Vec<u64>> = (0..dimension)
         .map(|row| {
-            let mut equation = Vec::with_capacity(width);
-            for vector in basis {
-                equation.push(vector.bit(row));
+            let mut equation = vec![0u64; coefficient_words + 1];
+            for (index, vector) in basis.iter().enumerate() {
+                if vector.bit(row) {
+                    equation[index / 64] |= 1u64 << (index % 64);
+                }
             }
-            equation.push(target.bit(row));
+            if target.bit(row) {
+                equation[augmented_word] |= augmented_mask;
+            }
             equation
         })
         .collect();
@@ -195,15 +204,20 @@ pub fn solve_linear_combination(
     let mut pivot_columns = Vec::with_capacity(basis.len());
 
     for column in 0..basis.len() {
-        let Some(found) = (pivot_row..rows.len()).find(|&row| rows[row][column]) else {
+        let word = column / 64;
+        let mask = 1u64 << (column % 64);
+        let Some(found) = (pivot_row..rows.len()).find(|&row| rows[row][word] & mask != 0) else {
             continue;
         };
         rows.swap(pivot_row, found);
 
+        // Reduced row echelon form makes the pivot coefficient directly
+        // readable from the augmented bit below. XOR whole machine words so
+        // the implementation remains compact and deterministic.
         for row in 0..rows.len() {
-            if row != pivot_row && rows[row][column] {
-                for bit in column..width {
-                    rows[row][bit] ^= rows[pivot_row][bit];
+            if row != pivot_row && rows[row][word] & mask != 0 {
+                for cell in 0..rows[row].len() {
+                    rows[row][cell] ^= rows[pivot_row][cell];
                 }
             }
         }
@@ -215,17 +229,24 @@ pub fn solve_linear_combination(
         }
     }
 
-    // 0 = 1 means the target is outside the span.
-    if rows.iter().any(|row| row[..basis.len()].iter().all(|bit| !*bit) && row[basis.len()]) {
+    // A zero coefficient row with a one augmented bit is an inconsistency:
+    // the target is outside the supplied span.
+    if rows.iter().any(|row| {
+        row[..coefficient_words].iter().all(|word| *word == 0)
+            && row[augmented_word] & augmented_mask != 0
+    }) {
         return None;
     }
 
-    // With a full-rank basis this is the unique coefficient vector. If the
-    // basis is dependent, leave free variables at zero and return one valid
-    // solution; callers needing uniqueness must check rank separately.
+    // For a full-rank basis this is the unique coefficient vector. If the
+    // basis is dependent, free variables remain zero and one valid solution
+    // is returned; callers requiring uniqueness must check rank separately.
     let mut coefficients = vec![false; basis.len()];
     for &(row, column) in &pivot_columns {
-        coefficients[column] = rows[row][basis.len()];
+        let word = column / 64;
+        let mask = 1u64 << (column % 64);
+        coefficients[column] = rows[row][augmented_word] & augmented_mask != 0;
+        debug_assert!(rows[row][word] & mask != 0);
     }
     Some(coefficients)
 }
