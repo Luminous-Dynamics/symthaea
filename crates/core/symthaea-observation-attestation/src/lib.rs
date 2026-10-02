@@ -275,6 +275,69 @@ impl EvaluationCheck {
         }
     }
 
+    /// Stable failure-outcome semantics for this check.
+    ///
+    /// These tags are part of the current procedure fingerprint. If the set of
+    /// outcomes a check may emit changes, the procedure identity must change too.
+    pub const fn allowed_failure_outcome_tags(self) -> &'static [u8] {
+        match self {
+            Self::EnvelopeStructuralValidation => &[verification_outcome_tag(
+                ReceiptAttestationVerificationOutcome::InvalidEnvelope,
+            )],
+            Self::ReceiptCommitment => &[verification_outcome_tag(
+                ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
+            )],
+            Self::TemporalValidity => &[
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
+            ],
+            Self::CryptosuiteConformance => &[verification_outcome_tag(
+                ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
+            )],
+            Self::VerificationMethodResolution => &[
+                verification_outcome_tag(
+                    ReceiptAttestationVerificationOutcome::VerificationMethodMismatch,
+                ),
+                verification_outcome_tag(
+                    ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+                ),
+            ],
+            Self::VerificationMethodLifecycle => &[
+                verification_outcome_tag(
+                    ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
+                ),
+                verification_outcome_tag(
+                    ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
+                ),
+            ],
+            Self::ProofPurposeAuthorization => &[verification_outcome_tag(
+                ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
+            )],
+            Self::ProofPolicyConformance => &[
+                verification_outcome_tag(
+                    ReceiptAttestationVerificationOutcome::ProofPurposeMismatch,
+                ),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::DomainMismatch),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::ChallengeMismatch),
+            ],
+            Self::CryptographicProof => &[
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::MissingProof),
+                verification_outcome_tag(
+                    ReceiptAttestationVerificationOutcome::InvalidProofEncoding,
+                ),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidSignature),
+            ],
+        }
+    }
+
+    fn allows_failure_outcome(
+        self,
+        outcome: ReceiptAttestationVerificationOutcome,
+    ) -> bool {
+        self.allowed_failure_outcome_tags()
+            .contains(&verification_outcome_tag(outcome))
+    }
+
     fn stage(self, report: &ReceiptAttestationVerificationReport) -> VerificationStage {
         match self {
             Self::EnvelopeStructuralValidation => report.structural_validation,
@@ -352,6 +415,9 @@ impl EvaluationProcedure {
             write_string(&mut bytes, check.id());
             if !legacy_v1 {
                 write_string(&mut bytes, check.definition_version());
+                let allowed_outcomes = check.allowed_failure_outcome_tags();
+                bytes.extend_from_slice(&(allowed_outcomes.len() as u64).to_be_bytes());
+                bytes.extend_from_slice(allowed_outcomes);
             }
         }
         bytes
@@ -529,7 +595,7 @@ impl EvaluationTrace {
                     && match result.stage {
                         VerificationStage::Passed => true,
                         VerificationStage::Failed(outcome) => {
-                            outcome_allowed_for_check(result.check, outcome)
+                            result.check.allows_failure_outcome(outcome)
                         }
                         VerificationStage::NotEvaluated => false,
                     }
@@ -3023,6 +3089,31 @@ mod tests {
             .established
             .push(EvaluationClaim::UnderlyingObservationTruth);
         assert!(!evaluation.is_consistent_with_report(&report));
+    }
+
+    #[test]
+    fn procedure_fingerprint_binds_failure_outcome_semantics() {
+        let current = EvaluationProcedure::attestation_ed25519();
+        let legacy = EvaluationProcedure::attestation_ed25519_v1();
+
+        assert_ne!(current.fingerprint(), legacy.fingerprint());
+
+        let current_canonical = current.canonical_bytes();
+        let legacy_canonical = legacy.canonical_bytes();
+
+        for check in current.checks {
+            let tags = check.allowed_failure_outcome_tags();
+            assert!(!tags.is_empty());
+            assert!(current_canonical.windows(tags.len()).any(|window| window == tags));
+        }
+
+        // Historical v1 canonicalization remains exactly the pre-v2 shape:
+        // check definition revisions and failure semantics are intentionally
+        // excluded so old evidence remains reconstructable.
+        for check in legacy.checks {
+            assert!(!legacy_canonical.windows(check.definition_version().len())
+                .any(|window| window == check.definition_version().as_bytes()));
+        }
     }
 
     #[test]
