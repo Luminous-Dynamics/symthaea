@@ -12,7 +12,7 @@
 //! - knowledge_causal_edges: cause, effect, strength, cycle
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
 //! - knowledge_snapshot_receipts: generation, canonical_digest_hex, receipt_digest_hex
-//! - knowledge_snapshot_validation_receipts: validation_event, generation, validator/profile metadata, outcome
+//! - knowledge_snapshot_validation_receipts: validation_sequence, validation_event, generation, validator/profile metadata, outcome
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
@@ -1002,17 +1002,20 @@ impl KnowledgePersistence {
             ));
         }
 
-        let next_validation_sequence = tx
+        let previous_validation_sequence = tx
             .query_row(
-                "SELECT COALESCE(MAX(validation_sequence), 0) + 1
+                "SELECT MAX(validation_sequence)
                  FROM knowledge_snapshot_validation_receipts",
                 [],
-                |row| row.get::<_, i64>(0),
+                |row| row.get::<_, Option<i64>>(0),
             )
             .map_err(|e| format!("Load validation sequence for append: {e}"))?;
-        if next_validation_sequence <= 0 {
-            return Err("Validation sequence exhausted SQLite INTEGER range".into());
-        }
+        let next_validation_sequence = match previous_validation_sequence {
+            None => 1_i64,
+            Some(value) => value
+                .checked_add(1)
+                .ok_or("Validation sequence exhausted SQLite INTEGER range")?,
+        };
 
         tx.execute(
             "INSERT INTO knowledge_snapshot_validation_receipts
@@ -1778,6 +1781,13 @@ impl KnowledgePersistence {
             [],
         )
         .map_err(|e| format!("Schema identity index: {e}"))?;
+
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshot_validation_receipts_sequence_unique
+             ON knowledge_snapshot_validation_receipts(validation_sequence)",
+            [],
+        )
+        .map_err(|e| format!("Schema validation sequence index: {e}"))?;
 
         // Enforce append-only receipt history at the SQLite boundary. Migration backfills
         // above intentionally happen before these triggers are created.
@@ -3901,6 +3911,62 @@ mod tests {
         assert_eq!(
             err,
             "Snapshot validation receipt snapshot digest mismatch: validation:digest"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_validation_sequence_rejects_history_gaps() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_validation_sequence_gap_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "validation-sequence-gap".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x91; BinaryHV::BYTES],
+            source_text: "sequence gap".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        let committed = p.latest_snapshot_receipt().unwrap().unwrap();
+
+        for event in ["validation:seq-1", "validation:seq-2"] {
+            p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
+                validation_event: event.into(),
+                generation: committed.generation,
+                snapshot_digest_hex: committed.canonical_digest_hex.clone(),
+                validator_ref: "validator:test".into(),
+                validator_version: "v1".into(),
+                validation_profile: "profile:test".into(),
+                conforms: true,
+                report_digest_hex: None,
+            })
+            .unwrap();
+        }
+
+        let conn = p.open_connection().unwrap();
+        conn.execute_batch(
+            "DROP TRIGGER trg_knowledge_snapshot_validation_receipts_no_delete;
+             DELETE FROM knowledge_snapshot_validation_receipts
+             WHERE validation_event = 'validation:seq-1';",
+        )
+        .unwrap();
+
+        let err = p.verify_snapshot_validation_receipts().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot validation receipt sequence discontinuity: expected 1, observed 2"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
