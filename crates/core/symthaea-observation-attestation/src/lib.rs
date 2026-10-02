@@ -120,6 +120,7 @@ impl VerifierEnvironmentIdentity {
     }
 }
 
+const REPORT_DOMAIN_SEPARATOR_V3: &[u8] = b"symthaea:observation-attestation-report:v3\n";
 const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v4\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -633,16 +634,23 @@ impl ReceiptAttestationVerificationReport {
         }
 
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(REPORT_DOMAIN_SEPARATOR);
+        let legacy_v3 = self.verifier_version == "symthaea-observation-attestation-report-v3";
+        bytes.extend_from_slice(if legacy_v3 {
+            REPORT_DOMAIN_SEPARATOR_V3
+        } else {
+            REPORT_DOMAIN_SEPARATOR
+        });
         write_string(&mut bytes, self.verifier_version);
         write_string(&mut bytes, &self.receipt_fingerprint);
         bytes.extend_from_slice(&self.evaluated_at_unix_ns.to_be_bytes());
         write_string(&mut bytes, &self.policy_fingerprint);
         write_string(&mut bytes, &self.environment_fingerprint);
         write_string(&mut bytes, &self.procedure_fingerprint);
-        let trace_bytes = self.execution_trace.canonical_bytes();
-        bytes.extend_from_slice(&(trace_bytes.len() as u64).to_be_bytes());
-        bytes.extend_from_slice(&trace_bytes);
+        if !legacy_v3 {
+            let trace_bytes = self.execution_trace.canonical_bytes();
+            bytes.extend_from_slice(&(trace_bytes.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(&trace_bytes);
+        }
         match &self.resolution_snapshot_fingerprint {
             Some(value) => { bytes.push(1); write_string(&mut bytes, value); }
             None => bytes.push(0),
@@ -655,15 +663,15 @@ impl ReceiptAttestationVerificationReport {
             None => bytes.push(0),
         }
         bytes.push(verification_outcome_tag(self.outcome));
-        write_stage(&mut bytes, self.structural_validation);
-        write_stage(&mut bytes, self.receipt_commitment);
-        write_stage(&mut bytes, self.temporal_validity);
-        write_stage(&mut bytes, self.cryptosuite);
-        write_stage(&mut bytes, self.verification_method);
-        write_stage(&mut bytes, self.lifecycle);
-        write_stage(&mut bytes, self.proof_purpose_authorization);
-        write_stage(&mut bytes, self.proof_policy);
-        write_stage(&mut bytes, self.cryptographic_proof);
+        write_stage(bytes.as_mut_slice(), self.structural_validation);
+        write_stage(bytes.as_mut_slice(), self.receipt_commitment);
+        write_stage(bytes.as_mut_slice(), self.temporal_validity);
+        write_stage(bytes.as_mut_slice(), self.cryptosuite);
+        write_stage(bytes.as_mut_slice(), self.verification_method);
+        write_stage(bytes.as_mut_slice(), self.lifecycle);
+        write_stage(bytes.as_mut_slice(), self.proof_purpose_authorization);
+        write_stage(bytes.as_mut_slice(), self.proof_policy);
+        write_stage(bytes.as_mut_slice(), self.cryptographic_proof);
         bytes
     }
 
@@ -2335,6 +2343,24 @@ mod tests {
 
         let evaluation = report.to_evidence_evaluation();
         assert_eq!(evaluation.execution_trace, report.execution_trace);
+    }
+
+    #[test]
+    fn legacy_v3_report_canonicalization_excludes_execution_trace() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let v4 = report.canonical_bytes();
+        report.verifier_version = "symthaea-observation-attestation-report-v3";
+        report.execution_trace = EvaluationTrace::default();
+        let v3 = report.canonical_bytes();
+        assert!(v3.starts_with(b"symthaea:observation-attestation-report:v3\n"));
+        assert!(v4.starts_with(b"symthaea:observation-attestation-report:v4\n"));
+        assert_ne!(v3, v4);
     }
 
     #[test]
