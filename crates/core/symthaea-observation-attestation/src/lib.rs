@@ -23,6 +23,7 @@ use symthaea_core::observation_fabric::{
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
 pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v4";
+const LEGACY_REPORT_VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v3";
 
 pub const EVALUATION_PROCEDURE_VERSION: &str =
     "symthaea-observation-evaluation-procedure-v2";
@@ -428,8 +429,10 @@ impl EvaluationTrace {
 
         let matches_trace = if report.execution_trace.is_well_formed() {
             self == &report.execution_trace
-        } else {
+        } else if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
             self.results == EvaluationTrace::from_report_legacy(report).results
+        } else {
+            false
         };
         matches_trace
             && self.terminal_outcome() == Some(report.outcome)
@@ -671,7 +674,7 @@ impl ReceiptAttestationVerificationReport {
         }
 
         let mut bytes = Vec::new();
-        let legacy_v3 = self.verifier_version == "symthaea-observation-attestation-report-v3";
+        let legacy_v3 = self.verifier_version == LEGACY_REPORT_VERIFIER_VERSION;
         bytes.extend_from_slice(if legacy_v3 {
             REPORT_DOMAIN_SEPARATOR_V3
         } else {
@@ -719,7 +722,7 @@ impl ReceiptAttestationVerificationReport {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        let domain = if self.verifier_version == "symthaea-observation-attestation-report-v3" {
+        let domain = if self.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
             REPORT_DOMAIN_SEPARATOR_V3
         } else {
             REPORT_DOMAIN_SEPARATOR
@@ -1087,10 +1090,13 @@ impl EvidenceEvaluation {
         let context = VerificationContext::from_report(report);
         let execution_trace = if report.execution_trace.is_well_formed() {
             report.execution_trace.clone()
-        } else {
+        } else if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
             // Compatibility path for legacy serialized reports that predate
-            // first-class execution traces.
+            // first-class execution traces. Current reports must preserve a
+            // malformed trace rather than silently replacing it with a projection.
             EvaluationTrace::from_report_legacy(report)
+        } else {
+            report.execution_trace.clone()
         };
         Self {
             evaluation_version: EVIDENCE_EVALUATION_VERSION,
@@ -2470,6 +2476,25 @@ mod tests {
 
         let evaluation = report.to_evidence_evaluation();
         assert_eq!(evaluation.execution_trace, report.execution_trace);
+    }
+
+    #[test]
+    fn current_v4_malformed_trace_is_not_reconstructed_from_stages() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        report.execution_trace.results.pop();
+
+        assert!(!report.execution_trace.is_well_formed());
+        assert!(!report.execution_trace.matches_report(&report));
+
+        let evaluation = report.to_evidence_evaluation();
+        assert_eq!(evaluation.execution_trace, report.execution_trace);
+        assert!(!evaluation.is_consistent_with_report(&report));
     }
 
     #[test]
