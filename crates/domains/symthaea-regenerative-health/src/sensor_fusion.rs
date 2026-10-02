@@ -120,9 +120,7 @@ impl SensorFusionGate {
         let state = if issues.iter().any(|issue| {
             matches!(
                 issue,
-                SensorFusionIssue::ConfigurationMismatch
-                    | SensorFusionIssue::ResidualDisagreement
-                    | SensorFusionIssue::DuplicateSensor
+                SensorFusionIssue::ResidualDisagreement | SensorFusionIssue::DuplicateSensor
             )
         }) {
             SensorFusionState::Conflicted
