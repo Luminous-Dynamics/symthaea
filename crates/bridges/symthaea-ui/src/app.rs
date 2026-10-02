@@ -524,3 +524,49 @@ pub fn App() -> impl IntoView {
         </div>
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine as _;
+
+    fn movie_json(width: u64, height: u64, channels: u64, frames: usize) -> Value {
+        let px = width.checked_mul(height).unwrap_or(0) as usize;
+        let bytes_per_pixel = channels as usize;
+        let raw = vec![7_u8; px.saturating_mul(bytes_per_pixel)];
+        let encoded = base64::engine::general_purpose::STANDARD.encode(raw);
+        serde_json::json!({
+            "mental_movie": {
+                "width": width,
+                "height": height,
+                "channels": channels,
+                "frames_b64": vec![encoded; frames],
+                "semantic_coherence": 1.7
+            }
+        })
+    }
+
+    #[test]
+    fn movie_parser_accepts_bounded_grayscale_frame() {
+        let movie = Movie::from_json(&movie_json(2, 2, 1, 1)).expect("valid movie");
+        assert_eq!(movie.frames_rgba.len(), 1);
+        assert_eq!(movie.frames_rgba[0], vec![7, 7, 7, 255, 7, 7, 7, 255, 7, 7, 7, 255, 7, 7, 7, 255]);
+        assert_eq!(movie.semantic_coherence, 1.0);
+    }
+
+    #[test]
+    fn movie_parser_rejects_unsupported_channels() {
+        assert!(Movie::from_json(&movie_json(2, 2, 2, 1)).is_none());
+    }
+
+    #[test]
+    fn movie_parser_rejects_dimension_overflow_before_cast() {
+        assert!(Movie::from_json(&movie_json((u32::MAX as u64) + 1, 1, 1, 1)).is_none());
+    }
+
+    #[test]
+    fn movie_parser_rejects_excessive_frame_count() {
+        assert!(Movie::from_json(&movie_json(2, 2, 1, MAX_MOVIE_FRAMES + 1)).is_none());
+    }
+}
