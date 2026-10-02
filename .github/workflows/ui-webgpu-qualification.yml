@@ -1,0 +1,58 @@
+name: UI WebGPU Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-ui/**"
+      - "crates/bridges/symthaea-web/**"
+      - "crates/domains/symthaea-canvas/**"
+      - ".github/workflows/ui-webgpu-qualification.yml"
+      - "Cargo.lock"
+      - "flake.nix"
+      - "flake.lock"
+
+concurrency:
+  group: ui-webgpu-qualification-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  browser-webgpu:
+    name: Deterministic browser WebGPU qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+
+      - name: Install Chromium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium
+
+      - name: Install web test dependencies
+        working-directory: crates/bridges/symthaea-web
+        run: npm ci
+
+      - name: Build qualification WASM UI
+        run: |
+          nix develop . -c bash -lc '
+            set -euo pipefail
+            cd crates/bridges/symthaea-ui
+            trunk build --release --features browser-qualification
+          '
+
+      - name: Run deterministic WebGPU + fallback qualification
+        working-directory: crates/bridges/symthaea-web
+        env:
+          WEBGPU_MODE: swiftshader
+        run: npm run test:ui-webgpu
+
+      - name: Upload qualification artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: symthaea-ui-webgpu-qualification
+          path: crates/bridges/symthaea-web/webgpu-qualification/
+          if-no-files-found: ignore
