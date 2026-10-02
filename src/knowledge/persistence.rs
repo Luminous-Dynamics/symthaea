@@ -1094,6 +1094,213 @@ mod tests {
     }
 
     #[test]
+    fn test_persistence_round_trip_is_canonical_across_domains() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_persistence_round_trip_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let facts = [
+            FactRecord {
+                memory_id: "memory-z".into(),
+                canonical_identity: Some("canon-z".into()),
+                provenance_family: Some("family-z".into()),
+                vector_bytes: vec![0xAA; 2048],
+                source_text: "Zeta fact".into(),
+                confidence: 0.7,
+                domain: Some("test".into()),
+                cycle: 9,
+                is_causal: true,
+            },
+            FactRecord {
+                memory_id: "memory-a".into(),
+                canonical_identity: None,
+                provenance_family: Some("family-a".into()),
+                vector_bytes: vec![0x11; 2048],
+                source_text: "Alpha fact".into(),
+                confidence: 0.9,
+                domain: None,
+                cycle: 3,
+                is_causal: false,
+            },
+        ];
+        let relations = [
+            ProvenanceRelationRecord {
+                source_memory_id: "memory-a".into(),
+                target_memory_id: "memory-z".into(),
+                kind: ProvenanceRelationKind::DerivedFrom,
+                created_at: "cycle:3".into(),
+            },
+            ProvenanceRelationRecord {
+                source_memory_id: "memory-z".into(),
+                target_memory_id: "memory-a".into(),
+                kind: ProvenanceRelationKind::Corroborates,
+                created_at: "cycle:9".into(),
+            },
+        ];
+        let edges = [
+            CausalEdgeRecord {
+                cause: "z".into(),
+                effect: "effect-z".into(),
+                strength: 0.8,
+                is_inhibitory: false,
+                cycle: 9,
+            },
+            CausalEdgeRecord {
+                cause: "a".into(),
+                effect: "effect-a".into(),
+                strength: 0.6,
+                is_inhibitory: true,
+                cycle: 3,
+            },
+        ];
+        let ontology = [
+            OntologyRecord {
+                name: "zeta".into(),
+                vector_bytes: vec![0x22; 2048],
+                usage_count: 4,
+                utility: 0.8,
+                created_at_cycle: 9,
+                last_used_cycle: 10,
+                is_a_parent: Some("animal".into()),
+            },
+            OntologyRecord {
+                name: "alpha".into(),
+                vector_bytes: vec![0x33; 2048],
+                usage_count: 2,
+                utility: 0.2,
+                created_at_cycle: 3,
+                last_used_cycle: 4,
+                is_a_parent: None,
+            },
+        ];
+
+        assert_eq!(p.save_facts(&facts).unwrap(), 2);
+        assert_eq!(p.save_provenance_relations(&relations).unwrap(), 2);
+        assert_eq!(p.save_causal_edges(&edges).unwrap(), 2);
+        assert_eq!(p.save_ontology(&ontology).unwrap(), 2);
+
+        let first_facts = p.load_facts().unwrap();
+        let first_relations = p.load_provenance_relations().unwrap();
+        let first_edges = p.load_causal_edges().unwrap();
+        let first_ontology = p.load_ontology().unwrap();
+
+        assert_eq!(p.save_facts(&first_facts).unwrap(), first_facts.len());
+        assert_eq!(p.save_provenance_relations(&first_relations).unwrap(), 0);
+        assert_eq!(p.save_causal_edges(&first_edges).unwrap(), first_edges.len());
+        assert_eq!(p.save_ontology(&first_ontology).unwrap(), first_ontology.len());
+
+        let second_facts = p.load_facts().unwrap();
+        let second_relations = p.load_provenance_relations().unwrap();
+        let second_edges = p.load_causal_edges().unwrap();
+        let second_ontology = p.load_ontology().unwrap();
+
+        assert_eq!(
+            second_facts
+                .iter()
+                .map(|f| (
+                    f.memory_id.as_str(),
+                    f.canonical_identity.as_deref(),
+                    f.provenance_family.as_deref(),
+                    f.vector_bytes.as_slice(),
+                    f.source_text.as_str(),
+                    f.confidence.to_bits(),
+                    f.domain.as_deref(),
+                    f.cycle,
+                    f.is_causal
+                ))
+                .collect::<Vec<_>>(),
+            first_facts
+                .iter()
+                .map(|f| (
+                    f.memory_id.as_str(),
+                    f.canonical_identity.as_deref(),
+                    f.provenance_family.as_deref(),
+                    f.vector_bytes.as_slice(),
+                    f.source_text.as_str(),
+                    f.confidence.to_bits(),
+                    f.domain.as_deref(),
+                    f.cycle,
+                    f.is_causal
+                ))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            second_relations
+                .iter()
+                .map(|r| (
+                    r.source_memory_id.as_str(),
+                    r.target_memory_id.as_str(),
+                    r.kind,
+                    r.created_at.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            first_relations
+                .iter()
+                .map(|r| (
+                    r.source_memory_id.as_str(),
+                    r.target_memory_id.as_str(),
+                    r.kind,
+                    r.created_at.as_str()
+                ))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            second_edges
+                .iter()
+                .map(|e| (
+                    e.cause.as_str(),
+                    e.effect.as_str(),
+                    e.strength.to_bits(),
+                    e.is_inhibitory,
+                    e.cycle
+                ))
+                .collect::<Vec<_>>(),
+            first_edges
+                .iter()
+                .map(|e| (
+                    e.cause.as_str(),
+                    e.effect.as_str(),
+                    e.strength.to_bits(),
+                    e.is_inhibitory,
+                    e.cycle
+                ))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            second_ontology
+                .iter()
+                .map(|o| (
+                    o.name.as_str(),
+                    o.vector_bytes.as_slice(),
+                    o.usage_count,
+                    o.utility.to_bits(),
+                    o.created_at_cycle,
+                    o.last_used_cycle,
+                    o.is_a_parent.as_deref()
+                ))
+                .collect::<Vec<_>>(),
+            first_ontology
+                .iter()
+                .map(|o| (
+                    o.name.as_str(),
+                    o.vector_bytes.as_slice(),
+                    o.usage_count,
+                    o.utility.to_bits(),
+                    o.created_at_cycle,
+                    o.last_used_cycle,
+                    o.is_a_parent.as_deref()
+                ))
+                .collect::<Vec<_>>()
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_save_and_load_causal_edges() {
         let dir = std::env::temp_dir().join(format!("symthaea_causal_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
