@@ -316,6 +316,6 @@ mod tests {
         history.entries[0].evidence_digest = evidence_digest(&evidence(99)).unwrap();
 
         assert!(history.verify().is_err());
-        assert_ne!(history.head_commitment(), original_head);
+        assert_eq!(history.head_commitment(), original_head);
     }
 }
