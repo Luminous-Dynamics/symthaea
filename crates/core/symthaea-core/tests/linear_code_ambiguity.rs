@@ -22,17 +22,19 @@ fn arbitrary_same_subspace_bound_is_not_uniquely_identifiable() {
 
 #[test]
 fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
-    let left = RandomLinearCode::generate(96, 6, 0x1111);
-    let right = RandomLinearCode::generate(96, 6, 0x2222);
+    // Reproduce the paper's C = K × V construction: K and V are subcodes
+    // obtained by partitioning one parent-code basis, so the direct-sum
+    // relationship is structural rather than an accidental property of two
+    // independently sampled subspaces.
+    let (parent, left, right) =
+        RandomLinearCode::generate_direct_sum(96, 6, 6, 0x1111).expect("valid direct sum");
 
-    // The direct-sum condition is rank(C1 + C2) = rank(C1) + rank(C2).
-    // We deliberately validate this algebraically instead of assuming that
-    // independently generated random subspaces are disjoint.
     let mut combined_basis = left.basis().to_vec();
     combined_basis.extend(right.basis().iter().cloned());
+    assert_eq!(combined_basis, parent.basis());
     assert_eq!(
         symthaea_core::hdc::linear_code::basis_rank(&combined_basis, 96),
-        left.rank() + right.rank()
+        parent.rank()
     );
 
     let left_message = [true, false, true, false, true, false];
