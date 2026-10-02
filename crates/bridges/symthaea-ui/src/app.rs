@@ -130,6 +130,11 @@ struct Movie {
 /// compromised gateway must not be able to drive an unbounded (or, on
 /// 32-bit wasm, integer-overflowing) allocation via `width`/`height`.
 const MAX_MOVIE_PIXELS: usize = 4096 * 4096;
+/// Bound the total RGBA allocation for one remote projection, not merely each
+/// individual frame. A 4096² frame is already far larger than the UI canvas;
+/// without a total budget, a bounded 120-frame sequence could still request
+/// multi-gigabyte browser memory before the canvas ever displays it.
+const MAX_MOVIE_RGBA_BYTES: usize = 64 * 1024 * 1024;
 
 impl Movie {
     fn from_json(v: &Value) -> Option<Movie> {
@@ -155,6 +160,10 @@ impl Movie {
         const MAX_MOVIE_FRAMES: usize = 120;
         let frames = m["frames_b64"].as_array()?;
         if frames.len() > MAX_MOVIE_FRAMES {
+            return None;
+        }
+        let total_rgba_bytes = rgba_capacity.checked_mul(frames.len())?;
+        if total_rgba_bytes > MAX_MOVIE_RGBA_BYTES {
             return None;
         }
         let frames_rgba: Vec<Vec<u8>> = frames
@@ -991,6 +1000,32 @@ mod tests {
             }
         });
         assert!(Movie::from_json(&payload).is_none());
+    }
+
+    #[test]
+    fn movie_rejects_excessive_total_rgba_allocation() {
+        let payload = serde_json::json!({
+            "mental_movie": {
+                "width": 4096,
+                "height": 4096,
+                "channels": 1,
+                "frames_b64": vec!["AA=="; 120]
+            }
+        });
+        assert!(Movie::from_json(&payload).is_none());
+    }
+
+    #[test]
+    fn movie_accepts_a_bounded_total_rgba_allocation() {
+        let payload = serde_json::json!({
+            "mental_movie": {
+                "width": 64,
+                "height": 64,
+                "channels": 1,
+                "frames_b64": vec!["AA=="; 120]
+            }
+        });
+        assert!(Movie::from_json(&payload).is_some());
     }
 
     #[test]
