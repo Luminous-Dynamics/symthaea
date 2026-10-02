@@ -286,7 +286,18 @@ pub fn App() -> impl IntoView {
 
     Effect::new(move |_| {
         let gw = gateway.get();
+        // Gateway changes are authority changes, not merely reconnects.
+        // Clear gateway-derived presentation state immediately so the UI
+        // cannot display the previous service's cognition while the new
+        // session is still negotiating or has not produced a fresh sample.
         ws_connected.set(false);
+        vitals.set(Vitals::default());
+        telemetry_count.set(0);
+        last_cycle.set(0);
+        daemon_status.set(None);
+        portrait.set(None);
+        movie.set(None);
+        movie_frame.set(0);
         // Cycle identifiers are daemon-local; do not carry the previous
         // session's cycle into a new session that has not emitted telemetry.
         last_cycle.set(0);
