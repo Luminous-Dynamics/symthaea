@@ -738,7 +738,7 @@ impl EvidenceEvaluation {
             }
         }
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v1\n");
+        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v2\n");
         write_string(&mut bytes, self.evaluation_version);
         write_string(&mut bytes, &self.subject_fingerprint);
         write_string(&mut bytes, self.evaluation_type);
@@ -767,7 +767,7 @@ impl EvidenceEvaluation {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:evidence-evaluation:v1\n");
+        hasher.update(b"symthaea:evidence-evaluation:v2\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
