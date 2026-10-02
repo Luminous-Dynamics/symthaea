@@ -162,7 +162,7 @@ fn cose_key_rejects_duplicate_labels() {
     bytes.extend_from_slice(&[0x01, 0x02]);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
-        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+        Err(Rfc9942VdpError::InvalidEncoding)
     );
 }
 
@@ -176,7 +176,7 @@ fn cose_key_rejects_non_map_root_and_trailing_bytes() {
     bytes.push(0x00);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
-        Err(Rfc9942VdpError::TrailingBytes)
+        Err(Rfc9942VdpError::InvalidEncoding)
     );
 }
 
@@ -194,6 +194,33 @@ fn cose_key_accepts_textual_ec2_p256_es256_and_verify() {
     assert_eq!(&parsed.public_key_sec1()[33..65], &Y);
 }
 
+
+#[test]
+fn cose_key_rejects_noncanonical_integer_and_indefinite_forms() {
+    let mut bytes = valid_key();
+    let pos = bytes.windows(2).position(|w| w == [0x01, 0x02]).unwrap();
+    bytes.splice(pos..pos + 2, [0x01, 0x18, 0x02]);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&bytes),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
+
+    let mut indefinite = valid_key();
+    indefinite[0] = 0xbf;
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&indefinite),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
+
+    let mut indefinite_bstr = valid_key();
+    let pos = indefinite_bstr.windows(3).position(|w| w == [0x21, 0x58, 0x20]).unwrap();
+    indefinite_bstr[pos + 1] = 0x5f;
+    indefinite_bstr.remove(pos + 2);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&indefinite_bstr),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
+}
 
 #[test]
 fn syntactically_valid_but_invalid_p256_point_is_rejected_by_crypto_boundary() {
