@@ -1345,7 +1345,7 @@ pub trait VerificationMethodResolver {
         verification_method: &str,
     ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
         let resolved = self.resolve(verification_method)?;
-        let snapshot_fingerprint = self.snapshot_fingerprint();
+        let snapshot_fingerprint = self.snapshot_fingerprint_for(verification_method);
         Ok(ResolvedVerificationMethodSnapshot {
             resolved,
             snapshot_fingerprint,
@@ -1359,6 +1359,16 @@ pub trait VerificationMethodResolver {
     /// must supply an explicit snapshot fingerprint when durable auditability is required.
     fn snapshot_fingerprint(&self) -> Option<String> {
         None
+    }
+
+    /// Return a fingerprint scoped to the verification-method resolution being performed.
+    ///
+    /// The default preserves compatibility with existing resolvers by reusing the resolver
+    /// state fingerprint. Mutable or remote implementations should override this when they
+    /// can produce a fingerprint of the exact durable view used to resolve this method.
+    fn snapshot_fingerprint_for(&self, verification_method: &str) -> Option<String> {
+        let _ = verification_method;
+        self.snapshot_fingerprint()
     }
 }
 
@@ -1416,6 +1426,30 @@ impl VerificationMethodResolver for InMemoryVerificationMethodResolver {
                 hasher.update(&(purpose.len() as u64).to_be_bytes());
                 hasher.update(purpose.as_bytes());
             }
+        }
+        Some(hasher.finalize().to_hex().to_string())
+    }
+
+    fn snapshot_fingerprint_for(&self, verification_method: &str) -> Option<String> {
+        let method = self.methods.get(verification_method)?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:verification-method-resolution-snapshot:v2\n");
+        hasher.update(&(verification_method.len() as u64).to_be_bytes());
+        hasher.update(verification_method.as_bytes());
+        hasher.update(&method.verifying_key.to_bytes());
+        hasher.update(&[match method.status {
+            VerificationMethodStatus::Active => 0,
+            VerificationMethodStatus::Revoked => 1,
+            VerificationMethodStatus::Expired => 2,
+            VerificationMethodStatus::Unknown => 3,
+        }]);
+        let mut purposes = method.allowed_proof_purposes.clone();
+        purposes.sort();
+        purposes.dedup();
+        hasher.update(&(purposes.len() as u64).to_be_bytes());
+        for purpose in &purposes {
+            hasher.update(&(purpose.len() as u64).to_be_bytes());
+            hasher.update(purpose.as_bytes());
         }
         Some(hasher.finalize().to_hex().to_string())
     }
@@ -2342,6 +2376,45 @@ mod tests {
             ],
         }]);
         assert_eq!(first.snapshot_fingerprint(), second.snapshot_fingerprint());
+    }
+
+    #[test]
+    fn resolver_snapshot_is_scoped_to_requested_method() {
+        let (_, signing_key, _) = envelope_and_key();
+        let method_a = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let method_b = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-b#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+
+        let resolver = InMemoryVerificationMethodResolver::new([method_a.clone(), method_b.clone()]);
+        let base = resolver
+            .snapshot_fingerprint_for(&method_a.verification_method)
+            .expect("method-a snapshot");
+
+        let mut unrelated = method_b.clone();
+        unrelated.status = VerificationMethodStatus::Revoked;
+        let unrelated_changed =
+            InMemoryVerificationMethodResolver::new([method_a.clone(), unrelated]);
+        assert_eq!(
+            unrelated_changed.snapshot_fingerprint_for(&method_a.verification_method),
+            Some(base.clone())
+        );
+
+        let mut relevant = method_a;
+        relevant.status = VerificationMethodStatus::Revoked;
+        let relevant_changed = InMemoryVerificationMethodResolver::new([relevant, method_b]);
+        assert_ne!(
+            relevant_changed.snapshot_fingerprint_for("did:example:attester-a#key-1"),
+            Some(base)
+        );
     }
 
     #[test]
