@@ -339,15 +339,16 @@ impl ExecutionLineageV1 {
         }
         for (name, value) in &self.toolchain_versions {
             validate_name(name)?;
-            if value.trim().is_empty() {
-                return Err(format!("empty toolchain version for {name}"));
-            }
+            validate_semantic_text("toolchain version", name, value)?;
         }
         for (name, value) in &self.allowed_env {
             validate_name(name)?;
             if value.contains('\0') {
                 return Err(format!("NUL in environment value for {name}"));
             }
+        }
+        for feature in &self.feature_flags {
+            validate_name(feature)?;
         }
         for (name, value) in [
             ("source_repository", self.source_repository.as_str()),
@@ -356,11 +357,14 @@ impl ExecutionLineageV1 {
             ("host_triple", self.host_triple.as_str()),
             ("target_triple", self.target_triple.as_str()),
             ("nix_identity", self.nix_identity.as_str()),
-            ("cwd", self.cwd.as_str()),
         ] {
-            if value.trim().is_empty() {
-                return Err(format!("empty lineage field {name}"));
-            }
+            validate_semantic_text("lineage field", name, value)?;
+        }
+        if self.cwd.trim().is_empty() {
+            return Err("empty lineage field cwd".into());
+        }
+        if self.cwd.contains('\0') {
+            return Err("NUL in lineage field cwd".into());
         }
         validate_git_object_id("source_revision", &self.source_revision)?;
         validate_git_object_id("source_tree", &self.source_tree)?;
@@ -528,6 +532,16 @@ fn validate_name(name: &str) -> Result<(), String> {
     } else {
         Ok(())
     }
+}
+
+fn validate_semantic_text(kind: &str, name: &str, value: &str) -> Result<(), String> {
+    if value.trim().is_empty() {
+        return Err(format!("empty {kind} for {name}"));
+    }
+    if value.chars().any(char::is_control) {
+        return Err(format!("control character in {kind} for {name}"));
+    }
+    Ok(())
 }
 
 fn validate_git_object_id(field: &str, value: &str) -> Result<(), String> {
@@ -1088,6 +1102,46 @@ mod tests {
             .into_iter()
             .collect(),
         }
+    }
+
+    #[test]
+    fn execution_lineage_validation_rejects_invalid_semantic_identifiers() {
+        let cases = [
+            ("source_repository", "repo\n"),
+            ("host_triple", "x86_64\tunknown"),
+            ("target_triple", "wasm32\nunknown"),
+            ("nix_identity", "nix\u{7f}identity"),
+            ("cwd", "\0/work"),
+        ];
+
+        for (field, value) in cases {
+            let mut lineage = lineage_fixture();
+            match field {
+                "source_repository" => lineage.source_repository = value.into(),
+                "host_triple" => lineage.host_triple = value.into(),
+                "target_triple" => lineage.target_triple = value.into(),
+                "nix_identity" => lineage.nix_identity = value.into(),
+                "cwd" => lineage.cwd = value.into(),
+                _ => unreachable!(),
+            }
+            assert!(
+                lineage.validate().is_err(),
+                "invalid semantic field {field} should fail"
+            );
+        }
+
+        let mut toolchain = lineage_fixture();
+        toolchain
+            .toolchain_versions
+            .insert("cargo".into(), "1.96.0\n".into());
+        assert!(toolchain.validate().is_err());
+
+        let mut features = lineage_fixture();
+        features.feature_flags.insert("".into());
+        assert!(features.validate().is_err());
+        features.feature_flags.remove("");
+        features.feature_flags.insert("feature\r".into());
+        assert!(features.validate().is_err());
     }
 
     #[test]
