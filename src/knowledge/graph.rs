@@ -847,7 +847,12 @@ impl EnhancedKnowledgeGraph {
         &mut self,
         record: &super::persistence::FactRecord,
     ) -> FactRestoreOutcome {
-        if record.vector_bytes.len() != 2048 || self.capacity == 0 {
+        if record.vector_bytes.len() != 2048
+            || record.memory_id.trim().is_empty()
+            || !record.confidence.is_finite()
+            || !(0.0..=1.0).contains(&record.confidence)
+            || self.capacity == 0
+        {
             return FactRestoreOutcome::default();
         }
         let mut arr = [0u8; 2048];
