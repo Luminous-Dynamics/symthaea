@@ -1940,11 +1940,18 @@ fn verify_snapshot_receipts_in_tx(
         })
         .map_err(|e| format!("Query snapshot receipts for verification: {e}"))?;
 
+    let mut expected_generation = 1_u64;
     for row in rows {
         let receipt =
             row.map_err(|e| format!("Load snapshot receipt for verification: {e}"))?;
         if receipt.generation == 0 {
             return Err("Snapshot receipt generation must be positive".into());
+        }
+        if receipt.generation != expected_generation {
+            return Err(format!(
+                "Snapshot receipt generation discontinuity: expected {}, observed {}",
+                expected_generation, receipt.generation
+            ));
         }
         if receipt.receipt_digest_hex != receipt.canonical_receipt_digest_hex() {
             return Err(format!(
@@ -1952,6 +1959,9 @@ fn verify_snapshot_receipts_in_tx(
                 receipt.generation
             ));
         }
+        expected_generation = expected_generation
+            .checked_add(1)
+            .ok_or("Snapshot receipt generation exhausted validation range")?;
     }
     Ok(())
 }
@@ -3517,6 +3527,55 @@ mod tests {
         assert_eq!(
             err,
             "Snapshot receipt self-digest mismatch: generation 11"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_receipt_history_rejects_generation_gaps() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_receipt_gap_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "gap-1".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x12; BinaryHV::BYTES],
+            source_text: "gap".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        let second = FactRecord {
+            memory_id: "gap-2".into(),
+            source_text: "gap two".into(),
+            cycle: 2,
+            ..fact
+        };
+        p.save_snapshot(std::slice::from_ref(&second), &[], &[], &[])
+            .unwrap();
+        assert_eq!(p.latest_snapshot_receipt().unwrap().unwrap().generation, 2);
+
+        let conn = p.open_connection().unwrap();
+        conn.execute_batch(
+            "DROP TRIGGER trg_knowledge_snapshot_receipts_no_delete;
+             DELETE FROM knowledge_snapshot_receipts WHERE generation = 1;",
+        )
+        .unwrap();
+
+        let err = p.latest_snapshot_receipt().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot receipt generation discontinuity: expected 1, observed 2"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
