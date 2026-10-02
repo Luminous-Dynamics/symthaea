@@ -624,6 +624,7 @@ mod tests {
             decision: "execute".into(),
             issued_at: "2026-10-02T20:00:00Z".into(),
             expires_at: Some("2026-10-02T20:05:00Z".into()),
+            authority_epoch: 1,
         };
         assert!(witness.is_bound_to(&action, "f2", "sha256:support", "policy-v2"));
         assert!(!witness.is_bound_to(&action, "f1", "sha256:support", "policy-v2"));
