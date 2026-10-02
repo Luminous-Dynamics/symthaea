@@ -494,8 +494,6 @@ fn portrait_from_json(v: &Value) -> Option<String> {
         if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphabetic()) {
             return None;
         }
-        let name = name.to_ascii_lowercase();
-
         element_count = element_count.checked_add(1)?;
         if element_count > MAX_PORTRAIT_ELEMENTS {
             return None;
@@ -527,6 +525,10 @@ fn portrait_from_json(v: &Value) -> Option<String> {
             seen_root = true;
         } else if stack.is_empty() {
             return None;
+        } else if matches!(stack.last().map(String::as_str), Some("title" | "desc")) {
+            // Title and desc are text-only in this projection contract.
+            // Reject child elements rather than relying on browser recovery.
+            return None;
         }
 
         if !self_closing {
@@ -548,14 +550,14 @@ fn portrait_from_json(v: &Value) -> Option<String> {
                 .find(|c: char| c.is_ascii_whitespace() || c == '=')
                 .unwrap_or(rest.len());
             let key = &rest[..key_end];
-            if key.is_empty() || key.contains(':') || key.starts_with("on") {
+            let lower_key = key.to_ascii_lowercase();
+            if key.is_empty() || key.contains(':') || lower_key.starts_with("on") {
                 return None;
             }
-            let key = key.to_ascii_lowercase();
-            if seen_attrs.iter().any(|existing| existing == &key) {
+            if seen_attrs.iter().any(|existing| existing == key) {
                 return None;
             }
-            seen_attrs.push(key.clone());
+            seen_attrs.push(key.to_string());
             rest = rest[key_end..].trim_start();
             if !rest.starts_with('=') {
                 return None;
@@ -578,10 +580,10 @@ fn portrait_from_json(v: &Value) -> Option<String> {
             }
 
             let allowed = match name.as_str() {
-                "svg" => matches!(key.as_str(), "viewbox" | "width" | "height" | "xmlns"),
+                "svg" => matches!(key, "viewBox" | "width" | "height" | "xmlns"),
                 "g" | "path" | "rect" | "circle" | "ellipse" | "line"
                 | "polyline" | "polygon" => matches!(
-                    key.as_str(),
+                    key,
                     "id"
                         | "transform"
                         | "fill"
@@ -661,7 +663,7 @@ fn portrait_from_json(v: &Value) -> Option<String> {
                         return None;
                     }
                 }
-                "viewbox" | "width" | "height" | "rx" | "ry" | "cx" | "cy" | "r"
+                "viewBox" | "width" | "height" | "rx" | "ry" | "cx" | "cy" | "r"
                 | "x" | "y" | "x1" | "y1" | "x2" | "y2" | "stroke-width" | "opacity" => {
                     if !svg_numeric_list_is_bounded(value) {
                         return None;
@@ -1386,6 +1388,24 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn portrait_rejects_case_folded_svg_markup() {
+        for svg in [
+            r#"<SVG><circle cx="1" cy="1" r="1"/></SVG>"#,
+            r#"<svg VIEWBOX="0 0 2 2"><circle cx="1" cy="1" r="1"/></svg>"#,
+        ] {
+            assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(), "accepted: {svg}");
+        }
+    }
+
+    #[test]
+    fn portrait_rejects_nested_descriptive_elements() {
+        let payload = serde_json::json!({
+            "canvas_svg": r#"<svg><title><g/></title></svg>"#
+        });
+        assert!(portrait_from_json(&payload).is_none());
+    }
+
     fn portrait_rejects_unbounded_numeric_geometry() {
         for svg in [
             r#"<svg><circle cx="1e9999" cy="0" r="1"/></svg>"#,
