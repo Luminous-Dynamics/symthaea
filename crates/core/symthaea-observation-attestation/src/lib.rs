@@ -392,6 +392,211 @@ impl ReceiptAttestationVerificationReport {
 
 }
 
+
+pub const VERIFICATION_CONTEXT_VERSION: &str =
+    "symthaea-observation-verification-context-v1";
+pub const EVIDENCE_EVALUATION_VERSION: &str =
+    "symthaea-observation-evaluation-v1";
+pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
+    "receipt-attestation-verification";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationContext {
+    pub context_version: &'static str,
+    pub policy_fingerprint: String,
+    pub verifier_version: &'static str,
+    pub environment_fingerprint: String,
+    pub resolution_snapshot_fingerprint: Option<String>,
+    pub trust_root_fingerprint: Option<String>,
+    pub authorization_policy_fingerprint: Option<String>,
+    pub evaluated_at_unix_ns: i128,
+}
+
+impl VerificationContext {
+    pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
+        Self {
+            context_version: VERIFICATION_CONTEXT_VERSION,
+            policy_fingerprint: report.policy_fingerprint.clone(),
+            verifier_version: report.verifier_version,
+            environment_fingerprint: report.environment_fingerprint.clone(),
+            resolution_snapshot_fingerprint: report.resolution_snapshot_fingerprint.clone(),
+            trust_root_fingerprint: None,
+            authorization_policy_fingerprint: None,
+            evaluated_at_unix_ns: report.evaluated_at_unix_ns,
+        }
+    }
+
+    pub fn with_trust_root_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
+        self.trust_root_fingerprint = Some(fingerprint.into());
+        self
+    }
+
+    pub fn with_authorization_policy_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
+        self.authorization_policy_fingerprint = Some(fingerprint.into());
+        self
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+        fn write_option(bytes: &mut Vec<u8>, value: Option<&str>) {
+            match value {
+                Some(value) => { bytes.push(1); write_string(bytes, value); }
+                None => bytes.push(0),
+            }
+        }
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea:observation-verification-context:v1\n");
+        write_string(&mut bytes, self.context_version);
+        write_string(&mut bytes, &self.policy_fingerprint);
+        write_string(&mut bytes, self.verifier_version);
+        write_string(&mut bytes, &self.environment_fingerprint);
+        write_option(&mut bytes, self.resolution_snapshot_fingerprint.as_deref());
+        write_option(&mut bytes, self.trust_root_fingerprint.as_deref());
+        write_option(&mut bytes, self.authorization_policy_fingerprint.as_deref());
+        bytes.extend_from_slice(&self.evaluated_at_unix_ns.to_be_bytes());
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-verification-context:v1\n");
+        hasher.update(&self.canonical_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvaluationLimitation {
+    UnderlyingObservationTruthNotEvaluated,
+    SemanticValidityNotEvaluated,
+    ExternalWorldStateNotEvaluated,
+    AttesterIntentNotEvaluated,
+}
+
+fn evaluation_limitation_tag(limitation: EvaluationLimitation) -> u8 {
+    match limitation {
+        EvaluationLimitation::UnderlyingObservationTruthNotEvaluated => 0,
+        EvaluationLimitation::SemanticValidityNotEvaluated => 1,
+        EvaluationLimitation::ExternalWorldStateNotEvaluated => 2,
+        EvaluationLimitation::AttesterIntentNotEvaluated => 3,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceEvaluation {
+    pub evaluation_version: &'static str,
+    pub subject_fingerprint: String,
+    pub evaluation_type: &'static str,
+    pub context: VerificationContext,
+    pub context_fingerprint: String,
+    pub verification_report_fingerprint: String,
+    pub outcome: ReceiptAttestationVerificationOutcome,
+    pub structural_validation: VerificationStage,
+    pub receipt_commitment: VerificationStage,
+    pub temporal_validity: VerificationStage,
+    pub cryptosuite: VerificationStage,
+    pub verification_method: VerificationStage,
+    pub lifecycle: VerificationStage,
+    pub proof_purpose_authorization: VerificationStage,
+    pub proof_policy: VerificationStage,
+    pub cryptographic_proof: VerificationStage,
+    pub limitations: Vec<EvaluationLimitation>,
+}
+
+impl EvidenceEvaluation {
+    pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
+        let context = VerificationContext::from_report(report);
+        Self {
+            evaluation_version: EVIDENCE_EVALUATION_VERSION,
+            subject_fingerprint: report.receipt_fingerprint.clone(),
+            evaluation_type: ATTESTATION_VERIFICATION_EVALUATION_TYPE,
+            context_fingerprint: context.fingerprint(),
+            context,
+            verification_report_fingerprint: report.fingerprint(),
+            outcome: report.outcome,
+            structural_validation: report.structural_validation,
+            receipt_commitment: report.receipt_commitment,
+            temporal_validity: report.temporal_validity,
+            cryptosuite: report.cryptosuite,
+            verification_method: report.verification_method,
+            lifecycle: report.lifecycle,
+            proof_purpose_authorization: report.proof_purpose_authorization,
+            proof_policy: report.proof_policy,
+            cryptographic_proof: report.cryptographic_proof,
+            limitations: vec![
+                EvaluationLimitation::UnderlyingObservationTruthNotEvaluated,
+                EvaluationLimitation::SemanticValidityNotEvaluated,
+                EvaluationLimitation::ExternalWorldStateNotEvaluated,
+                EvaluationLimitation::AttesterIntentNotEvaluated,
+            ],
+        }
+    }
+
+    pub fn with_context(mut self, context: VerificationContext) -> Self {
+        self.context_fingerprint = context.fingerprint();
+        self.context = context;
+        self
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+        fn write_stage(bytes: &mut Vec<u8>, stage: VerificationStage) {
+            match stage {
+                VerificationStage::Passed => bytes.push(0),
+                VerificationStage::Failed(outcome) => {
+                    bytes.push(1);
+                    bytes.push(verification_outcome_tag(outcome));
+                }
+                VerificationStage::NotEvaluated => bytes.push(2),
+            }
+        }
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v1\n");
+        write_string(&mut bytes, self.evaluation_version);
+        write_string(&mut bytes, &self.subject_fingerprint);
+        write_string(&mut bytes, self.evaluation_type);
+        write_string(&mut bytes, &self.context_fingerprint);
+        write_string(&mut bytes, &self.verification_report_fingerprint);
+        bytes.push(verification_outcome_tag(self.outcome));
+        write_stage(&mut bytes, self.structural_validation);
+        write_stage(&mut bytes, self.receipt_commitment);
+        write_stage(&mut bytes, self.temporal_validity);
+        write_stage(&mut bytes, self.cryptosuite);
+        write_stage(&mut bytes, self.verification_method);
+        write_stage(&mut bytes, self.lifecycle);
+        write_stage(&mut bytes, self.proof_purpose_authorization);
+        write_stage(&mut bytes, self.proof_policy);
+        write_stage(&mut bytes, self.cryptographic_proof);
+        let mut limitations = self.limitations.clone();
+        limitations.sort_by_key(|v| evaluation_limitation_tag(*v));
+        limitations.dedup();
+        bytes.extend_from_slice(&(limitations.len() as u64).to_be_bytes());
+        for limitation in limitations {
+            bytes.push(evaluation_limitation_tag(limitation));
+        }
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:evidence-evaluation:v1\n");
+        hasher.update(&self.canonical_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
+impl ReceiptAttestationVerificationReport {
+    pub fn to_evidence_evaluation(&self) -> EvidenceEvaluation {
+        EvidenceEvaluation::from_report(self)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationMethodStatus {
     Active,
