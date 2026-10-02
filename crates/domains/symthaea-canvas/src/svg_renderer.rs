@@ -130,7 +130,7 @@ fn write_remote_projection_node(
                 buf,
                 r#"{indent}<circle cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}""#,
             );
-            write_transform(buf, node);
+            write_remote_transform(buf, node);
             write_remote_style_attrs(buf, &node.style, gradient_colors);
             buf.push_str("/>\n");
         }
@@ -145,7 +145,7 @@ fn write_remote_projection_node(
                 buf,
                 r#"{indent}<ellipse cx="{cx:.1}" cy="{cy:.1}" rx="{rx:.1}" ry="{ry:.1}""#,
             );
-            write_transform(buf, node);
+            write_remote_transform(buf, node);
             write_remote_style_attrs(buf, &node.style, gradient_colors);
             buf.push_str("/>\n");
         }
@@ -160,7 +160,7 @@ fn write_remote_projection_node(
                 buf,
                 r#"{indent}<line x1="{x1:.1}" y1="{y1:.1}" x2="{x2:.1}" y2="{y2:.1}""#,
             );
-            write_transform(buf, node);
+            write_remote_transform(buf, node);
             write_remote_style_attrs(buf, &node.style, gradient_colors);
             buf.push_str("/>\n");
         }
@@ -174,7 +174,7 @@ fn write_remote_projection_node(
                 let _ = write!(buf, "{:.1},{:.1}", finite(*x, 0.0), finite(*y, 0.0));
             }
             buf.push('"');
-            write_transform(buf, node);
+            write_remote_transform(buf, node);
             write_remote_style_attrs(buf, &node.style, gradient_colors);
             buf.push_str("/>\n");
         }
@@ -193,13 +193,13 @@ fn write_remote_projection_node(
             if rx > 0.0 {
                 let _ = write!(buf, r#" rx="{rx:.1}""#);
             }
-            write_transform(buf, node);
+            write_remote_transform(buf, node);
             write_remote_style_attrs(buf, &node.style, gradient_colors);
             buf.push_str("/>\n");
         }
         NodeKind::Path { d } => {
             let _ = write!(buf, r#"{indent}<path d="{}""#, escape_xml_attr(d));
-            write_transform(buf, node);
+            write_remote_transform(buf, node);
             write_remote_style_attrs(buf, &node.style, gradient_colors);
             buf.push_str("/>\n");
         }
@@ -605,6 +605,21 @@ mod tests {
         assert!(svg.starts_with("<svg"));
         assert!(svg.contains("viewBox"));
         assert!(svg.ends_with("</svg>\n"));
+    }
+
+    #[test]
+    fn remote_projection_preserves_bounded_transforms() {
+        let root = SceneNode::group(None).with_child(
+            SceneNode::circle(5.0, 5.0, 1.0).with_transform(Transform {
+                translate_x: 12.0,
+                translate_y: -8.0,
+                rotate_deg: 25.0,
+                scale: 1.5,
+            }),
+        );
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert!(svg.contains("transform=\"translate(12.0,-8.0) rotate(25.0) scale(1.500)\""));
     }
 
     #[test]
