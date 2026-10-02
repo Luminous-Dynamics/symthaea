@@ -90,6 +90,38 @@ impl CurrentConclusionSupport {
     }
 }
 
+/// Immutable witness binding current authorization to one exact action instance.
+/// Kept separate from the epistemic decision witness so authorization cannot be
+/// replayed merely because its supporting conclusions remain available.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionAuthorizationWitness {
+    pub action_id: String,
+    pub action_digest: String,
+    pub frame: String,
+    pub support_digest: String,
+    pub policy: String,
+    pub decision: String,
+    pub issued_at: String,
+    pub expires_at: Option<String>,
+}
+
+impl ActionAuthorizationWitness {
+    pub fn is_bound_to(
+        &self,
+        action: &EpistemicAction,
+        current_frame: &str,
+        expected_support_digest: &str,
+        expected_policy: &str,
+    ) -> bool {
+        self.action_id == action.id
+            && !self.action_digest.is_empty()
+            && self.frame == current_frame
+            && self.support_digest == expected_support_digest
+            && self.policy == expected_policy
+            && !self.issued_at.is_empty()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDecisionWitness {
     pub frame: String,
@@ -396,6 +428,25 @@ mod tests {
         assert!(action.historical_decisions.is_empty());
     }
 
+
+    #[test]
+    fn authorization_witness_is_bound_to_exact_action_frame_support_and_policy() {
+        let action = EpistemicAction::new("a-bound", "intervention", ActionRisk::High);
+        let witness = ActionAuthorizationWitness {
+            action_id: "a-bound".into(),
+            action_digest: "sha256:action".into(),
+            frame: "f2".into(),
+            support_digest: "sha256:support".into(),
+            policy: "policy-v2".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(),
+            expires_at: Some("2026-10-02T20:05:00Z".into()),
+        };
+        assert!(witness.is_bound_to(&action, "f2", "sha256:support", "policy-v2"));
+        assert!(!witness.is_bound_to(&action, "f1", "sha256:support", "policy-v2"));
+        assert!(!witness.is_bound_to(&action, "f2", "sha256:other", "policy-v2"));
+        assert!(!witness.is_bound_to(&action, "f2", "sha256:support", "policy-v1"));
+    }
 
     #[test]
     fn current_support_does_not_collapse_staleness_conflict_or_provenance_into_lifecycle() {
