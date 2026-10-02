@@ -2513,10 +2513,12 @@ mod tests {
         }
 
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let method = resolved_method(
-            &envelope.attester_id,
-            signing_key.verifying_key(),
-        );
+        let method = ResolvedVerificationMethod {
+            verification_method: envelope.attester_id.clone(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
         let resolver = NoSnapshotResolver {
             snapshot_calls: std::cell::Cell::new(0),
             method,
