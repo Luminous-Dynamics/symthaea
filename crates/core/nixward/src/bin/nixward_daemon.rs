@@ -312,7 +312,7 @@ impl DaemonState {
     /// logic. Kept here: the AST-based already-configured check, which is
     /// more accurate than `set_option()`'s own naive substring search and
     /// has no equivalent inside `ConfigWriter` itself.
-    fn generate_nixos_hardening_patch(&mut self, unit: &str) -> Option<(String, String, String)> {
+    fn generate_nixos_hardening_patch(&mut self, unit: &str) -> Option<(String, String, String, String)> {
         let path = std::path::Path::new("/etc/nixos/configuration.nix");
         let content = if path.exists() {
             std::fs::read_to_string(path).ok()?
@@ -350,7 +350,8 @@ impl DaemonState {
         }
 
         let hardened_line = format!("{} = {}", path_str, value_str);
-        Some((hardened_line, path_str, value_str))
+        let config_digest = blake3::hash(content.as_bytes()).to_hex().to_string();
+        Some((hardened_line, path_str, value_str, config_digest))
     }
 
     /// Sync causal graphs and learned resolutions with other local daemons (Proposal 4)
