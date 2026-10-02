@@ -300,7 +300,9 @@ impl SqliteAuthorizationStore {
                WHERE native_replay_identity <> '';
              CREATE UNIQUE INDEX IF NOT EXISTS authorization_dispatch_operation_uq
                ON authorization_dispatches(operation_id)
-               WHERE operation_id <> '';",
+               WHERE operation_id <> '';
+             CREATE INDEX IF NOT EXISTS authorization_dispatch_action_fence_idx
+               ON authorization_dispatches(target_identity, action_digest, state);",
         )?;
         Ok(store)
     }
@@ -485,6 +487,22 @@ impl SqliteAuthorizationStore {
         if lease.action_id != action.id || lease.action_digest != expected_digest {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+
+        let occupied: Option<(String, String, String)> = tx
+            .query_row(
+                "SELECT authorization_instance,attempt_id,boundary_id
+                 FROM authorization_dispatches
+                 WHERE target_identity=?1 AND action_digest=?2
+                   AND state IN ('dispatch_pending','invoked','indeterminate')
+                 LIMIT 1",
+                params![expected_effect.target_identity.as_str(), expected_digest.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?;
+        if occupied.is_some() {
+            return Err(AuthorizationConsumptionError::ActionAlreadyInFlight.into());
+        }
+
         lease.mark_dispatch_pending(attempt_id)?;
         let record = DurableDispatchRecord::new(
             authorization_instance,
@@ -1990,6 +2008,56 @@ mod tests {
             &TestProviderVerifier,
         ).unwrap();
         assert_eq!(receipt.provider_idempotency_key,record.provider_idempotency_key);
+        let _=std::fs::remove_file(path);
+    }
+
+
+    #[test]
+    fn fresh_native_authority_cannot_bypass_same_action_in_flight() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-action-fence-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=EpistemicAction::new("same-action-fence","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+
+        let witness_a=ActionAuthorizationWitness {
+            authorization_instance:"fence-a".into(), action_id:action.id.clone(),
+            action_digest:digest.clone(), support_digest:"support-a".into(),
+            current_frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
+        };
+        let witness_b=ActionAuthorizationWitness {
+            authorization_instance:"fence-b".into(), action_id:action.id.clone(),
+            action_digest:digest, support_digest:"support-b".into(),
+            current_frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness_a.authorization_instance.clone(), witness_a.action_id.clone(),
+            witness_a.action_digest.clone(), witness_a.support_digest.clone(),
+            witness_a.policy.clone(), witness_a.authority_epoch, 1
+        )).unwrap();
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness_b.authorization_instance.clone(), witness_b.action_id.clone(),
+            witness_b.action_digest.clone(), witness_b.support_digest.clone(),
+            witness_b.policy.clone(), witness_b.authority_epoch, 1
+        )).unwrap();
+
+        store.prepare_for_execution_bound(&witness_a,&action,"frame@1","attempt-fence-a","boundary-A").unwrap();
+        store.mark_dispatch_pending_bound(
+            &witness_a.authorization_instance,"attempt-fence-a",&action,&effect,"boundary-A",
+            "operation:fence-a","native-grant:fence-a"
+        ).unwrap();
+
+        store.prepare_for_execution_bound(&witness_b,&action,"frame@1","attempt-fence-b","boundary-A").unwrap();
+        assert!(matches!(
+            store.mark_dispatch_pending_bound(
+                &witness_b.authorization_instance,"attempt-fence-b",&action,&effect,"boundary-A",
+                "operation:fence-b","native-grant:fence-b"
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ActionAlreadyInFlight
+            ))
+        ));
         let _=std::fs::remove_file(path);
     }
 

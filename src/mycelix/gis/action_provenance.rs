@@ -179,6 +179,8 @@ pub enum AuthorizationConsumptionError {
     NotReady,
     BudgetExhausted,
     AttemptMismatch,
+    /// Another unresolved attempt currently occupies the same effect action key.
+    ActionAlreadyInFlight,
     IndeterminateRequiresReconciliation,
     PreDispatchRecoveryNotAllowed,
 }
