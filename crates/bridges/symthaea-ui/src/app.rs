@@ -150,6 +150,17 @@ fn browser_qualification_scene() -> RemoteScene {
 }
 
 #[cfg(feature = "browser-qualification")]
+fn browser_qualification_portrait() -> String {
+    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<rect width="512" height="512" fill="#0a0f19"/>
+<circle cx="256" cy="256" r="160" fill="#2fb6eb" fill-opacity="0.75"/>
+<path d="M120 360 L256 120 L392 360 Z" fill="#eb7a29" fill-opacity="0.9"/>
+</svg>"#;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
+    format!("data:image/svg+xml;base64,{encoded}")
+}
+
+#[cfg(feature = "browser-qualification")]
 fn browser_qualification_movie() -> Movie {
     let width = 32u32;
     let height = 24u32;
@@ -293,6 +304,7 @@ pub fn App() -> impl IntoView {
             .is_some_and(|search| search.contains("symthaea_webgpu_fixture=1"));
         if enabled {
             gpu_scene.set(Some(browser_qualification_scene()));
+            portrait.set(Some(browser_qualification_portrait()));
             movie.set(Some(browser_qualification_movie()));
         }
     }
@@ -623,7 +635,7 @@ pub fn App() -> impl IntoView {
                         width="512" height="512"
                     ></canvas>
                     {move || (!webgpu_ready.get()).then(|| portrait.get()).flatten().map(|portrait_src| view! {
-                        <img class="portrait" style="max-width:220px;" src=portrait_src
+                        <img id="svg-cognitive-fallback" class="portrait" style="max-width:220px;" src=portrait_src
                             alt="Live cognitive self-portrait (SVG fallback)" />
                     })}
                 </div>
