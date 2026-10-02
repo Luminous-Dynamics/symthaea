@@ -793,6 +793,16 @@ impl KnowledgePersistence {
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
+
+        // Preserve the established legacy migration behavior before any complete
+        // snapshot verification attempts to decode memory identities.
+        conn.execute(
+            "UPDATE knowledge_facts
+             SET memory_id = 'legacy-fact:' || id
+             WHERE memory_id IS NULL",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
         let tx = conn
             .unchecked_transaction()
             .map_err(|e| format!("Begin latest snapshot receipt verification: {e}"))?;
@@ -923,6 +933,16 @@ impl KnowledgePersistence {
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
+
+        // Validation now verifies the complete live snapshot, so legacy rows must
+        // receive their deterministic EPF-011 identities before opening the transaction.
+        conn.execute(
+            "UPDATE knowledge_facts
+             SET memory_id = 'legacy-fact:' || id
+             WHERE memory_id IS NULL",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
         let tx = conn
             .unchecked_transaction()
             .map_err(|e| format!("Begin snapshot validation transaction: {e}"))?;
@@ -1034,6 +1054,16 @@ impl KnowledgePersistence {
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
+
+        // The live-state binding below reads the complete snapshot; preserve
+        // compatibility with pre-EPF-011 facts exactly as the snapshot loader does.
+        conn.execute(
+            "UPDATE knowledge_facts
+             SET memory_id = 'legacy-fact:' || id
+             WHERE memory_id IS NULL",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
         // Keep verification and retrieval in the same transaction snapshot.
         // A second transaction after verification would re-open a TOCTOU window in
         // which another writer could mutate validation history between the integrity
