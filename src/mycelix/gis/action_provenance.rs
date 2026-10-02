@@ -427,6 +427,7 @@ pub fn reconcile_indeterminate(
             action_id: self.action_id.clone(),
             authorization_instance: self.authorization_instance.clone(),
             action_digest: self.action_digest.clone(),
+            provider_idempotency_key: self.provider_idempotency_key(),
             attempt_id: attempt_id.to_owned(),
             authority_epoch: self.authority_epoch,
             outcome,
@@ -1237,6 +1238,7 @@ mod tests {
         let receipt = ExecutionReceipt {
             action_id: "a-receipt".into(), authorization_instance: "approval-1".into(),
             action_digest: "sha256:execution-only".into(),
+            provider_idempotency_key: "sha256:provider".into(),
             attempt_id: "attempt-1".into(), authority_epoch: 1, outcome: ExecutionOutcome::Succeeded,
         };
         assert_eq!(receipt.outcome, ExecutionOutcome::Succeeded);
