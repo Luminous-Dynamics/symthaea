@@ -444,16 +444,16 @@ impl EvaluationTrace {
     /// A successful outcome is terminal only when the full procedure executed.
     /// A partial prefix of passing checks is intentionally outcome-less.
     pub fn terminal_outcome(&self) -> Option<ReceiptAttestationVerificationOutcome> {
+        if !self.is_well_formed() {
+            return None;
+        }
+
         match self.results.last().map(|result| result.stage) {
             Some(VerificationStage::Failed(outcome)) => Some(outcome),
-            Some(VerificationStage::Passed)
-                if self.results.len() == EvaluationProcedure::attestation_ed25519().checks.len() =>
-            {
+            Some(VerificationStage::Passed) => {
                 Some(ReceiptAttestationVerificationOutcome::Verified)
             }
-            Some(VerificationStage::Passed)
-            | Some(VerificationStage::NotEvaluated)
-            | None => None,
+            Some(VerificationStage::NotEvaluated) | None => None,
         }
     }
 
@@ -2370,6 +2370,27 @@ mod tests {
         };
         assert_eq!(trace.terminal_outcome(), None);
         assert!(!trace.is_well_formed());
+    }
+
+    #[test]
+    fn evaluation_trace_malformed_all_pass_has_no_terminal_outcome() {
+        let procedure = EvaluationProcedure::attestation_ed25519();
+        let trace = EvaluationTrace {
+            procedure_fingerprint: procedure.fingerprint(),
+            results: procedure
+                .checks
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, check)| EvaluationCheckResult {
+                    sequence: index as u32 + 1,
+                    check,
+                    stage: VerificationStage::Passed,
+                })
+                .collect(),
+        };
+        assert!(!trace.is_well_formed());
+        assert_eq!(trace.terminal_outcome(), None);
     }
 
     #[test]
