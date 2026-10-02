@@ -703,7 +703,7 @@ impl ReceiptAttestationVerificationReport {
 
 
 pub const VERIFICATION_CONTEXT_VERSION: &str =
-    "symthaea-observation-verification-context-v2";
+    "symthaea-observation-verification-context-v3";
 pub const EVIDENCE_EVALUATION_VERSION: &str =
     "symthaea-observation-evaluation-v6";
 pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
@@ -716,6 +716,11 @@ pub struct VerificationContext {
     pub verifier_version: &'static str,
     pub environment_fingerprint: String,
     pub procedure_fingerprint: String,
+    /// Stable identity of the evaluator instance or organization, when available.
+    ///
+    /// This is deliberately distinct from verifier implementation/version: two
+    /// independent evaluators may run the same procedure and implementation.
+    pub evaluator_identity_fingerprint: Option<String>,
     pub resolution_snapshot_fingerprint: Option<String>,
     pub trust_root_fingerprint: Option<String>,
     pub authorization_policy_fingerprint: Option<String>,
@@ -730,6 +735,7 @@ impl VerificationContext {
             verifier_version: report.verifier_version,
             environment_fingerprint: report.environment_fingerprint.clone(),
             procedure_fingerprint: report.procedure_fingerprint.clone(),
+            evaluator_identity_fingerprint: None,
             resolution_snapshot_fingerprint: report.resolution_snapshot_fingerprint.clone(),
             trust_root_fingerprint: None,
             authorization_policy_fingerprint: None,
@@ -747,6 +753,11 @@ impl VerificationContext {
         self
     }
 
+    pub fn with_evaluator_identity_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
+        self.evaluator_identity_fingerprint = Some(fingerprint.into());
+        self
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         fn write_string(bytes: &mut Vec<u8>, value: &str) {
             bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
@@ -759,12 +770,13 @@ impl VerificationContext {
             }
         }
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:observation-verification-context:v2\n");
+        bytes.extend_from_slice(b"symthaea:observation-verification-context:v3\n");
         write_string(&mut bytes, self.context_version);
         write_string(&mut bytes, &self.policy_fingerprint);
         write_string(&mut bytes, self.verifier_version);
         write_string(&mut bytes, &self.environment_fingerprint);
         write_string(&mut bytes, &self.procedure_fingerprint);
+        write_option(&mut bytes, self.evaluator_identity_fingerprint.as_deref());
         write_option(&mut bytes, self.resolution_snapshot_fingerprint.as_deref());
         write_option(&mut bytes, self.trust_root_fingerprint.as_deref());
         write_option(&mut bytes, self.authorization_policy_fingerprint.as_deref());
@@ -774,7 +786,7 @@ impl VerificationContext {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-verification-context:v2\n");
+        hasher.update(b"symthaea:observation-verification-context:v3\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -1058,12 +1070,14 @@ impl EvidenceEvaluation {
         report: &ReceiptAttestationVerificationReport,
         context: VerificationContext,
     ) -> Self {
-        // Only supplemental trust/authorization roots may be supplied here.
-        // Procedure, policy, verifier, environment, resolver snapshot, and
-        // evaluation time are execution facts already bound by the report and
+        // Only supplemental evaluator/trust/authorization context may be
+        // supplied here. Procedure, policy, verifier, environment, resolver
+        // snapshot, and evaluation time are execution facts already bound by the report and
         // therefore cannot be replaced after the evaluation occurred.
         let mut evaluation = Self::from_report(report);
         let mut merged_context = VerificationContext::from_report(report);
+        merged_context.evaluator_identity_fingerprint =
+            context.evaluator_identity_fingerprint;
         merged_context.trust_root_fingerprint = context.trust_root_fingerprint;
         merged_context.authorization_policy_fingerprint =
             context.authorization_policy_fingerprint;
@@ -2424,6 +2438,32 @@ mod tests {
         let evaluation = report.to_evidence_evaluation();
         assert_eq!(evaluation.execution_trace, report.execution_trace);
         assert!(evaluation.is_consistent_with_report(&report));
+    }
+
+    #[test]
+    fn evaluator_identity_changes_context_without_changing_subject() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let base = report.to_evidence_evaluation();
+        let independent = EvidenceEvaluation::from_report_with_context(
+            &report,
+            VerificationContext::from_report(&report)
+                .with_evaluator_identity_fingerprint("evaluator-b"),
+        );
+
+        assert_eq!(base.subject_fingerprint, independent.subject_fingerprint);
+        assert_ne!(base.context_fingerprint, independent.context_fingerprint);
+        assert_ne!(base.fingerprint(), independent.fingerprint());
+        assert_eq!(
+            independent.context.evaluator_identity_fingerprint.as_deref(),
+            Some("evaluator-b")
+        );
     }
 
     #[test]
