@@ -551,7 +551,7 @@ impl Ed25519ReceiptVerifier {
         report
     }
 
-    pub fn verify_with_resolver_report_inner<R: VerificationMethodResolver>(
+    fn verify_with_resolver_report_inner<R: VerificationMethodResolver>(
         &self,
         envelope: &ReceiptAttestationEnvelope,
         receipt: &IndependenceVerificationReceipt,
