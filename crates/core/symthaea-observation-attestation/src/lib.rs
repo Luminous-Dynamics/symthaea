@@ -2316,6 +2316,28 @@ mod tests {
     }
 
     #[test]
+    fn verification_report_captures_execution_trace_at_execution_time() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        envelope.proof.proof_value[0] ^= 0x01;
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        assert!(report.execution_trace.is_well_formed());
+        assert!(report.execution_trace.matches_report(&report));
+        assert_eq!(
+            report.execution_trace.terminal_outcome(),
+            Some(ReceiptAttestationVerificationOutcome::InvalidSignature)
+        );
+
+        let evaluation = report.to_evidence_evaluation();
+        assert_eq!(evaluation.execution_trace, report.execution_trace);
+    }
+
+    #[test]
     fn evidence_evaluation_has_single_source_of_stage_results() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
