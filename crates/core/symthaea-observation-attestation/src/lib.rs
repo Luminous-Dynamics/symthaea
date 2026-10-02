@@ -22,7 +22,7 @@ use symthaea_core::observation_fabric::{
 };
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
-pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v1";
+pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v2";
 
 pub const POLICY_VERSION: &str = "symthaea-observation-verification-policy-v1";
 pub const VERIFIER_IMPLEMENTATION_ID: &str = "symthaea-observation-attestation-ed25519-v1";
@@ -115,7 +115,7 @@ impl VerifierEnvironmentIdentity {
     }
 }
 
-const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v1\n";
+const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v2\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReceiptAttestationVerificationOutcome {
@@ -385,7 +385,7 @@ impl ReceiptAttestationVerificationReport {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-attestation-report:v1\n");
+        hasher.update(b"symthaea:observation-attestation-report:v2\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
