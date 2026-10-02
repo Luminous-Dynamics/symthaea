@@ -22,6 +22,8 @@ use symthaea_core::observation_fabric::{
 };
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
+pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v1";
+const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v1\\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReceiptAttestationVerificationOutcome {
@@ -56,6 +58,9 @@ pub enum VerificationStage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptAttestationVerificationReport {
     pub outcome: ReceiptAttestationVerificationOutcome,
+    pub verifier_version: &'static str,
+    pub receipt_fingerprint: String,
+    pub resolved_verification_method: Option<String>,
     pub structural_validation: VerificationStage,
     pub receipt_commitment: VerificationStage,
     pub temporal_validity: VerificationStage,
@@ -71,10 +76,15 @@ impl ReceiptAttestationVerificationReport {
     fn failed(
         outcome: ReceiptAttestationVerificationOutcome,
         stage: fn(ReceiptAttestationVerificationOutcome) -> VerificationStage,
+        receipt_fingerprint: String,
+        resolved_verification_method: Option<String>,
     ) -> Self {
         let failed = stage(outcome);
         let mut report = Self {
             outcome,
+            verifier_version: VERIFIER_VERSION,
+            receipt_fingerprint,
+            resolved_verification_method,
             structural_validation: VerificationStage::NotEvaluated,
             receipt_commitment: VerificationStage::NotEvaluated,
             temporal_validity: VerificationStage::NotEvaluated,
@@ -162,9 +172,15 @@ impl ReceiptAttestationVerificationReport {
         report
     }
 
-    fn passed() -> Self {
+    fn passed(
+        receipt_fingerprint: String,
+        resolved_verification_method: Option<String>,
+    ) -> Self {
         Self {
             outcome: ReceiptAttestationVerificationOutcome::Verified,
+            verifier_version: VERIFIER_VERSION,
+            receipt_fingerprint,
+            resolved_verification_method,
             structural_validation: VerificationStage::Passed,
             receipt_commitment: VerificationStage::Passed,
             temporal_validity: VerificationStage::Passed,
@@ -176,6 +192,51 @@ impl ReceiptAttestationVerificationReport {
             cryptographic_proof: VerificationStage::Passed,
         }
     }
+    
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+        fn write_stage(bytes: &mut Vec<u8>, stage: VerificationStage) {
+            match stage {
+                VerificationStage::Passed => bytes.push(0),
+                VerificationStage::Failed(outcome) => {
+                    bytes.push(1);
+                    bytes.push(outcome as u8);
+                }
+                VerificationStage::NotEvaluated => bytes.push(2),
+            }
+        }
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(REPORT_DOMAIN_SEPARATOR);
+        write_string(&mut bytes, self.verifier_version);
+        write_string(&mut bytes, &self.receipt_fingerprint);
+        match &self.resolved_verification_method {
+            Some(method) => {
+                bytes.push(1);
+                write_string(&mut bytes, method);
+            }
+            None => bytes.push(0),
+        }
+        bytes.push(self.outcome as u8);
+        write_stage(&mut bytes, self.structural_validation);
+        write_stage(&mut bytes, self.receipt_commitment);
+        write_stage(&mut bytes, self.temporal_validity);
+        write_stage(&mut bytes, self.cryptosuite);
+        write_stage(&mut bytes, self.verification_method);
+        write_stage(&mut bytes, self.lifecycle);
+        write_stage(&mut bytes, self.proof_purpose_authorization);
+        write_stage(&mut bytes, self.proof_policy);
+        write_stage(&mut bytes, self.cryptographic_proof);
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        blake3::hash(&self.canonical_bytes()).to_hex().to_string()
+    }
+
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -334,14 +395,14 @@ impl Ed25519ReceiptVerifier {
         // resolution. Resolvers may consult databases or remote trust services, so
         // untrusted input must not trigger that work until cheap local checks pass.
         if envelope.validate().is_err() {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::InvalidEnvelope, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::InvalidEnvelope, VerificationStage::Failed, receipt.fingerprint(), None);
         }
         if !envelope.verify_against_receipt(receipt) {
             return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch, VerificationStage::Failed);
         }
         match envelope.temporal_status_at(self.now_unix_ns) {
             ReceiptAttestationTemporalStatus::NotYetValid =>
-                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::NotYetValid, VerificationStage::Failed),
+                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::NotYetValid, VerificationStage::Failed, receipt.fingerprint(), Some(verification_method.to_string())),
             ReceiptAttestationTemporalStatus::Expired =>
                 return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::Expired, VerificationStage::Failed),
             ReceiptAttestationTemporalStatus::Valid => {}
@@ -443,7 +504,7 @@ impl Ed25519ReceiptVerifier {
         let signature = Signature::from_bytes(&proof_bytes);
 
         match verifying_key.verify(&envelope.canonical_payload_bytes(), &signature) {
-            Ok(()) => ReceiptAttestationVerificationReport::passed(),
+            Ok(()) => ReceiptAttestationVerificationReport::passed(receipt.fingerprint(), Some(verification_method.to_string())),
             Err(_) => ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::InvalidSignature, VerificationStage::Failed),
         }
     }
