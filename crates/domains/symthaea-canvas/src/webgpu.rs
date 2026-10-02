@@ -626,6 +626,14 @@ impl WebGpuRenderer {
     }
 
     pub fn render(&self, scene: &GpuScene) -> Result<(), String> {
+        let bytes = scene_to_bytes(&scene.vertices);
+        if bytes.len() > self.vertex_buffer_bytes {
+            return Err(format!(
+                "GPU scene upload exceeds {} byte bound",
+                self.vertex_buffer_bytes
+            ));
+        }
+
         let frame = self
             .surface
             .get_current_texture()
@@ -634,14 +642,6 @@ impl WebGpuRenderer {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let bytes = scene_to_bytes(&scene.vertices);
-        if bytes.len() > self.vertex_buffer_bytes {
-            frame.present();
-            return Err(format!(
-                "GPU scene upload exceeds {} byte bound",
-                self.vertex_buffer_bytes
-            ));
-        }
         if !bytes.is_empty() {
             self.queue.write_buffer(&self.vertex_buffer, 0, &bytes);
         }
@@ -679,6 +679,7 @@ impl WebGpuRenderer {
         frame.present();
         Ok(())
     }
+
 }
 
 #[cfg(target_arch = "wasm32")]
