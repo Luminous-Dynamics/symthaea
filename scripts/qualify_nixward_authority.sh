@@ -20,6 +20,10 @@ if rg -n "fn approved_intent_digest|let approved_digest|approved_intent_digest\\
   echo "legacy verdict-file approval parser still present in daemon" >&2
   exit 1
 fi
+if rg -n "execute_confirmed\\(" crates/core/nixward/src/bin/nixward_daemon.rs; then
+  echo "daemon still reaches legacy confirmed executor directly" >&2
+  exit 1
+fi
 rg -n "NixOSCommand::ConfigPatch" crates/core/nixward/src/{action/executor.rs,bin/nixward_daemon.rs}
 echo "-- compile nixward library --"
 cargo check -p nixward --lib
