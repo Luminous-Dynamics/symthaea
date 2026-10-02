@@ -868,7 +868,7 @@ mod tests {
         let encoded=vdp.to_cbor();
         assert_eq!(encoded[0..3],[0xa1,0x21,0x81]);
         assert_eq!(encoded[3],0x58);
-        assert_eq!(encoded[4],34);
+        assert_eq!(encoded[4],0x26);
     }
 
     #[test]
