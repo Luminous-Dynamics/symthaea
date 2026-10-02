@@ -53,11 +53,14 @@ impl SqliteAuthorizationStore {
                 .map_err(|e| AuthorizationStoreError::InvalidState(e.to_string()))?;
         }
         let store = Self { path };
-        let connection = store.connection()?;
+        let mut connection = store.connection()?;
         connection.execute_batch(
             "PRAGMA journal_mode=WAL;
-             PRAGMA synchronous=FULL;
-             CREATE TABLE IF NOT EXISTS authorization_leases (
+             PRAGMA synchronous=FULL;",
+        )?;
+        migrate_legacy_schema(&mut connection)?;
+        connection.execute_batch(
+            "CREATE TABLE IF NOT EXISTS authorization_leases (
                authorization_instance TEXT PRIMARY KEY,
                action_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
@@ -175,6 +178,84 @@ impl SqliteAuthorizationStore {
         tx.commit()?;
         Ok(receipt)
     }
+}
+
+fn migrate_legacy_schema(connection: &mut Connection) -> Result<(), AuthorizationStoreError> {
+    let has_lease_table: bool = connection
+        .query_row(
+            "SELECT EXISTS(
+                SELECT 1 FROM sqlite_master
+                WHERE type='table' AND name='authorization_leases'
+            )",
+            [],
+            |row| row.get(0),
+        )?;
+
+    if !has_lease_table {
+        return Ok(());
+    }
+
+    let has_instance: bool = connection
+        .prepare("PRAGMA table_info(authorization_leases)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
+        .any(|name| name == "authorization_instance");
+
+    if has_instance {
+        return Ok(());
+    }
+
+    let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    tx.execute_batch(
+        "ALTER TABLE authorization_leases RENAME TO authorization_leases_legacy;
+         ALTER TABLE authorization_receipts RENAME TO authorization_receipts_legacy;
+
+         CREATE TABLE authorization_leases (
+           authorization_instance TEXT PRIMARY KEY,
+           action_id TEXT NOT NULL,
+           action_digest TEXT NOT NULL,
+           support_digest TEXT NOT NULL,
+           policy TEXT NOT NULL,
+           authority_epoch INTEGER NOT NULL,
+           remaining_executions INTEGER NOT NULL,
+           state TEXT NOT NULL,
+           attempt_id TEXT
+         );
+
+         CREATE TABLE authorization_receipts (
+           authorization_instance TEXT NOT NULL,
+           action_id TEXT NOT NULL,
+           attempt_id TEXT NOT NULL,
+           phase TEXT NOT NULL,
+           outcome TEXT NOT NULL,
+           action_digest TEXT NOT NULL,
+           authority_epoch INTEGER NOT NULL,
+           PRIMARY KEY(authorization_instance, attempt_id, phase)
+         );",
+    )?;
+    tx.execute(
+        "INSERT INTO authorization_leases
+         (authorization_instance,action_id,action_digest,support_digest,policy,
+          authority_epoch,remaining_executions,state,attempt_id)
+         SELECT action_id,action_id,action_digest,support_digest,policy,
+                authority_epoch,remaining_executions,state,attempt_id
+         FROM authorization_leases_legacy",
+        [],
+    )?;
+    tx.execute(
+        "INSERT INTO authorization_receipts
+         (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch)
+         SELECT action_id,action_id,attempt_id,phase,outcome,action_digest,authority_epoch
+         FROM authorization_receipts_legacy",
+        [],
+    )?;
+    tx.execute_batch(
+        "DROP TABLE authorization_leases_legacy;
+         DROP TABLE authorization_receipts_legacy;",
+    )?;
+    tx.commit()?;
+    Ok(())
 }
 
 fn encode_state(s: &AuthorizationLeaseState) -> &'static str {
@@ -317,6 +398,61 @@ mod tests {
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::BudgetExhausted))
         ));
         assert_eq!(reopened.commit(&action.id,"attempt-1",ExecutionOutcome::Succeeded).unwrap(),first);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn explicit_authorization_instances_allow_fresh_issuance_without_replay() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-instance-{}.db",std::process::id()));
+        let (store,action,old_witness)=fixture(&path);
+        store.prepare_for_execution(&old_witness,&action,"frame@1","old-attempt").unwrap();
+        store.commit(&action.id,"old-attempt",ExecutionOutcome::Succeeded).unwrap();
+
+        let digest=action.canonical_action_digest();
+        let fresh_witness=ActionAuthorizationWitness {
+            authorization_instance:"approval-new".into(),
+            issued_at:"2026-10-02T20:02:00Z".into(),
+            ..old_witness
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-new", action.id.clone(), digest, "sha256:support", "policy-v1", 1, 1,
+        )).unwrap();
+
+        store.prepare_for_execution(&fresh_witness,&action,"frame@1","new-attempt").unwrap();
+        let receipt=store.commit("approval-new","new-attempt",ExecutionOutcome::Succeeded).unwrap();
+        assert_eq!(receipt.authorization_instance,"approval-new");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn legacy_action_keyed_store_is_migrated_to_explicit_instances() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-migrate-{}.db",std::process::id()));
+        {
+            let connection=Connection::open(&path).unwrap();
+            connection.execute_batch(
+                "CREATE TABLE authorization_leases (
+                   action_id TEXT PRIMARY KEY, action_digest TEXT NOT NULL,
+                   support_digest TEXT NOT NULL, policy TEXT NOT NULL,
+                   authority_epoch INTEGER NOT NULL, remaining_executions INTEGER NOT NULL,
+                   state TEXT NOT NULL, attempt_id TEXT
+                 );
+                 CREATE TABLE authorization_receipts (
+                   action_id TEXT NOT NULL, attempt_id TEXT NOT NULL, phase TEXT NOT NULL,
+                   outcome TEXT NOT NULL, action_digest TEXT NOT NULL,
+                   authority_epoch INTEGER NOT NULL,
+                   PRIMARY KEY(action_id,attempt_id,phase)
+                 );
+                 INSERT INTO authorization_leases VALUES
+                   ('legacy-action','sha256:action','sha256:support','policy-v1',1,1,'ready',NULL);",
+            ).unwrap();
+        }
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let lease=store.connection().unwrap();
+        let instance:String=lease.query_row(
+            "SELECT authorization_instance FROM authorization_leases WHERE action_id='legacy-action'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(instance,"legacy-action");
         let _=std::fs::remove_file(path);
     }
 
