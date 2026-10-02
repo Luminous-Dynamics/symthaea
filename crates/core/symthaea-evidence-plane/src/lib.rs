@@ -106,7 +106,6 @@ pub fn config_hash<T: fmt::Debug>(config: &T) -> String {
     format!("{:x}", hasher.finish())
 }
 
-
 /// Canonical execution identity for evidence admission and replay.
 ///
 /// This v1 identity contains only computational inputs that can change what
@@ -298,7 +297,11 @@ impl ExecutionLineageV1 {
     /// representation; untrusted list inputs should reject duplicates before
     /// constructing the map.
     pub fn validate(&self) -> Result<(), String> {
-        for (name, value) in self.lock_digests.iter().chain(self.immutable_input_digests.iter()) {
+        for (name, value) in self
+            .lock_digests
+            .iter()
+            .chain(self.immutable_input_digests.iter())
+        {
             validate_name(name)?;
             validate_digest(value)?;
         }
@@ -328,8 +331,13 @@ impl ExecutionLineageV1 {
         }
         validate_git_object_id("source_revision", &self.source_revision)?;
         validate_git_object_id("source_tree", &self.source_tree)?;
-        if self.repository_source_snapshot_id.as_str()
-            != self.repository_source_snapshot_id.as_str().to_ascii_lowercase()
+        if self
+            .repository_source_snapshot_id
+            .as_str()
+            != self
+                .repository_source_snapshot_id
+                .as_str()
+                .to_ascii_lowercase()
         {
             return Err("repository_source_snapshot_id must be canonical lowercase hex".into());
         }
@@ -368,7 +376,11 @@ impl ExecutionLineageV1 {
         append_str(hasher, "cwd", &self.cwd);
         append_sequence(hasher, "argv", &self.argv);
         append_map(hasher, "allowed_env", &self.allowed_env);
-        append_map(hasher, "immutable_input_digests", &self.immutable_input_digests);
+        append_map(
+            hasher,
+            "immutable_input_digests",
+            &self.immutable_input_digests,
+        );
     }
 }
 
@@ -406,9 +418,7 @@ where
     deserializer.deserialize_map(UniqueMapVisitor)
 }
 
-fn deserialize_unique_string_set<'de, D>(
-    deserializer: D,
-) -> Result<BTreeSet<String>, D::Error>
+fn deserialize_unique_string_set<'de, D>(deserializer: D) -> Result<BTreeSet<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -488,7 +498,10 @@ fn validate_git_object_id(field: &str, value: &str) -> Result<(), String> {
 
 fn validate_digest(value: &str) -> Result<(), String> {
     let payload = value.split_once(':').map_or(value, |(_, payload)| payload);
-    if payload.len() < 16 || payload.len() % 2 != 0 || !payload.bytes().all(|b| b.is_ascii_hexdigit()) {
+    if payload.len() < 16
+        || payload.len() % 2 != 0
+        || !payload.bytes().all(|b| b.is_ascii_hexdigit())
+    {
         return Err(format!("invalid digest syntax: {value:?}"));
     }
     Ok(())
@@ -549,10 +562,16 @@ impl fmt::Display for EvidenceLineageCommitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidCurrentLineage(error) => {
-                write!(f, "cannot commit evidence for invalid current lineage: {error}")
+                write!(
+                    f,
+                    "cannot commit evidence for invalid current lineage: {error}"
+                )
             }
             Self::LineageDecision(decision) => {
-                write!(f, "cannot commit evidence under lineage decision: {decision:?}")
+                write!(
+                    f,
+                    "cannot commit evidence under lineage decision: {decision:?}"
+                )
             }
         }
     }
@@ -652,7 +671,6 @@ pub fn qualify_lineage_perturbation(
         (true, false) => LineagePerturbationResult::UnexpectedInvariance,
     }
 }
-
 
 /// A named bag of measured evidence values.
 ///
@@ -898,24 +916,34 @@ mod tests {
     #[test]
     fn raw_named_entries_reject_duplicate_map_keys_before_canonicalization() {
         let result = ExecutionLineageV1::from_raw_entries(
-            "repo".into(), "revision".into(), "tree".into(), "a".repeat(64),
+            "repo".into(),
+            "revision".into(),
+            "tree".into(),
+            "a".repeat(64),
             vec![
                 ("cargo".into(), "sha256:0011223344556677".into()),
                 ("cargo".into(), "sha256:8899aabbccddeeff".into()),
             ],
             vec![("rustc".into(), "1.96".into())],
-            "host/target".into(), "nix".into(), vec!["feature".into()],
-            "/work".into(), vec!["cargo".into(), "test".into()],
+            "host/target".into(),
+            "nix".into(),
+            vec!["feature".into()],
+            "/work".into(),
+            vec!["cargo".into(), "test".into()],
             vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
             vec![("input".into(), "blake3:0011223344556677".into())],
-        );
-        assert!(result.expect_err("duplicate lock name must fail").contains("duplicate name"));
+        )
+        .expect_err("duplicate lock name must fail");
+        assert!(result.contains("duplicate name"));
     }
 
     #[test]
     fn raw_named_entries_reject_duplicate_set_members() {
         let result = ExecutionLineageV1::from_raw_entries(
-            "repo".into(), "revision".into(), "tree".into(), "a".repeat(64),
+            "repo".into(),
+            "revision".into(),
+            "tree".into(),
+            "a".repeat(64),
             vec![("cargo".into(), "sha256:0011223344556677".into())],
             vec![("rustc".into(), "1.96".into())],
             "host/target".into(), "nix".into(), vec!["feature".into(), "feature".into()],
@@ -923,21 +951,33 @@ mod tests {
             vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
             vec![("input".into(), "blake3:0011223344556677".into())],
         );
-        assert!(result.expect_err("duplicate feature must fail").contains("duplicate name"));
+        )
+        .expect_err("duplicate feature must fail");
+        assert!(result.contains("duplicate name"));
     }
 
     #[test]
     fn raw_named_entries_validate_before_digest_is_available() {
         let lineage = ExecutionLineageV1::from_raw_entries(
-            "repo".into(), "revision".into(), "tree".into(), "a".repeat(64),
+            "repo".into(),
+            "revision".into(),
+            "tree".into(),
+            "a".repeat(64),
             vec![("cargo".into(), "sha256:0011223344556677".into())],
             vec![("rustc".into(), "1.96".into())],
-            "host/target".into(), "nix".into(), vec!["feature".into()],
-            "/work".into(), vec!["cargo".into(), "test".into()],
+            "host/target".into(),
+            "nix".into(),
+            vec!["feature".into()],
+            "/work".into(),
+            vec!["cargo".into(), "test".into()],
             vec![("RUSTFLAGS".into(), "-Dwarnings".into())],
             vec![("input".into(), "blake3:0011223344556677".into())],
-        ).expect("valid raw entries");
-        assert_eq!(lineage.lock_digests.get("cargo"), Some(&"sha256:0011223344556677".to_owned()));
+        )
+        .expect("valid raw entries");
+        assert_eq!(
+            lineage.lock_digests.get("cargo"),
+            Some(&"sha256:0011223344556677".to_owned())
+        );
     }
 
     fn lineage_fixture() -> ExecutionLineageV1 {
@@ -945,9 +985,8 @@ mod tests {
             source_repository: "github.com/Luminous-Dynamics/symthaea".into(),
             source_revision: "a".repeat(40),
             source_tree: "b".repeat(40),
-            repository_source_snapshot_id: RepositorySourceSnapshotId::parse(
-                &"A".repeat(64)
-            ).expect("valid snapshot id"),
+            repository_source_snapshot_id: RepositorySourceSnapshotId::parse(&"A".repeat(64))
+                .expect("valid snapshot id"),
             lock_digests: [(
                 "Cargo.lock".into(),
                 "sha256:00112233445566778899aabbccddeeff".into(),
@@ -959,8 +998,15 @@ mod tests {
             nix_identity: "nixpkgs:deadbeef".into(),
             feature_flags: ["default".into()].into_iter().collect(),
             cwd: "/workspace/symthaea".into(),
-            argv: vec!["cargo".into(), "test".into(), "-p".into(), "symthaea-evidence-plane".into()],
-            allowed_env: [("RUST_BACKTRACE".into(), "0".into())].into_iter().collect(),
+            argv: vec![
+                "cargo".into(),
+                "test".into(),
+                "-p".into(),
+                "symthaea-evidence-plane".into(),
+            ],
+            allowed_env: [("RUST_BACKTRACE".into(), "0".into())]
+                .into_iter()
+                .collect(),
             immutable_input_digests: [(
                 "fixture.json".into(),
                 "blake3:00112233445566778899aabbccddeeff".into(),
@@ -1022,7 +1068,11 @@ mod tests {
 
         let error = serde_json::from_value::<ExecutionLineageV1>(lineage)
             .expect_err("invalid lineage must be rejected during deserialization");
-        assert!(error.to_string().contains("empty lineage field source_repository"));
+        assert!(
+            error
+                .to_string()
+                .contains("empty lineage field source_repository")
+        );
     }
 
     #[test]
@@ -1145,7 +1195,9 @@ mod tests {
     #[test]
     fn execution_lineage_guard_rejects_invalid_preparation() {
         let mut lineage = lineage_fixture();
-        lineage.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
+        lineage
+            .immutable_input_digests
+            .insert("fixture.json".into(), "not-a-digest".into());
         assert!(EvidenceLineageGuardV1::try_prepare(&lineage).is_err());
     }
 
@@ -1243,12 +1295,12 @@ mod tests {
     #[test]
     fn execution_lineage_guard_allows_same_lineage_after_evidence() {
         let base = lineage_fixture();
-        let mut guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
-        guard.commit_evidence(&base).expect("stable lineage commits evidence");
-        assert_eq!(
-            guard.check(&base),
-            EvidenceLineageDecision::Stable
-        );
+        let mut guard =
+            EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
+        guard
+            .commit_evidence(&base)
+            .expect("stable lineage commits evidence");
+        assert_eq!(guard.check(&base), EvidenceLineageDecision::Stable);
     }
 
     #[test]
@@ -1287,7 +1339,8 @@ mod tests {
         let mut revision = base.clone();
         revision.source_revision = "c".repeat(40);
         let mut lock = base.clone();
-        lock.lock_digests.insert("Cargo.lock".into(), "lock999".into());
+        lock.lock_digests
+            .insert("Cargo.lock".into(), "lock999".into());
         let mut argv = base.clone();
         argv.argv.push("--nocapture".into());
 
