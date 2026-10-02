@@ -1515,7 +1515,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn movie_rejects_oversized_base64_before_decode() {
         let payload = serde_json::json!({
             "mental_movie": {
