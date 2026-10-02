@@ -837,8 +837,12 @@ impl Rfc9942SignatureWithReceipts {
         let protected_bytes = reader.read_bstr_bounded(4096)
             .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         let mut protected_reader = CborReader::new(&protected_bytes);
-        let protected_len = protected_reader.read_map_len()
-            .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        let protected_len = if protected_bytes.is_empty() {
+            0
+        } else {
+            protected_reader.read_map_len()
+                .map_err(|_|Rfc9942VdpError::InvalidEncoding)?
+        };
         if protected_len > 32 {
             return Err(Rfc9942VdpError::ResourceLimitExceeded);
         }
@@ -3079,6 +3083,33 @@ mod tests {
         assert_eq!(
             decoded.payload(),
             &Rfc9942SignaturePayload::Attached(payload)
+        );
+    }
+
+    #[test]
+    fn rfc9942_outer_signature_accepts_zero_length_protected_header() {
+        let mut bytes = Vec::new();
+        cbor_tag(&mut bytes, COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes, 4);
+        cbor_bytes(&mut bytes, &[]);
+        cbor_map_len(&mut bytes, 0);
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes, &[0xBB; 64]);
+
+        let decoded = Rfc9942SignatureWithReceipts::from_cbor(&bytes).unwrap();
+        assert_eq!(decoded.protected_header_bytes(), Vec::<u8>::new());
+        assert_eq!(decoded.to_cbor(), bytes);
+        assert_eq!(
+            decoded.protected_algorithm_id(),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        let mut malformed = bytes.clone();
+        malformed[1] = 0x84;
+        malformed.splice(2..2, [0x01]);
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&malformed),
+            Err(Rfc9942VdpError::InvalidEncoding)
         );
     }
 
