@@ -61,5 +61,10 @@ jobs:
         with:
           components: rustfmt
 
+      # Ubuntu runner images do not guarantee ripgrep is preinstalled; the
+      # checked-in boundary qualification intentionally uses rg for PCRE2/source fences.
+      - name: Install source-boundary scanner
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       - name: Run checked-in focused qualification
         run: bash scripts/qualify_nixward_authority.sh
