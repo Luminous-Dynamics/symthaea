@@ -591,7 +591,32 @@ mod tests {
     }
 
     #[test]
-    #[test]\n    fn rfc9942_proof_cbor_round_trips_through_strict_decoder() {\n        let inclusion=Rfc9162InclusionProof::new(20,17,vec![[0x11;32],[0x22;32]]);\n        assert_eq!(Rfc9162InclusionProof::from_cbor(&inclusion.to_cbor()).unwrap(),inclusion);\n        let consistency=Rfc9162ConsistencyProof::new(20,104,vec![[0x33;32],[0x44;32]]);\n        assert_eq!(Rfc9162ConsistencyProof::from_cbor(&consistency.to_cbor()).unwrap(),consistency);\n    }\n\n    #[test]\n    fn rfc9942_proof_decoder_rejects_noncanonical_and_trailing_input() {\n        let inclusion=Rfc9162InclusionProof::new(20,17,vec![[0x11;32]]);\n        let mut encoded=inclusion.to_cbor(); encoded.push(0); assert_eq!(Rfc9162InclusionProof::from_cbor(&encoded),Err(Rfc9162ProofDecodeError::TrailingBytes));\n        let noncanonical=vec![0x83,0x18,0x14,0x11,0x80];\n        assert_eq!(Rfc9162InclusionProof::from_cbor(&noncanonical),Err(Rfc9162ProofDecodeError::InvalidEncoding));\n    }\n\n    #[test]\n    fn rfc9942_inclusion_and_consistency_cbor_shapes_are_deterministic() {
+    #[test]
+    fn rfc9942_proof_cbor_round_trips_through_strict_decoder() {
+        let inclusion = Rfc9162InclusionProof::new(20, 17, vec![[0x11; 32], [0x22; 32]]);
+        assert_eq!(Rfc9162InclusionProof::from_cbor(&inclusion.to_cbor()).unwrap(), inclusion);
+        let consistency = Rfc9162ConsistencyProof::new(20, 104, vec![[0x33; 32], [0x44; 32]]);
+        assert_eq!(Rfc9162ConsistencyProof::from_cbor(&consistency.to_cbor()).unwrap(), consistency);
+    }
+
+    #[test]
+    fn rfc9942_proof_decoder_rejects_noncanonical_and_trailing_input() {
+        let inclusion = Rfc9162InclusionProof::new(20, 17, vec![[0x11; 32]]);
+        let mut encoded = inclusion.to_cbor();
+        encoded.push(0);
+        assert_eq!(
+            Rfc9162InclusionProof::from_cbor(&encoded),
+            Err(Rfc9162ProofDecodeError::TrailingBytes)
+        );
+        let noncanonical = vec![0x83, 0x18, 0x14, 0x11, 0x80];
+        assert_eq!(
+            Rfc9162InclusionProof::from_cbor(&noncanonical),
+            Err(Rfc9162ProofDecodeError::InvalidEncoding)
+        );
+    }
+
+    #[test]
+    fn rfc9942_inclusion_and_consistency_cbor_shapes_are_deterministic() {
         let inclusion = Rfc9162InclusionProof::new(20, 17, vec![[0x11; 32], [0x22; 32]]);
         assert_eq!(
             inclusion.to_cbor(),
