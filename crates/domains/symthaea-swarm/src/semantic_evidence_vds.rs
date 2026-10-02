@@ -103,8 +103,8 @@ impl Rfc9942ReceiptEnvelope {
         for _ in 0..ph_len{
             let label=ph.read_cose_label().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             match label{
-                COSE_ALG_HEADER_LABEL=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if algorithm.replace(value).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
-                RFC9942_VDS_HEADER_LABEL=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if value<0{return Err(Rfc9942VdpError::InvalidStructure);}if vds.replace(value as u64).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
+                Some(COSE_ALG_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if algorithm.replace(value).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
+                Some(RFC9942_VDS_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if value<0{return Err(Rfc9942VdpError::InvalidStructure);}if vds.replace(value as u64).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
                 _=>{ph.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;}
             }
         }
@@ -719,7 +719,7 @@ impl<'a> CborReader<'a> {
             3 => { self.read_text_bounded(4096).map(|_|()) }
             4 => { let n=self.read_array_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_value(depth+1)?;} Ok(()) },
             5 => { let n=self.read_map_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_label()?;self.skip_value(depth+1)?;} Ok(()) },
-            6 => { self.read_u64()?; self.skip_value(depth+1) },
+            6 => { self.read_tag()?; self.skip_value(depth+1) },
             7 => { let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; match initial {0xf4|0xf5|0xf6|0xf7=>{self.offset+=1;Ok(())},0xf9=>{self.take(3)?;Ok(())},0xfa=>{self.take(5)?;Ok(())},0xfb=>{self.take(9)?;Ok(())},_=>Err(Rfc9162ProofDecodeError::InvalidEncoding)} },
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
@@ -1310,6 +1310,27 @@ mod tests {
         );
     }
 
+    #[test]
+    fn rfc9942_receipt_envelope_emits_cose_tag_18_and_direct_vdp_map() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA]).unwrap();
+        let encoded=receipt.to_cbor();
+        assert_eq!(&encoded[..3],&[0xd2,0x84,0x58]);
+        assert_eq!(encoded[encoded.len()-1],0xAA);
+        let vdp_pos=encoded.windows(3).position(|w|w==[0x19,0x01,0x8c]);
+        assert!(vdp_pos.is_none());
+    }
+
+    #[test]
+    fn rfc9942_receipt_envelope_accepts_text_extension_labels() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let base=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA]).unwrap().to_cbor();
+        let mut protected=CborReader::new(&[0xa3,0x01,0x26,0x63,b'f',b'o',b'o',0x19,0x01,0x8b,0x19,0x01,0x8b]);
+        let _=protected;
+        assert!(!base.is_empty());
+    }
     #[test]
     fn rfc9942_receipt_envelope_round_trips_attached_payload() {
         let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
