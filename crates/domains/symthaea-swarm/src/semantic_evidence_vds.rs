@@ -79,7 +79,15 @@ pub struct Rfc9942ReceiptEnvelope {
 impl Rfc9942ReceiptEnvelope {
     pub fn new(algorithm_id:i64,vdp:Rfc9942Vdp,payload:Rfc9942ReceiptPayload,signature:Vec<u8>)->Result<Self,Rfc9942VdpError>{
         if vdp.vds_id()!=RFC9162_VDS_ID{return Err(Rfc9942VdpError::VdsMismatch(vdp.vds_id()));}
-        Ok(Self{algorithm_id,vds_id:RFC9162_VDS_ID,vdp,payload,signature})
+        Ok(Self{
+            algorithm_id,
+            vds_id:RFC9162_VDS_ID,
+            vdp,
+            payload,
+            signature,
+            protected_extensions:Vec::new(),
+            unprotected_extensions:Vec::new(),
+        })
     }
     pub const fn algorithm_id(&self)->i64{self.algorithm_id}
     pub const fn vds_id(&self)->u64{self.vds_id}
