@@ -62,6 +62,34 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
         })
         .collect();
 
+
     assert_eq!(matches.len(), 1);
     assert_eq!(matches[0], (a, b));
+
+    // A corrupted query is classified explicitly. Choose a one-bit flip that
+    // leaves the jointly generated factor span; this must not be silently
+    // treated as a valid clean decomposition.
+    let mut corrupted = composite.clone();
+    let corrupted_index = (0..96)
+        .find(|&index| {
+            let mut candidate = composite.clone();
+            candidate.set_bit(index, !candidate.bit(index));
+            !solve_linear_combination(&candidate, &basis).is_some()
+        })
+        .expect("at least one single-bit corruption should leave this low-rate span");
+    corrupted.set_bit(corrupted_index, !corrupted.bit(corrupted_index));
+    assert!(solve_linear_combination(&corrupted, &basis).is_none());
+
+    let corrupted_matches: Vec<_> = left
+        .enumerate()
+        .into_iter()
+        .flat_map(|candidate_a| {
+            let corrupted = corrupted.clone();
+            right.enumerate().into_iter().filter_map(move |candidate_b| {
+                (candidate_a.bound(&candidate_b) == corrupted)
+                    .then_some((candidate_a.clone(), candidate_b))
+            })
+        })
+        .collect();
+    assert!(corrupted_matches.is_empty());
 }
