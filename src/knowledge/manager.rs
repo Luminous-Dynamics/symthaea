@@ -25,7 +25,7 @@ use super::causal_bridge::CausalKnowledgeBridge;
 use super::encoding::KnowledgeEncoder;
 use super::extraction::{EntityType, KnowledgeExtractor};
 use super::graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult};
-use super::persistence::{CausalEdgeRecord, KnowledgePersistence, OntologyRecord, ProvenanceRelationRecord};
+use super::persistence::{CausalEdgeRecord, KnowledgePersistence, KnowledgePersistenceSnapshot, OntologyRecord, ProvenanceRelationRecord};
 use super::reasoning_context::{KnowledgeQueryResult, ReasoningContext};
 use std::collections::VecDeque;
 use symthaea_core::hdc::unified_hv::BinaryHV;
@@ -290,9 +290,18 @@ impl KnowledgeManager {
         };
         let persistence = config.db_path.as_ref().map(|path| {
             let mut p = KnowledgePersistence::new(path);
-            // Load existing facts
-            match p.load_facts() {
-                Ok(facts) => {
+
+            // Restore all domains from one SQLite read transaction. This prevents
+            // startup from mixing rows committed by different snapshot generations.
+            match p.load_snapshot() {
+                Ok(snapshot) => {
+                    let KnowledgePersistenceSnapshot {
+                        facts,
+                        provenance_relations,
+                        causal_edges,
+                        ontology: ontology_records,
+                    } = snapshot;
+
                     persistence_health.facts_loaded = true;
                     for record in &facts {
                         let outcome = graph.import_fact_record_with_outcome(record);
@@ -315,23 +324,13 @@ impl KnowledgeManager {
                     if !facts.is_empty() {
                         tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
                     }
-                }
-                Err(error) => {
-                    persistence_health.facts_loaded = false;
-                    tracing::warn!(%error, "Knowledge: failed to load facts from SQLite");
-                }
-            }
-            // Load append-only provenance relations after facts. Relations are historical
-            // provenance and may intentionally reference memories no longer resident in the
-            // local cognitive projection.
-            match p.load_provenance_relations() {
-                Ok(relations) => {
+
                     persistence_health.provenance_loaded = true;
                     let mut loaded_relations = 0usize;
-                    for record in relations {
+                    for record in provenance_relations {
                         match graph.import_provenance_relation(record.into()) {
                             Ok(true) => loaded_relations += 1,
-                            Ok(false) => {},
+                            Ok(false) => {}
                             Err(error) => {
                                 persistence_health.provenance_rejections += 1;
                                 tracing::warn!(
@@ -343,7 +342,10 @@ impl KnowledgeManager {
                         }
                     }
                     if loaded_relations > 0 {
-                        tracing::info!(count = loaded_relations, "Knowledge: loaded provenance relations from SQLite");
+                        tracing::info!(
+                            count = loaded_relations,
+                            "Knowledge: loaded provenance relations from SQLite"
+                        );
                     }
                     let report = graph.validate_provenance();
                     persistence_health.provenance_snapshot_conforms = report.conforms;
@@ -362,18 +364,9 @@ impl KnowledgeManager {
                             "Knowledge: persisted provenance snapshot is structurally non-conforming"
                         );
                     }
-                }
-                Err(error) => {
-                    persistence_health.provenance_loaded = false;
-                    tracing::warn!(%error, "Knowledge: failed to load provenance relations from SQLite");
-                },
-            }
-            // Load existing causal edges
-            match p.load_causal_edges() {
-                Ok(edges) => {
+
                     persistence_health.causal_loaded = true;
-                    let edge_count = edges.len();
-                    for record in &edges {
+                    for record in &causal_edges {
                         let outcome = causal_bridge.import_edge(
                             record.cause.clone(),
                             record.effect.clone(),
@@ -389,24 +382,15 @@ impl KnowledgeManager {
                             );
                         }
                     }
-                    if edge_count > 0 {
+                    if !causal_edges.is_empty() {
                         tracing::info!(
-                            count = edge_count,
+                            count = causal_edges.len(),
                             "Knowledge: loaded causal edges from SQLite"
                         );
                     }
-                }
-                Err(error) => {
-                    persistence_health.causal_loaded = false;
-                    tracing::warn!(%error, "Knowledge: failed to load causal edges from SQLite");
-                }
-            }
-            // Load existing ontology primitives
-            match p.load_ontology() {
-                Ok(records) => {
+
                     persistence_health.ontology_loaded = true;
-                    let onto_count = records.len();
-                    for record in &records {
+                    for record in &ontology_records {
                         let outcome = ontology.import_ontology_record_with_outcome(record);
                         persistence_health.ontology_restore_evictions += outcome.policy_evictions;
                         if outcome.rejected_by_policy {
@@ -431,16 +415,18 @@ impl KnowledgeManager {
                             );
                         }
                     }
-                    if onto_count > 0 {
+                    if !ontology_records.is_empty() {
                         tracing::info!(
-                            count = onto_count,
+                            count = ontology_records.len(),
                             "Knowledge: loaded ontology primitives from SQLite"
                         );
                     }
                 }
                 Err(error) => {
-                    persistence_health.ontology_loaded = false;
-                    tracing::warn!(%error, "Knowledge: failed to load ontology primitives from SQLite");
+                    tracing::warn!(
+                        %error,
+                        "Knowledge: failed to load coherent persistence snapshot from SQLite"
+                    );
                 }
             }
             p
