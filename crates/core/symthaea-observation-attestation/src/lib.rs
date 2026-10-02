@@ -1943,6 +1943,21 @@ mod tests {
     }
 
     #[test]
+    fn evidence_evaluation_uses_v2_fingerprint_domain() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+        assert!(evaluation
+            .canonical_bytes()
+            .starts_with(b"symthaea:evidence-evaluation:v2\n"));
+    }
+
+    #[test]
     fn evidence_evaluation_fingerprint_is_order_independent_for_limitations() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
