@@ -631,6 +631,19 @@ mod tests {
         let result = writer.apply_patch_if_current(&patch, &"11".repeat(32));
         assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::StaleData);
     }
+    #[test]
+    fn test_apply_patch_if_current_rejects_file_changed_after_proposal() {
+        let (dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let patch = writer.set_option("services.nginx.enable", "true").unwrap();
+        fs::write(
+            dir.path().join("configuration.nix"),
+            SAMPLE_CONFIG.replace("services.openssh.enable = true;", "services.openssh.enable = false;"),
+        )
+        .unwrap();
+        let expected = blake3::hash(patch.original.as_bytes()).to_hex().to_string();
+        let result = writer.apply_patch_if_current(&patch, &expected);
+        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::StaleData);
+    }
 
     #[test]
     fn test_apply_patch_rejects_unbalanced() {
