@@ -227,6 +227,37 @@ impl EvaluationProcedure {
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
+
+    /// Return the checks that actually executed for a report.
+    ///
+    /// This is derived mechanically from the report's stage states rather than
+    /// being supplied by the caller. A failed stage is therefore executed and
+    /// failed; a NotEvaluated stage was not reached by the procedure.
+    pub fn executed_check_ids(
+        &self,
+        report: &ReceiptAttestationVerificationReport,
+    ) -> Vec<&'static str> {
+        let stages = [
+            report.structural_validation,
+            report.receipt_commitment,
+            report.temporal_validity,
+            report.cryptosuite,
+            report.verification_method,
+            report.lifecycle,
+            report.proof_purpose_authorization,
+            report.proof_policy,
+            report.cryptographic_proof,
+        ];
+
+        self.check_ids
+            .iter()
+            .copied()
+            .zip(stages)
+            .filter_map(|(check_id, stage)| {
+                (!matches!(stage, VerificationStage::NotEvaluated)).then_some(check_id)
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -736,6 +767,8 @@ pub struct EvidenceEvaluation {
     pub evaluation_type: &'static str,
     pub context: VerificationContext,
     pub context_fingerprint: String,
+    /// The procedure checks that actually executed for this evaluation.
+    pub executed_check_ids: Vec<&'static str>,
     pub verification_report_fingerprint: String,
     pub outcome: ReceiptAttestationVerificationOutcome,
     pub structural_validation: VerificationStage,
@@ -753,12 +786,14 @@ pub struct EvidenceEvaluation {
 impl EvidenceEvaluation {
     pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
         let context = VerificationContext::from_report(report);
+        let procedure = EvaluationProcedure::attestation_ed25519();
         Self {
             evaluation_version: EVIDENCE_EVALUATION_VERSION,
             subject_fingerprint: report.receipt_fingerprint.clone(),
             evaluation_type: ATTESTATION_VERIFICATION_EVALUATION_TYPE,
             context_fingerprint: context.fingerprint(),
             context,
+            executed_check_ids: procedure.executed_check_ids(report),
             verification_report_fingerprint: report.fingerprint(),
             outcome: report.outcome,
             structural_validation: report.structural_validation,
@@ -824,6 +859,10 @@ impl EvidenceEvaluation {
         write_string(&mut bytes, &self.subject_fingerprint);
         write_string(&mut bytes, self.evaluation_type);
         write_string(&mut bytes, &self.context_fingerprint);
+        bytes.extend_from_slice(&(self.executed_check_ids.len() as u64).to_be_bytes());
+        for check_id in &self.executed_check_ids {
+            write_string(&mut bytes, check_id);
+        }
         write_string(&mut bytes, &self.verification_report_fingerprint);
         bytes.push(verification_outcome_tag(self.outcome));
         write_stage(&mut bytes, self.structural_validation);
@@ -2027,6 +2066,43 @@ mod tests {
         assert!(evaluation
             .canonical_bytes()
             .starts_with(b"symthaea:evidence-evaluation:v3\n"));
+    }
+
+    #[test]
+    fn executed_check_trace_matches_reached_stages() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        envelope.attester_id.clear();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+
+        assert_eq!(
+            evaluation.executed_check_ids,
+            vec!["envelope-structural-validation"]
+        );
+    }
+
+    #[test]
+    fn executed_check_trace_contains_all_checks_on_success() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+
+        assert_eq!(
+            evaluation.executed_check_ids,
+            EvaluationProcedure::attestation_ed25519()
+                .check_ids
+                .to_vec()
+        );
     }
 
     #[test]
