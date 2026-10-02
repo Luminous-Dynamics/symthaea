@@ -951,8 +951,13 @@ impl EvidenceEvaluation {
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v5\n");
+        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v6\n");
         write_string(&mut bytes, self.evaluation_version);
         write_string(&mut bytes, &self.subject_fingerprint);
         write_string(&mut bytes, self.evaluation_type);
@@ -962,27 +967,8 @@ impl EvidenceEvaluation {
         bytes.extend_from_slice(&trace_bytes);
         write_string(&mut bytes, &self.verification_report_fingerprint);
         bytes.push(verification_outcome_tag(self.outcome));
-        let trace_bytes = self.execution_trace.canonical_bytes();
-        bytes.extend_from_slice(&(trace_bytes.len() as u64).to_be_bytes());
-        bytes.extend_from_slice(&trace_bytes);
         bytes.extend_from_slice(&self.boundary.canonical_bytes());
         bytes
-    }
-
-    /// Validate that this evaluation is internally consistent with the report
-    /// from which it was materialized.
-    pub fn is_consistent_with_report(
-        &self,
-        report: &ReceiptAttestationVerificationReport,
-    ) -> bool {
-        self.evaluation_version == EVIDENCE_EVALUATION_VERSION
-            && self.subject_fingerprint == report.receipt_fingerprint
-            && self.verification_report_fingerprint == report.fingerprint()
-            && self.context_fingerprint == self.context.fingerprint()
-            && self.execution_trace.procedure_fingerprint == report.procedure_fingerprint
-            && self.execution_trace.terminal_outcome() == Some(self.outcome)
-            && self.execution_trace.is_well_formed()
-            && self.boundary.is_well_formed()
     }
 
     pub fn fingerprint(&self) -> String {
