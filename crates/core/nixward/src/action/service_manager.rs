@@ -336,6 +336,7 @@ mod tests {
         ));
     }
 
+    #[test]
     fn typed_operation_renders_to_legacy_command_one_way() {
         use super::super::service_domain::{
             NixServiceOperationKindV1, NixServiceOperationV1,
