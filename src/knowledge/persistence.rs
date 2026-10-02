@@ -3493,7 +3493,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn test_latest_snapshot_receipt_fails_closed_when_live_projection_drifts() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_latest_receipt_live_drift_test_{}",
@@ -3706,13 +3705,13 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             err,
-            "Snapshot validation receipt self-digest mismatch: validation:digest"
+            "Snapshot validation receipt snapshot digest mismatch: validation:digest"
         );
 
         let err = p.latest_snapshot_validation_receipts().unwrap_err();
         assert_eq!(
             err,
-            "Snapshot validation receipt self-digest mismatch: validation:digest"
+            "Snapshot validation receipt snapshot digest mismatch: validation:digest"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
