@@ -1535,6 +1535,19 @@ mod tests {
             Rfc9942ReceiptCollection::from_cbor(&trailing),
             Err(Rfc9942VdpError::TrailingBytes)
         );
+
+        let mut too_many_wire = Vec::new();
+        cbor_array_len(&mut too_many_wire, (MAX_RFC9942_RECEIPTS + 1) as u64);
+        assert_eq!(
+            Rfc9942ReceiptCollection::from_cbor(&too_many_wire),
+            Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)
+        );
+
+        let mut oversized_wire = vec![0x81, 0x5a, 0x00, 0x40, 0x00, 0x01];
+        assert_eq!(
+            Rfc9942ReceiptCollection::from_cbor(&oversized_wire),
+            Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)
+        );
     }
 
     #[test]
