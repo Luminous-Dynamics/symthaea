@@ -3,13 +3,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-canvas
 //!
-//! Living topology UI: real-time SVG projection of Symthaea's cognitive geometry.
+//! Living topology UI: real-time SVG and WebGPU projection of Symthaea's cognitive geometry.
 //!
 //! Converts cognitive telemetry (consciousness level, neuromodulators, Betti numbers,
 //! Cantor depth, harmony activations) into a declarative scene graph, then renders
-//! self-contained animated SVG.
+//! self-contained SVG or GPU-rendered geometry.
 //!
-//! Pipeline: `CognitiveSnapshot → AestheticEngine → AestheticState → build_scene() → render_svg()`
+//! Pipeline: `CognitiveSnapshot → AestheticEngine → AestheticState → build_scene() → renderer`
 //!
 //! Total pipeline target: <500µs per frame.
 
