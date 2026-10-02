@@ -52,6 +52,44 @@ fn test_canvas_svg_generated_after_interval() {
     assert!(found_svg, "canvas SVG should be generated within 10 cycles");
 }
 
+
+#[test]
+fn test_canvas_typed_scene_generated_with_svg() {
+    let mut service = make_canvas_service();
+
+    for i in 0..10 {
+        let result = service.cycle(&format!("typed scene cycle {i}"));
+        if result.canvas_svg.is_some() {
+            let scene = result
+                .canvas_scene
+                .as_ref()
+                .expect("typed canvas scene should accompany SVG");
+            assert_eq!(
+                scene.version,
+                symthaea_canvas::RemoteScene::VERSION,
+                "typed scene protocol version must be current"
+            );
+            assert!(
+                scene.is_supported(),
+                "typed scene must satisfy its own protocol budget"
+            );
+            let encoded = serde_json::to_vec(scene).expect("scene JSON");
+            assert!(
+                encoded.len() <= 128 * 1024,
+                "typed scene exceeds transport budget: {} bytes",
+                encoded.len()
+            );
+            assert!(
+                scene.root.children.len() > 0,
+                "generated cognitive scene should contain visible primitives"
+            );
+            return;
+        }
+    }
+
+    panic!("typed canvas scene should be generated within 10 cycles");
+}
+
 #[test]
 fn test_canvas_telemetry_in_metadata() {
     let mut service = make_canvas_service();
