@@ -2003,6 +2003,76 @@ mod tests {
     }
 
     #[test]
+    fn actual_canvas_scene_pipeline_output_is_accepted_by_hostile_boundary() {
+        use symthaea_canvas::build_scene;
+        use symthaea_canvas::color::Color;
+        use symthaea_canvas::scene_graph::{SceneNode, Style, Transform};
+        use symthaea_canvas::{AestheticEngine, CognitiveSnapshot};
+        use symthaea_canvas::svg_renderer::render_svg_for_remote_projection;
+
+        let mut snapshots = vec![CognitiveSnapshot::dormant()];
+        let mut active = CognitiveSnapshot::dormant();
+        active.consciousness_level = 0.95;
+        active.prediction_error = 0.35;
+        active.living_mind_vitality = 0.8;
+        active.living_mind_coherence = 0.9;
+        active.dopamine = 0.9;
+        active.noradrenaline = 0.7;
+        active.serotonin = 0.8;
+        active.acetylcholine = 0.7;
+        active.oxytocin = 0.8;
+        active.gaba = 0.6;
+        active.allostatic_load = 0.4;
+        active.betti_0 = 6;
+        active.betti_1 = 8;
+        active.betti_2 = 2;
+        active.persistence_components = vec![
+            [0.05, 0.8],
+            [0.1, 0.7],
+            [0.2, 0.9],
+        ];
+        active.persistence_cycles = vec![[0.15, 0.85], [0.25, 0.95]];
+        active.cantor_metacognitive_depth = 0.9;
+        active.cantor_last_depth = 6;
+        active.valence = 0.7;
+        active.arousal = 0.9;
+        active.harmony_activations = [0.2, 0.4, 0.6, 0.8, 0.9, 0.7, 0.5, 0.3];
+        active.thought_vector = vec![0.8, -0.6];
+        active.cycle_count = 999;
+        snapshots.push(active);
+
+        for snapshot in snapshots {
+            let mut engine = AestheticEngine::new();
+            let state = engine.process(&snapshot);
+            let scene = build_scene(&state);
+            let svg = render_svg_for_remote_projection(&scene);
+
+            assert!(svg.len() <= 512 * 1024);
+            assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_some());
+        }
+
+        // Keep one explicit styled node in this contract corpus too: the
+        // producer must flatten/sanitize these fields to the same grammar the
+        // hostile consumer accepts.
+        let styled = SceneNode::circle(16.0, 16.0, 4.0)
+            .with_style(Style {
+                fill: Some(Color::rgba(0.25, 0.5, 0.75, 0.5)),
+                stroke: Some(Color::rgb(0.9, 0.1, 0.2)),
+                stroke_width: Some(1.5),
+                opacity: Some(0.75),
+                ..Style::default()
+            })
+            .with_transform(Transform {
+                translate_x: 2.0,
+                translate_y: -1.0,
+                rotate_deg: 12.0,
+                scale: 1.25,
+            });
+        let svg = render_svg_for_remote_projection(&styled);
+        assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_some());
+    }
+
+    #[test]
     fn remote_canvas_renderer_drops_pathological_transforms_before_boundary() {
         use symthaea_canvas::scene_graph::{SceneNode, Transform};
         use symthaea_canvas::svg_renderer::render_svg_for_remote_projection;
