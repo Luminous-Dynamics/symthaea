@@ -89,7 +89,7 @@ jobs:
             echo '#[path = "'$GITHUB_WORKSPACE'/crates/core/symthaea-core/src/hdc/linear_code.rs"]'
             echo 'mod linear_code;'
             echo 'use linear_code::{BinaryCodeword, RandomLinearCode, basis_rank, recover_direct_sum_bound, recover_independent_bound, recover_linear_bound, solve_linear_combination};'
-            sed '1,/^};$/d' "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs"
+            sed '1,/^};$/d; s/symthaea_core::hdc::linear_code::/linear_code::/g'               "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs"
           } > "$HARNESS/tests/linear_code_ambiguity.rs"
 
           echo "path=$HARNESS" >> "$GITHUB_OUTPUT"
