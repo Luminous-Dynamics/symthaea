@@ -582,6 +582,7 @@ pub enum ObservationRelationKind {
 /// This keeps an independence classification auditable instead of collapsing
 /// every non-independent result into an opaque SharedUpstream label.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+
 /// Predicate evaluated by the bounded provenance-independence verifier.
 ///
 /// The verifier is intentionally narrow: these predicates describe provenance
@@ -623,6 +624,7 @@ impl IndependenceVerifierContract {
     };
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IndependenceBasis {
     SharedSensor { sensor_id: String },
     SharedPlatform { platform_id: String },
