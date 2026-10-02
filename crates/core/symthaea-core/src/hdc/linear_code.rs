@@ -292,6 +292,30 @@ pub fn solve_linear_combination(
     Some(coefficients)
 }
 
+/// Recover two factors from a clean bound when their linear-code subspaces
+/// form a direct sum. This is the two-factor specialization of Raviv's
+/// generator-basis binding-recovery construction.
+pub fn recover_direct_sum_bound(
+    target: &BinaryCodeword,
+    left: &RandomLinearCode,
+    right: &RandomLinearCode,
+) -> Option<(BinaryCodeword, BinaryCodeword)> {
+    if left.dimension() != right.dimension() || target.dimension() != left.dimension() {
+        return None;
+    }
+
+    let mut basis = left.basis().to_vec();
+    basis.extend(right.basis().iter().cloned());
+    if basis_rank(&basis, target.dimension()) != left.rank() + right.rank() {
+        return None;
+    }
+
+    let coefficients = solve_linear_combination(target, &basis)?;
+    let left_coefficients = &coefficients[..left.rank()];
+    let right_coefficients = &coefficients[left.rank()..];
+    Some((left.encode(left_coefficients), right.encode(right_coefficients)))
+}
+
 pub fn basis_rank(vectors: &[BinaryCodeword], dimension: usize) -> usize {
     let mut rows: Vec<BinaryCodeword> = vectors.iter()
         .filter(|vector| vector.dimension == dimension)
