@@ -1336,4 +1336,33 @@ mod tests {
         assert_eq!(scene.vertex_count(), 12);
         assert_eq!(scene.skipped_nodes, 0);
     }
+
+    #[test]
+    fn nested_transforms_and_opacity_survive_gpu_compilation() {
+        let scene = SceneNode::group(None)
+            .with_style(Style {
+                opacity: Some(0.5),
+                ..Style::default()
+            })
+            .with_transform(Transform {
+                translate_x: 10.0,
+                translate_y: 20.0,
+                scale: 2.0,
+                ..Transform::identity()
+            })
+            .with_child(
+                SceneNode::rect(0.0, 0.0, 10.0, 10.0).with_style(Style {
+                    fill: Some(Color::rgba(0.25, 0.5, 0.75, 0.5)),
+                    ..Style::default()
+                }),
+            );
+        let gpu = GpuScene::from_scene(&scene);
+
+        assert_eq!(gpu.vertex_count(), 6);
+        assert_eq!(gpu.skipped_nodes, 0);
+        let vertex = gpu.vertices[0];
+        assert!((vertex.position[0] - (-0.9609375)).abs() < 1e-6);
+        assert!((vertex.position[1] - 0.921875).abs() < 1e-6);
+        assert!((vertex.color[3] - 0.25).abs() < 1e-6);
+    }
 }
