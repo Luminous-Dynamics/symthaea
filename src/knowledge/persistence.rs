@@ -98,6 +98,24 @@ pub struct CausalEdgeRecord {
     pub cycle: u64,
 }
 
+impl CausalEdgeRecord {
+    fn validate(&self) -> Result<(), String> {
+        if self.cause.trim().is_empty() {
+            return Err("CausalEdgeRecord cause must be non-empty".into());
+        }
+        if self.effect.trim().is_empty() {
+            return Err("CausalEdgeRecord effect must be non-empty".into());
+        }
+        if !self.strength.is_finite() || !(-1.0..=1.0).contains(&self.strength) {
+            return Err("CausalEdgeRecord strength must be finite and in [-1, 1]".into());
+        }
+        if self.cycle > i64::MAX as u64 {
+            return Err("CausalEdgeRecord cycle exceeds SQLite INTEGER range".into());
+        }
+        Ok(())
+    }
+}
+
 /// A serializable ontology primitive record
 #[derive(Debug, Clone)]
 pub struct OntologyRecord {
@@ -549,19 +567,26 @@ impl KnowledgePersistence {
                      ORDER BY cycle DESC, cause ASC, effect ASC",
                 )
                 .map_err(|e| format!("Prepare snapshot causal edges: {e}"))?;
-            stmt.query_map([], |row| {
-                Ok(CausalEdgeRecord {
-                    cause: row.get(0)?,
-                    effect: row.get(1)?,
-                    strength: row.get(2)?,
-                    is_inhibitory: row.get(3)?,
-                    cycle: u64::try_from(row.get::<_, i64>(4)?)
-                        .map_err(|_| rusqlite::Error::InvalidColumnType(4, "cycle".into(), rusqlite::types::Type::Integer))?,
+            let edges = stmt
+                .query_map([], |row| {
+                    Ok(CausalEdgeRecord {
+                        cause: row.get(0)?,
+                        effect: row.get(1)?,
+                        strength: row.get(2)?,
+                        is_inhibitory: row.get(3)?,
+                        cycle: u64::try_from(row.get::<_, i64>(4)?)
+                            .map_err(|_| rusqlite::Error::InvalidColumnType(4, "cycle".into(), rusqlite::types::Type::Integer))?,
+                    })
                 })
-            })
-            .map_err(|e| format!("Query snapshot causal edges: {e}"))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Load snapshot causal edge row: {e}"))?
+                .map_err(|e| format!("Query snapshot causal edges: {e}"))?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| format!("Load snapshot causal edge row: {e}"))?;
+
+            for edge in &edges {
+                edge.validate()
+                    .map_err(|e| format!("Invalid persisted causal edge snapshot: {e}"))?;
+            }
+            edges
         };
 
         let ontology = {
@@ -728,11 +753,8 @@ impl KnowledgePersistence {
         if !self.is_configured() {
             return Err("No database path configured".into());
         }
-        if edges.iter().any(|edge| !edge.strength.is_finite()) {
-            return Err("CausalEdgeRecord strength must be finite".into());
-        }
-        if edges.iter().any(|edge| edge.cycle > i64::MAX as u64) {
-            return Err("CausalEdgeRecord cycle exceeds SQLite INTEGER range".into());
+        for edge in edges {
+            edge.validate()?;
         }
 
         let conn = self.open_connection()?;
@@ -796,6 +818,11 @@ impl KnowledgePersistence {
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| format!("Load causal edge row: {e}"))?;
+
+        for edge in &edges {
+            edge.validate()
+                .map_err(|e| format!("Invalid persisted causal edge: {e}"))?;
+        }
 
         self.total_loaded += edges.len() as u64;
         Ok(edges)
