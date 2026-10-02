@@ -9,6 +9,7 @@
 //! - Command classification and safety scoring
 //! - JSON output mode for structured results
 
+use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -52,6 +53,11 @@ pub enum NixOSCommand {
     CollectGarbage {
         older_than_days: Option<u32>,
         delete_all: bool,
+    },
+    /// Exact typed systemd service lifecycle operation.
+    Service {
+        operation: NixServiceOperationKindV1,
+        unit: String,
     },
     /// Custom command with safety classification
     Custom {
@@ -127,6 +133,26 @@ impl NixOSCommand {
         }
     }
 
+    /// Validate command-specific invariants that must hold even after
+    /// confirmation. Typed service commands must remain canonical at the
+    /// final execution boundary.
+    pub(crate) fn validate_shape(&self) -> Result<(), String> {
+        match self {
+            Self::Service { operation, unit } => {
+                let typed = NixServiceOperationV1::new(unit.clone(), *operation)
+                    .map_err(|error| error.to_string())?;
+                if typed.unit() != unit {
+                    return Err(
+                        "typed service unit must be canonical at the command boundary"
+                            .to_string(),
+                    );
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
     /// Get the safety level of this command
     pub fn safety_level(&self) -> SafetyLevel {
         match self {
@@ -167,6 +193,8 @@ impl NixOSCommand {
             Self::RebuildSwitch { .. } => SafetyLevel::SystemCritical,
 
             Self::CollectGarbage { .. } => SafetyLevel::Destructive,
+
+            Self::Service { .. } => SafetyLevel::SystemModify,
 
             Self::Custom { safety_level, .. } => *safety_level,
         }
@@ -336,6 +364,21 @@ impl NixOSCommand {
                 }
                 ("nix-collect-garbage".to_string(), args)
             }
+            Self::Service { operation, unit } => (
+                "systemctl".to_string(),
+                vec![
+                    match operation {
+                        NixServiceOperationKindV1::Start => "start",
+                        NixServiceOperationKindV1::Stop => "stop",
+                        NixServiceOperationKindV1::Restart => "restart",
+                        NixServiceOperationKindV1::Reload => "reload",
+                        NixServiceOperationKindV1::Enable => "enable",
+                        NixServiceOperationKindV1::Disable => "disable",
+                    }
+                    .to_string(),
+                    unit.clone(),
+                ],
+            ),
             Self::Custom { command, args, .. } => (command.clone(), args.clone()),
         }
     }
@@ -455,6 +498,12 @@ impl NixOSExecutor {
     /// SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md Phase 1.
     pub async fn execute(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
         let safety = command.safety_level();
+        if let Err(reason) = command.validate_shape() {
+            return ExecutionResult::Blocked {
+                reason,
+                safety_level: safety,
+            };
+        }
         let required_phi = safety.required_phi();
 
         if phi < required_phi {
@@ -575,6 +624,13 @@ impl NixOSExecutor {
     /// a real gate elsewhere (e.g. an explicit human approval) — this
     /// function performs no safety check of its own.
     pub async fn execute_confirmed(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
+        let safety = command.safety_level();
+        if let Err(reason) = command.validate_shape() {
+            return ExecutionResult::Blocked {
+                reason,
+                safety_level: safety,
+            };
+        }
         let (cmd, args) = command.to_command();
 
         info!(
@@ -775,6 +831,36 @@ mod tests {
             }
             _ => panic!("Expected pending confirmation"),
         }
+    }
+
+    #[test]
+    fn typed_service_command_has_fixed_scope_and_argv() {
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        assert_eq!(command.safety_level(), SafetyLevel::SystemModify);
+        assert!(command.validate_shape().is_ok());
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "systemctl");
+        assert_eq!(args, vec!["restart", "nginx.service"]);
+    }
+
+    #[tokio::test]
+    async fn invalid_typed_service_is_blocked_even_when_confirmed() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx*.service".to_string(),
+        };
+        let result = executor.execute_confirmed(command, 1.0).await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked {
+                safety_level: SafetyLevel::SystemModify,
+                ..
+            }
+        ));
     }
 
     #[tokio::test]
