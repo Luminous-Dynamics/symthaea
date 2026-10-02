@@ -1513,7 +1513,15 @@ impl KnowledgePersistence {
             return Ok(());
         }
 
-        conn.execute_batch(
+        // Serialize schema initialization across connections and keep the additive
+        // migration atomic. Without a write transaction, two first-time openers can
+        // race on ALTER TABLE / index creation and a failure midway can expose an
+        // intermediate schema to another connection.
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| format!("Begin schema migration transaction: {e}"))?;
+
+        tx.execute_batch(
             "CREATE TABLE IF NOT EXISTS knowledge_facts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 memory_id TEXT,
@@ -1587,7 +1595,7 @@ impl KnowledgePersistence {
             .collect();
         for (name, ty) in [("memory_id", "TEXT"), ("canonical_identity", "TEXT"), ("provenance_family", "TEXT")] {
             if !columns.iter().any(|c| c == name) {
-                conn.execute(&format!("ALTER TABLE knowledge_facts ADD COLUMN {name} {ty}"), [])
+                tx.execute(&format!("ALTER TABLE knowledge_facts ADD COLUMN {name} {ty}"), [])
                     .map_err(|e| format!("Schema migration {name}: {e}"))?;
             }
         }
@@ -1602,7 +1610,7 @@ impl KnowledgePersistence {
             .filter_map(Result::ok)
             .collect();
         if !snapshot_receipt_columns.iter().any(|c| c == "receipt_digest_hex") {
-            conn.execute(
+            tx.execute(
                 "ALTER TABLE knowledge_snapshot_receipts
                  ADD COLUMN receipt_digest_hex TEXT",
                 [],
@@ -1641,7 +1649,7 @@ impl KnowledgePersistence {
         };
 
         for (rowid, receipt) in legacy_snapshot_receipts {
-            conn.execute(
+            tx.execute(
                 "UPDATE knowledge_snapshot_receipts
                  SET receipt_digest_hex = ?1
                  WHERE rowid = ?2",
@@ -1660,7 +1668,7 @@ impl KnowledgePersistence {
             .filter_map(Result::ok)
             .collect();
         if !validation_sequence_columns.iter().any(|c| c == "validation_sequence") {
-            conn.execute(
+            tx.execute(
                 "ALTER TABLE knowledge_snapshot_validation_receipts
                  ADD COLUMN validation_sequence INTEGER",
                 [],
@@ -1704,7 +1712,7 @@ impl KnowledgePersistence {
             if next_sequence > i64::MAX as u64 {
                 return Err("Validation sequence exceeds SQLite INTEGER range".into());
             }
-            conn.execute(
+            tx.execute(
                 "UPDATE knowledge_snapshot_validation_receipts
                  SET validation_sequence = ?1
                  WHERE rowid = ?2",
@@ -1723,7 +1731,7 @@ impl KnowledgePersistence {
             .filter_map(Result::ok)
             .collect();
         if !validation_columns.iter().any(|c| c == "receipt_digest_hex") {
-            conn.execute(
+            tx.execute(
                 "ALTER TABLE knowledge_snapshot_validation_receipts
                  ADD COLUMN receipt_digest_hex TEXT",
                 [],
@@ -1769,7 +1777,7 @@ impl KnowledgePersistence {
         };
 
         for (rowid, receipt) in legacy_validation_rows {
-            conn.execute(
+            tx.execute(
                 "UPDATE knowledge_snapshot_validation_receipts
                  SET receipt_digest_hex = ?1
                  WHERE rowid = ?2",
@@ -1779,13 +1787,13 @@ impl KnowledgePersistence {
         }
 
         // Create the identity index only after the additive columns exist on legacy databases.
-        conn.execute(
+        tx.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_facts_memory_id_unique ON knowledge_facts(memory_id)",
             [],
         )
         .map_err(|e| format!("Schema identity index: {e}"))?;
 
-        conn.execute(
+        tx.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshot_validation_receipts_sequence_unique
              ON knowledge_snapshot_validation_receipts(validation_sequence)",
             [],
@@ -1794,7 +1802,7 @@ impl KnowledgePersistence {
 
         // Enforce append-only receipt history at the SQLite boundary. Migration backfills
         // above intentionally happen before these triggers are created.
-        conn.execute_batch(
+        tx.execute_batch(
             "CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_receipts_no_update
              BEFORE UPDATE ON knowledge_snapshot_receipts
              BEGIN
@@ -1818,6 +1826,8 @@ impl KnowledgePersistence {
         )
         .map_err(|e| format!("Schema receipt immutability triggers: {e}"))?;
 
+        tx.commit()
+            .map_err(|e| format!("Commit schema migration transaction: {e}"))?;
         self.initialized = true;
         Ok(())
     }
