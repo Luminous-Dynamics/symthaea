@@ -1670,6 +1670,137 @@ mod tests {
     }
 
     #[test]
+    fn test_manager_persistence_round_trip_preserves_canonical_state() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_persistence_round_trip_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mut first = KnowledgeManager::new(config.clone());
+        first.process("Sanctions caused oil shortage.", 1);
+        first.process("Oil shortage caused inflation.", 2);
+        first.persist_snapshot();
+
+        let first_facts = first.graph().export_fact_records();
+        let first_relations: Vec<_> = first.graph().provenance_relations().to_vec();
+        let first_edges = first.causal_bridge().export_edge_records();
+        let first_ontology = first.ontology().export_ontology_records();
+
+        let second = KnowledgeManager::new(config.clone());
+        let second_health = second.persistence_health();
+        assert!(!second_health.is_degraded());
+        assert_eq!(second_health.fact_rejections, 0);
+        assert_eq!(second_health.provenance_rejections, 0);
+        assert_eq!(second_health.ontology_rejections, 0);
+
+        let second_facts = second.graph().export_fact_records();
+        let second_relations: Vec<_> = second.graph().provenance_relations().to_vec();
+        let second_edges = second.causal_bridge().export_edge_records();
+        let second_ontology = second.ontology().export_ontology_records();
+
+        assert_eq!(
+            second_facts
+                .iter()
+                .map(|f| (
+                    f.memory_id.as_str(),
+                    f.canonical_identity.as_deref(),
+                    f.provenance_family.as_deref(),
+                    f.vector_bytes.as_slice(),
+                    f.source_text.as_str(),
+                    f.confidence.to_bits(),
+                    f.domain.as_deref(),
+                    f.cycle,
+                    f.is_causal
+                ))
+                .collect::<Vec<_>>(),
+            first_facts
+                .iter()
+                .map(|f| (
+                    f.memory_id.as_str(),
+                    f.canonical_identity.as_deref(),
+                    f.provenance_family.as_deref(),
+                    f.vector_bytes.as_slice(),
+                    f.source_text.as_str(),
+                    f.confidence.to_bits(),
+                    f.domain.as_deref(),
+                    f.cycle,
+                    f.is_causal
+                ))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(second_relations, first_relations);
+        assert_eq!(
+            second_edges
+                .iter()
+                .map(|(cause, effect, strength)| (
+                    cause.as_str(),
+                    effect.as_str(),
+                    strength.to_bits()
+                ))
+                .collect::<Vec<_>>(),
+            first_edges
+                .iter()
+                .map(|(cause, effect, strength)| (
+                    cause.as_str(),
+                    effect.as_str(),
+                    strength.to_bits()
+                ))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            second_ontology
+                .iter()
+                .map(|o| (
+                    o.name.as_str(),
+                    o.vector_bytes.as_slice(),
+                    o.usage_count,
+                    o.utility.to_bits(),
+                    o.created_at_cycle,
+                    o.last_used_cycle,
+                    o.is_a_parent.as_deref()
+                ))
+                .collect::<Vec<_>>(),
+            first_ontology
+                .iter()
+                .map(|o| (
+                    o.name.as_str(),
+                    o.vector_bytes.as_slice(),
+                    o.usage_count,
+                    o.utility.to_bits(),
+                    o.created_at_cycle,
+                    o.last_used_cycle,
+                    o.is_a_parent.as_deref()
+                ))
+                .collect::<Vec<_>>()
+        );
+
+        let mut third = second;
+        third.persist_snapshot();
+        let fourth = KnowledgeManager::new(config);
+        assert!(!fourth.persistence_degraded());
+        assert_eq!(
+            fourth.graph().export_fact_records()
+                .iter()
+                .map(|f| (f.memory_id.as_str(), f.vector_bytes.as_slice(), f.confidence.to_bits()))
+                .collect::<Vec<_>>(),
+            first_facts
+                .iter()
+                .map(|f| (f.memory_id.as_str(), f.vector_bytes.as_slice(), f.confidence.to_bits()))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(fourth.causal_bridge().export_edge_records(), first_edges);
+        assert_eq!(fourth.ontology().export_ontology_records().len(), first_ontology.len());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_persistence_restore_records_rejected_fact_rows() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_manager_fact_rejection_test_{}",
