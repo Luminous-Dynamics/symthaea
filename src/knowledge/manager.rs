@@ -1523,6 +1523,7 @@ mod tests {
             configured: true,
             facts_loaded: true,
             fact_rejections: 0,
+            fact_restore_evictions: 0,
             provenance_loaded: false,
             provenance_rejections: 0,
             provenance_snapshot_conforms: false,
@@ -1542,6 +1543,7 @@ mod tests {
             configured: true,
             facts_loaded: true,
             fact_rejections: 1,
+            fact_restore_evictions: 0,
             provenance_loaded: true,
             provenance_rejections: 0,
             provenance_snapshot_conforms: true,
@@ -1561,6 +1563,7 @@ mod tests {
             configured: true,
             facts_loaded: true,
             fact_rejections: 0,
+            fact_restore_evictions: 0,
             provenance_loaded: true,
             provenance_rejections: 0,
             provenance_snapshot_conforms: true,
@@ -1576,11 +1579,33 @@ mod tests {
     }
 
     #[test]
+    fn test_persistence_health_reports_fact_policy_evictions_without_degrading() {
+        let health = KnowledgePersistenceHealth {
+            configured: true,
+            facts_loaded: true,
+            fact_rejections: 0,
+            fact_restore_evictions: 3,
+            provenance_loaded: true,
+            provenance_rejections: 0,
+            provenance_snapshot_conforms: true,
+            causal_loaded: true,
+            causal_restore_evictions: 0,
+            ontology_loaded: true,
+            ontology_rejections: 0,
+        };
+
+        assert!(!health.is_degraded());
+        assert!(health.failed_domains().is_empty());
+        assert_eq!(health.fact_restore_evictions, 3);
+    }
+
+    #[test]
     fn test_persistence_health_reports_ontology_rejections_as_degraded() {
         let health = KnowledgePersistenceHealth {
             configured: true,
             facts_loaded: true,
             fact_rejections: 0,
+            fact_restore_evictions: 0,
             provenance_loaded: true,
             provenance_rejections: 0,
             provenance_snapshot_conforms: true,
