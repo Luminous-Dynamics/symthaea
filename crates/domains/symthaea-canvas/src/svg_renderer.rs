@@ -108,7 +108,7 @@ fn write_remote_projection_node(
     let indent = "  ".repeat(depth);
 
     match &node.kind {
-        NodeKind::Group { id } => {
+        NodeKind::Group { .. } => {
             let _ = write!(buf, "{indent}<g");
             write_transform(buf, node);
             write_remote_style_attrs(buf, &node.style, gradient_colors);
