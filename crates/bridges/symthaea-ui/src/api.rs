@@ -78,7 +78,7 @@ pub async fn send_query(gateway: &str, content: &str) -> Result<Value, String> {
 /// One request/response round-trip for status/introspect/etc — same shape
 /// as `send_query` but for the request types that take no `content`.
 pub async fn send_simple(gateway: &str, request_type: &str) -> Result<Value, String> {
-    let url = format!("{}/v1/service", gateway.trim_end_matches('/'));
+    let url = gateway_endpoint(gateway, "v1/service")?;
     let body = serde_json::json!({ "type": request_type });
     let resp = Request::post(&url)
         .header("content-type", "application/json")
@@ -116,7 +116,8 @@ pub async fn stream_telemetry(
     } else if ws_url.starts_with("https://") {
         ws_url.replace_range(..8, "wss://");
     } else {
-        return Err("gateway protocol could not be mapped to WebSocket".to_string());
+        leptos::logging::error!("gateway protocol could not be mapped to WebSocket");
+        return false;
     }
     let ws = match WebSocket::open(&ws_url) {
         Ok(ws) => ws,
