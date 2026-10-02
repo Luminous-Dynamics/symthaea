@@ -22,6 +22,11 @@ pub const RFC9942_VDS_HEADER_LABEL: i64 = 395;
 /// implementation resource limits, not changes to the RFC wire format.
 pub const MAX_RFC9942_PROOFS: usize = 256;
 pub const MAX_RFC9942_PROOF_BYTES: usize = 8 * 1024;
+/// Defensive bounds for the RFC 9942 receipts header value. These limits
+/// constrain decoding/allocation without changing the RFC wire representation.
+pub const MAX_RFC9942_RECEIPTS: usize = 16;
+pub const MAX_RFC9942_RECEIPT_BYTES: usize = 4 * 1024 * 1024;
+pub const MAX_RFC9942_RECEIPTS_BYTES_TOTAL: usize = 32 * 1024 * 1024;
 pub const RFC9942_VDP_HEADER_LABEL: i64 = 396;
 pub const COSE_SIGN1_TAG: u64 = 18;
 pub const COSE_ALG_HEADER_LABEL: i64 = 1;
@@ -143,6 +148,118 @@ impl Rfc9942ReceiptEnvelope {
         self.vdp.verify_consistency_with_payload(older,detached_payload)
     }
 }
+
+/// The value of RFC 9942 header parameter 394 (receipts).
+///
+/// RFC 9942 defines this as a non-empty, priority-ordered array of bstr-wrapped
+/// CBOR Receipts. This type preserves that order exactly and does not select,
+/// rank, or trust a receipt. Each nested receipt is structurally parsed as the
+/// tagged COSE_Sign1 envelope above, while cryptographic authentication remains
+/// outside this module.
+///
+/// The to_cbor/from_cbor methods encode/decode the header value itself:
+/// an array of bstr .cbor Receipt, not an enclosing COSE protected or
+/// unprotected header map and not the integer label 394.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rfc9942ReceiptCollection {
+    receipts: Vec<Rfc9942ReceiptEnvelope>,
+}
+
+impl Rfc9942ReceiptCollection {
+    pub fn new(receipts: Vec<Rfc9942ReceiptEnvelope>) -> Result<Self, Rfc9942VdpError> {
+        if receipts.is_empty() {
+            return Err(Rfc9942VdpError::EmptyReceiptCollection);
+        }
+        if receipts.len() > MAX_RFC9942_RECEIPTS {
+            return Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded);
+        }
+        let mut total_bytes = 0usize;
+        for receipt in &receipts {
+            let len = receipt.to_cbor().len();
+            if len > MAX_RFC9942_RECEIPT_BYTES {
+                return Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded);
+            }
+            total_bytes = total_bytes
+                .checked_add(len)
+                .ok_or(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)?;
+        }
+        if total_bytes > MAX_RFC9942_RECEIPTS_BYTES_TOTAL {
+            return Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded);
+        }
+        Ok(Self { receipts })
+    }
+
+    /// Receipts in RFC 9942 priority order. The order is preserved verbatim.
+    pub fn receipts(&self) -> &[Rfc9942ReceiptEnvelope] {
+        &self.receipts
+    }
+
+    pub fn len(&self) -> usize {
+        self.receipts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.receipts.is_empty()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Rfc9942ReceiptEnvelope> {
+        self.receipts.iter()
+    }
+
+    /// Encode the value carried by RFC 9942 header parameter 394.
+    pub fn to_cbor(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        cbor_array_len(&mut out, self.receipts.len() as u64);
+        for receipt in &self.receipts {
+            let encoded = receipt.to_cbor();
+            cbor_bytes(&mut out, &encoded);
+        }
+        out
+    }
+
+    /// Decode the value carried by RFC 9942 header parameter 394.
+    ///
+    /// The decoder is strict about the array shape and trailing bytes, and it
+    /// structurally validates every nested COSE_Sign1 receipt.
+    pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9942VdpError> {
+        let mut reader = CborReader::new(bytes);
+        let count = reader
+            .read_array_len()
+            .map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        if count == 0 {
+            return Err(Rfc9942VdpError::EmptyReceiptCollection);
+        }
+        if count > MAX_RFC9942_RECEIPTS {
+            return Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded);
+        }
+
+        let mut receipts = Vec::with_capacity(count);
+        let mut total_bytes = 0usize;
+        for _ in 0..count {
+            let encoded = reader
+                .read_bstr_bounded(MAX_RFC9942_RECEIPT_BYTES)
+                .map_err(|error| match error {
+                    Rfc9162ProofDecodeError::InvalidStructure =>
+                        Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded,
+                    _ => Rfc9942VdpError::InvalidEncoding,
+                })?;
+            total_bytes = total_bytes
+                .checked_add(encoded.len())
+                .ok_or(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)?;
+            if total_bytes > MAX_RFC9942_RECEIPTS_BYTES_TOTAL {
+                return Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded);
+            }
+            let receipt = Rfc9942ReceiptEnvelope::from_cbor(&encoded)
+                .map_err(|_| Rfc9942VdpError::InvalidReceiptStructure)?;
+            receipts.push(receipt);
+        }
+        reader
+            .finish()
+            .map_err(|_| Rfc9942VdpError::TrailingBytes)?;
+        Self::new(receipts)
+    }
+}
+
 /// RFC 9942 proof type carried in the vdp header map.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rfc9942ProofKind {
@@ -190,6 +307,10 @@ pub enum Rfc9942VdpError {
     DetachedPayloadRequired,
     #[error("invalid or unsupported COSE_Sign1 receipt structure")]
     InvalidReceiptStructure,
+    #[error("RFC 9942 receipts collection must contain at least one receipt")]
+    EmptyReceiptCollection,
+    #[error("RFC 9942 receipts collection exceeds its defensive resource bound")]
+    ReceiptCollectionResourceLimitExceeded,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
     VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
@@ -1376,6 +1497,62 @@ mod tests {
         assert_eq!(receipt.verify(b"a"),Err(Rfc9942VdpError::DetachedPayloadRequired));
         assert_eq!(receipt.verify_inclusion_with_detached_payload(b"a",&head.root()).unwrap(),head);
     }
+    #[test]
+    fn rfc9942_receipt_collection_preserves_priority_order_and_wire_shape() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let first=Rfc9942ReceiptEnvelope::new(-7,vdp.clone(),Rfc9942ReceiptPayload::Detached,vec![0x01]).unwrap();
+        let second=Rfc9942ReceiptEnvelope::new(-8,vdp,Rfc9942ReceiptPayload::Attached([0x22;32]),vec![0x02]).unwrap();
+        let collection=Rfc9942ReceiptCollection::new(vec![first.clone(),second.clone()]).unwrap();
+        let encoded=collection.to_cbor();
+        assert_eq!(encoded[0],0x82);
+        assert_eq!(collection.len(),2);
+        assert_eq!(collection.receipts(),&[first,second]);
+        let decoded=Rfc9942ReceiptCollection::from_cbor(&encoded).unwrap();
+        assert_eq!(decoded.receipts(),collection.receipts());
+    }
+
+    #[test]
+    fn rfc9942_receipt_collection_rejects_empty_excess_and_trailing_input() {
+        assert_eq!(
+            Rfc9942ReceiptCollection::new(Vec::new()),
+            Err(Rfc9942VdpError::EmptyReceiptCollection)
+        );
+
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA]).unwrap();
+        let too_many=vec![receipt;MAX_RFC9942_RECEIPTS+1];
+        assert_eq!(
+            Rfc9942ReceiptCollection::new(too_many),
+            Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)
+        );
+
+        let collection=Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
+        let mut trailing=collection.to_cbor();
+        trailing.push(0);
+        assert_eq!(
+            Rfc9942ReceiptCollection::from_cbor(&trailing),
+            Err(Rfc9942VdpError::TrailingBytes)
+        );
+    }
+
+    #[test]
+    fn rfc9942_receipt_collection_requires_bstr_encoded_tagged_receipts() {
+        let mut malformed=vec![0x81];
+        cbor_bytes(&mut malformed,&[0x84,0x00,0xa0,0xf6,0x40]);
+        assert_eq!(
+            Rfc9942ReceiptCollection::from_cbor(&malformed),
+            Err(Rfc9942VdpError::InvalidReceiptStructure)
+        );
+
+        let not_bstr=vec![0x81,0x01];
+        assert_eq!(
+            Rfc9942ReceiptCollection::from_cbor(&not_bstr),
+            Err(Rfc9942VdpError::InvalidEncoding)
+        );
+    }
+
     #[test]
     fn rfc9942_receipt_payload_distinguishes_attached_and_detached() {
         assert_eq!(Rfc9942ReceiptPayload::from_bytes(None).unwrap(),Rfc9942ReceiptPayload::Detached);
