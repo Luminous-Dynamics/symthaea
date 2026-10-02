@@ -136,12 +136,6 @@ impl SqliteAuthorizationStore {
                state TEXT NOT NULL,
                PRIMARY KEY(authorization_instance, attempt_id)
              );",
-             CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
-               ON authorization_leases(attempt_id)
-               WHERE boundary_id IS NOT NULL AND attempt_id IS NOT NULL;
-             CREATE UNIQUE INDEX IF NOT EXISTS authorization_dispatch_attempt_id_uq
-               ON authorization_dispatches(attempt_id)
-               WHERE boundary_id IS NOT NULL AND attempt_id IS NOT NULL;",
         )?;
         ensure_column(&mut connection, "authorization_leases", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
@@ -183,15 +177,79 @@ impl SqliteAuthorizationStore {
     ) -> Result<(), AuthorizationStoreError> {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let bound: Option<String> = tx
+            .query_row(
+                "SELECT boundary_id FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten();
+        if bound.is_some() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
         let mut lease = load_lease(&tx, &witness.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
         lease.prepare_for_execution(witness, action, current_frame, attempt_id)?;
         tx.execute(
             "UPDATE authorization_leases SET state='prepared', attempt_id=?2
-             WHERE authorization_instance=?1 AND state='ready' AND remaining_executions>0",
+             WHERE authorization_instance=?1 AND state='ready' AND remaining_executions>0
+               AND boundary_id IS NULL",
             params![witness.authorization_instance.as_str(), attempt_id],
         )?;
         if tx.changes() != 1 {
+            return Err(AuthorizationConsumptionError::NotReady.into());
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Prepare an effectful attempt with durable boundary ownership.
+    ///
+    /// Persisting the boundary while the lease is still Prepared means a crash
+    /// before DispatchPending cannot leave the reservation ownerless.
+    /// Bound attempt IDs are unique within this durable state domain.
+    pub fn prepare_for_execution_bound(
+        &self,
+        witness: &ActionAuthorizationWitness,
+        action: &EpistemicAction,
+        current_frame: &str,
+        attempt_id: &str,
+        boundary_id: &str,
+    ) -> Result<(), AuthorizationStoreError> {
+        if boundary_id.is_empty() || attempt_id.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        let prior_owner: Option<(String, String)> = tx
+            .query_row(
+                "SELECT authorization_instance,boundary_id
+                 FROM authorization_leases
+                 WHERE attempt_id=?1 AND boundary_id IS NOT NULL
+                   AND authorization_instance<>?2",
+                params![attempt_id, witness.authorization_instance.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        if prior_owner.is_some() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        let mut lease = load_lease(&tx, &witness.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
+        lease.prepare_for_execution(witness, action, current_frame, attempt_id)?;
+
+        let changed = tx.execute(
+            "UPDATE authorization_leases
+             SET state='prepared', attempt_id=?2, boundary_id=?3
+             WHERE authorization_instance=?1 AND state='ready'
+               AND remaining_executions>0 AND boundary_id IS NULL",
+            params![witness.authorization_instance.as_str(), attempt_id, boundary_id],
+        )?;
+        if changed != 1 {
             return Err(AuthorizationConsumptionError::NotReady.into());
         }
         tx.commit()?;
@@ -237,6 +295,26 @@ impl SqliteAuthorizationStore {
         }
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        let prior_owner: Option<(String, String)> = tx
+            .query_row(
+                "SELECT authorization_instance,boundary_id
+                 FROM authorization_leases
+                 WHERE attempt_id=?1 AND boundary_id IS NOT NULL
+                   AND authorization_instance<>?2",
+                params![attempt_id, authorization_instance],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        if prior_owner.is_some() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        let current_boundary = load_lease_boundary(&tx, authorization_instance)?;
+        if current_boundary.as_deref().is_some_and(|id| id != boundary_id) {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
         let mut lease = load_lease(&tx, authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
         let expected_digest = action.canonical_action_digest();
@@ -253,6 +331,14 @@ impl SqliteAuthorizationStore {
             expected_effect,
             boundary_id,
         );
+        if current_boundary.is_none() {
+            tx.execute(
+                "UPDATE authorization_leases SET boundary_id=?2
+                 WHERE authorization_instance=?1 AND state='prepared'
+                   AND attempt_id=?3 AND boundary_id IS NULL",
+                params![authorization_instance, boundary_id, attempt_id],
+            )?;
+        }
         tx.execute(
             "INSERT INTO authorization_dispatches
              (authorization_instance,attempt_id,action_id,action_digest,provider_idempotency_key,
@@ -298,6 +384,11 @@ impl SqliteAuthorizationStore {
             || row.4 != record.audience || row.5 != record.adapter
             || row.6 != record.boundary_id || row.7 != "dispatch_pending"
         {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
+        if current_boundary != record.boundary_id {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
         let mut lease = load_lease(&tx, &record.authorization_instance)?
@@ -369,6 +460,11 @@ impl SqliteAuthorizationStore {
             return if matches!(outcome, ExecutionOutcome::Indeterminate) { Ok(r) }
             else { Err(AuthorizationConsumptionError::IndeterminateRequiresReconciliation.into()) };
         }
+        let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
+        if current_boundary != record.boundary_id {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
         let mut lease = load_lease(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
         if lease.action_id != record.action_id || lease.action_digest != record.action_digest
@@ -377,9 +473,9 @@ impl SqliteAuthorizationStore {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
         let receipt = lease.commit(&record.attempt_id, outcome)?;
-        update_lease(&tx, &lease)?;
+        update_lease_with_boundary(&tx, &lease, Some(&record.boundary_id))?;
         let phase = if matches!(outcome, ExecutionOutcome::Indeterminate) { "indeterminate" } else { "final" };
-        insert_receipt(&tx, &receipt, phase)?;
+        insert_receipt_with_boundary(&tx, &receipt, phase, Some(&record.boundary_id))?;
         let dispatch_state = match outcome {
             ExecutionOutcome::Succeeded => "succeeded",
             ExecutionOutcome::Failed => "failed",
@@ -399,6 +495,10 @@ impl SqliteAuthorizationStore {
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        if dispatch_boundary(&tx, authorization_instance, attempt_id)?.is_some() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
 
         if let Some(r) = load_receipt(&tx, authorization_instance, attempt_id, "final")? { return Ok(r); }
         if let Some(r) = load_receipt(&tx, authorization_instance, attempt_id, "indeterminate")? {
@@ -432,6 +532,9 @@ impl SqliteAuthorizationStore {
         }
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if dispatch_boundary(&tx, authorization_instance, attempt_id)?.is_some() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
         if let Some(r) = load_receipt(&tx, authorization_instance, attempt_id, "reconciled")? { return Ok(r); }
 
         let mut lease = load_lease(&tx, authorization_instance)?
@@ -457,27 +560,131 @@ impl SqliteAuthorizationStore {
         Ok(receipt)
     }
 
+    /// Reconcile an indeterminate effect using its exact frozen dispatch record.
+    ///
+    /// The durable dispatch record and current lease must name the same boundary
+    /// before this operation can consume the authorization budget.
+    pub fn reconcile_indeterminate_bound(
+        &self,
+        record: &DurableDispatchRecord,
+        outcome: ExecutionOutcome,
+    ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
+        if matches!(outcome, ExecutionOutcome::Indeterminate) {
+            return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+        }
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        let row = tx.query_row(
+            "SELECT action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
+             FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance.as_str(), record.attempt_id.as_str()],
+            |r| Ok((
+                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
+                r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
+                r.get::<_,String>(6)?, r.get::<_,String>(7)?,
+            )),
+        ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
+
+        if row.0 != record.action_id || row.1 != record.action_digest
+            || row.2 != record.provider_idempotency_key || row.3 != record.target_identity
+            || row.4 != record.audience || row.5 != record.adapter
+            || row.6 != record.boundary_id || row.7 != "indeterminate"
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        if let Some(r) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "reconciled")? {
+            return Ok(r);
+        }
+
+        let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
+        if current_boundary != record.boundary_id {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        let mut lease = load_lease(&tx, &record.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
+        if lease.action_id != record.action_id || lease.action_digest != record.action_digest
+            || lease.provider_idempotency_key() != record.provider_idempotency_key
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        let receipt = lease.reconcile_indeterminate(&record.attempt_id, outcome)?;
+        update_lease_with_boundary(&tx, &lease, Some(&record.boundary_id))?;
+
+        let dispatch_state = if matches!(outcome, ExecutionOutcome::Succeeded) {
+            "succeeded"
+        } else {
+            "failed"
+        };
+        let changed = tx.execute(
+            "UPDATE authorization_dispatches SET state=?3
+             WHERE authorization_instance=?1 AND attempt_id=?2
+               AND boundary_id=?4 AND state='indeterminate'",
+            params![record.authorization_instance, record.attempt_id, dispatch_state, record.boundary_id],
+        )?;
+        if changed != 1 {
+            return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+        }
+        insert_receipt_with_boundary(&tx, &receipt, "reconciled", Some(&record.boundary_id))?;
+        tx.commit()?;
+        Ok(receipt)
+    }
+
     /// Crash recovery is deliberately conservative: a process may have reached
     /// the external sink after its last durable local write. Any non-terminal
     /// prepared/dispatch-pending reservation therefore becomes Indeterminate
     /// before another execution can be admitted.
+    pub fn recover_incomplete_attempts_for_boundary(
+        &self,
+        boundary_id: &str,
+    ) -> Result<usize, AuthorizationStoreError> {
+        if boundary_id.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        self.recover_incomplete_attempts_scoped(Some(boundary_id))
+    }
+
+    /// Recover only legacy/unscoped attempts. Bound effectful attempts should use
+    /// recover_incomplete_attempts_for_boundary.
     pub fn recover_incomplete_attempts(&self) -> Result<usize, AuthorizationStoreError> {
+        self.recover_incomplete_attempts_scoped(None)
+    }
+
+    fn recover_incomplete_attempts_scoped(
+        &self,
+        boundary_filter: Option<&str>,
+    ) -> Result<usize, AuthorizationStoreError> {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let mut recovered = Vec::new();
         {
-            let mut stmt = tx.prepare(
-                "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch
-                 FROM authorization_leases
-                 WHERE state IN ('prepared','dispatch_pending','invoked')",
-            )?;
-            let rows = stmt.query_map([], |row| {
+            let mut stmt = if boundary_filter.is_some() {
+                tx.prepare(
+                    "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
+                     FROM authorization_leases
+                     WHERE state IN ('prepared','dispatch_pending','invoked') AND boundary_id=?1",
+                )?
+            } else {
+                tx.prepare(
+                    "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
+                     FROM authorization_leases
+                     WHERE state IN ('prepared','dispatch_pending','invoked')",
+                )?
+            };
+            let bound_params = boundary_filter.map(|id| vec![id.to_owned()]).unwrap_or_default();
+            let rows = stmt.query_map(rusqlite::params_from_iter(bound_params.iter()), |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
                     row.get::<_, String>(3)?,
                     row.get::<_, i64>(4)? as u64,
+                    row.get::<_, Option<String>>(5)?,
                 ))
             })?;
             for row in rows {
@@ -485,7 +692,15 @@ impl SqliteAuthorizationStore {
             }
         }
 
-        for (instance, action_id, attempt_id, action_digest, authority_epoch) in &recovered {
+        for (instance, action_id, attempt_id, action_digest, authority_epoch, lease_boundary) in &recovered {
+            if let Some(boundary_id) = lease_boundary.as_deref() {
+                match dispatch_boundary(&tx, instance, attempt_id)? {
+                    Some(dispatch_boundary_id) if dispatch_boundary_id == boundary_id => {}
+                    Some(_) => return Err(AuthorizationConsumptionError::InvalidBinding.into()),
+                    None if is_pre_dispatch_state(&tx, instance, attempt_id)? => {}
+                    None => return Err(AuthorizationConsumptionError::InvalidBinding.into()),
+                }
+            }
             tx.execute(
                 "UPDATE authorization_leases
                  SET state='indeterminate', attempt_id=?2
@@ -516,19 +731,22 @@ impl SqliteAuthorizationStore {
             };
             tx.execute(
                 "UPDATE authorization_dispatches SET state='indeterminate'
-                 WHERE authorization_instance=?1 AND attempt_id=?2 AND state IN ('dispatch_pending','invoked')",
-                params![instance, attempt_id],
+                 WHERE authorization_instance=?1 AND attempt_id=?2
+                   AND state IN ('dispatch_pending','invoked')
+                   AND (?3 IS NULL OR boundary_id=?3)",
+                params![instance, attempt_id, lease_boundary],
             )?;
             tx.execute(
                 "INSERT OR IGNORE INTO authorization_receipts
-                 (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch)
-                 VALUES (?1,?2,?3,'indeterminate','indeterminate',?4,?5)",
+                 (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,boundary_id)
+                 VALUES (?1,?2,?3,'indeterminate','indeterminate',?4,?5,?6)",
                 params![
                     receipt.authorization_instance,
                     receipt.action_id,
                     receipt.attempt_id,
                     receipt.action_digest,
-                    receipt.authority_epoch as i64
+                    receipt.authority_epoch as i64,
+                    lease_boundary
                 ],
             )?;
         }
@@ -998,6 +1216,87 @@ mod tests {
         ));
         let receipt=store.commit_bound(&record,ExecutionOutcome::Succeeded).unwrap();
         assert_eq!(receipt.provider_idempotency_key,record.provider_idempotency_key);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn boundary_scoped_recovery_cannot_claim_another_boundary() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-recovery-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=EpistemicAction::new("boundary-recovery-action","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(), authorization_instance:"approval-boundary".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:10:00Z".into(), expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-boundary","boundary-A"
+        ).unwrap();
+        let record=store.mark_dispatch_pending_bound(
+            &witness.authorization_instance,"attempt-boundary",&action,&effect,"boundary-A"
+        ).unwrap();
+        drop(store);
+
+        let boundary_b=SqliteAuthorizationStore::open(&path).unwrap();
+        assert_eq!(boundary_b.recover_incomplete_attempts_for_boundary("boundary-B").unwrap(),0);
+        let mut wrong=record.clone();
+        wrong.boundary_id="boundary-B".into();
+        assert!(matches!(
+            boundary_b.reconcile_indeterminate_bound(&wrong,ExecutionOutcome::Succeeded),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let boundary_a=SqliteAuthorizationStore::open(&path).unwrap();
+        assert_eq!(boundary_a.recover_incomplete_attempts_for_boundary("boundary-A").unwrap(),1);
+        let receipt=boundary_a.reconcile_indeterminate_bound(&record,ExecutionOutcome::Succeeded).unwrap();
+        assert_eq!(receipt.outcome,ExecutionOutcome::Succeeded);
+        assert_eq!(receipt.authorization_instance,"approval-boundary");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_attempt_id_cannot_be_reused_across_boundaries() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-attempt-scope-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action_a=EpistemicAction::new("scope-a","a",super::super::ActionRisk::Critical);
+        let action_b=EpistemicAction::new("scope-b","b",super::super::ActionRisk::Critical);
+        let digest_a=action_a.canonical_action_digest();
+        let digest_b=action_b.canonical_action_digest();
+        let witness_a=ActionAuthorizationWitness {
+            action_id:action_a.id.clone(), authorization_instance:"scope-approval-a".into(),
+            action_digest:digest_a.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:11:00Z".into(), expires_at:None, authority_epoch:1,
+        };
+        let witness_b=ActionAuthorizationWitness {
+            action_id:action_b.id.clone(), authorization_instance:"scope-approval-b".into(),
+            action_digest:digest_b.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:11:01Z".into(), expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "scope-approval-a",action_a.id.clone(),digest_a,"sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "scope-approval-b",action_b.id.clone(),digest_b,"sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness_a,&action_a,"frame@1","attempt-reused","boundary-A"
+        ).unwrap();
+        assert!(matches!(
+            store.prepare_for_execution_bound(
+                &witness_b,&action_b,"frame@1","attempt-reused","boundary-B"
+            ),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
         let _=std::fs::remove_file(path);
     }
 
