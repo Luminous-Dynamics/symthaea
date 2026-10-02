@@ -258,6 +258,11 @@ impl KnowledgePersistence {
     /// Save typed provenance relations append-only. Replaying an existing relation is idempotent.
     pub fn save_provenance_relations(&mut self, relations: &[ProvenanceRelationRecord]) -> Result<usize, String> {
         if !self.is_configured() { return Err("No database path configured".into()); }
+        for relation in relations {
+            ProvenanceRelation::from(relation.clone())
+                .validate()
+                .map_err(|e| format!("Invalid provenance relation: {e}"))?;
+        }
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
         let tx = conn
@@ -265,10 +270,6 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Begin provenance transaction: {e}"))?;
         let mut count = 0;
         for relation in relations {
-            let relation_for_validation = ProvenanceRelation::from(relation.clone());
-            relation_for_validation
-                .validate()
-                .map_err(|e| format!("Invalid provenance relation: {e}"))?;
             let inserted = tx
                 .execute(
                     "INSERT INTO knowledge_provenance_relations
@@ -328,6 +329,12 @@ impl KnowledgePersistence {
         if !self.is_configured() {
             return Err("No database path configured".into());
         }
+        if edges.iter().any(|edge| !edge.strength.is_finite()) {
+            return Err("CausalEdgeRecord strength must be finite".into());
+        }
+        if edges.iter().any(|edge| edge.cycle > i64::MAX as u64) {
+            return Err("CausalEdgeRecord cycle exceeds SQLite INTEGER range".into());
+        }
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
@@ -349,7 +356,7 @@ impl KnowledgePersistence {
                     edge.effect,
                     edge.strength,
                     edge.is_inhibitory,
-                    i64::try_from(edge.cycle).map_err(|_| rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "causal edge cycle exceeds SQLite INTEGER range"))))?,
+                    i64::try_from(edge.cycle).expect("causal edge cycle preflighted for SQLite INTEGER range"),
                 ],
             )
             .map_err(|e| e.to_string())?;
@@ -871,6 +878,67 @@ mod tests {
         assert!(err.contains("Invalid provenance relation"));
         assert_eq!(p.total_saved(), 0);
         assert!(p.load_provenance_relations().unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_causal_edges_preflight_rejects_invalid_batch() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_causal_save_preflight_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let valid = CausalEdgeRecord {
+            cause: "cause".into(),
+            effect: "effect".into(),
+            strength: 0.5,
+            is_inhibitory: false,
+            cycle: 1,
+        };
+        let invalid = CausalEdgeRecord {
+            strength: f32::NAN,
+            ..valid.clone()
+        };
+
+        let err = p.save_causal_edges(&[valid, invalid]).unwrap_err();
+        assert!(err.contains("strength"));
+        assert_eq!(p.total_saved(), 0);
+        assert!(!db_path.exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_provenance_relations_preflight_rejects_invalid_batch() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_provenance_save_preflight_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let valid = ProvenanceRelationRecord {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let invalid = ProvenanceRelationRecord {
+            source_memory_id: " ".into(),
+            ..valid.clone()
+        };
+
+        let err = p
+            .save_provenance_relations(&[valid, invalid])
+            .unwrap_err();
+        assert!(err.contains("Invalid provenance relation"));
+        assert_eq!(p.total_saved(), 0);
+        assert!(!db_path.exists());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
