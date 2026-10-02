@@ -15,6 +15,7 @@ pub const ALGORITHM: &str = "BLAKE3-256";
 pub const VERSION: u16 = 1;
 pub const DOMAIN: &[u8] = b"symthaea-swarm/semantic-evidence-history";
 pub const ENTRY_DOMAIN: &[u8] = b"symthaea-swarm/semantic-evidence-history-entry";
+pub const SNAPSHOT_DOMAIN: &[u8] = b"symthaea-swarm/semantic-evidence-history-snapshot";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HistoryEntryCommitment([u8; 32]);
@@ -56,6 +57,19 @@ pub enum EvidenceHistoryError {
     EvidenceDigest(#[from] EvidenceDigestError),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct HistoryCheckpoint {
+    length: u64,
+    head: Option<HistoryEntryCommitment>,
+    snapshot: HistoryEntryCommitment,
+}
+
+impl HistoryCheckpoint {
+    pub fn length(&self) -> u64 { self.length }
+    pub fn head(&self) -> Option<HistoryEntryCommitment> { self.head }
+    pub fn snapshot(&self) -> HistoryEntryCommitment { self.snapshot }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct EvidenceHistory {
     entries: Vec<EvidenceHistoryEntry>,
@@ -68,6 +82,35 @@ impl EvidenceHistory {
     pub fn entries(&self) -> &[EvidenceHistoryEntry] { &self.entries }
     pub fn head_commitment(&self) -> Option<HistoryEntryCommitment> {
         self.entries.last().map(EvidenceHistoryEntry::commitment)
+    }
+
+    /// Return a deterministic commitment to the retained history snapshot.
+    ///
+    /// This is an untrusted local snapshot identifier, not a signed checkpoint
+    /// and not a transparency-service root.
+    pub fn snapshot_commitment(&self) -> HistoryEntryCommitment {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&(SNAPSHOT_DOMAIN.len() as u64).to_be_bytes());
+        hasher.update(SNAPSHOT_DOMAIN);
+        hasher.update(&VERSION.to_be_bytes());
+        hasher.update(&(self.entries.len() as u64).to_be_bytes());
+        match self.head_commitment() {
+            Some(head) => {
+                hasher.update(&[1]);
+                hasher.update(head.as_bytes());
+            }
+            None => hasher.update(&[0]),
+        }
+        HistoryEntryCommitment(*hasher.finalize().as_bytes())
+    }
+
+    /// Export the checkpoint material needed to identify this local prefix.
+    pub fn checkpoint(&self) -> HistoryCheckpoint {
+        HistoryCheckpoint {
+            length: self.entries.len() as u64,
+            head: self.head_commitment(),
+            snapshot: self.snapshot_commitment(),
+        }
     }
 
     /// Append one complete evidence envelope to the local history.
@@ -238,7 +281,19 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.len(), 2);
         assert!(first.head_commitment().is_some());
+        assert_eq!(first.checkpoint(), second.checkpoint());
         first.verify().unwrap();
+    }
+
+    #[test]
+    fn empty_and_nonempty_snapshots_are_distinct() {
+        let empty = EvidenceHistory::new();
+        let mut nonempty = EvidenceHistory::new();
+        nonempty.append(evidence(1)).unwrap();
+
+        assert_ne!(empty.snapshot_commitment(), nonempty.snapshot_commitment());
+        assert_eq!(empty.checkpoint().length(), 0);
+        assert_eq!(nonempty.checkpoint().length(), 1);
     }
 
     #[test]
