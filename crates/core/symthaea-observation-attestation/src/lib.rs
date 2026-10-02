@@ -380,6 +380,19 @@ impl EvaluationTrace {
         self.results.iter().map(EvaluationCheckResult::id).collect()
     }
 
+    /// Validate the structural invariants of the durable execution trace.
+    pub fn is_well_formed(&self) -> bool {
+        !self.procedure_fingerprint.is_empty()
+            && self.results.iter().enumerate().all(|(index, result)| {
+                result.sequence == index as u32
+                    && !matches!(result.stage, VerificationStage::NotEvaluated)
+            })
+            && self
+                .results
+                .windows(2)
+                .all(|pair| pair[0].check != pair[1].check)
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         fn write_string(bytes: &mut Vec<u8>, value: &str) {
             bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
@@ -969,7 +982,7 @@ impl EvidenceEvaluation {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:evidence-evaluation:v3\n");
+        hasher.update(b"symthaea:evidence-evaluation:v4\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -2180,7 +2193,7 @@ mod tests {
         let evaluation = report.to_evidence_evaluation();
 
         assert_eq!(
-            evaluation.executed_check_ids,
+            evaluation.execution_trace.executed_check_ids(),
             EvaluationProcedure::attestation_ed25519()
                 .checks
                 .iter()
@@ -2309,6 +2322,7 @@ mod tests {
             evaluation.execution_trace.procedure_fingerprint,
             report.procedure_fingerprint
         );
+        assert!(evaluation.execution_trace.is_well_formed());
         assert_eq!(evaluation.execution_trace.results.len(), 9);
         let last = evaluation.execution_trace.results.last().expect("trace has a result");
         assert_eq!(last.check, EvaluationCheck::CryptographicProof);
