@@ -379,7 +379,8 @@ impl KnowledgePersistence {
 
     /// Save ontology primitives to the database.
     ///
-    /// Uses INSERT OR REPLACE for upsert behavior.
+    /// Uses an explicit PRIMARY KEY conflict target so the persisted name
+    /// remains the identity being updated rather than using REPLACE semantics.
     /// Returns the number of primitives saved.
     pub fn save_ontology(&mut self, records: &[OntologyRecord]) -> Result<usize, String> {
         if !self.is_configured() {
@@ -394,9 +395,16 @@ impl KnowledgePersistence {
         {
             let mut stmt = tx
                 .prepare_cached(
-                    "INSERT OR REPLACE INTO knowledge_ontology
+                    "INSERT INTO knowledge_ontology
                      (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle, is_a_parent)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                     ON CONFLICT(name) DO UPDATE SET
+                        vector_blob = excluded.vector_blob,
+                        usage_count = excluded.usage_count,
+                        utility = excluded.utility,
+                        created_at_cycle = excluded.created_at_cycle,
+                        last_used_cycle = excluded.last_used_cycle,
+                        is_a_parent = excluded.is_a_parent",
                 )
                 .map_err(|e| format!("Prepare: {e}"))?;
 
@@ -1037,6 +1045,51 @@ mod tests {
         assert_eq!(p.save_ontology(&records).unwrap(), 2);
         let loaded = p.load_ontology().unwrap();
         assert_eq!(loaded.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), vec!["alpha", "zeta"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_ontology_upsert_updates_existing_identity() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_ontology_upsert_identity_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let initial = OntologyRecord {
+            name: "stable".into(),
+            vector_bytes: vec![1u8; 2048],
+            usage_count: 1,
+            utility: 0.2,
+            created_at_cycle: 1,
+            last_used_cycle: 1,
+            is_a_parent: None,
+        };
+        let updated = OntologyRecord {
+            name: "stable".into(),
+            vector_bytes: vec![2u8; 2048],
+            usage_count: 9,
+            utility: 0.8,
+            created_at_cycle: 4,
+            last_used_cycle: 7,
+            is_a_parent: Some("concept".into()),
+        };
+
+        assert_eq!(p.save_ontology(std::slice::from_ref(&initial)).unwrap(), 1);
+        assert_eq!(p.save_ontology(std::slice::from_ref(&updated)).unwrap(), 1);
+
+        let loaded = p.load_ontology().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].name, "stable");
+        assert_eq!(loaded[0].vector_bytes, vec![2u8; 2048]);
+        assert_eq!(loaded[0].usage_count, 9);
+        assert_eq!(loaded[0].utility, 0.8);
+        assert_eq!(loaded[0].created_at_cycle, 4);
+        assert_eq!(loaded[0].last_used_cycle, 7);
+        assert_eq!(loaded[0].is_a_parent.as_deref(), Some("concept"));
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
