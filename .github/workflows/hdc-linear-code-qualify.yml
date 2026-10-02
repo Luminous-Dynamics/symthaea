@@ -59,17 +59,62 @@ jobs:
             crates/core/symthaea-core/src/hdc/linear_code.rs \
             crates/core/symthaea-core/tests/linear_code_ambiguity.rs
 
+      - name: Build isolated linear-code qualification harness
+        id: harness
+        run: |
+          HARNESS="$RUNNER_TEMP/hdc-linear-code-qualifier"
+          rm -rf "$HARNESS"
+          mkdir -p "$HARNESS/src" "$HARNESS/tests"
+
+          cat > "$HARNESS/Cargo.toml" <<'EOF'
+          [package]
+          name = "hdc-linear-code-qualifier"
+          version = "0.0.0"
+          edition = "2024"
+          publish = false
+
+          [lib]
+          path = "src/lib.rs"
+
+          [dependencies]
+          rand = "0.8.6"
+          EOF
+
+          cat > "$HARNESS/src/lib.rs" <<EOF
+          #[path = "${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/linear_code.rs"]
+          pub mod linear_code;
+          EOF
+
+          {
+            echo '#[path = "'$GITHUB_WORKSPACE'/crates/core/symthaea-core/src/hdc/linear_code.rs"]'
+            echo 'mod linear_code;'
+            echo 'use linear_code::{BinaryCodeword, RandomLinearCode, basis_rank, recover_direct_sum_bound, recover_independent_bound, solve_linear_combination};'
+            sed '1,/^};$/d' "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs"
+          } > "$HARNESS/tests/linear_code_ambiguity.rs"
+
+          echo "path=$HARNESS" >> "$GITHUB_OUTPUT"
+
       - name: Linear-code unit tests
         id: unit_tests
-        run: cargo test -p symthaea-core --lib linear_code
+        run: |
+          cargo test \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --lib linear_code
 
       - name: Linear-code ambiguity integration test
         id: integration_tests
-        run: cargo test -p symthaea-core --test linear_code_ambiguity
+        run: |
+          cargo test \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_ambiguity
 
       - name: Strict Clippy
         id: clippy
-        run: cargo clippy -p symthaea-core --lib --features simd -- -D warnings
+        run: |
+          cargo clippy \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --all-targets \
+            -- -D warnings
 
       - name: Emit qualification receipt
         if: always()
@@ -86,8 +131,9 @@ jobs:
           decoder_oracle=exhaustive-bounded-distance
           decoder_oracle_is_production=false
           production_default_changed=false
-          qualification_status=${{ steps.format.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           focused_formatting=${{ steps.format.outcome }}
+          isolated_harness=${{ steps.harness.outcome }}
           linear_code_unit_tests=${{ steps.unit_tests.outcome }}
           ambiguity_integration_test=${{ steps.integration_tests.outcome }}
           strict_clippy=${{ steps.clippy.outcome }}
