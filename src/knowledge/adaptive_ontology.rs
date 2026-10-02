@@ -420,7 +420,10 @@ impl AdaptiveOntology {
         &mut self,
         record: &OntologyRecord,
     ) -> OntologyRestoreOutcome {
-        if record.name.trim().is_empty() || record.vector_bytes.len() != BinaryHV::BYTES {
+        if record.name.trim().is_empty()
+            || record.vector_bytes.len() != BinaryHV::BYTES
+            || !record.utility.is_finite()
+        {
             return OntologyRestoreOutcome::default();
         }
 
@@ -577,6 +580,25 @@ mod tests {
             ..similar_record
         };
         assert!(!ontology.import_ontology_record(&oversized_record));
+    }
+
+    #[test]
+    fn test_restore_rejects_non_finite_utility() {
+        let mut ontology = AdaptiveOntology::default();
+        let record = OntologyRecord {
+            name: "nan-utility".into(),
+            vector_bytes: BinaryHV::random(5).0.to_vec(),
+            usage_count: 1,
+            utility: f64::NAN,
+            created_at_cycle: 1,
+            last_used_cycle: 1,
+            is_a_parent: None,
+        };
+
+        let outcome = ontology.import_ontology_record_with_outcome(&record);
+        assert!(!outcome.accepted);
+        assert!(!outcome.rejected_by_policy);
+        assert!(ontology.primitives().is_empty());
     }
 
     #[test]
