@@ -1734,13 +1734,53 @@ mod tests {
         ).unwrap();
         assert_eq!(receipt.provider_idempotency_key,record.provider_idempotency_key);
         let reopened=SqliteAuthorizationStore::open(&path).unwrap();
-        let persisted=reopened.get_receipt(&record.authorization_instance,"attempt-reconcile-key","reconciled").unwrap().unwrap();
-        assert_eq!(persisted.provider_idempotency_key,record.provider_idempotency_key);
+        let connection=reopened.connection().unwrap();
+        let persisted:String=connection.query_row(
+            "SELECT provider_idempotency_key
+             FROM authorization_terminal_evidence
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(persisted,record.provider_idempotency_key);
         let _=std::fs::remove_file(path);
     }
-    #[test]
-    fn durable_state_survives_reopen_and_blocks_replay() {    #[test]
     fn provider_idempotency_key_is_derived_from_native_replay_identity() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-provider-key-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=action.with_effect_binding(effect.clone());
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"provider-key-fence".into(),
+            action_id:action.id.clone(),
+            action_digest:action.canonical_action_digest(),
+            support_digest:witness.support_digest,
+            current_frame:witness.current_frame,
+            policy:witness.policy,
+            authority_epoch:witness.authority_epoch,
+        };
+        store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-provider-key","boundary-A").unwrap();
+        let record=store.mark_dispatch_pending_bound(
+            &witness.authorization_instance,"attempt-provider-key",&action,&effect,"boundary-A",
+            "operation:provider-key","native-grant:one"
+        ).unwrap();
+        let expected=AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),action.canonical_action_digest(),
+            witness.support_digest.clone(),witness.policy.clone(),witness.authority_epoch,1
+        ).provider_idempotency_key_for_native_replay("native-grant:one","target-A").unwrap();
+        assert_eq!(record.provider_idempotency_key,expected);
+        let mut operation_changed=record.clone();
+        operation_changed.operation_id="operation:provider-key-renamed".into();
+        assert_eq!(record.provider_idempotency_key,operation_changed.provider_idempotency_key);
+        let mut attempt_changed=record.clone();
+        attempt_changed.attempt_id="attempt-provider-key-retry".into();
+        assert_eq!(record.provider_idempotency_key,attempt_changed.provider_idempotency_key);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn durable_state_survives_reopen_and_blocks_replay() {
+
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-provider-key-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
         let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
