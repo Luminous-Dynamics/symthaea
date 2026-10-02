@@ -464,10 +464,15 @@ impl EvaluationTrace {
     pub fn is_well_formed(&self) -> bool {
         let procedure = EvaluationProcedure::attestation_ed25519();
         let legacy_procedure = EvaluationProcedure::attestation_ed25519_v1();
-        let procedure_matches = self.procedure_fingerprint == procedure.fingerprint()
-            || self.procedure_fingerprint == legacy_procedure.fingerprint();
+        let procedure = if self.procedure_fingerprint == procedure.fingerprint() {
+            procedure
+        } else if self.procedure_fingerprint == legacy_procedure.fingerprint() {
+            legacy_procedure
+        } else {
+            return false;
+        };
+
         !self.results.is_empty()
-            && procedure_matches
             && self.results.iter().enumerate().all(|(index, result)| {
                 result.sequence == index as u32
                     && procedure.checks.get(index).copied() == Some(result.check)
@@ -2498,6 +2503,28 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn legacy_v1_trace_validates_against_its_bound_procedure() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let mut trace = EvaluationTrace::from_report_legacy(&report);
+        trace.procedure_fingerprint = EvaluationProcedure::attestation_ed25519_v1().fingerprint();
+
+        assert!(trace.is_well_formed());
+        assert_eq!(
+            trace.terminal_outcome(),
+            Some(ReceiptAttestationVerificationOutcome::Verified)
+        );
+
+        trace.results.pop();
+        assert!(!trace.is_well_formed());
+    }
+
     fn legacy_v3_report_canonicalization_excludes_execution_trace() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let mut report = Ed25519ReceiptVerifier::new(
