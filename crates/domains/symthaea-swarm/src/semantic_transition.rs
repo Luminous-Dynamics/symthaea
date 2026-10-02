@@ -313,6 +313,127 @@ pub fn build_transition_evidence(
     })
 }
 
+/// Canonical wire witness for a transition-evidence envelope.
+///
+/// This is a deterministic archival representation, not a signature. Length
+/// framing is explicit so independently stored evidence cannot become
+/// ambiguous as fields evolve.
+pub const EVIDENCE_DOMAIN: &[u8] = b"symthaea-swarm/semantic-transition-evidence";
+
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum TransitionEvidenceEncodingError {
+    #[error("evidence version is unsupported")]
+    UnsupportedVersion,
+    #[error("evidence claim kind does not match envelope kind")]
+    KindMismatch,
+    #[error("evidence field is too large to encode")]
+    FieldTooLarge,
+}
+
+pub fn canonical_evidence_bytes(
+    evidence: &TransitionEvidence,
+) -> Result<Vec<u8>, TransitionEvidenceEncodingError> {
+    if evidence.version != EVIDENCE_VERSION {
+        return Err(TransitionEvidenceEncodingError::UnsupportedVersion);
+    }
+    let expected_kind = claim_kind(&evidence.claim);
+    if evidence.kind != expected_kind {
+        return Err(TransitionEvidenceEncodingError::KindMismatch);
+    }
+
+    let mut out = Vec::new();
+    put_evidence_bytes(&mut out, EVIDENCE_DOMAIN)?;
+    out.extend_from_slice(&evidence.version.to_be_bytes());
+    out.push(evidence.kind.tag());
+    out.extend_from_slice(evidence.before_digest.as_bytes());
+    out.extend_from_slice(evidence.after_digest.as_bytes());
+    out.extend_from_slice(evidence.transition_commitment.as_bytes());
+    out.extend_from_slice(evidence.claim_commitment.as_bytes());
+    put_claim_bytes(&mut out, &evidence.claim)?;
+    Ok(out)
+}
+
+fn claim_kind(claim: &TransitionClaim) -> TransitionKind {
+    match claim {
+        TransitionClaim::Admission { .. } => TransitionKind::Admission,
+        TransitionClaim::Replay { .. } => TransitionKind::Replay,
+        TransitionClaim::LifecycleRetirement { .. } => TransitionKind::LifecycleRetirement,
+    }
+}
+
+fn put_evidence_bytes(
+    out: &mut Vec<u8>,
+    bytes: &[u8],
+) -> Result<(), TransitionEvidenceEncodingError> {
+    let len = u64::try_from(bytes.len())
+        .map_err(|_| TransitionEvidenceEncodingError::FieldTooLarge)?;
+    out.extend_from_slice(&len.to_be_bytes());
+    out.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn put_claim_bytes(
+    out: &mut Vec<u8>,
+    claim: &TransitionClaim,
+) -> Result<(), TransitionEvidenceEncodingError> {
+    match claim {
+        TransitionClaim::Admission {
+            delivery, observation, policy, now_ms, result,
+        }
+        | TransitionClaim::Replay {
+            delivery, observation, policy, now_ms, result,
+        } => {
+            out.push(claim_kind(claim).tag());
+            out.extend_from_slice(delivery.logical_delivery_id.as_bytes());
+            out.extend_from_slice(&delivery.schema_version.to_be_bytes());
+            out.extend_from_slice(&delivery.expires_at_ms.to_be_bytes());
+            put_evidence_bytes(out, &delivery.payload)?;
+            put_claim_observation(out, observation)?;
+            put_policy(out, *policy);
+            out.extend_from_slice(&now_ms.to_be_bytes());
+            out.extend_from_slice(result.logical_delivery_id.as_bytes());
+            put_claim_string(out, &result.observation.namespace)?;
+            out.extend_from_slice(result.observation.observation_id.as_bytes());
+        }
+        TransitionClaim::LifecycleRetirement { policy, now_ms } => {
+            out.push(TransitionKind::LifecycleRetirement.tag());
+            put_policy(out, *policy);
+            out.extend_from_slice(&now_ms.to_be_bytes());
+        }
+    }
+    Ok(())
+}
+
+fn put_claim_observation(
+    out: &mut Vec<u8>,
+    observation: &crate::semantic_admission::ObservationRecord,
+) -> Result<(), TransitionEvidenceEncodingError> {
+    put_claim_string(out, &observation.key.namespace)?;
+    out.extend_from_slice(observation.key.observation_id.as_bytes());
+    out.extend_from_slice(observation.source_id.as_bytes());
+    out.extend_from_slice(&observation.observed_at_ms.to_be_bytes());
+    put_evidence_bytes(out, &observation.payload)?;
+    Ok(())
+}
+
+fn put_claim_string(
+    out: &mut Vec<u8>,
+    value: &str,
+) -> Result<(), TransitionEvidenceEncodingError> {
+    put_evidence_bytes(out, value.as_bytes())
+}
+
+fn put_policy(
+    out: &mut Vec<u8>,
+    policy: crate::semantic_admission::AdmissionPolicy,
+) {
+    out.push(policy.allow_new_observation as u8);
+    out.extend_from_slice(&(policy.max_deliveries as u64).to_be_bytes());
+    out.extend_from_slice(&(policy.max_observations as u64).to_be_bytes());
+    out.extend_from_slice(&policy.retention_ms.to_be_bytes());
+    out.extend_from_slice(&policy.tombstone_retention_ms.to_be_bytes());
+}
+
 /// Verify a complete evidence envelope against the actual semantic state edge.
 ///
 /// Verification checks the envelope version/kind and state digests, then
@@ -731,6 +852,69 @@ mod tests {
 
         assert_eq!(evidence.kind(), TransitionKind::LifecycleRetirement);
         assert_eq!(verify_transition_evidence(&before, &after, &evidence), Ok(()));
+    }
+
+    #[test]
+    fn canonical_evidence_is_deterministic_and_kind_framed() {
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let result = match decide(&before, &delivery, &observation, policy, 10) {
+            AdmissionOutcome::Admitted { result, .. } => result,
+            other => panic!("fixture admission failed: {other:?}"),
+        };
+        let evidence = build_transition_evidence(
+            &before,
+            &after,
+            TransitionClaim::Admission {
+                delivery,
+                observation,
+                policy,
+                now_ms: 10,
+                result,
+            },
+        ).unwrap();
+
+        let a = canonical_evidence_bytes(&evidence).unwrap();
+        let b = canonical_evidence_bytes(&evidence).unwrap();
+        assert_eq!(a, b);
+        assert!(a.windows(EVIDENCE_DOMAIN.len()).any(|w| w == EVIDENCE_DOMAIN));
+    }
+
+    #[test]
+    fn canonical_evidence_rejects_inconsistent_envelope() {
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let result = match decide(&before, &delivery, &observation, policy, 10) {
+            AdmissionOutcome::Admitted { result, .. } => result,
+            other => panic!("fixture admission failed: {other:?}"),
+        };
+        let mut evidence = build_transition_evidence(
+            &before,
+            &after,
+            TransitionClaim::Admission {
+                delivery,
+                observation,
+                policy,
+                now_ms: 10,
+                result,
+            },
+        ).unwrap();
+        evidence.kind = TransitionKind::Replay;
+
+        assert_eq!(
+            canonical_evidence_bytes(&evidence),
+            Err(TransitionEvidenceEncodingError::KindMismatch)
+        );
     }
 
     #[test]
