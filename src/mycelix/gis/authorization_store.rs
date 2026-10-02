@@ -321,6 +321,61 @@ impl SqliteAuthorizationStore {
         Ok(())
     }
 
+    /// Commit an outcome only through the frozen dispatch record. The record
+    /// is revalidated immediately before the lease transition so the provider
+    /// outcome cannot be attached to a different sink contract.
+    pub fn commit_bound(
+        &self, record: &DurableDispatchRecord, outcome: ExecutionOutcome,
+    ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let row = tx.query_row(
+            "SELECT action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
+             FROM authorization_dispatches WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance, record.attempt_id],
+            |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,
+                  r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?,
+                  r.get::<_,String>(6)?,r.get::<_,String>(7)?)),
+        ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
+        if row.0 != record.action_id || row.1 != record.action_digest
+            || row.2 != record.provider_idempotency_key || row.3 != record.target_identity
+            || row.4 != record.audience || row.5 != record.adapter || row.6 != record.boundary_id
+            || !matches!(row.7.as_str(), "dispatch_pending" | "invoked" | "indeterminate" | "succeeded" | "failed")
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        if let Some(r) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
+            return Ok(r);
+        }
+        if let Some(r) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "indeterminate")? {
+            return if matches!(outcome, ExecutionOutcome::Indeterminate) { Ok(r) }
+            else { Err(AuthorizationConsumptionError::IndeterminateRequiresReconciliation.into()) };
+        }
+        let mut lease = load_lease(&tx, &record.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
+        if lease.action_id != record.action_id || lease.action_digest != record.action_digest
+            || lease.provider_idempotency_key() != record.provider_idempotency_key
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        let receipt = lease.commit(&record.attempt_id, outcome)?;
+        update_lease(&tx, &lease)?;
+        let phase = if matches!(outcome, ExecutionOutcome::Indeterminate) { "indeterminate" } else { "final" };
+        insert_receipt(&tx, &receipt, phase)?;
+        let dispatch_state = match outcome {
+            ExecutionOutcome::Succeeded => "succeeded",
+            ExecutionOutcome::Failed => "failed",
+            ExecutionOutcome::Indeterminate => "indeterminate",
+        };
+        tx.execute(
+            "UPDATE authorization_dispatches SET state=?3
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance, record.attempt_id, dispatch_state],
+        )?;
+        tx.commit()?;
+        Ok(receipt)
+    }
+
     pub fn commit(
         &self, authorization_instance: &str, attempt_id: &str, outcome: ExecutionOutcome,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
@@ -342,6 +397,11 @@ impl SqliteAuthorizationStore {
         update_lease(&tx, &lease)?;
         let phase = if matches!(outcome, ExecutionOutcome::Indeterminate) { "indeterminate" } else { "final" };
         insert_receipt(&tx, &receipt, phase)?;
+        tx.execute(
+            "UPDATE authorization_dispatches SET state=?3
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![authorization_instance, attempt_id, if matches!(outcome, ExecutionOutcome::Indeterminate) { "indeterminate" } else if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" }],
+        )?;
         tx.commit()?;
         Ok(receipt)
     }
