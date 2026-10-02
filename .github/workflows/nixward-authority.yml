@@ -27,6 +27,7 @@ on:
       - "crates/core/nixward/src/tui/app.rs"
       - "crates/core/nixward/tests/daemon_state_integration.rs"
       - "crates/core/nixward/Cargo.toml"
+      - "crates/core/symthaea-observation-attestation/Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/nixward-authority.yml"
