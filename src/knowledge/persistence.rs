@@ -99,6 +99,8 @@ pub struct CausalEdgeRecord {
 }
 
 /// A serializable ontology primitive record
+#[derive(Debug, Clone)]
+pub struct OntologyRecord {
     pub name: String,
     pub vector_bytes: Vec<u8>,
     pub usage_count: u64,
@@ -108,6 +110,15 @@ pub struct CausalEdgeRecord {
     /// IS-A parent concept name, if any (NULL in SQLite when absent).
     /// Science: Quillian (1967) — semantic networks; Collins & Loftus (1975).
     pub is_a_parent: Option<String>,
+}
+
+/// A complete, single-generation persistence read.
+#[derive(Debug, Clone)]
+pub struct KnowledgePersistenceSnapshot {
+    pub facts: Vec<FactRecord>,
+    pub provenance_relations: Vec<ProvenanceRelationRecord>,
+    pub causal_edges: Vec<CausalEdgeRecord>,
+    pub ontology: Vec<OntologyRecord>,
 }
 
 impl Default for KnowledgePersistence {
