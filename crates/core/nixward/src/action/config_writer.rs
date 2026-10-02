@@ -342,6 +342,10 @@ impl ConfigWriter {
 
     /// Apply a patch only when the current file matches the approved digest while
     /// the stable sidecar write lock is held.
+    ///
+    /// The sidecar lock is a cooperating-writer coordination primitive. It prevents
+    /// concurrent ConfigWriter instances from racing through currentness and rename,
+    /// but it cannot make arbitrary external path replacement impossible on Unix.
     pub fn apply_patch_if_current(
         &self,
         patch: &ConfigPatch,
@@ -541,6 +545,25 @@ mod tests {
   networking.firewall.enable = true;
 }
 "#;
+
+    #[cfg(unix)]
+    #[test]
+    fn test_write_lock_uses_stable_sidecar_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("configuration.nix");
+        fs::write(&target, SAMPLE_CONFIG).unwrap();
+        let writer = ConfigWriter::new().with_config_root(dir.path());
+
+        let lock = writer.open_write_lock(&target).unwrap();
+        let lock_path = dir.path().join(".configuration.nix.nixward.lock");
+        assert!(lock_path.is_file());
+        assert!(lock.metadata().unwrap().is_file());
+        assert_ne!(
+            lock_path,
+            target,
+            "coordination lock must not be placed on the replaceable target inode"
+        );
+    }
 
     #[cfg(unix)]
     #[test]
