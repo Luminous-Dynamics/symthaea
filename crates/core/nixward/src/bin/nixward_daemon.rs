@@ -2184,6 +2184,85 @@ fn main() -> ! {
 mod tests {
     use super::*;
 
+    #[test]
+    fn typed_watchdog_approval_is_bound_to_exact_action_intent() {
+        let restart = nixward::action::executor::NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        let enable = nixward::action::executor::NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Enable,
+            unit: "nginx.service".to_string(),
+        };
+
+        let restart_digest = action_intent_digest_for_command(
+            Some("generation:42".to_string()),
+            &restart,
+        )
+        .unwrap()
+        .expect("typed service commands must be governed");
+        let enable_digest = action_intent_digest_for_command(
+            Some("generation:42".to_string()),
+            &enable,
+        )
+        .unwrap()
+        .expect("typed service commands must be governed");
+
+        assert_ne!(restart_digest, enable_digest);
+        assert_eq!(
+            approved_intent_digest(&format!("Approved:{restart_digest}")),
+            Some(restart_digest.as_str())
+        );
+        assert_eq!(approved_intent_digest("Approved"), None);
+        assert_eq!(
+            approved_intent_digest(&format!("Approved:{enable_digest}")),
+            Some(enable_digest.as_str())
+        );
+    }
+
+    #[test]
+    fn typed_watchdog_approval_changes_when_pre_state_changes() {
+        let service = nixward::action::executor::NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        let generation_42 = action_intent_digest_for_command(
+            Some("generation:42".to_string()),
+            &service,
+        )
+        .unwrap()
+        .unwrap();
+        let generation_43 = action_intent_digest_for_command(
+            Some("generation:43".to_string()),
+            &service,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_ne!(generation_42, generation_43);
+        assert_eq!(
+            approved_intent_digest(&format!("Approved:{generation_42}")),
+            Some(generation_42.as_str())
+        );
+        assert_ne!(
+            approved_intent_digest(&format!("Approved:{generation_42}")),
+            Some(generation_43.as_str())
+        );
+    }
+
+    #[test]
+    fn legacy_custom_commands_have_no_v1_digest() {
+        let command = nixward::action::executor::NixOSCommand::Custom {
+            command: "nixos-rebuild".to_string(),
+            args: vec!["switch".to_string()],
+            safety_level: nixward::action::executor::SafetyLevel::SystemModify,
+        };
+        assert_eq!(
+            action_intent_digest_for_command(None, &command).unwrap(),
+            None
+        );
+    }
+
     fn test_config() -> DaemonConfig {
         DaemonConfig {
             enable_knowledge_learning: false,
