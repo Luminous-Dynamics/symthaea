@@ -136,14 +136,10 @@ impl Rfc9942ReceiptEnvelope {
     pub fn signature(&self)->&[u8]{&self.signature}
     pub fn protected_header_bytes(&self)->Vec<u8>{self.protected_bytes.as_deref().map_or_else(||self.protected_header_cbor(),ToOwned::to_owned)}
 
-    /// Build the RFC 9052 `Sig_structure` bytes used by COSE_Sign1
-    /// verification. The signature algorithm itself is intentionally external.
-    /// Verify an Ed25519 COSE signature over this Receipt.
+    /// Verify only the Ed25519 COSE signature over this Receipt.
     ///
-    /// Inclusion verification follows RFC9942's proof-then-signature order;
-    /// consistency verification follows its signature-then-proof order. A
-    /// single result is returned so callers cannot accidentally accept one
-    /// half of a consistency Receipt.
+    /// Proof verification is intentionally separate; the RFC9942-specific
+    /// combined helpers below enforce the required proof/signature ordering.
     #[cfg(feature = "semantic-receipts")]
     pub fn verify_ed25519(
         &self,
@@ -162,6 +158,41 @@ impl Rfc9942ReceiptEnvelope {
         use ed25519_dalek::Verifier;
         verifying_key.verify(&tbs, &signature)
             .map_err(|_| Rfc9942VdpError::InvalidEd25519Signature)
+    }
+
+    /// Verify an RFC9942 inclusion Receipt with Ed25519: proof first, then
+    /// signature, as required by RFC9942.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_ed25519_inclusion(
+        &self,
+        candidate_entry: &[u8],
+        public_key: &[u8; 32],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        let head=match detached_payload {
+            Some(payload)=>self.verify_inclusion_with_detached_payload(candidate_entry,payload)?,
+            None=>self.verify_inclusion(candidate_entry)?,
+        };
+        self.verify_ed25519(public_key,external_aad,detached_payload)?;
+        Ok(head)
+    }
+
+    /// Verify an RFC9942 consistency Receipt with Ed25519: signature first,
+    /// then append-only consistency proof, returning one unified result.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_ed25519_consistency(
+        &self,
+        older: VdsTreeHead,
+        public_key: &[u8; 32],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.verify_ed25519(public_key,external_aad,detached_payload)?;
+        match detached_payload {
+            Some(payload)=>self.verify_consistency_with_detached_payload(older,payload),
+            None=>self.verify_consistency(older),
+        }
     }
 
     pub fn signature1_tbs(
@@ -2039,6 +2070,34 @@ mod tests {
         assert_eq!(decoded.payload(),&Rfc9942SignaturePayload::Attached(b"signed-statement".to_vec()));
         assert_eq!(decoded.signature(),&[0xBB;64]);
         assert_eq!(decoded.to_cbor(),encoded);
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn rfc9942_ed25519_inclusion_verification_enforces_proof_then_signature() {
+        use ed25519_dalek::{Signer, SigningKey};
+        let signing_key=SigningKey::from_bytes(&[9u8;32]);
+        let vds=Rfc9162Sha256Vds;
+        let leaves=vec![b"a".to_vec(),b"b".to_vec()];
+        let head=vds.tree_head(&leaves);
+        let proof=vds.inclusion_proof(&leaves,0).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let unsigned=Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,vdp,Rfc9942ReceiptPayload::Attached(head.root()),Vec::new()
+        ).unwrap();
+        let tbs=unsigned.signature1_tbs(b"",None).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,unsigned.vdp().clone(),unsigned.payload().clone(),
+            signing_key.sign(&tbs).to_bytes().to_vec()
+        ).unwrap();
+        assert_eq!(
+            receipt.verify_ed25519_inclusion(b"a",signing_key.verifying_key().as_bytes(),b"",None).unwrap(),
+            head
+        );
+        assert_eq!(
+            receipt.verify_ed25519_inclusion(b"tampered",signing_key.verifying_key().as_bytes(),b"",None),
+            Err(Rfc9942VdpError::NoMatchingProof)
+        );
     }
 
     #[cfg(feature = "semantic-receipts")]
