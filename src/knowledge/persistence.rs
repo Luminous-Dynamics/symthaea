@@ -1586,7 +1586,7 @@ impl KnowledgePersistence {
         // Backward-compatible migration for databases created before EPF-011.
         // SQLite UNIQUE indexes permit multiple NULLs, so legacy rows without a memory_id
         // remain compatible while stable memory_id becomes the idempotency key for new rows.
-        let columns: Vec<String> = conn
+        let columns: Vec<String> = tx
             .prepare("PRAGMA table_info(knowledge_facts)")
             .map_err(|e| format!("Schema inspect: {e}"))?
             .query_map([], |row| row.get::<_, String>(1))
@@ -1602,7 +1602,7 @@ impl KnowledgePersistence {
 
         // Add snapshot-receipt self-digest support to databases created by the
         // earlier EPF-011 receipt tranche, then deterministically backfill legacy rows.
-        let snapshot_receipt_columns: Vec<String> = conn
+        let snapshot_receipt_columns: Vec<String> = tx
             .prepare("PRAGMA table_info(knowledge_snapshot_receipts)")
             .map_err(|e| format!("Snapshot receipt schema inspect: {e}"))?
             .query_map([], |row| row.get::<_, String>(1))
@@ -1619,7 +1619,7 @@ impl KnowledgePersistence {
         }
 
         let legacy_snapshot_receipts = {
-            let mut stmt = conn
+            let mut stmt = tx
                 .prepare(
                     "SELECT rowid, generation, canonical_digest_hex
                      FROM knowledge_snapshot_receipts
@@ -1660,7 +1660,7 @@ impl KnowledgePersistence {
 
         // Add validation append sequence to databases created before this hardening tranche.
         // Legacy rows are assigned deterministic sequence numbers in existing rowid order.
-        let validation_sequence_columns: Vec<String> = conn
+        let validation_sequence_columns: Vec<String> = tx
             .prepare("PRAGMA table_info(knowledge_snapshot_validation_receipts)")
             .map_err(|e| format!("Validation sequence schema inspect: {e}"))?
             .query_map([], |row| row.get::<_, String>(1))
@@ -1676,7 +1676,7 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Validation schema migration validation_sequence: {e}"))?;
         }
 
-        let starting_sequence = conn
+        let starting_sequence = tx
             .query_row(
                 "SELECT COALESCE(MAX(validation_sequence), 0)
                  FROM knowledge_snapshot_validation_receipts",
@@ -1689,7 +1689,7 @@ impl KnowledgePersistence {
         }
 
         let legacy_validation_sequence_rows = {
-            let mut stmt = conn
+            let mut stmt = tx
                 .prepare(
                     "SELECT rowid
                      FROM knowledge_snapshot_validation_receipts
@@ -1723,7 +1723,7 @@ impl KnowledgePersistence {
 
         // Add validation-receipt self-digest support to databases created by the
         // earlier validation-ledger tranche, then deterministically backfill legacy rows.
-        let validation_columns: Vec<String> = conn
+        let validation_columns: Vec<String> = tx
             .prepare("PRAGMA table_info(knowledge_snapshot_validation_receipts)")
             .map_err(|e| format!("Validation schema inspect: {e}"))?
             .query_map([], |row| row.get::<_, String>(1))
@@ -1740,7 +1740,7 @@ impl KnowledgePersistence {
         }
 
         let legacy_validation_rows = {
-            let mut stmt = conn
+            let mut stmt = tx
                 .prepare(
                     "SELECT rowid, validation_event, generation, snapshot_digest_hex,
                             validator_ref, validator_version, validation_profile,
