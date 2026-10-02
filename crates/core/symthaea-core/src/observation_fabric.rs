@@ -1420,7 +1420,9 @@ impl ObservationGraph {
                     }
                 }
                 for output_id in &activity.output_observation_ids {
-                    let output = by_id.get(output_id.as_str()).expect("checked above");
+                    let output = by_id.get(output_id.as_str()).ok_or_else(|| {
+                        ObservationValidationError::MissingActivityOutput(output_id.clone())
+                    })?;
                     if output
                         .provenance
                         .processing_activity
@@ -2912,6 +2914,32 @@ mod tests {
         assert_eq!(
             graph.validate(),
             Err(ObservationValidationError::ExecutionFingerprintMismatch)
+        );
+    }
+
+    #[test]
+    fn graph_rejects_missing_activity_output_without_panicking() {
+        let mut observation = fixture();
+        observation.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec![],
+            output_observation_ids: vec!["missing-output".into()],
+            derivations: Vec::new(),
+        });
+        assert_eq!(
+            ObservationGraph {
+                observations: vec![observation],
+                relations: vec![],
+            }
+            .validate(),
+            Err(ObservationValidationError::MissingActivityOutput("missing-output".into()))
         );
     }
 
