@@ -90,11 +90,14 @@ pub struct ProviderTerminalEvidence {
     pub evidence_id: String,
     /// Digest of the authenticated provider evidence payload.
     pub evidence_digest: String,
+    pub action_id: String,
     pub action_digest: String,
     pub attempt_id: String,
     pub provider_idempotency_key: String,
     pub target_identity: String,
     pub audience: String,
+    pub adapter: String,
+    pub boundary_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -559,11 +562,14 @@ impl SqliteAuthorizationStore {
         }
         if verified.verifier_id.is_empty() || verified.verification_digest.is_empty()
             || evidence.evidence_id.is_empty() || evidence.evidence_digest.is_empty()
-            || evidence.attempt_id != record.attempt_id
+            || evidence.action_id != record.action_id
             || evidence.action_digest != record.action_digest
+            || evidence.attempt_id != record.attempt_id
             || evidence.provider_idempotency_key != record.provider_idempotency_key
             || evidence.target_identity != record.target_identity
             || evidence.audience != record.audience
+            || evidence.adapter != record.adapter
+            || evidence.boundary_id != record.boundary_id
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
