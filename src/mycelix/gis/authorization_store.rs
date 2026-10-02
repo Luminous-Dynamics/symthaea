@@ -742,14 +742,18 @@ impl SqliteAuthorizationStore {
                     target_identity,audience,adapter,boundary_id,state
              FROM authorization_dispatches WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
-            |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,
-                  r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?,
-                  r.get::<_,String>(6)?,r.get::<_,String>(7)?)),
+            |r| Ok((
+                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
+                r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
+                r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
+                r.get::<_,String>(9)?,
+            )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
-        if row.0 != record.action_id || row.1 != record.action_digest
-            || row.2 != record.provider_idempotency_key || row.3 != record.target_identity
-            || row.4 != record.audience || row.5 != record.adapter || row.6 != record.boundary_id
-            || !matches!(row.7.as_str(), "dispatch_pending" | "invoked" | "indeterminate" | "succeeded" | "failed")
+        if row.0 != record.operation_id || row.1 != record.native_replay_identity
+            || row.2 != record.action_id || row.3 != record.action_digest
+            || row.4 != record.provider_idempotency_key || row.5 != record.target_identity
+            || row.6 != record.audience || row.7 != record.adapter || row.8 != record.boundary_id
+            || !matches!(row.9.as_str(), "dispatch_pending" | "invoked" | "indeterminate" | "succeeded" | "failed")
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
@@ -970,7 +974,8 @@ impl SqliteAuthorizationStore {
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         let row = tx.query_row(
-            "SELECT action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
+            "SELECT operation_id,native_replay_identity,action_id,action_digest,provider_idempotency_key,
+                    target_identity,audience,adapter,boundary_id,state
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance.as_str(), record.attempt_id.as_str()],
@@ -1004,7 +1009,13 @@ impl SqliteAuthorizationStore {
         let mut lease = load_lease(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
         if lease.action_id != record.action_id || lease.action_digest != record.action_digest
-            || lease.provider_idempotency_key() != record.provider_idempotency_key
+            || lease
+                .provider_idempotency_key_for_native_replay(
+                    &record.native_replay_identity,
+                    &record.target_identity,
+                )
+                .map_err(|_| AuthorizationConsumptionError::InvalidBinding)?
+                != record.provider_idempotency_key
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
@@ -1036,12 +1047,14 @@ impl SqliteAuthorizationStore {
               evidence_profile_digest,verification_digest)
              VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
             params![
-                record.authorization_instance, record.attempt_id, record.boundary_id,
-                record.action_digest, record.provider_idempotency_key, record.target_identity,
-                record.audience,
+                record.authorization_instance, record.attempt_id, record.operation_id,
+                record.native_replay_identity, record.boundary_id, record.action_digest,
+                record.provider_idempotency_key, record.target_identity, record.audience,
                 if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 verified.evidence.evidence_id, verified.evidence.evidence_digest,
-                verified.configuration.verifier_id, verified.verification_digest,
+                verified.configuration.verifier_id, verified.configuration.verifier_config_digest,
+                verified.configuration.trust_anchor_digest,
+                verified.configuration.evidence_profile_digest, verified.verification_digest,
             ],
         )?;
         tx.commit()?;
@@ -1698,6 +1711,33 @@ mod tests {
         let _=std::fs::remove_file(path);
     }
 
+    #[test]
+    fn reconciled_receipt_preserves_native_derived_provider_identity() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-reconcile-key-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=action.with_effect_binding(effect.clone());
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"reconcile-key".into(), action_id:action.id.clone(),
+            action_digest:action.canonical_action_digest(), support_digest:witness.support_digest,
+            current_frame:witness.current_frame, policy:witness.policy, authority_epoch:witness.authority_epoch,
+        };
+        store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-reconcile-key","boundary-A").unwrap();
+        let record=store.mark_dispatch_pending_bound(
+            &witness.authorization_instance,"attempt-reconcile-key",&action,&effect,"boundary-A",
+            "operation:reconcile-key","native-grant:reconcile"
+        ).unwrap();
+        store.mark_invoked_bound(&record).unwrap();
+        store.recover_incomplete_attempt_for_boundary("boundary-A","attempt-reconcile-key").unwrap();
+        let receipt=store.reconcile_indeterminate_bound_verified(
+            &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier
+        ).unwrap();
+        assert_eq!(receipt.provider_idempotency_key,record.provider_idempotency_key);
+        let reopened=SqliteAuthorizationStore::open(&path).unwrap();
+        let persisted=reopened.get_receipt(&record.authorization_instance,"attempt-reconcile-key","reconciled").unwrap().unwrap();
+        assert_eq!(persisted.provider_idempotency_key,record.provider_idempotency_key);
+        let _=std::fs::remove_file(path);
+    }
     #[test]
     fn durable_state_survives_reopen_and_blocks_replay() {    #[test]
     fn provider_idempotency_key_is_derived_from_native_replay_identity() {
