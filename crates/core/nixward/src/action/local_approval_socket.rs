@@ -200,7 +200,7 @@ impl LocalApprovalSocketServerV1 {
     /// This preserves the blocking admission implementation while giving a
     /// long-running daemon a safe, explicit polling seam. The listener itself
     /// remains in blocking mode; readiness is checked with poll(2) first.
-    pub fn try_accept_and_consume(
+    // SAFETY: poll receives a valid stack pollfd and inspects one borrowed listener fd; it does not retain either pointer.\n    #[allow(unsafe_code)]\n    pub fn try_accept_and_consume(
         &self,
         store: &LocalApprovalRequestStoreV1,
     ) -> Result<Option<ConsumedLocalApprovalDecisionV1>, LocalApprovalSocketErrorV1> {
