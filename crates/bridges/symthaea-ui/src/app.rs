@@ -212,6 +212,197 @@ impl Movie {
     }
 }
 
+/// SVG numeric tokens are parsed as finite f64 values and kept within a
+/// deliberately conservative magnitude bound. This prevents values such as
+/// enormous exponents from reaching browser SVG/geometry machinery even when
+/// their source string is otherwise character-safe.
+const MAX_PORTRAIT_NUMBER_ABS: f64 = 1_000_000.0;
+const MAX_PORTRAIT_NUMBER_LENGTH: usize = 32;
+const MAX_PORTRAIT_NUMBER_TOKENS: usize = 256;
+const MAX_PORTRAIT_TRANSFORMS: usize = 16;
+
+fn svg_number_is_bounded(token: &str) -> bool {
+    token.len() <= MAX_PORTRAIT_NUMBER_LENGTH
+        && token
+            .parse::<f64>()
+            .map(|value| value.is_finite() && value.abs() <= MAX_PORTRAIT_NUMBER_ABS)
+            .unwrap_or(false)
+}
+
+fn svg_numeric_list_is_bounded(value: &str) -> bool {
+    let mut token = String::new();
+    let mut token_count = 0usize;
+    let mut previous = None;
+
+    let flush = |token: &mut String, token_count: &mut usize| -> bool {
+        if token.is_empty() {
+            return false;
+        }
+        *token_count = token_count.checked_add(1).ok_or(()).unwrap_or(usize::MAX);
+        if *token_count > MAX_PORTRAIT_NUMBER_TOKENS || !svg_number_is_bounded(token) {
+            return false;
+        }
+        token.clear();
+        true
+    };
+
+    for ch in value.chars() {
+        let separator = ch == ',' || ch.is_ascii_whitespace();
+        let sign_starts_number = matches!(ch, '+' | '-')
+            && !token.is_empty()
+            && !matches!(previous, Some('e' | 'E'));
+
+        if separator || sign_starts_number {
+            if !flush(&mut token, &mut token_count) {
+                return false;
+            }
+            previous = Some(ch);
+            continue;
+        }
+
+        token.push(ch);
+        previous = Some(ch);
+    }
+
+    if token.is_empty() {
+        return false;
+    }
+    flush(&mut token, &mut token_count)
+}
+
+fn svg_path_data_is_bounded(value: &str) -> bool {
+    let mut token = String::new();
+    let mut number_count = 0usize;
+    let mut command_count = 0usize;
+    let mut previous = None;
+
+    let flush = |token: &mut String, number_count: &mut usize| -> bool {
+        if token.is_empty() {
+            return true;
+        }
+        *number_count = number_count.checked_add(1).unwrap_or(usize::MAX);
+        if *number_count > MAX_PORTRAIT_NUMBER_TOKENS || !svg_number_is_bounded(token) {
+            return false;
+        }
+        token.clear();
+        true
+    };
+
+    for ch in value.chars() {
+        if matches!(
+            ch,
+            'M' | 'm'
+                | 'L' | 'l'
+                | 'H' | 'h'
+                | 'V' | 'v'
+                | 'C' | 'c'
+                | 'S' | 's'
+                | 'Q' | 'q'
+                | 'T' | 't'
+                | 'A' | 'a'
+                | 'Z' | 'z'
+        ) {
+            if !flush(&mut token, &mut number_count) {
+                return false;
+            }
+            command_count = command_count.checked_add(1).unwrap_or(usize::MAX);
+            if command_count > MAX_PORTRAIT_TRANSFORMS * 16 {
+                return false;
+            }
+            previous = Some(ch);
+            continue;
+        }
+
+        let separator = ch == ',' || ch.is_ascii_whitespace();
+        let sign_starts_number = matches!(ch, '+' | '-')
+            && !token.is_empty()
+            && !matches!(previous, Some('e' | 'E'));
+
+        if separator || sign_starts_number {
+            if !flush(&mut token, &mut number_count) {
+                return false;
+            }
+            previous = Some(ch);
+            continue;
+        }
+
+        if ch == 'e' || ch == 'E' || ch == '.' || ch.is_ascii_digit() {
+            token.push(ch);
+            previous = Some(ch);
+        } else {
+            return false;
+        }
+    }
+
+    flush(&mut token, &mut number_count)
+}
+
+fn svg_transform_is_bounded(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let mut cursor = 0usize;
+    let mut transform_count = 0usize;
+
+    while cursor < bytes.len() {
+        while cursor < bytes.len() && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor == bytes.len() {
+            break;
+        }
+
+        let remaining = &value[cursor..];
+        let (name, arity_min, arity_max) = if remaining.starts_with("translate") {
+            ("translate", 1usize, 2usize)
+        } else if remaining.starts_with("rotate") {
+            ("rotate", 1usize, 3usize)
+        } else if remaining.starts_with("scale") {
+            ("scale", 1usize, 2usize)
+        } else {
+            return false;
+        };
+
+        cursor += name.len();
+        while cursor < bytes.len() && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= bytes.len() || bytes[cursor] != b'(' {
+            return false;
+        }
+        cursor += 1;
+
+        let start = cursor;
+        while cursor < bytes.len() && bytes[cursor] != b')' {
+            if bytes[cursor] == b'(' {
+                return false;
+            }
+            cursor += 1;
+        }
+        if cursor >= bytes.len() {
+            return false;
+        }
+
+        let args = &value[start..cursor];
+        if !svg_numeric_list_is_bounded(args) {
+            return false;
+        }
+        let arg_count = args
+            .split(|ch: char| ch == ',' || ch.is_ascii_whitespace())
+            .filter(|token| !token.is_empty())
+            .count();
+        if arg_count < arity_min || arg_count > arity_max {
+            return false;
+        }
+
+        cursor += 1;
+        transform_count = transform_count.checked_add(1).unwrap_or(usize::MAX);
+        if transform_count > MAX_PORTRAIT_TRANSFORMS {
+            return false;
+        }
+    }
+
+    transform_count > 0
+}
+
 /// Extract the live cognitive self-portrait SVG as an image data URL.
 ///
 /// The gateway payload is remote data. Rendering it through an image element keeps
@@ -459,43 +650,18 @@ fn portrait_from_json(v: &Value) -> Option<String> {
                     }
                 }
                 "transform" => {
-                    if !(value.contains("translate(")
-                        || value.contains("rotate(")
-                        || value.contains("scale("))
-                        || value.matches('(').count() != value.matches(')').count()
-                    {
-                        return None;
-                    }
-                    let mut numeric = value.to_string();
-                    for function_name in ["translate(", "rotate(", "scale("] {
-                        numeric = numeric.replace(function_name, "");
-                    }
-                    if !numeric.chars().all(|c| {
-                        c.is_ascii_digit()
-                            || matches!(c, 'e' | 'E' | '+' | '-' | '.' | ',' | '(' | ')' | ' ')
-                    }) {
+                    if !svg_transform_is_bounded(value) {
                         return None;
                     }
                 }
                 "viewbox" | "width" | "height" | "rx" | "ry" | "cx" | "cy" | "r"
                 | "x" | "y" | "x1" | "y1" | "x2" | "y2" | "stroke-width" | "opacity" => {
-                    if !value.chars().all(|c| {
-                        c.is_ascii_digit()
-                            || matches!(c, 'e' | 'E' | '+' | '-' | '.' | ',' | ' ')
-                    }) {
+                    if !svg_numeric_list_is_bounded(value) {
                         return None;
                     }
                 }
                 "points" | "d" => {
-                    if !value.chars().all(|c| {
-                        c.is_ascii_digit()
-                            || matches!(
-                                c,
-                                'e' | 'E' | '+' | '-' | '.' | ',' | ' ' | 'M' | 'm' | 'L'
-                                    | 'l' | 'H' | 'h' | 'V' | 'v' | 'C' | 'c' | 'S' | 's'
-                                    | 'Q' | 'q' | 'T' | 't' | 'A' | 'a' | 'Z' | 'z'
-                            )
-                    }) {
+                    if !svg_path_data_is_bounded(value) {
                         return None;
                     }
                 }
@@ -1208,6 +1374,39 @@ mod tests {
     fn portrait_accepts_inert_geometric_svg() {
         let payload = serde_json::json!({
             "canvas_svg": r#"<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><g id="root" opacity="0.8" transform="translate(1,2) rotate(3) scale(1)"><circle cx="5" cy="5" r="4" fill="#fff"/></g></svg>"#
+        });
+        assert!(portrait_from_json(&payload).is_some());
+    }
+
+    #[test]
+    fn portrait_rejects_unbounded_numeric_geometry() {
+        for svg in [
+            r#"<svg><circle cx="1e9999" cy="0" r="1"/></svg>"#,
+            r#"<svg><circle cx="1000001" cy="0" r="1"/></svg>"#,
+            r#"<svg><rect x="0" y="0" width="1.2.3" height="1"/></svg>"#,
+            r#"<svg><path d="M0 0 L1e9999 2"/></svg>"#,
+        ] {
+            assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(), "accepted: {svg}");
+        }
+    }
+
+    #[test]
+    fn portrait_rejects_malformed_or_excessive_transform_grammar() {
+        for svg in [
+            r#"<svg><g transform="translate(1 2 3)"/></svg>"#,
+            r#"<svg><g transform="rotate(1 2 3 4)"/></svg>"#,
+            r#"<svg><g transform="scale(1e9999)"/></svg>"#,
+            r#"<svg><g transform="translate(1) rotate(2)"/></svg> trailing"#,
+            r#"<svg><g transform="translate((1))"/></svg>"#,
+        ] {
+            assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(), "accepted: {svg}");
+        }
+    }
+
+    #[test]
+    fn portrait_accepts_bounded_numeric_and_transform_grammar() {
+        let payload = serde_json::json!({
+            "canvas_svg": r#"<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><g transform="translate(1,-2) rotate(3) scale(1,0.5)"><path d="M 0,0 L10-5 z"/></g></svg>"#
         });
         assert!(portrait_from_json(&payload).is_some());
     }
