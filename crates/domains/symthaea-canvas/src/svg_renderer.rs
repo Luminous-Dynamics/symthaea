@@ -87,6 +87,10 @@ fn collect_first_gradient_colors(root: &SceneNode) -> HashMap<&str, Color> {
 
 const MAX_REMOTE_PROJECTION_ELEMENTS: usize = 120;
 
+const MAX_REMOTE_PROJECTION_NESTING: usize = 24;
+const MAX_REMOTE_POLYGON_POINTS: usize = 128;
+const MAX_REMOTE_PATH_DATA_BYTES: usize = 12 * 1024;
+
 fn write_remote_projection_node(
     buf: &mut String,
     node: &SceneNode,
@@ -94,13 +98,20 @@ fn write_remote_projection_node(
     gradient_colors: &HashMap<&str, Color>,
     emitted_elements: &mut usize,
 ) {
-    if *emitted_elements >= MAX_REMOTE_PROJECTION_ELEMENTS {
+    if *emitted_elements >= MAX_REMOTE_PROJECTION_ELEMENTS
+        || depth > MAX_REMOTE_PROJECTION_NESTING
+    {
         return;
     }
     if matches!(
         &node.kind,
         NodeKind::RadialGradient { .. } | NodeKind::Filter { .. } | NodeKind::UseFilter { .. }
     ) {
+        return;
+    }
+    if matches!(&node.kind, NodeKind::Polygon { points, .. } if points.len() > MAX_REMOTE_POLYGON_POINTS)
+        || matches!(&node.kind, NodeKind::Path { d } if d.len() > MAX_REMOTE_PATH_DATA_BYTES)
+    {
         return;
     }
 
@@ -246,6 +257,7 @@ fn write_remote_transform(buf: &mut String, node: &SceneNode) {
     // projection. Keep the canonical SVG grammar produced by Transform while
     // dropping any transform whose raw numeric components exceed that bound.
     const MAX_REMOTE_TRANSFORM_COMPONENT: f32 = 1_000_000.0;
+    const MAX_REMOTE_SCALE_ABS: f32 = 8.0;
     let t = node.transform;
     if !t.translate_x.is_finite()
         || !t.translate_y.is_finite()
@@ -254,7 +266,7 @@ fn write_remote_transform(buf: &mut String, node: &SceneNode) {
         || t.translate_x.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
         || t.translate_y.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
         || t.rotate_deg.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
-        || t.scale.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
+        || t.scale.abs() > MAX_REMOTE_SCALE_ABS
     {
         return;
     }
@@ -605,6 +617,33 @@ mod tests {
         assert!(svg.starts_with("<svg"));
         assert!(svg.contains("viewBox"));
         assert!(svg.ends_with("</svg>\n"));
+    }
+
+    #[test]
+    fn remote_projection_drops_second_order_geometry_amplifiers() {
+        let mut deep = SceneNode::group(None);
+        for _ in 0..40 {
+            deep = deep.with_child(SceneNode::group(None));
+        }
+        let svg = render_svg_for_remote_projection(&deep);
+        assert!(svg.matches("<g").count() <= MAX_REMOTE_PROJECTION_NESTING);
+
+        let huge_polygon = SceneNode::polygon(vec![(0.0, 0.0); 129], true);
+        let svg = render_svg_for_remote_projection(&huge_polygon);
+        assert!(!svg.contains("<polygon"));
+
+        let huge_path = SceneNode::path("M 0 0 ".to_string() + &"L 1 1 ".repeat(4096));
+        let svg = render_svg_for_remote_projection(&huge_path);
+        assert!(!svg.contains("<path"));
+
+        let huge_scale = SceneNode::circle(1.0, 1.0, 1.0).with_transform(Transform {
+            translate_x: 0.0,
+            translate_y: 0.0,
+            rotate_deg: 0.0,
+            scale: 16.0,
+        });
+        let svg = render_svg_for_remote_projection(&huge_scale);
+        assert!(!svg.contains("scale(16.000)"));
     }
 
     #[test]
