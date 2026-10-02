@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-swarm-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+symthaea-swarm = { path = "..", default-features = false, features = ["semantic-receipts"] }
+
+[[bin]]
+name = "fuzz_cose_key_es256"
+path = "fuzz_targets/fuzz_cose_key_es256.rs"
+doc = false
