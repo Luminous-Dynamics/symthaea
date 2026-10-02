@@ -34,7 +34,10 @@ pub const COSE_SIGN1_TAG: u64 = 18;
 pub const COSE_ALG_HEADER_LABEL: i64 = 1;
 /// COSE algorithm identifier -8 is EdDSA. This adapter narrows it to Ed25519
 /// by requiring a 32-byte public key and is therefore not a generic EdDSA verifier.
+pub const COSE_ES256_ALGORITHM_ID: i64 = -7;
 pub const COSE_EDDSA_ALGORITHM_ID: i64 = -8;
+pub const ES256_PUBLIC_KEY_BYTES: usize = 65;
+pub const ES256_SIGNATURE_BYTES: usize = 64;
 
 /// RFC 9942 receipt payload representation after structural parsing.
 ///
@@ -160,6 +163,35 @@ impl Rfc9942ReceiptEnvelope {
             .map_err(|_| Rfc9942VdpError::InvalidEd25519Signature)
     }
 
+    /// Verify only an ES256 COSE signature over this Receipt.
+    ///
+    /// The key adapter accepts an uncompressed SEC1 P-256 public point (65 bytes)
+    /// and the RFC9053 fixed ECDSA signature form (64-byte r||s).
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256(
+        &self,
+        public_key: &[u8],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<(), Rfc9942VdpError> {
+        if self.algorithm_id != COSE_ES256_ALGORITHM_ID {
+            return Err(Rfc9942VdpError::UnsupportedSignatureAlgorithm(self.algorithm_id));
+        }
+        if public_key.len() != ES256_PUBLIC_KEY_BYTES || public_key.first().copied() != Some(0x04) {
+            return Err(Rfc9942VdpError::InvalidEs256PublicKey);
+        }
+        if self.signature.len() != ES256_SIGNATURE_BYTES {
+            return Err(Rfc9942VdpError::InvalidEs256Signature);
+        }
+        let tbs=self.signature1_tbs(external_aad,detached_payload)?;
+        let key=ring::signature::UnparsedPublicKey::new(
+            &ring::signature::ECDSA_P256_SHA256_FIXED,
+            public_key,
+        );
+        key.verify(&tbs,&self.signature)
+            .map_err(|_|Rfc9942VdpError::InvalidEs256Signature)
+    }
+
     /// Verify an RFC9942 inclusion Receipt with Ed25519: proof first, then
     /// signature, as required by RFC9942.
     #[cfg(feature = "semantic-receipts")]
@@ -189,6 +221,41 @@ impl Rfc9942ReceiptEnvelope {
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
         self.verify_ed25519(public_key,external_aad,detached_payload)?;
+        match detached_payload {
+            Some(payload)=>self.verify_consistency_with_detached_payload(older,payload),
+            None=>self.verify_consistency(older),
+        }
+    }
+
+    /// Verify an RFC9942 inclusion Receipt with ES256: proof first, then
+    /// signature.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256_inclusion(
+        &self,
+        candidate_entry: &[u8],
+        public_key: &[u8],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        let head=match detached_payload {
+            Some(payload)=>self.verify_inclusion_with_detached_payload(candidate_entry,payload)?,
+            None=>self.verify_inclusion(candidate_entry)?,
+        };
+        self.verify_es256(public_key,external_aad,detached_payload)?;
+        Ok(head)
+    }
+
+    /// Verify an RFC9942 consistency Receipt with ES256: signature first,
+    /// then consistency proof, with one unified result.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256_consistency(
+        &self,
+        older: VdsTreeHead,
+        public_key: &[u8],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.verify_es256(public_key,external_aad,detached_payload)?;
         match detached_payload {
             Some(payload)=>self.verify_consistency_with_detached_payload(older,payload),
             None=>self.verify_consistency(older),
@@ -416,6 +483,34 @@ impl Rfc9942SignatureWithReceipts {
         }
         reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         algorithm.ok_or(Rfc9942VdpError::InvalidStructure)
+    }
+
+    /// Verify the outer COSE_Sign1 signature with ES256, binding the
+    /// algorithm to the protected `alg=1:-7` value.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256(
+        &self,
+        public_key: &[u8],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<(), Rfc9942VdpError> {
+        let algorithm_id=self.protected_algorithm_id()?;
+        if algorithm_id != COSE_ES256_ALGORITHM_ID {
+            return Err(Rfc9942VdpError::UnsupportedSignatureAlgorithm(algorithm_id));
+        }
+        if public_key.len() != ES256_PUBLIC_KEY_BYTES || public_key.first().copied() != Some(0x04) {
+            return Err(Rfc9942VdpError::InvalidEs256PublicKey);
+        }
+        if self.signature.len() != ES256_SIGNATURE_BYTES {
+            return Err(Rfc9942VdpError::InvalidEs256Signature);
+        }
+        let tbs=self.signature1_tbs(external_aad,detached_payload)?;
+        let key=ring::signature::UnparsedPublicKey::new(
+            &ring::signature::ECDSA_P256_SHA256_FIXED,
+            public_key,
+        );
+        key.verify(&tbs,&self.signature)
+            .map_err(|_|Rfc9942VdpError::InvalidEs256Signature)
     }
 
     /// Verify the outer COSE_Sign1 signature with Ed25519, binding the
@@ -774,6 +869,10 @@ pub enum Rfc9942VdpError {
     InvalidEd25519PublicKey,
     #[error("invalid Ed25519 signature")]
     InvalidEd25519Signature,
+    #[error("invalid ES256 P-256 public key")]
+    InvalidEs256PublicKey,
+    #[error("invalid ES256 signature")]
+    InvalidEs256Signature,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
     VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
@@ -2157,6 +2256,37 @@ mod tests {
         assert_eq!(
             wrong_alg.verify_ed25519(signing_key.verifying_key().as_bytes(),b"",None),
             Err(Rfc9942VdpError::UnsupportedSignatureAlgorithm(-7))
+        );
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn rfc9942_es256_signature_verification_uses_cose_fixed_form() {
+        use ring::{rand::SystemRandom, signature::{EcdsaKeyPair, KeyPair}};
+        let rng=SystemRandom::new();
+        let pkcs8=EcdsaKeyPair::generate_pkcs8(&ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,&rng).unwrap();
+        let keypair=EcdsaKeyPair::from_pkcs8(
+            &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+            pkcs8.as_ref(),
+            &rng,
+        ).unwrap();
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let mut unsigned=Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,vdp,Rfc9942ReceiptPayload::Attached([0x22;32]),Vec::new()
+        ).unwrap();
+        let tbs=unsigned.signature1_tbs(b"",None).unwrap();
+        let signature=keypair.sign(&rng,&tbs).unwrap().as_ref().to_vec();
+        assert_eq!(signature.len(),ES256_SIGNATURE_BYTES);
+        unsigned.signature=signature;
+        assert!(unsigned.verify_es256(keypair.public_key().as_ref(),b"",None).is_ok());
+
+        let mut forged=unsigned.signature().to_vec();
+        forged[0]^=1;
+        unsigned.signature=forged;
+        assert_eq!(
+            unsigned.verify_es256(keypair.public_key().as_ref(),b"",None),
+            Err(Rfc9942VdpError::InvalidEs256Signature)
         );
     }
 
