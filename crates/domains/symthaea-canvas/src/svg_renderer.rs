@@ -3,6 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! SceneNode → self-contained animated SVG string.
 
+use std::collections::HashMap;
 use std::fmt::Write;
 
 use crate::animation::{FrameContext, MotionPreference};
@@ -43,6 +44,271 @@ impl Default for SvgRenderOptions {
 /// Render a SceneNode tree to a self-contained animated SVG string.
 pub fn render_svg(root: &SceneNode, consciousness: f64) -> String {
     render_svg_with_options(root, consciousness, SvgRenderOptions::default())
+}
+/// Render the effect-free SVG subset used for remote cognitive projection.
+///
+/// This renderer is intentionally narrower than render_svg: it emits only
+/// geometry, finite transforms, solid colors, opacity, and stroke width. SVG
+/// filters, gradients, CSS, classes, and resource references are flattened or
+/// omitted so the transport contract never has to interpret them.
+pub fn render_svg_for_remote_projection(root: &SceneNode) -> String {
+    const HEADER: &str =
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">"#;
+    const FOOTER: &str = "</svg>\n";
+    const MAX_REMOTE_PROJECTION_BYTES: usize = 512 * 1024;
+
+    let mut buf = String::with_capacity(2048);
+    let gradient_colors = collect_first_gradient_colors(root);
+    buf.push_str(HEADER);
+    buf.push('\n');
+    let mut emitted_elements = 0usize;
+    write_remote_projection_node(
+        &mut buf,
+        root,
+        1,
+        &gradient_colors,
+        &mut emitted_elements,
+    );
+
+    // The hostile UI boundary caps the complete SVG document at 512 KiB.
+    // Enforce the same transport ceiling here so the trusted producer can
+    // never emit an otherwise-valid projection that the consumer must reject
+    // solely for total size. A blank SVG is a valid, inert degradation and
+    // preserves the exact outer document contract without truncating markup.
+    if buf.len().checked_add(FOOTER.len()).is_none_or(|len| len > MAX_REMOTE_PROJECTION_BYTES) {
+        return format!("{HEADER}\n{FOOTER}");
+    }
+
+    buf.push_str(FOOTER);
+    buf
+}
+
+fn collect_first_gradient_colors(root: &SceneNode) -> HashMap<&str, Color> {
+    fn visit<'a>(node: &'a SceneNode, colors: &mut HashMap<&'a str, Color>) {
+        if let NodeKind::RadialGradient { id, stops } = &node.kind {
+            if let Some(stop) = stops.first() {
+                colors.entry(id.as_str()).or_insert(stop.color);
+            }
+        }
+        for child in &node.children {
+            visit(child, colors);
+        }
+    }
+
+    let mut colors = HashMap::new();
+    visit(root, &mut colors);
+    colors
+}
+
+const MAX_REMOTE_PROJECTION_ELEMENTS: usize = 120;
+
+const MAX_REMOTE_PROJECTION_NESTING: usize = 24;
+const MAX_REMOTE_POLYGON_POINTS: usize = 128;
+const MAX_REMOTE_PATH_DATA_BYTES: usize = 12 * 1024;
+const MAX_REMOTE_NUMERIC_ABS: f32 = 1_000_000.0;
+
+fn write_remote_projection_node(
+    buf: &mut String,
+    node: &SceneNode,
+    depth: usize,
+    gradient_colors: &HashMap<&str, Color>,
+    emitted_elements: &mut usize,
+) {
+    if *emitted_elements >= MAX_REMOTE_PROJECTION_ELEMENTS
+        || depth > MAX_REMOTE_PROJECTION_NESTING
+    {
+        return;
+    }
+    if matches!(
+        &node.kind,
+        NodeKind::RadialGradient { .. } | NodeKind::Filter { .. } | NodeKind::UseFilter { .. }
+    ) {
+        return;
+    }
+    if matches!(&node.kind, NodeKind::Polygon { points, .. } if points.len() > MAX_REMOTE_POLYGON_POINTS)
+        || matches!(&node.kind, NodeKind::Path { d } if d.len() > MAX_REMOTE_PATH_DATA_BYTES)
+    {
+        return;
+    }
+
+    *emitted_elements += 1;
+    let indent = "  ".repeat(depth);
+
+    match &node.kind {
+        NodeKind::Group { .. } => {
+            let _ = write!(buf, "{indent}<g");
+            write_remote_transform(buf, node);
+            write_remote_style_attrs(buf, &node.style, gradient_colors);
+            buf.push_str(">\n");
+            for child in &node.children {
+                write_remote_projection_node(
+                    buf,
+                    child,
+                    depth + 1,
+                    gradient_colors,
+                    emitted_elements,
+                );
+            }
+            let _ = writeln!(buf, "{indent}</g>");
+        }
+        NodeKind::Circle { cx, cy, r } => {
+            let (cx, cy, r) = (
+                remote_finite(*cx, 0.0),
+                remote_finite(*cy, 0.0),
+                remote_nonnegative(*r),
+            );
+            let _ = write!(
+                buf,
+                r#"{indent}<circle cx="{cx:.1}" cy="{cy:.1}" r="{r:.1}""#,
+            );
+            write_remote_transform(buf, node);
+            write_remote_style_attrs(buf, &node.style, gradient_colors);
+            buf.push_str("/>\n");
+        }
+        NodeKind::Ellipse { cx, cy, rx, ry } => {
+            let (cx, cy, rx, ry) = (
+                remote_finite(*cx, 0.0),
+                remote_finite(*cy, 0.0),
+                remote_nonnegative(*rx),
+                remote_nonnegative(*ry),
+            );
+            let _ = write!(
+                buf,
+                r#"{indent}<ellipse cx="{cx:.1}" cy="{cy:.1}" rx="{rx:.1}" ry="{ry:.1}""#,
+            );
+            write_remote_transform(buf, node);
+            write_remote_style_attrs(buf, &node.style, gradient_colors);
+            buf.push_str("/>\n");
+        }
+        NodeKind::Line { x1, y1, x2, y2 } => {
+            let (x1, y1, x2, y2) = (
+                remote_finite(*x1, 0.0),
+                remote_finite(*y1, 0.0),
+                remote_finite(*x2, 0.0),
+                remote_finite(*y2, 0.0),
+            );
+            let _ = write!(
+                buf,
+                r#"{indent}<line x1="{x1:.1}" y1="{y1:.1}" x2="{x2:.1}" y2="{y2:.1}""#,
+            );
+            write_remote_transform(buf, node);
+            write_remote_style_attrs(buf, &node.style, gradient_colors);
+            buf.push_str("/>\n");
+        }
+        NodeKind::Polygon { points, closed } => {
+            let tag = if *closed { "polygon" } else { "polyline" };
+            let _ = write!(buf, "{indent}<{tag} points=\"");
+            for (i, (x, y)) in points.iter().enumerate() {
+                if i > 0 {
+                    buf.push(' ');
+                }
+                let _ = write!(
+                    buf,
+                    "{:.1},{:.1}",
+                    remote_finite(*x, 0.0),
+                    remote_finite(*y, 0.0),
+                );
+            }
+            buf.push('"');
+            write_remote_transform(buf, node);
+            write_remote_style_attrs(buf, &node.style, gradient_colors);
+            buf.push_str("/>\n");
+        }
+        NodeKind::Rect { x, y, w, h, rx } => {
+            let (x, y, w, h, rx) = (
+                remote_finite(*x, 0.0),
+                remote_finite(*y, 0.0),
+                remote_nonnegative(*w),
+                remote_nonnegative(*h),
+                remote_nonnegative(*rx),
+            );
+            let _ = write!(
+                buf,
+                r#"{indent}<rect x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}""#,
+            );
+            if rx > 0.0 {
+                let _ = write!(buf, r#" rx="{rx:.1}""#);
+            }
+            write_remote_transform(buf, node);
+            write_remote_style_attrs(buf, &node.style, gradient_colors);
+            buf.push_str("/>\n");
+        }
+        NodeKind::Path { d } => {
+            let _ = write!(buf, r#"{indent}<path d="{}""#, escape_xml_attr(d));
+            write_remote_transform(buf, node);
+            write_remote_style_attrs(buf, &node.style, gradient_colors);
+            buf.push_str("/>\n");
+        }
+        NodeKind::RadialGradient { .. }
+        | NodeKind::Filter { .. }
+        | NodeKind::UseFilter { .. } => {}
+    }
+}
+
+fn write_remote_style_attrs(
+    buf: &mut String,
+    style: &Style,
+    gradient_colors: &HashMap<&str, Color>,
+) {
+    if let Some(fill) = &style.fill {
+        let _ = write!(buf, r#" fill="{}""#, fill.to_css());
+    } else if let Some(fill_url) = &style.fill_url {
+        if let Some(fill) = gradient_colors.get(fill_url.as_str()) {
+            let _ = write!(buf, r#" fill="{}""#, fill.to_css());
+        } else {
+            let _ = write!(buf, r#" fill="none""#);
+        }
+    }
+    if let Some(stroke) = &style.stroke {
+        let _ = write!(buf, r#" stroke="{}""#, stroke.to_css());
+    }
+    if let Some(sw) = style.stroke_width {
+        let _ = write!(buf, r#" stroke-width="{:.2}""#, remote_nonnegative(sw));
+    }
+    if let Some(opacity) = style.opacity {
+        let _ = write!(buf, r#" opacity="{:.2}""#, unit(opacity));
+    }
+}
+
+fn remote_finite(value: f32, fallback: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(-MAX_REMOTE_NUMERIC_ABS, MAX_REMOTE_NUMERIC_ABS)
+    } else {
+        fallback
+    }
+}
+
+fn remote_nonnegative(value: f32) -> f32 {
+    remote_finite(value, 0.0).max(0.0)
+}
+
+fn write_remote_transform(buf: &mut String, node: &SceneNode) {
+    let transform = node.transform.to_svg();
+    if transform.is_empty() {
+        return;
+    }
+
+    // The remote consumer bounds every transform number to ±1e6. Internal
+    // scenes are trusted, but the remote output contract must still guarantee
+    // that a finite-but-pathological transform does not turn into a rejected
+    // projection. Keep the canonical SVG grammar produced by Transform while
+    // dropping any transform whose raw numeric components exceed that bound.
+    const MAX_REMOTE_TRANSFORM_COMPONENT: f32 = 1_000_000.0;
+    const MAX_REMOTE_SCALE_ABS: f32 = 8.0;
+    let t = node.transform;
+    if !t.translate_x.is_finite()
+        || !t.translate_y.is_finite()
+        || !t.rotate_deg.is_finite()
+        || !t.scale.is_finite()
+        || t.translate_x.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
+        || t.translate_y.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
+        || t.rotate_deg.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
+        || t.scale.abs() > MAX_REMOTE_SCALE_ABS
+    {
+        return;
+    }
+
+    let _ = write!(buf, r#" transform="{}""#, transform);
 }
 
 /// Render with an explicit timeline so replacing the SVG does not restart motion.
@@ -390,6 +656,165 @@ mod tests {
         assert!(svg.ends_with("</svg>\n"));
     }
 
+    #[test]
+    fn remote_projection_drops_second_order_geometry_amplifiers() {
+        let mut deep = SceneNode::group(None);
+        for _ in 0..40 {
+            deep = deep.with_child(SceneNode::group(None));
+        }
+        let svg = render_svg_for_remote_projection(&deep);
+        assert!(svg.matches("<g").count() <= MAX_REMOTE_PROJECTION_NESTING);
+
+        let huge_polygon = SceneNode::polygon(vec![(0.0, 0.0); 129], true);
+        let svg = render_svg_for_remote_projection(&huge_polygon);
+        assert!(!svg.contains("<polygon"));
+
+        let huge_path = SceneNode::path("M 0 0 ".to_string() + &"L 1 1 ".repeat(4096));
+        let svg = render_svg_for_remote_projection(&huge_path);
+        assert!(!svg.contains("<path"));
+
+        let huge_scale = SceneNode::circle(1.0, 1.0, 1.0).with_transform(Transform {
+            translate_x: 0.0,
+            translate_y: 0.0,
+            rotate_deg: 0.0,
+            scale: 16.0,
+        });
+        let svg = render_svg_for_remote_projection(&huge_scale);
+        assert!(!svg.contains("scale(16.000)"));
+    }
+
+    #[test]
+    fn remote_projection_preserves_bounded_transforms() {
+        let root = SceneNode::group(None).with_child(
+            SceneNode::circle(5.0, 5.0, 1.0).with_transform(Transform {
+                translate_x: 12.0,
+                translate_y: -8.0,
+                rotate_deg: 25.0,
+                scale: 1.5,
+            }),
+        );
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert!(svg.contains("transform=\"translate(12.0,-8.0) rotate(25.0) scale(1.500)\""));
+    }
+
+    #[test]
+    fn remote_projection_bounds_pathological_geometry_numbers() {
+        let root = SceneNode::group(None)
+            .with_child(
+                SceneNode::circle(f32::MAX, f32::MIN_POSITIVE, f32::MAX).with_style(Style {
+                    stroke_width: Some(f32::MAX),
+                    ..Style::default()
+                }),
+            )
+            .with_child(SceneNode::line(
+                -f32::MAX,
+                f32::MAX,
+                f32::NEG_INFINITY,
+                f32::INFINITY,
+            ));
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert!(svg.contains(r#"cx="1000000.0""#));
+        assert!(svg.contains(r#"cy="0.0""#) || svg.contains(r#"cy="0.0"#));
+        assert!(svg.contains(r#"r="1000000.0""#));
+        assert!(svg.contains(r#"stroke-width="1000000.00""#));
+        assert!(!svg.contains("NaN"));
+        assert!(!svg.contains("inf"));
+    }
+
+    #[test]
+    fn remote_projection_caps_total_output_bytes() {
+        let path_data = "M 0 0 ".to_string() + &"L 1 1 ".repeat(2_047);
+        assert!(path_data.len() <= MAX_REMOTE_PATH_DATA_BYTES);
+
+        let mut root = SceneNode::group(None);
+        for _ in 0..110 {
+            root.children.push(SceneNode::path(path_data.clone()));
+        }
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert!(svg.len() <= 512 * 1024);
+        assert!(svg.starts_with(r#"<svg xmlns="http://www.w3.org/2000/svg""#));
+        assert!(svg.ends_with("</svg>\n"));
+        assert_eq!(svg.matches("<path").count(), 0, "oversized transport must degrade atomically");
+    }
+
+    #[test]
+    fn remote_projection_caps_emitted_elements() {
+        let mut root = SceneNode::group(None);
+        for i in 0..400 {
+            root.children.push(SceneNode::circle(i as f32, i as f32, 1.0));
+        }
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert_eq!(svg.matches("<circle").count(), 119);
+        assert_eq!(svg.matches("<g").count(), 1);
+        assert!(svg.matches("=").count() <= 1024);
+        assert!(svg.ends_with("</svg>\n"));
+    }
+    #[test]
+    fn remote_projection_is_effect_free_and_flattens_gradients() {
+        let mut root = SceneNode::group(Some("root"));
+        root.children.push(SceneNode {
+            kind: NodeKind::RadialGradient {
+                id: "bg".to_string(),
+                stops: vec![GradientStop {
+                    offset: 0.0,
+                    color: Color::rgb(0.1, 0.2, 0.3),
+                }],
+            },
+            transform: Transform::identity(),
+            style: Style::default(),
+            children: Vec::new(),
+        });
+        root.children.push(
+            SceneNode::rect(0.0, 0.0, 10.0, 10.0).with_style(Style {
+                fill_url: Some("bg".to_string()),
+                filter: Some("turb-filter".to_string()),
+                css_class: Some("animated".to_string()),
+                ..Style::default()
+            }),
+        );
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert!(svg.starts_with(r#"<svg xmlns="http://www.w3.org/2000/svg""#));
+        assert!(svg.contains(r#"fill="#1a334d""#));
+        assert!(!svg.contains("<style"));
+        assert!(!svg.contains("<defs"));
+        assert!(!svg.contains("url("));
+        assert!(!svg.contains("filter="));
+        assert!(!svg.contains("class="));
+        assert!(!svg.contains("turb-filter"));
+    }
+
+    #[test]
+    fn remote_projection_skips_effect_only_nodes() {
+        let root = SceneNode::group(None)
+            .with_child(SceneNode {
+                kind: NodeKind::Filter {
+                    id: "f".into(),
+                    filter_type: FilterType::Blur { std_dev: 5.0 },
+                },
+                transform: Transform::identity(),
+                style: Style::default(),
+                children: vec![],
+            })
+            .with_child(SceneNode {
+                kind: NodeKind::UseFilter {
+                    filter_id: "f".into(),
+                },
+                transform: Transform::identity(),
+                style: Style::default(),
+                children: vec![],
+            })
+            .with_child(SceneNode::circle(5.0, 5.0, 1.0));
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert_eq!(svg.matches("<circle").count(), 1);
+        assert!(!svg.contains("<filter"));
+        assert!(!svg.contains("filter ref"));
+    }
     #[test]
     fn renders_circle() {
         let root = SceneNode::group(None).with_child(SceneNode::circle(100.0, 200.0, 50.0));
