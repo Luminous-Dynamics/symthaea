@@ -104,7 +104,13 @@ pub async fn stream_telemetry(
     mut on_message: impl FnMut(Value),
     on_connected: impl FnOnce(),
 ) -> bool {
-    let mut ws_url = gateway_endpoint(gateway, "v1/ws/live")?;
+    let mut ws_url = match gateway_endpoint(gateway, "v1/ws/live") {
+        Ok(url) => url,
+        Err(e) => {
+            leptos::logging::error!("telemetry gateway rejected: {e}");
+            return false;
+        }
+    };
     if ws_url.starts_with("http://") {
         ws_url.replace_range(..7, "ws://");
     } else if ws_url.starts_with("https://") {
