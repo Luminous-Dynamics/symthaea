@@ -398,15 +398,36 @@ impl Rfc9942SignatureWithReceipts {
         Ok(cose_sign1_signature1_tbs(&self.protected_header_bytes(), external_aad, payload))
     }
 
-    /// Verify the outer COSE_Sign1 signature with Ed25519.
+    /// Return the protected COSE `alg` value. The Ed25519 verifier uses this
+    /// signed value rather than trusting an out-of-band algorithm argument.
+    pub fn protected_algorithm_id(&self) -> Result<i64, Rfc9942VdpError> {
+        let protected=self.protected_header_bytes();
+        let mut reader=CborReader::new(&protected);
+        let len=reader.read_map_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        let mut algorithm=None;
+        for _ in 0..len {
+            let label=reader.read_cose_label().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            if label==Some(COSE_ALG_HEADER_LABEL) {
+                let value=reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                algorithm=Some(value);
+            } else {
+                reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            }
+        }
+        reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        algorithm.ok_or(Rfc9942VdpError::InvalidStructure)
+    }
+
+    /// Verify the outer COSE_Sign1 signature with Ed25519, binding the
+    /// algorithm to protected header `alg=1:-8`.
     #[cfg(feature = "semantic-receipts")]
     pub fn verify_ed25519(
         &self,
-        algorithm_id: i64,
         public_key: &[u8; 32],
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<(), Rfc9942VdpError> {
+        let algorithm_id=self.protected_algorithm_id()?;
         if algorithm_id != COSE_EDDSA_ALGORITHM_ID {
             return Err(Rfc9942VdpError::UnsupportedSignatureAlgorithm(algorithm_id));
         }
@@ -414,10 +435,10 @@ impl Rfc9942SignatureWithReceipts {
             .map_err(|_| Rfc9942VdpError::InvalidEd25519PublicKey)?;
         let tbs = self.signature1_tbs(external_aad, detached_payload)?;
         let signature = ed25519_dalek::Signature::from_slice(self.signature())
-            .map_err(|_| Rfc9942VdpError::InvalidEd25519Signature)?;
+            .map_err(|_|Rfc9942VdpError::InvalidEd25519Signature)?;
         use ed25519_dalek::Verifier;
         verifying_key.verify(&tbs, &signature)
-            .map_err(|_| Rfc9942VdpError::InvalidEd25519Signature)
+            .map_err(|_|Rfc9942VdpError::InvalidEd25519Signature)
     }
 
     pub fn signature(&self) -> &[u8] {
@@ -2097,6 +2118,48 @@ mod tests {
         assert_eq!(
             receipt.verify_ed25519_inclusion(b"tampered",signing_key.verifying_key().as_bytes(),b"",None),
             Err(Rfc9942VdpError::NoMatchingProof)
+        );
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn rfc9942_outer_ed25519_verification_binds_protected_algorithm() {
+        use ed25519_dalek::{Signer, SigningKey};
+        let signing_key=SigningKey::from_bytes(&[13u8;32]);
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,1);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL); cbor_int(&mut protected,COSE_EDDSA_ALGORITHM_ID);
+
+        let mut unsigned_bytes=Vec::new();
+        cbor_tag(&mut unsigned_bytes,COSE_SIGN1_TAG); cbor_array_len(&mut unsigned_bytes,4);
+        cbor_bytes(&mut unsigned_bytes,&protected); cbor_map_len(&mut unsigned_bytes,0);
+        cbor_bytes(&mut unsigned_bytes,b"hello"); cbor_bytes(&mut unsigned_bytes,&[]);
+        let unsigned=Rfc9942SignatureWithReceipts::from_cbor(&unsigned_bytes).unwrap();
+        assert_eq!(unsigned.protected_algorithm_id().unwrap(),COSE_EDDSA_ALGORITHM_ID);
+        let signature=signing_key.sign(&unsigned.signature1_tbs(b"",None).unwrap()).to_bytes().to_vec();
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG); cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected); cbor_map_len(&mut bytes,0);
+        cbor_bytes(&mut bytes,b"hello"); cbor_bytes(&mut bytes,&signature);
+        let signed=Rfc9942SignatureWithReceipts::from_cbor(&bytes).unwrap();
+        assert!(signed.verify_ed25519(signing_key.verifying_key().as_bytes(),b"",None).is_ok());
+
+        let mut wrong_protected=Vec::new();
+        cbor_map_len(&mut wrong_protected,1);
+        cbor_int(&mut wrong_protected,COSE_ALG_HEADER_LABEL); cbor_int(&mut wrong_protected,-7);
+        let mut wrong=Vec::new();
+        cbor_tag(&mut wrong,COSE_SIGN1_TAG); cbor_array_len(&mut wrong,4);
+        cbor_bytes(&mut wrong_protected,&[]);
+        // Preserve the original signed bytes but swap only the protected header.
+        wrong.clear();
+        cbor_tag(&mut wrong,COSE_SIGN1_TAG); cbor_array_len(&mut wrong,4);
+        cbor_bytes(&mut wrong,&wrong_protected); cbor_map_len(&mut wrong,0);
+        cbor_bytes(&mut wrong,b"hello"); cbor_bytes(&mut wrong,&signature);
+        let wrong_alg=Rfc9942SignatureWithReceipts::from_cbor(&wrong).unwrap();
+        assert_eq!(
+            wrong_alg.verify_ed25519(signing_key.verifying_key().as_bytes(),b"",None),
+            Err(Rfc9942VdpError::UnsupportedSignatureAlgorithm(-7))
         );
     }
 
