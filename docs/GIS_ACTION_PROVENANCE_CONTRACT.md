@@ -118,4 +118,19 @@ The intended temporal boundary is therefore:
       ↓ enforcement
     Execution Receipt
 
+A current authorization witness is still not sufficient for replay-resistant execution. The execution boundary now models a separate durable authorization lease:
+
+    Canonical Action + Support + Policy + Authority Epoch
+      ↓
+    Authorization Witness
+      ↓ atomic prepare
+    Authorization Lease
+      ↓ effect / observation
+    Execution Receipt
+
+The lease carries an explicit execution budget and serialized state. Prepared prevents two concurrent attempts from consuming the same reservation; Exhausted prevents a newly issued witness from silently replenishing a consumed canonical action budget; and Indeterminate blocks blind retry when the effect boundary cannot establish whether the effect happened. Reconciliation is an explicit state transition rather than a second authorization. In a distributed deployment, these transitions require a shared durable atomic consumption domain; an in-memory state machine demonstrates the invariant but does not by itself provide cross-process replay protection.
+
+This boundary also keeps execution evidence non-authorizing: an ExecutionReceipt records the action digest, attempt, authority epoch, and observed outcome, but does not contain the support/policy/frame fields required to authorize another execution.
+
+
 This follows the broader evidence/authorization separation seen in recent agent-security work: authorization evidence should be request-specific, and execution evidence should remain a separate record of what actually happened.
