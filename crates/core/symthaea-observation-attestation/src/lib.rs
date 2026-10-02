@@ -266,6 +266,23 @@ impl EvaluationProcedure {
         }
     }
 
+    /// Validate that this evaluation remains consistent with the report that
+    /// materialized it. This catches post-hoc mutation of outcome, subject,
+    /// context identity, execution evidence, or epistemic boundary.
+    pub fn is_consistent_with_report(
+        &self,
+        report: &ReceiptAttestationVerificationReport,
+    ) -> bool {
+        self.evaluation_version == EVIDENCE_EVALUATION_VERSION
+            && self.subject_fingerprint == report.receipt_fingerprint
+            && self.verification_report_fingerprint == report.fingerprint()
+            && self.context_fingerprint == self.context.fingerprint()
+            && self.execution_trace.procedure_fingerprint == report.procedure_fingerprint
+            && self.execution_trace.terminal_outcome() == Some(self.outcome)
+            && self.execution_trace.is_well_formed()
+            && self.boundary.is_well_formed()
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         fn write_string(bytes: &mut Vec<u8>, value: &str) {
             bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
