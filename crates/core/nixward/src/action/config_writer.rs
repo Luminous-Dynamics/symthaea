@@ -292,29 +292,63 @@ impl ConfigWriter {
         Ok(())
     }
 
-    /// Apply a patch only when the currently locked file matches the approved digest.
+    /// Open the stable sidecar lock used to coordinate configuration writes.
     ///
-    /// The target is opened read/write and exclusively locked before its content is
-    /// re-read. This closes the check/read split between approval and the write for
-    /// cooperating writers.
-    pub fn apply_patch_if_current(
-        &self,
-        patch: &ConfigPatch,
-        expected_original_digest: &str,
-    ) -> Result<WriteResult, std::io::Error> {
+    /// The lock must not live on the target inode itself because the actual write
+    /// below is performed with temp-file + rename, which replaces that inode.
+    fn open_write_lock(&self, target: &Path) -> Result<std::fs::File, std::io::Error> {
+        let file_name = target.file_name().and_then(|name| name.to_str()).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "configuration target must have a valid file name",
+            )
+        })?;
+        let lock_path = target.with_file_name(format!(".{file_name}.nixward.lock"));
+
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true).write(true).create(true);
+        #[cfg(unix)]
+        {
+            options.custom_flags(libc::O_NOFOLLOW);
+            options.mode(0o600);
+        }
+        let file = options.open(lock_path)?;
+        if !file.metadata()?.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "configuration lock target is not a regular file",
+            ));
+        }
+        file.lock()?;
+        Ok(file)
+    }
+
+    fn open_target_for_currentness(
+        target: &Path,
+    ) -> Result<std::fs::File, std::io::Error> {
         let mut options = std::fs::OpenOptions::new();
         options.read(true).write(true);
         #[cfg(unix)]
         options.custom_flags(libc::O_NOFOLLOW);
-        let mut file = options.open(&patch.target)?;
+        let file = options.open(target)?;
         if !file.metadata()?.is_file() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "configuration target is not a regular file",
             ));
         }
-        file.lock()?;
+        Ok(file)
+    }
 
+    /// Apply a patch only when the current file matches the approved digest while
+    /// the stable sidecar write lock is held.
+    pub fn apply_patch_if_current(
+        &self,
+        patch: &ConfigPatch,
+        expected_original_digest: &str,
+    ) -> Result<WriteResult, std::io::Error> {
+        let _write_lock = self.open_write_lock(&patch.target)?;
+        let mut file = Self::open_target_for_currentness(&patch.target)?;
         let mut current = String::new();
         file.read_to_string(&mut current)?;
         let current_digest = blake3::hash(current.as_bytes()).to_hex().to_string();
@@ -325,10 +359,19 @@ impl ConfigWriter {
             ));
         }
 
-        self.apply_patch(patch)
+        self.apply_patch_unlocked(patch)
     }
-    /// Apply a patch: create backup, validate, write atomically.
+
+    /// Apply a patch: create backup, validate, and write atomically.
     pub fn apply_patch(&self, patch: &ConfigPatch) -> Result<WriteResult, std::io::Error> {
+        if patch.is_noop() || self.dry_run {
+            return self.apply_patch_unlocked(patch);
+        }
+        let _write_lock = self.open_write_lock(&patch.target)?;
+        self.apply_patch_unlocked(patch)
+    }
+
+    fn apply_patch_unlocked(&self, patch: &ConfigPatch) -> Result<WriteResult, std::io::Error> {
         if patch.is_noop() {
             return Ok(WriteResult {
                 path: patch.target.clone(),
