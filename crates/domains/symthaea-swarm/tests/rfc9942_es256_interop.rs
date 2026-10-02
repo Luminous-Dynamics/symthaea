@@ -68,7 +68,7 @@ fn rfc8392_es256_known_answer_verifies() {
     assert_eq!(
         message.payload(),
         &Rfc9942SignaturePayload::Attached(
-            RFC8392_SIGNED_CWT[30..110].to_vec()
+            RFC8392_SIGNED_CWT[29..109].to_vec()
         )
     );
 
