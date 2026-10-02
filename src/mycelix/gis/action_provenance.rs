@@ -157,6 +157,39 @@ pub enum ExecutionOutcome {
     Indeterminate,
 }
 
+/// Deterministic provenance for the native replay identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeReplayDerivation {
+    pub authority_namespace: String,
+    pub native_authorization_id: String,
+    pub native_replay_identity: String,
+    pub derivation_digest: String,
+}
+
+impl NativeReplayDerivation {
+    pub fn derive(
+        authority_namespace: impl Into<String>,
+        native_authorization_id: impl Into<String>,
+    ) -> Result<Self, AuthorizationConsumptionError> {
+        let authority_namespace=authority_namespace.into();
+        let native_authorization_id=native_authorization_id.into();
+        if authority_namespace.is_empty() || native_authorization_id.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance);
+        }
+        let mut h=Sha256::new();
+        h.update(b"symthaea:gis:native-replay:v1\n");
+        append_len_prefixed(&mut h,authority_namespace.as_bytes());
+        append_len_prefixed(&mut h,native_authorization_id.as_bytes());
+        let native_replay_identity=format!("sha256:{}",hex::encode(h.finalize()));
+        let mut d=Sha256::new();
+        d.update(b"symthaea:gis:native-replay-derivation:v1\n");
+        append_len_prefixed(&mut d,authority_namespace.as_bytes());
+        append_len_prefixed(&mut d,native_authorization_id.as_bytes());
+        append_len_prefixed(&mut d,native_replay_identity.as_bytes());
+        let derivation_digest=format!("sha256:{}",hex::encode(d.finalize()));
+        Ok(Self{authority_namespace,native_authorization_id,native_replay_identity,derivation_digest})
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutionReceipt {
     pub action_id: String,
@@ -181,6 +214,7 @@ pub enum AuthorizationConsumptionError {
     AttemptMismatch,
     /// Another unresolved attempt currently occupies the same effect action key.
     ActionAlreadyInFlight,
+    InvalidNativeReplayProvenance,
     IndeterminateRequiresReconciliation,
     PreDispatchRecoveryNotAllowed,
 }
@@ -1063,6 +1097,15 @@ mod tests {
         );
     }
 
+    #[test]
+    fn native_replay_derivation_is_stable_and_scope_bound() {
+        let a=NativeReplayDerivation::derive("issuer.example","grant-1").unwrap();
+        let b=NativeReplayDerivation::derive("issuer.example","grant-1").unwrap();
+        let c=NativeReplayDerivation::derive("issuer.example","grant-2").unwrap();
+        assert_eq!(a.native_replay_identity,b.native_replay_identity);
+        assert_eq!(a.derivation_digest,b.derivation_digest);
+        assert_ne!(a.native_replay_identity,c.native_replay_identity);
+    }
     #[test]
     fn provider_idempotency_identity_is_stable_across_attempts() {
         let lease = AuthorizationLease::new_with_instance(
