@@ -850,7 +850,7 @@ mod tests {
         assert_eq!(revoked.revoke(), Err(AuthorizationConsumptionError::NotReady));
 
         let mut expired = AuthorizationLease::new(
-            "a-terminal", "sha256:canonical", "sha256:support", "policy-v1", 1, 1,
+            "a-terminal", action_digest.clone(), "sha256:support", "policy-v1", 1, 1,
         );
         expired.expire().unwrap();
         assert_eq!(
@@ -902,7 +902,7 @@ mod tests {
     #[test]
     fn execution_receipt_is_not_an_authorization_witness() {
         let receipt = ExecutionReceipt {
-            action_id: "a-receipt".into(), action_digest: action_digest.clone(),
+            action_id: "a-receipt".into(), action_digest: "sha256:execution-only".into(),
             attempt_id: "attempt-1".into(), authority_epoch: 1, outcome: ExecutionOutcome::Succeeded,
         };
         assert_eq!(receipt.outcome, ExecutionOutcome::Succeeded);
