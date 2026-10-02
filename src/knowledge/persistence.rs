@@ -797,6 +797,7 @@ impl KnowledgePersistence {
             .unchecked_transaction()
             .map_err(|e| format!("Begin latest snapshot receipt verification: {e}"))?;
         verify_snapshot_receipts_in_tx(&tx)?;
+        verify_current_snapshot_matches_latest_receipt_in_tx(&tx)?;
 
         let receipt = tx
             .query_row(
@@ -1040,6 +1041,8 @@ impl KnowledgePersistence {
         let tx = conn
             .unchecked_transaction()
             .map_err(|e| format!("Begin latest validation verification: {e}"))?;
+        verify_snapshot_receipts_in_tx(&tx)?;
+        verify_current_snapshot_matches_latest_receipt_in_tx(&tx)?;
         verify_snapshot_validation_receipts_in_tx(&tx)?;
 
         let mut stmt = tx
@@ -1840,6 +1843,45 @@ fn read_snapshot_from_transaction(
     })
 }
 
+fn verify_current_snapshot_matches_latest_receipt_in_tx(
+    tx: &rusqlite::Transaction<'_>,
+) -> Result<(), String> {
+    let receipt = tx
+        .query_row(
+            "SELECT generation, canonical_digest_hex, receipt_digest_hex
+             FROM knowledge_snapshot_receipts
+             ORDER BY generation DESC
+             LIMIT 1",
+            [],
+            |row| {
+                let generation = row.get::<_, i64>(0)?;
+                Ok(KnowledgeSnapshotReceipt {
+                    generation: u64::try_from(generation).map_err(|_| {
+                        rusqlite::Error::IntegralValueOutOfRange(0, generation)
+                    })?,
+                    canonical_digest_hex: row.get(1)?,
+                    receipt_digest_hex: row.get(2)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|e| format!("Load latest snapshot receipt for state verification: {e}"))?;
+
+    let Some(receipt) = receipt else {
+        return Ok(());
+    };
+
+    let snapshot = read_snapshot_from_transaction(tx)?;
+    let actual_digest = snapshot.canonical_digest_hex();
+    if actual_digest != receipt.canonical_digest_hex {
+        return Err(format!(
+            "Snapshot receipt digest mismatch: generation {} records {}, observed {}",
+            receipt.generation, receipt.canonical_digest_hex, actual_digest
+        ));
+    }
+    Ok(())
+}
+
 fn verify_snapshot_receipts_in_tx(
     tx: &rusqlite::Transaction<'_>,
 ) -> Result<(), String> {
@@ -1889,11 +1931,12 @@ fn verify_snapshot_validation_receipts_in_tx(
 ) -> Result<(), String> {
     let mut stmt = tx
         .prepare(
-            "SELECT validation_event, generation, snapshot_digest_hex, validator_ref,
-                    validator_version, validation_profile, conforms, report_digest_hex,
-                    receipt_digest_hex
-             FROM knowledge_snapshot_validation_receipts
-             ORDER BY rowid ASC",
+            "SELECT v.validation_event, v.generation, v.snapshot_digest_hex, v.validator_ref,
+                    v.validator_version, v.validation_profile, v.conforms, v.report_digest_hex,
+                    v.receipt_digest_hex, r.canonical_digest_hex
+             FROM knowledge_snapshot_validation_receipts v
+             LEFT JOIN knowledge_snapshot_receipts r ON r.generation = v.generation
+             ORDER BY v.rowid ASC",
         )
         .map_err(|e| format!("Prepare validation receipt verification: {e}"))?;
 
@@ -1918,13 +1961,28 @@ fn verify_snapshot_validation_receipts_in_tx(
                     report_digest_hex: row.get(7)?,
                 },
                 row.get::<_, Option<String>>(8)?,
+                row.get::<_, Option<String>>(9)?,
             ))
         })
         .map_err(|e| format!("Query validation receipts for verification: {e}"))?;
 
     for row in rows {
-        let (receipt, stored_digest) =
+        let (receipt, stored_digest, linked_snapshot_digest) =
             row.map_err(|e| format!("Load validation receipt for verification: {e}"))?;
+
+        let Some(linked_snapshot_digest) = linked_snapshot_digest else {
+            return Err(format!(
+                "Snapshot validation receipt references missing snapshot generation: {}",
+                receipt.validation_event
+            ));
+        };
+        if linked_snapshot_digest != receipt.snapshot_digest_hex {
+            return Err(format!(
+                "Snapshot validation receipt snapshot digest mismatch: {}",
+                receipt.validation_event
+            ));
+        }
+
         let Some(stored_digest) = stored_digest else {
             return Err(format!(
                 "Snapshot validation receipt missing self-digest: {}",
