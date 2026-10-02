@@ -15,6 +15,7 @@
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
 use std::path::Path;
+use symthaea_core::hdc::unified_hv::BinaryHV;
 use symthaea_epistemic_types::{ProvenanceRelation, ProvenanceRelationKind};
 
 
@@ -151,6 +152,18 @@ impl KnowledgePersistence {
         if facts.iter().any(|fact| fact.memory_id.trim().is_empty()) {
             return Err("FactRecord memory_id must be non-empty".into());
         }
+        if facts.iter().any(|fact| fact.vector_bytes.len() != BinaryHV::BYTES) {
+            return Err(format!(
+                "FactRecord vector_bytes must be exactly {} bytes",
+                BinaryHV::BYTES
+            ));
+        }
+        if facts.iter().any(|fact| !fact.confidence.is_finite() || !(0.0..=1.0).contains(&fact.confidence)) {
+            return Err("FactRecord confidence must be finite and in [0, 1]".into());
+        }
+        if facts.iter().any(|fact| fact.cycle > i64::MAX as u64) {
+            return Err("FactRecord cycle exceeds SQLite INTEGER range".into());
+        }
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
@@ -180,7 +193,7 @@ impl KnowledgePersistence {
                     fact.source_text,
                     fact.confidence,
                     fact.domain,
-                    i64::try_from(fact.cycle).map_err(|_| rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "fact cycle exceeds SQLite INTEGER range"))))?,
+                    i64::try_from(fact.cycle).expect("fact cycle preflighted for SQLite INTEGER range"),
                     fact.is_causal,
                 ],
             )
@@ -391,6 +404,26 @@ impl KnowledgePersistence {
         if !self.is_configured() {
             return Err("No database path configured".into());
         }
+        if records.iter().any(|record| record.name.trim().is_empty()) {
+            return Err("OntologyRecord name must be non-empty".into());
+        }
+        if records.iter().any(|record| record.vector_bytes.len() != BinaryHV::BYTES) {
+            return Err(format!(
+                "OntologyRecord vector_bytes must be exactly {} bytes",
+                BinaryHV::BYTES
+            ));
+        }
+        if records.iter().any(|record| !record.utility.is_finite()) {
+            return Err("OntologyRecord utility must be finite".into());
+        }
+        if records.iter().any(|record| {
+            record.usage_count > i64::MAX as u64
+                || record.created_at_cycle > i64::MAX as u64
+                || record.last_used_cycle > i64::MAX as u64
+        }) {
+            return Err("OntologyRecord integer field exceeds SQLite INTEGER range".into());
+        }
+
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
@@ -417,10 +450,10 @@ impl KnowledgePersistence {
                 stmt.execute(rusqlite::params![
                     r.name,
                     r.vector_bytes,
-                    i64::try_from(r.usage_count).map_err(|_| rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "ontology usage count exceeds SQLite INTEGER range"))))?,
+                    i64::try_from(r.usage_count).expect("ontology usage count preflighted for SQLite INTEGER range"),
                     r.utility,
-                    i64::try_from(r.created_at_cycle).map_err(|_| rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "ontology creation cycle exceeds SQLite INTEGER range"))))?,
-                    i64::try_from(r.last_used_cycle).map_err(|_| rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "ontology last-used cycle exceeds SQLite INTEGER range"))))?,
+                    i64::try_from(r.created_at_cycle).expect("ontology creation cycle preflighted for SQLite INTEGER range"),
+                    i64::try_from(r.last_used_cycle).expect("ontology last-used cycle preflighted for SQLite INTEGER range"),
                     r.is_a_parent,
                 ])
                 .map_err(|e| format!("Insert ontology: {e}"))?;
@@ -721,6 +754,75 @@ mod tests {
         let mut p = KnowledgePersistence::new(&db_path);
         let err = p.load_ontology().unwrap_err();
         assert!(err.contains("Load ontology row"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_facts_preflight_rejects_malformed_batch() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_save_preflight_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let valid = FactRecord {
+            memory_id: "valid".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; BinaryHV::BYTES],
+            source_text: "valid".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        let invalid = FactRecord {
+            memory_id: "invalid".into(),
+            vector_bytes: vec![0u8; BinaryHV::BYTES - 1],
+            ..valid.clone()
+        };
+
+        let err = p.save_facts(&[valid, invalid]).unwrap_err();
+        assert!(err.contains("vector_bytes"));
+        assert_eq!(p.total_saved(), 0);
+        assert!(!db_path.exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_ontology_preflight_rejects_malformed_batch() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_ontology_save_preflight_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let valid = OntologyRecord {
+            name: "valid".into(),
+            vector_bytes: vec![0u8; BinaryHV::BYTES],
+            usage_count: 1,
+            utility: 0.8,
+            created_at_cycle: 1,
+            last_used_cycle: 1,
+            is_a_parent: None,
+        };
+        let invalid = OntologyRecord {
+            name: "invalid".into(),
+            vector_bytes: vec![0u8; BinaryHV::BYTES + 1],
+            utility: f64::NAN,
+            ..valid.clone()
+        };
+
+        let err = p.save_ontology(&[valid, invalid]).unwrap_err();
+        assert!(err.contains("vector_bytes"));
+        assert_eq!(p.total_saved(), 0);
+        assert!(!db_path.exists());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
