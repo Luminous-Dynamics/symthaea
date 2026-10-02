@@ -256,6 +256,9 @@ fn svg_numeric_list_is_bounded(value: &str) -> bool {
             if !flush(&mut token, &mut token_count) {
                 return false;
             }
+            if sign_starts_number {
+                token.push(ch);
+            }
             previous = Some(ch);
             continue;
         }
@@ -321,6 +324,9 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
         if separator || sign_starts_number {
             if !flush(&mut token, &mut number_count) {
                 return false;
+            }
+            if sign_starts_number {
+                token.push(ch);
             }
             previous = Some(ch);
             continue;
@@ -1404,6 +1410,14 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn portrait_preserves_svg_adjacent_sign_number_syntax() {
+        let payload = serde_json::json!({
+            "canvas_svg": r#"<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M10-5L2.5-3.25z"/></svg>"#
+        });
+        assert!(portrait_from_json(&payload).is_some());
+    }
+
     fn portrait_accepts_bounded_numeric_and_transform_grammar() {
         let payload = serde_json::json!({
             "canvas_svg": r#"<svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><g transform="translate(1,-2) rotate(3) scale(1,0.5)"><path d="M 0,0 L10-5 z"/></g></svg>"#
