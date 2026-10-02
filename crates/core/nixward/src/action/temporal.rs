@@ -269,8 +269,7 @@ mod tests {
 
     #[test]
     fn future_dated_and_expired_are_distinct() {
-        let future =
-            EvidenceTemporalEvaluationV1::evaluate(observed(), UnixMillisV1::new(99_999));
+        let future = EvidenceTemporalEvaluationV1::evaluate(observed(), UnixMillisV1::new(99_999));
         assert_eq!(future.status(), EvidenceTemporalStatusV1::NotYetValid);
         assert!(!future.is_current());
 
@@ -334,10 +333,7 @@ mod tests {
 
     #[test]
     fn historical_current_result_retains_original_evaluation_time() {
-        let result = EvidenceTemporalEvaluationV1::evaluate(
-            observed(),
-            UnixMillisV1::new(150_000),
-        );
+        let result = EvidenceTemporalEvaluationV1::evaluate(observed(), UnixMillisV1::new(150_000));
         assert_eq!(result.status(), EvidenceTemporalStatusV1::Current);
         assert_eq!(result.evaluated_at(), UnixMillisV1::new(150_000));
 
