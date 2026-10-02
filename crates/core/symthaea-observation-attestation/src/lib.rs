@@ -391,50 +391,111 @@ impl Ed25519ReceiptVerifier {
         receipt: &IndependenceVerificationReceipt,
         resolver: &R,
     ) -> ReceiptAttestationVerificationReport {
-        // Reject malformed or irrelevant envelopes before invoking application
-        // resolution. Resolvers may consult databases or remote trust services, so
-        // untrusted input must not trigger that work until cheap local checks pass.
         if envelope.validate().is_err() {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::InvalidEnvelope, VerificationStage::Failed, receipt.fingerprint(), None);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::InvalidEnvelope,
+                VerificationStage::Failed,
+                receipt.fingerprint(),
+                None,
+            );
         }
         if !envelope.verify_against_receipt(receipt) {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
+                VerificationStage::Failed,
+                receipt.fingerprint(),
+                None,
+            );
         }
         match envelope.temporal_status_at(self.now_unix_ns) {
-            ReceiptAttestationTemporalStatus::NotYetValid =>
-                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::NotYetValid, VerificationStage::Failed, receipt.fingerprint(), Some(verification_method.to_string())),
-            ReceiptAttestationTemporalStatus::Expired =>
-                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::Expired, VerificationStage::Failed),
+            ReceiptAttestationTemporalStatus::NotYetValid => {
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::NotYetValid,
+                    VerificationStage::Failed,
+                    receipt.fingerprint(),
+                    None,
+                );
+            }
+            ReceiptAttestationTemporalStatus::Expired => {
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::Expired,
+                    VerificationStage::Failed,
+                    receipt.fingerprint(),
+                    None,
+                );
+            }
             ReceiptAttestationTemporalStatus::Valid => {}
         }
         if envelope.cryptosuite.as_deref() != Some(CRYPTOSUITE) {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
+                VerificationStage::Failed,
+                receipt.fingerprint(),
+                None,
+            );
         }
 
         let Some(method) = envelope.verification_method.as_deref() else {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+                VerificationStage::Failed,
+                receipt.fingerprint(),
+                None,
+            );
         };
         let resolved = match resolver.resolve(method) {
             Ok(resolved) => resolved,
-            Err(_) => return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable, VerificationStage::Failed),
+            Err(_) => {
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+                    VerificationStage::Failed,
+                    receipt.fingerprint(),
+                    Some(method.to_string()),
+                );
+            }
         };
         if resolved.verification_method != method {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+                VerificationStage::Failed,
+                receipt.fingerprint(),
+                Some(method.to_string()),
+            );
         }
         match resolved.status {
             VerificationMethodStatus::Active => {}
             VerificationMethodStatus::Revoked => {
-                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::VerificationMethodRevoked, VerificationStage::Failed);
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
+                    VerificationStage::Failed,
+                    receipt.fingerprint(),
+                    Some(method.to_string()),
+                );
             }
             VerificationMethodStatus::Expired => {
-                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::VerificationMethodExpired, VerificationStage::Failed);
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
+                    VerificationStage::Failed,
+                    receipt.fingerprint(),
+                    Some(method.to_string()),
+                );
             }
             VerificationMethodStatus::Unknown => {
-                return ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable;
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+                    VerificationStage::Failed,
+                    receipt.fingerprint(),
+                    Some(method.to_string()),
+                );
             }
         }
         if !resolved.is_authorized_for(&envelope.proof_purpose) {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
+                VerificationStage::Failed,
+                receipt.fingerprint(),
+                Some(method.to_string()),
+            );
         }
         self.verify_with_resolved_key_report(envelope, receipt, method, &resolved.verifying_key)
     }
@@ -458,54 +519,119 @@ impl Ed25519ReceiptVerifier {
         verification_method: &str,
         verifying_key: &VerifyingKey,
     ) -> ReceiptAttestationVerificationReport {
+        let method = Some(verification_method.to_string());
+        let fingerprint = receipt.fingerprint();
+
         if envelope.validate().is_err() {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::InvalidEnvelope, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::InvalidEnvelope,
+                VerificationStage::Failed,
+                fingerprint,
+                method,
+            );
         }
         if !envelope.verify_against_receipt(receipt) {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
+                VerificationStage::Failed,
+                fingerprint,
+                method,
+            );
         }
 
         match envelope.temporal_status_at(self.now_unix_ns) {
-            ReceiptAttestationTemporalStatus::NotYetValid =>
-                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::NotYetValid, VerificationStage::Failed),
-            ReceiptAttestationTemporalStatus::Expired =>
-                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::Expired, VerificationStage::Failed),
+            ReceiptAttestationTemporalStatus::NotYetValid => {
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::NotYetValid,
+                    VerificationStage::Failed,
+                    fingerprint,
+                    method,
+                );
+            }
+            ReceiptAttestationTemporalStatus::Expired => {
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::Expired,
+                    VerificationStage::Failed,
+                    fingerprint,
+                    method,
+                );
+            }
             ReceiptAttestationTemporalStatus::Valid => {}
         }
 
         if envelope.cryptosuite.as_deref() != Some(CRYPTOSUITE) {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
+                VerificationStage::Failed,
+                fingerprint,
+                method,
+            );
         }
         if envelope.verification_method.as_deref() != Some(verification_method) {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::VerificationMethodMismatch, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::VerificationMethodMismatch,
+                VerificationStage::Failed,
+                fingerprint,
+                method,
+            );
         }
         if let Some(expected) = &self.expected_proof_purpose {
             if envelope.proof_purpose != *expected {
-                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::ProofPurposeMismatch, VerificationStage::Failed);
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::ProofPurposeMismatch,
+                    VerificationStage::Failed,
+                    fingerprint,
+                    method,
+                );
             }
         }
         if let Some(expected) = &self.expected_domain {
             if envelope.domain.as_deref() != Some(expected.as_str()) {
-                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::DomainMismatch, VerificationStage::Failed);
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::DomainMismatch,
+                    VerificationStage::Failed,
+                    fingerprint,
+                    method,
+                );
             }
         }
         if let Some(expected) = &self.expected_challenge {
             if envelope.challenge.as_deref() != Some(expected.as_str()) {
-                return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::ChallengeMismatch, VerificationStage::Failed);
+                return ReceiptAttestationVerificationReport::failed(
+                    ReceiptAttestationVerificationOutcome::ChallengeMismatch,
+                    VerificationStage::Failed,
+                    fingerprint,
+                    method,
+                );
             }
         }
 
         let Some(proof) = envelope.proof.as_deref() else {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::MissingProof, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::MissingProof,
+                VerificationStage::Failed,
+                fingerprint,
+                method,
+            );
         };
         let Ok(proof_bytes) = <[u8; 64]>::try_from(proof) else {
-            return ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::InvalidProofEncoding, VerificationStage::Failed);
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::InvalidProofEncoding,
+                VerificationStage::Failed,
+                fingerprint,
+                method,
+            );
         };
         let signature = Signature::from_bytes(&proof_bytes);
 
         match verifying_key.verify(&envelope.canonical_payload_bytes(), &signature) {
-            Ok(()) => ReceiptAttestationVerificationReport::passed(receipt.fingerprint(), Some(verification_method.to_string())),
-            Err(_) => ReceiptAttestationVerificationReport::failed(ReceiptAttestationVerificationOutcome::InvalidSignature, VerificationStage::Failed),
+            Ok(()) => ReceiptAttestationVerificationReport::passed(fingerprint, method),
+            Err(_) => ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::InvalidSignature,
+                VerificationStage::Failed,
+                fingerprint,
+                method,
+            ),
         }
     }
 }
