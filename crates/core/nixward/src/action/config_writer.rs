@@ -297,12 +297,15 @@ impl ConfigWriter {
     /// The lock must not live on the target inode itself because the actual write
     /// below is performed with temp-file + rename, which replaces that inode.
     fn open_write_lock(&self, target: &Path) -> Result<std::fs::File, std::io::Error> {
-        let file_name = target.file_name().and_then(|name| name.to_str()).ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "configuration target must have a valid file name",
-            )
-        })?;
+        let file_name = target
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "configuration target must have a valid file name",
+                )
+            })?;
         let lock_path = target.with_file_name(format!(".{file_name}.nixward.lock"));
 
         let mut options = std::fs::OpenOptions::new();
@@ -323,9 +326,7 @@ impl ConfigWriter {
         Ok(file)
     }
 
-    fn open_target_for_currentness(
-        target: &Path,
-    ) -> Result<std::fs::File, std::io::Error> {
+    fn open_target_for_currentness(target: &Path) -> Result<std::fs::File, std::io::Error> {
         let mut options = std::fs::OpenOptions::new();
         options.read(true).write(true);
         #[cfg(unix)]
@@ -559,8 +560,7 @@ mod tests {
         assert!(lock_path.is_file());
         assert!(lock.metadata().unwrap().is_file());
         assert_ne!(
-            lock_path,
-            target,
+            lock_path, target,
             "coordination lock must not be placed on the replaceable target inode"
         );
     }
@@ -754,7 +754,10 @@ mod tests {
         let patch = writer.set_option("services.nginx.enable", "true").unwrap();
         fs::write(
             dir.path().join("configuration.nix"),
-            SAMPLE_CONFIG.replace("services.openssh.enable = true;", "services.openssh.enable = false;"),
+            SAMPLE_CONFIG.replace(
+                "services.openssh.enable = true;",
+                "services.openssh.enable = false;",
+            ),
         )
         .unwrap();
         let expected = blake3::hash(patch.original.as_bytes()).to_hex().to_string();
