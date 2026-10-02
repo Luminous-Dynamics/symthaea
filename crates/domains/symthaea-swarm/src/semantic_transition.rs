@@ -242,6 +242,129 @@ pub fn transition_claim_commitment(
     }
 }
 
+/// Version of the self-contained replay evidence envelope.
+pub const EVIDENCE_VERSION: u16 = 1;
+
+/// Self-contained semantic transition evidence.
+///
+/// This bundle is deliberately unsigned. It establishes deterministic
+/// semantic validity, while authentication, authorization, and
+/// non-repudiation remain separate layers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransitionEvidence {
+    pub version: u16,
+    pub kind: TransitionKind,
+    pub before_digest: crate::semantic_digest::SemanticDigest,
+    pub after_digest: crate::semantic_digest::SemanticDigest,
+    pub transition_commitment: TransitionCommitment,
+    pub claim_commitment: TransitionClaimCommitment,
+    pub claim: TransitionClaim,
+}
+
+impl TransitionEvidence {
+    pub fn kind(&self) -> TransitionKind {
+        self.kind
+    }
+}
+
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum TransitionEvidenceError {
+    #[error("unsupported transition evidence version: {0}")]
+    UnsupportedVersion(u16),
+    #[error("evidence kind does not match typed claim")]
+    KindMismatch,
+    #[error("before-state digest does not match evidence")]
+    BeforeDigestMismatch,
+    #[error("after-state digest does not match evidence")]
+    AfterDigestMismatch,
+    #[error("transition verification failed: {0}")]
+    Verification(#[from] TransitionVerificationError),
+    #[error("transition commitment could not be reconstructed: {0}")]
+    Commitment(#[from] TransitionCommitmentError),
+    #[error("semantic state digest could not be reconstructed: {0}")]
+    Digest(#[from] SemanticDigestError),
+}
+
+/// Build replayable evidence from a semantic state edge and its complete
+/// typed operation claim.
+pub fn build_transition_evidence(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    claim: TransitionClaim,
+) -> Result<TransitionEvidence, TransitionEvidenceError> {
+    let kind = match &claim {
+        TransitionClaim::Admission { .. } => TransitionKind::Admission,
+        TransitionClaim::Replay { .. } => TransitionKind::Replay,
+        TransitionClaim::LifecycleRetirement { .. } => TransitionKind::LifecycleRetirement,
+    };
+    let before_digest = semantic_digest(before)?;
+    let after_digest = semantic_digest(after)?;
+    let transition_commitment = transition_commitment(before, after, kind)?;
+    let claim_commitment = transition_claim_commitment(before, after, &claim)?;
+
+    Ok(TransitionEvidence {
+        version: EVIDENCE_VERSION,
+        kind,
+        before_digest,
+        after_digest,
+        transition_commitment,
+        claim_commitment,
+        claim,
+    })
+}
+
+/// Verify a complete evidence envelope against the actual semantic state edge.
+///
+/// Verification checks the envelope version/kind and state digests, then
+/// replays the operation-specific pure oracle and verifies both commitments.
+pub fn verify_transition_evidence(
+    before: &SemanticAdmissionState,
+    after: &SemanticAdmissionState,
+    evidence: &TransitionEvidence,
+) -> Result<(), TransitionEvidenceError> {
+    if evidence.version != EVIDENCE_VERSION {
+        return Err(TransitionEvidenceError::UnsupportedVersion(evidence.version));
+    }
+
+    let expected_kind = match &evidence.claim {
+        TransitionClaim::Admission { .. } => TransitionKind::Admission,
+        TransitionClaim::Replay { .. } => TransitionKind::Replay,
+        TransitionClaim::LifecycleRetirement { .. } => TransitionKind::LifecycleRetirement,
+    };
+    if evidence.kind != expected_kind {
+        return Err(TransitionEvidenceError::KindMismatch);
+    }
+
+    if semantic_digest(before)? != evidence.before_digest {
+        return Err(TransitionEvidenceError::BeforeDigestMismatch);
+    }
+    if semantic_digest(after)? != evidence.after_digest {
+        return Err(TransitionEvidenceError::AfterDigestMismatch);
+    }
+
+    match &evidence.claim {
+        TransitionClaim::Admission {
+            delivery, observation, policy, now_ms, result,
+        } => verify_admission_transition_claim(
+            before, after, delivery, observation, *policy, *now_ms, result,
+            &evidence.transition_commitment, &evidence.claim_commitment,
+        )?,
+        TransitionClaim::Replay {
+            delivery, observation, policy, now_ms, result,
+        } => verify_replay_transition_claim(
+            before, after, delivery, observation, *policy, *now_ms, result,
+            &evidence.transition_commitment, &evidence.claim_commitment,
+        )?,
+        TransitionClaim::LifecycleRetirement { policy, now_ms } =>
+            verify_lifecycle_retirement_claim(
+                before, after, *policy, *now_ms,
+                &evidence.transition_commitment, &evidence.claim_commitment,
+            )?,
+    }
+
+    Ok(())
+}
+
 /// Failure returned when a claimed transition cannot be reconstructed from the
 /// semantic transition oracle and its committed state edge.
 ///
@@ -268,6 +391,8 @@ pub enum TransitionVerificationError {
     ResultMismatch,
     #[error("claimed transition commitment does not match the reconstructed transition")]
     CommitmentMismatch,
+    #[error("claimed operation claim commitment does not match the reconstructed claim")]
+    ClaimCommitmentMismatch,
     #[error("transition commitment could not be reconstructed: {0}")]
     Commitment(#[from] TransitionCommitmentError),
 }
@@ -520,6 +645,100 @@ mod tests {
         assert_ne!(
             transition_claim_commitment(&before, &after, &admission).unwrap(),
             transition_claim_commitment(&before, &after, &replay).unwrap(),
+        );
+    }
+
+    #[test]
+    fn admission_evidence_round_trips_through_verifier() {
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let result = match decide(&before, &delivery, &observation, policy, 10) {
+            AdmissionOutcome::Admitted { result, .. } => result,
+            other => panic!("fixture admission failed: {other:?}"),
+        };
+        let evidence = build_transition_evidence(
+            &before,
+            &after,
+            TransitionClaim::Admission {
+                delivery,
+                observation,
+                policy,
+                now_ms: 10,
+                result,
+            },
+        ).unwrap();
+
+        assert_eq!(evidence.version, EVIDENCE_VERSION);
+        assert_eq!(evidence.kind(), TransitionKind::Admission);
+        assert_eq!(verify_transition_evidence(&before, &after, &evidence), Ok(()));
+    }
+
+    #[test]
+    fn evidence_rejects_tampered_state_digest() {
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let result = match decide(&before, &delivery, &observation, policy, 10) {
+            AdmissionOutcome::Admitted { result, .. } => result,
+            other => panic!("fixture admission failed: {other:?}"),
+        };
+        let mut evidence = build_transition_evidence(
+            &before,
+            &after,
+            TransitionClaim::Admission {
+                delivery,
+                observation,
+                policy,
+                now_ms: 10,
+                result,
+            },
+        ).unwrap();
+
+        evidence.before_digest = evidence.after_digest;
+        assert_eq!(
+            verify_transition_evidence(&before, &after, &evidence),
+            Err(TransitionEvidenceError::BeforeDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn evidence_rejects_mismatched_claim_kind() {
+        let (before, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let result = crate::semantic_admission::SemanticResult {
+            logical_delivery_id: delivery.logical_delivery_id,
+            observation: observation.key.clone(),
+        };
+        let mut evidence = build_transition_evidence(
+            &before,
+            &after,
+            TransitionClaim::Admission {
+                delivery,
+                observation,
+                policy,
+                now_ms: 10,
+                result,
+            },
+        ).unwrap();
+
+        evidence.kind = TransitionKind::Replay;
+        assert_eq!(
+            verify_transition_evidence(&before, &after, &evidence),
+            Err(TransitionEvidenceError::KindMismatch)
         );
     }
 
