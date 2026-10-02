@@ -45,8 +45,6 @@ pub enum ReceiptAttestationVerificationOutcome {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationStage {
     Passed,
     Failed(ReceiptAttestationVerificationOutcome),
@@ -180,6 +178,7 @@ impl ReceiptAttestationVerificationReport {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationMethodStatus {
     Active,
     Revoked,
