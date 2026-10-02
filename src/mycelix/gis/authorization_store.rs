@@ -857,6 +857,14 @@ mod tests {
         assert!(matches!(store.mark_invoked_bound(&tampered),Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))));
         store.mark_invoked_bound(&record).unwrap();
         assert!(store.mark_invoked_bound(&record).is_err());
+        let mut wrong_key=record.clone();
+        wrong_key.provider_idempotency_key.push_str("-tampered");
+        assert!(matches!(
+            store.commit_bound(&wrong_key,ExecutionOutcome::Succeeded),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+        let receipt=store.commit_bound(&record,ExecutionOutcome::Succeeded).unwrap();
+        assert_eq!(receipt.provider_idempotency_key,record.provider_idempotency_key);
         let _=std::fs::remove_file(path);
     }
 
