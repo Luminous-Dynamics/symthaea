@@ -856,6 +856,7 @@ struct LiveTelemetry {
     #[serde(skip_serializing_if = "Option::is_none")]
     canvas_svg: Option<String>,
     /// Typed renderer-neutral cognitive scene; additive beside legacy SVG.
+    #[cfg(feature = "canvas")]
     #[serde(skip_serializing_if = "Option::is_none")]
     canvas_scene: Option<symthaea_canvas::RemoteScene>,
     /// Geodesic mental-simulation frames, when imagination fired this turn.
@@ -899,6 +900,8 @@ impl LiveTelemetry {
         let canvas_svg = cycle.canvas_svg.clone();
         #[cfg(feature = "canvas")]
         let canvas_scene = cycle.canvas_scene.clone();
+        #[cfg(feature = "canvas")]
+        let canvas_scene = cycle.canvas_scene.clone();
         #[cfg(not(feature = "canvas"))]
         let canvas_svg = None;
         #[cfg(not(feature = "canvas"))]
@@ -907,6 +910,7 @@ impl LiveTelemetry {
         Self {
             metadata: cycle.metadata.clone(),
             canvas_svg,
+            #[cfg(feature = "canvas")]
             canvas_scene,
             mental_movie,
         }
