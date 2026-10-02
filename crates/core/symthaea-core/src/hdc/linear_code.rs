@@ -4,8 +4,9 @@
 
 //! Research-only GF(2) kernel for the linear-code HDC recovery comparator.
 //!
-//! This module intentionally stops at the algebraic substrate. It does not
-//! claim to implement Raviv's recovery algorithm yet.
+//! This module implements the algebraic representation and recovery path only.
+//! It is not integrated into the production HDC defaults and does not claim
+//! production-grade decoding or noise correction.
 
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
