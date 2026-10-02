@@ -697,9 +697,19 @@ impl EnhancedKnowledgeGraph {
             activated.insert(seed.fact_id, seed.similarity);
         }
 
+        // HashMap iteration is intentionally arbitrary in Rust. Do not let the
+        // discovery order decide which parent first activates a node: different
+        // parents can yield different activation values. Instead, collect every
+        // candidate at a hop and retain the strongest activation for each node.
+        // This makes the traversal path-independent and reproducible.
+        let mut facts: Vec<&TemporalFact> = self.facts.values().collect();
+        facts.sort_by_key(|fact| fact.id);
+
         for hop in 0..hops {
             let hop_decay = decay_factor.powi(hop as i32 + 1);
-            let mut next_frontier = Vec::new();
+            let mut candidates: HashMap<FactId, f32> = HashMap::new();
+
+            frontier_ids.sort_unstable();
 
             for &fid in &frontier_ids {
                 let query_vec = match self.facts.get(&fid) {
@@ -707,28 +717,36 @@ impl EnhancedKnowledgeGraph {
                     None => continue,
                 };
 
-                // Find similar facts
-                for fact in self.facts.values() {
+                for fact in &facts {
                     if activated.contains_key(&fact.id) {
                         continue;
                     }
                     let sim = fact.encoding.vector.similarity(&query_vec);
                     if sim > 0.1 {
                         let decayed_sim = sim * hop_decay;
-                        activated.insert(fact.id, decayed_sim);
-                        next_frontier.push(fact.id);
+                        candidates
+                            .entry(fact.id)
+                            .and_modify(|existing| *existing = existing.max(decayed_sim))
+                            .or_insert(decayed_sim);
                     }
                 }
             }
 
-            frontier_ids = next_frontier;
-            if frontier_ids.is_empty() {
+            if candidates.is_empty() {
                 break;
+            }
+
+            frontier_ids = candidates.keys().copied().collect();
+            frontier_ids.sort_unstable();
+
+            for (id, activation) in candidates {
+                activated.insert(id, activation);
             }
         }
 
         // Remove seeds from results (caller already has them)
-        let seed_ids: std::collections::HashSet<FactId> = seeds.iter().map(|s| s.fact_id).collect();
+        let seed_ids: std::collections::HashSet<FactId> =
+            seeds.iter().map(|s| s.fact_id).collect();
 
         let mut results: Vec<FactSearchResult> = activated
             .into_iter()
