@@ -626,6 +626,17 @@ pub struct ReceiptAttestationVerificationReport {
 }
 
 impl ReceiptAttestationVerificationReport {
+    /// Check that stored identity fingerprints still commit to their semantic inputs.
+    ///
+    /// Reports are serializable public data, so callers must not assume these
+    /// redundant fields remain mutually consistent after deserialization.
+    pub fn has_consistent_identity_bindings(&self) -> bool {
+        (self.verifier_version == VERIFIER_VERSION
+            || self.verifier_version == LEGACY_REPORT_VERIFIER_VERSION)
+            && self.policy_fingerprint == self.policy_inputs.fingerprint()
+            && self.environment_fingerprint == self.environment_identity.fingerprint()
+    }
+
     fn failed(
         outcome: ReceiptAttestationVerificationOutcome,
         failed_check: EvaluationCheck,
@@ -1220,7 +1231,8 @@ impl EvidenceEvaluation {
         &self,
         report: &ReceiptAttestationVerificationReport,
     ) -> bool {
-        self.evaluation_version == EVIDENCE_EVALUATION_VERSION
+        report.has_consistent_identity_bindings()
+            && self.evaluation_version == EVIDENCE_EVALUATION_VERSION
             && self.subject_fingerprint == report.receipt_fingerprint
             && self.verification_report_fingerprint == report.fingerprint()
             && self.context_fingerprint == self.context.fingerprint()
@@ -2167,6 +2179,28 @@ mod tests {
         assert_eq!(report.environment_identity.build_fingerprint, "build-sha-abc");
         assert_eq!(report.policy_fingerprint, report.policy_inputs.fingerprint());
         assert_eq!(report.environment_fingerprint, report.environment_identity.fingerprint());
+    }
+
+    #[test]
+    fn evidence_evaluation_rejects_mutated_policy_or_environment_inputs() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+        assert!(evaluation.is_consistent_with_report(&report));
+
+        let mut changed_policy = report.clone();
+        changed_policy.policy_inputs.expected_domain = Some("attacker-domain".into());
+        assert!(!evaluation.is_consistent_with_report(&changed_policy));
+
+        let mut changed_environment = report.clone();
+        changed_environment.environment_identity.build_fingerprint =
+            "different-build".into();
+        assert!(!evaluation.is_consistent_with_report(&changed_environment));
     }
 
     #[test]
