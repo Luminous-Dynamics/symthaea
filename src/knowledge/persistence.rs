@@ -216,7 +216,7 @@ impl KnowledgePersistence {
         let mut stmt = conn
             .prepare(
                 "SELECT id, memory_id, canonical_identity, provenance_family, vector_blob, source_text, confidence, domain, cycle, is_causal
-                 FROM knowledge_facts ORDER BY cycle DESC",
+                 FROM knowledge_facts ORDER BY cycle DESC, memory_id ASC, id ASC",
             )
             .map_err(|e| e.to_string())?;
 
@@ -808,6 +808,51 @@ mod tests {
         assert_eq!(loaded[1].source_text, "Test fact one");
 
         // Cleanup
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_facts_total_orders_equal_cycles_by_memory_identity() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_equal_cycle_fact_order_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let facts = vec![
+            FactRecord {
+                memory_id: "memory-z".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: "later lexical identity".into(),
+                confidence: 0.7,
+                domain: None,
+                cycle: 9,
+                is_causal: false,
+            },
+            FactRecord {
+                memory_id: "memory-a".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![1u8; 2048],
+                source_text: "earlier lexical identity".into(),
+                confidence: 0.8,
+                domain: None,
+                cycle: 9,
+                is_causal: false,
+            },
+        ];
+
+        assert_eq!(p.save_facts(&facts).unwrap(), 2);
+        let loaded = p.load_facts().unwrap();
+        assert_eq!(
+            loaded.iter().map(|f| f.memory_id.as_str()).collect::<Vec<_>>(),
+            vec!["memory-a", "memory-z"]
+        );
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
