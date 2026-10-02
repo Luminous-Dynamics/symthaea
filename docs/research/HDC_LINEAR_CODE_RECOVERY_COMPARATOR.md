@@ -58,7 +58,7 @@ Required primitives:
 - row-reduction / rank;
 - deterministic basis construction;
 - Boolean subspace membership;
-- conversion between packed GF(2) words and the experiment's bipolar observation vector.
+- conversion between packed GF(2) words and the experiment's bipolar observation vector, using Raviv's convention GF(2) 0 -> +1 and GF(2) 1 -> -1 so XOR is exactly bipolar Hadamard binding.
 
 Tests should cover:
 
@@ -67,6 +67,7 @@ Tests should cover:
 - rank preservation;
 - deterministic regeneration from seed;
 - round-trip conversion;
+- XOR/Hadamard equivalence under the bipolar mapping;
 - rejection of malformed dimensions.
 
 ### Stage B — bound fixture
