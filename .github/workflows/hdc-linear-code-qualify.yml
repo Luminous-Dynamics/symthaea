@@ -77,7 +77,7 @@ jobs:
           path = "src/lib.rs"
 
           [dependencies]
-          rand = "0.8.6"
+          rand = "=0.8.6"
           EOF
 
           cat > "$HARNESS/src/lib.rs" <<EOF
