@@ -1829,6 +1829,70 @@ mod tests {
     }
 
     #[test]
+    fn test_persistence_restore_does_not_partially_admit_failed_generation() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_atomic_restore_failure_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id TEXT,
+                    canonical_identity TEXT,
+                    provenance_family TEXT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE knowledge_causal_edges (
+                    cause TEXT NOT NULL,
+                    effect TEXT NOT NULL,
+                    strength REAL NOT NULL,
+                    is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                    cycle INTEGER NOT NULL,
+                    PRIMARY KEY (cause, effect)
+                );
+                CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT
+                );
+                INSERT INTO knowledge_facts
+                    (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+                VALUES ('valid-fact', zeroblob(2048), 'valid', 0.9, 7, 0);
+                INSERT INTO knowledge_ontology
+                    (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle)
+                VALUES ('corrupt-utility', zeroblob(2048), 1, 'not-a-number', 7, 7);",
+            )
+            .unwrap();
+        }
+
+        let mgr = KnowledgeManager::new(KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        });
+
+        assert!(mgr.persistence_degraded());
+        assert!(mgr.graph().is_empty());
+        assert!(mgr.causal_bridge().edge_count() == 0);
+        assert!(mgr.ontology().primitives().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_persistence_restore_records_rejected_fact_rows() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_manager_fact_rejection_test_{}",
