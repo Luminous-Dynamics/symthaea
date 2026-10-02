@@ -166,6 +166,13 @@ impl Movie {
         if total_rgba_bytes > MAX_MOVIE_RGBA_BYTES {
             return None;
         }
+        // Standard base64 expands binary data by at most 4/3. Bound each
+        // encoded frame before decoding so a hostile string cannot force a
+        // large temporary allocation merely to be rejected for its size.
+        let max_encoded_frame_bytes = bytes_per_frame
+            .checked_add(2)?
+            .checked_div(3)?
+            .checked_mul(4)?;
         // A malformed frame invalidates the whole projection. Silently
         // dropping bad frames would make a partially accepted remote movie
         // look authoritative while hiding transport corruption or hostile
@@ -173,6 +180,9 @@ impl Movie {
         let mut frames_rgba = Vec::with_capacity(frames.len());
         for frame in frames {
             let encoded = frame.as_str()?;
+            if encoded.len() > max_encoded_frame_bytes {
+                return None;
+            }
             let raw = engine.decode(encoded).ok()?;
             if raw.len() != bytes_per_frame {
                 return None;
@@ -1505,6 +1515,19 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn movie_rejects_oversized_base64_before_decode() {
+        let payload = serde_json::json!({
+            "mental_movie": {
+                "width": 1,
+                "height": 1,
+                "channels": 1,
+                "frames_b64": ["A".repeat(1024 * 1024)]
+            }
+        });
+        assert!(Movie::from_json(&payload).is_none());
+    }
+
     fn movie_rejects_any_malformed_frame_instead_of_silently_dropping_it() {
         let payload = serde_json::json!({
             "mental_movie": {
