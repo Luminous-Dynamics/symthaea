@@ -110,7 +110,7 @@ fn write_remote_projection_node(
     match &node.kind {
         NodeKind::Group { .. } => {
             let _ = write!(buf, "{indent}<g");
-            write_transform(buf, node);
+            write_remote_transform(buf, node);
             write_remote_style_attrs(buf, &node.style, gradient_colors);
             buf.push_str(">\n");
             for child in &node.children {
@@ -222,15 +222,44 @@ fn write_remote_style_attrs(
         } else {
             let _ = write!(buf, r#" fill="none""#);
         }
-    } else if let Some(stroke) = &style.stroke {
+    }
+    if let Some(stroke) = &style.stroke {
         let _ = write!(buf, r#" stroke="{}""#, stroke.to_css());
-        if let Some(sw) = style.stroke_width {
-            let _ = write!(buf, r#" stroke-width="{:.2}""#, nonnegative(sw));
-        }
+    }
+    if let Some(sw) = style.stroke_width {
+        let _ = write!(buf, r#" stroke-width="{:.2}""#, nonnegative(sw));
     }
     if let Some(opacity) = style.opacity {
         let _ = write!(buf, r#" opacity="{:.2}""#, unit(opacity));
     }
+}
+
+fn write_remote_transform(buf: &mut String, node: &SceneNode) {
+    let transform = node.transform.to_svg();
+    if transform.is_empty() {
+        return;
+    }
+
+    // The remote consumer bounds every transform number to ±1e6. Internal
+    // scenes are trusted, but the remote output contract must still guarantee
+    // that a finite-but-pathological transform does not turn into a rejected
+    // projection. Keep the canonical SVG grammar produced by Transform while
+    // dropping any transform whose raw numeric components exceed that bound.
+    const MAX_REMOTE_TRANSFORM_COMPONENT: f32 = 1_000_000.0;
+    let t = node.transform;
+    if !t.translate_x.is_finite()
+        || !t.translate_y.is_finite()
+        || !t.rotate_deg.is_finite()
+        || !t.scale.is_finite()
+        || t.translate_x.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
+        || t.translate_y.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
+        || t.rotate_deg.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
+        || t.scale.abs() > MAX_REMOTE_TRANSFORM_COMPONENT
+    {
+        return;
+    }
+
+    let _ = write!(buf, r#" transform="{}""#, transform);
 }
 
 /// Render with an explicit timeline so replacing the SVG does not restart motion.
@@ -576,6 +605,22 @@ mod tests {
         assert!(svg.starts_with("<svg"));
         assert!(svg.contains("viewBox"));
         assert!(svg.ends_with("</svg>\n"));
+    }
+
+    #[test]
+    fn remote_projection_omits_pathological_transforms() {
+        let root = SceneNode::group(None).with_child(
+            SceneNode::circle(5.0, 5.0, 1.0).with_transform(Transform {
+                translate_x: f32::MAX,
+                translate_y: 0.0,
+                rotate_deg: 0.0,
+                scale: 1.0,
+            }),
+        );
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert!(!svg.contains("transform="));
+        assert!(svg.contains(r#"cx="5.0""#));
     }
 
     #[test]
