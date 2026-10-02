@@ -136,6 +136,9 @@ pub enum AuthorizationLeaseState {
     /// The durable pre-dispatch fence. No effect sink may be entered until
     /// this state is durably recorded.
     DispatchPending { attempt_id: String },
+    /// The external sink has been entered; this is durable dispatch evidence,
+    /// not proof that the protected effect succeeded.
+    Invoked { attempt_id: String },
     Indeterminate { attempt_id: String },
     Exhausted,
     Revoked,
@@ -333,6 +336,33 @@ impl AuthorizationLease {
         }
     }
 
+    /// Record that provider entry has begun after a durable DispatchPending fence.
+    ///
+    /// This transition is deliberately separate from the outcome: entering the
+    /// sink does not establish success. A crash after entry but before an
+    /// authoritative outcome remains recoverable as Indeterminate.
+    pub fn mark_invoked(
+        &mut self,
+        attempt_id: &str,
+    ) -> Result<(), AuthorizationConsumptionError> {
+        if matches!(
+            &self.state,
+            AuthorizationLeaseState::DispatchPending { attempt_id: id } if id == attempt_id
+        ) {
+            self.state = AuthorizationLeaseState::Invoked {
+                attempt_id: attempt_id.to_owned(),
+            };
+            Ok(())
+        } else if matches!(
+            &self.state,
+            AuthorizationLeaseState::Invoked { attempt_id: id } if id == attempt_id
+        ) {
+            Ok(())
+        } else {
+            Err(AuthorizationConsumptionError::AttemptMismatch)
+        }
+    }
+
     pub fn commit(
         &mut self,
         attempt_id: &str,
@@ -340,7 +370,9 @@ impl AuthorizationLease {
     ) -> Result<ExecutionReceipt, AuthorizationConsumptionError> {
         let prepared = matches!(
             &self.state,
-            AuthorizationLeaseState::DispatchPending { attempt_id: id } if id == attempt_id
+            AuthorizationLeaseState::DispatchPending { attempt_id: id }
+                | AuthorizationLeaseState::Invoked { attempt_id: id }
+                if id == attempt_id
         );
         if !prepared {
             return if matches!(self.state, AuthorizationLeaseState::Indeterminate { .. }) {
@@ -940,6 +972,36 @@ mod tests {
         assert_eq!(
             lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap().outcome,
             ExecutionOutcome::Succeeded
+        );
+    }
+
+    #[test]
+    fn invoked_is_a_distinct_durable_dispatch_evidence_state() {
+        let mut lease = AuthorizationLease::new_with_instance(
+            "approval-1", "action-1", "sha256:action", "sha256:support", "policy-v1", 1, 1,
+        );
+        let witness = authorization_witness_for(&lease);
+        let action = action_for("action-1", "sha256:action");
+        lease.prepare_for_execution(&witness, &action, "frame-1", "attempt-1").unwrap();
+        lease.mark_dispatch_pending("attempt-1").unwrap();
+        lease.mark_invoked("attempt-1").unwrap();
+        assert!(matches!(
+            lease.state,
+            AuthorizationLeaseState::Invoked { ref attempt_id } if attempt_id == "attempt-1"
+        ));
+        let receipt = lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap();
+        assert_eq!(receipt.outcome, ExecutionOutcome::Succeeded);
+    }
+
+    #[test]
+    fn invoked_wrong_attempt_is_fenced() {
+        let mut lease = AuthorizationLease::new_with_instance(
+            "approval-1", "action-1", "sha256:action", "sha256:support", "policy-v1", 1, 1,
+        );
+        lease.state = AuthorizationLeaseState::DispatchPending { attempt_id: "attempt-1".into() };
+        assert_eq!(
+            lease.mark_invoked("attempt-2"),
+            Err(AuthorizationConsumptionError::AttemptMismatch)
         );
     }
 
