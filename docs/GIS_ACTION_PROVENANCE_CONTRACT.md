@@ -196,6 +196,8 @@ The durable execution lifecycle now makes the external-effect boundary explicit:
       ↓ durable commit
     DISPATCH_PENDING
       ↓ provider entry
+    INVOKED
+      ↓ authoritative outcome
     EXECUTED | FAILED
       └────────→ INDETERMINATE → authenticated reconciliation
 
@@ -209,8 +211,8 @@ The execution identities remain deliberately non-interchangeable:
 
 Consequently, a crash or executor replacement must not manufacture a new provider idempotency key merely because it has a new attempt ID. A freshly issued authorization instance receives a distinct provider identity. The provider key is a downstream replay-control identity, not a substitute for authorization and not evidence that the effect occurred.
 
-`DispatchPending` is therefore an evidence boundary, not an execution receipt. It proves that the local executor durably recorded its intent immediately before the effect boundary; it does not prove that the provider accepted the effect.
+`DispatchPending` is therefore an evidence boundary, not an execution receipt. `Invoked` is the subsequent durable provider-entry marker; it is likewise not an execution receipt. It proves that the local executor durably recorded its intent immediately before the effect boundary; it does not prove that the provider accepted the effect.
 
-On restart, both `Prepared` and `DispatchPending` non-terminal reservations are conservatively recovered to `Indeterminate`. This deliberately fails closed because local durable state cannot prove whether a crash occurred before or after an external sink accepted the effect. The recovered attempt remains occupied and cannot be retried until explicit reconciliation establishes a terminal outcome. Reconciliation consumes the existing authorization budget; it does not create a new authorization.
+On restart, `Prepared`, `DispatchPending`, and `Invoked` non-terminal reservations are conservatively recovered to `Indeterminate`. `Invoked` records durable evidence that provider entry began; it still does not establish that the protected effect succeeded. This deliberately fails closed because local durable state cannot prove whether a crash occurred before or after an external sink accepted the effect. The recovered attempt remains occupied and cannot be retried until explicit reconciliation establishes a terminal outcome. Reconciliation consumes the existing authorization budget; it does not create a new authorization.
 
 The store therefore does not claim atomicity between SQLite and an external provider. The safety property is narrower and auditable: authority is durably reserved before dispatch, dispatch intent is durably recorded before provider entry, ambiguous outcomes are preserved rather than guessed, and replay is blocked until authenticated reconciliation. This matches current distributed-systems analysis that a crashed executor cannot infer sink acceptance from its own database alone, and current agent-effect boundary work that requires a durable pre-dispatch state and an explicit indeterminate path. The cited IETF material is an Internet-Draft, not a final standard.
