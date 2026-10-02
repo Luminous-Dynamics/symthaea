@@ -117,6 +117,18 @@ impl Rfc9162ConsistencyProof {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum Rfc9162ProofVerificationError {
+    #[error("invalid RFC 9942 proof encoding: {0}")]
+    Decode(#[from] Rfc9162ProofDecodeError),
+    #[error("proof tree size does not match expected tree head")]
+    TreeSizeMismatch,
+    #[error("proof root does not match expected tree head")]
+    RootMismatch,
+    #[error("RFC 9162 proof verification failed")]
+    InvalidProof,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Rfc9162ProofDecodeError {
     #[error("unexpected end of CBOR input")]
     UnexpectedEof,
@@ -160,6 +172,59 @@ impl Rfc9162InclusionProof {
         let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?; let n=r.read_array_len()?; let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
         if tree_size==0 || leaf_index>=tree_size{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         Ok(Self::new(tree_size,leaf_index,path))
+    }
+}
+
+impl Rfc9162Sha256Vds {
+    /// Verify RFC 9942 inclusion-proof content against an expected tree head.
+    ///
+    /// This performs the proof step only. COSE signature, signer identity,
+    /// authorization, and receipt-policy checks remain outside this VDS layer.
+    pub fn verify_rfc9942_inclusion_cbor(
+        &self,
+        candidate_entry: &[u8],
+        expected_head: VdsTreeHead,
+        proof_cbor: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9162ProofVerificationError> {
+        let proof = Rfc9162InclusionProof::from_cbor(proof_cbor)?;
+        if proof.tree_size != expected_head.tree_size() {
+            return Err(Rfc9162ProofVerificationError::TreeSizeMismatch);
+        }
+        if !self.verify_inclusion(candidate_entry, expected_head.root(), &proof) {
+            return Err(Rfc9162ProofVerificationError::InvalidProof);
+        }
+        Ok(expected_head)
+    }
+
+    /// Verify RFC 9942 inclusion proof content for an EvidenceDigest leaf.
+    pub fn verify_rfc9942_evidence_inclusion_cbor(
+        &self,
+        digest: crate::semantic_evidence_digest::EvidenceDigest,
+        expected_head: VdsTreeHead,
+        proof_cbor: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9162ProofVerificationError> {
+        let leaf = EvidenceVdsLeaf::from_evidence_digest(digest);
+        self.verify_rfc9942_inclusion_cbor(leaf.as_bytes(), expected_head, proof_cbor)
+    }
+
+    /// Verify RFC 9942 consistency-proof content against both tree heads.
+    ///
+    /// The returned head is the newer head, matching RFC 9942's detached
+    /// payload semantics for a consistency receipt.
+    pub fn verify_rfc9942_consistency_cbor(
+        &self,
+        older: VdsTreeHead,
+        newer: VdsTreeHead,
+        proof_cbor: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9162ProofVerificationError> {
+        let proof = Rfc9162ConsistencyProof::from_cbor(proof_cbor)?;
+        if proof.first != older.tree_size() || proof.second != newer.tree_size() {
+            return Err(Rfc9162ProofVerificationError::TreeSizeMismatch);
+        }
+        if !self.verify(older.root(), newer.root(), &proof) {
+            return Err(Rfc9162ProofVerificationError::InvalidProof);
+        }
+        Ok(newer)
     }
 }
 
@@ -526,7 +591,7 @@ mod tests {
     }
 
     #[test]
-    #[test]\n    fn rfc9942_proof_cbor_round_trips_through_strict_decoder() {\n        let inclusion=Rfc9162InclusionProof::new(20,17,vec![[0x11;32],[0x22;32]]);\n        assert_eq!(Rfc9162InclusionProof::from_cbor(&inclusion.to_cbor()).unwrap(),inclusion);\n        let consistency=Rfc9162ConsistencyProof::new(20,104,vec![[0x33;32],[0x44;32]]);\n        assert_eq!(Rfc9162ConsistencyProof::from_cbor(&consistency.to_cbor()).unwrap(),consistency);\n    }\n\n    #[test]\n    fn rfc9942_proof_decoder_rejects_noncanonical_and_trailing_input() {\n        let inclusion=Rfc9162InclusionProof::new(20,17,vec![[0x11;32]]);\n        let mut encoded=inclusion.to_cbor(); encoded.push(0); assert_eq!(Rfc9162InclusionProof::from_cbor(&encoded),Err(Rfc9162ProofDecodeError::TrailingBytes));\n        let noncanonical=vec![0x83,0x18,0x14,0x11,0x80];\n        assert_eq!(Rfc9162InclusionProof::from_cbor(&noncanonical),Err(Rfc9162ProofDecodeError::InvalidEncoding));\n    }\n\n    fn rfc9942_inclusion_and_consistency_cbor_shapes_are_deterministic() {
+    #[test]\n    fn rfc9942_proof_cbor_round_trips_through_strict_decoder() {\n        let inclusion=Rfc9162InclusionProof::new(20,17,vec![[0x11;32],[0x22;32]]);\n        assert_eq!(Rfc9162InclusionProof::from_cbor(&inclusion.to_cbor()).unwrap(),inclusion);\n        let consistency=Rfc9162ConsistencyProof::new(20,104,vec![[0x33;32],[0x44;32]]);\n        assert_eq!(Rfc9162ConsistencyProof::from_cbor(&consistency.to_cbor()).unwrap(),consistency);\n    }\n\n    #[test]\n    fn rfc9942_proof_decoder_rejects_noncanonical_and_trailing_input() {\n        let inclusion=Rfc9162InclusionProof::new(20,17,vec![[0x11;32]]);\n        let mut encoded=inclusion.to_cbor(); encoded.push(0); assert_eq!(Rfc9162InclusionProof::from_cbor(&encoded),Err(Rfc9162ProofDecodeError::TrailingBytes));\n        let noncanonical=vec![0x83,0x18,0x14,0x11,0x80];\n        assert_eq!(Rfc9162InclusionProof::from_cbor(&noncanonical),Err(Rfc9162ProofDecodeError::InvalidEncoding));\n    }\n\n    #[test]\n    fn rfc9942_inclusion_and_consistency_cbor_shapes_are_deterministic() {
         let inclusion = Rfc9162InclusionProof::new(20, 17, vec![[0x11; 32], [0x22; 32]]);
         assert_eq!(
             inclusion.to_cbor(),
