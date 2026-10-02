@@ -716,10 +716,19 @@ impl EvidenceEvaluation {
         }
     }
 
-    pub fn with_context(mut self, context: VerificationContext) -> Self {
-        self.context_fingerprint = context.fingerprint();
-        self.context = context;
-        self
+    /// Construct an evaluation from a report and an explicitly supplied context.
+    ///
+    /// The context is part of the evaluation's evidence identity. Callers should
+    /// only supply context that actually governed the evaluation; changing context
+    /// after construction is intentionally not supported.
+    pub fn from_report_with_context(
+        report: &ReceiptAttestationVerificationReport,
+        context: VerificationContext,
+    ) -> Self {
+        let mut evaluation = Self::from_report(report);
+        evaluation.context_fingerprint = context.fingerprint();
+        evaluation.context = context;
+        evaluation
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -1923,8 +1932,10 @@ mod tests {
         )
         .verify_report(&envelope, &receipt);
         let base = report.to_evidence_evaluation();
-        let changed = base.clone().with_context(
-            VerificationContext::from_report(&report).with_trust_root_fingerprint("trust-root-a"),
+        let changed = EvidenceEvaluation::from_report_with_context(
+            &report,
+            VerificationContext::from_report(&report)
+                .with_trust_root_fingerprint("trust-root-a"),
         );
         assert_eq!(base.subject_fingerprint, changed.subject_fingerprint);
         assert_ne!(base.context_fingerprint, changed.context_fingerprint);
