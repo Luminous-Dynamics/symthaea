@@ -99,6 +99,42 @@ impl Rfc9162ConsistencyProof {
     }
 }
 
+/// Canonical VDS leaf projection for a semantic evidence digest.
+///
+/// This is deliberately a projection: the EvidenceDigest remains the semantic
+/// identity, while the VDS receives a versioned, domain-separated leaf input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EvidenceVdsLeaf([u8; 32]);
+
+impl EvidenceVdsLeaf {
+    pub fn from_evidence_digest(digest: crate::semantic_evidence_digest::EvidenceDigest) -> Self {
+        let mut input = Vec::with_capacity(1 + 2 + 2 + DOMAIN.len() + 32);
+        input.extend_from_slice(&(DOMAIN.len() as u16).to_be_bytes());
+        input.extend_from_slice(DOMAIN);
+        input.extend_from_slice(&VERSION.to_be_bytes());
+        input.extend_from_slice(&1u16.to_be_bytes());
+        input.extend_from_slice(digest.as_bytes());
+        Self(sha256(&input))
+    }
+
+    pub fn as_bytes(&self) -> &[u8; 32] { &self.0 }
+    pub fn as_vec(&self) -> Vec<u8> { self.0.to_vec() }
+}
+
+/// RFC 9162 inclusion proof for one projected evidence leaf.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rfc9162InclusionProof {
+    pub tree_size: u64,
+    pub leaf_index: u64,
+    pub inclusion_path: Vec<[u8; 32]>,
+}
+
+impl Rfc9162InclusionProof {
+    pub fn new(tree_size: u64, leaf_index: u64, inclusion_path: Vec<[u8; 32]>) -> Self {
+        Self { tree_size, leaf_index, inclusion_path }
+    }
+}
+
 /// Concrete RFC 9162 SHA-256 Merkle VDS operations.
 ///
 /// This VDS consumes an explicit ordered leaf sequence. It does not consume
@@ -116,6 +152,31 @@ impl Rfc9162Sha256Vds {
         if first == 0 || first >= leaves.len() { return None; }
         let path = consistency_subproof(first, leaves, true);
         Some(Rfc9162ConsistencyProof::new(first as u64, leaves.len() as u64, path))
+    }
+
+    pub fn inclusion_proof(&self, leaves: &[Vec<u8>], leaf_index: usize) -> Option<Rfc9162InclusionProof> {
+        if leaf_index >= leaves.len() { return None; }
+        let path = inclusion_path(leaf_index, leaves);
+        Some(Rfc9162InclusionProof::new(leaves.len() as u64, leaf_index as u64, path))
+    }
+
+    pub fn verify_inclusion(
+        &self,
+        leaf: &[u8],
+        root: [u8; 32],
+        proof: &Rfc9162InclusionProof,
+    ) -> bool {
+        verify_rfc9162_inclusion(leaf, root, proof)
+    }
+
+    pub fn verify_evidence_inclusion(
+        &self,
+        digest: crate::semantic_evidence_digest::EvidenceDigest,
+        root: [u8; 32],
+        proof: &Rfc9162InclusionProof,
+    ) -> bool {
+        let leaf = EvidenceVdsLeaf::from_evidence_digest(digest);
+        self.verify_inclusion(leaf.as_bytes(), root, proof)
     }
 
     pub fn verify(
@@ -164,6 +225,50 @@ fn largest_power_of_two_less_than(n: usize) -> usize {
     debug_assert!(n > 1);
     let highest = 1usize << (usize::BITS - 1 - n.leading_zeros());
     if highest == n { highest >> 1 } else { highest }
+}
+
+fn inclusion_path(index: usize, leaves: &[Vec<u8>]) -> Vec<[u8; 32]> {
+    if leaves.len() <= 1 { return Vec::new(); }
+    let k = largest_power_of_two_less_than(leaves.len());
+    if index < k {
+        let mut path = inclusion_path(index, &leaves[..k]);
+        path.push(merkle_tree_hash(&leaves[k..].to_vec()));
+        path
+    } else {
+        let mut path = inclusion_path(index - k, &leaves[k..]);
+        path.push(merkle_tree_hash(&leaves[..k].to_vec()));
+        path
+    }
+}
+
+fn verify_rfc9162_inclusion(
+    leaf: &[u8],
+    root: [u8; 32],
+    proof: &Rfc9162InclusionProof,
+) -> bool {
+    if proof.tree_size == 0 || proof.leaf_index >= proof.tree_size { return false; }
+    let mut fn_ = proof.leaf_index;
+    let mut sn = proof.tree_size - 1;
+    let mut r = leaf_hash(leaf);
+
+    for p in &proof.inclusion_path {
+        if sn == 0 { return false; }
+        if (fn_ & 1) == 1 || fn_ == sn {
+            r = node_hash(p, &r);
+            if fn_ & 1 == 0 {
+                while fn_ & 1 == 0 && fn_ != 0 {
+                    fn_ >>= 1;
+                    sn >>= 1;
+                }
+            }
+        } else {
+            r = node_hash(&r, p);
+        }
+        fn_ >>= 1;
+        sn >>= 1;
+    }
+
+    sn == 0 && r == root
 }
 
 fn consistency_subproof(m: usize, leaves: &[Vec<u8>], complete: bool) -> Vec<[u8; 32]> {
@@ -295,6 +400,34 @@ mod tests {
                 assert!(vds.verify(old_root, new_root, &proof), "n={n}, first={first}");
             }
         }
+    }
+
+    #[test]
+    fn generated_inclusion_proofs_round_trip() {
+        let vds = Rfc9162Sha256Vds;
+        for n in 1..=12 {
+            let leaves: Vec<Vec<u8>> = (0..n).map(|i| format!("leaf-{i}").into_bytes()).collect();
+            let root = vds.root(&leaves);
+            for index in 0..n {
+                let proof = vds.inclusion_proof(&leaves, index).expect("valid inclusion request");
+                assert!(vds.verify_inclusion(&leaves[index], root, &proof), "n={n}, index={index}");
+                let mut tampered = leaves[index].clone();
+                tampered.push(b'!');
+                assert!(!vds.verify_inclusion(&tampered, root, &proof), "tampered n={n}, index={index}");
+            }
+        }
+    }
+
+    #[test]
+    fn evidence_digest_projection_is_domain_separated_and_verifiable() {
+        let digest = crate::semantic_evidence_digest::EvidenceDigest([7u8; 32]);
+        let leaf = EvidenceVdsLeaf::from_evidence_digest(digest);
+        let vds = Rfc9162Sha256Vds;
+        let leaves = vec![leaf.as_vec(), b"other".to_vec()];
+        let root = vds.root(&leaves);
+        let proof = vds.inclusion_proof(&leaves, 0).expect("leaf proof");
+        assert!(vds.verify_evidence_inclusion(digest, root, &proof));
+        assert_ne!(leaf.as_bytes(), digest.as_bytes());
     }
 
     #[test]
