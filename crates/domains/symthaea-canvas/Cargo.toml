@@ -2,11 +2,19 @@
 name = "symthaea-canvas"
 version = "0.1.0"
 edition = "2024"
-description = "Living topology UI: real-time SVG projection of Symthaea's cognitive geometry"
+description = "Living topology UI: real-time SVG and WebGPU projection of Symthaea's cognitive geometry"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
 serde = { workspace = true }
+wgpu = { workspace = true, optional = true }
+
+[features]
+default = []
+webgpu = ["dep:wgpu", "dep:web-sys"]
+
+[target."cfg(target_arch = "wasm32")".dependencies]
+web-sys = { version = "0.3", features = ["HtmlCanvasElement"] , optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
