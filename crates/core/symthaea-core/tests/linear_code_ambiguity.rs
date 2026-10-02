@@ -190,6 +190,58 @@ fn three_partitioned_factor_subcodes_recover_exactly() {
     assert_eq!(exhaustive_matches, vec![(left_word, middle_word, right_word)]);
 }
 
+
+#[test]
+fn exhaustive_noise_profile_separates_in_span_from_out_of_span_errors() {
+    // Exact GF(2) recovery is not itself error correction. Enumerate the full
+    // Boolean error space on a small fixture and classify each error by
+    // whether it lies in the code subspace.
+    let code = RandomLinearCode::generate(16, 5, 0xE770);
+    let message = [true, false, true, false, true];
+    let clean = code.encode(&message);
+
+    let mut in_span_by_weight = [0usize; 17];
+    let mut out_of_span_by_weight = [0usize; 17];
+    let total_patterns = 1usize << 16;
+
+    for mask in 0..total_patterns {
+        let mut error = BinaryCodeword::zero(16);
+        let mut weight = 0usize;
+        for index in 0..16 {
+            if (mask >> index) & 1 == 1 {
+                error.set_bit(index, true);
+                weight += 1;
+            }
+        }
+
+        let corrupted = clean.bound(&error);
+        if code.contains(&error) {
+            in_span_by_weight[weight] += 1;
+
+            // A non-zero in-span error remains exactly solvable, but the
+            // recovered codeword is different from the original message.
+            if weight > 0 {
+                let recovered =
+                    solve_linear_combination(&corrupted, code.basis()).expect("in-span target");
+                assert_ne!(recovered, message);
+            }
+        } else {
+            out_of_span_by_weight[weight] += 1;
+            assert!(solve_linear_combination(&corrupted, code.basis()).is_none());
+        }
+    }
+
+    // A rank-r binary subspace contains exactly 2^r of the 2^n possible
+    // error vectors.
+    assert_eq!(in_span_by_weight.iter().sum::<usize>(), 1 << code.rank());
+    assert_eq!(
+        out_of_span_by_weight.iter().sum::<usize>(),
+        total_patterns - (1 << code.rank())
+    );
+    assert_eq!(in_span_by_weight[0], 1);
+    assert_eq!(out_of_span_by_weight[0], 0);
+}
+
 #[test]
 fn independent_bound_recovery_rejects_overlapping_factor_bases() {
     let parent = RandomLinearCode::generate(96, 8, 0x4444);
