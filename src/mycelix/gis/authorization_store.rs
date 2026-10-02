@@ -169,7 +169,7 @@ impl SqliteAuthorizationStore {
             "UPDATE authorization_leases SET state=?2, attempt_id=?3, remaining_executions=?4
              WHERE authorization_instance=?1 AND state='indeterminate' AND attempt_id=?5",
             params![
-                action_id, encode_state(&lease.state), state_attempt(&lease.state),
+                authorization_instance, encode_state(&lease.state), state_attempt(&lease.state),
                 lease.remaining_executions as i64, attempt_id
             ],
         )?;
