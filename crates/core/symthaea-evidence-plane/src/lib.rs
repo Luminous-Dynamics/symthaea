@@ -343,6 +343,17 @@ pub struct EvidenceLineageGuardV1 {
 }
 
 impl EvidenceLineageGuardV1 {
+    /// Prepare an evidence guard only after validating the lineage.
+    ///
+    /// This is the preferred admission path for untrusted or parser-derived
+    /// lineage values. The infallible `prepare` constructor remains available
+    /// for already-typed, trusted fixtures and compatibility with existing
+    /// callers.
+    pub fn try_prepare(lineage: &ExecutionLineageV1) -> Result<Self, String> {
+        lineage.validate()?;
+        Ok(Self::prepare(lineage))
+    }
+
     pub fn prepare(lineage: &ExecutionLineageV1) -> Self {
         Self {
             prepared_digest: lineage.digest(),
@@ -691,6 +702,13 @@ mod tests {
             allowed_env: [("RUST_BACKTRACE".into(), "0".into())].into_iter().collect(),
             immutable_input_digests: [("fixture.json".into(), "sha256:1234".into())].into_iter().collect(),
         }
+    }
+
+    #[test]
+    fn execution_lineage_guard_rejects_invalid_preparation() {
+        let mut lineage = lineage_fixture();
+        lineage.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
+        assert!(EvidenceLineageGuardV1::try_prepare(&lineage).is_err());
     }
 
     #[test]
