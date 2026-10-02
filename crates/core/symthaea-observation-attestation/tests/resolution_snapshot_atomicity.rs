@@ -33,11 +33,8 @@ impl AtomicTestResolver {
 impl VerificationMethodResolver for AtomicTestResolver {
     fn resolve(
         &self,
-        verification_method: &str,
+        _verification_method: &str,
     ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
-        if verification_method != "did:example:resolver#key-1" {
-            return Err(VerificationMethodResolutionError::NotFound);
-        }
         Ok(self.resolved())
     }
 
