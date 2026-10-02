@@ -56,7 +56,7 @@ pub fn render_svg_for_remote_projection(root: &SceneNode) -> String {
     let gradient_colors = collect_first_gradient_colors(root);
     buf.push_str(r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">"#);
     buf.push('\n');
-    let mut emitted_elements = 1usize;
+    let mut emitted_elements = 0usize;
     write_remote_projection_node(
         &mut buf,
         root,
@@ -110,13 +110,6 @@ fn write_remote_projection_node(
     match &node.kind {
         NodeKind::Group { id } => {
             let _ = write!(buf, "{indent}<g");
-            if let Some(id) = id {
-                let _ = write!(
-                    buf,
-                    r#" id="{}""#,
-                    escape_xml_attr(&qualified_id(SvgRenderOptions::default(), id)),
-                );
-            }
             write_transform(buf, node);
             write_remote_style_attrs(buf, &node.style, gradient_colors);
             buf.push_str(">\n");
@@ -229,7 +222,6 @@ fn write_remote_style_attrs(
         } else {
             let _ = write!(buf, r#" fill="none""#);
         }
-    }
     } else if let Some(stroke) = &style.stroke {
         let _ = write!(buf, r#" stroke="{}""#, stroke.to_css());
         if let Some(sw) = style.stroke_width {
