@@ -884,6 +884,7 @@ mod tests {
             r#"<svg><foreignObject><div>x</div></foreignObject></svg>"#,
             r#"<svg><use href="https://attacker.example/icon.svg#x"/></svg>"#,
             r#"<svg><image href="https://attacker.example/pixel.png"/></svg>"#,
+            r#"<svg><rect style="fill:url(https://attacker.example/pixel.svg#x)"/></svg>"#,
         ] {
             let payload = serde_json::json!({ "canvas_svg": svg });
             assert!(portrait_from_json(&payload).is_none(), "accepted: {svg}");
