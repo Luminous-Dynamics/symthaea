@@ -28,6 +28,7 @@ pub enum TemporalFusionState {
 pub enum TemporalFusionIssue {
     EmptyInput,
     InsufficientTrustedSensors,
+    InsufficientIndependentGroups,
     DuplicateSensor,
     NonMonotonicTime,
     TemporalDisagreement,
@@ -38,6 +39,7 @@ pub struct TemporalFusionPolicy {
     pub schema_version: String,
     pub policy_id: String,
     pub minimum_trusted_sensors: u16,
+    pub minimum_independent_groups: u16,
     pub maximum_delta_disagreement_milli: u32,
 }
 
@@ -47,6 +49,8 @@ pub struct TemporalSensorPair {
     pub previous_decision: SensorHealthDecision,
     pub current: SensorObservation,
     pub current_decision: SensorHealthDecision,
+    /// Physical/common-mode independence domain. Distinct sensor IDs do not imply independent evidence.
+    pub independence_group: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -70,6 +74,7 @@ impl TemporalFusionGate {
         if policy.schema_version.trim().is_empty()
             || policy.policy_id.trim().is_empty()
             || policy.minimum_trusted_sensors == 0
+            || policy.minimum_independent_groups == 0
             || policy.maximum_delta_disagreement_milli == 0
         {
             return Err("invalid temporal fusion policy");
@@ -110,8 +115,17 @@ impl TemporalFusionGate {
         }
 
         let required = self.policy.minimum_trusted_sensors as usize;
+        let independent_groups: std::collections::BTreeSet<_> = trusted
+            .iter()
+            .map(|pair| pair.independence_group.as_str())
+            .filter(|group| !group.trim().is_empty())
+            .collect();
+        let required_groups = self.policy.minimum_independent_groups as usize;
         if trusted.len() < required {
             issues.push(TemporalFusionIssue::InsufficientTrustedSensors);
+        }
+        if independent_groups.len() < required_groups {
+            issues.push(TemporalFusionIssue::InsufficientIndependentGroups);
         }
 
         let mut deltas: Vec<(String, f64)> = trusted
@@ -157,7 +171,7 @@ impl TemporalFusionGate {
             )
         }) {
             TemporalFusionState::Conflicted
-        } else if trusted.len() < required {
+        } else if trusted.len() < required || independent_groups.len() < required_groups {
             TemporalFusionState::InsufficientEvidence
         } else {
             TemporalFusionState::Corroborated
@@ -225,6 +239,7 @@ mod tests {
             schema_version: "0.1".into(),
             policy_id: "temporal-fusion-v1".into(),
             minimum_trusted_sensors: 2,
+            minimum_independent_groups: 2,
             maximum_delta_disagreement_milli: 250,
         })
         .unwrap()
@@ -261,6 +276,18 @@ mod tests {
         ]);
         assert_eq!(d.state, TemporalFusionState::Conflicted);
         assert!(d.issues.contains(&TemporalFusionIssue::TemporalDisagreement));
+    }
+
+
+    #[test]
+    fn colocated_sensors_do_not_create_independent_quorum() {
+        let mut a = pair("strain-a", 0.5, 1.5);
+        let mut b = pair("strain-b", 0.6, 1.6);
+        a.independence_group = "wing-root-a".into();
+        b.independence_group = "wing-root-a".into();
+        let d = fusion_gate().assess(&[a, b]);
+        assert_eq!(d.state, TemporalFusionState::InsufficientEvidence);
+        assert!(d.issues.contains(&TemporalFusionIssue::InsufficientIndependentGroups));
     }
 
     #[test]
