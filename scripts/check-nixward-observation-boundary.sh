@@ -163,7 +163,8 @@ run_boundary_check() {
 
   # CROSS-022: legacy ServiceManager lifecycle constructors remain
   # compatibility APIs, but governed callers must use the fallible typed
-  # bridges. Keep the compatibility implementation itself out of this scan.
+  # bridges. Keep the compatibility implementation and its regression tests
+  # out of this scan.
   local nixward_src="${ROOT}/crates/core/nixward/src"
   if matches="$(rg -n --pcre2 "${LEGACY_SERVICE_CONSTRUCTOR_PATTERN}" "${nixward_src}" --glob '*.rs' --glob '!action/service_manager.rs')"; then
     echo "ERROR: Nixward caller uses infallible legacy ServiceManager constructor" >&2
