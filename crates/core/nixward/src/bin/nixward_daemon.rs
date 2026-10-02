@@ -1501,7 +1501,7 @@ impl DaemonState {
                                                 #[cfg(target_os = "linux")]
                                                 {
                                                     self.pending_local_approval = None;
-                                                    self.local_approved_intent_digest = None;
+                                                    self.local_approval_consumed = None;
                                                 }
                                                 return (
                                                     dynamic_threshold,
