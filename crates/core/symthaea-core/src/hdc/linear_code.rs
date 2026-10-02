@@ -120,10 +120,10 @@ impl RandomLinearCode {
             for word in &mut candidate.words {
                 *word = rng.r#gen();
             }
-            if dimension % 64 != 0 {
-                if let Some(last) = candidate.words.last_mut() {
-                    *last &= last_word_mask(dimension);
-                }
+            if !dimension.is_multiple_of(64)
+                && let Some(last) = candidate.words.last_mut()
+            {
+                *last &= last_word_mask(dimension);
             }
             if extends_span(&basis, &candidate) {
                 basis.push(candidate);
@@ -475,9 +475,9 @@ pub fn basis_rank(vectors: &[BinaryCodeword], dimension: usize) -> usize {
 
         rows.swap(rank, pivot);
         let pivot_row = rows[rank].clone();
-        for row in 0..rows.len() {
-            if row != rank && rows[row].bit(column) {
-                rows[row].xor_assign(&pivot_row);
+        for (row, current) in rows.iter_mut().enumerate() {
+            if row != rank && current.bit(column) {
+                current.xor_assign(&pivot_row);
             }
         }
         rank += 1;
