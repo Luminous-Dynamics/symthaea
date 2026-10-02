@@ -69,8 +69,9 @@ impl BinaryCodeword {
         &self.words
     }
 
-    /// Convert the Boolean codeword to the bipolar HDC observation convention.
-    /// GF(2) zero maps to -1 and one maps to +1.
+    /// Convert the Boolean codeword to Raviv's bipolar HDC convention.
+    /// GF(2) zero maps to +1 and one maps to -1, so XOR corresponds exactly
+    /// to bipolar Hadamard binding.
     pub fn to_bipolar(&self) -> Vec<i8> {
         (0..self.dimension)
             .map(|index| if self.bit(index) { 1 } else { -1 })
@@ -83,8 +84,8 @@ impl BinaryCodeword {
         let mut codeword = Self::zero(values.len());
         for (index, &value) in values.iter().enumerate() {
             match value {
-                -1 => {}
-                1 => codeword.set_bit(index, true),
+                1 => {}
+                -1 => codeword.set_bit(index, true),
                 _ => return None,
             }
         }
@@ -587,6 +588,23 @@ mod tests {
             let bipolar = word.to_bipolar();
             assert_eq!(BinaryCodeword::from_bipolar(&bipolar), Some(word));
         }
+    }
+
+    fn bipolar_binding_matches_boolean_xor() {
+        let code = RandomLinearCode::generate(73, 8, 0xABCD);
+        let left = code.encode(&[true, false, true, false, true, false, false, true]);
+        let right = code.encode(&[false, true, true, false, false, true, false, false]);
+        let boolean_bound = left.bound(&right);
+
+        let left_bipolar = left.to_bipolar();
+        let right_bipolar = right.to_bipolar();
+        let hadamard: Vec<i8> = left_bipolar
+            .iter()
+            .zip(&right_bipolar)
+            .map(|(left, right)| left * right)
+            .collect();
+
+        assert_eq!(BinaryCodeword::from_bipolar(&hadamard), Some(boolean_bound));
     }
 
     #[test]
