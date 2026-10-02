@@ -477,11 +477,16 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
     let mut command_count = 0usize;
     let mut active_command = None::<char>;
     let mut first_multiplicity = true;
+    let mut subpath_start_required = true;
 
     while index < tokens.len() {
         let command = match &tokens[index] {
             Token::Command(command) => {
                 let command = *command;
+                if subpath_start_required && !matches!(command, 'M' | 'm') {
+                    return false;
+                }
+                subpath_start_required = false;
                 index += 1;
                 command
             }
@@ -511,6 +516,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
             }
             active_command = None;
             first_multiplicity = true;
+            subpath_start_required = true;
             continue;
         }
 
@@ -1841,11 +1847,26 @@ mod tests {
             r#"<svg><path d="L0 0"/></svg>"#,
             r#"<svg><path d="C0 0 1 1 2 2"/></svg>"#,
             r#"<svg><path d="Z"/></svg>"#,
+            r#"<svg><path d="M0 0 Z L10 10"/></svg>"#,
+            r#"<svg><path d="M0 0 Z C1 1 2 2 3 3"/></svg>"#,
             r#"<svg><path d="M0 0 C1 2 3"/></svg>"#,
         ] {
             assert!(
                 portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(),
                 "accepted: {svg}"
+            );
+        }
+    }
+
+    #[test]
+    fn portrait_accepts_multiple_moveto_subpaths() {
+        for svg in [
+            r#"<svg><path d="M0 0 L10 0 Z M20 20 L30 30 Z"/></svg>"#,
+            r#"<svg><path d="m0 0 10 0 z m20 20 10 10 z"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_some(),
+                "rejected: {svg}"
             );
         }
     }
