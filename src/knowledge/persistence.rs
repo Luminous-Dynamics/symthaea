@@ -11,7 +11,7 @@
 //! - knowledge_facts: id, vector_blob, source_text, confidence, domain, cycle, is_causal
 //! - knowledge_causal_edges: cause, effect, strength, cycle
 //! - knowledge_ontology: name, vector_blob, usage_count, utility, cycle
-//! - knowledge_snapshot_receipts: generation, canonical_digest_hex
+//! - knowledge_snapshot_receipts: generation, canonical_digest_hex, receipt_digest_hex
 //! - knowledge_snapshot_validation_receipts: validation_event, generation, validator/profile metadata, outcome
 //!
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
@@ -1496,7 +1496,8 @@ impl KnowledgePersistence {
             );
             CREATE TABLE IF NOT EXISTS knowledge_snapshot_receipts (
                 generation INTEGER PRIMARY KEY AUTOINCREMENT,
-                canonical_digest_hex TEXT NOT NULL
+                canonical_digest_hex TEXT NOT NULL,
+                receipt_digest_hex TEXT NOT NULL CHECK (length(receipt_digest_hex) = 64)
             );
             CREATE TABLE IF NOT EXISTS knowledge_snapshot_validation_receipts (
                 validation_event TEXT PRIMARY KEY,
@@ -1532,6 +1533,64 @@ impl KnowledgePersistence {
                 conn.execute(&format!("ALTER TABLE knowledge_facts ADD COLUMN {name} {ty}"), [])
                     .map_err(|e| format!("Schema migration {name}: {e}"))?;
             }
+        }
+
+        // Add snapshot-receipt self-digest support to databases created by the
+        // earlier EPF-011 receipt tranche, then deterministically backfill legacy rows.
+        let snapshot_receipt_columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(knowledge_snapshot_receipts)")
+            .map_err(|e| format!("Snapshot receipt schema inspect: {e}"))?
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(|e| format!("Snapshot receipt schema inspect query: {e}"))?
+            .filter_map(Result::ok)
+            .collect();
+        if !snapshot_receipt_columns.iter().any(|c| c == "receipt_digest_hex") {
+            conn.execute(
+                "ALTER TABLE knowledge_snapshot_receipts
+                 ADD COLUMN receipt_digest_hex TEXT",
+                [],
+            )
+            .map_err(|e| format!("Snapshot receipt schema migration receipt_digest_hex: {e}"))?;
+        }
+
+        let legacy_snapshot_receipts = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT rowid, generation, canonical_digest_hex
+                     FROM knowledge_snapshot_receipts
+                     WHERE receipt_digest_hex IS NULL
+                     ORDER BY generation ASC",
+                )
+                .map_err(|e| format!("Snapshot receipt backfill prepare: {e}"))?;
+            stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    KnowledgeSnapshotReceipt {
+                        generation: u64::try_from(row.get::<_, i64>(1)?).map_err(|_| {
+                            rusqlite::Error::InvalidColumnType(
+                                1,
+                                "generation".into(),
+                                rusqlite::types::Type::Integer,
+                            )
+                        })?,
+                        canonical_digest_hex: row.get(2)?,
+                        receipt_digest_hex: String::new(),
+                    },
+                ))
+            })
+            .map_err(|e| format!("Snapshot receipt backfill query: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Snapshot receipt backfill row: {e}"))?
+        };
+
+        for (rowid, receipt) in legacy_snapshot_receipts {
+            conn.execute(
+                "UPDATE knowledge_snapshot_receipts
+                 SET receipt_digest_hex = ?1
+                 WHERE rowid = ?2",
+                rusqlite::params![receipt.canonical_receipt_digest_hex(), rowid],
+            )
+            .map_err(|e| format!("Snapshot receipt backfill update: {e}"))?;
         }
 
         // Add validation-receipt self-digest support to databases created by the
@@ -1605,6 +1664,32 @@ impl KnowledgePersistence {
             [],
         )
         .map_err(|e| format!("Schema identity index: {e}"))?;
+
+        // Enforce append-only receipt history at the SQLite boundary. Migration backfills
+        // above intentionally happen before these triggers are created.
+        conn.execute_batch(
+            "CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_receipts_no_update
+             BEFORE UPDATE ON knowledge_snapshot_receipts
+             BEGIN
+                 SELECT RAISE(ABORT, 'knowledge_snapshot_receipts is append-only: UPDATE prohibited');
+             END;
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_receipts_no_delete
+             BEFORE DELETE ON knowledge_snapshot_receipts
+             BEGIN
+                 SELECT RAISE(ABORT, 'knowledge_snapshot_receipts is append-only: DELETE prohibited');
+             END;
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_validation_receipts_no_update
+             BEFORE UPDATE ON knowledge_snapshot_validation_receipts
+             BEGIN
+                 SELECT RAISE(ABORT, 'knowledge_snapshot_validation_receipts is append-only: UPDATE prohibited');
+             END;
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_validation_receipts_no_delete
+             BEFORE DELETE ON knowledge_snapshot_validation_receipts
+             BEGIN
+                 SELECT RAISE(ABORT, 'knowledge_snapshot_validation_receipts is append-only: DELETE prohibited');
+             END;",
+        )
+        .map_err(|e| format!("Schema receipt immutability triggers: {e}"))?;
 
         self.initialized = true;
         Ok(())
