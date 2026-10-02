@@ -1,4 +1,4 @@
-use symthaea_core::hdc::linear_code::{basis_rank, solve_linear_combination, BinaryCodeword, RandomLinearCode};
+use symthaea_core::hdc::linear_code::{basis_rank, recover_direct_sum_bound, solve_linear_combination, BinaryCodeword, RandomLinearCode};
 
 #[test]
 fn arbitrary_same_subspace_bound_is_not_uniquely_identifiable() {
@@ -51,6 +51,11 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
     let recovered = solve_linear_combination(&composite, &basis).expect("clean bound must be in span");
     let expected: Vec<bool> = left_message.into_iter().chain(right_message).collect();
     assert_eq!(recovered, expected);
+
+    let (recovered_left, recovered_right) =
+        recover_direct_sum_bound(&composite, &left, &right).expect("direct-sum recovery");
+    assert_eq!(recovered_left, a);
+    assert_eq!(recovered_right, b);
 
     let matches: Vec<_> = left
         .enumerate()
