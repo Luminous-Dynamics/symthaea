@@ -16,7 +16,7 @@ use leptos::task::spawn_local;
 use serde_json::Value;
 use std::cell::RefCell;
 use std::rc::Rc;
-use symthaea_canvas::{GpuScene, RemoteScene, WebGpuRenderer};
+use symthaea_canvas::{GpuScene, RemoteScene, WebGpuMovieRenderer, WebGpuRenderer};
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
