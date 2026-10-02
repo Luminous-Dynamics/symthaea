@@ -41,7 +41,8 @@ pub use approver_evidence::{
 pub use authorization::{
     NixActionDescriptorV1, NixActionIntentV1, NixActionScopeV1,
     NixAuthorizationDecisionV1, NixAuthorizationErrorV1, NixAuthorizationProfileV1,
-    NixExecutionAuthorizationRecordV1, NixExecutionReceiptV1, NixMechanicalResultV1,
+    NixExecutionAuthorizationRecordV1, NixExecutionReceiptV1, NixLocalExecutionAuthorityV1,
+    NixMechanicalResultV1,
     NixPostconditionStatusV1,
 };
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
