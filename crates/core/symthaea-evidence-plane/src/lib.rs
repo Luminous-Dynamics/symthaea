@@ -780,10 +780,12 @@ impl ExecutionLineageDriftV1 {
             }
         }
 
-        debug_assert!(
-            !changed_fields.is_empty(),
-            "digest drift must have a field cause"
-        );
+        if changed_fields.is_empty() {
+            return Err(
+                "execution-lineage digest changed without a corresponding field-level difference"
+                    .into(),
+            );
+        }
 
         Ok(Some(Self {
             prepared_digest,
