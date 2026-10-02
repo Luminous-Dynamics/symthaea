@@ -27,6 +27,18 @@ use crate::presentation::{
 
 const DEFAULT_GATEWAY: &str = "http://127.0.0.1:8090";
 
+/// Allocate an authority generation without ever reusing an identity.
+///
+/// Request/status generations gate asynchronous responses. Saturating at
+/// u64::MAX would make the terminal generation repeat forever, which could
+/// allow an arbitrarily old response to become authoritative again. Exhaustion
+/// is therefore a deliberate fail-closed state.
+fn next_authority_generation(current: &mut u64) -> Option<u64> {
+    let next = current.checked_add(1)?;
+    *current = next;
+    Some(next)
+}
+
 #[derive(Clone, Debug)]
 struct Turn {
     role: &'static str,
@@ -393,9 +405,19 @@ pub fn App() -> impl IntoView {
         let request_generation = Rc::clone(&request_generation);
         Effect::new(move |_| {
             let _gateway_generation = gateway.get();
-            let next = request_generation.get().saturating_add(1);
-            request_generation.set(next);
-            sending.set(false);
+            let mut generation = request_generation.get();
+            if next_authority_generation(&mut generation).is_some() {
+                request_generation.set(generation);
+                sending.set(false);
+            } else {
+                leptos::logging::error!(
+                    "conversation request generation exhausted; refusing to reuse authority"
+                );
+                sending.set(false);
+                last_error.set(Some(
+                    "conversation request authority exhausted; reload required".to_string(),
+                ));
+            }
         });
     }
 
@@ -409,8 +431,14 @@ pub fn App() -> impl IntoView {
         // previous owner-scoped loop is cancelled on effect cleanup.
         let _gateway_generation = gateway.get();
         let status_session = {
-            let next = status_generation.get().saturating_add(1);
-            status_generation.set(next);
+            let mut generation = status_generation.get();
+            let Some(next) = next_authority_generation(&mut generation) else {
+                leptos::logging::error!(
+                    "status generation exhausted; refusing to reuse authority"
+                );
+                return;
+            };
+            status_generation.set(generation);
             next
         };
         let status_authority = Rc::clone(&status_generation);
@@ -492,8 +520,17 @@ pub fn App() -> impl IntoView {
         });
         let gw = gateway.get_untracked();
         let request_id = {
-            let next = request_generation.get().saturating_add(1);
-            request_generation.set(next);
+            let mut generation = request_generation.get();
+            let Some(next) = next_authority_generation(&mut generation) else {
+                leptos::logging::error!(
+                    "conversation request generation exhausted; refusing to reuse authority"
+                );
+                last_error.set(Some(
+                    "conversation request authority exhausted; reload required".to_string(),
+                ));
+                return;
+            };
+            request_generation.set(generation);
             next
         };
         let request_generation = Rc::clone(&request_generation);
@@ -815,26 +852,25 @@ mod tests {
     }
 
     #[test]
-    fn request_generation_is_monotonic() {
+    fn authority_generation_is_monotonic() {
         let mut generation = 0_u64;
-        let first = generation.saturating_add(1);
-        generation = first;
-        let second = generation.saturating_add(1);
-        generation = second;
+        let first = next_authority_generation(&mut generation).unwrap();
+        let second = next_authority_generation(&mut generation).unwrap();
         assert_eq!(generation, 2);
+        assert_eq!(first, 1);
+        assert_eq!(second, 2);
         assert_ne!(first, second);
     }
 
     #[test]
-    fn status_generation_rejects_previous_gateway_session() {
-        let mut generation = 0_u64;
-        let first = generation.saturating_add(1);
-        generation = first;
-        let second = generation.saturating_add(1);
-        generation = second;
-        assert_ne!(first, second);
-        assert_ne!(generation, first);
-        assert_eq!(generation, second);
+    fn authority_generation_fails_closed_at_exhaustion() {
+        let mut generation = u64::MAX - 1;
+        assert_eq!(next_authority_generation(&mut generation), Some(u64::MAX));
+        assert_eq!(generation, u64::MAX);
+        assert_eq!(next_authority_generation(&mut generation), None);
+        assert_eq!(generation, u64::MAX);
+        assert_eq!(next_authority_generation(&mut generation), None);
+        assert_eq!(generation, u64::MAX);
     }
 
     #[test]
