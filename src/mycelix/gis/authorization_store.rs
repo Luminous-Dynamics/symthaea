@@ -1448,6 +1448,111 @@ mod tests {
     }
 
     #[test]
+    fn pre_dispatch_recovery_rejects_tampered_scope_and_digest() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-pre-recovery-fence-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new("pre-recovery-fence","intervention",super::super::ActionRisk::Critical);
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(), authorization_instance:"approval-pre-fence".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:15:00Z".into(), expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-pre-fence",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-pre-fence","boundary-A"
+        ).unwrap();
+
+        let wrong_boundary=RecoveryAuthorizationWitness {
+            authorization_instance:"approval-pre-fence".into(),
+            attempt_id:"attempt-pre-fence".into(),
+            boundary_id:"boundary-B".into(),
+            action_digest:digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:16:00Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&wrong_boundary),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let wrong_digest=RecoveryAuthorizationWitness {
+            authorization_instance:"approval-pre-fence".into(),
+            attempt_id:"attempt-pre-fence".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:"sha256:forged".into(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:16:01Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&wrong_digest),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let correct=RecoveryAuthorizationWitness {
+            authorization_instance:"approval-pre-fence".into(),
+            attempt_id:"attempt-pre-fence".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest,
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:16:02Z".into(),
+        };
+        assert!(store.recover_pre_dispatch_attempt(&correct).unwrap());
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn pre_dispatch_recovery_cannot_release_after_dispatch_pending() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-pre-recovery-after-dispatch-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=EpistemicAction::new("pre-recovery-after-dispatch","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(), authorization_instance:"approval-after-dispatch".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:17:00Z".into(), expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-after-dispatch",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-after-dispatch","boundary-A"
+        ).unwrap();
+        let record=store.mark_dispatch_pending_bound(
+            "approval-after-dispatch","attempt-after-dispatch",&action,&effect,"boundary-A"
+        ).unwrap();
+
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:"approval-after-dispatch".into(),
+            attempt_id:"attempt-after-dispatch".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest,
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-02T20:18:00Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&recovery),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::PreDispatchRecoveryNotAllowed
+            ))
+        ));
+        assert_eq!(record.boundary_id,"boundary-A");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn boundary_scoped_recovery_cannot_claim_another_boundary() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-recovery-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
