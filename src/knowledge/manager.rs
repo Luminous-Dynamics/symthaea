@@ -1036,6 +1036,8 @@ impl KnowledgeManager {
                 .confidence
                 .partial_cmp(&a.encoding.confidence)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.memory_id.cmp(&b.memory_id))
+                .then_with(|| a.id.cmp(&b.id))
         });
         facts
             .iter()
@@ -1083,15 +1085,25 @@ impl KnowledgeManager {
         end_cycle: u64,
         k: usize,
     ) -> Vec<FactSearchResult> {
-        self.graph
+        let mut facts: Vec<_> = self
+            .graph
             .all_facts()
             .filter(|f| f.inserted_at_cycle >= start_cycle && f.inserted_at_cycle <= end_cycle)
+            .collect();
+        facts.sort_by(|a, b| {
+            a.inserted_at_cycle
+                .cmp(&b.inserted_at_cycle)
+                .then_with(|| a.memory_id.cmp(&b.memory_id))
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        facts
+            .into_iter()
+            .take(k)
             .map(|f| FactSearchResult {
                 fact_id: f.id,
                 similarity: 1.0, // No query vector — temporal filter only
                 confidence: f.confidence,
             })
-            .take(k)
             .collect()
     }
 
