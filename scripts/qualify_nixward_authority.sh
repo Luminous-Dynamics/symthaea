@@ -36,6 +36,9 @@ cargo test -p nixward --lib action::service_manager::tests
 echo "-- executor typed-service tests --"
 cargo test -p nixward --lib action::executor::tests
 
+echo "-- config-writer currentness tests --"
+cargo test -p nixward --lib action::config_writer::tests
+
 echo "-- daemon approval-binding tests --"
 cargo test -p nixward --bin nixward_daemon
 
