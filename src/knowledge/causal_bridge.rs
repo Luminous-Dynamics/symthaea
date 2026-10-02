@@ -295,22 +295,24 @@ impl CausalKnowledgeBridge {
 
     /// Export the canonical current-state persistence projection.
     ///
-    /// SQLite identifies a causal relation by `(cause, effect)`, so repeated
-    /// observations of the same relation must collapse to one persisted record.
-    /// The latest observation wins, with a deterministic semantic tie-break when
-    /// multiple observations share the same discovery cycle.
+    /// SQLite identifies a causal relation by (cause, effect), so repeated
+    /// observations of the same relation collapse to one persisted record.
+    /// The persisted strength is the same sequential running-average state used
+    /// by the live adjacency graph; the latest observation supplies polarity and
+    /// discovery metadata. This keeps restart behavior aligned with live state.
     pub fn export_edge_records_with_metadata(
         &self,
     ) -> Vec<(String, String, f32, bool, u64)> {
-        let mut selected: HashMap<(String, String), &CausalEdge> = HashMap::new();
+        let mut selected: HashMap<(String, String), (&CausalEdge, f32)> = HashMap::new();
 
         for edge in self.edges.iter().filter(|e| !e.is_negated) {
             let key = (edge.cause.clone(), edge.effect.clone());
-            match selected.get(&key) {
+            match selected.remove(&key) {
                 None => {
-                    selected.insert(key, edge);
+                    selected.insert(key, (edge, edge.strength.abs()));
                 }
-                Some(previous) => {
+                Some((previous, aggregate)) => {
+                    let aggregate = (aggregate + edge.strength.abs()) / 2.0;
                     let take_new = edge
                         .discovered_at_cycle
                         .cmp(&previous.discovered_at_cycle)
@@ -318,25 +320,30 @@ impl CausalKnowledgeBridge {
                         .then_with(|| edge.strength.total_cmp(&previous.strength))
                         .then_with(|| edge.source_text.cmp(&previous.source_text))
                         .is_gt();
-                    if take_new {
-                        selected.insert(key, edge);
-                    }
+                    selected.insert(
+                        key,
+                        if take_new {
+                            (edge, aggregate)
+                        } else {
+                            (previous, aggregate)
+                        },
+                    );
                 }
             }
         }
 
         let mut records: Vec<_> = selected
             .into_iter()
-            .map(|((cause, effect), edge)| {
-                let strength = if edge.is_inhibitory {
-                    -edge.strength.abs()
+            .map(|((cause, effect), (edge, strength))| {
+                let signed_strength = if edge.is_inhibitory {
+                    -strength.abs()
                 } else {
-                    edge.strength.abs()
+                    strength.abs()
                 };
                 (
                     cause,
                     effect,
-                    strength,
+                    signed_strength,
                     edge.is_inhibitory,
                     edge.discovered_at_cycle,
                 )
@@ -346,7 +353,6 @@ impl CausalKnowledgeBridge {
         records.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
         records
     }
-
     /// Update the strength of an existing causal edge based on prediction outcome.
     ///
     /// If the predicted effect occurred (`outcome_occurred = true`), strengthen the edge;
@@ -854,7 +860,7 @@ mod tests {
             vec![(
                 "policy".to_string(),
                 "growth".to_string(),
-                -0.8,
+                -0.6,
                 true,
                 9
             )]
@@ -891,6 +897,60 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_persistence_projection_matches_running_average_state() {
+        let mut bridge = CausalKnowledgeBridge::new(100);
+
+        bridge.add_edge(CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.2,
+            is_inhibitory: false,
+            is_negated: false,
+            source_text: "first".into(),
+            discovered_at_cycle: 1,
+        });
+        bridge.add_edge(CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.8,
+            is_inhibitory: false,
+            is_negated: false,
+            source_text: "second".into(),
+            discovered_at_cycle: 2,
+        });
+        bridge.add_edge(CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.4,
+            is_inhibitory: true,
+            is_negated: false,
+            source_text: "latest".into(),
+            discovered_at_cycle: 3,
+        });
+
+        let exported = bridge.export_edge_records_with_metadata();
+        assert_eq!(
+            exported,
+            vec![(
+                "policy".to_string(),
+                "growth".to_string(),
+                -0.5,
+                true,
+                3,
+            )]
+        );
+
+        let mut restored = CausalKnowledgeBridge::new(100);
+        restored.import_edge_with_metadata(
+            exported[0].0.clone(),
+            exported[0].1.clone(),
+            exported[0].2,
+            exported[0].3,
+            exported[0].4,
+        );
+        assert_eq!(restored.export_edge_records_with_metadata(), exported);
+    }
     #[test]
     fn test_inhibitory_restore_is_not_pruned_by_signed_strength() {
         let mut bridge = CausalKnowledgeBridge::new(1);
