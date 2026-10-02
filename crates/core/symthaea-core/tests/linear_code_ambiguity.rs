@@ -1,4 +1,7 @@
-use symthaea_core::hdc::linear_code::{basis_rank, recover_direct_sum_bound, recover_independent_bound, solve_linear_combination, BinaryCodeword, RandomLinearCode};
+use symthaea_core::hdc::linear_code::{
+    BinaryCodeword, RandomLinearCode, basis_rank, recover_direct_sum_bound,
+    recover_independent_bound, solve_linear_combination,
+};
 
 #[test]
 fn arbitrary_same_subspace_bound_is_not_uniquely_identifiable() {
@@ -48,7 +51,8 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
     let mut basis = left.basis().to_vec();
     basis.extend(right.basis().iter().cloned());
     assert_eq!(basis_rank(&basis, 96), basis.len());
-    let recovered = solve_linear_combination(&composite, &basis).expect("clean bound must be in span");
+    let recovered =
+        solve_linear_combination(&composite, &basis).expect("clean bound must be in span");
     let expected: Vec<bool> = left_message.into_iter().chain(right_message).collect();
     assert_eq!(recovered, expected);
 
@@ -62,10 +66,13 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
         .into_iter()
         .flat_map(|candidate_a| {
             let composite = composite.clone();
-            right.enumerate().into_iter().filter_map(move |candidate_b| {
-                (candidate_a.bound(&candidate_b) == composite)
-                    .then_some((candidate_a.clone(), candidate_b))
-            })
+            right
+                .enumerate()
+                .into_iter()
+                .filter_map(move |candidate_b| {
+                    (candidate_a.bound(&candidate_b) == composite)
+                        .then_some((candidate_a.clone(), candidate_b))
+                })
         })
         .collect();
 
@@ -92,15 +99,17 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
         .into_iter()
         .flat_map(|candidate_a| {
             let corrupted = corrupted.clone();
-            right.enumerate().into_iter().filter_map(move |candidate_b| {
-                (candidate_a.bound(&candidate_b) == corrupted)
-                    .then_some((candidate_a.clone(), candidate_b))
-            })
+            right
+                .enumerate()
+                .into_iter()
+                .filter_map(move |candidate_b| {
+                    (candidate_a.bound(&candidate_b) == corrupted)
+                        .then_some((candidate_a.clone(), candidate_b))
+                })
         })
         .collect();
     assert!(corrupted_matches.is_empty());
 }
-
 
 #[test]
 fn packed_solver_handles_coefficient_word_boundary() {
@@ -144,7 +153,6 @@ fn solver_rejects_dimension_mismatch_without_panicking() {
     assert!(solve_linear_combination(&target, code.basis()).is_none());
 }
 
-
 #[test]
 fn three_partitioned_factor_subcodes_recover_exactly() {
     // Extend the paper's parent-code partition construction to F=3 while
@@ -168,7 +176,10 @@ fn three_partitioned_factor_subcodes_recover_exactly() {
     let recovered = recover_independent_bound(&target, &[&left, &middle, &right])
         .expect("independent factor subcodes must recover");
 
-    assert_eq!(recovered, vec![left_word.clone(), middle_word.clone(), right_word.clone()]);
+    assert_eq!(
+        recovered,
+        vec![left_word.clone(), middle_word.clone(), right_word.clone()]
+    );
 
     let exhaustive_matches: Vec<_> = left
         .enumerate()
@@ -187,9 +198,11 @@ fn three_partitioned_factor_subcodes_recover_exactly() {
         })
         .collect();
 
-    assert_eq!(exhaustive_matches, vec![(left_word, middle_word, right_word)]);
+    assert_eq!(
+        exhaustive_matches,
+        vec![(left_word, middle_word, right_word)]
+    );
 }
-
 
 #[test]
 fn exhaustive_noise_profile_separates_in_span_from_out_of_span_errors() {
@@ -241,7 +254,6 @@ fn exhaustive_noise_profile_separates_in_span_from_out_of_span_errors() {
     assert_eq!(in_span_by_weight[0], 1);
     assert_eq!(out_of_span_by_weight[0], 0);
 }
-
 
 #[test]
 fn exhaustive_bounded_distance_oracle_separates_detection_from_correction() {
@@ -298,9 +310,7 @@ fn exhaustive_bounded_distance_oracle_separates_detection_from_correction() {
         let nearest_indices: Vec<usize> = distances
             .iter()
             .enumerate()
-            .filter_map(|(index, &distance)| {
-                (distance == nearest_distance).then_some(index)
-            })
+            .filter_map(|(index, &distance)| (distance == nearest_distance).then_some(index))
             .collect();
 
         // This is an exhaustive oracle, not a production decoder. Coding
@@ -322,7 +332,6 @@ fn exhaustive_bounded_distance_oracle_separates_detection_from_correction() {
     assert!(checked_patterns > 1);
     assert!(observed_out_of_span > 0);
 }
-
 
 #[test]
 fn minimum_distance_boundary_can_map_one_valid_codeword_to_another() {
