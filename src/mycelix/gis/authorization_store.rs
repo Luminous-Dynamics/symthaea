@@ -580,10 +580,10 @@ impl SqliteAuthorizationStore {
         {
             return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
         }
-        if verified.verifier_id.is_empty()
-            || verified.verifier_config_digest.is_empty()
-            || verified.trust_anchor_digest.is_empty()
-            || verified.evidence_profile_digest.is_empty()
+        if verified.configuration.verifier_id.is_empty()
+            || verified.configuration.verifier_config_digest.is_empty()
+            || verified.configuration.trust_anchor_digest.is_empty()
+            || verified.configuration.evidence_profile_digest.is_empty()
             || verified.verification_digest.is_empty()
             || evidence.evidence_id.is_empty() || evidence.evidence_digest.is_empty()
             || evidence.action_id != record.action_id
@@ -662,9 +662,9 @@ impl SqliteAuthorizationStore {
                 record.action_digest, record.provider_idempotency_key, record.target_identity,
                 record.audience,
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
-                evidence.evidence_id, evidence.evidence_digest, verified.verifier_id,
-                verified.verifier_config_digest, verified.trust_anchor_digest,
-                verified.evidence_profile_digest, verified.verification_digest,
+                evidence.evidence_id, evidence.evidence_digest, verified.configuration.verifier_id,
+                verified.configuration.verifier_config_digest, verified.configuration.trust_anchor_digest,
+                verified.configuration.evidence_profile_digest, verified.verification_digest,
             ],
         )?;
         insert_receipt_with_boundary(&tx, &receipt, "final", Some(&record.boundary_id))?;
@@ -977,7 +977,7 @@ impl SqliteAuthorizationStore {
                 record.audience,
                 if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 verified.evidence.evidence_id, verified.evidence.evidence_digest,
-                verified.verifier_id, verified.verification_digest,
+                verified.configuration.verifier_id, verified.verification_digest,
             ],
         )?;
         tx.commit()?;
@@ -1515,10 +1515,12 @@ mod tests {
             }
             Ok(VerifiedProviderOutcome {
                 evidence: evidence.clone(),
-                verifier_id: "test-verifier/v1".into(),
-                verifier_config_digest: "sha256:test-verifier-config".into(),
-                trust_anchor_digest: "sha256:test-trust-anchors".into(),
-                evidence_profile_digest: "sha256:test-evidence-profile".into(),
+                configuration: ProviderVerifierConfiguration {
+                    verifier_id: "test-verifier/v1".into(),
+                    verifier_config_digest: "sha256:test-verifier-config".into(),
+                    trust_anchor_digest: "sha256:test-trust-anchors".into(),
+                    evidence_profile_digest: "sha256:test-evidence-profile".into(),
+                },
                 verification_digest: "sha256:test-verification".into(),
             })
         }
