@@ -524,6 +524,12 @@ impl CausalKnowledgeBridge {
                     a.strength
                         .partial_cmp(&b.strength)
                         .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.cause.cmp(&b.cause))
+                        .then_with(|| a.effect.cmp(&b.effect))
+                        .then_with(|| a.is_inhibitory.cmp(&b.is_inhibitory))
+                        .then_with(|| a.is_negated.cmp(&b.is_negated))
+                        .then_with(|| a.discovered_at_cycle.cmp(&b.discovered_at_cycle))
+                        .then_with(|| a.source_text.cmp(&b.source_text))
                 })
                 .map(|(index, _)| index);
 
@@ -599,6 +605,43 @@ mod tests {
         let added = bridge.process_relation(&rel, "sky is blue", 1);
         assert!(!added);
         assert_eq!(bridge.edge_count(), 0);
+    }
+
+    #[test]
+    fn test_capacity_tie_eviction_is_restore_order_invariant() {
+        let make = |order: &[(&str, &str)]| {
+            let mut bridge = CausalKnowledgeBridge::new(2);
+            for &(cause, effect) in order {
+                bridge.add_edge(CausalEdge {
+                    cause: cause.into(),
+                    effect: effect.into(),
+                    strength: 0.8,
+                    is_inhibitory: false,
+                    is_negated: false,
+                    source_text: String::new(),
+                    discovered_at_cycle: 0,
+                });
+            }
+            let mut retained = bridge
+                .export_edges()
+                .into_iter()
+                .map(|(cause, effect, _)| (cause, effect))
+                .collect::<Vec<_>>();
+            retained.sort();
+            retained
+        };
+
+        let forward = make(&[("zeta", "effect"), ("alpha", "effect"), ("middle", "effect")]);
+        let reverse = make(&[("middle", "effect"), ("alpha", "effect"), ("zeta", "effect")]);
+
+        assert_eq!(forward, reverse);
+        assert_eq!(
+            forward,
+            vec![
+                ("alpha".to_string(), "effect".to_string()),
+                ("middle".to_string(), "effect".to_string()),
+            ]
+        );
     }
 
     #[test]
