@@ -145,3 +145,14 @@ Changing any executable action field changes the digest and invalidates the prio
 Revocation and expiry are also fenced at the effect boundary. A lease in Ready may be revoked or expired; a lease already Prepared cannot be silently converted to a terminal cancellation state. If an attempt has crossed far enough that its effect is uncertain, the lease must enter Indeterminate and be reconciled. This prevents a control-plane revocation from falsely asserting that no effect could have occurred.
 
 These rules align with current agent-authorization research: exact action hashing, a shared authorization instance/consumption key, terminal state transitions, and durable atomic consumption are being treated as distinct requirements rather than properties of a signed token alone. The relevant IETF work is still an Internet-Draft, not a final standard.
+
+
+## Durable shared consumption domain
+
+The in-memory authorization lease is now complemented by a SQLite-backed shared consumption domain. The durable store persists the lease state, remaining execution budget, attempt identity, and immutable execution observations.
+
+Reservation and consumption transitions execute inside SQLite write transactions. The store uses WAL mode and FULL synchronous durability. Concurrent processes therefore contend on one authoritative state machine rather than independently maintaining local budgets. Reopening the database preserves terminal consumption, and repeated commits for the same action/attempt return the recorded receipt instead of consuming authority again.
+
+This still does not make an external side effect transactionally atomic with the authorization database. The prepare/effect/commit gap remains an explicit failure boundary: an uncertain external effect becomes Indeterminate, and reconciliation is required before another attempt can be admitted.
+
+SQLite is appropriate as a durable local/shared-node implementation where writer concurrency is bounded; deployments requiring many concurrent writers or multiple independent servers should use an equivalent client/server transactional domain rather than treating SQLite as a universal distributed-consensus layer.
