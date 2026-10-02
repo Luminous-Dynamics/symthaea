@@ -108,6 +108,17 @@ impl Rfc9942Vdp {
 
     /// Verify an RFC 9942 inclusion VDP collection against a candidate entry.
     /// The collection may contain multiple proofs; at least one must verify.
+    /// Verify inclusion after explicitly binding the RFC 9942 vds header value.
+    pub fn verify_inclusion_for_vds(
+        &self,
+        vds_id: u64,
+        candidate_entry: &[u8],
+        expected_head: VdsTreeHead,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.validate_vds_id(vds_id)?;
+        self.verify_inclusion(candidate_entry, expected_head)
+    }
+
     pub fn verify_inclusion(
         &self,
         candidate_entry: &[u8],
@@ -127,6 +138,17 @@ impl Rfc9942Vdp {
 
     /// Verify an RFC 9942 consistency VDP collection against both tree heads.
     /// The collection may contain multiple proofs; at least one must verify.
+    /// Verify consistency after explicitly binding the RFC 9942 vds header value.
+    pub fn verify_consistency_for_vds(
+        &self,
+        vds_id: u64,
+        older: VdsTreeHead,
+        newer: VdsTreeHead,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.validate_vds_id(vds_id)?;
+        self.verify_consistency(older, newer)
+    }
+
     pub fn verify_consistency(
         &self,
         older: VdsTreeHead,
@@ -902,6 +924,17 @@ mod tests {
         let decoded=Rfc9942Vdp::from_cbor(&vdp.to_cbor()).unwrap();
         assert_eq!(decoded.kind(),Rfc9942ProofKind::Consistency);
         assert_eq!(decoded.proofs(),&[consistency]);
+    }
+
+    #[test]
+    fn rfc9942_vdp_verification_requires_matching_vds_id() {
+        let vds=Rfc9162Sha256Vds;
+        let leaves=vec![b"a".to_vec(),b"b".to_vec()];
+        let head=vds.tree_head(&leaves);
+        let proof=vds.inclusion_proof(&leaves,0).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        assert_eq!(vdp.verify_inclusion_for_vds(2,b"a",head),Err(Rfc9942VdpError::VdsMismatch(2)));
+        assert_eq!(vdp.verify_inclusion_for_vds(1,b"a",head),Ok(head));
     }
 
     #[test]
