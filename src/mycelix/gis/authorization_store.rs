@@ -668,6 +668,9 @@ impl SqliteAuthorizationStore {
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+        if !matches!(outcome, ExecutionOutcome::Indeterminate) {
+            return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
+        }
         if let Some(r) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
             return Ok(r);
         }
