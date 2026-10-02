@@ -56,7 +56,14 @@ pub fn render_svg_for_remote_projection(root: &SceneNode) -> String {
     let gradient_colors = collect_first_gradient_colors(root);
     buf.push_str(r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">"#);
     buf.push('\n');
-    write_remote_projection_node(&mut buf, root, 1, &gradient_colors);
+    let mut emitted_elements = 1usize;
+    write_remote_projection_node(
+        &mut buf,
+        root,
+        1,
+        &gradient_colors,
+        &mut emitted_elements,
+    );
     buf.push_str("</svg>\n");
     buf
 }
@@ -78,12 +85,26 @@ fn collect_first_gradient_colors(root: &SceneNode) -> HashMap<&str, Color> {
     colors
 }
 
+const MAX_REMOTE_PROJECTION_ELEMENTS: usize = 120;
+
 fn write_remote_projection_node(
     buf: &mut String,
     node: &SceneNode,
     depth: usize,
     gradient_colors: &HashMap<&str, Color>,
+    emitted_elements: &mut usize,
 ) {
+    if *emitted_elements >= MAX_REMOTE_PROJECTION_ELEMENTS {
+        return;
+    }
+    if matches!(
+        &node.kind,
+        NodeKind::RadialGradient { .. } | NodeKind::Filter { .. } | NodeKind::UseFilter { .. }
+    ) {
+        return;
+    }
+
+    *emitted_elements += 1;
     let indent = "  ".repeat(depth);
 
     match &node.kind {
@@ -100,7 +121,13 @@ fn write_remote_projection_node(
             write_remote_style_attrs(buf, &node.style, gradient_colors);
             buf.push_str(">\n");
             for child in &node.children {
-                write_remote_projection_node(buf, child, depth + 1, gradient_colors);
+                write_remote_projection_node(
+                    buf,
+                    child,
+                    depth + 1,
+                    gradient_colors,
+                    emitted_elements,
+                );
             }
             let _ = writeln!(buf, "{indent}</g>");
         }
@@ -203,11 +230,11 @@ fn write_remote_style_attrs(
             let _ = write!(buf, r#" fill="none""#);
         }
     }
-    if let Some(stroke) = &style.stroke {
+    } else if let Some(stroke) = &style.stroke {
         let _ = write!(buf, r#" stroke="{}""#, stroke.to_css());
-    }
-    if let Some(sw) = style.stroke_width {
-        let _ = write!(buf, r#" stroke-width="{:.2}""#, nonnegative(sw));
+        if let Some(sw) = style.stroke_width {
+            let _ = write!(buf, r#" stroke-width="{:.2}""#, nonnegative(sw));
+        }
     }
     if let Some(opacity) = style.opacity {
         let _ = write!(buf, r#" opacity="{:.2}""#, unit(opacity));
@@ -559,6 +586,19 @@ mod tests {
         assert!(svg.ends_with("</svg>\n"));
     }
 
+    #[test]
+    fn remote_projection_caps_emitted_elements() {
+        let mut root = SceneNode::group(None);
+        for i in 0..400 {
+            root.children.push(SceneNode::circle(i as f32, i as f32, 1.0));
+        }
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert_eq!(svg.matches("<circle").count(), 119);
+        assert_eq!(svg.matches("<g").count(), 1);
+        assert!(svg.matches("=").count() <= 1024);
+        assert!(svg.ends_with("</svg>\n"));
+    }
     #[test]
     fn remote_projection_is_effect_free_and_flattens_gradients() {
         let mut root = SceneNode::group(Some("root"));
