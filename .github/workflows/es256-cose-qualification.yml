@@ -1,0 +1,69 @@
+name: ES256 COSE Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-swarm/src/semantic_evidence_vds.rs"
+      - "crates/domains/symthaea-swarm/src/semantic_evidence_anchor.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_cose_key_corpus.rs"
+      - "crates/domains/symthaea-swarm/fuzz/**"
+      - ".github/workflows/es256-cose-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: es256-cose-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  corpus:
+    name: ES256 COSE corpus
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-es256-cose-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-es256-cose-
+      - name: Run COSE_Key interoperability corpus
+        run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_cose_key_corpus
+      - name: Run semantic_evidence_vds unit tests
+        run: cargo test -p symthaea-swarm --features semantic-receipts --lib semantic_evidence_vds
+
+  fuzz-build:
+    name: ES256 COSE fuzz target build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Cache fuzz Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crates/domains/symthaea-swarm/fuzz/target
+          key: ${{ runner.os }}-es256-cose-fuzz-${{ hashFiles('crates/domains/symthaea-swarm/fuzz/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-es256-cose-fuzz-
+      - name: Check fuzz manifest
+        run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bin fuzz_cose_key_es256
