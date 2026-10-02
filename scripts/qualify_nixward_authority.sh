@@ -12,11 +12,20 @@ echo "Cargo: $(cargo --version)"
 echo "-- formatting --"
 cargo fmt --all -- --check
 
+echo "-- source boundary --"
+bash scripts/check-nixward-observation-boundary.sh
+
 echo "-- compile nixward library --"
 cargo check -p nixward --lib
 
 echo "-- authority tests --"
 cargo test -p nixward --lib action::authorization::tests
+
+echo "-- typed service-domain tests --"
+cargo test -p nixward --lib action::service_domain::tests
+
+echo "-- service-manager boundary tests --"
+cargo test -p nixward --lib action::service_manager::tests
 
 echo "-- temporal tests --"
 cargo test -p nixward --lib action::temporal::tests
