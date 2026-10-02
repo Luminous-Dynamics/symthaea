@@ -23,7 +23,7 @@ use symthaea_core::observation_fabric::{
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
 pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v1";
-const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v1\\n";
+const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v1\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReceiptAttestationVerificationOutcome {
