@@ -366,6 +366,44 @@ fn write_canonical_string_vec(hasher: &mut blake3::Hasher, values: &[String]) {
     for value in values { write_canonical_string(hasher, value); }
 }
 
+fn write_canonical_independence(hasher: &mut blake3::Hasher, value: &EvidenceIndependence) {
+    let tag = match value {
+        EvidenceIndependence::Independent => 0u8,
+        EvidenceIndependence::VerifiedIndependent => 1,
+        EvidenceIndependence::SharedUpstream => 2,
+        EvidenceIndependence::Derived => 3,
+        EvidenceIndependence::Unknown => 4,
+    };
+    hasher.update(&[tag]);
+}
+
+fn write_canonical_independence_basis(hasher: &mut blake3::Hasher, value: &IndependenceBasis) {
+    match value {
+        IndependenceBasis::SharedSensor { sensor_id } => {
+            hasher.update(&[0]);
+            write_canonical_string(hasher, sensor_id);
+        }
+        IndependenceBasis::SharedPlatform { platform_id } => {
+            hasher.update(&[1]);
+            write_canonical_string(hasher, platform_id);
+        }
+        IndependenceBasis::SharedAncestor { observation_id } => {
+            hasher.update(&[2]);
+            write_canonical_string(hasher, observation_id);
+        }
+        IndependenceBasis::SharedProcessingActivity { activity_id } => {
+            hasher.update(&[3]);
+            write_canonical_string(hasher, activity_id);
+        }
+        IndependenceBasis::IdenticalAsset { hash_algorithm, content_hash } => {
+            hasher.update(&[4]);
+            write_canonical_string(hasher, hash_algorithm);
+            write_canonical_string(hasher, content_hash);
+        }
+        IndependenceBasis::NoSharedProvenance => hasher.update(&[5]),
+    }
+}
+
 /// Provenance linking an observation to its producer and processing lineage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationProvenance {
@@ -462,8 +500,6 @@ pub enum ObservationRelationKind {
     PossibleSameEntity,
 }
 
-/// Auditable edge between observations.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// The concrete provenance basis for an independence assessment.
 ///
 /// This keeps an independence classification auditable instead of collapsing
@@ -485,16 +521,42 @@ pub enum IndependenceBasis {
 /// that the observations are substantively true or independent in reality.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndependenceAssessment {
+    pub source_observation_id: String,
+    pub target_observation_id: String,
     pub classification: EvidenceIndependence,
     pub basis: IndependenceBasis,
     pub examined_observation_ids: Vec<String>,
     pub verifier_version: &'static str,
+    /// BLAKE3 commitment to the assessed pair, scope, classification, basis,
+    /// and verifier version. This is an assessment fingerprint, not a truth claim.
+    pub assessment_fingerprint: String,
 }
 
 impl IndependenceAssessment {
     const VERIFIER_VERSION: &'static str = "observation-fabric-independence-v1";
+
+    fn compute_fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-independence-assessment:v1\n");
+        write_canonical_string(&mut hasher, &self.source_observation_id);
+        write_canonical_string(&mut hasher, &self.target_observation_id);
+        write_canonical_string_vec(&mut hasher, &self.examined_observation_ids);
+        write_canonical_string(&mut hasher, self.verifier_version);
+        write_canonical_independence(&mut hasher, &self.classification);
+        write_canonical_independence_basis(&mut hasher, &self.basis);
+        hasher.finalize().to_hex().to_string()
+    }
+
+    /// Verify that the stored fingerprint still commits to this assessment.
+    ///
+    /// This verifies the integrity of the assessment record itself. It does
+    /// not re-run graph analysis and does not assert that the assessment is true.
+    pub fn verify_fingerprint(&self) -> bool {
+        self.assessment_fingerprint == self.compute_fingerprint()
+    }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EvidenceIndependence {
     /// The producer declares no known shared upstream source.
     ///
@@ -609,16 +671,39 @@ impl ObservationGraph {
                 target_observation_id.to_string(),
             ))?;
 
-        let examined_observation_ids = self
+        let mut examined_observation_ids = self
             .observations
             .iter()
             .map(|observation| observation.id.clone())
             .collect::<Vec<_>>();
-        let assessment = |classification, basis| IndependenceAssessment {
-            classification,
-            basis,
-            examined_observation_ids: examined_observation_ids.clone(),
-            verifier_version: IndependenceAssessment::VERIFIER_VERSION,
+        examined_observation_ids.sort();
+        let assessment = |classification, basis| {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(b"symthaea:observation-independence-assessment:v1\n");
+            write_canonical_string(
+                &mut hasher,
+                source_observation_id,
+            );
+            write_canonical_string(
+                &mut hasher,
+                target_observation_id,
+            );
+            write_canonical_string_vec(&mut hasher, &examined_observation_ids);
+            write_canonical_string(
+                &mut hasher,
+                IndependenceAssessment::VERIFIER_VERSION,
+            );
+            write_canonical_independence(&mut hasher, &classification);
+            write_canonical_independence_basis(&mut hasher, &basis);
+            IndependenceAssessment {
+                source_observation_id: source_observation_id.to_string(),
+                target_observation_id: target_observation_id.to_string(),
+                classification,
+                basis,
+                examined_observation_ids: examined_observation_ids.clone(),
+                verifier_version: IndependenceAssessment::VERIFIER_VERSION,
+                assessment_fingerprint: hasher.finalize().to_hex().to_string(),
+            }
         };
 
         if source.provenance.source.sensor_id == target.provenance.source.sensor_id {
@@ -648,7 +733,7 @@ impl ObservationGraph {
         let target_ancestors = Self::ancestor_ids(target_observation_id, &by_id)?;
         if let Some(shared_ancestor) = source_ancestors
             .intersection(&target_ancestors)
-            .next()
+            .min()
         {
             return Ok(assessment(
                 EvidenceIndependence::SharedUpstream,
@@ -684,7 +769,7 @@ impl ObservationGraph {
             .collect::<HashSet<_>>();
         if let Some(shared_activity) = source_activities
             .intersection(&target_activities)
-            .next()
+            .min()
         {
             return Ok(assessment(
                 EvidenceIndependence::SharedUpstream,
@@ -1666,6 +1751,49 @@ mod tests {
     }
 
     #[test]
+    fn graph_detailed_independence_is_stable_across_observation_order() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph_a = ObservationGraph {
+            observations: vec![fixture(), second.clone()],
+            relations: vec![],
+        };
+        let graph_b = ObservationGraph {
+            observations: vec![second, fixture()],
+            relations: vec![],
+        };
+        let a = graph_a
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
+        let b = graph_b
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
+        assert_eq!(a.examined_observation_ids, b.examined_observation_ids);
+        assert_eq!(a.assessment_fingerprint, b.assessment_fingerprint);
+    }
+
+    #[test]
+    fn graph_detailed_independence_records_shared_sensor_basis() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        let assessment = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        }
+        .assess_independence_detailed("obs-001", "obs-002")
+        .expect("assessment");
+        assert_eq!(assessment.classification, EvidenceIndependence::SharedUpstream);
+        assert_eq!(
+            assessment.basis,
+            IndependenceBasis::SharedSensor {
+                sensor_id: "camera-1".into()
+            }
+        );
+        assert_eq!(assessment.assessment_fingerprint.len(), 64);
+    }
+
+    #[test]
     fn graph_detailed_independence_records_audit_basis() {
         let mut second = fixture();
         second.id = "obs-002".into();
@@ -1676,10 +1804,60 @@ mod tests {
         }
         .assess_independence_detailed("obs-001", "obs-002")
         .expect("assessment");
+        assert_eq!(assessment.source_observation_id, "obs-001");
+        assert_eq!(assessment.target_observation_id, "obs-002");
         assert_eq!(assessment.classification, EvidenceIndependence::VerifiedIndependent);
         assert_eq!(assessment.basis, IndependenceBasis::NoSharedProvenance);
         assert_eq!(assessment.examined_observation_ids, vec!["obs-001", "obs-002"]);
         assert_eq!(assessment.verifier_version, "observation-fabric-independence-v1");
+        assert_eq!(assessment.assessment_fingerprint.len(), 64);
+        assert!(assessment.assessment_fingerprint.bytes().all(|b| b.is_ascii_hexdigit()));
+        assert!(assessment.verify_fingerprint());
+    }
+
+    #[test]
+    fn detailed_independence_fingerprint_changes_when_basis_changes() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let mut assessment = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        }
+        .assess_independence_detailed("obs-001", "obs-002")
+        .expect("assessment");
+        let original = assessment.assessment_fingerprint.clone();
+
+        assessment.basis = IndependenceBasis::SharedPlatform {
+            platform_id: "platform-1".into(),
+        };
+        assert_ne!(assessment.assessment_fingerprint, assessment.compute_fingerprint());
+        assert_ne!(original, assessment.compute_fingerprint());
+        assert!(!assessment.verify_fingerprint());
+    }
+
+    #[test]
+    fn detailed_independence_fingerprint_is_not_debug_format_dependent() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let assessment = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        }
+        .assess_independence_detailed("obs-001", "obs-002")
+        .expect("assessment");
+
+        let mut expected = blake3::Hasher::new();
+        expected.update(b"symthaea:observation-independence-assessment:v1\n");
+        write_canonical_string(&mut expected, "obs-001");
+        write_canonical_string(&mut expected, "obs-002");
+        write_canonical_string_vec(&mut expected, &["obs-001".into(), "obs-002".into()]);
+        write_canonical_string(&mut expected, "observation-fabric-independence-v1");
+        write_canonical_independence(&mut expected, &EvidenceIndependence::VerifiedIndependent);
+        write_canonical_independence_basis(&mut expected, &IndependenceBasis::NoSharedProvenance);
+        assert_eq!(assessment.assessment_fingerprint, expected.finalize().to_hex().to_string());
+        assert!(assessment.verify_fingerprint());
     }
 
     #[test]
