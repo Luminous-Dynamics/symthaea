@@ -5,6 +5,10 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Unified Leptos web UI for symthaea-service — Converse + Observe panes over the HTTP gateway (SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md Phase 3)"
 
+[features]
+default = []
+browser-qualification = []
+
 [dependencies]
 leptos = { version = "0.8", features = ["csr"] }
 serde = { version = "1.0", features = ["derive"] }
