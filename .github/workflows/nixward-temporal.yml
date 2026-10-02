@@ -6,6 +6,7 @@ on:
     paths:
       - "crates/core/nixward/src/action/temporal.rs"
       - "crates/core/nixward/src/action/mod.rs"
+      - "crates/core/symthaea-observation-attestation/Cargo.toml"
       - "scripts/qualify_nixward_temporal.sh"
       - ".github/workflows/nixward-temporal.yml"
   workflow_dispatch:
