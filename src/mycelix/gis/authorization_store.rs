@@ -428,6 +428,12 @@ impl SqliteAuthorizationStore {
             ],
         )?;
         if changed != 1 { return Err(AuthorizationConsumptionError::AttemptMismatch.into()); }
+        tx.execute(
+            "UPDATE authorization_dispatches SET state=?3
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND state='indeterminate'",
+            params![authorization_instance, attempt_id,
+                if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" }],
+        )?;
         insert_receipt(&tx, &receipt, "reconciled")?;
         tx.commit()?;
         Ok(receipt)
