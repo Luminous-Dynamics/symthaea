@@ -1062,7 +1062,12 @@ impl KnowledgeManager {
                 (r.fact_id, combined)
             })
             .collect();
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.1
+                .partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
 
         scored
             .iter()
@@ -1135,6 +1140,7 @@ impl KnowledgeManager {
             b.similarity
                 .partial_cmp(&a.similarity)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
         });
         results.truncate(k);
         results
@@ -1368,6 +1374,7 @@ impl KnowledgeManager {
                 score_b
                     .partial_cmp(&score_a)
                     .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.fact_id.cmp(&b.fact_id))
             });
             self.last_search_results
                 .truncate(self.config.search_top_k * 2);
