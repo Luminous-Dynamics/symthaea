@@ -380,6 +380,32 @@ fn minimum_distance_boundary_can_map_one_valid_codeword_to_another() {
 }
 
 #[test]
+fn exhaustive_overlapping_recovery_preserves_valid_factorization() {
+    let parent = RandomLinearCode::generate(96, 9, 0x4949);
+    let left = RandomLinearCode::from_basis(parent.basis()[..6].to_vec()).expect("left subcode");
+    let right =
+        RandomLinearCode::from_basis(parent.basis()[3..9].to_vec()).expect("overlapping subcode");
+
+    // The two factors overlap in three generators. Every parent-codeword is
+    // therefore a clean target in the union span, but some targets admit more
+    // than one factorization. Exhaust all 2^9 parent messages to verify that
+    // the general recovery path always returns a valid factorization.
+    for mask in 0..(1usize << parent.rank()) {
+        let message: Vec<bool> = (0..parent.rank())
+            .map(|bit| (mask >> bit) & 1 == 1)
+            .collect();
+        let target = parent.encode(&message);
+
+        let recovered =
+            recover_linear_bound(&target, &[&left, &right]).expect("target is in union span");
+        assert_eq!(recovered.len(), 2);
+        assert!(left.contains(&recovered[0]));
+        assert!(right.contains(&recovered[1]));
+        assert_eq!(recovered[0].bound(&recovered[1]), target);
+    }
+}
+
+#[test]
 fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
     let parent = RandomLinearCode::generate(96, 8, 0x4444);
     let left = RandomLinearCode::from_basis(parent.basis()[..4].to_vec()).expect("left subcode");
