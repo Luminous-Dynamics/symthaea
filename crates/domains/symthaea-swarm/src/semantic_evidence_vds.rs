@@ -116,6 +116,53 @@ impl Rfc9162ConsistencyProof {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum Rfc9162ProofDecodeError {
+    #[error("unexpected end of CBOR input")]
+    UnexpectedEof,
+    #[error("invalid CBOR major type or non-preferred encoding")]
+    InvalidEncoding,
+    #[error("invalid proof structure")]
+    InvalidStructure,
+    #[error("invalid hash length")]
+    InvalidHashLength,
+    #[error("trailing bytes after proof")]
+    TrailingBytes,
+}
+
+struct CborReader<'a> { bytes: &'a [u8], offset: usize }
+impl<'a> CborReader<'a> {
+    fn new(bytes: &'a [u8]) -> Self { Self { bytes, offset: 0 } }
+    fn read_u64(&mut self) -> Result<u64, Rfc9162ProofDecodeError> {
+        let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1;
+        if initial>>5 != 0 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
+        let ai=initial&0x1f;
+        match ai { 0..=23 => Ok(ai as u64), 24 => self.read_uint(1,24), 25=>self.read_uint(2,256), 26=>self.read_uint(4,65536), 27=>self.read_uint(8,4294967296), _=>Err(Rfc9162ProofDecodeError::InvalidEncoding) }
+    }
+    fn read_uint(&mut self,n:usize,min:u64)->Result<u64,Rfc9162ProofDecodeError>{ if self.offset+n>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)} let mut v=0u64; for b in &self.bytes[self.offset..self.offset+n]{v=(v<<8)|*b as u64;} self.offset+=n; if v<min{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} Ok(v) }
+    fn read_array_len(&mut self)->Result<usize,Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure) }
+    fn read_bstr32(&mut self)->Result<[u8;32],Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=2{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; if n!=32{return Err(Rfc9162ProofDecodeError::InvalidHashLength)} let end=self.offset.checked_add(32).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?; if end>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)} let mut out=[0u8;32]; out.copy_from_slice(&self.bytes[self.offset..end]); self.offset=end; Ok(out) }
+    fn finish(self)->Result<(),Rfc9162ProofDecodeError>{ if self.offset==self.bytes.len(){Ok(())}else{Err(Rfc9162ProofDecodeError::TrailingBytes)} }
+}
+
+impl Rfc9162ConsistencyProof {
+    pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
+        let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+        let first=r.read_u64()?; let second=r.read_u64()?; let n=r.read_array_len()?; let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
+        if first==0 || first>=second || path.is_empty(){return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+        Ok(Self::new(first,second,path))
+    }
+}
+
+impl Rfc9162InclusionProof {
+    pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
+        let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+        let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?; let n=r.read_array_len()?; let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
+        if tree_size==0 || leaf_index>=tree_size{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+        Ok(Self::new(tree_size,leaf_index,path))
+    }
+}
+
 impl Rfc9162ConsistencyProof {
     /// Encode the RFC 9942 proof-content array using deterministic CBOR.
     ///
@@ -479,7 +526,7 @@ mod tests {
     }
 
     #[test]
-    fn rfc9942_inclusion_and_consistency_cbor_shapes_are_deterministic() {
+    #[test]\n    fn rfc9942_proof_cbor_round_trips_through_strict_decoder() {\n        let inclusion=Rfc9162InclusionProof::new(20,17,vec![[0x11;32],[0x22;32]]);\n        assert_eq!(Rfc9162InclusionProof::from_cbor(&inclusion.to_cbor()).unwrap(),inclusion);\n        let consistency=Rfc9162ConsistencyProof::new(20,104,vec![[0x33;32],[0x44;32]]);\n        assert_eq!(Rfc9162ConsistencyProof::from_cbor(&consistency.to_cbor()).unwrap(),consistency);\n    }\n\n    #[test]\n    fn rfc9942_proof_decoder_rejects_noncanonical_and_trailing_input() {\n        let inclusion=Rfc9162InclusionProof::new(20,17,vec![[0x11;32]]);\n        let mut encoded=inclusion.to_cbor(); encoded.push(0); assert_eq!(Rfc9162InclusionProof::from_cbor(&encoded),Err(Rfc9162ProofDecodeError::TrailingBytes));\n        let noncanonical=vec![0x83,0x18,0x14,0x11,0x80];\n        assert_eq!(Rfc9162InclusionProof::from_cbor(&noncanonical),Err(Rfc9162ProofDecodeError::InvalidEncoding));\n    }\n\n    fn rfc9942_inclusion_and_consistency_cbor_shapes_are_deterministic() {
         let inclusion = Rfc9162InclusionProof::new(20, 17, vec![[0x11; 32], [0x22; 32]]);
         assert_eq!(
             inclusion.to_cbor(),
