@@ -1009,7 +1009,8 @@ mod tests {
     #[test]
     fn execution_receipt_is_not_an_authorization_witness() {
         let receipt = ExecutionReceipt {
-            action_id: "a-receipt".into(), action_digest: "sha256:execution-only".into(),
+            action_id: "a-receipt".into(), authorization_instance: "approval-1".into(),
+            action_digest: "sha256:execution-only".into(),
             attempt_id: "attempt-1".into(), authority_epoch: 1, outcome: ExecutionOutcome::Succeeded,
         };
         assert_eq!(receipt.outcome, ExecutionOutcome::Succeeded);
