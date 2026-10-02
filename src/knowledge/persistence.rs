@@ -3522,7 +3522,9 @@ mod tests {
             )
             .unwrap();
         }
-        retry.ensure_schema(&retry.open_connection().unwrap()).unwrap();
+        let retry_conn = retry.open_connection().unwrap();
+        retry.ensure_schema(&retry_conn).unwrap();
+        retry.verify_snapshot_validation_receipts().unwrap();
 
         let _ = std::fs::remove_dir_all(&dir);
     }
