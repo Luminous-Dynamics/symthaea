@@ -95,6 +95,10 @@ pub use controller::VehicleController;
 pub use encoder::VehicleHdcEncoder;
 pub use fep_agent::{ActiveInferenceVehicleAgent, VehicleFepConfig, VehicleFepResult};
 pub use perturbations::{PerturbationSchedule, VehiclePerturbation};
+pub use symthaea_regenerative_health::{
+    HealthObservation, RecoveryEvidence, RegenerativeAction, RegenerativeDecision,
+    RegenerativeHealthGate, RegenerativeHealthState, RegenerativeIssue, RegenerativePolicy,
+};
 pub use reward::{episode_reward, follow_distance_reward, safety_reward, speed_reward};
 pub use road::{Road, RoadSegment};
 pub use scenarios::{
