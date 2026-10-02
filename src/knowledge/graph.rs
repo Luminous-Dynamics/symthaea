@@ -127,6 +127,15 @@ pub struct FactSearchResult {
     pub confidence: f32,
 }
 
+/// Result of restoring one persisted fact into the bounded graph.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FactRestoreOutcome {
+    /// Whether the persisted fact was admitted into the graph.
+    pub accepted: bool,
+    /// Number of existing facts evicted by graph retention policy while admitting it.
+    pub policy_evictions: usize,
+}
+
 // ── Enhanced Knowledge Graph ───────────────────────────────────────────────
 
 /// Knowledge graph with temporal awareness and HDC similarity search
@@ -779,15 +788,6 @@ impl EnhancedKnowledgeGraph {
     }
 
     // ── Persistence Support ─────────────────────────────────────────────
-
-    /// Result of restoring one persisted fact into the bounded graph.
-    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-    pub struct FactRestoreOutcome {
-        /// Whether the persisted fact was admitted into the graph.
-        pub accepted: bool,
-        /// Number of existing facts evicted by graph retention policy while admitting it.
-        pub policy_evictions: usize,
-    }
 
     /// Import a fact from a persistence record, exposing retention-policy outcomes.
     pub fn import_fact_record_with_outcome(
