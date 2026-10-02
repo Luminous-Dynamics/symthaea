@@ -15,6 +15,9 @@
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
+
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::process::Command;
 
 /// Result of a config write operation.
@@ -299,10 +302,17 @@ impl ConfigWriter {
         patch: &ConfigPatch,
         expected_original_digest: &str,
     ) -> Result<WriteResult, std::io::Error> {
-        let mut file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&patch.target)?;
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true).write(true);
+        #[cfg(unix)]
+        options.custom_flags(libc::O_NOFOLLOW);
+        let mut file = options.open(&patch.target)?;
+        if !file.metadata()?.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "configuration target is not a regular file",
+            ));
+        }
         file.lock()?;
 
         let mut current = String::new();
@@ -488,6 +498,47 @@ mod tests {
   networking.firewall.enable = true;
 }
 "#;
+
+    #[cfg(unix)]
+    #[test]
+    fn test_apply_patch_if_current_rejects_symlink_target() {
+        let dir = tempfile::tempdir().unwrap();
+        let real = dir.path().join("real-configuration.nix");
+        let target = dir.path().join("configuration.nix");
+        fs::write(&real, SAMPLE_CONFIG).unwrap();
+        std::os::unix::fs::symlink(&real, &target).unwrap();
+
+        let writer = ConfigWriter::new()
+            .with_config_root(dir.path())
+            .with_git_backup(false)
+            .with_dry_run(false);
+
+        let patch = ConfigPatch {
+            target: target.clone(),
+            original: SAMPLE_CONFIG.to_string(),
+            modified: SAMPLE_CONFIG.replace(
+                "networking.firewall.enable = true;",
+                "networking.firewall.enable = false;",
+            ),
+            description: "symlink rejection".to_string(),
+        };
+
+        let error = writer
+            .apply_patch_if_current(
+                &patch,
+                &blake3::hash(SAMPLE_CONFIG.as_bytes()).to_hex().to_string(),
+            )
+            .unwrap_err();
+        assert!(
+            matches!(
+                error.kind(),
+                std::io::ErrorKind::InvalidInput
+                    | std::io::ErrorKind::PermissionDenied
+                    | std::io::ErrorKind::FilesystemLoop
+            ),
+            "expected symlink-safe open rejection, got {error:?}"
+        );
+    }
 
     #[test]
     fn test_add_package_patch() {
