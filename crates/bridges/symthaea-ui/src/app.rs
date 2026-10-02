@@ -1262,7 +1262,7 @@ mod tests {
         assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none());
 
         let many_attrs = "<g ".to_string()
-            + &(0..1024).map(|i| format!("id{}="x" ", i)).collect::<String>()
+            + &(0..1024).map(|i| format!("id{}=\"x\" ", i)).collect::<String>()
             + "/></svg>";
         let many_attrs = "<svg>".to_string() + &many_attrs;
         assert!(portrait_from_json(&serde_json::json!({
