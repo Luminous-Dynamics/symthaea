@@ -997,6 +997,7 @@ fn harmony_resolution_effort(harmony: Harmony, impact: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mycelix::gis::Uncertainty3D;
 
     #[test]
     fn test_frame_lineage_contiguity() {
