@@ -398,7 +398,8 @@ impl AdaptiveOntology {
         } else {
             inserted || merged
         }
-    }}
+    }
+}
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
