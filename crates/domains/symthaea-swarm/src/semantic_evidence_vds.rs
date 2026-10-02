@@ -1323,6 +1323,23 @@ mod tests {
         assert_eq!(Rfc9942ReceiptEnvelope::from_cbor(&encoded).unwrap(),receipt);
     }
     #[test]
+    fn rfc9942_receipt_envelope_accepts_standard_extension_labels() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,3);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL); cbor_int(&mut protected,-7);
+        cbor_int(&mut protected,RFC9942_VDS_HEADER_LABEL); cbor_uint(&mut protected,1);
+        cbor_int(&mut protected,4); cbor_bytes(&mut protected,&[0x01]);
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,18); cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected); cbor_map_len(&mut bytes,2);
+        cbor_int(&mut bytes,RFC9942_VDP_HEADER_LABEL); bytes.extend_from_slice(&vdp.to_cbor());
+        bytes.push(0xf6); cbor_bytes(&mut bytes,&[0xAA;64]);
+        let decoded=Rfc9942ReceiptEnvelope::from_cbor(&bytes).unwrap();
+        assert_eq!(decoded.algorithm_id(),-7); assert_eq!(decoded.vds_id(),1);
+    }
+    #[test]
     fn rfc9942_receipt_envelope_round_trips_attached_payload() {
         let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
         let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
