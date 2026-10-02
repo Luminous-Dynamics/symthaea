@@ -120,15 +120,15 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
             0.2,
             vec![
                 ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0, override_current: None }),
-                ("b", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
-                ("c", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
+                ("b", SensorModel { offset: 0.0, stuck: false, drift: 0.0, override_current: None }),
+                ("c", SensorModel { offset: 0.0, stuck: false, drift: 0.0, override_current: None }),
             ],
         ),
         AdversarialScenario::GenuinePhysicalChange => (
             0.5,
             1.5,
             vec![
-                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
+                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0, override_current: None }),
                 ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0, override_current: None }),
                 ("c", SensorModel { offset: -0.05, stuck: false, drift: 0.0, override_current: None }),
             ],
@@ -137,8 +137,8 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
             0.5,
             1.5,
             vec![
-                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
-                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0 }),
+                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0, override_current: None }),
+                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0, override_current: None }),
                 ("c", SensorModel { offset: 0.0, stuck: true, drift: 0.0, override_current: None }),
             ],
         ),
@@ -146,8 +146,8 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
             0.5,
             1.5,
             vec![
-                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
-                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0 }),
+                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0, override_current: None }),
+                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0, override_current: None }),
                 ("c", SensorModel { offset: 0.0, stuck: false, drift: -0.45, override_current: None }),
             ],
         ),
@@ -155,8 +155,8 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
             0.5,
             1.5,
             vec![
-                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
-                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0 }),
+                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0, override_current: None }),
+                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0, override_current: None }),
             ],
         ),
         AdversarialScenario::CoordinatedFalseTrajectory => (
@@ -172,9 +172,9 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
             1.5,
             0.2,
             vec![
-                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0 }),
-                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0 }),
-                ("c", SensorModel { offset: -0.05, stuck: false, drift: 0.0 }),
+                ("a", SensorModel { offset: 0.0, stuck: false, drift: 0.0, override_current: None }),
+                ("b", SensorModel { offset: 0.05, stuck: false, drift: 0.0, override_current: None }),
+                ("c", SensorModel { offset: -0.05, stuck: false, drift: 0.0, override_current: None }),
             ],
         ),
     };
@@ -192,11 +192,8 @@ pub fn run_scenario(scenario: AdversarialScenario) -> AdversarialCrucibleResult 
         temporal_state: decision.state,
         trusted_sensor_count: decision.trusted_sensor_ids.len(),
         observed_current_consensus: decision
-            .sensor_deltas
-            .iter()
-            .map(|(_, delta)| delta)
-            .next()
-            .map(|delta| latent_previous + delta + 0.0),
+            .consensus_delta
+            .map(|delta| latent_previous + delta),
         temporal_disagreement: !decision.issues.is_empty()
             && decision
                 .issues
