@@ -7,7 +7,7 @@
 #![cfg(feature = "semantic-receipts")]
 
 use symthaea_swarm::semantic_evidence_vds::{
-    Rfc9942Es256CoseKey, Rfc9942VdpError, COSE_ES256_ALGORITHM_ID,
+    Rfc9942Es256CoseKey, Rfc9942VdpError,
 };
 
 const X: [u8; 32] = [
@@ -145,8 +145,8 @@ fn cose_key_rejects_private_d_material() {
 fn cose_key_rejects_wrong_coordinate_length() {
     let mut bytes = valid_key();
     let pos = bytes.windows(3).position(|w| w == [0x21, 0x58, 0x20]).unwrap();
-    bytes[pos + 2] = 0x1f;
-    bytes.remove(pos + 3);
+    bytes[pos + 3] = 0x1f;
+    bytes.remove(pos + 4);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
         Err(Rfc9942VdpError::InvalidEs256CoseKey)
