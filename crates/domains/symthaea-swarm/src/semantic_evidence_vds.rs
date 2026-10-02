@@ -110,6 +110,14 @@ impl Rfc9162Sha256Vds {
     pub fn vds_name(&self) -> &'static str { RFC9162_VDS_NAME }
     pub fn root(&self, leaves: &[Vec<u8>]) -> [u8; 32] { merkle_tree_hash(leaves) }
 
+    /// Generate the RFC 9162 minimal consistency proof for the first `first`
+    /// leaves of the supplied ordered sequence.
+    pub fn prove(&self, leaves: &[Vec<u8>], first: usize) -> Option<Rfc9162ConsistencyProof> {
+        if first == 0 || first >= leaves.len() { return None; }
+        let path = consistency_subproof(first, leaves, true);
+        Some(Rfc9162ConsistencyProof::new(first as u64, leaves.len() as u64, path))
+    }
+
     pub fn verify(
         &self,
         first_root: [u8; 32],
@@ -156,6 +164,26 @@ fn largest_power_of_two_less_than(n: usize) -> usize {
     debug_assert!(n > 1);
     let highest = 1usize << (usize::BITS - 1 - n.leading_zeros());
     if highest == n { highest >> 1 } else { highest }
+}
+
+fn consistency_subproof(m: usize, leaves: &[Vec<u8>], complete: bool) -> Vec<[u8; 32]> {
+    if m == leaves.len() {
+        return if complete { Vec::new() } else { vec![merkle_tree_hash(leaves)] };
+    }
+
+    let k = largest_power_of_two_less_than(leaves.len());
+    let mut proof = if m <= k {
+        consistency_subproof(m, &leaves[..k], complete)
+    } else {
+        consistency_subproof(m - k, &leaves[k..], false)
+    };
+
+    if m <= k {
+        proof.push(merkle_tree_hash(&leaves[k..].to_vec()));
+    } else {
+        proof.push(merkle_tree_hash(&leaves[..k].to_vec()));
+    }
+    proof
 }
 
 fn verify_rfc9162_consistency(
@@ -253,6 +281,20 @@ mod tests {
         let leaves = vec![b"a".to_vec(), b"b".to_vec()];
         let expected = node_hash(&leaf_hash(b"a"), &leaf_hash(b"b"));
         assert_eq!(vds.root(&leaves), expected);
+    }
+
+    #[test]
+    fn generated_consistency_proofs_round_trip() {
+        let vds = Rfc9162Sha256Vds;
+        for n in 2..=12 {
+            let leaves: Vec<Vec<u8>> = (0..n).map(|i| format!("leaf-{i}").into_bytes()).collect();
+            let new_root = vds.root(&leaves);
+            for first in 1..n {
+                let proof = vds.prove(&leaves, first).expect("valid proof request");
+                let old_root = vds.root(&leaves[..first].to_vec());
+                assert!(vds.verify(old_root, new_root, &proof), "n={n}, first={first}");
+            }
+        }
     }
 
     #[test]
