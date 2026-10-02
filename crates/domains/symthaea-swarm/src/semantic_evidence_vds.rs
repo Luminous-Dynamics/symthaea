@@ -138,6 +138,9 @@ impl Rfc9942Es256CoseKey {
                     if value.len()!=32 { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
                     let mut out=[0u8;32]; out.copy_from_slice(&value); y=Some(out);
                 }
+                CborLabelKey::Integer(-4) => {
+                    return Err(Rfc9942VdpError::Es256PrivateKeyMaterial);
+                }
                 _ => {
                     reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                 }
@@ -1040,6 +1043,8 @@ pub enum Rfc9942VdpError {
     Es256CoseKeyAlgorithmMismatch,
     #[error("ES256 COSE_Key does not permit verification")]
     Es256CoseKeyOperationNotPermitted,
+    #[error("ES256 public-key adapter refuses private EC2 key material")]
+    Es256PrivateKeyMaterial,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
     VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
@@ -2454,6 +2459,15 @@ mod tests {
         cbor_int(&mut wrong,-2); cbor_bytes(&mut wrong,&public[1..33]);
         cbor_int(&mut wrong,-3); cbor_bytes(&mut wrong,&public[33..65]);
         assert_eq!(Rfc9942Es256CoseKey::from_cbor(&wrong),Err(Rfc9942VdpError::InvalidEs256CoseKey));
+
+        let mut private=Vec::new();
+        cbor_map_len(&mut private,5);
+        cbor_int(&mut private,COSE_KTY_LABEL); cbor_int(&mut private,COSE_EC2_KTY);
+        cbor_int(&mut private,-1); cbor_int(&mut private,COSE_P256_CRV);
+        cbor_int(&mut private,-2); cbor_bytes(&mut private,&public[1..33]);
+        cbor_int(&mut private,-3); cbor_bytes(&mut private,&public[33..65]);
+        cbor_int(&mut private,-4); cbor_bytes(&mut private,&[0xAA;32]);
+        assert_eq!(Rfc9942Es256CoseKey::from_cbor(&private),Err(Rfc9942VdpError::Es256PrivateKeyMaterial));
     }
 
     #[cfg(feature = "semantic-receipts")]
