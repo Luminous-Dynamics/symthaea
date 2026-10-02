@@ -977,11 +977,23 @@ mod tests {
 
     #[test]
     fn invoked_is_a_distinct_durable_dispatch_evidence_state() {
+        let action = EpistemicAction::new("invoked-action", "effect", ActionRisk::Critical);
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            action_id: action.id.clone(),
+            authorization_instance: "approval-1".into(),
+            action_digest: digest.clone(),
+            frame: "frame-1".into(),
+            support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(),
+            expires_at: None,
+            authority_epoch: 1,
+        };
         let mut lease = AuthorizationLease::new_with_instance(
-            "approval-1", "action-1", "sha256:action", "sha256:support", "policy-v1", 1, 1,
+            "approval-1", action.id.clone(), digest, "sha256:support", "policy-v1", 1, 1,
         );
-        let witness = authorization_witness_for(&lease);
-        let action = action_for("action-1", "sha256:action");
         lease.prepare_for_execution(&witness, &action, "frame-1", "attempt-1").unwrap();
         lease.mark_dispatch_pending("attempt-1").unwrap();
         lease.mark_invoked("attempt-1").unwrap();
