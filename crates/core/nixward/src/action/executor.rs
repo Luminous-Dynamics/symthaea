@@ -677,7 +677,33 @@ impl NixOSExecutor {
             };
         }
 
-        let intent_digest = authority.action_intent_digest().unwrap_or_else(|_| "<invalid-intent>".to_string());
+        if let NixOSCommand::ConfigPatch {
+            option_path,
+            value,
+            expected_config_digest,
+        } = &command
+        {
+            if !self.dry_run {
+                let writer = super::config_writer::ConfigWriter::new();
+                let patch = match writer.set_option(option_path, value) {
+                    Ok(patch) => patch,
+                    Err(error) => {
+                        return ExecutionResult::FailedNoRollback {
+                            error: format!("config patch preparation failed: {error}"),
+                            rollback_error: None,
+                        };
+                    }
+                };
+                if let Err(error) = writer.apply_patch_if_current(&patch, expected_config_digest) {
+                    return ExecutionResult::FailedNoRollback {
+                        error: format!("config patch currentness/write failed: {error}"),
+                        rollback_error: None,
+                    };
+                }
+            }
+        }
+
+        let intent_digest = authority.action_intent_digest().unwrap_or_else(|| "<invalid-intent>".to_string());
         info!(
             command = ?command,
             intent = %intent_digest,
@@ -702,6 +728,12 @@ impl NixOSExecutor {
         if let Err(reason) = command.validate_shape() {
             return ExecutionResult::Blocked {
                 reason,
+                safety_level: safety,
+            };
+        }
+        if matches!(command, NixOSCommand::ConfigPatch { .. }) {
+            return ExecutionResult::Blocked {
+                reason: "ConfigPatch requires a live Nixward execution authority".to_string(),
                 safety_level: safety,
             };
         }
@@ -956,6 +988,24 @@ mod tests {
             result,
             ExecutionResult::Blocked {
                 safety_level: SafetyLevel::SystemModify,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_execute_confirmed_rejects_config_patch_without_authority() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let command = NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "ab".repeat(32),
+        };
+        let result = executor.execute_confirmed(command, 1.0).await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked {
+                safety_level: SafetyLevel::SystemCritical,
                 ..
             }
         ));
