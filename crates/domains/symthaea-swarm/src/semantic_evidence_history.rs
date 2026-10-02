@@ -68,6 +68,13 @@ impl HistoryCheckpoint {
     pub fn length(&self) -> u64 { self.length }
     pub fn head(&self) -> Option<HistoryEntryCommitment> { self.head }
     pub fn snapshot(&self) -> HistoryEntryCommitment { self.snapshot }
+
+    /// Verify that the cached snapshot is consistent with the checkpoint
+    /// material itself. This does not prove that the checkpoint came from a
+    /// particular history; it only validates its internal commitment.
+    pub fn verify(&self) -> bool {
+        self.snapshot == snapshot_commitment(self.length, self.head)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -89,19 +96,7 @@ impl EvidenceHistory {
     /// This is an untrusted local snapshot identifier, not a signed checkpoint
     /// and not a transparency-service root.
     pub fn snapshot_commitment(&self) -> HistoryEntryCommitment {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&(SNAPSHOT_DOMAIN.len() as u64).to_be_bytes());
-        hasher.update(SNAPSHOT_DOMAIN);
-        hasher.update(&VERSION.to_be_bytes());
-        hasher.update(&(self.entries.len() as u64).to_be_bytes());
-        match self.head_commitment() {
-            Some(head) => {
-                hasher.update(&[1]);
-                hasher.update(head.as_bytes());
-            }
-            None => hasher.update(&[0]),
-        }
-        HistoryEntryCommitment(*hasher.finalize().as_bytes())
+        snapshot_commitment(self.entries.len() as u64, self.head_commitment())
     }
 
     /// Export the checkpoint material needed to identify this local prefix.
@@ -196,6 +191,22 @@ impl EvidenceHistory {
     }
 }
 
+fn snapshot_commitment(length: u64, head: Option<HistoryEntryCommitment>) -> HistoryEntryCommitment {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&(SNAPSHOT_DOMAIN.len() as u64).to_be_bytes());
+    hasher.update(SNAPSHOT_DOMAIN);
+    hasher.update(&VERSION.to_be_bytes());
+    hasher.update(&length.to_be_bytes());
+    match head {
+        Some(head) => {
+            hasher.update(&[1]);
+            hasher.update(head.as_bytes());
+        }
+        None => hasher.update(&[0]),
+    }
+    HistoryEntryCommitment(*hasher.finalize().as_bytes())
+}
+
 fn entry_commitment(
     sequence: u64,
     evidence_digest: &EvidenceDigest,
@@ -286,6 +297,22 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn checkpoint_internal_commitment_is_verifiable() {
+        let history = EvidenceHistory::new();
+        let empty = history.checkpoint();
+        assert!(empty.verify());
+
+        let mut history = history;
+        history.append(evidence(1)).unwrap();
+        let checkpoint = history.checkpoint();
+        assert!(checkpoint.verify());
+
+        let mut tampered = checkpoint;
+        tampered.snapshot = HistoryEntryCommitment([0; 32]);
+        assert!(!tampered.verify());
+    }
+
     fn empty_and_nonempty_snapshots_are_distinct() {
         let empty = EvidenceHistory::new();
         let mut nonempty = EvidenceHistory::new();
