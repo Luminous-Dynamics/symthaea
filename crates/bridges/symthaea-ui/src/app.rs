@@ -86,11 +86,9 @@ struct Movie {
     semantic_coherence: f32,
 }
 
-/// Generous upper bound on a single "mental movie" frame's pixel count
-/// (far more than a telemetry visualization frame plausibly needs). The
-/// gateway URL is a user-editable text field, so a malicious or
-/// compromised gateway must not be able to drive an unbounded (or, on
-/// 32-bit wasm, integer-overflowing) allocation via `width`/`height`.
+/// Bound decoded mental-movie dimensions, frame count, and expanded RGBA
+/// storage together. The gateway is remote input and must not be able to
+/// drive an unbounded allocation through width/height/frame multiplicity.
 const MAX_MOVIE_PIXELS: usize = 2048 * 2048;
 const MAX_MOVIE_FRAMES: usize = 24;
 const MAX_MOVIE_RGBA_BYTES: usize = 32 * 1024 * 1024;
@@ -315,7 +313,9 @@ pub fn App() -> impl IntoView {
     {
         let renderer = Rc::clone(&webgpu_renderer);
         Effect::new(move |_| {
-            let _ready = webgpu_ready.get();
+            if !webgpu_ready.get() {
+                return;
+            }
             let Some(scene) = gpu_scene.get() else {
                 return;
             };
@@ -365,7 +365,9 @@ pub fn App() -> impl IntoView {
     // Render the current imagination frame through WebGPU when available.
     // The texture is persistent across frames; only the RGBA payload changes.
     Effect::new(move |_| {
-        let _ready = movie_webgpu_ready.get();
+        if !movie_webgpu_ready.get() {
+            return;
+        }
         let idx = movie_frame.get();
         let Some(movie) = movie.get() else {
             return;
