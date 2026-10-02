@@ -426,6 +426,13 @@ impl KnowledgePersistence {
         if facts.iter().any(|fact| fact.memory_id.trim().is_empty()) {
             return Err("FactRecord memory_id must be non-empty".into());
         }
+        let mut fact_ids = HashSet::with_capacity(facts.len());
+        if facts
+            .iter()
+            .any(|fact| !fact_ids.insert(fact.memory_id.as_str()))
+        {
+            return Err("Snapshot contains duplicate FactRecord memory_id".into());
+        }
         if facts.iter().any(|fact| fact.vector_bytes.len() != BinaryHV::BYTES) {
             return Err(format!(
                 "FactRecord vector_bytes must be exactly {} bytes",
@@ -445,6 +452,17 @@ impl KnowledgePersistence {
             ProvenanceRelation::from(relation.clone())
                 .validate()
                 .map_err(|e| format!("Invalid provenance relation: {e}"))?;
+        }
+        let mut provenance_keys = HashSet::with_capacity(relations.len());
+        if relations.iter().any(|relation| {
+            !provenance_keys.insert((
+                relation.source_memory_id.as_str(),
+                relation.target_memory_id.as_str(),
+                relation.kind,
+                relation.created_at.as_str(),
+            ))
+        }) {
+            return Err("Snapshot contains duplicate ProvenanceRelationRecord key".into());
         }
 
         for edge in edges {
