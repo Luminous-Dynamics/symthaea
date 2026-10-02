@@ -931,7 +931,7 @@ impl KnowledgePersistence {
             return Err("No database path configured".into());
         }
 
-        let conn = self.open_connection()?;
+        let mut conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
         // Validation now verifies the complete live snapshot, so legacy rows must
@@ -943,8 +943,12 @@ impl KnowledgePersistence {
             [],
         )
         .map_err(|e| e.to_string())?;
+
+        // This transaction both observes the snapshot and appends the validation receipt.
+        // Starting it as IMMEDIATE avoids the deferred read→write upgrade race that can
+        // otherwise surface as SQLITE_BUSY_SNAPSHOT under concurrent writers.
         let tx = conn
-            .unchecked_transaction()
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|e| format!("Begin snapshot validation transaction: {e}"))?;
 
         verify_snapshot_receipts_in_tx(&tx)?;
