@@ -394,12 +394,14 @@ fn emit_polygon_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) -
     for (index, point) in points.iter().enumerate() {
         if polygon
             .last()
-            .is_none_or(|&last: &usize| points[last] != *point)
+            .map_or(true, |&last| points[last] != *point)
         {
             polygon.push(index);
         }
     }
-    if polygon.len() > 1 && points[*polygon.first().unwrap()] == points[*polygon.last().unwrap()] {
+    if polygon.len() > 1
+        && points[*polygon.first().unwrap()] == points[*polygon.last().unwrap()]
+    {
         polygon.pop();
     }
     if polygon.len() < 3 {
