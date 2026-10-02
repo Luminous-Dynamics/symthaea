@@ -23,6 +23,98 @@ use symthaea_core::observation_fabric::{
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
 pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v1";
+
+pub const POLICY_VERSION: &str = "symthaea-observation-verification-policy-v1";
+pub const VERIFIER_IMPLEMENTATION_ID: &str = "symthaea-observation-attestation-ed25519-v1";
+pub const ENVIRONMENT_IDENTITY_VERSION: &str = "symthaea-verifier-environment-v1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationPolicyInputs {
+    pub policy_version: &'static str,
+    pub cryptosuite: &'static str,
+    pub expected_proof_purpose: Option<String>,
+    pub expected_domain: Option<String>,
+    pub expected_challenge_fingerprint: Option<String>,
+    pub require_active_verification_method: bool,
+}
+
+impl VerificationPolicyInputs {
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+        fn write_option(bytes: &mut Vec<u8>, value: Option<&str>) {
+            match value {
+                Some(value) => { bytes.push(1); write_string(bytes, value); }
+                None => bytes.push(0),
+            }
+        }
+        write_string(&mut bytes, self.policy_version);
+        write_string(&mut bytes, self.cryptosuite);
+        write_option(&mut bytes, self.expected_proof_purpose.as_deref());
+        write_option(&mut bytes, self.expected_domain.as_deref());
+        write_option(&mut bytes, self.expected_challenge_fingerprint.as_deref());
+        bytes.push(self.require_active_verification_method as u8);
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-verification-policy:v1\n");
+        hasher.update(&self.canonical_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifierEnvironmentIdentity {
+    pub identity_version: &'static str,
+    pub implementation_id: &'static str,
+    pub build_fingerprint: String,
+    pub runtime_profile: Option<String>,
+}
+
+impl VerifierEnvironmentIdentity {
+    pub fn new(build_fingerprint: impl Into<String>) -> Self {
+        Self {
+            identity_version: ENVIRONMENT_IDENTITY_VERSION,
+            implementation_id: VERIFIER_IMPLEMENTATION_ID,
+            build_fingerprint: build_fingerprint.into(),
+            runtime_profile: None,
+        }
+    }
+
+    pub fn with_runtime_profile(mut self, profile: impl Into<String>) -> Self {
+        self.runtime_profile = Some(profile.into());
+        self
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+        write_string(&mut bytes, self.identity_version);
+        write_string(&mut bytes, self.implementation_id);
+        write_string(&mut bytes, &self.build_fingerprint);
+        match self.runtime_profile.as_deref() {
+            Some(profile) => { bytes.push(1); write_string(&mut bytes, profile); }
+            None => bytes.push(0),
+        }
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:verifier-environment:v1\n");
+        hasher.update(&self.canonical_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
 const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v1\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,6 +152,11 @@ pub struct ReceiptAttestationVerificationReport {
     pub outcome: ReceiptAttestationVerificationOutcome,
     pub verifier_version: &'static str,
     pub receipt_fingerprint: String,
+    pub evaluated_at_unix_ns: i128,
+    pub policy_inputs: VerificationPolicyInputs,
+    pub policy_fingerprint: String,
+    pub environment_identity: VerifierEnvironmentIdentity,
+    pub environment_fingerprint: String,
     pub resolved_verification_method: Option<String>,
     pub structural_validation: VerificationStage,
     pub receipt_commitment: VerificationStage,
@@ -78,12 +175,20 @@ impl ReceiptAttestationVerificationReport {
         stage: fn(ReceiptAttestationVerificationOutcome) -> VerificationStage,
         receipt_fingerprint: String,
         resolved_verification_method: Option<String>,
+        evaluated_at_unix_ns: i128,
+        policy_inputs: VerificationPolicyInputs,
+        environment_identity: VerifierEnvironmentIdentity,
     ) -> Self {
         let failed = stage(outcome);
         let mut report = Self {
             outcome,
             verifier_version: VERIFIER_VERSION,
             receipt_fingerprint,
+            evaluated_at_unix_ns,
+            policy_fingerprint: policy_inputs.fingerprint(),
+            environment_fingerprint: environment_identity.fingerprint(),
+            policy_inputs,
+            environment_identity,
             resolved_verification_method,
             structural_validation: VerificationStage::NotEvaluated,
             receipt_commitment: VerificationStage::NotEvaluated,
@@ -213,6 +318,9 @@ impl ReceiptAttestationVerificationReport {
         bytes.extend_from_slice(REPORT_DOMAIN_SEPARATOR);
         write_string(&mut bytes, self.verifier_version);
         write_string(&mut bytes, &self.receipt_fingerprint);
+        bytes.extend_from_slice(&self.evaluated_at_unix_ns.to_be_bytes());
+        write_string(&mut bytes, &self.policy_fingerprint);
+        write_string(&mut bytes, &self.environment_fingerprint);
         match &self.resolved_verification_method {
             Some(method) => {
                 bytes.push(1);
@@ -234,7 +342,10 @@ impl ReceiptAttestationVerificationReport {
     }
 
     pub fn fingerprint(&self) -> String {
-        blake3::hash(&self.canonical_bytes()).to_hex().to_string()
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-attestation-report:v1\n");
+        hasher.update(&self.canonical_bytes());
+        hasher.finalize().to_hex().to_string()
     }
 
 }
@@ -316,6 +427,8 @@ pub struct Ed25519ReceiptVerifier {
     expected_domain: Option<String>,
     expected_challenge: Option<String>,
     now_unix_ns: i128,
+    policy_inputs: VerificationPolicyInputs,
+    environment_identity: VerifierEnvironmentIdentity,
 }
 
 impl Ed25519ReceiptVerifier {
@@ -331,21 +444,43 @@ impl Ed25519ReceiptVerifier {
             expected_domain: None,
             expected_challenge: None,
             now_unix_ns,
+            policy_inputs: VerificationPolicyInputs {
+                policy_version: POLICY_VERSION,
+                cryptosuite: CRYPTOSUITE,
+                expected_proof_purpose: None,
+                expected_domain: None,
+                expected_challenge_fingerprint: None,
+                require_active_verification_method: true,
+            },
+            environment_identity: VerifierEnvironmentIdentity::new("unspecified"),
         }
     }
 
     pub fn with_expected_proof_purpose(mut self, purpose: impl Into<String>) -> Self {
         self.expected_proof_purpose = Some(purpose.into());
+        self.policy_inputs.expected_proof_purpose = self.expected_proof_purpose.clone();
         self
     }
 
     pub fn with_expected_domain(mut self, domain: impl Into<String>) -> Self {
         self.expected_domain = Some(domain.into());
+        self.policy_inputs.expected_domain = self.expected_domain.clone();
         self
     }
 
     pub fn with_expected_challenge(mut self, challenge: impl Into<String>) -> Self {
         self.expected_challenge = Some(challenge.into());
+        self.policy_inputs.expected_challenge_fingerprint = self.expected_challenge.as_deref().map(|v| blake3::hash(v.as_bytes()).to_hex().to_string());
+        self
+    }
+
+    pub fn with_environment_identity(mut self, identity: VerifierEnvironmentIdentity) -> Self {
+        self.environment_identity = identity;
+        self
+    }
+
+    pub fn with_policy_version(mut self, version: &'static str) -> Self {
+        self.policy_inputs.policy_version = version;
         self
     }
 
@@ -414,6 +549,9 @@ impl Ed25519ReceiptVerifier {
                     VerificationStage::Failed,
                     receipt.fingerprint(),
                     None,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
             ReceiptAttestationTemporalStatus::Expired => {
@@ -451,6 +589,9 @@ impl Ed25519ReceiptVerifier {
                     VerificationStage::Failed,
                     receipt.fingerprint(),
                     Some(method.to_string()),
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
         };
@@ -546,6 +687,9 @@ impl Ed25519ReceiptVerifier {
                     VerificationStage::Failed,
                     fingerprint,
                     method,
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
                 );
             }
             ReceiptAttestationTemporalStatus::Expired => {
@@ -625,7 +769,13 @@ impl Ed25519ReceiptVerifier {
         let signature = Signature::from_bytes(&proof_bytes);
 
         match verifying_key.verify(&envelope.canonical_payload_bytes(), &signature) {
-            Ok(()) => ReceiptAttestationVerificationReport::passed(fingerprint, method),
+            Ok(()) => ReceiptAttestationVerificationReport::passed(
+                fingerprint,
+                method,
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
+            ),
             Err(_) => ReceiptAttestationVerificationReport::failed(
                 ReceiptAttestationVerificationOutcome::InvalidSignature,
                 VerificationStage::Failed,
@@ -949,6 +1099,51 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn verification_report_binds_policy_environment_and_evaluation_time() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .with_expected_proof_purpose("observation-independence")
+        .with_expected_domain("mycelix")
+        .with_environment_identity(
+            VerifierEnvironmentIdentity::new("build-sha-abc")
+                .with_runtime_profile("portable"),
+        );
+        let report = verifier.verify_report(&envelope, &receipt);
+        assert_eq!(report.evaluated_at_unix_ns, 150);
+        assert_eq!(report.policy_inputs.expected_proof_purpose.as_deref(), Some("observation-independence"));
+        assert_eq!(report.policy_inputs.expected_domain.as_deref(), Some("mycelix"));
+        assert_eq!(report.environment_identity.build_fingerprint, "build-sha-abc");
+        assert_eq!(report.policy_fingerprint, report.policy_inputs.fingerprint());
+        assert_eq!(report.environment_fingerprint, report.environment_identity.fingerprint());
+    }
+
+    #[test]
+    fn verification_report_fingerprint_changes_when_policy_or_environment_changes() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let base = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let policy = base.clone().with_expected_domain("mycelix");
+        let environment = base.clone().with_environment_identity(
+            VerifierEnvironmentIdentity::new("build-sha-abc")
+        );
+        assert_ne!(
+            base.verify_report(&envelope, &receipt).fingerprint(),
+            policy.verify_report(&envelope, &receipt).fingerprint()
+        );
+        assert_ne!(
+            base.verify_report(&envelope, &receipt).fingerprint(),
+            environment.verify_report(&envelope, &receipt).fingerprint()
+        );
+    }
 
     #[test]
     fn verification_report_fingerprint_is_deterministic_and_binds_receipt() {
