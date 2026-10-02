@@ -876,7 +876,7 @@ impl NixOSExecutor {
                 safety_level: safety,
             };
         }
-        self.execute_confirmed_inner(command, phi).await
+        self.execute_confirmed_inner(command, ExecutionBasisV1::Phi { phi }).await
     }
 
     async fn execute_confirmed_inner(
