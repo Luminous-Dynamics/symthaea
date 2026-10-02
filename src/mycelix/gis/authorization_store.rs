@@ -602,6 +602,44 @@ mod tests {
     }
 
     #[test]
+    fn invoked_state_is_durable_and_committable() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-invoked-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        store.prepare_for_execution(&witness,&action,"frame@1","attempt-invoked").unwrap();
+        store.mark_dispatch_pending(&witness.authorization_instance,"attempt-invoked").unwrap();
+        store.mark_invoked(&witness.authorization_instance,"attempt-invoked").unwrap();
+        let reopened=SqliteAuthorizationStore::open(&path).unwrap();
+        let receipt=reopened.commit(
+            &witness.authorization_instance,"attempt-invoked",ExecutionOutcome::Succeeded
+        ).unwrap();
+        assert_eq!(receipt.outcome,ExecutionOutcome::Succeeded);
+        assert_eq!(receipt.provider_idempotency_key, AuthorizationLease::new(
+            action.id.clone(), action.canonical_action_digest(), "sha256:support", "policy-v1", 1, 1
+        ).provider_idempotency_key());
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn recovery_treats_invoked_as_indeterminate() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-invoked-recovery-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        store.prepare_for_execution(&witness,&action,"frame@1","attempt-crash").unwrap();
+        store.mark_dispatch_pending(&witness.authorization_instance,"attempt-crash").unwrap();
+        store.mark_invoked(&witness.authorization_instance,"attempt-crash").unwrap();
+        drop(store);
+
+        let reopened=SqliteAuthorizationStore::open(&path).unwrap();
+        assert_eq!(reopened.recover_incomplete_attempts().unwrap(),1);
+        assert!(matches!(
+            reopened.prepare_for_execution(&witness,&action,"frame@1","attempt-retry"),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::IndeterminateRequiresReconciliation
+            ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn dispatch_pending_wrong_attempt_is_fenced() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-dispatch-fence-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
