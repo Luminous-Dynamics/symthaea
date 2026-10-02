@@ -955,6 +955,45 @@ mod tests {
     }
 
     #[test]
+    fn movie_rejects_unsupported_four_channel_frames() {
+        let payload = serde_json::json!({
+            "mental_movie": {
+                "width": 1,
+                "height": 1,
+                "channels": 4,
+                "frames_b64": ["AAAA"]
+            }
+        });
+        assert!(Movie::from_json(&payload).is_none());
+    }
+
+    #[test]
+    fn movie_rejects_trailing_frame_bytes_instead_of_silently_ignoring_them() {
+        let payload = serde_json::json!({
+            "mental_movie": {
+                "width": 1,
+                "height": 1,
+                "channels": 1,
+                "frames_b64": ["AQID"]
+            }
+        });
+        assert!(Movie::from_json(&payload).is_none());
+    }
+
+    #[test]
+    fn movie_rejects_more_than_the_bounded_frame_count() {
+        let payload = serde_json::json!({
+            "mental_movie": {
+                "width": 1,
+                "height": 1,
+                "channels": 1,
+                "frames_b64": vec!["AQ=="; 121]
+            }
+        });
+        assert!(Movie::from_json(&payload).is_none());
+    }
+
+    #[test]
     fn authority_generation_is_monotonic() {
         let mut generation = 0_u64;
         let first = next_authority_generation(&mut generation).unwrap();
