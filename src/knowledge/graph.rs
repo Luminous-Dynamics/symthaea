@@ -1077,8 +1077,8 @@ impl EnhancedKnowledgeGraph {
             a.confidence
                 .partial_cmp(&b.confidence)
                 .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.memory_id.cmp(&b.memory_id))
-                .then_with(|| a.id.cmp(&b.id))
+                .then_with(|| b.memory_id.cmp(&a.memory_id))
+                .then_with(|| b.id.cmp(&a.id))
         }) {
             self.remove_fact(id);
             self.total_evictions += 1;
@@ -1476,6 +1476,34 @@ mod tests {
         assert_eq!(forward_ids, reverse_ids);
     }
 
+    #[test]
+    fn test_bounded_fact_restore_equal_confidence_prefers_smaller_memory_id() {
+        let records = [
+            ("beta", 0.8),
+            ("gamma", 0.8),
+            ("alpha", 0.8),
+        ];
+        let mut graph = EnhancedKnowledgeGraph::new(2);
+        for (memory_id, confidence) in records {
+            let record = super::persistence::FactRecord {
+                memory_id: memory_id.into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: memory_id.into(),
+                confidence,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            };
+            graph.import_fact_record_with_outcome(&record);
+        }
+
+        assert_eq!(
+            graph.all_facts().map(|f| f.memory_id.as_str()).collect::<Vec<_>>(),
+            vec!["alpha", "beta"]
+        );
+    }
     #[test]
     fn test_bounded_fact_restore_rejects_weaker_incoming_without_eviction() {
         let mut graph = EnhancedKnowledgeGraph::new(2);
