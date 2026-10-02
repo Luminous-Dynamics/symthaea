@@ -275,7 +275,35 @@ impl AuthorizationLease {
         Ok(receipt)
     }
 
-    pub fn reconcile_indeterminate(
+        /// Revoke authority before the effect boundary. Revocation is terminal and
+    /// cannot be undone by presenting the old authorization witness again.
+    pub fn revoke(&mut self) -> Result<(), AuthorizationConsumptionError> {
+        if matches!(
+            self.state,
+            AuthorizationLeaseState::Ready | AuthorizationLeaseState::Prepared { .. }
+        ) {
+            self.state = AuthorizationLeaseState::Revoked;
+            Ok(())
+        } else {
+            Err(AuthorizationConsumptionError::NotReady)
+        }
+    }
+
+    /// Expire authority when its validity window is no longer acceptable.
+    /// Like revocation, expiry is terminal and does not replenish budget.
+    pub fn expire(&mut self) -> Result<(), AuthorizationConsumptionError> {
+        if matches!(
+            self.state,
+            AuthorizationLeaseState::Ready | AuthorizationLeaseState::Prepared { .. }
+        ) {
+            self.state = AuthorizationLeaseState::Expired;
+            Ok(())
+        } else {
+            Err(AuthorizationConsumptionError::NotReady)
+        }
+    }
+
+pub fn reconcile_indeterminate(
         &mut self,
         attempt_id: &str,
         outcome: ExecutionOutcome,
@@ -745,6 +773,37 @@ mod tests {
                 Err(AuthorizationConsumptionError::InvalidBinding)
             );
         }
+    }
+
+    #[test]
+    fn revoked_or_expired_leases_cannot_be_resurrected() {
+        let action = EpistemicAction::new("a-terminal", "intervention", ActionRisk::High);
+        let witness = ActionAuthorizationWitness {
+            action_id: "a-terminal".into(), action_digest: "sha256:canonical".into(),
+            frame: "f1".into(), support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(), decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 1,
+        };
+
+        let mut revoked = AuthorizationLease::new(
+            "a-terminal", "sha256:canonical", "sha256:support", "policy-v1", 1, 1,
+        );
+        revoked.revoke().unwrap();
+        assert_eq!(
+            revoked.prepare_for_execution(&witness, &action, "f1", "attempt"),
+            Err(AuthorizationConsumptionError::NotReady)
+        );
+        assert_eq!(revoked.revoke(), Err(AuthorizationConsumptionError::NotReady));
+
+        let mut expired = AuthorizationLease::new(
+            "a-terminal", "sha256:canonical", "sha256:support", "policy-v1", 1, 1,
+        );
+        expired.expire().unwrap();
+        assert_eq!(
+            expired.prepare_for_execution(&witness, &action, "f1", "attempt"),
+            Err(AuthorizationConsumptionError::NotReady)
+        );
+        assert_eq!(expired.expire(), Err(AuthorizationConsumptionError::NotReady));
     }
 
     #[test]
