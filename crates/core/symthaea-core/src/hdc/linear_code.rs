@@ -591,6 +591,19 @@ mod tests {
     }
 
     #[test]
+    fn bipolar_mapping_matches_raviv_boolean_convention() {
+        let mut word = BinaryCodeword::zero(3);
+        assert_eq!(word.to_bipolar(), vec![1, 1, 1]);
+
+        word.set_bit(0, true);
+        assert_eq!(word.to_bipolar(), vec![-1, 1, 1]);
+        assert_eq!(
+            BinaryCodeword::from_bipolar(&[-1, 1, 1]),
+            Some(word)
+        );
+    }
+
+    #[test]
     fn bipolar_binding_matches_boolean_xor() {
         let code = RandomLinearCode::generate(73, 8, 0xABCD);
         let left = code.encode(&[true, false, true, false, true, false, false, true]);
