@@ -798,9 +798,6 @@ impl ExecutionLineageDriftV1 {
         prepared: &ExecutionLineageV1,
         observed: &ExecutionLineageV1,
     ) -> Result<Option<Self>, String> {
-        prepared.validate()?;
-        observed.validate()?;
-
         let prepared_digest = prepared.validated_digest()?;
         let observed_digest = observed.validated_digest()?;
         if prepared_digest == observed_digest {
@@ -1240,7 +1237,7 @@ mod tests {
 
     #[test]
     fn validated_digest_rejects_invalid_direct_construction() {
-        let mut lineage = valid_lineage();
+        let mut lineage = lineage_fixture();
         lineage.argv.clear();
 
         let error = lineage
@@ -1251,7 +1248,7 @@ mod tests {
 
     #[test]
     fn checked_perturbation_qualifier_rejects_invalid_lineages() {
-        let before = valid_lineage();
+        let before = lineage_fixture();
         let mut after = before.clone();
         after.argv.clear();
 
@@ -1262,7 +1259,7 @@ mod tests {
 
     #[test]
     fn checked_perturbation_qualifier_preserves_four_way_classification() {
-        let before = valid_lineage();
+        let before = lineage_fixture();
         let mut after = before.clone();
         after.target_triple = "aarch64-unknown-linux-gnu".into();
 
