@@ -1840,6 +1840,50 @@ fn read_snapshot_from_transaction(
     })
 }
 
+fn verify_snapshot_receipts_in_tx(
+    tx: &rusqlite::Transaction<'_>,
+) -> Result<(), String> {
+    let mut stmt = tx
+        .prepare(
+            "SELECT generation, canonical_digest_hex, receipt_digest_hex
+             FROM knowledge_snapshot_receipts
+             ORDER BY generation ASC",
+        )
+        .map_err(|e| format!("Prepare snapshot receipt verification: {e}"))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let generation = u64::try_from(row.get::<_, i64>(0)?).map_err(|_| {
+                rusqlite::Error::InvalidColumnType(
+                    0,
+                    "generation".into(),
+                    rusqlite::types::Type::Integer,
+                )
+            })?;
+            Ok(KnowledgeSnapshotReceipt {
+                generation,
+                canonical_digest_hex: row.get(1)?,
+                receipt_digest_hex: row.get(2)?,
+            })
+        })
+        .map_err(|e| format!("Query snapshot receipts for verification: {e}"))?;
+
+    for row in rows {
+        let receipt =
+            row.map_err(|e| format!("Load snapshot receipt for verification: {e}"))?;
+        if receipt.generation == 0 {
+            return Err("Snapshot receipt generation must be positive".into());
+        }
+        if receipt.receipt_digest_hex != receipt.canonical_receipt_digest_hex() {
+            return Err(format!(
+                "Snapshot receipt self-digest mismatch: generation {}",
+                receipt.generation
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn verify_snapshot_validation_receipts_in_tx(
     tx: &rusqlite::Transaction<'_>,
 ) -> Result<(), String> {
