@@ -83,7 +83,7 @@ impl PendingNixApprovalRequestV1 {
         validate_digest(&self.displayed_action_digest, "displayed action digest")?;
         validate_identifier(&self.authority_profile_ref, "authority profile ref")?;
         RequiredApprovalProfileV1::parse_ref(&self.authority_profile_ref)
-            .map_err(|_| LocalApprovalErrorV1::UnknownAuthorityProfile)?;
+            .map_err(|_| LocalApprovalErrorV1::InvalidIdentifier("authority profile ref"))?;
         self.currentness()?;
 
         if self.request_nonce == [0; 32] {
