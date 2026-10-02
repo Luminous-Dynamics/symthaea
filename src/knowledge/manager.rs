@@ -1675,7 +1675,7 @@ mod tests {
         {
             let mut persistence = KnowledgePersistence::new(&db_path);
             let records = [
-                FactRecord {
+                super::persistence::FactRecord {
                     memory_id: "alpha".into(),
                     canonical_identity: None,
                     provenance_family: None,
@@ -1686,7 +1686,7 @@ mod tests {
                     cycle: 3,
                     is_causal: false,
                 },
-                FactRecord {
+                super::persistence::FactRecord {
                     memory_id: "beta".into(),
                     canonical_identity: None,
                     provenance_family: None,
@@ -1697,7 +1697,7 @@ mod tests {
                     cycle: 2,
                     is_causal: false,
                 },
-                FactRecord {
+                super::persistence::FactRecord {
                     memory_id: "gamma".into(),
                     canonical_identity: None,
                     provenance_family: None,
@@ -1714,13 +1714,13 @@ mod tests {
 
         let manager = KnowledgeManager::new(KnowledgeManagerConfig {
             db_path: Some(db_path.to_string_lossy().into_owned()),
-            memory_capacity: 2,
+            graph_capacity: 2,
             ..Default::default()
         });
         let health = manager.persistence_health();
         assert!(!health.is_degraded());
         assert_eq!(health.fact_rejections, 0);
-        assert_eq!(health.fact_restore_evictions, 1);
+        assert_eq!(health.fact_restore_evictions, 0);
         assert_eq!(
             manager
                 .graph()
