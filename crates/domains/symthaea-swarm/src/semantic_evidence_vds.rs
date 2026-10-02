@@ -119,7 +119,7 @@ impl Rfc9942ReceiptEnvelope {
         }
         let vdp=vdp.ok_or(Rfc9942VdpError::InvalidStructure)?;
         let payload=match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)?{
-            2=>{let raw=reader.read_bstr_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;Rfc9942ReceiptPayload::from_bytes(Some(&raw))?;}
+            2=>{let raw=reader.read_bstr_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;Rfc9942ReceiptPayload::from_bytes(Some(&raw))?}
             7=>{reader.read_nil().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;Rfc9942ReceiptPayload::Detached}
             _=>return Err(Rfc9942VdpError::InvalidEncoding),
         };
