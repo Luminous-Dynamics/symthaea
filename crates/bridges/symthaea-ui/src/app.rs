@@ -463,6 +463,16 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
         return false;
     }
 
+    // SVG path data is organized as subpaths, each beginning with a
+    // moveto command. Reject draw/close commands before the first M/m
+    // rather than relying on browser recovery semantics.
+    if !matches!(
+        tokens.first(),
+        Some(Token::Command('M' | 'm'))
+    ) {
+        return false;
+    }
+
     let mut index = 0usize;
     let mut command_count = 0usize;
     let mut active_command = None::<char>;
@@ -1829,6 +1839,8 @@ mod tests {
             r#"<svg><path d="M0 0 L1"/></svg>"#,
             r#"<svg><path d="M0 0 A1 1 0 2 0 5 5"/></svg>"#,
             r#"<svg><path d="L0 0"/></svg>"#,
+            r#"<svg><path d="C0 0 1 1 2 2"/></svg>"#,
+            r#"<svg><path d="Z"/></svg>"#,
             r#"<svg><path d="M0 0 C1 2 3"/></svg>"#,
         ] {
             assert!(
