@@ -7,6 +7,8 @@ on:
       - "crates/domains/symthaea-swarm/src/semantic_evidence_anchor.rs"
       - "crates/domains/symthaea-swarm/tests/rfc9942_cose_key_corpus.rs"
       - "crates/domains/symthaea-swarm/fuzz/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/es256-cose-qualification.yml"
   workflow_dispatch:
 
@@ -66,4 +68,4 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-es256-cose-fuzz-
       - name: Check fuzz manifest
-        run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bin fuzz_cose_key_es256
+        run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bins
