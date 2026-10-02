@@ -2418,6 +2418,39 @@ mod tests {
     }
 
     #[test]
+    fn resolve_with_snapshot_uses_scoped_snapshot_fingerprint() {
+        let (_, signing_key, _) = envelope_and_key();
+        let method_a = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let method_b = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-b#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus.Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver =
+            InMemoryVerificationMethodResolver::new([method_a.clone(), method_b]);
+
+        let resolved = resolver
+            .resolve_with_snapshot(&method_a.verification_method)
+            .expect("method-a resolution");
+
+        assert_eq!(resolved.resolved, method_a);
+        assert_eq!(
+            resolved.snapshot_fingerprint,
+            resolver.snapshot_fingerprint_for(&method_a.verification_method)
+        );
+        assert_ne!(
+            resolved.snapshot_fingerprint,
+            resolver.snapshot_fingerprint()
+        );
+    }
+
+    #[test]
     fn resolver_snapshot_binds_key_and_authorization_state() {
         let (_, signing_key, _) = envelope_and_key();
         let alternate_key = SigningKey::from_bytes(&[0x42; 32]);
