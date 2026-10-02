@@ -1216,6 +1216,84 @@ mod tests {
     }
 
     #[test]
+    fn test_spreading_activation_is_invariant_to_restore_order() {
+        let records = [
+            ("memory-seed", "seed"),
+            ("memory-a", "neighbor-a"),
+            ("memory-b", "neighbor-b"),
+            ("memory-c", "neighbor-c"),
+            ("memory-d", "neighbor-d"),
+            ("memory-e", "neighbor-e"),
+        ];
+
+        let build = |order: &[usize]| {
+            let mut graph = EnhancedKnowledgeGraph::new(16);
+            for &index in order {
+                let (memory_id, text) = records[index];
+                let encoding = make_encoding(text, 0.8);
+                graph.import_fact_record(&super::super::persistence::FactRecord {
+                    memory_id: memory_id.into(),
+                    canonical_identity: None,
+                    provenance_family: None,
+                    vector_bytes: encoding.vector.0.to_vec(),
+                    source_text: text.into(),
+                    confidence: 0.8,
+                    domain: None,
+                    cycle: index as u64,
+                    is_causal: false,
+                });
+            }
+            graph
+        };
+
+        let mut first = build(&[0, 1, 2, 3, 4, 5]);
+        let mut second = build(&[5, 3, 1, 4, 2, 0]);
+
+        let first_seed = first
+            .all_facts()
+            .find(|fact| fact.memory_id == "memory-seed")
+            .map(|fact| fact.id)
+            .unwrap();
+        let second_seed = second
+            .all_facts()
+            .find(|fact| fact.memory_id == "memory-seed")
+            .map(|fact| fact.id)
+            .unwrap();
+
+        let first_seed_result = FactSearchResult {
+            fact_id: first_seed,
+            similarity: 1.0,
+            confidence: 0.8,
+        };
+        let second_seed_result = FactSearchResult {
+            fact_id: second_seed,
+            similarity: 1.0,
+            confidence: 0.8,
+        };
+
+        let first_results = first
+            .spreading_activation_search(&[first_seed_result], 3, 0.5, 8, 10)
+            .into_iter()
+            .filter_map(|result| {
+                first
+                    .get_fact(result.fact_id)
+                    .map(|fact| (fact.memory_id.clone(), result.similarity))
+            })
+            .collect::<Vec<_>>();
+        let second_results = second
+            .spreading_activation_search(&[second_seed_result], 3, 0.5, 8, 10)
+            .into_iter()
+            .filter_map(|result| {
+                second
+                    .get_fact(result.fact_id)
+                    .map(|fact| (fact.memory_id.clone(), result.similarity))
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(first_results, second_results);
+    }
+
+    #[test]
     fn test_graph_search_and_export_have_stable_tie_order() {
         let mut graph = EnhancedKnowledgeGraph::new(10);
         let vector = make_encoding("same-vector", 0.8).vector;
