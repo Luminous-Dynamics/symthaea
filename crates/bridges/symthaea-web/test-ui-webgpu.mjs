@@ -194,7 +194,7 @@ if (TARGET_URL.startsWith('http://localhost:') || TARGET_URL.startsWith('https:/
   if (!existsSync(DIST_DIR)) {
     throw new Error(`symthaea-ui dist not found at ${DIST_DIR}; build the WASM UI with the browser-qualification feature first`);
   }
-  const port = globalThis.URL.parse(TARGET_URL).port || '8401';
+  const port = new globalThis.URL(TARGET_URL).port || '8401';
   server = spawn('python3', ['-m', 'http.server', port, '--bind', '127.0.0.1', '--directory', DIST_DIR], {
     stdio: 'ignore',
     detached: true,
