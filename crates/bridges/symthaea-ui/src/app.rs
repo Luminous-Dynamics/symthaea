@@ -432,15 +432,17 @@ pub fn App() -> impl IntoView {
                     }
                 >
                     <h2 style="font-size:0.9em;opacity:0.7;">"self-portrait"</h2>
-                    {move || webgpu_ready.get().then(|| view! {
-                        <canvas node_ref=webgpu_canvas
-                            style="width:220px;height:220px;border-radius:8px;display:block;"
-                            width="512" height="512"
-                        ></canvas>
-                    }).or_else(|| portrait.get().map(|portrait_src| view! {
+                    <canvas node_ref=webgpu_canvas
+                        style:display=move || if webgpu_ready.get() { "block" } else { "none" }
+                        style:width="220px"
+                        style:height="220px"
+                        style:border-radius="8px"
+                        width="512" height="512"
+                    ></canvas>
+                    {move || (!webgpu_ready.get()).then(|| portrait.get()).flatten().map(|portrait_src| view! {
                         <img class="portrait" style="max-width:220px;" src=portrait_src
                             alt="Live cognitive self-portrait (SVG fallback)" />
-                    }))}
+                    })}
                 </div>
                 <div class="projection-pane"
                     style:display=move || if movie.with(|m| m.is_some()) { "block" } else { "none" }
