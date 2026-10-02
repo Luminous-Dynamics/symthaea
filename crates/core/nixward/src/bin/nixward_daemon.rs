@@ -44,16 +44,16 @@ use symthaea_core::hdc::ContinuousHV;
 #[cfg(feature = "observability")]
 use nixward::observability::{Metrics, PhaseTimer, init_tracing};
 
-/// Legacy compatibility bridge for service actions.
+/// Build a semantic typed service command from the validated service domain.
 ///
-/// This is deliberately a one-way projection through the typed service domain;
-/// it does not confer authorization or bypass the future effect-binding path.
-fn render_legacy_service_action(
+/// The command retains the operation/unit distinction all the way to the executor
+/// and therefore can participate in the governed action-intent vocabulary.
+fn render_typed_service_action(
     operation: NixServiceOperationKindV1,
     unit: &str,
 ) -> Result<nixward::action::executor::NixOSCommand, NixServiceOperationErrorV1> {
     let typed = NixServiceOperationV1::new(unit, operation)?;
-    ServiceManager::render_legacy_command(&typed)
+    ServiceManager::typed_command(&typed)
 }
 
 /// Mutable daemon state collected across cycles.
@@ -1043,7 +1043,7 @@ impl DaemonState {
                                         ActionCategory::Disable => NixServiceOperationKindV1::Disable,
                                         _ => unreachable!("service-action compatibility arm only handles enable/disable"),
                                     };
-                                    match render_legacy_service_action(operation, &target_name_clone) {
+                                    match render_typed_service_action(operation, &target_name_clone) {
                                         Ok(cmd) => cmd,
                                         Err(error) => {
                                             eprintln!(
@@ -3282,9 +3282,16 @@ mod tests {
         assert!(result.changed);
     }
     #[test]
-    fn legacy_service_bridge_uses_typed_enablement_domain() {
+    fn typed_service_bridge_preserves_semantic_command_kind() {
         let command =
-            render_legacy_service_action(NixServiceOperationKindV1::Enable, "nginx").unwrap();
+            render_typed_service_action(NixServiceOperationKindV1::Enable, "nginx").unwrap();
+        assert!(matches!(
+            command,
+            nixward::action::executor::NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Enable,
+                unit,
+            } if unit == "nginx.service"
+        ));
         let (bin, args) = command.to_command();
         assert_eq!(bin, "systemctl");
         assert_eq!(args, vec!["enable".to_string(), "nginx.service".to_string()]);
@@ -3293,7 +3300,7 @@ mod tests {
     #[test]
     fn legacy_service_bridge_rejects_path_like_unit() {
         let error =
-            render_legacy_service_action(NixServiceOperationKindV1::Disable, "../nginx.service")
+            render_typed_service_action(NixServiceOperationKindV1::Disable, "../nginx.service")
                 .unwrap_err();
         assert_eq!(error, NixServiceOperationErrorV1::PathLikeUnit);
     }
