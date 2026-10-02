@@ -19,14 +19,14 @@
 import puppeteer from 'puppeteer-core';
 import { execSync, spawn } from 'child_process';
 import { createHash } from 'crypto';
-import { existsSync, readFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
 
 const ROOT = import.meta.dirname;
 const DIST_DIR = process.env.SYMTHAEA_UI_DIST
   ? path.resolve(ROOT, process.env.SYMTHAEA_UI_DIST)
   : path.resolve(ROOT, '../symthaea-ui/dist');
-const URL = process.argv[2] || 'http://localhost:8401/?symthaea_webgpu_fixture=1';
+const TARGET_URL = process.argv[2] || 'http://localhost:8401/?symthaea_webgpu_fixture=1';
 const ARTIFACT_DIR = path.join(ROOT, 'webgpu-qualification');
 const MODE = process.env.WEBGPU_MODE || 'swiftshader';
 
@@ -87,13 +87,13 @@ async function runBrowser({ name, args, requireWebGpu, requireFallback }) {
   const result = {
     name,
     mode: MODE,
-    url: URL,
+    url: TARGET_URL,
     errors,
     warnings,
   };
 
   try {
-    await page.goto(URL, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 30000 });
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     result.capability = await page.evaluate(async () => {
@@ -190,11 +190,11 @@ async function runBrowser({ name, args, requireWebGpu, requireFallback }) {
 mkdirSync(ARTIFACT_DIR, { recursive: true });
 
 let server = null;
-if (URL.startsWith('http://localhost:')) {
+if (TARGET_URL.startsWith('http://localhost:') || TARGET_URL.startsWith('https://localhost:')) {
   if (!existsSync(DIST_DIR)) {
     throw new Error(`symthaea-ui dist not found at ${DIST_DIR}; build the WASM UI with the browser-qualification feature first`);
   }
-  const port = new URL(URL).port || '8401';
+  const port = globalThis.URL.parse(TARGET_URL).port || '8401';
   server = spawn('python3', ['-m', 'http.server', port, '--bind', '127.0.0.1', '--directory', DIST_DIR], {
     stdio: 'ignore',
     detached: true,
