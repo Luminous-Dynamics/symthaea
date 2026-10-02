@@ -501,6 +501,9 @@ pub struct WebGpuRenderer {
     vertex_buffer: wgpu::Buffer,
     vertex_buffer_bytes: usize,
     config: wgpu::SurfaceConfiguration,
+    /// Reusable CPU-side staging bytes for scene uploads; avoids a fresh
+    /// allocation on every cognitive-frame render.
+    upload_bytes: Vec<u8>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -632,6 +635,7 @@ impl WebGpuRenderer {
             vertex_buffer,
             vertex_buffer_bytes,
             config,
+            upload_bytes: Vec::new(),
         })
     }
 
@@ -642,13 +646,14 @@ impl WebGpuRenderer {
     }
 
     pub fn render(&mut self, scene: &GpuScene) -> Result<(), String> {
-        let bytes = scene_to_bytes(&scene.vertices);
-        if bytes.len() > self.vertex_buffer_bytes {
+        scene_to_bytes(&scene.vertices, &mut self.upload_bytes);
+        if self.upload_bytes.len() > self.vertex_buffer_bytes {
             return Err(format!(
                 "GPU scene upload exceeds {} byte bound",
                 self.vertex_buffer_bytes
             ));
         }
+        let bytes = &self.upload_bytes;
 
         let frame = self.acquire_surface_frame()?;
         let view = frame
@@ -1020,14 +1025,17 @@ impl WebGpuMovieRenderer {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn scene_to_bytes(vertices: &[GpuVertex]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(vertices.len() * std::mem::size_of::<f32>() * 6);
+fn scene_to_bytes(vertices: &[GpuVertex], bytes: &mut Vec<u8>) {
+    let required = vertices.len() * std::mem::size_of::<f32>() * 6;
+    bytes.clear();
+    if bytes.capacity() < required {
+        bytes.reserve(required - bytes.capacity());
+    }
     for vertex in vertices {
         for value in vertex.position.iter().chain(vertex.color.iter()) {
             bytes.extend_from_slice(&value.to_ne_bytes());
         }
     }
-    bytes
 }
 
 #[cfg(target_arch = "wasm32")]
