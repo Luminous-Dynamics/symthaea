@@ -1254,6 +1254,8 @@ impl DaemonState {
                         let safety = cmd.safety_level();
                         let is_modifying = safety != SafetyLevel::ReadOnly;
 
+                        let mut execution_authority = None;
+
                         if is_modifying {
                             // Typed V1 actions are approved by exact semantic identity,
                             // not by a reusable global approval bit. Bind approval to the
@@ -1418,8 +1420,7 @@ impl DaemonState {
                                         );
                                     }
                                 };
-                                let execution_authority =
-                                    match NixLocalExecutionAuthorityV1::from_consumed_local_approval(
+                                execution_authority = Some(match NixLocalExecutionAuthorityV1::from_consumed_local_approval(
                                         intent,
                                         consumed_approval,
                                     ) {
@@ -1435,7 +1436,7 @@ impl DaemonState {
                                                 Some(best_action.expected_free_energy),
                                             );
                                         }
-                                    };
+                                    });
 
                                 eprintln!(
                                     "nixward-daemon: Watchdog APPROVED action: {}{}",
@@ -1479,7 +1480,10 @@ impl DaemonState {
                                 // and promoted it to a live execution-authority object.
                                 // execute_authorized verifies the exact command identity
                                 // and consumes that authority object by value.
-                                let result = executor.execute_authorized(cmd, execution_authority).await;
+                                let result = match execution_authority {
+                                    Some(authority) => executor.execute_authorized(cmd, authority).await,
+                                    None => executor.execute(cmd, SafetyLevel::ReadOnly.required_phi()).await,
+                                };
                                 eprintln!("nixward-daemon: Active healing execution finished. Result: {:?}", result);
                             });
                         });
