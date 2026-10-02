@@ -287,8 +287,9 @@ impl KnowledgePersistence {
                 .map_err(|e| format!("Invalid provenance relation: {e}"))?;
         }
 
-        if edges.iter().any(|edge| !edge.strength.is_finite()) {
-            return Err("CausalEdgeRecord strength must be finite".into());
+        for edge in edges {
+            edge.validate()
+                .map_err(|e| format!("Invalid causal edge: {e}"))?;
         }
         let mut causal_keys = HashSet::with_capacity(edges.len());
         if edges
@@ -2076,6 +2077,30 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    #[test]
+    fn test_snapshot_rejects_strength_metadata_sign_mismatch() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_causal_sign_mismatch_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let edge = CausalEdgeRecord {
+            cause: "cause".into(),
+            effect: "effect".into(),
+            strength: 0.8,
+            is_inhibitory: true,
+            cycle: 1,
+        };
+        let error = p
+            .save_snapshot(&[], &[], &[edge], &[])
+            .unwrap_err();
+        assert!(error.contains("strength sign must match is_inhibitory"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
     #[test]
     fn test_load_causal_edges_rejects_strength_metadata_sign_mismatch() {
         let dir = std::env::temp_dir().join(format!(
