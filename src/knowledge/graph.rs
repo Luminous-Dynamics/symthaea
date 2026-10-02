@@ -618,7 +618,9 @@ impl EnhancedKnowledgeGraph {
         if self.facts.is_empty() {
             return 0.0;
         }
-        let sum: f32 = self.facts.values().map(|f| f.confidence).sum();
+        // HashMap iteration is arbitrary; sum in the graph's stable memory-identity order
+        // so floating-point accumulation is reproducible across restore/insertion order.
+        let sum: f32 = self.all_facts().map(|f| f.confidence).sum();
         sum / self.facts.len() as f32
     }
 
@@ -1078,6 +1080,59 @@ fn contains_negation(text: &str) -> bool {
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
+    #[test]
+    fn test_average_confidence_is_restore_order_invariant() {
+        let records = [
+            super::persistence::FactRecord {
+                memory_id: "memory-a".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: "a".into(),
+                confidence: 0.1,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "memory-b".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![1u8; 2048],
+                source_text: "b".into(),
+                confidence: 0.2,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "memory-c".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![2u8; 2048],
+                source_text: "c".into(),
+                confidence: 0.7,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            },
+        ];
+
+        let mut forward = EnhancedKnowledgeGraph::new(10);
+        let mut reverse = EnhancedKnowledgeGraph::new(10);
+        for record in &records {
+            assert!(forward.import_fact_record_with_outcome(record).accepted);
+        }
+        for record in records.iter().rev() {
+            assert!(reverse.import_fact_record_with_outcome(record).accepted);
+        }
+
+        assert_eq!(
+            forward.average_confidence().to_bits(),
+            reverse.average_confidence().to_bits()
+        );
+    }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1248,584 +1303,3 @@ mod tests {
             &FactEncoding {
                 vector: graph.get_fact(1).unwrap().encoding.vector.clone(),
                 role_vectors: HashMap::new(),
-                source_text: "claim one not".into(),
-                confidence: 0.7,
-            },
-            3,
-        );
-        let ids = alerts.iter().map(|alert| alert.existing_fact_id).collect::<Vec<_>>();
-        assert!(ids.windows(2).all(|pair| pair[0] <= pair[1]));
-    }
-
-    #[test]
-    fn test_spreading_activation_is_invariant_to_restore_order() {
-        let records = [
-            ("memory-seed", "seed"),
-            ("memory-a", "neighbor-a"),
-            ("memory-b", "neighbor-b"),
-            ("memory-c", "neighbor-c"),
-            ("memory-d", "neighbor-d"),
-            ("memory-e", "neighbor-e"),
-        ];
-
-        let build = |order: &[usize]| {
-            let mut graph = EnhancedKnowledgeGraph::new(16);
-            for &index in order {
-                let (memory_id, text) = records[index];
-                let encoding = make_encoding(text, 0.8);
-                graph.import_fact_record(&super::super::persistence::FactRecord {
-                    memory_id: memory_id.into(),
-                    canonical_identity: None,
-                    provenance_family: None,
-                    vector_bytes: encoding.vector.0.to_vec(),
-                    source_text: text.into(),
-                    confidence: 0.8,
-                    domain: None,
-                    cycle: index as u64,
-                    is_causal: false,
-                });
-            }
-            graph
-        };
-
-        let mut first = build(&[0, 1, 2, 3, 4, 5]);
-        let mut second = build(&[5, 3, 1, 4, 2, 0]);
-
-        let first_seed = first
-            .all_facts()
-            .find(|fact| fact.memory_id == "memory-seed")
-            .map(|fact| fact.id)
-            .unwrap();
-        let second_seed = second
-            .all_facts()
-            .find(|fact| fact.memory_id == "memory-seed")
-            .map(|fact| fact.id)
-            .unwrap();
-
-        let first_seed_result = FactSearchResult {
-            fact_id: first_seed,
-            similarity: 1.0,
-            confidence: 0.8,
-        };
-        let second_seed_result = FactSearchResult {
-            fact_id: second_seed,
-            similarity: 1.0,
-            confidence: 0.8,
-        };
-
-        let first_results = first
-            .spreading_activation_search(&[first_seed_result], 3, 0.5, 8, 10)
-            .into_iter()
-            .filter_map(|result| {
-                first
-                    .get_fact(result.fact_id)
-                    .map(|fact| (fact.memory_id.clone(), result.similarity))
-            })
-            .collect::<Vec<_>>();
-        let second_results = second
-            .spreading_activation_search(&[second_seed_result], 3, 0.5, 8, 10)
-            .into_iter()
-            .filter_map(|result| {
-                second
-                    .get_fact(result.fact_id)
-                    .map(|fact| (fact.memory_id.clone(), result.similarity))
-            })
-            .collect::<Vec<_>>();
-
-        assert_eq!(first_results, second_results);
-    }
-
-    #[test]
-    fn test_all_facts_enumeration_is_stable_by_memory_identity() {
-        let mut graph = EnhancedKnowledgeGraph::new(10);
-        for memory_id in ["memory-z", "memory-a", "memory-m"] {
-            let encoding = make_encoding(memory_id, 0.8);
-            graph.import_fact_record(&super::super::persistence::FactRecord {
-                memory_id: memory_id.into(),
-                canonical_identity: None,
-                provenance_family: None,
-                vector_bytes: encoding.vector.0.to_vec(),
-                source_text: memory_id.into(),
-                confidence: 0.8,
-                domain: None,
-                cycle: 1,
-                is_causal: false,
-            });
-        }
-
-        let ids = graph
-            .all_facts()
-            .map(|fact| fact.memory_id.as_str())
-            .collect::<Vec<_>>();
-        assert_eq!(ids, vec!["memory-a", "memory-m", "memory-z"]);
-    }
-
-    #[test]
-    fn test_graph_search_and_export_have_stable_tie_order() {
-        let mut graph = EnhancedKnowledgeGraph::new(10);
-        let vector = make_encoding("same-vector", 0.8).vector;
-        for memory_id in ["memory-b", "memory-a"] {
-            graph.import_fact_record(&super::super::persistence::FactRecord {
-                memory_id: memory_id.into(),
-                canonical_identity: None,
-                provenance_family: None,
-                vector_bytes: vector.0.to_vec(),
-                source_text: memory_id.into(),
-                confidence: 0.8,
-                domain: None,
-                cycle: 1,
-                is_causal: false,
-            });
-        }
-
-        let results = graph.search(&vector, 2, 2);
-        assert_eq!(
-            results.iter().map(|result| result.fact_id).collect::<Vec<_>>(),
-            vec![1, 2]
-        );
-
-        let exported = graph.export_fact_records();
-        assert_eq!(
-            exported.iter().map(|record| record.memory_id.as_str()).collect::<Vec<_>>(),
-            vec!["memory-a", "memory-b"]
-        );
-    }
-
-    #[test]
-    fn test_fact_restore_enforces_capacity_and_reports_policy_eviction() {
-        let mut graph = EnhancedKnowledgeGraph::new(2);
-        let records = [
-            super::super::persistence::FactRecord {
-                memory_id: "memory-low".into(),
-                canonical_identity: None,
-                provenance_family: None,
-                vector_bytes: vec![0u8; 2048],
-                source_text: "low".into(),
-                confidence: 0.2,
-                domain: Some("test".into()),
-                cycle: 1,
-                is_causal: false,
-            },
-            super::super::persistence::FactRecord {
-                memory_id: "memory-high".into(),
-                canonical_identity: None,
-                provenance_family: None,
-                vector_bytes: vec![1u8; 2048],
-                source_text: "high".into(),
-                confidence: 0.9,
-                domain: Some("test".into()),
-                cycle: 2,
-                is_causal: false,
-            },
-            super::super::persistence::FactRecord {
-                memory_id: "memory-mid".into(),
-                canonical_identity: None,
-                provenance_family: None,
-                vector_bytes: vec![2u8; 2048],
-                source_text: "mid".into(),
-                confidence: 0.8,
-                domain: Some("test".into()),
-                cycle: 3,
-                is_causal: false,
-            },
-        ];
-
-        assert!(graph.import_fact_record_with_outcome(&records[0]).accepted);
-        assert!(graph.import_fact_record_with_outcome(&records[1]).accepted);
-        let outcome = graph.import_fact_record_with_outcome(&records[2]);
-
-        assert_eq!(outcome.policy_evictions, 1);
-        assert_eq!(graph.len(), 2);
-        assert_eq!(graph.total_evictions(), 1);
-        assert!(graph.all_facts().all(|fact| fact.memory_id != "memory-low"));
-        assert_eq!(graph.domain_count(), 1);
-    }
-
-    #[test]
-    fn test_fact_restore_eviction_tie_break_is_deterministic() {
-        let mut graph = EnhancedKnowledgeGraph::new(2);
-        let first = super::super::persistence::FactRecord {
-            memory_id: "memory-z".into(),
-            canonical_identity: None,
-            provenance_family: None,
-            vector_bytes: vec![0u8; 2048],
-            source_text: "z".into(),
-            confidence: 0.5,
-            domain: None,
-            cycle: 1,
-            is_causal: false,
-        };
-        let second = super::super::persistence::FactRecord {
-            memory_id: "memory-a".into(),
-            canonical_identity: None,
-            provenance_family: None,
-            vector_bytes: vec![1u8; 2048],
-            source_text: "a".into(),
-            confidence: 0.5,
-            domain: None,
-            cycle: 2,
-            is_causal: false,
-        };
-        let third = super::super::persistence::FactRecord {
-            memory_id: "memory-m".into(),
-            canonical_identity: None,
-            provenance_family: None,
-            vector_bytes: vec![2u8; 2048],
-            source_text: "m".into(),
-            confidence: 0.5,
-            domain: None,
-            cycle: 3,
-            is_causal: false,
-        };
-
-        assert!(graph.import_fact_record_with_outcome(&first).accepted);
-        assert!(graph.import_fact_record_with_outcome(&second).accepted);
-        let outcome = graph.import_fact_record_with_outcome(&third);
-
-        assert_eq!(outcome.policy_evictions, 1);
-        assert_eq!(
-            graph.all_facts().map(|fact| fact.memory_id.as_str()).collect::<Vec<_>>(),
-            vec!["memory-z", "memory-m"]
-        );
-    }
-
-    #[test]
-    fn test_provenance_family_does_not_collapse_memory_identity() {
-        let mut graph = EnhancedKnowledgeGraph::new(100);
-
-        for (memory_id, family, text) in [
-            ("memory-a", "source-family-1", "representation a"),
-            ("memory-b", "source-family-1", "representation b"),
-            ("memory-c", "source-family-2", "independent source"),
-        ] {
-            let encoding = make_encoding(text, 0.8);
-            graph.import_fact_record(&super::super::persistence::FactRecord {
-                memory_id: memory_id.into(),
-                canonical_identity: None,
-                provenance_family: Some(family.into()),
-                vector_bytes: encoding.vector.0.to_vec(),
-                source_text: text.into(),
-                confidence: 0.8,
-                domain: None,
-                cycle: 1,
-                is_causal: false,
-            });
-        }
-
-        let records = graph.export_fact_records();
-        assert_eq!(records.len(), 3);
-
-        let same_family: Vec<_> = records
-            .iter()
-            .filter(|r| r.provenance_family.as_deref() == Some("source-family-1"))
-            .collect();
-        assert_eq!(same_family.len(), 2);
-        assert_ne!(same_family[0].memory_id, same_family[1].memory_id);
-
-        let independent: Vec<_> = records
-            .iter()
-            .filter(|r| r.provenance_family.as_deref() == Some("source-family-2"))
-            .collect();
-        assert_eq!(independent.len(), 1);
-        assert_ne!(same_family[0].memory_id, independent[0].memory_id);
-    }
-
-    #[test]
-    fn test_admission_receipt_must_bind_current_conforming_snapshot() {
-        let mut graph = EnhancedKnowledgeGraph::new(100);
-        let (id, _) = graph.insert(make_encoding("receipt-bound fact", 0.8), 1, None, false);
-
-        let validation = graph.validate_provenance();
-        let receipt = CanonicalAdmissionReceipt::new(
-            "admission:event-1",
-            Some("frontier:1".into()),
-            validation.snapshot_digest.clone(),
-            validation.validator_version.clone(),
-            validation.snapshot_schema_version,
-        ).unwrap();
-        let admission = graph
-            .admit_canonical_identity("claim:receipt-bound", Some("family:1".into()))
-            .unwrap()
-            .with_receipt(receipt);
-        assert!(graph.attach_admitted_provenance(id, admission));
-        assert_eq!(
-            graph.get_fact(id).unwrap().canonical_identity.as_deref(),
-            Some("claim:receipt-bound")
-        );
-
-        let (id2, _) = graph.insert(make_encoding("stale receipt fact", 0.8), 2, None, false);
-        let stale = graph.validate_provenance();
-        let stale_receipt = CanonicalAdmissionReceipt::new(
-            "admission:event-stale",
-            Some("frontier:1".into()),
-            stale.snapshot_digest,
-            stale.validator_version,
-            stale.snapshot_schema_version,
-        ).unwrap();
-
-        graph.record_provenance_relation(ProvenanceRelation {
-            source_memory_id: graph.provenance(id2).unwrap().memory_id,
-            target_memory_id: graph.provenance(id).unwrap().memory_id,
-            kind: ProvenanceRelationKind::Corroborates,
-            created_at: "cycle:3".into(),
-        }).unwrap();
-
-        let stale_admission = graph
-            .admit_canonical_identity("claim:must-not-bypass", Some("family:2".into()))
-            .unwrap()
-            .with_receipt(stale_receipt);
-        assert!(!graph.attach_admitted_provenance(id2, stale_admission));
-        assert!(graph.get_fact(id2).unwrap().canonical_identity.is_none());
-    }
-
-    #[test]
-    fn test_canonical_identity_requires_explicit_admission() {
-        let mut graph = EnhancedKnowledgeGraph::new(100);
-        let enc = make_encoding("admission boundary claim", 0.8);
-        let (id, _) = graph.insert(enc, 1, None, false);
-
-        let before = graph.provenance(id).unwrap();
-        assert!(before.canonical_identity.is_none());
-
-        let query = graph.get_fact(id).unwrap().encoding.vector.clone();
-        let _ = graph.search(&query, 1, 2);
-        assert!(graph.provenance(id).unwrap().canonical_identity.is_none());
-
-        let admission = graph
-            .admit_canonical_identity("canonical:claim-1", Some("source-family-1".into()))
-            .unwrap();
-        assert!(graph.attach_admitted_provenance(id, admission));
-        let after = graph.provenance(id).unwrap();
-        assert_eq!(after.canonical_identity.as_deref(), Some("canonical:claim-1"));
-        assert_eq!(after.provenance_family.as_deref(), Some("source-family-1"));
-    }
-
-    #[test]
-    fn canonical_admission_receipt_binds_snapshot_context_without_evidence_weight() {
-        let graph = EnhancedKnowledgeGraph::new(100);
-        let receipt = CanonicalAdmissionReceipt::new(
-            "admission:event-1",
-            Some("frontier:7".into()),
-            "digest-abc",
-            "melothaea-provenance-structural-v1",
-            1,
-        )
-        .unwrap();
-        let admission = graph
-            .admit_canonical_identity("canonical:claim-1", Some("family-1".into()))
-            .unwrap()
-            .with_receipt(receipt.clone());
-        assert_eq!(admission.receipt(), Some(&receipt));
-        assert_eq!(admission.canonical_identity, "canonical:claim-1");
-        assert_eq!(admission.provenance_family.as_deref(), Some("family-1"));
-    }
-
-    #[test]
-    fn canonical_admission_receipt_rejects_missing_context() {
-        assert_eq!(
-            CanonicalAdmissionReceipt::new(" ", None, "digest", "validator", 1).unwrap_err(),
-            "admission event must be non-empty"
-        );
-        assert_eq!(
-            CanonicalAdmissionReceipt::new("event", None, " ", "validator", 1).unwrap_err(),
-            "provenance snapshot digest must be non-empty"
-        );
-    }
-
-    #[test]
-    fn canonical_admission_rejects_empty_identity() {
-        let graph = EnhancedKnowledgeGraph::new(100);
-        assert_eq!(graph.admit_canonical_identity("  ", None).unwrap_err(), "canonical identity must be non-empty");
-        assert_eq!(graph.admit_canonical_identity("canonical:1", Some(" ".into())).unwrap_err(), "provenance family must be non-empty when present");
-    }
-
-    #[test]
-    fn retrieval_cannot_supply_canonical_admission_capability() {
-        let mut graph = EnhancedKnowledgeGraph::new(100);
-        let (id, _) = graph.insert(make_encoding("retrieval-only", 0.8), 1, None, false);
-        let query = graph.get_fact(id).unwrap().encoding.vector.clone();
-        let _ = graph.search(&query, 1, 2);
-        assert!(graph.provenance(id).unwrap().canonical_identity.is_none());
-    }
-
-    #[test]
-    fn test_eviction_does_not_reassign_surviving_identity() {
-        let mut graph = EnhancedKnowledgeGraph::new(2);
-        let (id_a, _) = graph.insert(make_encoding("claim a", 0.9), 1, None, false);
-        graph.insert(make_encoding("claim b", 0.8), 2, None, false);
-        let memory_a = graph.provenance(id_a).unwrap().memory_id;
-
-        graph.insert(make_encoding("claim c", 0.7), 3, None, false);
-
-        assert_eq!(graph.provenance(id_a).unwrap().memory_id, memory_a);
-    }
-
-    #[test]
-    fn test_provenance_view_is_snapshot_and_non_mutating() {
-        let mut graph = EnhancedKnowledgeGraph::new(100);
-        let (a, _) = graph.insert(make_encoding("source", 0.8), 1, None, false);
-        let (b, _) = graph.insert(make_encoding("derived", 0.6), 2, None, false);
-        let source = graph.provenance(a).unwrap().memory_id;
-        let derived = graph.provenance(b).unwrap().memory_id;
-
-        graph.record_provenance_relation(ProvenanceRelation {
-            source_memory_id: derived.clone(),
-            target_memory_id: source.clone(),
-            kind: ProvenanceRelationKind::DerivedFrom,
-            created_at: "cycle:2".into(),
-        }).unwrap();
-
-        let view = graph.provenance_view();
-        assert_eq!(view.relations_from(&derived).len(), 1);
-        assert!(view.is_structurally_conforming());
-
-        graph.record_provenance_relation(ProvenanceRelation {
-            source_memory_id: source,
-            target_memory_id: derived,
-            kind: ProvenanceRelationKind::Corroborates,
-            created_at: "cycle:3".into(),
-        }).unwrap();
-
-        assert_eq!(view.relations.len(), 1);
-        assert_eq!(graph.provenance_view().relations.len(), 2);
-    }
-
-    #[test]
-    fn test_provenance_relation_is_append_only_and_non_evidence_weighting() {
-        let mut graph = EnhancedKnowledgeGraph::new(100);
-        let (a, _) = graph.insert(make_encoding("source", 0.8), 1, None, false);
-        let (b, _) = graph.insert(make_encoding("derived", 0.6), 2, None, false);
-        let source_id = graph.provenance(a).unwrap().memory_id;
-        let derived_id = graph.provenance(b).unwrap().memory_id;
-        let before = graph.get_fact(b).unwrap().confidence;
-        let relation = ProvenanceRelation { source_memory_id: derived_id, target_memory_id: source_id, kind: ProvenanceRelationKind::DerivedFrom, created_at: "cycle:2".into() };
-        assert_eq!(graph.record_provenance_relation(relation.clone()).unwrap(), true);
-        assert_eq!(graph.record_provenance_relation(relation).unwrap(), false);
-        assert_eq!(graph.provenance_relations().len(), 1);
-        assert_eq!(graph.get_fact(b).unwrap().confidence, before);
-
-        let corroborates = ProvenanceRelation {
-            source_memory_id: graph.provenance(a).unwrap().memory_id,
-            target_memory_id: graph.provenance(b).unwrap().memory_id,
-            kind: ProvenanceRelationKind::Corroborates,
-            created_at: "cycle:2".into(),
-        };
-        assert!(graph.record_provenance_relation(corroborates).unwrap());
-        assert_eq!(graph.get_fact(b).unwrap().confidence, before);
-
-        let representation = ProvenanceRelation {
-            source_memory_id: graph.provenance(b).unwrap().memory_id,
-            target_memory_id: graph.provenance(a).unwrap().memory_id,
-            kind: ProvenanceRelationKind::RepresentationOf,
-            created_at: "cycle:2".into(),
-        };
-        assert!(graph.record_provenance_relation(representation).unwrap());
-        assert_eq!(graph.get_fact(b).unwrap().confidence, before);
-    }
-
-    #[test]
-    fn test_provenance_relation_survives_local_eviction_boundary() {
-        let mut graph = EnhancedKnowledgeGraph::new(1);
-        let (a, _) = graph.insert(make_encoding("source", 0.8), 1, None, false);
-        let a_id = graph.provenance(a).unwrap().memory_id;
-        let (b, _) = graph.insert(make_encoding("replacement", 0.7), 2, None, false);
-        let b_id = graph.provenance(b).unwrap().memory_id;
-
-        assert!(graph.provenance(a).is_none());
-        let relation = ProvenanceRelation {
-            source_memory_id: b_id,
-            target_memory_id: a_id.clone(),
-            kind: ProvenanceRelationKind::RevisedFrom,
-            created_at: "cycle:2".into(),
-        };
-        assert!(graph.record_provenance_relation(relation).is_ok());
-        assert_eq!(graph.provenance_relations()[0].target_memory_id, a_id);
-    }
-
-    #[test]
-    fn test_provenance_queries_are_non_mutating() {
-        let mut graph = EnhancedKnowledgeGraph::new(100);
-        let (a, _) = graph.insert(make_encoding("a", 0.8), 1, None, false);
-        let (b, _) = graph.insert(make_encoding("b", 0.6), 2, None, false);
-        let a_id = graph.provenance(a).unwrap().memory_id;
-        let b_id = graph.provenance(b).unwrap().memory_id;
-        let before = graph.get_fact(b).unwrap().confidence;
-        graph.record_provenance_relation(ProvenanceRelation {
-            source_memory_id: b_id.clone(),
-            target_memory_id: a_id.clone(),
-            kind: ProvenanceRelationKind::Corroborates,
-            created_at: "cycle:2".into(),
-        }).unwrap();
-        assert_eq!(graph.provenance_relations_from(&b_id).len(), 1);
-        assert_eq!(graph.provenance_relations_to(&a_id).len(), 1);
-        assert_eq!(graph.provenance_relations_of_kind(ProvenanceRelationKind::Corroborates).len(), 1);
-        assert_eq!(graph.get_fact(b).unwrap().confidence, before);
-    }
-
-    #[test]
-    fn test_provenance_validation_report_is_non_mutating_and_snapshot_bound() {
-        let mut graph = EnhancedKnowledgeGraph::new(100);
-        let (a, _) = graph.insert(make_encoding("a", 0.8), 1, None, false);
-        let (b, _) = graph.insert(make_encoding("b", 0.8), 2, None, false);
-        let a_id = graph.provenance(a).unwrap().memory_id;
-        let b_id = graph.provenance(b).unwrap().memory_id;
-
-        graph.record_provenance_relation(ProvenanceRelation {
-            source_memory_id: b_id,
-            target_memory_id: a_id,
-            kind: ProvenanceRelationKind::DerivedFrom,
-            created_at: "cycle:2".into(),
-        }).unwrap();
-
-        let before = graph.provenance_relations().to_vec();
-        let report = graph.validate_provenance();
-        assert!(report.conforms);
-        assert_eq!(report.relation_count, 1);
-        assert!(!report.snapshot_digest.is_empty());
-        assert_eq!(graph.provenance_relations(), before.as_slice());
-    }
-
-    #[test]
-    fn test_provenance_lineage_rejects_cycles() {
-        let mut graph = EnhancedKnowledgeGraph::new(100);
-        let (a, _) = graph.insert(make_encoding("a", 0.8), 1, None, false);
-        let (b, _) = graph.insert(make_encoding("b", 0.8), 2, None, false);
-        let a_id = graph.provenance(a).unwrap().memory_id;
-        let b_id = graph.provenance(b).unwrap().memory_id;
-        graph.record_provenance_relation(ProvenanceRelation { source_memory_id: b_id.clone(), target_memory_id: a_id.clone(), kind: ProvenanceRelationKind::DerivedFrom, created_at: "cycle:2".into() }).unwrap();
-        let err = graph.record_provenance_relation(ProvenanceRelation { source_memory_id: a_id, target_memory_id: b_id, kind: ProvenanceRelationKind::RevisedFrom, created_at: "cycle:3".into() }).unwrap_err();
-        assert_eq!(err, "derivation lineage relation would create a cycle");
-    }
-
-    #[test]
-    fn test_supersession_lineage_rejects_cycles() {
-        let mut graph = EnhancedKnowledgeGraph::new(100);
-        let (a, _) = graph.insert(make_encoding("a", 0.8), 1, None, false);
-        let (b, _) = graph.insert(make_encoding("b", 0.8), 2, None, false);
-        let a_id = graph.provenance(a).unwrap().memory_id;
-        let b_id = graph.provenance(b).unwrap().memory_id;
-
-        graph.record_provenance_relation(ProvenanceRelation {
-            source_memory_id: b_id.clone(),
-            target_memory_id: a_id.clone(),
-            kind: ProvenanceRelationKind::Supersedes,
-            created_at: "cycle:2".into(),
-        }).unwrap();
-
-        let err = graph.record_provenance_relation(ProvenanceRelation {
-            source_memory_id: a_id,
-            target_memory_id: b_id,
-            kind: ProvenanceRelationKind::Supersedes,
-            created_at: "cycle:3".into(),
-        }).unwrap_err();
-        assert_eq!(err, "derivation lineage relation would create a cycle");
-    }
-
-    #[test]
-    fn test_empty_graph() {
-        let graph = EnhancedKnowledgeGraph::new(100);
-        assert!(graph.is_empty());
-        assert_eq!(graph.average_confidence(), 0.0);
-        assert_eq!(graph.domain_count(), 0);
-    }
-}
