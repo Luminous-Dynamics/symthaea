@@ -50,6 +50,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
+use super::EpistemicFrame;
 use super::GISError;
 use super::zk_proofs::{ZKEIGRangeProof, ZKTopicCommitment};
 
