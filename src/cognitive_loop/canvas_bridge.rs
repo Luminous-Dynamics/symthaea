@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 use symthaea_aesthetic::{AestheticConfig, AestheticFeedback, AestheticScore};
 #[cfg(feature = "canvas")]
 use symthaea_canvas::{
-    AestheticEngine, AestheticState, CognitiveSnapshot, aesthetic_score, build_scene, render_svg,
+    AestheticEngine, AestheticState, CognitiveSnapshot, aesthetic_score, build_scene,
+    render_svg_for_remote_projection,
 };
 
 /// Telemetry from the canvas pipeline, stored in CycleMetadata.
@@ -128,7 +129,10 @@ impl CanvasManager {
         let mut state = self.engine.process(snap);
         let scene = build_scene(&state);
         state.aesthetic_score = aesthetic_score(&state, &scene);
-        let svg = render_svg(&scene, snap.consciousness_level);
+        // The externally exposed canvas payload uses the deliberately narrower
+        // geometry-only renderer. The full renderer remains available to
+        // trusted/internal consumers and retains animation/filter effects.
+        let svg = render_svg_for_remote_projection(&scene);
 
         let elapsed = start.elapsed();
 
