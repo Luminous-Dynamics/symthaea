@@ -380,6 +380,9 @@ impl ExecutionLineageV1 {
         {
             return Err("repository_source_snapshot_id must be canonical lowercase hex".into());
         }
+        if self.argv.is_empty() {
+            return Err("empty lineage argv".into());
+        }
         if self.argv.iter().any(|arg| arg.contains('\0')) {
             return Err("NUL in argv".into());
         }
@@ -1483,6 +1486,13 @@ mod tests {
         changed.repository_source_snapshot_id =
             RepositorySourceSnapshotId::parse(&"b".repeat(64)).expect("valid snapshot id");
         assert_ne!(base.digest(), changed.digest());
+    }
+
+    #[test]
+    fn execution_lineage_validation_rejects_empty_argv() {
+        let mut lineage = lineage_fixture();
+        lineage.argv.clear();
+        assert!(lineage.validate().is_err());
     }
 
     #[test]
