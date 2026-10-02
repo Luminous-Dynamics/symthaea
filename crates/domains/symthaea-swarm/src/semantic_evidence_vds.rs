@@ -1318,18 +1318,9 @@ mod tests {
         let encoded=receipt.to_cbor();
         assert_eq!(&encoded[..3],&[0xd2,0x84,0x58]);
         assert_eq!(encoded[encoded.len()-1],0xAA);
-        let vdp_pos=encoded.windows(3).position(|w|w==[0x19,0x01,0x8c]);
-        assert!(vdp_pos.is_none());
-    }
-
-    #[test]
-    fn rfc9942_receipt_envelope_accepts_text_extension_labels() {
-        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
-        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
-        let base=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA]).unwrap().to_cbor();
-        let mut protected=CborReader::new(&[0xa3,0x01,0x26,0x63,b'f',b'o',b'o',0x19,0x01,0x8b,0x19,0x01,0x8b]);
-        let _=protected;
-        assert!(!base.is_empty());
+        let vdp_key=encoded.windows(3).position(|w|w==[0x19,0x01,0x8c]).expect("vdp header label");
+        assert_eq!(encoded[vdp_key+3]>>5,5);
+        assert_eq!(Rfc9942ReceiptEnvelope::from_cbor(&encoded).unwrap(),receipt);
     }
     #[test]
     fn rfc9942_receipt_envelope_round_trips_attached_payload() {
