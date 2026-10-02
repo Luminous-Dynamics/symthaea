@@ -23,6 +23,8 @@ pub mod geometry;
 pub mod scene_features;
 pub mod scene_graph;
 pub mod svg_renderer;
+#[cfg(feature = "webgpu")]
+pub mod webgpu;
 pub mod validation;
 
 use serde::{Deserialize, Serialize};
@@ -37,6 +39,10 @@ pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
 pub use svg_renderer::{SvgRenderOptions, render_svg, render_svg_with_options};
 pub use validation::{SnapshotLimits, SnapshotSanitization};
+#[cfg(feature = "webgpu")]
+pub use webgpu::{GpuScene, GpuVertex};
+#[cfg(all(feature = "webgpu", target_arch = "wasm32"))]
+pub use webgpu::WebGpuRenderer;
 
 /// Lightweight snapshot of cognitive state, decoupled from CycleMetadata.
 ///
