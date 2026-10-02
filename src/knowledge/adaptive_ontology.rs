@@ -593,8 +593,8 @@ mod tests {
         };
         let mut ontology = AdaptiveOntology::new(config);
         ontology.learn("zeta", BinaryHV::random(1), vec![], 1);
-        ontology.learn("alpha", BinaryHV::random(2), vec![], 1);
-        ontology.learn("middle", BinaryHV::random(3), vec![], 1);
+        ontology.learn("alpha", BinaryHV::random(2), vec![], 2);
+        ontology.learn("middle", BinaryHV::random(3), vec![], 3);
 
         assert!(!ontology.primitives().contains_key("alpha"));
         assert!(ontology.primitives().contains_key("middle"));
