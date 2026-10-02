@@ -445,7 +445,7 @@ impl VerificationMethodResolver for InMemoryVerificationMethodResolver {
 
     fn snapshot_fingerprint(&self) -> Option<String> {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:verification-method-resolver-snapshot:v1\\n");
+        hasher.update(b"symthaea:verification-method-resolver-snapshot:v1\n");
         for (method_id, method) in &self.methods {
             hasher.update(&(method_id.len() as u64).to_be_bytes());
             hasher.update(method_id.as_bytes());
