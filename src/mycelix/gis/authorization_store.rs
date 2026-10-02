@@ -73,7 +73,6 @@ impl RecoveryAuthorizationWitness {
 
 /// A durable shared consumption domain. Each operation uses a fresh connection,
 /// allowing independent processes to contend on the same SQLite state machine.
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// The purpose of provider evidence presented to the verifier. A pre-entry lookup
 /// is intentionally not interchangeable with terminal outcome evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,6 +128,7 @@ pub trait ProviderEvidenceVerifier {
     ) -> Result<VerifiedProviderOutcome, ProviderVerificationError>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DurableDispatchRecord {
     pub authorization_instance: String,
     pub attempt_id: String,
