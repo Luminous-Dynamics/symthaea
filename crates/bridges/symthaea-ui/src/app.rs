@@ -885,7 +885,7 @@ mod tests {
     }
 
     #[test]
-    fn movie_semantic_coherence_fails_closed_on_non_finite_or_f32_overflow() {
+    fn movie_semantic_coherence_normalizes_non_finite_or_f32_overflow() {
         let mut payload = serde_json::json!({
             "mental_movie": {
                 "width": 1,
