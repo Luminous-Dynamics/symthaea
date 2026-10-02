@@ -12,6 +12,12 @@ References:
 - DOI: 10.1162/neco_a_01665
 - arXiv: 2403.03278
 
+### Recent noise-decoding context
+
+Deng and Raviv, *Efficient Vector Symbolic Architectures from Histogram Recovery* (arXiv:2511.01838v2, revised 2026-04-16), extends the linear-code VSA direction specifically because random binary linear codes are difficult to decode under noise. Their construction uses a Reed–Solomon outer code concatenated with a Hadamard inner code and a dedicated histogram-recovery/list-decoding layer. They retain linear-code binding-recovery via subcode structure, but treat noisy superposition recovery as a separate decoding problem.
+
+This is a useful boundary for this comparator: the exact GF(2) span solver here establishes clean binding recovery and representation semantics; it is not evidence for noisy recovery. Any future noise experiment must name the decoder and code construction explicitly rather than interpreting out-of-span detection as correction.
+
 ## Research boundary
 
 Do not implement a "linear-code-inspired" approximation by reusing the existing random bipolar codebook and calling a different search routine. That would not test the claimed representation-level distinction.
