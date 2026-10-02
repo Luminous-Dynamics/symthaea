@@ -287,10 +287,9 @@ mod tests {
         NixActionIntentV1::from_command(
             "machine:workstation",
             Some("generation:42".to_string()),
-            &NixOSCommand::Custom {
-                command: "systemctl".to_string(),
-                args: vec!["restart".to_string(), service.to_string()],
-                safety_level: crate::action::SafetyLevel::SystemModify,
+            &NixOSCommand::Service {
+                operation: crate::action::NixServiceOperationKindV1::Restart,
+                unit: service.to_string(),
             },
         )
         .unwrap()
