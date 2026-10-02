@@ -258,9 +258,10 @@ impl KnowledgePersistence {
                 .map_err(|e| format!("Invalid provenance relation: {e}"))?;
             let inserted = tx
                 .execute(
-                    "INSERT OR IGNORE INTO knowledge_provenance_relations
+                    "INSERT INTO knowledge_provenance_relations
                      (source_memory_id, target_memory_id, kind, created_at)
-                     VALUES (?1, ?2, ?3, ?4)",
+                     VALUES (?1, ?2, ?3, ?4)
+                     ON CONFLICT(source_memory_id, target_memory_id, kind, created_at) DO NOTHING",
                     rusqlite::params![
                         relation.source_memory_id,
                         relation.target_memory_id,
@@ -324,8 +325,12 @@ impl KnowledgePersistence {
         let mut count = 0;
         for edge in edges {
             conn.execute(
-                "INSERT OR REPLACE INTO knowledge_causal_edges (cause, effect, strength, is_inhibitory, cycle)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT INTO knowledge_causal_edges (cause, effect, strength, is_inhibitory, cycle)
+                 VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(cause, effect) DO UPDATE SET
+                    strength = excluded.strength,
+                    is_inhibitory = excluded.is_inhibitory,
+                    cycle = excluded.cycle",
                 rusqlite::params![
                     edge.cause,
                     edge.effect,
@@ -1045,6 +1050,45 @@ mod tests {
         assert_eq!(p.save_ontology(&records).unwrap(), 2);
         let loaded = p.load_ontology().unwrap();
         assert_eq!(loaded.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), vec!["alpha", "zeta"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_causal_edge_upsert_updates_existing_identity() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_causal_upsert_identity_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let initial = CausalEdgeRecord {
+            cause: "cause".into(),
+            effect: "effect".into(),
+            strength: 0.2,
+            is_inhibitory: false,
+            cycle: 1,
+        };
+        let updated = CausalEdgeRecord {
+            cause: "cause".into(),
+            effect: "effect".into(),
+            strength: -0.8,
+            is_inhibitory: true,
+            cycle: 7,
+        };
+
+        assert_eq!(p.save_causal_edges(std::slice::from_ref(&initial)).unwrap(), 1);
+        assert_eq!(p.save_causal_edges(std::slice::from_ref(&updated)).unwrap(), 1);
+
+        let loaded = p.load_causal_edges().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].cause, "cause");
+        assert_eq!(loaded[0].effect, "effect");
+        assert_eq!(loaded[0].strength, -0.8);
+        assert!(loaded[0].is_inhibitory);
+        assert_eq!(loaded[0].cycle, 7);
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
