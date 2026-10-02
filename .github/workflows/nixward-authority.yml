@@ -22,6 +22,8 @@ on:
       - "crates/core/nixward/src/action/executor.rs"
       - "crates/core/nixward/src/action/plan_executor.rs"
       - "crates/core/nixward/src/bin/nixward_daemon.rs"
+      - "crates/core/nixward/src/ipc.rs"
+      - "crates/core/nixward/src/tui/app.rs"
       - "crates/core/nixward/Cargo.toml"
       - "Cargo.toml"
       - "Cargo.lock"
