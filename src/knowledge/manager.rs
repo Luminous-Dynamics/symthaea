@@ -307,12 +307,19 @@ impl KnowledgeManager {
                         let outcome = graph.import_fact_record_with_outcome(record);
                         persistence_health.fact_restore_evictions += outcome.policy_evictions;
                         if !outcome.accepted {
-                            persistence_health.fact_rejections += 1;
-                            tracing::warn!(
-                                memory_id = %record.memory_id,
-                                rejected = persistence_health.fact_rejections,
-                                "Knowledge: rejected persisted fact during graph restore"
-                            );
+                            if outcome.rejected_by_policy {
+                                tracing::debug!(
+                                    memory_id = %record.memory_id,
+                                    "Knowledge: fact restore rejected by graph retention policy"
+                                );
+                            } else {
+                                persistence_health.fact_rejections += 1;
+                                tracing::warn!(
+                                    memory_id = %record.memory_id,
+                                    rejected = persistence_health.fact_rejections,
+                                    "Knowledge: rejected persisted fact during graph restore"
+                                );
+                            }
                         } else if outcome.policy_evictions > 0 {
                             tracing::debug!(
                                 memory_id = %record.memory_id,
