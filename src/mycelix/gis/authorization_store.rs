@@ -1515,7 +1515,18 @@ mod tests {
         let (store,action,witness)=fixture(&path);
         let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
-        let witness=ActionAuthorizationWitness { action_digest:action.canonical_action_digest(), ..witness };
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"verifier-kind".into(),
+            action_id:action.id.clone(),
+            action_digest:action.canonical_action_digest(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-02T20:30:00Z".into(),
+            expires_at:None,
+            authority_epoch:1,
+        };
         store.register_lease(&AuthorizationLease::new_with_instance(
             witness.authorization_instance.clone(), action.id.clone(), witness.action_digest.clone(),
             "sha256:support","policy-v1",1,1
@@ -1541,7 +1552,18 @@ mod tests {
         let (store,action,witness)=fixture(&path);
         let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
-        let witness=ActionAuthorizationWitness { action_digest:action.canonical_action_digest(), ..witness };
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"verifier-binding".into(),
+            action_id:action.id.clone(),
+            action_digest:action.canonical_action_digest(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-02T20:31:00Z".into(),
+            expires_at:None,
+            authority_epoch:1,
+        };
         store.register_lease(&AuthorizationLease::new_with_instance(
             witness.authorization_instance.clone(), action.id.clone(), witness.action_digest.clone(),
             "sha256:support","policy-v1",1,1
