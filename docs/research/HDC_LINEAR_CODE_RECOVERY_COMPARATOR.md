@@ -213,6 +213,8 @@ The deterministic fixture now also defines a research-only nearest-codeword orac
 
 The oracle is intentionally kept separate from solve_linear_combination: below the unique-decoding radius, a nonzero error can produce an observation outside the linear-code subspace even though the intended codeword is uniquely recoverable by Hamming distance. The test therefore asserts both facts simultaneously. This is an executable distinction between **detection/membership** and **correction**, not a heuristic claim about a production decoder.
 
+The fixture also pins the minimum-distance ambiguity boundary. A corruption equal to a minimum-weight nonzero codeword leaves the observation inside the code, but changes it to another valid codeword. Exact span recovery therefore returns a different valid message; the original message is not identifiable from that observation alone. This is the concrete reason the clean algebraic solver cannot be promoted into an error-correcting decoder without an explicit noise model and decoding objective.
+
 The recent Deng–Raviv noisy-VSA construction is a separate comparator family: it changes the code construction to a Reed–Solomon/Hadamard concatenation and uses histogram recovery/list-decoding machinery to obtain formal noise resilience. It should remain separate from the current random-linear-code exact-recovery implementation unless that representation is intentionally adopted.
 
 ### Acceptance gates
