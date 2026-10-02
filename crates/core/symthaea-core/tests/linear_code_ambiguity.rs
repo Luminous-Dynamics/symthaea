@@ -74,7 +74,7 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
         .find(|&index| {
             let mut candidate = composite.clone();
             candidate.set_bit(index, !candidate.bit(index));
-            !solve_linear_combination(&candidate, &basis).is_some()
+            solve_linear_combination(&candidate, &basis).is_none()
         })
         .expect("at least one single-bit corruption should leave this low-rate span");
     corrupted.set_bit(corrupted_index, !corrupted.bit(corrupted_index));
@@ -92,4 +92,47 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
         })
         .collect();
     assert!(corrupted_matches.is_empty());
+}
+
+
+#[test]
+fn packed_solver_handles_coefficient_word_boundary() {
+    // 65 basis vectors forces the packed coefficient matrix across a u64
+    // boundary; the solver must preserve both the 64th and 65th coefficients.
+    let dimension = 160;
+    let code = RandomLinearCode::generate(dimension, 65, 0x65AA);
+    let message: Vec<bool> = (0..65).map(|index| index % 3 == 1).collect();
+    let target = code.encode(&message);
+
+    let recovered =
+        solve_linear_combination(&target, code.basis()).expect("target must be in span");
+    assert_eq!(recovered, message);
+}
+
+#[test]
+fn dependent_basis_returns_a_solution_but_not_a_uniqueness_claim() {
+    let code = RandomLinearCode::generate(96, 8, 0xDADA);
+    let basis = code.basis();
+    let mut dependent = basis.to_vec();
+    dependent.push(basis[0].clone());
+
+    let target = basis[2].bound(&basis[5]);
+    let recovered =
+        solve_linear_combination(&target, &dependent).expect("target must be in dependent span");
+
+    let mut reconstructed = BinaryCodeword::zero(96);
+    for (coefficient, vector) in recovered.iter().zip(&dependent) {
+        if *coefficient {
+            reconstructed.xor_assign(vector);
+        }
+    }
+    assert_eq!(reconstructed, target);
+    assert_eq!(basis_rank(&dependent, 96), 8);
+}
+
+#[test]
+fn solver_rejects_dimension_mismatch_without_panicking() {
+    let code = RandomLinearCode::generate(96, 4, 0x5151);
+    let target = BinaryCodeword::zero(95);
+    assert!(solve_linear_combination(&target, code.basis()).is_none());
 }
