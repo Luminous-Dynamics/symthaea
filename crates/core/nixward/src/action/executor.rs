@@ -745,7 +745,8 @@ impl NixOSExecutor {
         command: NixOSCommand,
         phi: f32,
     ) -> ExecutionResult {
-        let safety = command.safety_level();        let (cmd, args) = command.to_command();
+        let safety = command.safety_level();
+        let (cmd, args) = command.to_command();
 
         info!(
             command = %cmd,
