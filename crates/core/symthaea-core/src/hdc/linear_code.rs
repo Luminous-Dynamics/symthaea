@@ -7,7 +7,7 @@
 //! This module intentionally stops at the algebraic substrate. It does not
 //! claim to implement Raviv's recovery algorithm yet.
 
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BinaryCodeword {
@@ -17,7 +17,10 @@ pub struct BinaryCodeword {
 
 impl BinaryCodeword {
     pub fn zero(dimension: usize) -> Self {
-        Self { dimension, words: vec![0; words_for(dimension)] }
+        Self {
+            dimension,
+            words: vec![0; words_for(dimension)],
+        }
     }
 
     pub fn from_words(dimension: usize, mut words: Vec<u64>) -> Self {
@@ -28,7 +31,9 @@ impl BinaryCodeword {
         Self { dimension, words }
     }
 
-    pub fn dimension(&self) -> usize { self.dimension }
+    pub fn dimension(&self) -> usize {
+        self.dimension
+    }
 
     pub fn bit(&self, index: usize) -> bool {
         assert!(index < self.dimension);
@@ -38,20 +43,30 @@ impl BinaryCodeword {
     pub fn set_bit(&mut self, index: usize, value: bool) {
         assert!(index < self.dimension);
         let mask = 1u64 << (index % 64);
-        if value { self.words[index / 64] |= mask; }
-        else { self.words[index / 64] &= !mask; }
+        if value {
+            self.words[index / 64] |= mask;
+        } else {
+            self.words[index / 64] &= !mask;
+        }
     }
 
     pub fn xor_assign(&mut self, other: &Self) {
         assert_eq!(self.dimension, other.dimension);
-        for (a, b) in self.words.iter_mut().zip(&other.words) { *a ^= *b; }
+        for (a, b) in self.words.iter_mut().zip(&other.words) {
+            *a ^= *b;
+        }
     }
 
     pub fn weight(&self) -> usize {
-        self.words.iter().map(|word| word.count_ones() as usize).sum()
+        self.words
+            .iter()
+            .map(|word| word.count_ones() as usize)
+            .sum()
     }
 
-    pub fn words(&self) -> &[u64] { &self.words }
+    pub fn words(&self) -> &[u64] {
+        &self.words
+    }
 
     /// Convert the Boolean codeword to the bipolar HDC observation convention.
     /// GF(2) zero maps to -1 and one maps to +1.
@@ -93,27 +108,44 @@ pub struct RandomLinearCode {
 impl RandomLinearCode {
     pub fn generate(dimension: usize, rank: usize, seed: u64) -> Self {
         assert!(dimension > 0, "dimension must be positive");
-        assert!(rank > 0 && rank <= dimension, "rank must be in 1..=dimension");
+        assert!(
+            rank > 0 && rank <= dimension,
+            "rank must be in 1..=dimension"
+        );
         let mut rng = StdRng::seed_from_u64(seed);
         let mut basis = Vec::with_capacity(rank);
 
         while basis.len() < rank {
             let mut candidate = BinaryCodeword::zero(dimension);
-            for word in &mut candidate.words { *word = rng.r#gen(); }
+            for word in &mut candidate.words {
+                *word = rng.r#gen();
+            }
             if dimension % 64 != 0 {
                 if let Some(last) = candidate.words.last_mut() {
                     *last &= last_word_mask(dimension);
                 }
             }
-            if extends_span(&basis, &candidate) { basis.push(candidate); }
+            if extends_span(&basis, &candidate) {
+                basis.push(candidate);
+            }
         }
 
-        Self { dimension, rank, basis }
+        Self {
+            dimension,
+            rank,
+            basis,
+        }
     }
 
-    pub fn dimension(&self) -> usize { self.dimension }
-    pub fn rank(&self) -> usize { self.rank }
-    pub fn basis(&self) -> &[BinaryCodeword] { &self.basis }
+    pub fn dimension(&self) -> usize {
+        self.dimension
+    }
+    pub fn rank(&self) -> usize {
+        self.rank
+    }
+    pub fn basis(&self) -> &[BinaryCodeword] {
+        &self.basis
+    }
 
     /// Construct a code from an explicitly supplied independent basis.
     ///
@@ -126,11 +158,18 @@ impl RandomLinearCode {
         if basis.iter().any(|vector| vector.dimension() != dimension) {
             return None;
         }
-        if basis.iter().any(|vector| vector.words.iter().all(|word| *word == 0)) {
+        if basis
+            .iter()
+            .any(|vector| vector.words.iter().all(|word| *word == 0))
+        {
             return None;
         }
         let rank = basis_rank(&basis, dimension);
-        (rank == basis.len()).then_some(Self { dimension, rank, basis })
+        (rank == basis.len()).then_some(Self {
+            dimension,
+            rank,
+            basis,
+        })
     }
 
     /// Generate a parent linear code and two subcodes whose bases partition
@@ -170,7 +209,9 @@ impl RandomLinearCode {
         assert_eq!(message.len(), self.rank);
         let mut codeword = BinaryCodeword::zero(self.dimension);
         for (bit, generator) in message.iter().zip(&self.basis) {
-            if *bit { codeword.xor_assign(generator); }
+            if *bit {
+                codeword.xor_assign(generator);
+            }
         }
         codeword
     }
@@ -178,24 +219,32 @@ impl RandomLinearCode {
     pub fn enumerate(&self) -> Vec<BinaryCodeword> {
         assert!(self.rank < usize::BITS as usize);
         let count = 1usize << self.rank;
-        (0..count).map(|mask| {
-            let message: Vec<bool> = (0..self.rank)
-                .map(|bit| (mask >> bit) & 1 == 1)
-                .collect();
-            self.encode(&message)
-        }).collect()
+        (0..count)
+            .map(|mask| {
+                let message: Vec<bool> = (0..self.rank).map(|bit| (mask >> bit) & 1 == 1).collect();
+                self.encode(&message)
+            })
+            .collect()
     }
 }
 
-fn words_for(dimension: usize) -> usize { dimension.div_ceil(64) }
+fn words_for(dimension: usize) -> usize {
+    dimension.div_ceil(64)
+}
 
 fn last_word_mask(dimension: usize) -> u64 {
     let remainder = dimension % 64;
-    if remainder == 0 { u64::MAX } else { (1u64 << remainder) - 1 }
+    if remainder == 0 {
+        u64::MAX
+    } else {
+        (1u64 << remainder) - 1
+    }
 }
 
 fn extends_span(basis: &[BinaryCodeword], candidate: &BinaryCodeword) -> bool {
-    if candidate.words.iter().all(|word| *word == 0) { return false; }
+    if candidate.words.iter().all(|word| *word == 0) {
+        return false;
+    }
     let before = basis_rank(basis, candidate.dimension);
     let mut extended = basis.to_vec();
     extended.push(candidate.clone());
@@ -334,9 +383,7 @@ pub fn recover_independent_bound(
         basis.extend(factor.basis().iter().cloned());
     }
 
-    if basis.len() != total_rank
-        || basis_rank(&basis, dimension) != total_rank
-    {
+    if basis.len() != total_rank || basis_rank(&basis, dimension) != total_rank {
         return None;
     }
 
@@ -353,17 +400,21 @@ pub fn recover_independent_bound(
     Some(recovered)
 }
 pub fn basis_rank(vectors: &[BinaryCodeword], dimension: usize) -> usize {
-    let mut rows: Vec<BinaryCodeword> = vectors.iter()
+    let mut rows: Vec<BinaryCodeword> = vectors
+        .iter()
         .filter(|vector| vector.dimension == dimension)
         .cloned()
         .collect();
 
     let mut rank = 0usize;
     for column in (0..dimension).rev() {
-        let pivot = rows[rank..].iter()
+        let pivot = rows[rank..]
+            .iter()
             .position(|row| row.bit(column))
             .map(|offset| rank + offset);
-        let Some(pivot) = pivot else { continue; };
+        let Some(pivot) = pivot else {
+            continue;
+        };
 
         rows.swap(rank, pivot);
         let pivot_row = rows[rank].clone();
@@ -373,7 +424,9 @@ pub fn basis_rank(vectors: &[BinaryCodeword], dimension: usize) -> usize {
             }
         }
         rank += 1;
-        if rank == rows.len() { break; }
+        if rank == rows.len() {
+            break;
+        }
     }
     rank
 }
@@ -498,11 +551,9 @@ mod tests {
         let right_word = right.encode(&right_message);
         let composite = left_word.bound(&right_word);
 
-        let coefficients = solve_linear_combination(&composite, &basis).expect("composite must be in span");
-        let expected: Vec<bool> = left_message
-            .into_iter()
-            .chain(right_message)
-            .collect();
+        let coefficients =
+            solve_linear_combination(&composite, &basis).expect("composite must be in span");
+        let expected: Vec<bool> = left_message.into_iter().chain(right_message).collect();
         assert_eq!(coefficients, expected);
 
         let mut reconstructed = BinaryCodeword::zero(96);
