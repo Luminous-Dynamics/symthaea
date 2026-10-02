@@ -132,6 +132,9 @@ pub struct FactSearchResult {
 pub struct FactRestoreOutcome {
     /// Whether the persisted fact was admitted into the graph.
     pub accepted: bool,
+    /// Whether the fact was rejected by the bounded retention policy rather than
+    /// because its persisted representation was malformed.
+    pub rejected_by_policy: bool,
     /// Number of existing facts evicted by graph retention policy while admitting it.
     pub policy_evictions: usize,
 }
@@ -865,8 +868,29 @@ impl EnhancedKnowledgeGraph {
         };
 
         let mut policy_evictions = 0;
-        if self.facts.len() >= self.capacity && self.evict_lowest_confidence() {
-            policy_evictions = 1;
+        if self.facts.len() >= self.capacity {
+            if let Some(weakest) = self.facts.values().min_by(|a, b| {
+                a.confidence
+                    .total_cmp(&b.confidence)
+                    .then_with(|| a.memory_id.cmp(&b.memory_id))
+                    .then_with(|| a.id.cmp(&b.id))
+            }) {
+                let incoming_outranks = record.confidence > weakest.confidence
+                    || (record.confidence == weakest.confidence
+                        && record.memory_id.as_str() < weakest.memory_id.as_str());
+
+                if !incoming_outranks {
+                    return FactRestoreOutcome {
+                        accepted: false,
+                        rejected_by_policy: true,
+                        policy_evictions: 0,
+                    };
+                }
+            }
+
+            if self.evict_lowest_confidence() {
+                policy_evictions = 1;
+            }
         }
 
         let id: FactId = self.next_id;
@@ -895,6 +919,7 @@ impl EnhancedKnowledgeGraph {
         self.facts.insert(id, fact);
         FactRestoreOutcome {
             accepted: true,
+            rejected_by_policy: false,
             policy_evictions,
         }
     }
@@ -1371,6 +1396,97 @@ mod tests {
         assert!(graph.is_empty());
     }
 
+    #[test]
+    fn test_bounded_fact_restore_is_order_invariant() {
+        let records = [
+            super::persistence::FactRecord {
+                memory_id: "alpha".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: "alpha".into(),
+                confidence: 0.8,
+                domain: None,
+                cycle: 3,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "beta".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![1u8; 2048],
+                source_text: "beta".into(),
+                confidence: 0.7,
+                domain: None,
+                cycle: 2,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "gamma".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![2u8; 2048],
+                source_text: "gamma".into(),
+                confidence: 0.1,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            },
+        ];
+
+        let mut forward = EnhancedKnowledgeGraph::new(2);
+        let mut reverse = EnhancedKnowledgeGraph::new(2);
+        for record in &records {
+            forward.import_fact_record_with_outcome(record);
+        }
+        for record in records.iter().rev() {
+            reverse.import_fact_record_with_outcome(record);
+        }
+
+        let forward_ids: Vec<_> = forward.all_facts().map(|f| f.memory_id.as_str()).collect();
+        let reverse_ids: Vec<_> = reverse.all_facts().map(|f| f.memory_id.as_str()).collect();
+        assert_eq!(forward_ids, vec!["alpha", "beta"]);
+        assert_eq!(forward_ids, reverse_ids);
+    }
+
+    #[test]
+    fn test_bounded_fact_restore_rejects_weaker_incoming_without_eviction() {
+        let mut graph = EnhancedKnowledgeGraph::new(2);
+        for (memory_id, confidence) in [("alpha", 0.9), ("beta", 0.8)] {
+            let record = super::persistence::FactRecord {
+                memory_id: memory_id.into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: memory_id.into(),
+                confidence,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            };
+            assert!(graph.import_fact_record_with_outcome(&record).accepted);
+        }
+
+        let weak = super::persistence::FactRecord {
+            memory_id: "gamma".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; 2048],
+            source_text: "gamma".into(),
+            confidence: 0.1,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        let outcome = graph.import_fact_record_with_outcome(&weak);
+        assert!(!outcome.accepted);
+        assert!(outcome.rejected_by_policy);
+        assert_eq!(outcome.policy_evictions, 0);
+        assert_eq!(
+            graph.all_facts().map(|f| f.memory_id.as_str()).collect::<Vec<_>>(),
+            vec!["alpha", "beta"]
+        );
+    }
     #[test]
     fn test_memory_identity_survives_export_import() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
