@@ -82,6 +82,23 @@ pub enum ProviderEvidenceKind {
     PreEntryLookup,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderVerificationPurpose {
+    TerminalOutcome,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderVerifierConfiguration {
+    /// Stable relying-party-selected verifier implementation/profile identifier.
+    pub verifier_id: String,
+    /// Digest of the pinned verifier implementation/profile configuration.
+    pub verifier_config_digest: String,
+    /// Digest/identifier of the configured trust-anchor set.
+    pub trust_anchor_digest: String,
+    /// Digest/identifier of the configured evidence schema/profile.
+    pub evidence_profile_digest: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderTerminalEvidence {
     pub kind: ProviderEvidenceKind,
@@ -105,6 +122,12 @@ pub struct VerifiedProviderOutcome {
     pub evidence: ProviderTerminalEvidence,
     /// Relying-party configured verifier identity/revision.
     pub verifier_id: String,
+    /// Digest of the pinned verifier implementation/profile configuration.
+    pub verifier_config_digest: String,
+    /// Digest/identifier of the configured trust-anchor set.
+    pub trust_anchor_digest: String,
+    /// Digest/identifier of the configured evidence schema/profile.
+    pub evidence_profile_digest: String,
     /// Digest of the verifier's authenticated verification statement.
     pub verification_digest: String,
 }
@@ -122,8 +145,9 @@ pub enum ProviderVerificationError {
 /// truth; it only accepts a verifier result that explicitly affirms terminal
 /// evidence for the exact frozen dispatch record.
 pub trait ProviderEvidenceVerifier {
-    fn verify_terminal_outcome(
+    fn verify(
         &self,
+        purpose: ProviderVerificationPurpose,
         record: &DurableDispatchRecord,
         evidence: &ProviderTerminalEvidence,
     ) -> Result<VerifiedProviderOutcome, ProviderVerificationError>;
@@ -230,6 +254,9 @@ impl SqliteAuthorizationStore {
                evidence_id TEXT NOT NULL,
                evidence_digest TEXT NOT NULL,
                verifier_id TEXT NOT NULL,
+               verifier_config_digest TEXT NOT NULL,
+               trust_anchor_digest TEXT NOT NULL,
+               evidence_profile_digest TEXT NOT NULL,
                verification_digest TEXT NOT NULL,
                PRIMARY KEY(authorization_instance, attempt_id)
              );
@@ -587,7 +614,7 @@ impl SqliteAuthorizationStore {
         verifier: &V,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
         let verified = verifier
-            .verify_terminal_outcome(record, evidence)
+            .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
         Self::validate_verified_terminal_outcome(record, &verified)?;
 
@@ -632,14 +659,15 @@ impl SqliteAuthorizationStore {
             "INSERT OR REPLACE INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,boundary_id,action_digest,provider_idempotency_key,
               target_identity,audience,outcome,evidence_id,evidence_digest,verifier_id,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
             params![
                 record.authorization_instance, record.attempt_id, record.boundary_id,
                 record.action_digest, record.provider_idempotency_key, record.target_identity,
                 record.audience,
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 evidence.evidence_id, evidence.evidence_digest, verified.verifier_id,
-                verified.verification_digest,
+                verified.verifier_config_digest, verified.trust_anchor_digest,
+                verified.evidence_profile_digest, verified.verification_digest,
             ],
         )?;
         insert_receipt_with_boundary(&tx, &receipt, "final", Some(&record.boundary_id))?;
@@ -1467,12 +1495,14 @@ mod tests {
     struct TestProviderVerifier;
 
     impl ProviderEvidenceVerifier for TestProviderVerifier {
-        fn verify_terminal_outcome(
+        fn verify(
             &self,
+            purpose: ProviderVerificationPurpose,
             record: &DurableDispatchRecord,
             evidence: &ProviderTerminalEvidence,
         ) -> Result<VerifiedProviderOutcome, ProviderVerificationError> {
-            if !matches!(evidence.kind, ProviderEvidenceKind::TerminalOutcome)
+            if !matches!(purpose, ProviderVerificationPurpose::TerminalOutcome)
+                || !matches!(evidence.kind, ProviderEvidenceKind::TerminalOutcome)
                 || evidence.action_id != record.action_id
                 || evidence.action_digest != record.action_digest
                 || evidence.attempt_id != record.attempt_id
@@ -1488,6 +1518,9 @@ mod tests {
             Ok(VerifiedProviderOutcome {
                 evidence: evidence.clone(),
                 verifier_id: "test-verifier/v1".into(),
+                verifier_config_digest: "sha256:test-verifier-config".into(),
+                trust_anchor_digest: "sha256:test-trust-anchors".into(),
+                evidence_profile_digest: "sha256:test-evidence-profile".into(),
                 verification_digest: "sha256:test-verification".into(),
             })
         }
