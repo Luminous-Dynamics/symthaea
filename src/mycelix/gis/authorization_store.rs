@@ -442,7 +442,33 @@ impl SqliteAuthorizationStore {
     /// fence in one durable transaction. Effectful callers should use this path
     /// rather than the legacy attempt-only transition because it freezes every
     /// material field that the later provider boundary must consume.
-    pub fn mark_dispatch_pending_bound(
+    /// Derive the native replay identity at the protected effect boundary
+    /// from the pinned authority namespace and native authorization ID.
+    ///
+    /// This is the preferred entry point for production native authorization
+    /// handoffs. The older free-form replay-identity API remains for staged
+    /// migration but is deprecated because it cannot prove its derivation inputs.
+    pub fn mark_dispatch_pending_bound_from_native_authority(
+        &self,
+        authorization_instance: &str,
+        attempt_id: &str,
+        action: &EpistemicAction,
+        expected_effect: &super::ActionEffectBinding,
+        boundary_id: &str,
+        operation_id: &str,
+        authority_namespace: &str,
+        native_authorization_id: &str,
+    ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
+        let replay=super::NativeReplayDerivation::derive(
+            authority_namespace,native_authorization_id,
+        ).map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
+        self.mark_dispatch_pending_bound(
+            authorization_instance,attempt_id,action,expected_effect,boundary_id,
+            operation_id,&replay.native_replay_identity,
+        )
+    }
+
+    #[deprecated(note = "use mark_dispatch_pending_bound_from_native_authority")]    pub fn mark_dispatch_pending_bound(
         &self,
         authorization_instance: &str,
         attempt_id: &str,
@@ -1833,6 +1859,27 @@ mod tests {
         let mut attempt_changed=record.clone();
         attempt_changed.attempt_id="attempt-provider-key-retry".into();
         assert_eq!(record.provider_idempotency_key,attempt_changed.provider_idempotency_key);
+        let _=std::fs::remove_file(path);
+    }
+    #[test]
+    fn native_authority_entry_derives_replay_identity_at_boundary() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-native-derived-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=action.with_effect_binding(effect.clone());
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"native-derived".into(),action_id:action.id.clone(),
+            action_digest:action.canonical_action_digest(),support_digest:witness.support_digest,
+            current_frame:witness.current_frame,policy:witness.policy,authority_epoch:witness.authority_epoch,
+        };
+        store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-native-derived","boundary-A").unwrap();
+        let record=store.mark_dispatch_pending_bound_from_native_authority(
+            &witness.authorization_instance,"attempt-native-derived",&action,&effect,"boundary-A",
+            "operation:native-derived","issuer.example","native-auth-1"
+        ).unwrap();
+        let expected=super::super::NativeReplayDerivation::derive("issuer.example","native-auth-1").unwrap();
+        assert_eq!(record.native_replay_identity,expected.native_replay_identity);
+        assert!(record.provider_idempotency_key.starts_with("sha256:"));
         let _=std::fs::remove_file(path);
     }
     #[test]
