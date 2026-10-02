@@ -505,6 +505,7 @@ pub struct WebGpuRenderer {
 
 #[cfg(target_arch = "wasm32")]
 impl WebGpuRenderer {
+    /// Initialize a movie renderer for the supplied canvas.
     pub async fn new(canvas: HtmlCanvasElement) -> Result<Self, String> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::BROWSER_WEBGPU,
@@ -723,6 +724,7 @@ const MAX_MOVIE_HEIGHT: u32 = 2048;
 #[cfg(target_arch = "wasm32")]
 const MAX_MOVIE_RGBA_BYTES: usize = 32 * 1024 * 1024;
 
+/// WebGPU renderer for decoded RGBA cognitive movie frames.
 #[cfg(target_arch = "wasm32")]
 pub struct WebGpuMovieRenderer {
     surface: wgpu::Surface<'static>,
@@ -880,6 +882,7 @@ impl WebGpuMovieRenderer {
         })
     }
 
+    /// Upload one bounded RGBA frame and present it with nearest-neighbour sampling.
     pub fn render(&mut self, width: u32, height: u32, rgba: &[u8]) -> Result<(), String> {
         if width == 0
             || height == 0
