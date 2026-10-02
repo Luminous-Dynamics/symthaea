@@ -604,14 +604,12 @@ fn svg_transform_is_bounded(value: &str) -> bool {
         }
 
         let args = &value[start..cursor];
-        if !svg_numeric_list_is_bounded(args) {
+        let numbers = svg_numeric_tokens(args)?;
+        let arg_count = numbers.len();
+        if arg_count < arity_min || arg_count > arity_max {
             return false;
         }
-        let arg_count = args
-            .split(|ch: char| ch == ',' || ch.is_ascii_whitespace())
-            .filter(|token| !token.is_empty())
-            .count();
-        if arg_count < arity_min || arg_count > arity_max {
+        if name == "scale" && numbers.iter().any(|value| value.abs() > 8.0) {
             return false;
         }
 
@@ -1732,6 +1730,20 @@ mod tests {
             r#"<svg><path d="M0 0 C1 2 3 4 5 6 S7 8 9 10 Q11 12 13 14 T15 16 A4 4 0 0 1 19 20"/></svg>"#,
         ] {
             assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_some(), "rejected: {svg}");
+        }
+    }
+
+    #[test]
+    fn portrait_rejects_excessive_scale_amplification() {
+        for svg in [
+            r#"<svg><g transform="scale(8.0001)"/></svg>"#,
+            r#"<svg><g transform="scale(-8.0001)"/></svg>"#,
+            r#"<svg><g transform="scale(9 1)"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(),
+                "accepted: {svg}"
+            );
         }
     }
 
