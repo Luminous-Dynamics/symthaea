@@ -54,7 +54,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Caller-labeled identity for one evidence-bearing run.
 ///
@@ -120,6 +120,48 @@ pub fn config_hash<T: fmt::Debug>(config: &T) -> String {
 /// Canonicalization is explicit and domain-separated so the digest is stable
 /// across map insertion order and does not rely on Debug formatting.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Canonical identity of a validated repository source snapshot.
+///
+/// The inner value is private so callers cannot bypass canonicalization. The
+/// serde representation remains a plain string for wire compatibility, while
+/// deserialization and construction normalize hexadecimal to lowercase.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RepositorySourceSnapshotId(String);
+
+impl RepositorySourceSnapshotId {
+    pub const SCHEMA: &'static str = "symthaea.repository-source-snapshot.v2";
+
+    pub fn parse(value: &str) -> Result<Self, String> {
+        if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(format!("invalid repository_source_snapshot_id: {value:?}"));
+        }
+        Ok(Self(value.to_ascii_lowercase()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Serialize for RepositorySourceSnapshotId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for RepositorySourceSnapshotId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::parse(&value).map_err(serde::de::Error::custom)
+    }
+}
+
 pub struct ExecutionLineageV1 {
     pub source_repository: String,
     pub source_revision: String,
@@ -128,7 +170,7 @@ pub struct ExecutionLineageV1 {
     ///
     /// This is distinct from Git HEAD/tree metadata: staged, unstaged, deleted,
     /// and explicitly included ignored source bytes can all belong to the exact source subject.
-    pub repository_source_snapshot_id: String,
+    pub repository_source_snapshot_id: RepositorySourceSnapshotId,
     pub lock_digests: BTreeMap<String, String>,
     pub toolchain_versions: BTreeMap<String, String>,
     pub host_target: String,
@@ -174,7 +216,9 @@ impl ExecutionLineageV1 {
             source_repository,
             source_revision,
             source_tree,
-            repository_source_snapshot_id,
+            repository_source_snapshot_id: RepositorySourceSnapshotId::parse(
+                &repository_source_snapshot_id,
+            )?,
             lock_digests,
             toolchain_versions,
             host_target,
@@ -225,10 +269,11 @@ impl ExecutionLineageV1 {
                 return Err(format!("empty lineage field {name}"));
             }
         }
-        validate_sha256_identity(
-            "repository_source_snapshot_id",
-            &self.repository_source_snapshot_id,
-        )?;
+        if self.repository_source_snapshot_id.as_str()
+            != self.repository_source_snapshot_id.as_str().to_ascii_lowercase()
+        {
+            return Err("repository_source_snapshot_id must be canonical lowercase hex".into());
+        }
         if self.argv.iter().any(|arg| arg.contains('\0')) {
             return Err("NUL in argv".into());
         }
@@ -249,7 +294,7 @@ impl ExecutionLineageV1 {
         append_str(
             hasher,
             "repository_source_snapshot_id",
-            &self.repository_source_snapshot_id,
+            self.repository_source_snapshot_id.as_str(),
         );
         append_map(hasher, "lock_digests", &self.lock_digests);
         append_map(hasher, "toolchain_versions", &self.toolchain_versions);
@@ -300,13 +345,6 @@ fn validate_digest(value: &str) -> Result<(), String> {
     let payload = value.split_once(':').map_or(value, |(_, payload)| payload);
     if payload.len() < 16 || payload.len() % 2 != 0 || !payload.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(format!("invalid digest syntax: {value:?}"));
-    }
-    Ok(())
-}
-
-fn validate_sha256_identity(field: &str, value: &str) -> Result<(), String> {
-    if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(format!("invalid {field}: {value:?}"));
     }
     Ok(())
 }
@@ -721,7 +759,9 @@ mod tests {
             source_repository: "github.com/Luminous-Dynamics/symthaea".into(),
             source_revision: "abc123".into(),
             source_tree: "tree456".into(),
-            repository_source_snapshot_id: "a".repeat(64),
+            repository_source_snapshot_id: RepositorySourceSnapshotId::parse(
+                &"A".repeat(64)
+            ).expect("valid snapshot id"),
             lock_digests: [("Cargo.lock".into(), "lock789".into())].into_iter().collect(),
             toolchain_versions: [("rustc".into(), "1.96.0".into())].into_iter().collect(),
             host_target: "x86_64-unknown-linux-gnu".into(),
@@ -735,17 +775,33 @@ mod tests {
     }
 
     #[test]
+    fn repository_source_snapshot_id_is_canonicalized_to_lowercase() {
+        let id = RepositorySourceSnapshotId::parse(&"AB".repeat(32)).expect("valid snapshot id");
+        assert_eq!(id.as_str(), &"ab".repeat(32));
+        let json = serde_json::to_string(&id).expect("serialize snapshot id");
+        assert_eq!(json, format!("\"{}\"", "ab".repeat(32)));
+    }
+
+    #[test]
+    fn repository_source_snapshot_id_serde_canonicalizes_case() {
+        let upper = format!("\"{}\"", "CD".repeat(32));
+        let id: RepositorySourceSnapshotId =
+            serde_json::from_str(&upper).expect("deserialize snapshot id");
+        assert_eq!(id.as_str(), &"cd".repeat(32));
+    }
+
+    #[test]
     fn execution_lineage_validation_rejects_invalid_repository_source_snapshot_id() {
         let mut lineage = lineage_fixture();
-        lineage.repository_source_snapshot_id = "not-a-sha256".into();
-        assert!(lineage.validate().is_err());
+        assert!(RepositorySourceSnapshotId::parse("not-a-sha256").is_err());
     }
 
     #[test]
     fn repository_source_snapshot_identity_changes_lineage_digest() {
         let base = lineage_fixture();
         let mut changed = base.clone();
-        changed.repository_source_snapshot_id = "b".repeat(64);
+        changed.repository_source_snapshot_id =
+            RepositorySourceSnapshotId::parse(&"b".repeat(64)).expect("valid snapshot id");
         assert_ne!(base.digest(), changed.digest());
     }
 
