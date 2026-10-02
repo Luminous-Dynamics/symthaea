@@ -267,6 +267,23 @@ impl AuthorizationLease {
         Ok(())
     }
 
+    /// Effectful execution must use an action carrying an exact sink binding.
+    /// The witness already commits to the action digest, so the sink cannot be
+    /// swapped after authorization without invalidating that witness.
+    pub fn prepare_for_effect_execution(
+        &mut self,
+        witness: &ActionAuthorizationWitness,
+        action: &EpistemicAction,
+        expected_effect: &ActionEffectBinding,
+        current_frame: &str,
+        attempt_id: impl Into<String>,
+    ) -> Result<(), AuthorizationConsumptionError> {
+        if action.effect_binding.as_ref() != Some(expected_effect) {
+            return Err(AuthorizationConsumptionError::InvalidBinding);
+        }
+        self.prepare_for_execution(witness, action, current_frame, attempt_id)
+    }
+
     pub fn commit(
         &mut self,
         attempt_id: &str,
@@ -386,11 +403,59 @@ pub struct ActionReevaluationWitness {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionEffectBinding {
+    /// Executor-observed identity of the effect target.
+    pub target_identity: String,
+    /// Intended audience/environment of the effecting interface.
+    pub audience: String,
+    /// Exact adapter/finality sink that is permitted to effect the action.
+    pub adapter: String,
+}
+
+impl ActionEffectBinding {
+    pub fn new(
+        target_identity: impl Into<String>,
+        audience: impl Into<String>,
+        adapter: impl Into<String>,
+    ) -> Self {
+        Self {
+            target_identity: target_identity.into(),
+            audience: audience.into(),
+            adapter: adapter.into(),
+        }
+    }
+
+    pub fn canonical_digest(&self) -> String {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"SYMTHEA-GIS-EFFECT-V1");
+        fn append_field(bytes: &mut Vec<u8>, value: &[u8]) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value);
+        }
+        append_field(&mut bytes, self.target_identity.as_bytes());
+        append_field(&mut bytes, self.audience.as_bytes());
+        append_field(&mut bytes, self.adapter.as_bytes());
+
+        let digest = Sha256::digest(bytes);
+        let mut encoded = String::with_capacity(71);
+        encoded.push_str("sha256:");
+        for byte in digest {
+            use std::fmt::Write as _;
+            write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
+        }
+        encoded
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EpistemicAction {
     pub id: String,
     pub description: String,
     pub risk: ActionRisk,
     pub dependencies: Vec<ActionDependency>,
+    /// Exact effect boundary covered by the action digest. None is retained for
+    /// informational/control-plane actions that do not cross an effect sink.
+    pub effect_binding: Option<ActionEffectBinding>,
     pub status: ActionStatus,
     pub historical_decisions: Vec<ActionDecisionWitness>,
     pub reevaluation: Option<ActionReevaluationWitness>,
@@ -439,6 +504,13 @@ impl EpistemicAction {
             append_field(&mut bytes, conclusion_id.as_bytes());
             append_field(&mut bytes, &[kind]);
         }
+        match &self.effect_binding {
+            Some(effect) => {
+                append_field(&mut bytes, b"effect-bound");
+                append_field(&mut bytes, effect.canonical_digest().as_bytes());
+            }
+            None => append_field(&mut bytes, b"no-effect-binding"),
+        }
 
         let digest = Sha256::digest(bytes);
         let mut encoded = String::with_capacity(71);
@@ -456,10 +528,23 @@ impl EpistemicAction {
             description: description.into(),
             risk,
             dependencies: Vec::new(),
+            effect_binding: None,
             status: ActionStatus::Ready,
             historical_decisions: Vec::new(),
             reevaluation: None,
         }
+    }
+
+    /// Bind the immutable executable action to one exact effect boundary.
+    /// The binding becomes part of the canonical action digest, so changing the
+    /// target, audience, or adapter invalidates prior authorization.
+    pub fn with_effect_binding(mut self, effect: ActionEffectBinding) -> Self {
+        self.effect_binding = Some(effect);
+        self
+    }
+
+    pub fn effect_binding(&self) -> Option<&ActionEffectBinding> {
+        self.effect_binding.as_ref()
     }
 
     pub fn require_reevaluation(
@@ -1014,6 +1099,69 @@ mod tests {
             attempt_id: "attempt-1".into(), authority_epoch: 1, outcome: ExecutionOutcome::Succeeded,
         };
         assert_eq!(receipt.outcome, ExecutionOutcome::Succeeded);
+    }
+
+    #[test]
+    fn effect_boundary_is_part_of_canonical_authorization_identity() {
+        let effect = ActionEffectBinding::new("target:payments/ledger-7", "audience:ledger", "adapter:ledger-v2");
+        let action = EpistemicAction::new("a-effect", "transfer", ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+
+        let witness = ActionAuthorizationWitness {
+            action_id: action.id.clone(),
+            authorization_instance: "approval-effect-1".into(),
+            action_digest: digest.clone(),
+            frame: "f1".into(),
+            support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(),
+            expires_at: None,
+            authority_epoch: 1,
+        };
+        let mut lease = AuthorizationLease::new_with_instance(
+            "approval-effect-1", action.id.clone(), digest,
+            "sha256:support", "policy-v1", 1, 1,
+        );
+        lease.prepare_for_effect_execution(&witness, &action, &effect, "f1", "attempt-1").unwrap();
+
+        let wrong_effect = ActionEffectBinding::new("target:payments/ledger-8", "audience:ledger", "adapter:ledger-v2");
+        assert_eq!(
+            lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap().outcome,
+            ExecutionOutcome::Succeeded
+        );
+        assert_ne!(wrong_effect.canonical_digest(), effect.canonical_digest());
+    }
+
+    #[test]
+    fn effect_rebinding_invalidates_existing_authorization() {
+        let effect = ActionEffectBinding::new("target:device-1", "audience:actuator", "adapter:v1");
+        let mut action = EpistemicAction::new("a-effect-rebind", "actuate", ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            action_id: action.id.clone(),
+            authorization_instance: "approval-rebind-1".into(),
+            action_digest: digest.clone(),
+            frame: "f1".into(),
+            support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(),
+            expires_at: None,
+            authority_epoch: 1,
+        };
+        let mut lease = AuthorizationLease::new_with_instance(
+            "approval-rebind-1", action.id.clone(), digest,
+            "sha256:support", "policy-v1", 1, 1,
+        );
+
+        action.effect_binding = Some(ActionEffectBinding::new("target:device-2", "audience:actuator", "adapter:v1"));
+        assert_eq!(
+            lease.prepare_for_execution(&witness, &action, "f1", "attempt-1"),
+            Err(AuthorizationConsumptionError::InvalidBinding)
+        );
     }
 
     #[test]
