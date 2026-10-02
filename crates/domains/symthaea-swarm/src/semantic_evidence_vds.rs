@@ -32,6 +32,9 @@ pub const MAX_RFC9942_SIGNATURE_PAYLOAD_BYTES: usize = 8 * 1024 * 1024;
 pub const RFC9942_VDP_HEADER_LABEL: i64 = 396;
 pub const COSE_SIGN1_TAG: u64 = 18;
 pub const COSE_ALG_HEADER_LABEL: i64 = 1;
+/// COSE algorithm identifier -8 is EdDSA. This adapter narrows it to Ed25519
+/// by requiring a 32-byte public key and is therefore not a generic EdDSA verifier.
+pub const COSE_EDDSA_ALGORITHM_ID: i64 = -8;
 
 /// RFC 9942 receipt payload representation after structural parsing.
 ///
@@ -135,6 +138,32 @@ impl Rfc9942ReceiptEnvelope {
 
     /// Build the RFC 9052 `Sig_structure` bytes used by COSE_Sign1
     /// verification. The signature algorithm itself is intentionally external.
+    /// Verify an Ed25519 COSE signature over this Receipt.
+    ///
+    /// Inclusion verification follows RFC9942's proof-then-signature order;
+    /// consistency verification follows its signature-then-proof order. A
+    /// single result is returned so callers cannot accidentally accept one
+    /// half of a consistency Receipt.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_ed25519(
+        &self,
+        public_key: &[u8; 32],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<(), Rfc9942VdpError> {
+        if self.algorithm_id != COSE_EDDSA_ALGORITHM_ID {
+            return Err(Rfc9942VdpError::UnsupportedSignatureAlgorithm(self.algorithm_id));
+        }
+        let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(public_key)
+            .map_err(|_| Rfc9942VdpError::InvalidEd25519PublicKey)?;
+        let tbs = self.signature1_tbs(external_aad, detached_payload)?;
+        let signature = ed25519_dalek::Signature::from_slice(self.signature())
+            .map_err(|_| Rfc9942VdpError::InvalidEd25519Signature)?;
+        use ed25519_dalek::Verifier;
+        verifying_key.verify(&tbs, &signature)
+            .map_err(|_| Rfc9942VdpError::InvalidEd25519Signature)
+    }
+
     pub fn signature1_tbs(
         &self,
         external_aad: &[u8],
@@ -336,6 +365,28 @@ impl Rfc9942SignatureWithReceipts {
             (Rfc9942SignaturePayload::Detached, None) => return Err(Rfc9942VdpError::DetachedPayloadRequired),
         };
         Ok(cose_sign1_signature1_tbs(&self.protected_header_bytes(), external_aad, payload))
+    }
+
+    /// Verify the outer COSE_Sign1 signature with Ed25519.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_ed25519(
+        &self,
+        algorithm_id: i64,
+        public_key: &[u8; 32],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<(), Rfc9942VdpError> {
+        if algorithm_id != COSE_EDDSA_ALGORITHM_ID {
+            return Err(Rfc9942VdpError::UnsupportedSignatureAlgorithm(algorithm_id));
+        }
+        let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(public_key)
+            .map_err(|_| Rfc9942VdpError::InvalidEd25519PublicKey)?;
+        let tbs = self.signature1_tbs(external_aad, detached_payload)?;
+        let signature = ed25519_dalek::Signature::from_slice(self.signature())
+            .map_err(|_| Rfc9942VdpError::InvalidEd25519Signature)?;
+        use ed25519_dalek::Verifier;
+        verifying_key.verify(&tbs, &signature)
+            .map_err(|_| Rfc9942VdpError::InvalidEd25519Signature)
     }
 
     pub fn signature(&self) -> &[u8] {
@@ -665,6 +716,12 @@ pub enum Rfc9942VdpError {
     ReceiptCollectionResourceLimitExceeded,
     #[error("outer RFC 9942 COSE_Sign1 payload exceeds its defensive resource bound")]
     SignaturePayloadResourceLimitExceeded,
+    #[error("COSE signature algorithm {0} is not supported by this verifier")]
+    UnsupportedSignatureAlgorithm(i64),
+    #[error("invalid Ed25519 public key")]
+    InvalidEd25519PublicKey,
+    #[error("invalid Ed25519 signature")]
+    InvalidEd25519Signature,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
     VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
@@ -1982,6 +2039,43 @@ mod tests {
         assert_eq!(decoded.payload(),&Rfc9942SignaturePayload::Attached(b"signed-statement".to_vec()));
         assert_eq!(decoded.signature(),&[0xBB;64]);
         assert_eq!(decoded.to_cbor(),encoded);
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn rfc9942_ed25519_signature_verification_binds_tbs() {
+        use ed25519_dalek::{Signer, SigningKey};
+        let signing_key=SigningKey::from_bytes(&[7u8;32]);
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt_payload=Rfc9942ReceiptPayload::Attached([0x22;32]);
+        let unsigned=Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,
+            vdp,
+            receipt_payload,
+            Vec::new(),
+        ).unwrap();
+        let tbs=unsigned.signature1_tbs(b"",None).unwrap();
+        let signature=signing_key.sign(&tbs).to_bytes().to_vec();
+        let receipt=Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,
+            unsigned.vdp().clone(),
+            unsigned.payload().clone(),
+            signature,
+        ).unwrap();
+        assert!(receipt.verify_ed25519(signing_key.verifying_key().as_bytes(),b"",None).is_ok());
+        let mut forged=receipt.signature().to_vec();
+        forged[0]^=0x01;
+        let forged_receipt=Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,
+            receipt.vdp().clone(),
+            receipt.payload().clone(),
+            forged,
+        ).unwrap();
+        assert_eq!(
+            forged_receipt.verify_ed25519(signing_key.verifying_key().as_bytes(),b"",None),
+            Err(Rfc9942VdpError::InvalidEd25519Signature)
+        );
     }
 
     #[test]
