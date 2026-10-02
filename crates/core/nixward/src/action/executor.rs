@@ -18,6 +18,12 @@ use std::process::Stdio;
 use tokio::process::Command;
 use tracing::{info, warn};
 
+#[derive(Debug, Deserialize)]
+struct NixOSGenerationRecordV1 {
+    generation: u32,
+    current: bool,
+}
+
 fn parse_generation_pre_state_identity(identity: &str) -> Result<u32, String> {
     const PREFIX: &str = "generation:";
     let raw = identity
@@ -28,6 +34,19 @@ fn parse_generation_pre_state_identity(identity: &str) -> Result<u32, String> {
     }
     raw.parse::<u32>()
         .map_err(|_| format!("invalid generation pre-state identity: {identity}"))
+}
+
+fn parse_current_generation(stdout: &str) -> Result<u32, String> {
+    let records: Vec<NixOSGenerationRecordV1> = serde_json::from_str(stdout)
+        .map_err(|error| format!("invalid nixos-rebuild generation JSON: {error}"))?;
+    let mut current = records.iter().filter(|record| record.current);
+    let record = current
+        .next()
+        .ok_or_else(|| "nixos-rebuild generation JSON contained no current generation".to_string())?;
+    if current.next().is_some() {
+        return Err("nixos-rebuild generation JSON contained multiple current generations".to_string());
+    }
+    Ok(record.generation)
 }
 
 /// NixOS-specific commands with structured parameters
@@ -505,26 +524,25 @@ impl NixOSExecutor {
     /// Capture the current NixOS generation for rollback
     pub async fn capture_generation(&mut self) -> anyhow::Result<u32> {
         let output = Command::new("nixos-rebuild")
-            .args(["list-generations"])
+            .args(["list-generations", "--json"])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
             .await?;
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        for line in stdout.lines() {
-            if line.contains("(current)")
-                && let Some(gen_str) = line.split_whitespace().next()
-                && let Ok(r#gen) = gen_str.trim().parse::<u32>()
-            {
-                self.current_generation = Some(r#gen);
-                info!(generation = r#gen, "Captured current NixOS generation");
-                return Ok(r#gen);
-            }
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "nixos-rebuild list-generations --json failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
         }
 
-        Err(anyhow::anyhow!("Could not determine current generation"))
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let generation = parse_current_generation(&stdout)
+            .map_err(|error| anyhow::anyhow!("Could not determine current generation: {error}"))?;
+        self.current_generation = Some(generation);
+        info!(generation, "Captured current NixOS generation");
+        Ok(generation)
     }
 
     /// Execute a NixOS command, gated on `phi` clearing the command's safety
@@ -889,6 +907,29 @@ mod tests {
         assert!(parse_generation_pre_state_identity("generation:").is_err());
         assert!(parse_generation_pre_state_identity("generation:-1").is_err());
         assert!(parse_generation_pre_state_identity("host:workstation").is_err());
+    }
+
+    #[test]
+    fn current_generation_parser_accepts_structured_json() {
+        let json = r#"[{"generation": 874, "current": true}, {"generation": 873, "current": false}]"#;
+        assert_eq!(parse_current_generation(json).unwrap(), 874);
+    }
+
+    #[test]
+    fn current_generation_parser_rejects_missing_current_generation() {
+        let json = r#"[{"generation": 874, "current": false}]"#;
+        assert!(parse_current_generation(json).is_err());
+    }
+
+    #[test]
+    fn current_generation_parser_rejects_multiple_current_generations() {
+        let json = r#"[{"generation": 874, "current": true}, {"generation": 873, "current": true}]"#;
+        assert!(parse_current_generation(json).is_err());
+    }
+
+    #[test]
+    fn current_generation_parser_rejects_malformed_json() {
+        assert!(parse_current_generation("{not-json}").is_err());
     }
 
     #[test]
