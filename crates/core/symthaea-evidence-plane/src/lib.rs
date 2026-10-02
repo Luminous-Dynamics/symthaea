@@ -390,6 +390,29 @@ pub enum EvidenceLineageDecision {
     RefuseMixedLineageAfterEvidence,
 }
 
+/// Failure returned when claim-bearing evidence cannot be committed to the
+/// prepared lineage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidenceLineageCommitError {
+    InvalidCurrentLineage(String),
+    LineageDecision(EvidenceLineageDecision),
+}
+
+impl fmt::Display for EvidenceLineageCommitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidCurrentLineage(error) => {
+                write!(f, "cannot commit evidence for invalid current lineage: {error}")
+            }
+            Self::LineageDecision(decision) => {
+                write!(f, "cannot commit evidence under lineage decision: {decision:?}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for EvidenceLineageCommitError {}
+
 /// Explicit guard against silently mixing evidence from different executions.
 ///
 /// The guard never adopts a drifted lineage automatically. Callers must
@@ -406,22 +429,43 @@ impl EvidenceLineageGuardV1 {
     ///
     /// This is the preferred admission path for untrusted or parser-derived
     /// lineage values. The infallible `prepare` constructor remains available
-    /// for already-typed, trusted fixtures and compatibility with existing
-    /// callers.
+    /// for trusted callers, but it also validates and therefore fails closed
+    /// rather than creating a guard around an invalid lineage.
     pub fn try_prepare(lineage: &ExecutionLineageV1) -> Result<Self, String> {
         lineage.validate()?;
         Ok(Self::prepare(lineage))
     }
 
     pub fn prepare(lineage: &ExecutionLineageV1) -> Self {
+        if let Err(error) = lineage.validate() {
+            panic!("cannot prepare invalid execution lineage: {error}");
+        }
         Self {
             prepared_digest: lineage.digest(),
             evidence_committed: false,
         }
     }
 
-    pub fn mark_evidence_committed(&mut self) {
-        self.evidence_committed = true;
+    /// Commit claim-bearing evidence only when the current lineage is valid
+    /// and exactly matches the prepared lineage.
+    ///
+    /// The guard owns the phase transition so callers cannot accidentally
+    /// mark evidence committed after a drifted lineage has already arrived.
+    pub fn commit_evidence(
+        &mut self,
+        current: &ExecutionLineageV1,
+    ) -> Result<(), EvidenceLineageCommitError> {
+        current
+            .validate()
+            .map_err(EvidenceLineageCommitError::InvalidCurrentLineage)?;
+
+        match self.check(current) {
+            EvidenceLineageDecision::Stable => {
+                self.evidence_committed = true;
+                Ok(())
+            }
+            decision => Err(EvidenceLineageCommitError::LineageDecision(decision)),
+        }
     }
 
     pub fn prepared_digest(&self) -> &str {
@@ -832,6 +876,71 @@ mod tests {
     }
 
     #[test]
+    fn execution_lineage_guard_commits_only_stable_valid_lineage() {
+        let base = lineage_fixture();
+        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+
+        guard
+            .commit_evidence(&base)
+            .expect("stable valid lineage should commit");
+
+        assert_eq!(guard.check(&base), EvidenceLineageDecision::Stable);
+    }
+
+    #[test]
+    fn execution_lineage_guard_does_not_commit_after_pre_evidence_drift() {
+        let base = lineage_fixture();
+        let mut changed = base.clone();
+        changed.source_revision = "def456".into();
+
+        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        let error = guard
+            .commit_evidence(&changed)
+            .expect_err("drifted lineage must not commit");
+
+        assert_eq!(
+            error,
+            EvidenceLineageCommitError::LineageDecision(
+                EvidenceLineageDecision::ReprepareBeforeEvidence
+            )
+        );
+        assert_eq!(
+            guard.check(&base),
+            EvidenceLineageDecision::Stable
+        );
+    }
+
+    #[test]
+    fn execution_lineage_guard_rejects_invalid_current_lineage_before_commit() {
+        let base = lineage_fixture();
+        let mut invalid = base.clone();
+        invalid.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
+
+        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        let error = guard
+            .commit_evidence(&invalid)
+            .expect_err("invalid current lineage must be rejected");
+
+        assert!(matches!(
+            error,
+            EvidenceLineageCommitError::InvalidCurrentLineage(_)
+        ));
+        assert!(!guard.evidence_committed);
+    }
+
+    #[test]
+    fn execution_lineage_guard_does_not_allow_invalid_preparation() {
+        let mut invalid = lineage_fixture();
+        invalid.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
+
+        let panic = std::panic::catch_unwind(|| {
+            EvidenceLineageGuardV1::prepare(&invalid);
+        });
+
+        assert!(panic.is_err(), "invalid lineage preparation must fail closed");
+    }
+
+    #[test]
     fn execution_lineage_guard_requires_reprepare_before_evidence() {
         let base = lineage_fixture();
         let mut changed = base.clone();
@@ -851,7 +960,7 @@ mod tests {
         changed.source_revision = "def456".into();
 
         let mut guard = EvidenceLineageGuardV1::prepare(&base);
-        guard.mark_evidence_committed();
+        guard.commit_evidence(&base).expect("stable lineage commits evidence");
         assert_eq!(
             guard.check(&changed),
             EvidenceLineageDecision::RefuseMixedLineageAfterEvidence
@@ -862,7 +971,7 @@ mod tests {
     fn execution_lineage_guard_allows_same_lineage_after_evidence() {
         let base = lineage_fixture();
         let mut guard = EvidenceLineageGuardV1::prepare(&base);
-        guard.mark_evidence_committed();
+        guard.commit_evidence(&base).expect("stable lineage commits evidence");
         assert_eq!(
             guard.check(&base),
             EvidenceLineageDecision::Stable
