@@ -1338,6 +1338,8 @@ impl KnowledgePersistence {
             rusqlite::Connection::open(&self.db_path).map_err(|e| format!("SQLite open: {e}"))?;
         conn.busy_timeout(SQLITE_BUSY_TIMEOUT)
             .map_err(|e| format!("SQLite busy timeout: {e}"))?;
+        conn.execute_batch("PRAGMA foreign_keys = ON;")
+            .map_err(|e| format!("SQLite foreign keys: {e}"))?;
         Ok(conn)
     }
 
@@ -1682,6 +1684,37 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&dir);
     }
+    #[test]
+    fn test_open_connection_enables_foreign_keys() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_foreign_key_enforcement_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let p = KnowledgePersistence::new(&db_path);
+        let conn = p.open_connection().unwrap();
+        let enabled: i64 = conn
+            .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(enabled, 1);
+
+        p.ensure_schema(&conn).unwrap();
+        let err = conn
+            .execute(
+                "INSERT INTO knowledge_snapshot_validation_receipts
+                 (validation_event, generation, snapshot_digest_hex, validator_ref,
+                  validator_version, validation_profile, conforms)
+                 VALUES ('orphan', 999999, 'digest', 'validator', 'v1', 'profile', 1)",
+                [],
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains("FOREIGN KEY"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn test_unconfigured() {
         let mut p = KnowledgePersistence::default();
