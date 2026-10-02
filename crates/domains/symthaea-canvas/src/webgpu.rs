@@ -275,22 +275,29 @@ fn visit(
 }
 
 fn collect_first_gradient_colors(root: &SceneNode) -> HashMap<&str, Color> {
-    fn visit<'a>(node: &'a SceneNode, colors: &mut HashMap<&'a str, Color>) {
+    let mut colors = HashMap::new();
+    let mut stack = vec![(root, 0usize)];
+    let mut visited = 0usize;
+
+    while let Some((node, depth)) = stack.pop() {
+        if depth > MAX_GPU_NESTING || visited >= MAX_GPU_NODES {
+            break;
+        }
+        visited += 1;
         if let NodeKind::RadialGradient { id, stops } = &node.kind {
             if let Some(stop) = stops.first() {
                 colors.entry(id.as_str()).or_insert(stop.color);
             }
         }
-        for child in &node.children {
-            visit(child, colors);
+        for child in node.children.iter().rev() {
+            if visited.saturating_add(stack.len()) >= MAX_GPU_NODES {
+                break;
+            }
+            stack.push((child, depth + 1));
         }
     }
-
-    let mut colors = HashMap::new();
-    visit(root, &mut colors);
     colors
 }
-
 fn effective_fill(
     style: &Style,
     gradients: &HashMap<&str, Color>,
