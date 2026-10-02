@@ -419,6 +419,12 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
             continue;
         }
 
+        if matches!(ch, '+' | '-') && matches!(previous, Some('e' | 'E')) {
+            number.push(ch);
+            previous = Some(ch);
+            continue;
+        }
+
         if ch == 'e' || ch == 'E' || ch == '.' || ch.is_ascii_digit() {
             number.push(ch);
             previous = Some(ch);
@@ -1618,6 +1624,14 @@ mod tests {
         ] {
             assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(), "accepted: {svg}");
         }
+    }
+
+    #[test]
+    fn portrait_accepts_exponent_signs_inside_path_numbers() {
+        let payload = serde_json::json!({
+            "canvas_svg": r#"<svg><path d="M1e+3 0 L2e-2 3e1"/></svg>"#
+        });
+        assert!(portrait_from_json(&payload).is_some());
     }
 
     #[test]
