@@ -16,6 +16,7 @@
 
 use std::collections::HashSet;
 use std::path::Path;
+use std::time::Duration;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 use symthaea_epistemic_types::{ProvenanceRelation, ProvenanceRelationKind};
 
@@ -156,6 +157,8 @@ impl Default for KnowledgePersistence {
         }
     }
 }
+
+const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl KnowledgePersistence {
     /// Create a new persistence layer with the given database path.
@@ -957,7 +960,11 @@ impl KnowledgePersistence {
     // ── Internal ────────────────────────────────────────────────────────
 
     fn open_connection(&self) -> Result<rusqlite::Connection, String> {
-        rusqlite::Connection::open(&self.db_path).map_err(|e| format!("SQLite open: {e}"))
+        let conn =
+            rusqlite::Connection::open(&self.db_path).map_err(|e| format!("SQLite open: {e}"))?;
+        conn.busy_timeout(SQLITE_BUSY_TIMEOUT)
+            .map_err(|e| format!("SQLite busy timeout: {e}"))?;
+        Ok(conn)
     }
 
     fn ensure_schema(&mut self, conn: &rusqlite::Connection) -> Result<(), String> {
@@ -1122,6 +1129,24 @@ fn delete_absent_composite_keys(
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_open_connection_configures_busy_timeout() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_busy_timeout_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let p = KnowledgePersistence::new(&db_path);
+        let conn = p.open_connection().unwrap();
+        let timeout: i64 = conn
+            .query_row("PRAGMA busy_timeout", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(timeout, 5_000);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
     #[test]
     fn test_unconfigured() {
         let mut p = KnowledgePersistence::default();
