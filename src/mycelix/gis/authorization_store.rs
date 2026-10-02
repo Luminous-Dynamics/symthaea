@@ -43,6 +43,46 @@ impl From<AuthorizationConsumptionError> for AuthorizationStoreError {
 
 /// A durable shared consumption domain. Each operation uses a fresh connection,
 /// allowing independent processes to contend on the same SQLite state machine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DurableDispatchRecord {
+    pub authorization_instance: String,
+    pub attempt_id: String,
+    pub action_id: String,
+    pub action_digest: String,
+    pub provider_idempotency_key: String,
+    pub target_identity: String,
+    pub audience: String,
+    pub adapter: String,
+    /// Stable boundary identity. It scopes attempt ownership without entering
+    /// the shared action key, so separate boundary instances cannot claim one
+    /// another's dispatch records.
+    pub boundary_id: String,
+}
+
+impl DurableDispatchRecord {
+    pub fn new(
+        authorization_instance: impl Into<String>,
+        attempt_id: impl Into<String>,
+        action_id: impl Into<String>,
+        action_digest: impl Into<String>,
+        provider_idempotency_key: impl Into<String>,
+        effect: &super::ActionEffectBinding,
+        boundary_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            authorization_instance: authorization_instance.into(),
+            attempt_id: attempt_id.into(),
+            action_id: action_id.into(),
+            action_digest: action_digest.into(),
+            provider_idempotency_key: provider_idempotency_key.into(),
+            target_identity: effect.target_identity.clone(),
+            audience: effect.audience.clone(),
+            adapter: effect.adapter.clone(),
+            boundary_id: boundary_id.into(),
+        }
+    }
+}
+
 pub struct SqliteAuthorizationStore { path: PathBuf }
 
 impl SqliteAuthorizationStore {
@@ -80,6 +120,19 @@ impl SqliteAuthorizationStore {
                action_digest TEXT NOT NULL,
                authority_epoch INTEGER NOT NULL,
                PRIMARY KEY(authorization_instance, attempt_id, phase)
+             );
+             CREATE TABLE IF NOT EXISTS authorization_dispatches (
+               authorization_instance TEXT NOT NULL,
+               attempt_id TEXT NOT NULL,
+               action_id TEXT NOT NULL,
+               action_digest TEXT NOT NULL,
+               provider_idempotency_key TEXT NOT NULL,
+               target_identity TEXT NOT NULL,
+               audience TEXT NOT NULL,
+               adapter TEXT NOT NULL,
+               boundary_id TEXT NOT NULL,
+               state TEXT NOT NULL,
+               PRIMARY KEY(authorization_instance, attempt_id)
              );",
         )?;
         Ok(store)
@@ -149,7 +202,105 @@ impl SqliteAuthorizationStore {
         Ok(())
     }
 
+    /// Create the immutable provider-entry record and cross the pre-dispatch
+    /// fence in one durable transaction. Effectful callers should use this path
+    /// rather than the legacy attempt-only transition because it freezes every
+    /// material field that the later provider boundary must consume.
+    pub fn mark_dispatch_pending_bound(
+        &self,
+        authorization_instance: &str,
+        attempt_id: &str,
+        action: &EpistemicAction,
+        expected_effect: &super::ActionEffectBinding,
+        boundary_id: &str,
+    ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
+        if action.effect_binding.as_ref() != Some(expected_effect) || boundary_id.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut lease = load_lease(&tx, authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
+        let expected_digest = action.canonical_action_digest();
+        if lease.action_id != action.id || lease.action_digest != expected_digest {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        lease.mark_dispatch_pending(attempt_id)?;
+        let record = DurableDispatchRecord::new(
+            authorization_instance,
+            attempt_id,
+            &action.id,
+            &expected_digest,
+            &lease.provider_idempotency_key(),
+            expected_effect,
+            boundary_id,
+        );
+        tx.execute(
+            "INSERT INTO authorization_dispatches
+             (authorization_instance,attempt_id,action_id,action_digest,provider_idempotency_key,
+              target_identity,audience,adapter,boundary_id,state)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'dispatch_pending')",
+            params![record.authorization_instance, record.attempt_id, record.action_id,
+                record.action_digest, record.provider_idempotency_key, record.target_identity,
+                record.audience, record.adapter, record.boundary_id],
+        )?;
+        let changed = tx.execute(
+            "UPDATE authorization_leases SET state='dispatch_pending', attempt_id=?2
+             WHERE authorization_instance=?1 AND state='prepared' AND attempt_id=?2",
+            params![authorization_instance, attempt_id],
+        )?;
+        if changed != 1 {
+            return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+        }
+        tx.commit()?;
+        Ok(record)
+    }
+
     /// Durably record provider entry after DispatchPending has committed.
+    /// Cross the provider-entry boundary only for the exact immutable record
+    /// created before dispatch. All identity/effect fields are checked again,
+    /// preventing a stale executor from substituting a different sink or key.
+    pub fn mark_invoked_bound(
+        &self, record: &DurableDispatchRecord,
+    ) -> Result<(), AuthorizationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let row = tx.query_row(
+            "SELECT action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
+             FROM authorization_dispatches WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance, record.attempt_id],
+            |r| Ok((
+                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
+                r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
+                r.get::<_,String>(6)?, r.get::<_,String>(7)?,
+            )),
+        ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
+        if row.0 != record.action_id || row.1 != record.action_digest
+            || row.2 != record.provider_idempotency_key || row.3 != record.target_identity
+            || row.4 != record.audience || row.5 != record.adapter
+            || row.6 != record.boundary_id || row.7 != "dispatch_pending"
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        let mut lease = load_lease(&tx, &record.authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
+        lease.mark_invoked(&record.attempt_id)?;
+        let changed = tx.execute(
+            "UPDATE authorization_leases SET state='invoked', attempt_id=?2
+             WHERE authorization_instance=?1 AND state='dispatch_pending' AND attempt_id=?2",
+            params![record.authorization_instance, record.attempt_id],
+        )?;
+        if changed != 1 { return Err(AuthorizationConsumptionError::AttemptMismatch.into()); }
+        let changed = tx.execute(
+            "UPDATE authorization_dispatches SET state='invoked'
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND state='dispatch_pending'",
+            params![record.authorization_instance, record.attempt_id],
+        )?;
+        if changed != 1 { return Err(AuthorizationConsumptionError::AttemptMismatch.into()); }
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn mark_invoked(
         &self, authorization_instance: &str, attempt_id: &str,
     ) -> Result<(), AuthorizationStoreError> {
@@ -279,6 +430,11 @@ impl SqliteAuthorizationStore {
                 authority_epoch: *authority_epoch,
                 outcome: ExecutionOutcome::Indeterminate,
             };
+            tx.execute(
+                "UPDATE authorization_dispatches SET state='indeterminate'
+                 WHERE authorization_instance=?1 AND attempt_id=?2 AND state IN ('dispatch_pending','invoked')",
+                params![instance, attempt_id],
+            )?;
             tx.execute(
                 "INSERT OR IGNORE INTO authorization_receipts
                  (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch)
@@ -616,6 +772,25 @@ mod tests {
         assert_eq!(receipt.provider_idempotency_key, AuthorizationLease::new(
             action.id.clone(), action.canonical_action_digest(), "sha256:support", "policy-v1", 1, 1
         ).provider_idempotency_key());
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_dispatch_record_freezes_effect_and_boundary_identity() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-bound-dispatch-{}.db",std::process::id()));
+        let (store,mut action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness { action_digest:digest.clone(), ..witness };
+        store.register_lease(&AuthorizationLease::new(action.id.clone(),digest,"sha256:support","policy-v1",1,1)).unwrap();
+        store.prepare_for_execution(&witness,&action,"frame@1","attempt-bound").unwrap();
+        let record=store.mark_dispatch_pending_bound(&witness.authorization_instance,"attempt-bound",&action,&effect,"boundary-A").unwrap();
+        assert_eq!(record.target_identity,"target-A");
+        let mut tampered=record.clone(); tampered.adapter="adapter-B".into();
+        assert!(matches!(store.mark_invoked_bound(&tampered),Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))));
+        store.mark_invoked_bound(&record).unwrap();
+        assert!(store.mark_invoked_bound(&record).is_err());
         let _=std::fs::remove_file(path);
     }
 
