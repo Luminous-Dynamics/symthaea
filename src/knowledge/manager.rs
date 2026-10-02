@@ -1482,8 +1482,6 @@ pub struct KnowledgePersistenceHealth {
     /// Decoded ontology rows rejected because the persisted record was malformed or invalid.
     /// Policy-limited capacity is tracked separately and does not degrade persistence health.
     pub ontology_rejections: usize,
- ontology_policy_rejections: 0,
- ontology_restore_evictions: 0,
     /// Persisted ontology rows rejected because the bounded restore retention policy
     /// preferred the already-retained set.
     pub ontology_policy_rejections: usize,
