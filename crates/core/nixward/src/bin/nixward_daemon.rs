@@ -1121,6 +1121,7 @@ impl DaemonState {
                                     );
                                     self.watchdog_status = None;
                                     self.pending_action = None;
+                                self.pending_action_intent_digest = None;
                                     self.pending_action_intent_digest = None;
                                     return (
                                         dynamic_threshold,
@@ -1252,6 +1253,7 @@ impl DaemonState {
                                                 );
                                                 self.watchdog_status = None;
                                                 self.pending_action = None;
+                                self.pending_action_intent_digest = None;
                                                 return (
                                                     dynamic_threshold,
                                                     Some(best_action.expected_free_energy),
@@ -1267,6 +1269,7 @@ impl DaemonState {
                                 let _ = std::fs::remove_file(wd_path);
                                 self.watchdog_status = None;
                                 self.pending_action = None;
+                                self.pending_action_intent_digest = None;
                             }
                         } else {
                             self.pending_action = None;
