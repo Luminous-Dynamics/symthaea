@@ -82,6 +82,7 @@ impl SqliteAuthorizationStore {
                PRIMARY KEY(authorization_instance, attempt_id, phase)
              );",
         )?;
+        store.recover_incomplete_attempts()?;
         Ok(store)
     }
 
@@ -122,6 +123,28 @@ impl SqliteAuthorizationStore {
         )?;
         if tx.changes() != 1 {
             return Err(AuthorizationConsumptionError::NotReady.into());
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Durably cross the pre-dispatch fence. This must commit before the
+    /// executor enters the external effect sink.
+    pub fn mark_dispatch_pending(
+        &self, authorization_instance: &str, attempt_id: &str,
+    ) -> Result<(), AuthorizationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut lease = load_lease(&tx, authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
+        lease.mark_dispatch_pending(attempt_id)?;
+        let changed = tx.execute(
+            "UPDATE authorization_leases SET state='dispatch_pending', attempt_id=?2
+             WHERE authorization_instance=?1 AND state='prepared' AND attempt_id=?2",
+            params![authorization_instance, attempt_id],
+        )?;
+        if changed != 1 {
+            return Err(AuthorizationConsumptionError::AttemptMismatch.into());
         }
         tx.commit()?;
         Ok(())
@@ -177,6 +200,68 @@ impl SqliteAuthorizationStore {
         insert_receipt(&tx, &receipt, "reconciled")?;
         tx.commit()?;
         Ok(receipt)
+    }
+
+    /// Crash recovery is deliberately conservative: a process may have reached
+    /// the external sink after its last durable local write. Any non-terminal
+    /// prepared/dispatch-pending reservation therefore becomes Indeterminate
+    /// before another execution can be admitted.
+    pub fn recover_incomplete_attempts(&self) -> Result<usize, AuthorizationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let mut recovered = Vec::new();
+        {
+            let mut stmt = tx.prepare(
+                "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch
+                 FROM authorization_leases
+                 WHERE state IN ('prepared','dispatch_pending')",
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)? as u64,
+                ))
+            })?;
+            for row in rows {
+                recovered.push(row?);
+            }
+        }
+
+        for (instance, action_id, attempt_id, action_digest, authority_epoch) in &recovered {
+            tx.execute(
+                "UPDATE authorization_leases
+                 SET state='indeterminate', attempt_id=?2
+                 WHERE authorization_instance=?1
+                   AND state IN ('prepared','dispatch_pending')
+                   AND attempt_id=?2",
+                params![instance, attempt_id],
+            )?;
+            let receipt = ExecutionReceipt {
+                action_id: action_id.clone(),
+                authorization_instance: instance.clone(),
+                action_digest: action_digest.clone(),
+                attempt_id: attempt_id.clone(),
+                authority_epoch: *authority_epoch,
+                outcome: ExecutionOutcome::Indeterminate,
+            };
+            tx.execute(
+                "INSERT OR IGNORE INTO authorization_receipts
+                 (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch)
+                 VALUES (?1,?2,?3,'indeterminate','indeterminate',?4,?5)",
+                params![
+                    receipt.authorization_instance,
+                    receipt.action_id,
+                    receipt.attempt_id,
+                    receipt.action_digest,
+                    receipt.authority_epoch as i64
+                ],
+            )?;
+        }
+        tx.commit()?;
+        Ok(recovered.len())
     }
 }
 
@@ -270,8 +355,9 @@ fn encode_state(s: &AuthorizationLeaseState) -> &'static str {
 }
 fn state_attempt(s: &AuthorizationLeaseState) -> Option<&str> {
     match s {
-        AuthorizationLeaseState::Prepared { attempt_id } |
-        AuthorizationLeaseState::Indeterminate { attempt_id } => Some(attempt_id),
+        AuthorizationLeaseState::Prepared { attempt_id }
+        | AuthorizationLeaseState::DispatchPending { attempt_id }
+        | AuthorizationLeaseState::Indeterminate { attempt_id } => Some(attempt_id),
         _ => None,
     }
 }
@@ -287,6 +373,9 @@ fn load_lease(tx: &Transaction<'_>, id: &str) -> Result<Option<AuthorizationLeas
             let decoded = match state.as_str() {
                 "ready" => AuthorizationLeaseState::Ready,
                 "prepared" => AuthorizationLeaseState::Prepared {
+                    attempt_id: attempt.ok_or_else(|| rusqlite::Error::InvalidQuery)?,
+                },
+                "dispatch_pending" => AuthorizationLeaseState::DispatchPending {
                     attempt_id: attempt.ok_or_else(|| rusqlite::Error::InvalidQuery)?,
                 },
                 "indeterminate" => AuthorizationLeaseState::Indeterminate {
