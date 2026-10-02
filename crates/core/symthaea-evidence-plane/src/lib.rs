@@ -496,7 +496,7 @@ impl ExecutionLineageV1 {
 pub mod execution_lineage {
     pub use super::{
         qualify_lineage_perturbation, EvidenceLineageCommitError, EvidenceLineageDecision,
-        EvidenceLineageDriftFieldV1, EvidenceLineageDriftV1, EvidenceLineageGuardV1,
+        ExecutionLineageDriftFieldV1, ExecutionLineageDriftV1, EvidenceLineageGuardV1,
         ExecutionLineageV1, LineagePerturbationResult, RepositorySourceSnapshotId,
     };
 }
@@ -692,7 +692,9 @@ fn append_optional_str(
             hasher.update(&[1]);
             append_bytes(hasher, value.as_bytes());
         }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        }
     }
 }
 
