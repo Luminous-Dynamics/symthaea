@@ -205,6 +205,17 @@ fn portrait_from_json(v: &Value) -> Option<String> {
     if svg.len() > 512 * 1024 || !svg.trim_end().ends_with("</svg>") {
         return None;
     }
+    // Keep the image-only rendering contract explicit at the trust boundary.
+    // The browser already disables scripting and external resource loading for
+    // SVG used through <img>, but rejecting active/resource-bearing SVG here
+    // makes the invariant independent of browser-specific behavior and avoids
+    // turning a future embedding change into a security regression.
+    let lower = svg.to_ascii_lowercase();
+    for marker in ["<script", "<foreignobject", "<iframe", "<object", "<embed", "<use", "href="http", "href='http", "xlink:href="http", "xlink:href='http"] {
+        if lower.contains(marker) {
+            return None;
+        }
+    }
     let encoded = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
     Some(format!("data:image/svg+xml;base64,{encoded}"))
 }
@@ -864,6 +875,19 @@ mod tests {
     #[test]
     fn telemetry_requires_finite_cognitive_measurements() {
         assert!(Vitals::from_json(&valid_payload()).is_some());
+    }
+
+    #[test]
+    fn portrait_rejects_active_or_external_svg_content() {
+        for svg in [
+            r#"<svg><script>alert(1)</script></svg>"#,
+            r#"<svg><foreignObject><div>x</div></foreignObject></svg>"#,
+            r#"<svg><use href="https://attacker.example/icon.svg#x"/></svg>"#,
+            r#"<svg><image href="https://attacker.example/pixel.png"/></svg>"#,
+        ] {
+            let payload = serde_json::json!({ "canvas_svg": svg });
+            assert!(portrait_from_json(&payload).is_none(), "accepted: {svg}");
+        }
     }
 
     #[test]
