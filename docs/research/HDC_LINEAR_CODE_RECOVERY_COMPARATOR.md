@@ -144,3 +144,7 @@ The literature supports treating this as a distinct recovery family. Raviv repor
 - no composite "best HDC" score;
 - no replacement of the resonator architecture;
 - no 3-factor expansion before the two-factor comparator is validated.
+
+
+### Stage-B construction constraint
+The bound-recovery comparator must not use arbitrary factors from a single common linear code as its primary recovery fixture. Such factors are generally non-identifiable from XOR alone because multiple decompositions can exist within the same subspace. The paper's bound-recovery framework instead uses factors associated with participating linear-code subspaces and exploits their basis/subspace structure. Therefore Stage B requires an explicit fixture in which the participating factor domains are defined and the intended factorization is uniquely identifiable (or all valid ambiguity classes are exhaustively enumerated). No recovery-performance claim is valid until that construction is verified.
