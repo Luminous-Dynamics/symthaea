@@ -430,8 +430,8 @@ impl ExecutionLineageV1 {
 pub mod execution_lineage {
     pub use super::{
         qualify_lineage_perturbation, EvidenceLineageCommitError, EvidenceLineageDecision,
-        EvidenceLineageGuardV1, ExecutionLineageV1, LineagePerturbationResult,
-        RepositorySourceSnapshotId,
+        EvidenceLineageDriftFieldV1, EvidenceLineageDriftV1, EvidenceLineageGuardV1,
+        ExecutionLineageV1, LineagePerturbationResult, RepositorySourceSnapshotId,
     };
 }
 
@@ -660,6 +660,138 @@ impl fmt::Display for EvidenceLineageCommitError {
 }
 
 impl std::error::Error for EvidenceLineageCommitError {}
+
+/// A deterministic field-family report explaining why two valid execution
+/// lineages have different content identities.
+///
+/// The report classifies semantic lineage dimensions only; it does not infer
+/// causality or assign severity. A caller can compare this report with its own
+/// declared dependency/change cone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionLineageDriftFieldV1 {
+    SourceRepository,
+    SourceRevision,
+    SourceTree,
+    RepositorySourceSnapshotId,
+    LockDigests,
+    ToolchainVersions,
+    HostTriple,
+    TargetTriple,
+    NixIdentity,
+    FeatureFlags,
+    WorkingDirectory,
+    CommandArgv,
+    AllowedEnvironment,
+    ImmutableInputDigests,
+}
+
+/// Deterministic explanation of execution-lineage drift between two valid
+/// canonical lineages.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionLineageDriftV1 {
+    pub prepared_digest: String,
+    pub observed_digest: String,
+    pub changed_fields: Vec<ExecutionLineageDriftFieldV1>,
+}
+
+impl ExecutionLineageDriftV1 {
+    /// Report changed lineage field families in canonical field order.
+    ///
+    /// Both lineages are validated before comparison so an invalid value
+    /// cannot masquerade as a meaningful drift report.
+    pub fn between(
+        prepared: &ExecutionLineageV1,
+        observed: &ExecutionLineageV1,
+    ) -> Result<Option<Self>, String> {
+        prepared.validate()?;
+        observed.validate()?;
+
+        let prepared_digest = prepared.digest();
+        let observed_digest = observed.digest();
+        if prepared_digest == observed_digest {
+            return Ok(None);
+        }
+
+        let mut changed_fields = Vec::new();
+        let pairs = [
+            (
+                ExecutionLineageDriftFieldV1::SourceRepository,
+                prepared.source_repository != observed.source_repository,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::SourceRevision,
+                prepared.source_revision != observed.source_revision,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::SourceTree,
+                prepared.source_tree != observed.source_tree,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::RepositorySourceSnapshotId,
+                prepared.repository_source_snapshot_id
+                    != observed.repository_source_snapshot_id,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::LockDigests,
+                prepared.lock_digests != observed.lock_digests,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::ToolchainVersions,
+                prepared.toolchain_versions != observed.toolchain_versions,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::HostTriple,
+                prepared.host_triple != observed.host_triple,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::TargetTriple,
+                prepared.target_triple != observed.target_triple,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::NixIdentity,
+                prepared.nix_identity != observed.nix_identity,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::FeatureFlags,
+                prepared.feature_flags != observed.feature_flags,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::WorkingDirectory,
+                prepared.cwd != observed.cwd,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::CommandArgv,
+                prepared.argv != observed.argv,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::AllowedEnvironment,
+                prepared.allowed_env != observed.allowed_env,
+            ),
+            (
+                ExecutionLineageDriftFieldV1::ImmutableInputDigests,
+                prepared.immutable_input_digests != observed.immutable_input_digests,
+            ),
+        ];
+
+        for (field, changed) in pairs {
+            if changed {
+                changed_fields.push(field);
+            }
+        }
+
+        debug_assert!(
+            !changed_fields.is_empty(),
+            "digest drift must have a field cause"
+        );
+
+        Ok(Some(Self {
+            prepared_digest,
+            observed_digest,
+            changed_fields,
+        }))
+    }
+}
 
 /// Explicit guard against silently mixing evidence from different executions.
 ///
@@ -1328,6 +1460,56 @@ mod tests {
         changed.repository_source_snapshot_id =
             RepositorySourceSnapshotId::parse(&"b".repeat(64)).expect("valid snapshot id");
         assert_ne!(base.digest(), changed.digest());
+    }
+
+    #[test]
+    fn execution_lineage_drift_report_is_empty_for_stable_lineage() {
+        let lineage = lineage_fixture();
+        assert_eq!(
+            ExecutionLineageDriftV1::between(&lineage, &lineage).expect("valid comparison"),
+            None
+        );
+    }
+
+    #[test]
+    fn execution_lineage_drift_report_classifies_multiple_changed_fields() {
+        let base = lineage_fixture();
+        let mut changed = base.clone();
+        changed.source_revision = "c".repeat(40);
+        changed.host_triple = "aarch64-unknown-linux-gnu".into();
+        changed.target_triple = "wasm32-wasi".into();
+        changed.feature_flags.insert("research".into());
+        changed.argv.push("--nocapture".into());
+        changed
+            .immutable_input_digests
+            .insert("extra.bin".into(), "blake3:0011223344556677".into());
+
+        let report = ExecutionLineageDriftV1::between(&base, &changed)
+            .expect("valid lineages")
+            .expect("changed lineages report drift");
+
+        assert_eq!(report.prepared_digest, base.digest());
+        assert_eq!(report.observed_digest, changed.digest());
+        assert_eq!(
+            report.changed_fields,
+            vec![
+                ExecutionLineageDriftFieldV1::SourceRevision,
+                ExecutionLineageDriftFieldV1::HostTriple,
+                ExecutionLineageDriftFieldV1::TargetTriple,
+                ExecutionLineageDriftFieldV1::FeatureFlags,
+                ExecutionLineageDriftFieldV1::CommandArgv,
+                ExecutionLineageDriftFieldV1::ImmutableInputDigests,
+            ]
+        );
+    }
+
+    #[test]
+    fn execution_lineage_drift_report_rejects_invalid_lineage() {
+        let base = lineage_fixture();
+        let mut invalid = base.clone();
+        invalid.feature_flags.insert(String::new());
+
+        assert!(ExecutionLineageDriftV1::between(&base, &invalid).is_err());
     }
 
     #[test]
