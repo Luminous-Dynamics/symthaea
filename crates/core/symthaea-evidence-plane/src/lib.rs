@@ -285,7 +285,8 @@ impl ExecutionLineageV1 {
         toolchain_versions: Vec<(String, String)>,
         host_triple: String,
         target_triple: String,
-        nix_identity: Option<String>,        feature_flags: Vec<String>,
+        nix_identity: Option<String>,
+        feature_flags: Vec<String>,
         cwd: String,
         argv: Vec<String>,
         allowed_env: Vec<(String, String)>,
@@ -1270,7 +1271,7 @@ mod tests {
                 "source_repository" => lineage.source_repository = value.into(),
                 "host_triple" => lineage.host_triple = value.into(),
                 "target_triple" => lineage.target_triple = value.into(),
-                "nix_identity" => lineage.nix_identity = value.into(),
+                "nix_identity" => lineage.nix_identity = Some(value.into()),
                 "cwd" => lineage.cwd = value.into(),
                 _ => unreachable!(),
             }
@@ -1452,7 +1453,11 @@ mod tests {
             &lineage.toolchain_versions,
         );
         append_str(&mut legacy, "host_target", &lineage.host_triple);
-        append_str(&mut legacy, "nix_identity", &lineage.nix_identity);
+        append_str(
+            &mut legacy,
+            "nix_identity",
+            lineage.nix_identity.as_deref().unwrap_or(""),
+        );
         append_set(&mut legacy, "feature_flags", &lineage.feature_flags);
         append_str(&mut legacy, "cwd", &lineage.cwd);
         append_sequence(&mut legacy, "argv", &lineage.argv);
