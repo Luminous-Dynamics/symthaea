@@ -662,14 +662,22 @@ impl EnhancedKnowledgeGraph {
             .domain_index
             .iter()
             .map(|(domain, ids)| {
-                let valid_facts: Vec<f32> = ids
+                // Domain index entries are keyed by process-local FactId and can be
+                // populated in different orders across restore paths. Re-establish the
+                // graph's stable memory identity order before floating-point reduction so
+                // the reported average is reproducible as well as the final ordering.
+                let mut valid_facts: Vec<(&str, FactId, f32)> = ids
                     .iter()
-                    .filter_map(|id| self.facts.get(id))
-                    .map(|f| f.confidence)
+                    .filter_map(|id| self.facts.get(id).map(|f| (f.memory_id.as_str(), f.id, f.confidence)))
                     .collect();
+                valid_facts.sort_by(|a, b| {
+                    a.0.cmp(b.0)
+                        .then_with(|| a.1.cmp(&b.1))
+                });
                 let count = valid_facts.len();
                 let avg_conf = if count > 0 {
-                    valid_facts.iter().sum::<f32>() / count as f32
+                    valid_facts.iter().map(|(_, _, confidence)| *confidence).sum::<f32>()
+                        / count as f32
                 } else {
                     0.0
                 };
