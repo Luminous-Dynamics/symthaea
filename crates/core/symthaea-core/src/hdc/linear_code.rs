@@ -223,9 +223,8 @@ pub fn solve_linear_combination(
     // Gaussian elimination proportional to machine words rather than allocating
     // one bool per coefficient/coordinate.
     let coefficient_words = basis.len().div_ceil(64);
-    // Store the augmented target bit immediately after the coefficient words.
-    // Keeping it in a dedicated word avoids the boundary bug that occurs when
-    // the coefficient count is exactly a multiple of 64.
+    // Store the augmented target bit in a dedicated word immediately after
+    // the packed coefficient words, making the matrix layout explicit.
     let augmented_word = coefficient_words;
     let augmented_mask = 1u64;
     let mut rows: Vec<Vec<u64>> = (0..dimension)
