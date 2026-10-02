@@ -6,13 +6,13 @@
 //! Domain data only: no command conversion, executor handle, or authority.
 
 use blake3::Hasher;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 const SERVICE_OPERATION_DOMAIN_V1: &[u8] = b"nixward-service-operation-v1";
 const MAX_SERVICE_UNIT_BYTES_V1: usize = 255;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NixServiceOperationKindV1 { Enable, Disable, Start, Stop, Restart, Reload }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -59,6 +59,17 @@ fn canonical_service_unit_v1(unit: &str) -> Result<String, NixServiceOperationEr
     let canonical = format!("{unit}.service");
     validate_service_unit_shape_v1(&canonical)?;
     Ok(canonical)
+}
+
+pub(crate) fn validate_canonical_service_operation_v1(
+    unit: &str,
+    operation: NixServiceOperationKindV1,
+) -> Result<(), NixServiceOperationErrorV1> {
+    let typed = NixServiceOperationV1::new(unit.to_string(), operation)?;
+    if typed.unit() != unit {
+        return Err(NixServiceOperationErrorV1::NonCanonicalUnit);
+    }
+    Ok(())
 }
 
 fn validate_service_unit_shape_v1(unit: &str) -> Result<(), NixServiceOperationErrorV1> {
@@ -110,6 +121,7 @@ pub enum NixServiceOperationErrorV1 {
     #[error("service unit has an ambiguous leading or trailing dot")] AmbiguousUnit,
     #[error("service unit exceeds the systemd 255-byte maximum")] TooLong,
     #[error("service unit must not be option-like")] OptionLikeUnit,
+    #[error("service unit is not in canonical normalized form")] NonCanonicalUnit,
     #[error("service unit contains a character outside the conservative v1 allowlist")] InvalidCharacter,
 }
 
@@ -190,6 +202,22 @@ mod tests {
             assert!(NixServiceOperationV1::new(unit, NixServiceOperationKindV1::Start).is_ok());
         }
     }
+    #[test]
+    fn command_boundary_requires_canonical_spelling() {
+        assert_eq!(
+            validate_canonical_service_operation_v1("nginx", NixServiceOperationKindV1::Start)
+                .unwrap_err(),
+            NixServiceOperationErrorV1::NonCanonicalUnit
+        );
+        assert!(
+            validate_canonical_service_operation_v1(
+                "nginx.service",
+                NixServiceOperationKindV1::Start
+            )
+            .is_ok()
+        );
+    }
+
     #[test]
     fn rejects_malformed_instance_markers() {
         for unit in ["@worker.service", "worker@@instance.service", "worker@instance@2.service"] {
