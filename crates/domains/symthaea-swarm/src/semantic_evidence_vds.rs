@@ -2149,10 +2149,7 @@ mod tests {
         cbor_map_len(&mut wrong_protected,1);
         cbor_int(&mut wrong_protected,COSE_ALG_HEADER_LABEL); cbor_int(&mut wrong_protected,-7);
         let mut wrong=Vec::new();
-        cbor_tag(&mut wrong,COSE_SIGN1_TAG); cbor_array_len(&mut wrong,4);
-        cbor_bytes(&mut wrong_protected,&[]);
         // Preserve the original signed bytes but swap only the protected header.
-        wrong.clear();
         cbor_tag(&mut wrong,COSE_SIGN1_TAG); cbor_array_len(&mut wrong,4);
         cbor_bytes(&mut wrong,&wrong_protected); cbor_map_len(&mut wrong,0);
         cbor_bytes(&mut wrong,b"hello"); cbor_bytes(&mut wrong,&signature);
