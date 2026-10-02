@@ -692,4 +692,75 @@ mod tests {
             ReceiptAttestationVerificationOutcome::Verified
         );
     }
+
+    #[test]
+    fn verification_report_preserves_stage_boundaries() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = verifier.verify_report(&envelope, &receipt);
+        assert_eq!(report.outcome, ReceiptAttestationVerificationOutcome::Verified);
+        assert_eq!(report.structural_validation, VerificationStage::Passed);
+        assert_eq!(report.receipt_commitment, VerificationStage::Passed);
+        assert_eq!(report.cryptographic_proof, VerificationStage::Passed);
+    }
+
+    #[test]
+    fn verification_report_marks_unexecuted_stages() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        envelope.attester_id.clear();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = verifier.verify_report(&envelope, &receipt);
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::InvalidEnvelope
+        );
+        assert_eq!(
+            report.structural_validation,
+            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::InvalidEnvelope)
+        );
+        assert_eq!(report.receipt_commitment, VerificationStage::NotEvaluated);
+        assert_eq!(report.cryptographic_proof, VerificationStage::NotEvaluated);
+    }
+
+    #[test]
+    fn resolver_report_records_lifecycle_failure() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let method = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Revoked,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([method]);
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::VerificationMethodRevoked
+        );
+        assert_eq!(report.verification_method, VerificationStage::Passed);
+        assert_eq!(
+            report.lifecycle,
+            VerificationStage::Failed(
+                ReceiptAttestationVerificationOutcome::VerificationMethodRevoked
+            )
+        );
+        assert_eq!(
+            report.proof_policy,
+            VerificationStage::NotEvaluated
+        );
+    }
+
 }
