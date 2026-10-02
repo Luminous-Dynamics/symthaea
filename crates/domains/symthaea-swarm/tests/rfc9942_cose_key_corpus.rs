@@ -7,7 +7,9 @@
 #![cfg(feature = "semantic-receipts")]
 
 use symthaea_swarm::semantic_evidence_vds::{
-    Rfc9942Es256CoseKey, Rfc9942VdpError,
+    Rfc9942Es256CoseKey, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload,
+    Rfc9942Vdp, Rfc9942ProofKind, Rfc9942VdpError, Rfc9162InclusionProof,
+    COSE_ES256_ALGORITHM_ID,
 };
 
 const X: [u8; 32] = [
@@ -190,4 +192,29 @@ fn cose_key_accepts_textual_ec2_p256_es256_and_verify() {
     let parsed = Rfc9942Es256CoseKey::from_cbor(&bytes).expect("textual aliases");
     assert_eq!(&parsed.public_key_sec1()[1..33], &X);
     assert_eq!(&parsed.public_key_sec1()[33..65], &Y);
+}
+
+
+#[test]
+fn syntactically_valid_but_invalid_p256_point_is_rejected_by_crypto_boundary() {
+    let mut fields = valid_fields();
+    fields[5] = bstr_field(0x21, &[0u8; 32]);
+    fields[6] = bstr_field(0x22, &[0u8; 32]);
+    let key = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
+        .expect("point shape is structurally valid");
+
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Attached([0u8; 32]),
+        vec![0u8; 64],
+    )
+    .unwrap();
+
+    assert_eq!(
+        receipt.verify_es256_cose_key(&key, &[], None),
+        Err(Rfc9942VdpError::InvalidEs256Signature)
+    );
 }
