@@ -20,6 +20,7 @@ on:
       - "scripts/qualify_nixward_authority.sh"
       - "crates/core/nixward/src/action/mod.rs"
       - "crates/core/nixward/src/action/executor.rs"
+      - "crates/core/nixward/src/action/config_writer.rs"
       - "crates/core/nixward/src/action/plan_executor.rs"
       - "crates/core/nixward/src/bin/nixward_daemon.rs"
       - "crates/core/nixward/src/ipc.rs"
