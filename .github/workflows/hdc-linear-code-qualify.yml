@@ -133,6 +133,8 @@ jobs:
           source_sha256=${{ steps.provenance.outputs.source_sha256 }}
           integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
           representation=gf2_random_linear_code
+          bipolar_mapping=gf2_0_to_plus1_1_to_minus1
+          binding_equivalence=hadamard_equals_gf2_xor
           stage=A-C-algebraic-recovery+E-decoder-oracle
           stage_b_paper_fidelity=not-claimed
           factor_identifiability=ambiguity-explicit
