@@ -390,7 +390,7 @@ impl AdaptiveOntology {
     /// retained. A record merged into an existing similar primitive is handled,
     /// not rejected.
     pub fn import_ontology_record(&mut self, record: &OntologyRecord) -> bool {
-        if record.name.trim().is_empty() || record.vector_bytes.len() < BinaryHV::BYTES {
+        if record.name.trim().is_empty() || record.vector_bytes.len() != BinaryHV::BYTES {
             return false;
         }
         let mut arr = [0u8; BinaryHV::BYTES];
@@ -458,6 +458,12 @@ mod tests {
             ..record
         };
         assert!(!ontology.import_ontology_record(&malformed_record));
+
+        let oversized_record = OntologyRecord {
+            vector_bytes: vec![0u8; BinaryHV::BYTES + 1],
+            ..similar_record
+        };
+        assert!(!ontology.import_ontology_record(&oversized_record));
     }
 
     #[test]
