@@ -54,8 +54,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{MapAccess, SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Caller-labeled identity for one evidence-bearing run.
 ///
@@ -162,7 +162,6 @@ impl<'de> Deserialize<'de> for RepositorySourceSnapshotId {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionLineageV1 {
-
     pub source_repository: String,
     pub source_revision: String,
     pub source_tree: String,
@@ -1001,17 +1000,16 @@ mod tests {
                 EvidenceLineageDecision::ReprepareBeforeEvidence
             )
         );
-        assert_eq!(
-            guard.check(&base),
-            EvidenceLineageDecision::Stable
-        );
+        assert_eq!(guard.check(&base), EvidenceLineageDecision::Stable);
     }
 
     #[test]
     fn execution_lineage_guard_rejects_invalid_current_lineage_before_commit() {
         let base = lineage_fixture();
         let mut invalid = base.clone();
-        invalid.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
+        invalid
+            .immutable_input_digests
+            .insert("fixture.json".into(), "not-a-digest".into());
 
         let mut guard = EvidenceLineageGuardV1::prepare(&base);
         let error = guard
@@ -1057,7 +1055,9 @@ mod tests {
         changed.source_revision = "def456".into();
 
         let mut guard = EvidenceLineageGuardV1::prepare(&base);
-        guard.commit_evidence(&base).expect("stable lineage commits evidence");
+        guard
+            .commit_evidence(&base)
+            .expect("stable lineage commits evidence");
         assert_eq!(
             guard.check(&changed),
             EvidenceLineageDecision::RefuseMixedLineageAfterEvidence
