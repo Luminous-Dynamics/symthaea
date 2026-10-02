@@ -638,8 +638,8 @@ mod tests {
         assert_eq!(
             forward,
             vec![
-                ("alpha".to_string(), "effect".to_string()),
                 ("middle".to_string(), "effect".to_string()),
+                ("zeta".to_string(), "effect".to_string()),
             ]
         );
     }
