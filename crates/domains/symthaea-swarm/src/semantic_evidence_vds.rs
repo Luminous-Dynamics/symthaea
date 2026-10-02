@@ -591,7 +591,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn rfc9942_proof_cbor_round_trips_through_strict_decoder() {
         let inclusion = Rfc9162InclusionProof::new(20, 17, vec![[0x11; 32], [0x22; 32]]);
         assert_eq!(Rfc9162InclusionProof::from_cbor(&inclusion.to_cbor()).unwrap(), inclusion);
@@ -634,6 +633,69 @@ mod tests {
             .chain([0x33; 32])
             .collect::<Vec<_>>();
         assert_eq!(consistency.to_cbor(), expected);
+    }
+
+    #[test]
+    fn rfc9942_inclusion_verification_binds_candidate_and_tree_head() {
+        let vds = Rfc9162Sha256Vds;
+        let leaves: Vec<Vec<u8>> = (0..4).map(|i| format!("leaf-{i}").into_bytes()).collect();
+        let head = vds.tree_head(&leaves);
+        let proof = vds.inclusion_proof(&leaves, 2).expect("proof").to_cbor();
+        assert_eq!(
+            vds.verify_rfc9942_inclusion_cbor(&leaves[2], head, &proof).unwrap(),
+            head
+        );
+        assert_eq!(
+            vds.verify_rfc9942_inclusion_cbor(b"tampered", head, &proof),
+            Err(Rfc9162ProofVerificationError::InvalidProof)
+        );
+        let wrong_size = VdsTreeHead::new(head.tree_size() + 1, head.root());
+        assert_eq!(
+            vds.verify_rfc9942_inclusion_cbor(&leaves[2], wrong_size, &proof),
+            Err(Rfc9162ProofVerificationError::TreeSizeMismatch)
+        );
+    }
+
+    #[test]
+    fn rfc9942_consistency_verification_binds_both_tree_heads() {
+        let vds = Rfc9162Sha256Vds;
+        let leaves: Vec<Vec<u8>> = (0..8).map(|i| format!("leaf-{i}").into_bytes()).collect();
+        let older = vds.tree_head(&leaves[..4].to_vec());
+        let newer = vds.tree_head(&leaves);
+        let proof = vds.prove(&leaves, 4).expect("proof").to_cbor();
+        assert_eq!(
+            vds.verify_rfc9942_consistency_cbor(older, newer, &proof).unwrap(),
+            newer
+        );
+        let wrong_root = VdsTreeHead::new(newer.tree_size(), [0xAA; 32]);
+        assert_eq!(
+            vds.verify_rfc9942_consistency_cbor(older, wrong_root, &proof),
+            Err(Rfc9162ProofVerificationError::InvalidProof)
+        );
+        let wrong_size = VdsTreeHead::new(3, older.root());
+        assert_eq!(
+            vds.verify_rfc9942_consistency_cbor(wrong_size, newer, &proof),
+            Err(Rfc9162ProofVerificationError::TreeSizeMismatch)
+        );
+    }
+
+    #[test]
+    fn rfc9162_inclusion_rejects_out_of_range_leaf_index() {
+        let vds = Rfc9162Sha256Vds;
+        let leaves = vec![b"a".to_vec(), b"b".to_vec()];
+        let proof = Rfc9162InclusionProof::new(2, 2, Vec::new());
+        assert!(!vds.verify_inclusion(&leaves[0], vds.root(&leaves), &proof));
+    }
+
+    #[test]
+    fn rfc9162_consistency_covers_smallest_valid_extension() {
+        let vds = Rfc9162Sha256Vds;
+        let leaves = vec![b"a".to_vec(), b"b".to_vec()];
+        let older = vds.tree_head(&leaves[..1].to_vec());
+        let newer = vds.tree_head(&leaves);
+        let proof = vds.prove(&leaves, 1).expect("proof");
+        assert_eq!(proof.consistency_path.len(), 1);
+        assert!(vds.verify_tree_heads(older, newer, &proof));
     }
 
     #[test]
