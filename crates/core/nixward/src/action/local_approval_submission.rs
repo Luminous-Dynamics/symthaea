@@ -15,7 +15,7 @@
 
 use super::approver_evidence::{
     required_profile_accepts_evidence_v1, ApproverEvidenceErrorV1,
-    ApproverEvidenceProfileV1, RequiredApprovalProfileV1,
+    ApproverEvidenceProfileV1, RequiredApprovalProfileV1, VerifiedApproverEvidenceProfileV1,
     VerifiedLocalUnixPeerCredentialV1,
 };
 use super::local_approval::{
