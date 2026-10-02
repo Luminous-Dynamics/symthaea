@@ -22,7 +22,12 @@ use symthaea_core::observation_fabric::{
 };
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
-pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v2";
+pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v3";
+
+pub const EVALUATION_PROCEDURE_VERSION: &str =
+    "symthaea-observation-evaluation-procedure-v1";
+pub const EVALUATION_PROCEDURE_ID: &str =
+    "symthaea-observation-attestation-ed25519-procedure-v1";
 
 pub const POLICY_VERSION: &str = "symthaea-observation-verification-policy-v1";
 pub const VERIFIER_IMPLEMENTATION_ID: &str = "symthaea-observation-attestation-ed25519-v1";
@@ -115,7 +120,7 @@ impl VerifierEnvironmentIdentity {
     }
 }
 
-const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v2\n";
+const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v3\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReceiptAttestationVerificationOutcome {
@@ -174,6 +179,57 @@ pub enum VerificationStage {
 /// Structured stage-by-stage verification evidence. This deliberately does not
 /// collapse evidence into an aggregate trust score.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvaluationProcedure {
+    pub procedure_version: &'static str,
+    pub procedure_id: &'static str,
+    pub check_ids: &'static [&'static str],
+}
+
+impl EvaluationProcedure {
+    pub const fn attestation_ed25519() -> Self {
+        Self {
+            procedure_version: EVALUATION_PROCEDURE_VERSION,
+            procedure_id: EVALUATION_PROCEDURE_ID,
+            check_ids: &[
+                "envelope-structural-validation",
+                "receipt-commitment",
+                "temporal-validity",
+                "cryptosuite-conformance",
+                "verification-method-resolution",
+                "verification-method-lifecycle",
+                "proof-purpose-authorization",
+                "proof-policy-conformance",
+                "cryptographic-proof",
+            ],
+        }
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
+        }
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea:observation-evaluation-procedure:v1\n");
+        write_string(&mut bytes, self.procedure_version);
+        write_string(&mut bytes, self.procedure_id);
+        bytes.extend_from_slice(&(self.check_ids.len() as u64).to_be_bytes());
+        for check_id in self.check_ids {
+            write_string(&mut bytes, check_id);
+        }
+        bytes
+    }
+
+    pub fn fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-evaluation-procedure:v1\n");
+        hasher.update(&self.canonical_bytes());
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptAttestationVerificationReport {
     pub outcome: ReceiptAttestationVerificationOutcome,
     pub verifier_version: &'static str,
@@ -215,6 +271,7 @@ impl ReceiptAttestationVerificationReport {
             evaluated_at_unix_ns,
             policy_fingerprint: policy_inputs.fingerprint(),
             environment_fingerprint: environment_identity.fingerprint(),
+            procedure_fingerprint: EvaluationProcedure::attestation_ed25519().fingerprint(),
             policy_inputs,
             environment_identity,
             resolution_snapshot_fingerprint: None,
@@ -320,6 +377,7 @@ impl ReceiptAttestationVerificationReport {
             evaluated_at_unix_ns,
             policy_fingerprint: policy_inputs.fingerprint(),
             environment_fingerprint: environment_identity.fingerprint(),
+            procedure_fingerprint: EvaluationProcedure::attestation_ed25519().fingerprint(),
             policy_inputs,
             environment_identity,
             resolution_snapshot_fingerprint: None,
@@ -359,6 +417,7 @@ impl ReceiptAttestationVerificationReport {
         bytes.extend_from_slice(&self.evaluated_at_unix_ns.to_be_bytes());
         write_string(&mut bytes, &self.policy_fingerprint);
         write_string(&mut bytes, &self.environment_fingerprint);
+        write_string(&mut bytes, &self.procedure_fingerprint);
         match &self.resolution_snapshot_fingerprint {
             Some(value) => { bytes.push(1); write_string(&mut bytes, value); }
             None => bytes.push(0),
@@ -385,7 +444,7 @@ impl ReceiptAttestationVerificationReport {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-attestation-report:v2\n");
+        hasher.update(b"symthaea:observation-attestation-report:v3\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -394,9 +453,9 @@ impl ReceiptAttestationVerificationReport {
 
 
 pub const VERIFICATION_CONTEXT_VERSION: &str =
-    "symthaea-observation-verification-context-v1";
+    "symthaea-observation-verification-context-v2";
 pub const EVIDENCE_EVALUATION_VERSION: &str =
-    "symthaea-observation-evaluation-v2";
+    "symthaea-observation-evaluation-v3";
 pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
     "receipt-attestation-verification";
 
@@ -406,6 +465,7 @@ pub struct VerificationContext {
     pub policy_fingerprint: String,
     pub verifier_version: &'static str,
     pub environment_fingerprint: String,
+    pub procedure_fingerprint: String,
     pub resolution_snapshot_fingerprint: Option<String>,
     pub trust_root_fingerprint: Option<String>,
     pub authorization_policy_fingerprint: Option<String>,
@@ -419,6 +479,7 @@ impl VerificationContext {
             policy_fingerprint: report.policy_fingerprint.clone(),
             verifier_version: report.verifier_version,
             environment_fingerprint: report.environment_fingerprint.clone(),
+            procedure_fingerprint: report.procedure_fingerprint.clone(),
             resolution_snapshot_fingerprint: report.resolution_snapshot_fingerprint.clone(),
             trust_root_fingerprint: None,
             authorization_policy_fingerprint: None,
@@ -448,11 +509,12 @@ impl VerificationContext {
             }
         }
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:observation-verification-context:v1\n");
+        bytes.extend_from_slice(b"symthaea:observation-verification-context:v2\n");
         write_string(&mut bytes, self.context_version);
         write_string(&mut bytes, &self.policy_fingerprint);
         write_string(&mut bytes, self.verifier_version);
         write_string(&mut bytes, &self.environment_fingerprint);
+        write_string(&mut bytes, &self.procedure_fingerprint);
         write_option(&mut bytes, self.resolution_snapshot_fingerprint.as_deref());
         write_option(&mut bytes, self.trust_root_fingerprint.as_deref());
         write_option(&mut bytes, self.authorization_policy_fingerprint.as_deref());
@@ -462,7 +524,7 @@ impl VerificationContext {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:observation-verification-context:v1\n");
+        hasher.update(b"symthaea:observation-verification-context:v2\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -747,7 +809,7 @@ impl EvidenceEvaluation {
             }
         }
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v2\n");
+        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v3\n");
         write_string(&mut bytes, self.evaluation_version);
         write_string(&mut bytes, &self.subject_fingerprint);
         write_string(&mut bytes, self.evaluation_type);
@@ -776,7 +838,7 @@ impl EvidenceEvaluation {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:evidence-evaluation:v2\n");
+        hasher.update(b"symthaea:evidence-evaluation:v3\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -1954,7 +2016,79 @@ mod tests {
         let evaluation = report.to_evidence_evaluation();
         assert!(evaluation
             .canonical_bytes()
-            .starts_with(b"symthaea:evidence-evaluation:v2\n"));
+            .starts_with(b"symthaea:evidence-evaluation:v3\n"));
+    }
+
+    #[test]
+    fn verification_report_binds_evaluation_procedure() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        assert_eq!(
+            report.procedure_fingerprint,
+            EvaluationProcedure::attestation_ed25519().fingerprint()
+        );
+    }
+
+    #[test]
+    fn evaluation_context_binds_procedure_identity() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let base = VerificationContext::from_report(&report);
+        let mut changed = base.clone();
+        changed.procedure_fingerprint = "procedure-alternate".into();
+
+        assert_eq!(
+            base.context_version,
+            "symthaea-observation-verification-context-v2"
+        );
+        assert_ne!(base.fingerprint(), changed.fingerprint());
+
+        let base_evaluation = EvidenceEvaluation::from_report_with_context(&report, base);
+        let changed_evaluation =
+            EvidenceEvaluation::from_report_with_context(&report, changed);
+        assert_eq!(
+            base_evaluation.subject_fingerprint,
+            changed_evaluation.subject_fingerprint
+        );
+        assert_ne!(
+            base_evaluation.context_fingerprint,
+            changed_evaluation.context_fingerprint
+        );
+        assert_ne!(base_evaluation.fingerprint(), changed_evaluation.fingerprint());
+    }
+
+    #[test]
+    fn evaluation_procedure_fingerprint_binds_check_order() {
+        let procedure = EvaluationProcedure::attestation_ed25519();
+        let reordered = EvaluationProcedure {
+            procedure_version: procedure.procedure_version,
+            procedure_id: procedure.procedure_id,
+            check_ids: &[
+                "receipt-commitment",
+                "envelope-structural-validation",
+                "temporal-validity",
+                "cryptosuite-conformance",
+                "verification-method-resolution",
+                "verification-method-lifecycle",
+                "proof-purpose-authorization",
+                "proof-policy-conformance",
+                "cryptographic-proof",
+            ],
+        };
+
+        assert_ne!(procedure.fingerprint(), reordered.fingerprint());
     }
 
     #[test]
