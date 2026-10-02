@@ -71,7 +71,7 @@ Tests should cover:
 
 ### Stage B — bound fixture
 
-Do not assume that choosing both factors from one arbitrary linear subspace makes the pair identifiable. Since a linear code is closed under XOR, a composite can have multiple decompositions into members of that same code. The fixture must therefore reproduce the paper's actual factor-domain/subcode/key-value structure, or explicitly characterize the ambiguity rather than label an arbitrary pair as uniquely recoverable. Confirm the exact bound construction from the paper before fixing fixture semantics.
+Do not assume that choosing both factors from one arbitrary linear subspace makes the pair identifiable. Since a linear code is closed under XOR, a composite can have multiple decompositions into members of that same code. The fixture must therefore reproduce the paper's actual factor-domain/subcode/key-value structure, or explicitly characterize the ambiguity rather than label an arbitrary pair as uniquely recoverable. Confirm the exact bound construction from the paper before fixing fixture semantics. The primary text now provides the required structural definition: for a parent linear code C, the notation C = K × V means K and V are subcodes whose XOR/direct-sum decomposition of every parent codeword is unique, with trivial intersection. The executable fixture should therefore derive K and V by partitioning one parent generator basis rather than merely sampling two unrelated codes.
 
 The fixture must record:
 
@@ -164,7 +164,7 @@ The bound-recovery comparator must not use arbitrary factors from a single commo
 
 The literature review of the paper provides a more concrete interpretation of this condition: it describes a key/value construction using subcodes (K) and (V) of a parent code (C), with (C = K 	imes V) meaning each parent codeword has a unique XOR decomposition into one key-subcode word and one value-subcode word. A separate description of bound recovery likewise says the factors are drawn from different linear-code subspaces and recovered by solving against a basis of the participating codes. These are secondary descriptions, so they strengthen the construction hypothesis but are not being treated as substitutes for the paper's full derivation.
 
-The first executable fixture now uses two independently generated factor subspaces (C_1,C_2) in the same 96-bit ambient space and **checks** the direct-sum condition algebraically:
+The first executable fixture now derives two factor subcodes from a single generated parent code, partitioning its independent generator basis into K and V. It still **checks** the direct-sum condition algebraically rather than trusting construction:
 [
 \operatorname{rank}(C_1 + C_2)=\operatorname{rank}(C_1)+\operatorname{rank}(C_2).
 ]
@@ -190,3 +190,12 @@ The first executable fixture now uses two independently generated factor subspac
 \operatorname{rank}(C_1 + C_2)=\operatorname{rank}(C_1)+\operatorname{rank}(C_2).
 ]
 For such a direct sum, the decomposition of any element of (C_1+C_2) into one element of each factor subspace is unique. The test then exhaustively enumerates both small codebooks and requires exactly one pair to reproduce the clean bound. This is an algebraic validation fixture, not yet a claim that it reproduces Raviv's exact benchmark construction; the paper-specific construction still needs to be matched before Stage C.
+
+
+## Primary-text construction verification
+
+A direct read of Raviv's primary text resolved the key Stage-B ambiguity. The paper defines C = K × V when K and V are subcodes of a parent linear code C and every parent codeword has a unique XOR decomposition into one K word and one V word; equivalently, the two subcodes intersect trivially. It also defines bound recovery as factoring a bound whose factors are drawn from different codebooks. cite0†Raviv 2024 primary text, lines 65-73 and 111-112 in the retrieved source
+
+Accordingly, the executable fixture now constructs one parent [n,k]_2 code and partitions its independent generator basis into the K and V factor bases. This is materially closer to the paper's stated construction than independently sampling two unrelated factor codes. The test still verifies the resulting direct-sum rank invariant and exhaustive uniqueness.
+
+The remaining gap is narrower now: implement the paper's stated binding-recovery procedure and its theorem conditions, then reproduce a small parameterized experiment before any performance comparison is interpreted.
