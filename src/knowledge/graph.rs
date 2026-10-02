@@ -1233,6 +1233,25 @@ mod tests {
     }
 
     #[test]
+    fn test_contradiction_alerts_are_stable_by_existing_fact_id() {
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        graph.insert(make_encoding("claim one", 0.8), 1, None, false);
+        graph.insert(make_encoding("claim two", 0.8), 2, None, false);
+
+        let mut alerts = graph.detect_contradictions(
+            &FactEncoding {
+                vector: graph.get_fact(1).unwrap().encoding.vector.clone(),
+                role_vectors: HashMap::new(),
+                source_text: "claim one not".into(),
+                confidence: 0.7,
+            },
+            3,
+        );
+        let ids = alerts.iter().map(|alert| alert.existing_fact_id).collect::<Vec<_>>();
+        assert!(ids.windows(2).all(|pair| pair[0] <= pair[1]));
+    }
+
+    #[test]
     fn test_spreading_activation_is_invariant_to_restore_order() {
         let records = [
             ("memory-seed", "seed"),
