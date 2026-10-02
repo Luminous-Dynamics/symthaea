@@ -1322,6 +1322,7 @@ mod tests {
         drop(store);
 
         let boundary_b=SqliteAuthorizationStore::open(&path).unwrap();
+        assert_eq!(boundary_b.recover_incomplete_attempts().unwrap(),0);
         assert_eq!(
             boundary_b
                 .recover_incomplete_attempt_for_boundary("boundary-B","attempt-boundary")
@@ -1346,6 +1347,46 @@ mod tests {
         let receipt=boundary_a.reconcile_indeterminate_bound(&record,ExecutionOutcome::Succeeded).unwrap();
         assert_eq!(receipt.outcome,ExecutionOutcome::Succeeded);
         assert_eq!(receipt.authorization_instance,"approval-boundary");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn boundary_ownership_survives_crash_before_dispatch_record() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-prepared-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new("boundary-prepared","intervention",super::super::ActionRisk::Critical);
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(), authorization_instance:"approval-prepared".into(),
+            action_digest:digest, frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-02T20:12:00Z".into(), expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-prepared",action.id.clone(),action.canonical_action_digest(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-prepared","boundary-A"
+        ).unwrap();
+        drop(store);
+
+        let reopened=SqliteAuthorizationStore::open(&path).unwrap();
+        assert_eq!(reopened.recover_incomplete_attempts().unwrap(),0);
+        assert_eq!(
+            reopened
+                .recover_incomplete_attempt_for_boundary("boundary-A","attempt-prepared")
+                .unwrap(),
+            1
+        );
+        assert!(matches!(
+            reopened.prepare_for_execution_bound(
+                &witness,&action,"frame@1","attempt-retry","boundary-A"
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::IndeterminateRequiresReconciliation
+            ))
+        ));
         let _=std::fs::remove_file(path);
     }
 
