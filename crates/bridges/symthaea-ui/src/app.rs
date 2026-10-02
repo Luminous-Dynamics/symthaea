@@ -341,149 +341,166 @@ fn svg_points_is_bounded(value: &str) -> bool {
 }
 
 fn svg_path_data_is_bounded(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    let mut cursor = 0usize;
-    let mut command_count = 0usize;
-    let mut number_count = 0usize;
-    let mut first_command = true;
-    let mut pending_command: Option<u8> = None;
-    let mut saw_segment = false;
+    // SVG path data is a real command/parameter grammar. Character-level
+    // allowlisting alone would accept incomplete commands, wrong arities, or
+    // numbers in places where a command is required. Parse only the supported
+    // command vocabulary and require each parameter group to be complete.
+    #[derive(Clone, Copy)]
+    enum Token {
+        Command(char),
+        Number,
+    }
 
-    const COMMANDS: &[u8] = b"MmZzLlHhVvCcSsQqTtAa";
-
-    loop {
-        while cursor < bytes.len()
-            && (bytes[cursor] == b',' || bytes[cursor].is_ascii_whitespace())
-        {
-            cursor += 1;
-        }
-        if cursor >= bytes.len() {
-            break;
-        }
-
-        let command = if COMMANDS.contains(&bytes[cursor]) {
-            let command = bytes[cursor];
-            cursor += 1;
-            command_count = command_count.checked_add(1).unwrap_or(usize::MAX);
-            if command_count > MAX_PORTRAIT_PATH_COMMANDS {
-                return false;
-            }
-            pending_command = Some(command);
-            command
-        } else {
-            match pending_command {
-                Some(command) if !matches!(command, b'Z' | b'z') => command,
-                _ => return false,
-            }
-        };
-
-        if first_command && !matches!(command, b'M' | b'm') {
-            return false;
-        }
-
-        if matches!(command, b'Z' | b'z') {
-            saw_segment = true;
-            pending_command = None;
-            first_command = false;
-            continue;
-        }
-
-        let arity = match command {
-            b'M' | b'm' | b'L' | b'l' | b'T' | b't' => 2,
-            b'H' | b'h' | b'V' | b'v' => 1,
-            b'C' | b'c' => 6,
-            b'S' | b's' | b'Q' | b'q' => 4,
-            b'A' | b'a' => 7,
-            _ => return false,
-        };
-
-        let mut group_position = 0usize;
-        for _ in 0..arity {
-            while cursor < bytes.len()
-                && (bytes[cursor] == b',' || bytes[cursor].is_ascii_whitespace())
-            {
-                cursor += 1;
-            }
-            if cursor >= bytes.len() || COMMANDS.contains(&bytes[cursor]) {
-                return false;
-            }
-
-            let start = cursor;
-            if matches!(bytes[cursor], b'+' | b'-') {
-                cursor += 1;
-            }
-
-            let integer_start = cursor;
-            while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
-                cursor += 1;
-            }
-            let has_integer = cursor > integer_start;
-
-            let mut has_fraction = false;
-            if cursor < bytes.len() && bytes[cursor] == b'.' {
-                cursor += 1;
-                let fraction_start = cursor;
-                while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
-                    cursor += 1;
-                }
-                has_fraction = cursor > fraction_start;
-            }
-
-            if !has_integer && !has_fraction {
-                return false;
-            }
-
-            if cursor < bytes.len() && matches!(bytes[cursor], b'e' | b'E') {
-                cursor += 1;
-                if cursor < bytes.len() && matches!(bytes[cursor], b'+' | b'-') {
-                    cursor += 1;
-                }
-                let exponent_start = cursor;
-                while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
-                    cursor += 1;
-                }
-                if cursor == exponent_start {
-                    return false;
-                }
-            }
-
-            let token = &value[start..cursor];
-            if !svg_number_is_bounded(token) {
-                return false;
-            }
-            if matches!(command, b'A' | b'a') && matches!(group_position, 3 | 4) {
-                if !matches!(token, "0" | "1") {
-                    return false;
-                }
-            }
-
-            number_count = number_count.checked_add(1).unwrap_or(usize::MAX);
-            if number_count > MAX_PORTRAIT_NUMBER_TOKENS {
-                return false;
-            }
-            group_position += 1;
-
-            if cursor < bytes.len()
-                && !bytes[cursor].is_ascii_whitespace()
-                && bytes[cursor] != b','
-                && bytes[cursor] != b'+'
-                && bytes[cursor] != b'-'
-                && !COMMANDS.contains(&bytes[cursor])
-            {
-                return false;
-            }
-        }
-
-        saw_segment = true;
-        first_command = false;
-        if matches!(command, b'M' | b'm') {
-            pending_command = Some(if command == b'M' { b'L' } else { b'l' });
+    fn parameter_count(command: char) -> Option<usize> {
+        match command {
+            'M' | 'm' => Some(2),
+            'L' | 'l' => Some(2),
+            'H' | 'h' => Some(1),
+            'V' | 'v' => Some(1),
+            'C' | 'c' => Some(6),
+            'S' | 's' => Some(4),
+            'Q' | 'q' => Some(4),
+            'T' | 't' => Some(2),
+            'A' | 'a' => Some(7),
+            'Z' | 'z' => Some(0),
+            _ => None,
         }
     }
 
-    saw_segment
-}
+    let mut tokens = Vec::<Token>::new();
+    let mut number = String::new();
+    let mut previous = None;
 
+    let flush_number = |number: &mut String, tokens: &mut Vec<Token>| -> bool {
+        if number.is_empty() {
+            return true;
+        }
+        if tokens.iter().filter(|token| matches!(token, Token::Number)).count()
+            >= MAX_PORTRAIT_NUMBER_TOKENS
+        {
+            return false;
+        }
+        if !svg_number_is_bounded(number) {
+            return false;
+        }
+        tokens.push(Token::Number);
+        number.clear();
+        true
+    };
+
+    for ch in value.chars() {
+        if parameter_count(ch).is_some() {
+            if !flush_number(&mut number, &mut tokens) {
+                return false;
+            }
+            tokens.push(Token::Command(ch));
+            previous = Some(ch);
+            continue;
+        }
+
+        let separator = ch == ',' || ch.is_ascii_whitespace();
+        let sign_starts_number = matches!(ch, '+' | '-')
+            && !number.is_empty()
+            && !matches!(previous, Some('e' | 'E'));
+
+        if separator || sign_starts_number {
+            if !flush_number(&mut number, &mut tokens) {
+                return false;
+            }
+            if sign_starts_number {
+                number.push(ch);
+            }
+            previous = Some(ch);
+            continue;
+        }
+
+        if ch == 'e' || ch == 'E' || ch == '.' || ch.is_ascii_digit() {
+            number.push(ch);
+            previous = Some(ch);
+            continue;
+        }
+
+        return false;
+    }
+
+    if !flush_number(&mut number, &mut tokens) {
+        return false;
+    }
+
+    let mut index = 0usize;
+    let mut command_count = 0usize;
+    let mut active_command = None::<char>;
+    let mut first_multiplicity = true;
+
+    while index < tokens.len() {
+        let command = match tokens[index] {
+            Token::Command(command) => {
+                index += 1;
+                command
+            }
+            Token::Number => {
+                if active_command.is_none() {
+                    return false;
+                }
+                active_command.unwrap()
+            }
+        };
+
+        let arity = match parameter_count(command) {
+            Some(arity) => arity,
+            None => return false,
+        };
+
+        command_count = command_count.checked_add(1).unwrap_or(usize::MAX);
+        if command_count > MAX_PORTRAIT_NUMBER_TOKENS {
+            return false;
+        }
+
+        if arity == 0 {
+            // ClosePath never consumes parameters; another number before the
+            // next command would therefore be malformed.
+            if index < tokens.len() && matches!(tokens[index], Token::Number) {
+                return false;
+            }
+            active_command = None;
+            first_multiplicity = true;
+            continue;
+        }
+
+        active_command = Some(command);
+        first_multiplicity = true;
+        let mut consumed = 0usize;
+
+        while index < tokens.len() && matches!(tokens[index], Token::Number) {
+            consumed += 1;
+            index += 1;
+
+            if consumed == arity {
+                // MoveTo's additional coordinate pairs are implicit LineTo
+                // commands of the same relative/absolute case. All other
+                // commands simply repeat the same command grammar.
+                let repeated = if first_multiplicity && matches!(command, 'M' | 'm') {
+                    if command == 'M' { 'L' } else { 'l' }
+                } else {
+                    command
+                };
+                active_command = Some(repeated);
+                first_multiplicity = false;
+                consumed = 0;
+
+                if index < tokens.len() && matches!(tokens[index], Token::Command(_)) {
+                    break;
+                }
+            }
+        }
+
+        if consumed != 0 {
+            return false;
+        }
+    }
+
+    !tokens.is_empty()
+}
 fn svg_transform_is_bounded(value: &str) -> bool {
     let bytes = value.as_bytes();
     let mut cursor = 0usize;
@@ -1564,6 +1581,32 @@ mod tests {
             r#"<svg><path d="M0 0 L1e9999 2"/></svg>"#,
         ] {
             assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(), "accepted: {svg}");
+        }
+    }
+
+    #[test]
+    fn portrait_rejects_incomplete_or_wrong_arity_path_commands() {
+        for svg in [
+            r#"<svg><path d="M 0"/></svg>"#,
+            r#"<svg><path d="C 0 0 1 1 2"/></svg>"#,
+            r#"<svg><path d="A 10 10 0 0 1 20"/></svg>"#,
+            r#"<svg><path d="H 10 20 30"/></svg>"#,
+            r#"<svg><path d="Z 10"/></svg>"#,
+            r#"<svg><path d="M 0 0 1"/></svg>"#,
+        ] {
+            assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(), "accepted: {svg}");
+        }
+    }
+
+    #[test]
+    fn portrait_accepts_repeated_and_implicit_move_to_path_commands() {
+        for svg in [
+            r#"<svg><path d="M 0 0 10 10 20 0"/></svg>"#,
+            r#"<svg><path d="m0 0 10-5 20,5"/></svg>"#,
+            r#"<svg><path d="M0 0 H10 V20 L0 20 Z"/></svg>"#,
+            r#"<svg><path d="M0 0 C1 2 3 4 5 6 S7 8 9 10 Q11 12 13 14 T15 16 A4 4 0 0 1 19 20"/></svg>"#,
+        ] {
+            assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_some(), "rejected: {svg}");
         }
     }
 
