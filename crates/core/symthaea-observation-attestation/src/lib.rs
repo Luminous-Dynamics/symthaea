@@ -595,7 +595,7 @@ impl ReceiptAttestationVerificationReport {
 pub const VERIFICATION_CONTEXT_VERSION: &str =
     "symthaea-observation-verification-context-v2";
 pub const EVIDENCE_EVALUATION_VERSION: &str =
-    "symthaea-observation-evaluation-v5";
+    "symthaea-observation-evaluation-v6";
 pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
     "receipt-attestation-verification";
 
@@ -686,6 +686,7 @@ pub enum EvaluationClaim {
     ExternalWorldCorrespondence,
     AttesterIntent,
     EvaluatorIndependence,
+    EnvelopeStructuralValidity,
 }
 
 fn evaluation_claim_tag(claim: EvaluationClaim) -> u8 {
@@ -704,6 +705,8 @@ fn evaluation_claim_tag(claim: EvaluationClaim) -> u8 {
         EvaluationClaim::ExternalWorldCorrespondence => 11,
         EvaluationClaim::AttesterIntent => 12,
         EvaluationClaim::EvaluatorIndependence => 13,
+        // Append-only: never renumber existing canonical claim tags.
+        EvaluationClaim::EnvelopeStructuralValidity => 14,
     }
 }
 
@@ -734,6 +737,13 @@ impl EvaluationBoundary {
         let mut not_established = Vec::new();
         let mut indeterminate = Vec::new();
 
+        classify(
+            report.structural_validation,
+            EvaluationClaim::EnvelopeStructuralValidity,
+            &mut established,
+            &mut not_established,
+            &mut indeterminate,
+        );
         classify(
             report.receipt_commitment,
             EvaluationClaim::ReceiptIntegrity,
@@ -826,6 +836,23 @@ impl EvaluationBoundary {
             not_established,
             indeterminate,
         }
+    }
+
+    /// Validate the epistemic partition: a claim may occupy exactly one bucket.
+    pub fn is_well_formed(&self) -> bool {
+        let established: std::collections::BTreeSet<_> =
+            self.established.iter().copied().collect();
+        let not_established: std::collections::BTreeSet<_> =
+            self.not_established.iter().copied().collect();
+        let indeterminate: std::collections::BTreeSet<_> =
+            self.indeterminate.iter().copied().collect();
+
+        established.len() == self.established.len()
+            && not_established.len() == self.not_established.len()
+            && indeterminate.len() == self.indeterminate.len()
+            && established.is_disjoint(&not_established)
+            && established.is_disjoint(&indeterminate)
+            && not_established.is_disjoint(&indeterminate)
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -959,7 +986,7 @@ impl EvidenceEvaluation {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:evidence-evaluation:v5\n");
+        hasher.update(b"symthaea:evidence-evaluation:v6\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -2129,7 +2156,7 @@ mod tests {
     }
 
     #[test]
-    fn evidence_evaluation_uses_v5_fingerprint_domain() {
+    fn evidence_evaluation_uses_v6_fingerprint_domain() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
@@ -2140,7 +2167,7 @@ mod tests {
         let evaluation = report.to_evidence_evaluation();
         assert!(evaluation
             .canonical_bytes()
-            .starts_with(b"symthaea:evidence-evaluation:v5\n"));
+            .starts_with(b"symthaea:evidence-evaluation:v6\n"));
     }
 
     #[test]
@@ -2163,11 +2190,34 @@ mod tests {
         .verify_report(&envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
         assert!(evaluation.is_consistent_with_report(&report));
+        assert!(evaluation.boundary.is_well_formed());
 
         let mut tampered = evaluation.clone();
         tampered.outcome =
             ReceiptAttestationVerificationOutcome::InvalidSignature;
         assert!(!tampered.is_consistent_with_report(&report));
+    }
+
+    #[test]
+    fn evidence_boundary_tracks_structural_validity_separately() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        envelope.attester_id.clear();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+        assert!(evaluation
+            .boundary
+            .not_established
+            .contains(&EvaluationClaim::EnvelopeStructuralValidity));
+        assert!(evaluation
+            .boundary
+            .indeterminate
+            .contains(&EvaluationClaim::ReceiptIntegrity));
+        assert!(evaluation.boundary.is_well_formed());
     }
 
     #[test]
@@ -2349,6 +2399,7 @@ mod tests {
             report.procedure_fingerprint
         );
         assert!(evaluation.execution_trace.is_well_formed());
+        assert!(evaluation.boundary.is_well_formed());
         assert_eq!(evaluation.execution_trace.results.len(), 9);
         let last = evaluation.execution_trace.results.last().expect("trace has a result");
         assert_eq!(last.check, EvaluationCheck::CryptographicProof);
