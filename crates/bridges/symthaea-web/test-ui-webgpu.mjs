@@ -218,7 +218,7 @@ try {
 
   const fallback = await runBrowser({
     name: 'forced-fallback',
-    args: ['--disable-gpu'],
+    args: ['--disable-gpu', '--disable-features=WebGPUService'],
     requireWebGpu: false,
     requireFallback: true,
   });
