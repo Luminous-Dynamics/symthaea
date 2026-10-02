@@ -21,6 +21,7 @@ bincode = { workspace = true, optional = true }
 blake3 = { version = "1", optional = true }
 sha2 = { version = "0.10", optional = true }
 ed25519-dalek = { workspace = true, optional = true }
+ring = { version = "0.17.14", optional = true }
 
 # Distributed networking via Iroh
 iroh = { version = "0.97", optional = true }
@@ -29,7 +30,7 @@ iroh-gossip = { version = "0.97", optional = true }
 [features]
 default = ["networking"]
 semantic-digest = ["dep:blake3", "dep:sha2"]
-semantic-receipts = ["semantic-digest", "dep:ed25519-dalek"]
+semantic-receipts = ["semantic-digest", "dep:ed25519-dalek", "dep:ring"]
 networking = [
     "dep:bincode",
     "semantic-digest",
