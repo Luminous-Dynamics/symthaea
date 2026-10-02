@@ -148,3 +148,9 @@ The literature supports treating this as a distinct recovery family. Raviv repor
 
 ### Stage-B construction constraint
 The bound-recovery comparator must not use arbitrary factors from a single common linear code as its primary recovery fixture. Such factors are generally non-identifiable from XOR alone because multiple decompositions can exist within the same subspace. The paper's bound-recovery framework instead uses factors associated with participating linear-code subspaces and exploits their basis/subspace structure. Therefore Stage B requires an explicit fixture in which the participating factor domains are defined and the intended factorization is uniquely identifiable (or all valid ambiguity classes are exhaustively enumerated). No recovery-performance claim is valid until that construction is verified.
+
+The first executable fixture now uses two independently generated factor subspaces (C_1,C_2) in the same 96-bit ambient space and **checks** the direct-sum condition algebraically:
+[
+\operatorname{rank}(C_1 + C_2)=\operatorname{rank}(C_1)+\operatorname{rank}(C_2).
+]
+For such a direct sum, the decomposition of any element of (C_1+C_2) into one element of each factor subspace is unique. The test then exhaustively enumerates both small codebooks and requires exactly one pair to reproduce the clean bound. This is an algebraic validation fixture, not yet a claim that it reproduces Raviv's exact benchmark construction; the paper-specific construction still needs to be matched before Stage C.
