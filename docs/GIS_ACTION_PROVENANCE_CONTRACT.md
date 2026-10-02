@@ -118,4 +118,4 @@ The intended temporal boundary is therefore:
       ↓ enforcement
     Execution Receipt
 
-This follows the broader evidence/authorization separation seen in recent agent-security work: authorization evidence should be request-specific, and execution evidence should remain a separate record of what actually happened. citeturn0search0turn0search5
+This follows the broader evidence/authorization separation seen in recent agent-security work: authorization evidence should be request-specific, and execution evidence should remain a separate record of what actually happened.
