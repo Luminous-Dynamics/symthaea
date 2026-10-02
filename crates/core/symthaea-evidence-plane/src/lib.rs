@@ -518,12 +518,13 @@ mod tests {
     }
 
     #[test]
-    fn execution_lineage_run_id_is_not_part_of_identity() {
+    fn execution_lineage_serde_round_trip_preserves_identity() {
         let lineage = lineage_fixture();
-        let run_a = RunId::new("run-a");
-        let run_b = RunId::new("run-b");
-        assert_ne!(run_a, run_b);
-        assert_eq!(lineage.digest(), lineage.digest());
+        let json = serde_json::to_string(&lineage).expect("serialize lineage");
+        let restored: ExecutionLineageV1 =
+            serde_json::from_str(&json).expect("deserialize lineage");
+        assert_eq!(restored, lineage);
+        assert_eq!(restored.digest(), lineage.digest());
     }
 
     #[test]
