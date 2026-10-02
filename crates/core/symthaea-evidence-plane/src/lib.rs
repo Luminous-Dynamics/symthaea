@@ -124,6 +124,11 @@ pub struct ExecutionLineageV1 {
     pub source_repository: String,
     pub source_revision: String,
     pub source_tree: String,
+    /// Exact identity of the validated repository source subject used for this execution.
+    ///
+    /// This is distinct from Git HEAD/tree metadata: staged, unstaged, deleted,
+    /// and explicitly included ignored source bytes can all belong to the exact source subject.
+    pub repository_source_snapshot_id: String,
     pub lock_digests: BTreeMap<String, String>,
     pub toolchain_versions: BTreeMap<String, String>,
     pub host_target: String,
@@ -147,6 +152,7 @@ impl ExecutionLineageV1 {
         source_repository: String,
         source_revision: String,
         source_tree: String,
+        repository_source_snapshot_id: String,
         lock_digests: Vec<(String, String)>,
         toolchain_versions: Vec<(String, String)>,
         host_target: String,
@@ -168,6 +174,7 @@ impl ExecutionLineageV1 {
             source_repository,
             source_revision,
             source_tree,
+            repository_source_snapshot_id,
             lock_digests,
             toolchain_versions,
             host_target,
@@ -218,6 +225,10 @@ impl ExecutionLineageV1 {
                 return Err(format!("empty lineage field {name}"));
             }
         }
+        validate_sha256_identity(
+            "repository_source_snapshot_id",
+            &self.repository_source_snapshot_id,
+        )?;
         if self.argv.iter().any(|arg| arg.contains('\0')) {
             return Err("NUL in argv".into());
         }
@@ -235,6 +246,11 @@ impl ExecutionLineageV1 {
         append_str(hasher, "source_repository", &self.source_repository);
         append_str(hasher, "source_revision", &self.source_revision);
         append_str(hasher, "source_tree", &self.source_tree);
+        append_str(
+            hasher,
+            "repository_source_snapshot_id",
+            &self.repository_source_snapshot_id,
+        );
         append_map(hasher, "lock_digests", &self.lock_digests);
         append_map(hasher, "toolchain_versions", &self.toolchain_versions);
         append_str(hasher, "host_target", &self.host_target);
@@ -284,6 +300,13 @@ fn validate_digest(value: &str) -> Result<(), String> {
     let payload = value.split_once(':').map_or(value, |(_, payload)| payload);
     if payload.len() < 16 || payload.len() % 2 != 0 || !payload.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(format!("invalid digest syntax: {value:?}"));
+    }
+    Ok(())
+}
+
+fn validate_sha256_identity(field: &str, value: &str) -> Result<(), String> {
+    if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(format!("invalid {field}: {value:?}"));
     }
     Ok(())
 }
@@ -645,7 +668,7 @@ mod tests {
     #[test]
     fn raw_named_entries_reject_duplicate_map_keys_before_canonicalization() {
         let result = ExecutionLineageV1::from_raw_entries(
-            "repo".into(), "revision".into(), "tree".into(),
+            "repo".into(), "revision".into(), "tree".into(), "a".repeat(64),
             vec![
                 ("cargo".into(), "sha256:0011223344556677".into()),
                 ("cargo".into(), "sha256:8899aabbccddeeff".into()),
@@ -662,7 +685,7 @@ mod tests {
     #[test]
     fn raw_named_entries_reject_duplicate_set_members() {
         let result = ExecutionLineageV1::from_raw_entries(
-            "repo".into(), "revision".into(), "tree".into(),
+            "repo".into(), "revision".into(), "tree".into(), "a".repeat(64),
             vec![("cargo".into(), "sha256:0011223344556677".into())],
             vec![("rustc".into(), "1.96".into())],
             "host/target".into(), "nix".into(), vec!["feature".into(), "feature".into()],
@@ -676,7 +699,7 @@ mod tests {
     #[test]
     fn raw_named_entries_validate_before_digest_is_available() {
         let lineage = ExecutionLineageV1::from_raw_entries(
-            "repo".into(), "revision".into(), "tree".into(),
+            "repo".into(), "revision".into(), "tree".into(), "a".repeat(64),
             vec![("cargo".into(), "sha256:0011223344556677".into())],
             vec![("rustc".into(), "1.96".into())],
             "host/target".into(), "nix".into(), vec!["feature".into()],
@@ -692,6 +715,7 @@ mod tests {
             source_repository: "github.com/Luminous-Dynamics/symthaea".into(),
             source_revision: "abc123".into(),
             source_tree: "tree456".into(),
+            repository_source_snapshot_id: "a".repeat(64),
             lock_digests: [("Cargo.lock".into(), "lock789".into())].into_iter().collect(),
             toolchain_versions: [("rustc".into(), "1.96.0".into())].into_iter().collect(),
             host_target: "x86_64-unknown-linux-gnu".into(),
@@ -702,6 +726,21 @@ mod tests {
             allowed_env: [("RUST_BACKTRACE".into(), "0".into())].into_iter().collect(),
             immutable_input_digests: [("fixture.json".into(), "sha256:1234".into())].into_iter().collect(),
         }
+    }
+
+    #[test]
+    fn execution_lineage_validation_rejects_invalid_repository_source_snapshot_id() {
+        let mut lineage = lineage_fixture();
+        lineage.repository_source_snapshot_id = "not-a-sha256".into();
+        assert!(lineage.validate().is_err());
+    }
+
+    #[test]
+    fn repository_source_snapshot_identity_changes_lineage_digest() {
+        let base = lineage_fixture();
+        let mut changed = base.clone();
+        changed.repository_source_snapshot_id = "b".repeat(64);
+        assert_ne!(base.digest(), changed.digest());
     }
 
     #[test]
