@@ -171,6 +171,56 @@ fn verification_outcome_tag(outcome: ReceiptAttestationVerificationOutcome) -> u
     }
 }
 
+/// Prevent a structurally valid trace from pairing a check with an outcome that
+/// could never be emitted by that check in the bound procedure.
+fn outcome_allowed_for_check(
+    check: EvaluationCheck,
+    outcome: ReceiptAttestationVerificationOutcome,
+) -> bool {
+    match check {
+        EvaluationCheck::EnvelopeStructuralValidation =>
+            matches!(outcome, ReceiptAttestationVerificationOutcome::InvalidEnvelope),
+        EvaluationCheck::ReceiptCommitment =>
+            matches!(outcome, ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch),
+        EvaluationCheck::TemporalValidity =>
+            matches!(
+                outcome,
+                ReceiptAttestationVerificationOutcome::NotYetValid
+                    | ReceiptAttestationVerificationOutcome::Expired
+            ),
+        EvaluationCheck::CryptosuiteConformance =>
+            matches!(outcome, ReceiptAttestationVerificationOutcome::CryptosuiteMismatch),
+        EvaluationCheck::VerificationMethodResolution =>
+            matches!(
+                outcome,
+                ReceiptAttestationVerificationOutcome::VerificationMethodMismatch
+                    | ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable
+            ),
+        EvaluationCheck::VerificationMethodLifecycle =>
+            matches!(
+                outcome,
+                ReceiptAttestationVerificationOutcome::VerificationMethodRevoked
+                    | ReceiptAttestationVerificationOutcome::VerificationMethodExpired
+            ),
+        EvaluationCheck::ProofPurposeAuthorization =>
+            matches!(outcome, ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized),
+        EvaluationCheck::ProofPolicyConformance =>
+            matches!(
+                outcome,
+                ReceiptAttestationVerificationOutcome::ProofPurposeMismatch
+                    | ReceiptAttestationVerificationOutcome::DomainMismatch
+                    | ReceiptAttestationVerificationOutcome::ChallengeMismatch
+            ),
+        EvaluationCheck::CryptographicProof =>
+            matches!(
+                outcome,
+                ReceiptAttestationVerificationOutcome::MissingProof
+                    | ReceiptAttestationVerificationOutcome::InvalidProofEncoding
+                    | ReceiptAttestationVerificationOutcome::InvalidSignature
+            ),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationStage {
     Passed,
@@ -476,7 +526,13 @@ impl EvaluationTrace {
             && self.results.iter().enumerate().all(|(index, result)| {
                 result.sequence == index as u32
                     && procedure.checks.get(index).copied() == Some(result.check)
-                    && !matches!(result.stage, VerificationStage::NotEvaluated)
+                    && match result.stage {
+                        VerificationStage::Passed => true,
+                        VerificationStage::Failed(outcome) => {
+                            outcome_allowed_for_check(result.check, outcome)
+                        }
+                        VerificationStage::NotEvaluated => false,
+                    }
             })
             && self
                 .results
@@ -2503,7 +2559,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn legacy_v1_trace_validates_against_its_bound_procedure() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
@@ -2525,6 +2580,7 @@ mod tests {
         assert!(!trace.is_well_formed());
     }
 
+    #[test]
     fn legacy_v3_report_canonicalization_excludes_execution_trace() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let mut report = Ed25519ReceiptVerifier::new(
@@ -2967,6 +3023,27 @@ mod tests {
             .established
             .push(EvaluationClaim::UnderlyingObservationTruth);
         assert!(!evaluation.is_consistent_with_report(&report));
+    }
+
+    #[test]
+    fn execution_trace_rejects_outcome_for_wrong_check() {
+        let procedure = EvaluationProcedure::attestation_ed25519();
+        let mut trace = EvaluationTrace {
+            procedure_fingerprint: procedure.fingerprint(),
+            results: vec![EvaluationCheckResult {
+                sequence: 0,
+                check: EvaluationCheck::EnvelopeStructuralValidation,
+                stage: VerificationStage::Failed(
+                    ReceiptAttestationVerificationOutcome::InvalidSignature,
+                ),
+            }],
+        };
+        assert!(!trace.is_well_formed());
+
+        trace.results[0].stage = VerificationStage::Failed(
+            ReceiptAttestationVerificationOutcome::InvalidEnvelope,
+        );
+        assert!(trace.is_well_formed());
     }
 
     #[test]
