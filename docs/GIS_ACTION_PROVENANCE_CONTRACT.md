@@ -265,7 +265,7 @@ The verifier is passed:
 - adapter/finality sink;
 - boundary identity.
 
-The verifier must return an explicit affirmative VerifiedProviderOutcome, including verifier identity and a verification digest. The durable store re-checks the returned binding before committing the terminal state and persists the evidence/verifier digests alongside the terminal receipt.
+The verifier configuration is itself relying-party-pinned and auditable: verifier implementation/profile identifier and digest, trust-anchor-set digest, and accepted evidence-profile/schema digest are persisted with the terminal evidence. The verifier is invoked with an explicit `TerminalOutcome` purpose; a verifier result that does not affirm that purpose is not terminal authority. This makes `verified` an inspectable statement about a configured verification procedure, rather than an opaque Boolean. The verifier must return an explicit affirmative VerifiedProviderOutcome, including verifier identity and a verification digest. The durable store re-checks the returned binding before committing the terminal state and persists the evidence/verifier digests alongside the terminal receipt.
 
 A PreEntryLookup is a different evidence kind and is rejected by terminal commitment/reconciliation. It cannot be converted into Failed for an attempt that reached DispatchPending.
 
