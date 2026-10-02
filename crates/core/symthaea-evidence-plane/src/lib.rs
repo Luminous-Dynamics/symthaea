@@ -193,6 +193,7 @@ pub struct ExecutionLineageV1 {
 /// inputs cannot bypass the semantic admission check merely by deserializing
 /// into the same field shape.
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ExecutionLineageV1Wire {
     pub source_repository: String,
     pub source_revision: String,
@@ -937,6 +938,16 @@ mod tests {
             allowed_env: [("RUST_BACKTRACE".into(), "0".into())].into_iter().collect(),
             immutable_input_digests: [("fixture.json".into(), "sha256:1234".into())].into_iter().collect(),
         }
+    }
+
+    #[test]
+    fn execution_lineage_serde_rejects_unknown_fields() {
+        let mut lineage = serde_json::to_value(lineage_fixture()).expect("serialize fixture");
+        lineage["unexpected_future_field"] = serde_json::Value::String("ignored".into());
+
+        let error = serde_json::from_value::<ExecutionLineageV1>(lineage)
+            .expect_err("unknown lineage fields must fail closed");
+        assert!(error.to_string().contains("unknown field"));
     }
 
     #[test]
