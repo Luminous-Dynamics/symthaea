@@ -418,6 +418,19 @@ impl ExecutionLineageV1 {
     }
 }
 
+/// Public namespace for the canonical execution-lineage contract.
+///
+/// The root-level re-exports remain available for compatibility, while new
+/// consumers can depend on the explicit `execution_lineage` path described by
+/// the evidence-plane contract and downstream R4.5 work.
+pub mod execution_lineage {
+    pub use super::{
+        qualify_lineage_perturbation, EvidenceLineageCommitError, EvidenceLineageDecision,
+        EvidenceLineageGuardV1, ExecutionLineageV1, LineagePerturbationResult,
+        RepositorySourceSnapshotId,
+    };
+}
+
 fn deserialize_unique_string_map<'de, D>(
     deserializer: D,
 ) -> Result<BTreeMap<String, String>, D::Error>
@@ -1040,7 +1053,7 @@ mod tests {
         );
     }
 
-    fn lineage_fixture() -> ExecutionLineageV1 {
+    fn lineage_fixture() -> execution_lineage::ExecutionLineageV1 {
         ExecutionLineageV1 {
             source_repository: "github.com/Luminous-Dynamics/symthaea".into(),
             source_revision: "a".repeat(40),
