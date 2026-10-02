@@ -80,3 +80,9 @@ The next layer is therefore model/physics evidence, not a larger sensor quorum.
 ## Research alignment
 
 Recent 2026 digital-twin SHM literature emphasizes uncertainty quantification, model updating, sensor validation, temporal synchronization, and explicit treatment of model discrepancy as prerequisites for dependable data/physics fusion. This contract intentionally starts with deterministic evidence qualification before introducing learned or adaptive model components.
+
+## Independence semantics
+
+A trusted-sensor quorum is not treated as independent merely because sensor IDs differ. Temporal corroboration now carries an explicit `independence_group`, representing a physical or common-mode dependency domain. The policy can require a minimum number of independent groups. This prevents multiple colocated, shared-path, or otherwise common-mode sensors from manufacturing a false quorum.
+
+This is consistent with current SHM work emphasizing redundancy and decentralized sensor placement while also documenting the challenge of concurrent multi-sensor failures and loss of spatial correlation. citeturn0search1turn0search2
