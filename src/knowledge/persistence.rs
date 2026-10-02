@@ -3192,6 +3192,172 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+
+    #[test]
+    fn test_legacy_receipt_ledgers_migrate_and_backfill_integrity_fields() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_legacy_receipt_migration_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let canonical_digest = "a".repeat(64);
+        let report_digest = Some("b".repeat(64));
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                CREATE TABLE knowledge_causal_edges (
+                    cause TEXT NOT NULL,
+                    effect TEXT NOT NULL,
+                    strength REAL NOT NULL,
+                    is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                    cycle INTEGER NOT NULL,
+                    PRIMARY KEY (cause, effect)
+                );
+                CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT
+                );
+                CREATE TABLE knowledge_snapshot_receipts (
+                    generation INTEGER PRIMARY KEY AUTOINCREMENT,
+                    canonical_digest_hex TEXT NOT NULL
+                );
+                CREATE TABLE knowledge_snapshot_validation_receipts (
+                    validation_event TEXT PRIMARY KEY,
+                    generation INTEGER NOT NULL,
+                    snapshot_digest_hex TEXT NOT NULL,
+                    validator_ref TEXT NOT NULL,
+                    validator_version TEXT NOT NULL,
+                    validation_profile TEXT NOT NULL,
+                    conforms INTEGER NOT NULL,
+                    report_digest_hex TEXT,
+                    FOREIGN KEY (generation) REFERENCES knowledge_snapshot_receipts(generation)
+                );",
+            )
+            .unwrap();
+
+            conn.execute(
+                "INSERT INTO knowledge_snapshot_receipts
+                 (generation, canonical_digest_hex)
+                 VALUES (1, ?1)",
+                [canonical_digest.as_str()],
+            )
+            .unwrap();
+
+            conn.execute(
+                "INSERT INTO knowledge_snapshot_validation_receipts
+                 (validation_event, generation, snapshot_digest_hex, validator_ref,
+                  validator_version, validation_profile, conforms, report_digest_hex)
+                 VALUES ('legacy-validation', 1, ?1, 'legacy-validator', 'v1',
+                         'legacy-profile', 1, ?2)",
+                rusqlite::params![canonical_digest.as_str(), report_digest.as_deref()],
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        {
+            let conn = p.open_connection().unwrap();
+            p.ensure_schema(&conn).unwrap();
+
+            let snapshot_receipt: (String,) = conn
+                .query_row(
+                    "SELECT receipt_digest_hex
+                     FROM knowledge_snapshot_receipts
+                     WHERE generation = 1",
+                    [],
+                    |row| Ok((row.get(0)?,)),
+                )
+                .unwrap();
+            let expected_snapshot_receipt = KnowledgeSnapshotReceipt {
+                generation: 1,
+                canonical_digest_hex: canonical_digest.clone(),
+                receipt_digest_hex: String::new(),
+            }
+            .canonical_receipt_digest_hex();
+            assert_eq!(snapshot_receipt.0, expected_snapshot_receipt);
+
+            let validation_row: (i64, String) = conn
+                .query_row(
+                    "SELECT validation_sequence, receipt_digest_hex
+                     FROM knowledge_snapshot_validation_receipts
+                     WHERE validation_event = 'legacy-validation'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            assert_eq!(validation_row.0, 1);
+
+            let expected_validation_receipt =
+                KnowledgeSnapshotValidationReceipt {
+                    validation_event: "legacy-validation".into(),
+                    generation: 1,
+                    snapshot_digest_hex: canonical_digest.clone(),
+                    validator_ref: "legacy-validator".into(),
+                    validator_version: "v1".into(),
+                    validation_profile: "legacy-profile".into(),
+                    conforms: true,
+                    report_digest_hex: report_digest.clone(),
+                }
+                .canonical_digest_hex();
+            assert_eq!(validation_row.1, expected_validation_receipt);
+
+            let snapshot_receipt_schema: Vec<String> = conn
+                .prepare("PRAGMA table_info(knowledge_snapshot_receipts)")
+                .unwrap()
+                .query_map([], |row| row.get(1))
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            assert!(snapshot_receipt_schema
+                .iter()
+                .any(|column| column == "receipt_digest_hex"));
+
+            let validation_schema: Vec<String> = conn
+                .prepare("PRAGMA table_info(knowledge_snapshot_validation_receipts)")
+                .unwrap()
+                .query_map([], |row| row.get(1))
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            assert!(validation_schema
+                .iter()
+                .any(|column| column == "validation_sequence"));
+            assert!(validation_schema
+                .iter()
+                .any(|column| column == "receipt_digest_hex"));
+        }
+
+        // A second persistence instance must see the already-migrated schema as stable.
+        let mut second = KnowledgePersistence::new(&db_path);
+        second.verify_snapshot_validation_receipts().unwrap();
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn test_load_provenance_relations_total_orders_equal_timestamps_by_kind() {
         let dir = std::env::temp_dir().join(format!(
