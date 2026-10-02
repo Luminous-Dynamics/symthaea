@@ -92,9 +92,6 @@ impl Rfc9942Vdp {
     /// The VDS identifier this concrete VDP implementation is defined for.
     /// It is metadata, not part of this VDP's CBOR bytes; callers must bind it
     /// to the separate RFC 9942 `vds` protected-header value.
-    /// The VDS identifier this concrete VDP implementation is defined for.
-    /// It is metadata, not part of this VDP's CBOR bytes; callers must bind it
-    /// to the separate RFC 9942 vds protected-header value.
     pub const fn vds_id(&self) -> u64 { RFC9162_VDS_ID }
 
     /// Bind the VDP to the RFC 9942 vds protected-header value before proof
@@ -106,9 +103,8 @@ impl Rfc9942Vdp {
     pub const fn kind(&self) -> Rfc9942ProofKind { self.kind }
     pub fn proofs(&self) -> &[Vec<u8>] { &self.proofs }
 
-    /// Verify an RFC 9942 inclusion VDP collection against a candidate entry.
+    /// Verify inclusion after explicitly binding the RFC 9942 `vds` header value.
     /// The collection may contain multiple proofs; at least one must verify.
-    /// Verify inclusion after explicitly binding the RFC 9942 vds header value.
     pub fn verify_inclusion_for_vds(
         &self,
         vds_id: u64,
@@ -136,9 +132,8 @@ impl Rfc9942Vdp {
         Err(Rfc9942VdpError::NoMatchingProof)
     }
 
-    /// Verify an RFC 9942 consistency VDP collection against both tree heads.
+    /// Verify consistency after explicitly binding the RFC 9942 `vds` header value.
     /// The collection may contain multiple proofs; at least one must verify.
-    /// Verify consistency after explicitly binding the RFC 9942 vds header value.
     pub fn verify_consistency_for_vds(
         &self,
         vds_id: u64,
