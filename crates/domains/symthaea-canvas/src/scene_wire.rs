@@ -154,6 +154,10 @@ impl RemoteScene {
         serde_json::to_vec(self).map(|bytes| bytes.len()).unwrap_or(MAX_SCENE_BYTES + 1)
     }
 
+    pub fn is_supported(&self) -> bool {
+        self.version == Self::VERSION && self.serialized_len() <= MAX_SCENE_BYTES
+    }
+
     pub fn is_within_budget(&self) -> bool {
         self.serialized_len() <= MAX_SCENE_BYTES
     }
