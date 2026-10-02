@@ -387,6 +387,9 @@ pub fn App() -> impl IntoView {
     // fallback. putImageData wants RGBA at native size; CSS scales it up with
     // image-rendering: pixelated.
     Effect::new(move |_| {
+        if movie_webgpu_ready.get() {
+            return;
+        }
         let idx = movie_frame.get();
         let Some(canvas) = movie_canvas.get() else {
             return;
