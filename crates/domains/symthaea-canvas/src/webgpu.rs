@@ -20,6 +20,7 @@ use crate::scene_graph::{NodeKind, SceneNode, Style, Transform};
 const VIEWPORT_W: f32 = 512.0;
 const VIEWPORT_H: f32 = 512.0;
 const MAX_GPU_NODES: usize = 512;
+const MAX_GPU_NESTING: usize = 24;
 const MAX_GPU_VERTICES: usize = 200_000;
 const CIRCLE_SEGMENTS: usize = 32;
 const MAX_POLYGON_POINTS: usize = 128;
@@ -49,6 +50,7 @@ impl GpuScene {
             Affine::identity(),
             1.0,
             &gradients,
+            0,
             &mut nodes,
             &mut out,
         );
@@ -133,11 +135,12 @@ fn visit(
     parent: Affine,
     parent_opacity: f32,
     gradients: &HashMap<&str, Color>,
+    depth: usize,
     nodes: &mut usize,
     out: &mut GpuScene,
 ) {
-    if *nodes >= MAX_GPU_NODES {
-        out.skipped_nodes = out.skipped_nodes.saturating_add(node.node_count());
+    if *nodes >= MAX_GPU_NODES || depth > MAX_GPU_NESTING {
+        out.skipped_nodes = out.skipped_nodes.saturating_add(1);
         return;
     }
     *nodes += 1;
@@ -153,7 +156,15 @@ fn visit(
     match &node.kind {
         NodeKind::Group { .. } => {
             for child in &node.children {
-                visit(child, transform, opacity, gradients, nodes, out);
+                visit(
+                    child,
+                    transform,
+                    opacity,
+                    gradients,
+                    depth + 1,
+                    nodes,
+                    out,
+                );
                 if *nodes >= MAX_GPU_NODES {
                     break;
                 }
