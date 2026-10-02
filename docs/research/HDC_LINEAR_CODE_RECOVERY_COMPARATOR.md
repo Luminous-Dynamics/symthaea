@@ -198,4 +198,13 @@ A direct read of Raviv's primary text resolved the key Stage-B ambiguity. The pa
 
 Accordingly, the executable fixture now constructs one parent [n,k]_2 code and partitions its independent generator basis into the K and V factor bases. This is materially closer to the paper's stated construction than independently sampling two unrelated factor codes. The test still verifies the resulting direct-sum rank invariant and exhaustive uniqueness.
 
-The remaining gap is narrower now: implement the paper's stated binding-recovery procedure and its theorem conditions, then reproduce a small parameterized experiment before any performance comparison is interpreted.
+The remaining gap is narrower now: the direct-sum two-factor recovery API is implemented as a faithful specialization of the paper's Theorem 2, while the fully generic multi-code maximal-independent-union case and the paper's benchmark parameterization remain to be reconstructed before performance claims.
+
+
+### Primary-text theorem verification
+
+The primary paper's Section IV-A defines bound recovery as finding factors from separate codebooks whose XOR equals the query. Theorem 2 states that when the factor codebooks are linear, recovery can be performed from their generator bases by forming a maximal linearly independent subset of the union of those bases and solving a Boolean linear system. The paper gives an O(Δ^3 n) upper bound for this general construction, where Δ is the sum of the factor-code dimensions. It also explicitly notes that recovery need not be unique when factor subcodes overlap, and motivates product/direct-sum subcodes to guarantee unique decomposition.
+
+For the current two-factor product fixture, the concatenated generator bases are already independent. Therefore recover_direct_sum_bound is a faithful specialization of the paper's Theorem 2: construct the combined basis, verify independence, solve the GF(2) system, and split the recovered coefficients by factor domain. The code does not yet claim the fully general overlapping-code path.
+
+Source checked: Netanel Raviv, Linear Codes for Hyperdimensional Computing, arXiv:2403.03278v1, Section IV-A, Theorem 2 and Remark 7; primary HTML version.
