@@ -679,6 +679,61 @@ mod tests {
     }
 
     #[test]
+    fn replay_evidence_round_trips_as_semantic_noop() {
+        let (_, after) = fixture();
+        let delivery = after.deliveries.values().next().unwrap().clone();
+        let observation = after.observations.values().next().unwrap().clone();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+        let result = match decide(&after, &delivery, &observation, policy, 11) {
+            AdmissionOutcome::Replay { existing_result } => existing_result,
+            other => panic!("fixture replay failed: {other:?}"),
+        };
+        let evidence = build_transition_evidence(
+            &after,
+            &after,
+            TransitionClaim::Replay {
+                delivery,
+                observation,
+                policy,
+                now_ms: 11,
+                result,
+            },
+        ).unwrap();
+
+        assert_eq!(evidence.kind(), TransitionKind::Replay);
+        assert_eq!(verify_transition_evidence(&after, &after, &evidence), Ok(()));
+    }
+
+    #[test]
+    fn lifecycle_evidence_round_trips_retirement() {
+        use crate::semantic_admission::retire_expired;
+
+        let (mut before, _) = fixture();
+        let observation = before.observations.values().next().unwrap().clone();
+        before.observations.get_mut(&observation.key).unwrap().observed_at_ms = 0;
+        let policy = AdmissionPolicy {
+            retention_ms: 10,
+            tombstone_retention_ms: 100,
+            ..AdmissionPolicy::default()
+        };
+        let after = retire_expired(&before, policy, 11).unwrap();
+        let evidence = build_transition_evidence(
+            &before,
+            &after,
+            TransitionClaim::LifecycleRetirement {
+                policy,
+                now_ms: 11,
+            },
+        ).unwrap();
+
+        assert_eq!(evidence.kind(), TransitionKind::LifecycleRetirement);
+        assert_eq!(verify_transition_evidence(&before, &after, &evidence), Ok(()));
+    }
+
+    #[test]
     fn evidence_rejects_tampered_state_digest() {
         let (before, after) = fixture();
         let delivery = after.deliveries.values().next().unwrap().clone();
