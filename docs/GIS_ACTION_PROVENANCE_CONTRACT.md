@@ -247,6 +247,40 @@ The legacy attempt-only transition APIs are also fenced from boundary-owned atte
 Boundary identity remains a recovery/ownership field, not an action-identity field. It is persisted on attempt-bearing durable records so recovery operations can be scoped to one execution boundary, while the canonical action digest and downstream provider idempotency identity remain common across boundaries for the same authorized action. This follows the current Action Evidence Boundary Internet-Draft's distinction between shared action identity and boundary-scoped attempt ownership, including its requirement that recovery of one attempt cannot close or release records belonging to another.
 
 
+### Provider-verifier boundary
+
+Terminal provider outcomes are now a separate authority boundary from the durable dispatch record.
+
+A DispatchPending or Invoked record proves only local lifecycle facts. A raw Succeeded/Failed enum returned by an adapter is not terminal evidence by itself. Effectful terminal commitment and reconciliation therefore require a relying-party-configured ProviderEvidenceVerifier.
+
+The verifier is passed:
+
+- the exact frozen DurableDispatchRecord;
+- evidence explicitly classified as TerminalOutcome;
+- the exact action ID/digest;
+- exact attempt ID;
+- provider idempotency key;
+- target identity;
+- audience/environment;
+- adapter/finality sink;
+- boundary identity.
+
+The verifier must return an explicit affirmative VerifiedProviderOutcome, including verifier identity and a verification digest. The durable store re-checks the returned binding before committing the terminal state and persists the evidence/verifier digests alongside the terminal receipt.
+
+A PreEntryLookup is a different evidence kind and is rejected by terminal commitment/reconciliation. It cannot be converted into Failed for an attempt that reached DispatchPending.
+
+The legacy outcome-only commit_bound and reconcile_indeterminate_bound paths are fenced for terminal outcomes. They may no longer turn a locally observed enum into provider truth. The intended effectful path is:
+
+    provider evidence
+      ↓
+    ProviderEvidenceVerifier
+      ↓ explicit terminal affirmation
+    exact frozen dispatch record
+      ↓
+    EXECUTED | FAILED
+
+This remains an adapter boundary, not a universal proof of physical truth. The verifier's trust anchors, provider authentication, freshness rules, cancellation semantics, and semantic interpretation remain relying-party configuration. The store records which verifier/revision produced the accepted terminal attestation rather than pretending SQLite itself authenticated the provider.
+
 ### Pre-entry recovery versus Indeterminate reconciliation
 
 The recovery boundary is intentionally split in two. A Prepared attempt that has not crossed DispatchPending can be recovered as a pre-entry stop only through the exact recovery witness and an atomic transition that records the not-entered marker. That transition prevents the stranded executor from dispatching the old attempt after recovery. A DispatchPending or Invoked attempt cannot use this release path; it remains occupied and follows the Indeterminate reconciliation path.
