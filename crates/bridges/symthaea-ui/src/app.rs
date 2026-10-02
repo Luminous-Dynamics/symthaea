@@ -220,6 +220,7 @@ const MAX_PORTRAIT_NUMBER_ABS: f64 = 1_000_000.0;
 const MAX_PORTRAIT_NUMBER_LENGTH: usize = 32;
 const MAX_PORTRAIT_NUMBER_TOKENS: usize = 256;
 const MAX_PORTRAIT_TRANSFORMS: usize = 16;
+const MAX_PORTRAIT_PATH_COMMANDS: usize = 256;
 
 fn svg_number_is_bounded(token: &str) -> bool {
     token.len() <= MAX_PORTRAIT_NUMBER_LENGTH
@@ -238,7 +239,7 @@ fn svg_numeric_list_is_bounded(value: &str) -> bool {
         if token.is_empty() {
             return false;
         }
-        *token_count = token_count.checked_add(1).ok_or(()).unwrap_or(usize::MAX);
+        *token_count = token_count.checked_add(1).unwrap_or(usize::MAX);
         if *token_count > MAX_PORTRAIT_NUMBER_TOKENS || !svg_number_is_bounded(token) {
             return false;
         }
@@ -309,7 +310,7 @@ fn svg_path_data_is_bounded(value: &str) -> bool {
                 return false;
             }
             command_count = command_count.checked_add(1).unwrap_or(usize::MAX);
-            if command_count > MAX_PORTRAIT_TRANSFORMS * 16 {
+            if command_count > MAX_PORTRAIT_PATH_COMMANDS {
                 return false;
             }
             previous = Some(ch);
