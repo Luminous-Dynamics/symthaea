@@ -408,7 +408,8 @@ impl EvaluationTrace {
 
     /// Validate the structural invariants of the durable execution trace.
     pub fn is_well_formed(&self) -> bool {
-        !self.procedure_fingerprint.is_empty()
+        self.procedure_fingerprint
+            == EvaluationProcedure::attestation_ed25519().fingerprint()
             && self.results.iter().enumerate().all(|(index, result)| {
                 result.sequence == index as u32
                     && !matches!(result.stage, VerificationStage::NotEvaluated)
@@ -2384,6 +2385,20 @@ mod tests {
         };
 
         assert_ne!(procedure.fingerprint(), reordered.fingerprint());
+    }
+
+    #[test]
+    fn evaluation_trace_rejects_unknown_procedure_identity() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let mut trace = EvaluationTrace::from_report(&report);
+        trace.procedure_fingerprint = "unknown-procedure".into();
+        assert!(!trace.is_well_formed());
     }
 
     #[test]
