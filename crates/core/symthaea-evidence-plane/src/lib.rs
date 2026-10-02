@@ -196,6 +196,52 @@ fn append_map(hasher: &mut blake3::Hasher, field: &str, values: &BTreeMap<String
     }
 }
 
+/// Admission decision when an execution lineage is compared with a prepared lineage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceLineageDecision {
+    Stable,
+    ReprepareBeforeEvidence,
+    RefuseMixedLineageAfterEvidence,
+}
+
+/// Explicit guard against silently mixing evidence from different executions.
+///
+/// The guard never adopts a drifted lineage automatically. Callers must
+/// deliberately prepare a new lineage before committing any new claim-bearing
+/// evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidenceLineageGuardV1 {
+    prepared_digest: String,
+    evidence_committed: bool,
+}
+
+impl EvidenceLineageGuardV1 {
+    pub fn prepare(lineage: &ExecutionLineageV1) -> Self {
+        Self {
+            prepared_digest: lineage.digest(),
+            evidence_committed: false,
+        }
+    }
+
+    pub fn mark_evidence_committed(&mut self) {
+        self.evidence_committed = true;
+    }
+
+    pub fn prepared_digest(&self) -> &str {
+        &self.prepared_digest
+    }
+
+    pub fn check(&self, current: &ExecutionLineageV1) -> EvidenceLineageDecision {
+        if self.prepared_digest == current.digest() {
+            EvidenceLineageDecision::Stable
+        } else if self.evidence_committed {
+            EvidenceLineageDecision::RefuseMixedLineageAfterEvidence
+        } else {
+            EvidenceLineageDecision::ReprepareBeforeEvidence
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineagePerturbationResult {
     Stable,
@@ -473,6 +519,44 @@ mod tests {
             allowed_env: [("RUST_BACKTRACE".into(), "0".into())].into_iter().collect(),
             immutable_input_digests: [("fixture.json".into(), "sha256:1234".into())].into_iter().collect(),
         }
+    }
+
+    #[test]
+    fn execution_lineage_guard_requires_reprepare_before_evidence() {
+        let base = lineage_fixture();
+        let mut changed = base.clone();
+        changed.source_revision = "def456".into();
+
+        let guard = EvidenceLineageGuardV1::prepare(&base);
+        assert_eq!(
+            guard.check(&changed),
+            EvidenceLineageDecision::ReprepareBeforeEvidence
+        );
+    }
+
+    #[test]
+    fn execution_lineage_guard_refuses_mixing_after_evidence() {
+        let base = lineage_fixture();
+        let mut changed = base.clone();
+        changed.source_revision = "def456".into();
+
+        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        guard.mark_evidence_committed();
+        assert_eq!(
+            guard.check(&changed),
+            EvidenceLineageDecision::RefuseMixedLineageAfterEvidence
+        );
+    }
+
+    #[test]
+    fn execution_lineage_guard_allows_same_lineage_after_evidence() {
+        let base = lineage_fixture();
+        let mut guard = EvidenceLineageGuardV1::prepare(&base);
+        guard.mark_evidence_committed();
+        assert_eq!(
+            guard.check(&base),
+            EvidenceLineageDecision::Stable
+        );
     }
 
     #[test]
