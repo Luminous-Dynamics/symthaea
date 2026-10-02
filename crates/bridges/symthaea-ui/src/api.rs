@@ -22,6 +22,9 @@ use web_sys::Url;
 /// separate from the WebSocket budget because service queries/status should
 /// remain small even though telemetry may carry a bounded mental movie.
 const MAX_HTTP_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+/// Gateway strings are configuration, not arbitrary transport documents.
+/// Keep URL parsing itself bounded before handing input to the browser URL API.
+const MAX_GATEWAY_BYTES: usize = 8 * 1024;
 /// Outbound chat/query content is bounded independently of response limits so
 /// an oversized local input cannot create an unbounded JSON request body.
 const MAX_QUERY_CONTENT_BYTES: usize = 256 * 1024;
@@ -72,6 +75,9 @@ async fn read_json_response(
 /// own URL model rather than a second ad-hoc parser.
 fn gateway_base(gateway: &str) -> Result<Url, String> {
     let gateway = gateway.trim();
+    if gateway.len() > MAX_GATEWAY_BYTES {
+        return Err(format!("gateway exceeds {MAX_GATEWAY_BYTES} byte limit"));
+    }
     let url = Url::new(gateway).map_err(|_| "gateway must be a valid absolute URL".to_string())?;
     match url.protocol().as_str() {
         "http:" | "https:" => {}
@@ -217,9 +223,10 @@ mod tests {
     }
 
     #[test]
-    fn outbound_query_and_request_type_limits_are_explicit() {
+    fn outbound_input_limits_are_explicit() {
         assert!("x".repeat(MAX_QUERY_CONTENT_BYTES).len() <= MAX_QUERY_CONTENT_BYTES);
         assert!("x".repeat(MAX_QUERY_CONTENT_BYTES + 1).len() > MAX_QUERY_CONTENT_BYTES);
         assert!("x".repeat(MAX_REQUEST_TYPE_BYTES + 1).len() > MAX_REQUEST_TYPE_BYTES);
+        assert!("x".repeat(MAX_GATEWAY_BYTES + 1).len() > MAX_GATEWAY_BYTES);
     }
 }
