@@ -1002,13 +1002,26 @@ impl KnowledgePersistence {
             ));
         }
 
+        let next_validation_sequence = tx
+            .query_row(
+                "SELECT COALESCE(MAX(validation_sequence), 0) + 1
+                 FROM knowledge_snapshot_validation_receipts",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|e| format!("Load validation sequence for append: {e}"))?;
+        if next_validation_sequence <= 0 {
+            return Err("Validation sequence exhausted SQLite INTEGER range".into());
+        }
+
         tx.execute(
             "INSERT INTO knowledge_snapshot_validation_receipts
-             (validation_event, generation, snapshot_digest_hex, validator_ref,
+             (validation_event, validation_sequence, generation, snapshot_digest_hex, validator_ref,
               validator_version, validation_profile, conforms, report_digest_hex, receipt_digest_hex)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             rusqlite::params![
                 validation.validation_event,
+                next_validation_sequence,
                 i64::try_from(validation.generation)
                     .map_err(|_| "Snapshot validation generation exceeds SQLite INTEGER range")?,
                 validation.snapshot_digest_hex,
@@ -1538,6 +1551,7 @@ impl KnowledgePersistence {
             );
             CREATE TABLE IF NOT EXISTS knowledge_snapshot_validation_receipts (
                 validation_event TEXT PRIMARY KEY,
+                validation_sequence INTEGER NOT NULL UNIQUE CHECK (validation_sequence > 0),
                 generation INTEGER NOT NULL,
                 snapshot_digest_hex TEXT NOT NULL,
                 validator_ref TEXT NOT NULL,
@@ -1628,6 +1642,69 @@ impl KnowledgePersistence {
                 rusqlite::params![receipt.canonical_receipt_digest_hex(), rowid],
             )
             .map_err(|e| format!("Snapshot receipt backfill update: {e}"))?;
+        }
+
+        // Add validation append sequence to databases created before this hardening tranche.
+        // Legacy rows are assigned deterministic sequence numbers in existing rowid order.
+        let validation_sequence_columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(knowledge_snapshot_validation_receipts)")
+            .map_err(|e| format!("Validation sequence schema inspect: {e}"))?
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(|e| format!("Validation sequence schema inspect query: {e}"))?
+            .filter_map(Result::ok)
+            .collect();
+        if !validation_sequence_columns.iter().any(|c| c == "validation_sequence") {
+            conn.execute(
+                "ALTER TABLE knowledge_snapshot_validation_receipts
+                 ADD COLUMN validation_sequence INTEGER",
+                [],
+            )
+            .map_err(|e| format!("Validation schema migration validation_sequence: {e}"))?;
+        }
+
+        let starting_sequence = conn
+            .query_row(
+                "SELECT COALESCE(MAX(validation_sequence), 0)
+                 FROM knowledge_snapshot_validation_receipts",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|e| format!("Load validation sequence watermark: {e}"))?;
+        if starting_sequence < 0 {
+            return Err("Validation sequence contains a negative value".into());
+        }
+
+        let legacy_validation_sequence_rows = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT rowid
+                     FROM knowledge_snapshot_validation_receipts
+                     WHERE validation_sequence IS NULL
+                     ORDER BY rowid ASC",
+                )
+                .map_err(|e| format!("Validation sequence backfill prepare: {e}"))?;
+            stmt.query_map([], |row| row.get::<_, i64>(0))
+                .map_err(|e| format!("Validation sequence backfill query: {e}"))?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| format!("Validation sequence backfill row: {e}"))?
+        };
+
+        let mut next_sequence = u64::try_from(starting_sequence)
+            .map_err(|_| "Validation sequence exceeds supported range")?;
+        for rowid in legacy_validation_sequence_rows {
+            next_sequence = next_sequence
+                .checked_add(1)
+                .ok_or("Validation sequence exhausted SQLite INTEGER range")?;
+            if next_sequence > i64::MAX as u64 {
+                return Err("Validation sequence exceeds SQLite INTEGER range".into());
+            }
+            conn.execute(
+                "UPDATE knowledge_snapshot_validation_receipts
+                 SET validation_sequence = ?1
+                 WHERE rowid = ?2",
+                rusqlite::params![i64::try_from(next_sequence).expect("sequence preflighted"), rowid],
+            )
+            .map_err(|e| format!("Validation sequence backfill update: {e}"))?;
         }
 
         // Add validation-receipt self-digest support to databases created by the
@@ -1975,7 +2052,7 @@ fn verify_snapshot_validation_receipts_in_tx(
 ) -> Result<(), String> {
     let mut stmt = tx
         .prepare(
-            "SELECT v.validation_event, v.generation, v.snapshot_digest_hex, v.validator_ref,
+            "SELECT v.validation_sequence, v.validation_event, v.generation, v.snapshot_digest_hex, v.validator_ref,
                     v.validator_version, v.validation_profile, v.conforms, v.report_digest_hex,
                     v.receipt_digest_hex, r.canonical_digest_hex
              FROM knowledge_snapshot_validation_receipts v
@@ -1986,33 +2063,52 @@ fn verify_snapshot_validation_receipts_in_tx(
 
     let rows = stmt
         .query_map([], |row| {
-            let generation = u64::try_from(row.get::<_, i64>(1)?).map_err(|_| {
+            let validation_sequence = u64::try_from(row.get::<_, i64>(0)?).map_err(|_| {
                 rusqlite::Error::InvalidColumnType(
-                    1,
+                    0,
+                    "validation_sequence".into(),
+                    rusqlite::types::Type::Integer,
+                )
+            })?;
+            let generation = u64::try_from(row.get::<_, i64>(2)?).map_err(|_| {
+                rusqlite::Error::InvalidColumnType(
+                    2,
                     "generation".into(),
                     rusqlite::types::Type::Integer,
                 )
             })?;
             Ok((
                 KnowledgeSnapshotValidationReceipt {
-                    validation_event: row.get(0)?,
+                    validation_event: row.get(1)?,
                     generation,
-                    snapshot_digest_hex: row.get(2)?,
-                    validator_ref: row.get(3)?,
-                    validator_version: row.get(4)?,
-                    validation_profile: row.get(5)?,
-                    conforms: row.get(6)?,
-                    report_digest_hex: row.get(7)?,
+                    snapshot_digest_hex: row.get(3)?,
+                    validator_ref: row.get(4)?,
+                    validator_version: row.get(5)?,
+                    validation_profile: row.get(6)?,
+                    conforms: row.get(7)?,
+                    report_digest_hex: row.get(8)?,
                 },
-                row.get::<_, Option<String>>(8)?,
+                validation_sequence,
                 row.get::<_, Option<String>>(9)?,
+                row.get::<_, Option<String>>(10)?,
             ))
         })
         .map_err(|e| format!("Query validation receipts for verification: {e}"))?;
 
+    let mut expected_sequence = 1_u64;
     for row in rows {
-        let (receipt, stored_digest, linked_snapshot_digest) =
+        let (receipt, validation_sequence, stored_digest, linked_snapshot_digest) =
             row.map_err(|e| format!("Load validation receipt for verification: {e}"))?;
+
+        if validation_sequence != expected_sequence {
+            return Err(format!(
+                "Snapshot validation receipt sequence discontinuity: expected {}, observed {}",
+                expected_sequence, validation_sequence
+            ));
+        }
+        expected_sequence = expected_sequence
+            .checked_add(1)
+            .ok_or("Snapshot validation sequence exhausted validation range")?;
 
         let Some(linked_snapshot_digest) = linked_snapshot_digest else {
             return Err(format!(
