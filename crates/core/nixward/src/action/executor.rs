@@ -59,6 +59,15 @@ pub enum NixOSCommand {
         operation: NixServiceOperationKindV1,
         unit: String,
     },
+    /// Exact NixOS configuration option mutation, followed by a fixed switch.
+    ///
+    /// The expected configuration digest binds the authorization to the file state
+    /// that was observed when the mutation was proposed.
+    ConfigPatch {
+        option_path: String,
+        value: String,
+        expected_config_digest: String,
+    },
     /// Custom command with safety classification
     Custom {
         command: String,
@@ -149,6 +158,25 @@ impl NixOSCommand {
                 }
                 Ok(())
             }
+            Self::ConfigPatch {
+                option_path,
+                value,
+                expected_config_digest,
+            } => {
+                if option_path.trim().is_empty() {
+                    return Err("config patch option path must not be blank".to_string());
+                }
+                if value.trim().is_empty() {
+                    return Err("config patch value must not be blank".to_string());
+                }
+                if expected_config_digest.len() != 64
+                    || !expected_config_digest.bytes().all(|b| b.is_ascii_hexdigit())
+                {
+                    return Err("config patch expected config digest must be 64 hex characters".to_string());
+                }
+                Ok(())
+            }
+
             _ => Ok(()),
         }
     }
@@ -195,6 +223,8 @@ impl NixOSCommand {
             Self::CollectGarbage { .. } => SafetyLevel::Destructive,
 
             Self::Service { .. } => SafetyLevel::SystemModify,
+
+            Self::ConfigPatch { .. } => SafetyLevel::SystemCritical,
 
             Self::Custom { safety_level, .. } => *safety_level,
         }
@@ -378,6 +408,10 @@ impl NixOSCommand {
                     .to_string(),
                     unit.clone(),
                 ],
+            ),
+            Self::ConfigPatch { .. } => (
+                "nixos-rebuild".to_string(),
+                vec!["switch".to_string()],
             ),
             Self::Custom { command, args, .. } => (command.clone(), args.clone()),
         }
@@ -831,6 +865,30 @@ mod tests {
             }
             _ => panic!("Expected pending confirmation"),
         }
+    }
+
+    #[test]
+    fn config_patch_command_has_fixed_scope_and_argv() {
+        let command = NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "ab".repeat(32),
+        };
+        assert_eq!(command.safety_level(), SafetyLevel::SystemCritical);
+        assert!(command.validate_shape().is_ok());
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "nixos-rebuild");
+        assert_eq!(args, vec!["switch"]);
+    }
+
+    #[test]
+    fn invalid_config_patch_digest_is_blocked() {
+        let command = NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "not-a-digest".to_string(),
+        };
+        assert!(command.validate_shape().is_err());
     }
 
     #[test]
