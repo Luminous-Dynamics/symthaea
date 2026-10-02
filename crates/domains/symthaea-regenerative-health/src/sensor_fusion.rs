@@ -23,7 +23,6 @@ pub enum SensorFusionState {
 pub enum SensorFusionIssue {
     EmptyInput,
     InsufficientTrustedSensors,
-    ConfigurationMismatch,
     ResidualDisagreement,
     DuplicateSensor,
 }
@@ -92,14 +91,6 @@ impl SensorFusionGate {
         let required = self.policy.minimum_trusted_sensors as usize;
         if trusted.len() < required {
             issues.push(SensorFusionIssue::InsufficientTrustedSensors);
-        }
-
-        let mut configuration_digests = std::collections::BTreeSet::new();
-        for input in &trusted {
-            configuration_digests.insert(input.observation.configuration_digest.clone());
-        }
-        if configuration_digests.len() > 1 {
-            issues.push(SensorFusionIssue::ConfigurationMismatch);
         }
 
         let mut values: Vec<f64> = trusted
