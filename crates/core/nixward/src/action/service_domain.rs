@@ -80,6 +80,12 @@ fn validate_service_unit_shape_v1(unit: &str) -> Result<(), NixServiceOperationE
     if !unit.ends_with(".service") {
         return Err(NixServiceOperationErrorV1::NonServiceUnit);
     }
+    let name = unit.strip_suffix(".service").unwrap_or(unit);
+    if let Some(at) = name.find('@') {
+        if at == 0 || name[at + 1..].contains('@') {
+            return Err(NixServiceOperationErrorV1::InvalidCharacter);
+        }
+    }
     if unit.contains('/') || unit.contains('\\') {
         return Err(NixServiceOperationErrorV1::PathLikeUnit);
     }
@@ -164,11 +170,22 @@ mod tests {
             "foo-bar_2.service",
             "dbus-org.example.service",
             "worker@instance.service",
+            "worker@.service",
             "foo:bar.service",
         ] {
             assert!(NixServiceOperationV1::new(unit, NixServiceOperationKindV1::Start).is_ok());
         }
     }
+    #[test]
+    fn rejects_malformed_instance_markers() {
+        for unit in ["@worker.service", "worker@@instance.service", "worker@instance@2.service"] {
+            assert_eq!(
+                NixServiceOperationV1::new(unit, NixServiceOperationKindV1::Start).unwrap_err(),
+                NixServiceOperationErrorV1::InvalidCharacter
+            );
+        }
+    }
+
     #[test]
     fn operation_mutation_changes_digest() {
         let enable = NixServiceOperationV1::new("nginx", NixServiceOperationKindV1::Enable).unwrap();
