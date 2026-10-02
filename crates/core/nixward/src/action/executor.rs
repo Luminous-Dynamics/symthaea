@@ -715,7 +715,7 @@ impl NixOSExecutor {
         // The authority token is intentionally consumed here by value. The legacy
         // confirmed executor remains the mechanical dispatch primitive, while the
         // authority boundary is enforced before it can be reached.
-        self.execute_confirmed(command, 0.0).await
+        self.execute_confirmed_inner(command, 0.0).await
     }
 
     /// Execute unconditionally, bypassing the tier-threshold check in
@@ -737,7 +737,15 @@ impl NixOSExecutor {
                 safety_level: safety,
             };
         }
-        let (cmd, args) = command.to_command();
+        self.execute_confirmed_inner(command, phi).await
+    }
+
+    async fn execute_confirmed_inner(
+        &mut self,
+        command: NixOSCommand,
+        phi: f32,
+    ) -> ExecutionResult {
+        let safety = command.safety_level();        let (cmd, args) = command.to_command();
 
         info!(
             command = %cmd,
