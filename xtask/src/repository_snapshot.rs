@@ -135,7 +135,9 @@ pub fn build_snapshot(
         explicit_ignored.push(normalized);
     }
     explicit_ignored.sort();
-    explicit_ignored.dedup();
+    if explicit_ignored.windows(2).any(|pair| pair[0] == pair[1]) {
+        bail!("duplicate explicit ignored input is not allowed: {}", explicit_ignored[0]);
+    }
 
     let mut entries = BTreeMap::<String, SnapshotEntry>::new();
     let mut unknown_surfaces = BTreeSet::<UnknownSurface>::new();
