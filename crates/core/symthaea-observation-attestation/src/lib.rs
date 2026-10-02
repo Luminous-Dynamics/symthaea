@@ -380,6 +380,18 @@ impl EvaluationTrace {
         self.results.iter().map(EvaluationCheckResult::id).collect()
     }
 
+    /// Return the aggregate outcome represented by this trace.
+    pub fn terminal_outcome(&self) -> ReceiptAttestationVerificationOutcome {
+        self.results
+            .last()
+            .and_then(|result| match result.stage {
+                VerificationStage::Passed => None,
+                VerificationStage::Failed(outcome) => Some(outcome),
+                VerificationStage::NotEvaluated => None,
+            })
+            .unwrap_or(ReceiptAttestationVerificationOutcome::Verified)
+    }
+
     /// Validate the structural invariants of the durable execution trace.
     pub fn is_well_formed(&self) -> bool {
         !self.procedure_fingerprint.is_empty()
@@ -390,7 +402,10 @@ impl EvaluationTrace {
             && self
                 .results
                 .windows(2)
-                .all(|pair| pair[0].check != pair[1].check)
+                .all(|pair| {
+                    pair[0].check != pair[1].check
+                        && !matches!(pair[0].stage, VerificationStage::Failed(_))
+                })
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -912,20 +927,6 @@ impl EvidenceEvaluation {
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        fn write_string(bytes: &mut Vec<u8>, value: &str) {
-            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
-            bytes.extend_from_slice(value.as_bytes());
-        }
-        fn write_stage(bytes: &mut Vec<u8>, stage: VerificationStage) {
-            match stage {
-                VerificationStage::Passed => bytes.push(0),
-                VerificationStage::Failed(outcome) => {
-                    bytes.push(1);
-                    bytes.push(verification_outcome_tag(outcome));
-                }
-                VerificationStage::NotEvaluated => bytes.push(2),
-            }
-        }
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"symthaea:evidence-evaluation:v5\n");
         write_string(&mut bytes, self.evaluation_version);
@@ -942,6 +943,21 @@ impl EvidenceEvaluation {
         bytes.extend_from_slice(&trace_bytes);
         bytes.extend_from_slice(&self.boundary.canonical_bytes());
         bytes
+    }
+
+    /// Validate that this evaluation is internally consistent with the report
+    /// from which it was materialized.
+    pub fn is_consistent_with_report(
+        &self,
+        report: &ReceiptAttestationVerificationReport,
+    ) -> bool {
+        self.evaluation_version == EVIDENCE_EVALUATION_VERSION
+            && self.subject_fingerprint == report.receipt_fingerprint
+            && self.verification_report_fingerprint == report.fingerprint()
+            && self.context_fingerprint == self.context.fingerprint()
+            && self.execution_trace.procedure_fingerprint == report.procedure_fingerprint
+            && self.execution_trace.terminal_outcome() == self.outcome
+            && self.execution_trace.is_well_formed()
     }
 
     pub fn fingerprint(&self) -> String {
@@ -2128,6 +2144,24 @@ mod tests {
         assert!(evaluation
             .canonical_bytes()
             .starts_with(b"symthaea:evidence-evaluation:v4\n"));
+    }
+
+    #[test]
+    fn evidence_evaluation_consistency_binds_trace_and_outcome() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+        assert!(evaluation.is_consistent_with_report(&report));
+
+        let mut tampered = evaluation.clone();
+        tampered.outcome =
+            ReceiptAttestationVerificationOutcome::InvalidSignature;
+        assert!(!tampered.is_consistent_with_report(&report));
     }
 
     #[test]
