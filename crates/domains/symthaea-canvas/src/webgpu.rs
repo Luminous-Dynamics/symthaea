@@ -715,6 +715,307 @@ impl WebGpuRenderer {
 
 }
 
+
+#[cfg(target_arch = "wasm32")]
+const MAX_MOVIE_WIDTH: u32 = 2048;
+#[cfg(target_arch = "wasm32")]
+const MAX_MOVIE_HEIGHT: u32 = 2048;
+#[cfg(target_arch = "wasm32")]
+const MAX_MOVIE_RGBA_BYTES: usize = 32 * 1024 * 1024;
+
+#[cfg(target_arch = "wasm32")]
+pub struct WebGpuMovieRenderer {
+    surface: wgpu::Surface<'static>,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    pipeline: wgpu::RenderPipeline,
+    bind_group_layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
+    texture: Option<wgpu::Texture>,
+    bind_group: Option<wgpu::BindGroup>,
+    config: wgpu::SurfaceConfiguration,
+    frame_width: u32,
+    frame_height: u32,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl WebGpuMovieRenderer {
+    pub async fn new(canvas: HtmlCanvasElement) -> Result<Self, String> {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::BROWSER_WEBGPU,
+            ..Default::default()
+        });
+        let surface = instance
+            .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
+            .map_err(|error| format!("failed to create WebGPU movie surface: {error}"))?;
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                force_fallback_adapter: false,
+                compatible_surface: Some(&surface),
+            })
+            .await
+            .map_err(|error| format!("failed to request WebGPU movie adapter: {error}"))?;
+        let (device, queue) = adapter
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("Symthaea WebGPU Movie"),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                memory_hints: wgpu::MemoryHints::Performance,
+                experimental_features: Default::default(),
+                trace: wgpu::Trace::Off,
+            })
+            .await
+            .map_err(|error| format!("failed to create WebGPU movie device: {error}"))?;
+
+        let width = canvas.width().max(1);
+        let height = canvas.height().max(1);
+        let capabilities = surface.get_capabilities(&adapter);
+        let Some(&format) = capabilities.formats.first() else {
+            return Err("WebGPU movie adapter exposed no surface formats".to_string());
+        };
+        let Some(&alpha_mode) = capabilities.alpha_modes.first() else {
+            return Err("WebGPU movie adapter exposed no alpha modes".to_string());
+        };
+        let present_mode = if capabilities.present_modes.contains(&wgpu::PresentMode::Fifo) {
+            wgpu::PresentMode::Fifo
+        } else {
+            *capabilities
+                .present_modes
+                .first()
+                .ok_or_else(|| "WebGPU movie adapter exposed no present modes".to_string())?
+        };
+
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format,
+            width,
+            height,
+            present_mode,
+            desired_maximum_frame_latency: 2,
+            alpha_mode,
+            view_formats: vec![],
+        };
+        surface.configure(&device, &config);
+
+        let bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Symthaea WebGPU Movie Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                        count: None,
+                    },
+                ],
+            });
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Symthaea WebGPU Movie Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Symthaea WebGPU Movie Shader"),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(WGSL_MOVIE_SHADER)),
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Symthaea WebGPU Movie Pipeline Layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Symthaea WebGPU Movie Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+
+        Ok(Self {
+            surface,
+            device,
+            queue,
+            pipeline,
+            bind_group_layout,
+            sampler,
+            texture: None,
+            bind_group: None,
+            config,
+            frame_width: 0,
+            frame_height: 0,
+        })
+    }
+
+    pub fn render(&mut self, width: u32, height: u32, rgba: &[u8]) -> Result<(), String> {
+        if width == 0
+            || height == 0
+            || width > MAX_MOVIE_WIDTH
+            || height > MAX_MOVIE_HEIGHT
+        {
+            return Err("WebGPU movie frame dimensions exceed bounds".to_string());
+        }
+        let expected = (width as usize)
+            .checked_mul(height as usize)
+            .and_then(|pixels| pixels.checked_mul(4))
+            .ok_or_else(|| "WebGPU movie frame size overflow".to_string())?;
+        if expected > MAX_MOVIE_RGBA_BYTES || rgba.len() != expected {
+            return Err("WebGPU movie frame payload exceeds bounds".to_string());
+        }
+
+        if self.frame_width != width
+            || self.frame_height != height
+            || self.bind_group.is_none()
+        {
+            let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("Symthaea WebGPU Persistent Movie Texture"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Symthaea WebGPU Movie Bind Group"),
+                layout: &self.bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    },
+                ],
+            });
+            self.texture = Some(texture);
+            self.bind_group = Some(bind_group);
+            self.frame_width = width;
+            self.frame_height = height;
+        }
+
+        let texture = self
+            .texture
+            .as_ref()
+            .ok_or_else(|| "WebGPU movie texture was not initialized".to_string())?;
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            rgba,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(width.saturating_mul(4)),
+                rows_per_image: Some(height),
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        let frame = match self.surface.get_current_texture() {
+            Ok(frame) => frame,
+            Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
+                self.surface.configure(&self.device, &self.config);
+                self.surface
+                    .get_current_texture()
+                    .map_err(|error| format!("failed to reacquire WebGPU movie surface: {error}"))?
+            }
+            Err(wgpu::SurfaceError::Timeout) => {
+                return Err("WebGPU movie surface acquisition timed out".to_string());
+            }
+            Err(wgpu::SurfaceError::OutOfMemory) => {
+                return Err("WebGPU movie surface acquisition ran out of memory".to_string());
+            }
+            Err(wgpu::SurfaceError::Other) => {
+                return Err("WebGPU movie surface acquisition failed".to_string());
+            }
+        };
+
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let bind_group = self
+            .bind_group
+            .as_ref()
+            .ok_or_else(|| "WebGPU movie bind group was not initialized".to_string())?;
+        let mut encoder =
+            self.device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Symthaea WebGPU Movie Encoder"),
+                });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Symthaea WebGPU Movie Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            pass.set_pipeline(&self.pipeline);
+            pass.set_bind_group(0, bind_group, &[]);
+            pass.draw(0..6, 0..1);
+        }
+        self.queue.submit(Some(encoder.finish()));
+        frame.present();
+        Ok(())
+    }
+}
+
 #[cfg(target_arch = "wasm32")]
 fn scene_to_bytes(vertices: &[GpuVertex]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(vertices.len() * std::mem::size_of::<f32>() * 6);
