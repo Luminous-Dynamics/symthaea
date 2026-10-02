@@ -115,7 +115,7 @@ impl SqliteAuthorizationStore {
         tx.execute(
             "UPDATE authorization_leases SET state='prepared', attempt_id=?2
              WHERE authorization_instance=?1 AND state='ready' AND remaining_executions>0",
-            params![witness.authorization_instance, attempt_id],
+            params![witness.authorization_instance.as_str(), attempt_id],
         )?;
         if tx.changes() != 1 {
             return Err(AuthorizationConsumptionError::NotReady.into());
@@ -296,7 +296,8 @@ mod tests {
         let action = EpistemicAction::new("durable-action","intervention",super::super::ActionRisk::Critical);
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            action_id:action.id.clone(), action_digest:digest.clone(), frame:"frame@1".into(),
+            action_id:action.id.clone(), authorization_instance:action.id.clone(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
             issued_at:"2026-10-02T20:00:00Z".into(), expires_at:None, authority_epoch:1,
         };
