@@ -163,6 +163,22 @@ impl Rfc9942Vdp {
 
     /// Verify an RFC 9942 inclusion proof with both required external bindings:
     /// the protected-header VDS identifier and the receipt payload root.
+    /// Verify inclusion using the receipt's structural payload state.
+    /// An attached payload is checked immediately. A detached payload is not
+    /// accepted as a root by itself; the caller must provide the detached bytes
+    /// through the explicit payload verification path.
+    pub fn verify_inclusion_for_receipt_payload(
+        &self,
+        vds_id: u64,
+        candidate_entry: &[u8],
+        payload: &Rfc9942ReceiptPayload,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.validate_vds_id(vds_id)?;
+        match payload {
+            Rfc9942ReceiptPayload::Attached(root) => self.verify_inclusion_with_payload(candidate_entry, root),
+            Rfc9942ReceiptPayload::Detached => Err(Rfc9942VdpError::DetachedPayloadRequired),
+        }
+    }
     pub fn verify_inclusion_for_vds_with_payload(
         &self,
         vds_id: u64,
@@ -230,6 +246,19 @@ impl Rfc9942Vdp {
 
     /// Verify an RFC 9942 consistency proof with both required external
     /// bindings: the protected-header VDS identifier and newer-tree payload root.
+    /// Verify consistency using the receipt's structural payload state.
+    pub fn verify_consistency_for_receipt_payload(
+        &self,
+        vds_id: u64,
+        older: VdsTreeHead,
+        payload: &Rfc9942ReceiptPayload,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.validate_vds_id(vds_id)?;
+        match payload {
+            Rfc9942ReceiptPayload::Attached(root) => self.verify_consistency_with_payload(older, root),
+            Rfc9942ReceiptPayload::Detached => Err(Rfc9942VdpError::DetachedPayloadRequired),
+        }
+    }
     pub fn verify_consistency_for_vds_with_payload(
         &self,
         vds_id: u64,
@@ -1063,6 +1092,22 @@ mod tests {
         assert_eq!(encoded[4],0x26);
     }
 
+    #[test]
+    fn rfc9942_receipt_payload_helpers_never_treat_nil_as_a_root() {
+        let vds=Rfc9162Sha256Vds;
+        let leaves=vec![b"a".to_vec(),b"b".to_vec()];
+        let head=vds.tree_head(&leaves);
+        let proof=vds.inclusion_proof(&leaves,0).unwrap().to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        assert_eq!(
+            vdp.verify_inclusion_for_receipt_payload(1,b"a",&Rfc9942ReceiptPayload::Detached),
+            Err(Rfc9942VdpError::DetachedPayloadRequired)
+        );
+        assert_eq!(
+            vdp.verify_inclusion_for_receipt_payload(1,b"a",&Rfc9942ReceiptPayload::Attached(head.root())).unwrap(),
+            head
+        );
+    }
     #[test]
     fn rfc9942_vdp_safe_verification_path_binds_vds_and_payload() {
         let vds=Rfc9162Sha256Vds;
