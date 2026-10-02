@@ -86,3 +86,17 @@ Recent 2026 digital-twin SHM literature emphasizes uncertainty quantification, m
 A trusted-sensor quorum is not treated as independent merely because sensor IDs differ. Temporal corroboration now carries an explicit `independence_group`, representing a physical or common-mode dependency domain. The policy can require a minimum number of independent groups. This prevents multiple colocated, shared-path, or otherwise common-mode sensors from manufacturing a false quorum.
 
 This is consistent with current SHM work emphasizing redundancy and decentralized sensor placement while also documenting the challenge of concurrent multi-sensor failures and loss of spatial correlation. citeturn0search1turn0search2
+
+
+## Provenance-bound independence
+
+The independence domain is now treated as qualified metadata rather than an arbitrary quorum label. Each temporal sensor pair carries:
+
+- an independence group;
+- a topology/dependency digest identifying the declaration behind that group;
+- a provenance evidence identity;
+- the sensor/component context already carried by the observations.
+
+Malformed independence metadata is not silently ignored. The temporal gate excludes it from the trusted cohort and records an explicit evidence-quality issue. The resulting decision also exposes the independent group IDs and count so downstream audit logic cannot confuse raw sensor count with independent evidence count.
+
+This is deliberately still a local deterministic contract. The topology digest and evidence identity are placeholders for a later provenance-backed asset topology record; they do not by themselves prove physical independence. Current SHM literature likewise treats redundancy and sensor placement as reliability mechanisms while recognizing that sensor faults and structural changes can be difficult to disentangle. citeturn0search0turn0search2
