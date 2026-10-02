@@ -52,9 +52,14 @@ pub fn render_svg(root: &SceneNode, consciousness: f64) -> String {
 /// filters, gradients, CSS, classes, and resource references are flattened or
 /// omitted so the transport contract never has to interpret them.
 pub fn render_svg_for_remote_projection(root: &SceneNode) -> String {
+    const HEADER: &str =
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">"#;
+    const FOOTER: &str = "</svg>\n";
+    const MAX_REMOTE_PROJECTION_BYTES: usize = 512 * 1024;
+
     let mut buf = String::with_capacity(2048);
     let gradient_colors = collect_first_gradient_colors(root);
-    buf.push_str(r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">"#);
+    buf.push_str(HEADER);
     buf.push('\n');
     let mut emitted_elements = 0usize;
     write_remote_projection_node(
@@ -64,7 +69,17 @@ pub fn render_svg_for_remote_projection(root: &SceneNode) -> String {
         &gradient_colors,
         &mut emitted_elements,
     );
-    buf.push_str("</svg>\n");
+
+    // The hostile UI boundary caps the complete SVG document at 512 KiB.
+    // Enforce the same transport ceiling here so the trusted producer can
+    // never emit an otherwise-valid projection that the consumer must reject
+    // solely for total size. A blank SVG is a valid, inert degradation and
+    // preserves the exact outer document contract without truncating markup.
+    if buf.len().checked_add(FOOTER.len()).is_none_or(|len| len > MAX_REMOTE_PROJECTION_BYTES) {
+        return format!("{HEADER}\n{FOOTER}");
+    }
+
+    buf.push_str(FOOTER);
     buf
 }
 
@@ -675,6 +690,23 @@ mod tests {
         let svg = render_svg_for_remote_projection(&root);
         assert!(!svg.contains("transform="));
         assert!(svg.contains(r#"cx="5.0""#));
+    }
+
+    #[test]
+    fn remote_projection_caps_total_output_bytes() {
+        let path_data = "M 0 0 ".to_string() + &"L 1 1 ".repeat(2_048);
+        assert!(path_data.len() <= MAX_REMOTE_PATH_DATA_BYTES);
+
+        let mut root = SceneNode::group(None);
+        for _ in 0..110 {
+            root.children.push(SceneNode::path(path_data.clone()));
+        }
+
+        let svg = render_svg_for_remote_projection(&root);
+        assert!(svg.len() <= 512 * 1024);
+        assert!(svg.starts_with(r#"<svg xmlns="http://www.w3.org/2000/svg""#));
+        assert!(svg.ends_with("</svg>\n"));
+        assert_eq!(svg.matches("<path").count(), 0, "oversized transport must degrade atomically");
     }
 
     #[test]
