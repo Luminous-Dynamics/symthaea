@@ -62,6 +62,23 @@ pub struct SensorHealthDecision {
     pub issues: Vec<SensorHealthIssue>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SensorHealthAdmissionError {
+    NotTrusted(SensorHealthState),
+}
+
+/// Admit a structural-health observation only after the sensing layer has
+/// independently qualified the measurement as trusted.
+pub fn admit_health_observation(
+    sensor: &SensorHealthDecision,
+    observation: crate::HealthObservation,
+) -> Result<crate::HealthObservation, SensorHealthAdmissionError> {
+    if sensor.state != SensorHealthState::Trusted {
+        return Err(SensorHealthAdmissionError::NotTrusted(sensor.state));
+    }
+    Ok(observation)
+}
+
 #[derive(Debug, Clone)]
 pub struct SensorHealthGate {
     policy: SensorHealthPolicy,
@@ -182,6 +199,29 @@ mod tests {
             evidence_id: "sensor-e-1".into(),
             configuration_digest: "cfg-1".into(),
         }
+    }
+
+    #[test]
+    fn only_trusted_sensor_evidence_can_be_admitted() {
+        let trusted = gate().assess(&observation(0.5), Some("cfg-1"), 1_000);
+        let health = crate::HealthObservation {
+            observation_id: "health-1".into(),
+            component_id: "wing".into(),
+            timestamp_ms: 1_000,
+            normalized_residual: 0.5,
+            uncertainty: 1.0,
+            evidence_ids: vec!["health-e-1".into()],
+            configuration_digest: "cfg-1".into(),
+        };
+        assert!(admit_health_observation(&trusted, health.clone()).is_ok());
+
+        let degraded = gate().assess(&observation(2.5), Some("cfg-1"), 1_000);
+        assert_eq!(
+            admit_health_observation(&degraded, health),
+            Err(SensorHealthAdmissionError::NotTrusted(
+                SensorHealthState::Degraded
+            ))
+        );
     }
 
     #[test]
