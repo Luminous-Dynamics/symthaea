@@ -207,11 +207,16 @@ pub fn App() -> impl IntoView {
     let movie = RwSignal::new(Option::<Movie>::None);
     let movie_frame = RwSignal::new(0_usize);
     let movie_canvas = NodeRef::<leptos::html::Canvas>::new();
+    let movie_webgpu_canvas = NodeRef::<leptos::html::Canvas>::new();
     let webgpu_canvas = NodeRef::<leptos::html::Canvas>::new();
     let gpu_scene = RwSignal::new(Option::<RemoteScene>::None);
     let webgpu_ready = RwSignal::new(false);
+    let movie_webgpu_ready = RwSignal::new(false);
     let webgpu_renderer: Rc<RefCell<Option<WebGpuRenderer>>> = Rc::new(RefCell::new(None));
+    let movie_webgpu_renderer: Rc<RefCell<Option<WebGpuMovieRenderer>>> =
+        Rc::new(RefCell::new(None));
     let webgpu_init_started = Rc::new(RefCell::new(false));
+    let movie_webgpu_init_started = Rc::new(RefCell::new(false));
 
     // Open the telemetry stream once, on mount, against whatever gateway
     // URL is set at that moment. Reconnecting on URL change is a v1 nicety
@@ -277,6 +282,34 @@ pub fn App() -> impl IntoView {
         });
     }
 
+    // Initialize the WebGPU movie renderer independently from the cognitive
+    // scene renderer. Either projection can degrade to its legacy path alone.
+    {
+        let renderer = Rc::clone(&movie_webgpu_renderer);
+        let started = Rc::clone(&movie_webgpu_init_started);
+        Effect::new(move |_| {
+            if *started.borrow() {
+                return;
+            }
+            let Some(canvas) = movie_webgpu_canvas.get() else {
+                return;
+            };
+            *started.borrow_mut() = true;
+            let renderer = Rc::clone(&renderer);
+            spawn_local(async move {
+                match WebGpuMovieRenderer::new(canvas).await {
+                    Ok(gpu) => {
+                        *renderer.borrow_mut() = Some(gpu);
+                        movie_webgpu_ready.set(true);
+                    }
+                    Err(error) => {
+                        leptos::logging::warn!("WebGPU movie renderer unavailable: {error}");
+                    }
+                }
+            });
+        });
+    }
+
     // Render each typed cognitive scene through WebGPU. The renderer-neutral
     // scene is reconstructed into native scene nodes only at the backend edge.
     {
@@ -329,8 +362,27 @@ pub fn App() -> impl IntoView {
         });
     });
 
-    // Draw the current imagination frame whenever the movie or frame index
-    // changes. putImageData wants RGBA at native size; CSS scales it up with
+    // Render the current imagination frame through WebGPU when available.
+    // The texture is persistent across frames; only the RGBA payload changes.
+    Effect::new(move |_| {
+        let _ready = movie_webgpu_ready.get();
+        let idx = movie_frame.get();
+        let Some(movie) = movie.get() else {
+            return;
+        };
+        let mut renderer_ref = movie_webgpu_renderer.borrow_mut();
+        let Some(renderer) = renderer_ref.as_mut() else {
+            return;
+        };
+        let frame = &movie.frames_rgba[idx % movie.frames_rgba.len()];
+        if let Err(error) = renderer.render(movie.width, movie.height, frame) {
+            leptos::logging::warn!("WebGPU movie render failed: {error}");
+            movie_webgpu_ready.set(false);
+        }
+    });
+
+    // Draw the current imagination frame through Canvas2D as a graceful
+    // fallback. putImageData wants RGBA at native size; CSS scales it up with
     // image-rendering: pixelated.
     Effect::new(move |_| {
         let idx = movie_frame.get();
@@ -485,7 +537,13 @@ pub fn App() -> impl IntoView {
                     style:display=move || if movie.with(|m| m.is_some()) { "block" } else { "none" }
                 >
                     <h2 style="font-size:0.9em;opacity:0.7;">"imagination"</h2>
+                    <canvas node_ref=movie_webgpu_canvas
+                        style:display=move || if movie_webgpu_ready.get() { "block" } else { "none" }
+                        style="width:192px;height:192px;image-rendering:pixelated;border-radius:8px;"
+                        width="192" height="192"
+                    ></canvas>
                     <canvas node_ref=movie_canvas
+                        style:display=move || if movie_webgpu_ready.get() { "none" } else { "block" }
                         style="width:192px;height:192px;image-rendering:pixelated;border-radius:8px;"
                     ></canvas>
                     {move || movie.with(|m| m.as_ref().map(|m| view! {
