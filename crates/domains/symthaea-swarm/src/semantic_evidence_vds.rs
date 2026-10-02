@@ -116,6 +116,69 @@ impl Rfc9162ConsistencyProof {
     }
 }
 
+impl Rfc9162ConsistencyProof {
+    /// Encode the RFC 9942 proof-content array using deterministic CBOR.
+    ///
+    /// This is proof content only; it is not a COSE receipt and carries no
+    /// signer, issuer, or authorization semantics.
+    pub fn to_cbor(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        cbor_array_len(&mut out, 3);
+        cbor_uint(&mut out, self.first);
+        cbor_uint(&mut out, self.second);
+        cbor_array_len(&mut out, self.consistency_path.len() as u64);
+        for hash in &self.consistency_path { cbor_bytes(&mut out, hash); }
+        out
+    }
+}
+
+impl Rfc9162InclusionProof {
+    /// Encode the RFC 9942 proof-content array using deterministic CBOR.
+    ///
+    /// This is proof content only; it is not a COSE receipt and carries no
+    /// signer, issuer, or authorization semantics.
+    pub fn to_cbor(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        cbor_array_len(&mut out, 3);
+        cbor_uint(&mut out, self.tree_size);
+        cbor_uint(&mut out, self.leaf_index);
+        cbor_array_len(&mut out, self.inclusion_path.len() as u64);
+        for hash in &self.inclusion_path { cbor_bytes(&mut out, hash); }
+        out
+    }
+}
+
+fn cbor_uint(out: &mut Vec<u8>, value: u64) {
+    match value {
+        0..=23 => out.push(value as u8),
+        24..=255 => { out.extend_from_slice(&[0x18, value as u8]); }
+        256..=65_535 => { out.push(0x19); out.extend_from_slice(&(value as u16).to_be_bytes()); }
+        65_536..=4_294_967_295 => { out.push(0x1a); out.extend_from_slice(&(value as u32).to_be_bytes()); }
+        _ => { out.push(0x1b); out.extend_from_slice(&value.to_be_bytes()); }
+    }
+}
+
+fn cbor_array_len(out: &mut Vec<u8>, len: u64) {
+    match len {
+        0..=23 => out.push(0x80 | len as u8),
+        24..=255 => out.extend_from_slice(&[0x98, len as u8]),
+        256..=65_535 => { out.push(0x99); out.extend_from_slice(&(len as u16).to_be_bytes()); }
+        65_536..=4_294_967_295 => { out.push(0x9a); out.extend_from_slice(&(len as u32).to_be_bytes()); }
+        _ => { out.push(0x9b); out.extend_from_slice(&len.to_be_bytes()); }
+    }
+}
+
+fn cbor_bytes(out: &mut Vec<u8>, bytes: &[u8]) {
+    match bytes.len() as u64 {
+        0..=23 => out.push(0x40 | bytes.len() as u8),
+        24..=255 => out.extend_from_slice(&[0x58, bytes.len() as u8]),
+        256..=65_535 => { out.push(0x59); out.extend_from_slice(&(bytes.len() as u16).to_be_bytes()); }
+        65_536..=4_294_967_295 => { out.push(0x5a); out.extend_from_slice(&(bytes.len() as u32).to_be_bytes()); }
+        _ => { out.push(0x5b); out.extend_from_slice(&(bytes.len() as u64).to_be_bytes()); }
+    }
+    out.extend_from_slice(bytes);
+}
+
 /// Canonical VDS leaf projection for a semantic evidence digest.
 ///
 /// This is deliberately a projection: the EvidenceDigest remains the semantic
@@ -417,7 +480,29 @@ mod tests {
 
     #[test]
     #[test]
-    fn tree_heads_bind_size_to_root_and_verify_consistency() {
+    #[test]
+    fn rfc9942_inclusion_and_consistency_cbor_shapes_are_deterministic() {
+        let inclusion = Rfc9162InclusionProof::new(20, 17, vec![[0x11; 32], [0x22; 32]]);
+        assert_eq!(
+            inclusion.to_cbor(),
+            vec![0x83, 0x14, 0x11, 0x82, 0x58, 0x20]
+                .into_iter()
+                .chain([0x11; 32])
+                .chain([0x58, 0x20])
+                .chain([0x22; 32])
+                .collect::<Vec<_>>()
+        );
+
+        let consistency = Rfc9162ConsistencyProof::new(20, 104, vec![[0x33; 32]]);
+        let expected = vec![0x83, 0x14, 0x18, 0x68, 0x81, 0x58, 0x20]
+            .into_iter()
+            .chain([0x33; 32])
+            .collect::<Vec<_>>();
+        assert_eq!(consistency.to_cbor(), expected);
+    }
+
+    #[test]
+        fn tree_heads_bind_size_to_root_and_verify_consistency() {
         let vds = Rfc9162Sha256Vds;
         let leaves: Vec<Vec<u8>> = (0..8).map(|i| format!("leaf-{i}").into_bytes()).collect();
         let older = vds.tree_head(&leaves[..4].to_vec());
