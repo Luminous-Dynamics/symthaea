@@ -115,6 +115,47 @@ impl RandomLinearCode {
     pub fn rank(&self) -> usize { self.rank }
     pub fn basis(&self) -> &[BinaryCodeword] { &self.basis }
 
+    /// Construct a code from an explicitly supplied independent basis.
+    ///
+    /// This is useful for reproducing the paper's subcode construction:
+    /// choose one parent-code basis and partition it into factor subcode
+    /// bases. The constructor rejects malformed or dependent bases so the
+    /// resulting object remains a genuine [n,k]_2 code.
+    pub fn from_basis(basis: Vec<BinaryCodeword>) -> Option<Self> {
+        let dimension = basis.first()?.dimension();
+        if basis.iter().any(|vector| vector.dimension() != dimension) {
+            return None;
+        }
+        if basis.iter().any(|vector| vector.words.iter().all(|word| *word == 0)) {
+            return None;
+        }
+        let rank = basis_rank(&basis, dimension);
+        (rank == basis.len()).then_some(Self { dimension, rank, basis })
+    }
+
+    /// Generate a parent linear code and two subcodes whose bases partition
+    /// the parent's basis. This realizes the direct-sum construction
+    /// C = K × V used by the research comparator.
+    pub fn generate_direct_sum(
+        dimension: usize,
+        left_rank: usize,
+        right_rank: usize,
+        seed: u64,
+    ) -> Option<(Self, Self, Self)> {
+        assert!(dimension > 0, "dimension must be positive");
+        assert!(left_rank > 0, "left rank must be positive");
+        assert!(right_rank > 0, "right rank must be positive");
+        let total_rank = left_rank.checked_add(right_rank)?;
+        if total_rank > dimension {
+            return None;
+        }
+
+        let parent = Self::generate(dimension, total_rank, seed);
+        let left = Self::from_basis(parent.basis[..left_rank].to_vec())?;
+        let right = Self::from_basis(parent.basis[left_rank..].to_vec())?;
+        Some((parent, left, right))
+    }
+
     /// Test whether a word belongs to this code's Boolean subspace.
     pub fn contains(&self, word: &BinaryCodeword) -> bool {
         if word.dimension() != self.dimension {
@@ -280,6 +321,34 @@ pub fn basis_rank(vectors: &[BinaryCodeword], dimension: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn direct_sum_subcodes_partition_a_parent_basis() {
+        let (parent, left, right) =
+            RandomLinearCode::generate_direct_sum(96, 6, 6, 0x5150).expect("valid direct sum");
+        assert_eq!(parent.rank(), 12);
+        assert_eq!(left.rank(), 6);
+        assert_eq!(right.rank(), 6);
+
+        let mut combined = left.basis().to_vec();
+        combined.extend(right.basis().iter().cloned());
+        assert_eq!(combined, parent.basis());
+        assert_eq!(basis_rank(&combined, 96), parent.rank());
+        for word in left.enumerate() {
+            assert!(parent.contains(&word));
+        }
+        for word in right.enumerate() {
+            assert!(parent.contains(&word));
+        }
+    }
+
+    #[test]
+    fn from_basis_rejects_dependent_basis() {
+        let code = RandomLinearCode::generate(64, 5, 0xA11CE);
+        let mut dependent = code.basis().to_vec();
+        dependent.push(code.basis()[0].clone());
+        assert!(RandomLinearCode::from_basis(dependent).is_none());
+    }
 
     #[test]
     fn deterministic_generation_is_reproducible() {
