@@ -353,6 +353,17 @@ mod tests {
     }
 
     #[test]
+    fn git_version_is_metadata_not_source_identity() {
+        let mut a = stored();
+        let mut b = a.clone();
+        b.git_version = "git version 999.0.0".into();
+        assert_eq!(a.computed_snapshot_id().unwrap(), b.computed_snapshot_id().unwrap());
+        a.validate().unwrap();
+        b.validate().unwrap();
+        assert_eq!(a.snapshot_id, b.snapshot_id);
+    }
+
+    #[test]
     fn one_byte_identity_change_breaks_stored_receipt() {
         let mut snapshot = stored();
         snapshot.entries[0].content_sha256 = Some("e".repeat(64));
