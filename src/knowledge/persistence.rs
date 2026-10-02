@@ -872,6 +872,8 @@ impl KnowledgePersistence {
             .unchecked_transaction()
             .map_err(|e| format!("Begin snapshot validation transaction: {e}"))?;
 
+        verify_snapshot_validation_receipts_in_tx(&tx)?;
+
         let latest = tx
             .query_row(
                 "SELECT generation, canonical_digest_hex
@@ -956,58 +958,12 @@ impl KnowledgePersistence {
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
-        let mut stmt = conn
-            .prepare(
-                "SELECT validation_event, generation, snapshot_digest_hex, validator_ref,
-                        validator_version, validation_profile, conforms, report_digest_hex,
-                        receipt_digest_hex
-                 FROM knowledge_snapshot_validation_receipts
-                 ORDER BY rowid ASC",
-            )
-            .map_err(|e| format!("Prepare validation receipt verification: {e}"))?;
-
-        let rows = stmt
-            .query_map([], |row| {
-                let generation = u64::try_from(row.get::<_, i64>(1)?).map_err(|_| {
-                    rusqlite::Error::InvalidColumnType(
-                        1,
-                        "generation".into(),
-                        rusqlite::types::Type::Integer,
-                    )
-                })?;
-                Ok((
-                    KnowledgeSnapshotValidationReceipt {
-                        validation_event: row.get(0)?,
-                        generation,
-                        snapshot_digest_hex: row.get(2)?,
-                        validator_ref: row.get(3)?,
-                        validator_version: row.get(4)?,
-                        validation_profile: row.get(5)?,
-                        conforms: row.get(6)?,
-                        report_digest_hex: row.get(7)?,
-                    },
-                    row.get::<_, Option<String>>(8)?,
-                ))
-            })
-            .map_err(|e| format!("Query validation receipts for verification: {e}"))?;
-
-        for row in rows {
-            let (receipt, stored_digest) =
-                row.map_err(|e| format!("Load validation receipt for verification: {e}"))?;
-            let Some(stored_digest) = stored_digest else {
-                return Err(format!(
-                    "Snapshot validation receipt missing self-digest: {}",
-                    receipt.validation_event
-                ));
-            };
-            let expected = receipt.canonical_digest_hex();
-            if stored_digest != expected {
-                return Err(format!(
-                    "Snapshot validation receipt self-digest mismatch: {}",
-                    receipt.validation_event
-                ));
-            }
-        }
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Begin validation receipt verification: {e}"))?;
+        verify_snapshot_validation_receipts_in_tx(&tx)?;
+        tx.commit()
+            .map_err(|e| format!("Commit validation receipt verification: {e}"))?;
         Ok(())
     }
 
@@ -1021,6 +977,14 @@ impl KnowledgePersistence {
 
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
+        let verify_tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Begin latest validation verification: {e}"))?;
+        verify_snapshot_validation_receipts_in_tx(&verify_tx)?;
+        verify_tx
+            .commit()
+            .map_err(|e| format!("Commit latest validation verification: {e}"))?;
+
         let mut stmt = conn
             .prepare(
                 "SELECT validation_event, generation, snapshot_digest_hex, validator_ref,
@@ -1726,6 +1690,64 @@ fn read_snapshot_from_transaction(
         causal_edges,
         ontology,
     })
+}
+
+fn verify_snapshot_validation_receipts_in_tx(
+    tx: &rusqlite::Transaction<'_>,
+) -> Result<(), String> {
+    let mut stmt = tx
+        .prepare(
+            "SELECT validation_event, generation, snapshot_digest_hex, validator_ref,
+                    validator_version, validation_profile, conforms, report_digest_hex,
+                    receipt_digest_hex
+             FROM knowledge_snapshot_validation_receipts
+             ORDER BY rowid ASC",
+        )
+        .map_err(|e| format!("Prepare validation receipt verification: {e}"))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let generation = u64::try_from(row.get::<_, i64>(1)?).map_err(|_| {
+                rusqlite::Error::InvalidColumnType(
+                    1,
+                    "generation".into(),
+                    rusqlite::types::Type::Integer,
+                )
+            })?;
+            Ok((
+                KnowledgeSnapshotValidationReceipt {
+                    validation_event: row.get(0)?,
+                    generation,
+                    snapshot_digest_hex: row.get(2)?,
+                    validator_ref: row.get(3)?,
+                    validator_version: row.get(4)?,
+                    validation_profile: row.get(5)?,
+                    conforms: row.get(6)?,
+                    report_digest_hex: row.get(7)?,
+                },
+                row.get::<_, Option<String>>(8)?,
+            ))
+        })
+        .map_err(|e| format!("Query validation receipts for verification: {e}"))?;
+
+    for row in rows {
+        let (receipt, stored_digest) =
+            row.map_err(|e| format!("Load validation receipt for verification: {e}"))?;
+        let Some(stored_digest) = stored_digest else {
+            return Err(format!(
+                "Snapshot validation receipt missing self-digest: {}",
+                receipt.validation_event
+            ));
+        };
+        let expected = receipt.canonical_digest_hex();
+        if stored_digest != expected {
+            return Err(format!(
+                "Snapshot validation receipt self-digest mismatch: {}",
+                receipt.validation_event
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn delete_absent_keys(
