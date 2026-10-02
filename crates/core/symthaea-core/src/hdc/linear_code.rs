@@ -401,10 +401,8 @@ pub fn recover_linear_bound(
         .map(|_| BinaryCodeword::zero(dimension))
         .collect::<Vec<_>>();
 
-    for ((coefficient, generator), &owner) in coefficients
-        .iter()
-        .zip(&independent_basis)
-        .zip(&owners)
+    for ((coefficient, generator), &owner) in
+        coefficients.iter().zip(&independent_basis).zip(&owners)
     {
         if *coefficient {
             recovered[owner].xor_assign(generator);
