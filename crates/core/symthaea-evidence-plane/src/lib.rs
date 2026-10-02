@@ -928,7 +928,12 @@ mod tests {
             repository_source_snapshot_id: RepositorySourceSnapshotId::parse(
                 &"A".repeat(64)
             ).expect("valid snapshot id"),
-            lock_digests: [("Cargo.lock".into(), "lock789".into())].into_iter().collect(),
+            lock_digests: [(
+                "Cargo.lock".into(),
+                "sha256:00112233445566778899aabbccddeeff".into(),
+            )]
+            .into_iter()
+            .collect(),
             toolchain_versions: [("rustc".into(), "1.96.0".into())].into_iter().collect(),
             host_target: "x86_64-unknown-linux-gnu".into(),
             nix_identity: "nixpkgs:deadbeef".into(),
@@ -936,8 +941,18 @@ mod tests {
             cwd: "/workspace/symthaea".into(),
             argv: vec!["cargo".into(), "test".into(), "-p".into(), "symthaea-evidence-plane".into()],
             allowed_env: [("RUST_BACKTRACE".into(), "0".into())].into_iter().collect(),
-            immutable_input_digests: [("fixture.json".into(), "sha256:1234".into())].into_iter().collect(),
+            immutable_input_digests: [(
+                "fixture.json".into(),
+                "blake3:00112233445566778899aabbccddeeff".into(),
+            )]
+            .into_iter()
+            .collect(),
         }
+    }
+
+    #[test]
+    fn execution_lineage_fixture_is_admissible() {
+        assert!(lineage_fixture().validate().is_ok());
     }
 
     #[test]
