@@ -82,7 +82,6 @@ impl SqliteAuthorizationStore {
                PRIMARY KEY(authorization_instance, attempt_id, phase)
              );",
         )?;
-        store.recover_incomplete_attempts()?;
         Ok(store)
     }
 
@@ -484,6 +483,7 @@ mod tests {
         store.mark_dispatch_pending(&witness.authorization_instance,"attempt-1").unwrap();
         let first=store.commit(&action.id,"attempt-1",ExecutionOutcome::Succeeded).unwrap();
         let reopened=SqliteAuthorizationStore::open(&path).unwrap();
+        reopened.recover_incomplete_attempts().unwrap();
         assert!(matches!(
             reopened.prepare_for_execution(&witness,&action,"frame@1","attempt-2"),
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::BudgetExhausted))
