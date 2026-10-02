@@ -242,6 +242,87 @@ fn exhaustive_noise_profile_separates_in_span_from_out_of_span_errors() {
     assert_eq!(out_of_span_by_weight[0], 0);
 }
 
+
+#[test]
+fn exhaustive_bounded_distance_oracle_separates_detection_from_correction() {
+    // The exact GF(2) solver only answers whether an observation is in the
+    // code span. A bounded-distance decoder has a different contract: for
+    // errors below half the minimum distance, the clean codeword is the
+    // unique nearest codeword even though the corrupted observation itself
+    // is outside the code.
+    let code = RandomLinearCode::generate(16, 5, 0xE770);
+    let codewords = code.enumerate();
+    let hamming_distance = |left: &BinaryCodeword, right: &BinaryCodeword| {
+        left.words()
+            .iter()
+            .zip(right.words())
+            .map(|(a, b)| (a ^ b).count_ones() as usize)
+            .sum::<usize>()
+    };
+
+    let min_distance = codewords
+        .iter()
+        .filter(|word| word.weight() > 0)
+        .map(|word| hamming_distance(word, &BinaryCodeword::zero(16)))
+        .min()
+        .expect("non-zero codeword must exist");
+    assert!(
+        min_distance >= 3,
+        "deterministic noise fixture must admit a non-trivial correction radius"
+    );
+    let correction_radius = (min_distance - 1) / 2;
+
+    let clean = code.encode(&[true, false, true, false, true]);
+    let mut checked_patterns = 0usize;
+    let mut observed_out_of_span = 0usize;
+
+    for mask in 0..(1usize << 16) {
+        let error_weight = mask.count_ones() as usize;
+        if error_weight > correction_radius {
+            continue;
+        }
+
+        let mut error = BinaryCodeword::zero(16);
+        for index in 0..16 {
+            if (mask >> index) & 1 == 1 {
+                error.set_bit(index, true);
+            }
+        }
+
+        let corrupted = clean.bound(&error);
+        let distances: Vec<usize> = codewords
+            .iter()
+            .map(|candidate| hamming_distance(&corrupted, candidate))
+            .collect();
+        let nearest_distance = *distances.iter().min().expect("codebook is non-empty");
+        let nearest_indices: Vec<usize> = distances
+            .iter()
+            .enumerate()
+            .filter_map(|(index, &distance)| {
+                (distance == nearest_distance).then_some(index)
+            })
+            .collect();
+
+        // This is an exhaustive oracle, not a production decoder. Coding
+        // theory predicts unique nearest-codeword recovery below d_min / 2.
+        assert_eq!(nearest_indices.len(), 1);
+        assert_eq!(codewords[nearest_indices[0]], clean);
+        assert_eq!(nearest_distance, error_weight);
+
+        if error_weight > 0 {
+            // No non-zero codeword can have weight below d_min, so these
+            // non-zero low-weight errors are necessarily outside the code.
+            assert!(!code.contains(&error));
+            assert!(solve_linear_combination(&corrupted, code.basis()).is_none());
+            observed_out_of_span += 1;
+        }
+        checked_patterns += 1;
+    }
+
+    assert!(checked_patterns > 1);
+    assert!(observed_out_of_span > 0);
+}
+
 #[test]
 fn independent_bound_recovery_rejects_overlapping_factor_bases() {
     let parent = RandomLinearCode::generate(96, 8, 0x4444);
