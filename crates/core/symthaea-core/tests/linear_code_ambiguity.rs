@@ -36,7 +36,7 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
     combined_basis.extend(right.basis().iter().cloned());
     assert_eq!(combined_basis, parent.basis());
     assert_eq!(
-        symthaea_core::hdc::linear_code::basis_rank(&combined_basis, 96),
+        basis_rank(&combined_basis, 96),
         parent.rank()
     );
 
