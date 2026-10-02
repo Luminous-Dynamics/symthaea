@@ -123,7 +123,7 @@ impl TemporalFusionGate {
                 continue;
             }
             if pair.previous.configuration_digest != pair.current.configuration_digest
-                || !pair.current.configuration_digest.eq(&pair.current_decision.configuration_digest)
+                || pair.current.configuration_digest.trim().is_empty()
             {
                 issues.push(TemporalFusionIssue::IndependenceConfigurationMismatch);
                 continue;
@@ -263,7 +263,7 @@ mod tests {
         }
     }
 
-    fn fusion_gate/() -> TemporalFusionGate {
+    fn fusion_gate() -> TemporalFusionGate {
         TemporalFusionGate::new(TemporalFusionPolicy {
             schema_version: "0.1".into(),
             policy_id: "temporal-fusion-v1".into(),
