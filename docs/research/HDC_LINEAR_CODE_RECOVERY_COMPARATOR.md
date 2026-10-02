@@ -12,6 +12,20 @@ References:
 - DOI: 10.1162/neco_a_01665
 - arXiv: 2403.03278
 
+## Literature boundary update
+
+The 2024 Raviv result is the representation/recovery basis for this comparator: random linear codes are Boolean subspaces, and bound recovery is obtained through their subspace structure. Raviv explicitly distinguishes exact computation from approximate/noisy recovery. The published article is *Neural Computation* 36(6), 1084–1120 (2024).
+
+A 2026 peer-reviewed follow-up by Deng and Raviv, *Efficient Vector Symbolic Architectures from Histogram Recovery* (ISIT 2026), addresses a different problem: noisy recovery. Its construction uses Reed–Solomon/Hadamard concatenation and histogram recovery with list-decoding methods, rather than treating the exact GF(2) span solver as an error-correcting decoder. This reinforces the comparator boundary: exact factorization and noise-resilient decoding must be benchmarked as separate capabilities.
+
+Current coding-theory work in 2026 is also advancing time/space-efficient list decoding near capacity. Those results are useful context for a future decoder study, but they do not by themselves establish performance for the small deterministic linear-code fixtures in this repository.
+
+Sources:
+- Raviv (2024): https://arxiv.org/abs/2403.03278
+- Deng & Raviv (2026 / preprint): https://arxiv.org/abs/2511.01838
+- Deng & Raviv (ISIT 2026): https://doi.org/10.1109/ISIT62367.2026.11654060
+- Fathollahi, Ron-Zewi & Wootters (2026): https://arxiv.org/abs/2608.15937
+
 ### Recent noise-decoding context
 
 Deng and Raviv, *Efficient Vector Symbolic Architectures from Histogram Recovery* (arXiv:2511.01838v2, revised 2026-04-16), extends the linear-code VSA direction specifically because random binary linear codes are difficult to decode under noise. Their construction uses a Reed–Solomon outer code concatenated with a Hadamard inner code and a dedicated histogram-recovery/list-decoding layer. They retain linear-code binding-recovery via subcode structure, but treat noisy superposition recovery as a separate decoding problem.
