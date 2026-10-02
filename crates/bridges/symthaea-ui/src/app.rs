@@ -286,11 +286,12 @@ pub fn App() -> impl IntoView {
             let Some(scene) = gpu_scene.get() else {
                 return;
             };
-            let Some(renderer) = renderer.borrow().as_ref() else {
-                return;
-            };
             let native = scene.to_scene_node();
             let gpu = GpuScene::from_scene(&native);
+            let mut renderer_ref = renderer.borrow_mut();
+            let Some(renderer) = renderer_ref.as_mut() else {
+                return;
+            };
             if let Err(error) = renderer.render(&gpu) {
                 leptos::logging::warn!("WebGPU cognitive canvas render failed: {error}");
                 webgpu_ready.set(false);
