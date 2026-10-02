@@ -1510,6 +1510,58 @@ mod tests {
     }
 
     #[test]
+    fn pre_entry_lookup_cannot_be_used_as_terminal_outcome() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-verifier-kind-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=action.with_effect_binding(effect.clone());
+        let witness=ActionAuthorizationWitness { action_digest:action.canonical_action_digest(), ..witness };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(), action.id.clone(), witness.action_digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-kind","boundary-A").unwrap();
+        let record=store.mark_dispatch_pending_bound(
+            &witness.authorization_instance,"attempt-kind",&action,&effect,"boundary-A"
+        ).unwrap();
+        let mut evidence=verified_evidence(&record,ExecutionOutcome::Failed);
+        evidence.kind=ProviderEvidenceKind::PreEntryLookup;
+        assert!(matches!(
+            store.commit_bound_verified(&record,&evidence,&TestProviderVerifier),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
+            ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn verified_terminal_evidence_is_exact_attempt_and_sink_bound() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-verifier-binding-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=action.with_effect_binding(effect.clone());
+        let witness=ActionAuthorizationWitness { action_digest:action.canonical_action_digest(), ..witness };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(), action.id.clone(), witness.action_digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-exact","boundary-A").unwrap();
+        let record=store.mark_dispatch_pending_bound(
+            &witness.authorization_instance,"attempt-exact",&action,&effect,"boundary-A"
+        ).unwrap();
+        let mut evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        evidence.provider_idempotency_key.push_str("-forged");
+        assert!(matches!(
+            store.commit_bound_verified(&record,&evidence,&TestProviderVerifier),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
+            ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn durable_state_survives_reopen_and_blocks_replay() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
