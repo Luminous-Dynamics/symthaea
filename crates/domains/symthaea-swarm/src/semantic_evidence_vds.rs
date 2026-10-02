@@ -19,6 +19,7 @@ pub const RFC9162_CONSISTENCY_PROOF_ID: i64 = -2;
 pub const RFC9942_RECEIPTS_HEADER_LABEL: i64 = 394;
 pub const RFC9942_VDS_HEADER_LABEL: i64 = 395;
 pub const RFC9942_VDP_HEADER_LABEL: i64 = 396;
+
 /// RFC 9942 proof type carried in the vdp header map.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rfc9942ProofKind {
@@ -67,8 +68,6 @@ pub enum Rfc9942VdpError {
     WrongProofKind,
     #[error("none of the supplied RFC 9942 proofs verifies against the expected VDS state")]
     NoMatchingProof,
-    #[error("RFC 9942 proof verification failed: {0}")]
-    Verification(#[from] Rfc9162ProofVerificationError),
 }
 
 impl Rfc9942Vdp {
@@ -866,7 +865,7 @@ mod tests {
         let consistency=Rfc9162ConsistencyProof::new(1,2,vec![[0x22;32]]).to_cbor();
         let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Consistency,vec![consistency]).unwrap();
         let encoded=vdp.to_cbor();
-        assert_eq!(encoded[0..3],[0xa1,0x21,0x81]);
+        assert_eq!(&encoded[..3],&[0xa1,0x21,0x81]);
         assert_eq!(encoded[3],0x58);
         assert_eq!(encoded[4],0x26);
     }
@@ -879,6 +878,12 @@ mod tests {
         assert_eq!(decoded.vds_id(),RFC9162_VDS_ID);
         assert_eq!(decoded.kind(),Rfc9942ProofKind::Inclusion);
         assert_eq!(decoded.proofs(),&[inclusion]);
+
+        let consistency=Rfc9162ConsistencyProof::new(1,2,vec![[0x22;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Consistency,vec![consistency.clone()]).unwrap();
+        let decoded=Rfc9942Vdp::from_cbor(&vdp.to_cbor()).unwrap();
+        assert_eq!(decoded.kind(),Rfc9942ProofKind::Consistency);
+        assert_eq!(decoded.proofs(),&[consistency]);
     }
 
     #[test]
