@@ -18,7 +18,12 @@ use gloo_net::websocket::futures::WebSocket;
 use serde_json::Value;
 use web_sys::Url;
 
+/// HTTP responses are bounded before serde_json parsing. This is intentionally
+/// separate from the WebSocket budget because service queries/status should
+/// remain small even though telemetry may carry a bounded mental movie.
 const MAX_HTTP_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+/// The telemetry budget covers the maximum 64 MiB RGBA movie projection plus
+/// base64 expansion and JSON framing, while remaining finite before parsing.
 const MAX_WS_TEXT_BYTES: usize = 72 * 1024 * 1024;
 
 fn parse_json_with_limit(text: &str, max_bytes: usize) -> Result<Value, String> {
