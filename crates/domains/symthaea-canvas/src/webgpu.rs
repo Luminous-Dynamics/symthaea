@@ -538,8 +538,16 @@ impl WebGpuRenderer {
         let Some(&alpha_mode) = capabilities.alpha_modes.first() else {
             return Err("WebGPU adapter exposed no alpha modes".to_string());
         };
-        let Some(&present_mode) = capabilities.present_modes.first() else {
-            return Err("WebGPU adapter exposed no present modes".to_string());
+        let present_mode = if capabilities
+            .present_modes
+            .contains(&wgpu::PresentMode::Fifo)
+        {
+            wgpu::PresentMode::Fifo
+        } else {
+            *capabilities
+                .present_modes
+                .first()
+                .ok_or_else(|| "WebGPU adapter exposed no present modes".to_string())?
         };
 
         let config = wgpu::SurfaceConfiguration {
