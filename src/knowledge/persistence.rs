@@ -99,8 +99,6 @@ pub struct CausalEdgeRecord {
 }
 
 /// A serializable ontology primitive record
-#[derive(Debug, Clone)]
-pub struct OntologyRecord {
     pub name: String,
     pub vector_bytes: Vec<u8>,
     pub usage_count: u64,
@@ -433,6 +431,168 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Commit snapshot transaction: {e}"))?;
         self.total_saved += saved_count as u64;
         Ok(())
+    }
+
+    /// Load all persistence domains from one SQLite read transaction.
+    ///
+    /// The returned records are all observed from a single database snapshot.
+    /// This prevents startup restore from combining facts/provenance/causal/ontology
+    /// rows committed by different snapshot generations.
+    pub fn load_snapshot(&mut self) -> Result<KnowledgePersistenceSnapshot, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+
+        // Materialize deterministic identities for pre-EPF-011 rows before
+        // beginning the read transaction.
+        conn.execute(
+            "UPDATE knowledge_facts
+             SET memory_id = 'legacy-fact:' || id
+             WHERE memory_id IS NULL",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Begin persistence snapshot read: {e}"))?;
+
+        let facts = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT id, memory_id, canonical_identity, provenance_family, vector_blob, source_text, confidence, domain, cycle, is_causal
+                     FROM knowledge_facts ORDER BY cycle DESC, memory_id ASC, id ASC",
+                )
+                .map_err(|e| format!("Prepare snapshot facts: {e}"))?;
+            stmt.query_map([], |row| {
+                Ok(FactRecord {
+                    memory_id: row.get(1)?,
+                    canonical_identity: row.get(2)?,
+                    provenance_family: row.get(3)?,
+                    vector_bytes: row.get(4)?,
+                    source_text: row.get(5)?,
+                    confidence: row.get(6)?,
+                    domain: row.get(7)?,
+                    cycle: u64::try_from(row.get::<_, i64>(8)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(8, "cycle".into(), rusqlite::types::Type::Integer))?,
+                    is_causal: row.get(9)?,
+                })
+            })
+            .map_err(|e| format!("Query snapshot facts: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load snapshot fact row: {e}"))?
+        };
+
+        let provenance_relations = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT source_memory_id, target_memory_id, kind, created_at
+                     FROM knowledge_provenance_relations
+                     ORDER BY created_at, source_memory_id, target_memory_id, kind",
+                )
+                .map_err(|e| format!("Prepare snapshot provenance: {e}"))?;
+            let rows = stmt
+                .query_map([], |row| {
+                    let kind: String = row.get(2)?;
+                    let kind = match kind.as_str() {
+                        "DerivedFrom" => ProvenanceRelationKind::DerivedFrom,
+                        "RevisedFrom" => ProvenanceRelationKind::RevisedFrom,
+                        "Supersedes" => ProvenanceRelationKind::Supersedes,
+                        "Contradicts" => ProvenanceRelationKind::Contradicts,
+                        "Corroborates" => ProvenanceRelationKind::Corroborates,
+                        "RepresentationOf" => ProvenanceRelationKind::RepresentationOf,
+                        _ => return Err(rusqlite::Error::InvalidColumnType(
+                            2,
+                            "kind".into(),
+                            rusqlite::types::Type::Text,
+                        )),
+                    };
+                    Ok(ProvenanceRelationRecord {
+                        source_memory_id: row.get(0)?,
+                        target_memory_id: row.get(1)?,
+                        kind,
+                        created_at: row.get(3)?,
+                    })
+                })
+                .map_err(|e| format!("Query snapshot provenance: {e}"))?;
+
+            let mut loaded = Vec::new();
+            for row in rows {
+                let record = row.map_err(|e| format!("Load snapshot provenance row: {e}"))?;
+                ProvenanceRelation::from(record.clone())
+                    .validate()
+                    .map_err(|e| format!("Invalid persisted provenance relation: {e}"))?;
+                loaded.push(record);
+            }
+            loaded
+        };
+
+        let causal_edges = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT cause, effect, strength, is_inhibitory, cycle
+                     FROM knowledge_causal_edges
+                     ORDER BY cycle DESC, cause ASC, effect ASC",
+                )
+                .map_err(|e| format!("Prepare snapshot causal edges: {e}"))?;
+            stmt.query_map([], |row| {
+                Ok(CausalEdgeRecord {
+                    cause: row.get(0)?,
+                    effect: row.get(1)?,
+                    strength: row.get(2)?,
+                    is_inhibitory: row.get(3)?,
+                    cycle: u64::try_from(row.get::<_, i64>(4)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(4, "cycle".into(), rusqlite::types::Type::Integer))?,
+                })
+            })
+            .map_err(|e| format!("Query snapshot causal edges: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load snapshot causal edge row: {e}"))?
+        };
+
+        let ontology = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle, is_a_parent
+                     FROM knowledge_ontology
+                     ORDER BY utility DESC, name ASC, created_at_cycle ASC, last_used_cycle ASC",
+                )
+                .map_err(|e| format!("Prepare snapshot ontology: {e}"))?;
+            stmt.query_map([], |row| {
+                Ok(OntologyRecord {
+                    name: row.get(0)?,
+                    vector_bytes: row.get(1)?,
+                    usage_count: u64::try_from(row.get::<_, i64>(2)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(2, "usage_count".into(), rusqlite::types::Type::Integer))?,
+                    utility: row.get(3)?,
+                    created_at_cycle: u64::try_from(row.get::<_, i64>(4)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(4, "created_at_cycle".into(), rusqlite::types::Type::Integer))?,
+                    last_used_cycle: u64::try_from(row.get::<_, i64>(5)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(5, "last_used_cycle".into(), rusqlite::types::Type::Integer))?,
+                    is_a_parent: row.get(6)?,
+                })
+            })
+            .map_err(|e| format!("Query snapshot ontology: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load snapshot ontology row: {e}"))?
+        };
+
+        tx.commit()
+            .map_err(|e| format!("Commit persistence snapshot read: {e}"))?;
+
+        let loaded_count =
+            facts.len() + provenance_relations.len() + causal_edges.len() + ontology.len();
+        self.total_loaded += loaded_count as u64;
+
+        Ok(KnowledgePersistenceSnapshot {
+            facts,
+            provenance_relations,
+            causal_edges,
+            ontology,
+        })
     }
 
     /// Load all fact records from the database.
@@ -1970,6 +2130,69 @@ mod tests {
         assert_eq!(loaded[0].created_at_cycle, 4);
         assert_eq!(loaded[0].last_used_cycle, 7);
         assert_eq!(loaded[0].is_a_parent.as_deref(), Some("concept"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_snapshot_returns_all_domains_from_one_read() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_load_snapshot_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "snapshot-fact".into(),
+            canonical_identity: Some("snapshot-canonical".into()),
+            provenance_family: Some("snapshot-family".into()),
+            vector_bytes: vec![0xAB; BinaryHV::BYTES],
+            source_text: "snapshot fact".into(),
+            confidence: 0.9,
+            domain: Some("test".into()),
+            cycle: 4,
+            is_causal: true,
+        };
+        let relation = ProvenanceRelationRecord {
+            source_memory_id: "snapshot-fact".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:4".into(),
+        };
+        let edge = CausalEdgeRecord {
+            cause: "cause".into(),
+            effect: "effect".into(),
+            strength: 0.8,
+            is_inhibitory: false,
+            cycle: 4,
+        };
+        let ontology = OntologyRecord {
+            name: "snapshot-primitive".into(),
+            vector_bytes: vec![0xCD; BinaryHV::BYTES],
+            usage_count: 3,
+            utility: 0.7,
+            created_at_cycle: 4,
+            last_used_cycle: 4,
+            is_a_parent: None,
+        };
+
+        p.save_snapshot(
+            std::slice::from_ref(&fact),
+            std::slice::from_ref(&relation),
+            std::slice::from_ref(&edge),
+            std::slice::from_ref(&ontology),
+        )
+        .unwrap();
+
+        let snapshot = p.load_snapshot().unwrap();
+        assert_eq!(snapshot.facts.len(), 1);
+        assert_eq!(snapshot.facts[0].memory_id, "snapshot-fact");
+        assert_eq!(snapshot.provenance_relations.len(), 1);
+        assert_eq!(snapshot.causal_edges.len(), 1);
+        assert_eq!(snapshot.ontology.len(), 1);
+        assert_eq!(p.total_loaded(), 4);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
