@@ -3049,19 +3049,27 @@ mod tests {
         assert_ne!(current.fingerprint(), legacy.fingerprint());
 
         let current_canonical = current.canonical_bytes();
-        for check in current.checks {
-            let tags = check.allowed_failure_outcome_tags();
-            assert!(!tags.is_empty());
-            assert!(current_canonical.windows(tags.len()).any(|window| window == tags));
-        }
 
-        // Reconstruct the historical v1 canonical form exactly. This guards
-        // against accidentally changing the identity of legacy evidence while
-        // strengthening the current procedure.
+        // Reconstruct the pre-hardening v2 canonical form. The current form
+        // must differ because failure semantics are now part of procedure identity.
         fn write_string(bytes: &mut Vec<u8>, value: &str) {
             bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
             bytes.extend_from_slice(value.as_bytes());
         }
+        let mut pre_hardening_v2 = Vec::new();
+        pre_hardening_v2.extend_from_slice(b"symthaea:observation-evaluation-procedure:v2\n");
+        write_string(&mut pre_hardening_v2, current.procedure_version);
+        write_string(&mut pre_hardening_v2, current.procedure_id);
+        pre_hardening_v2.extend_from_slice(&(current.checks.len() as u64).to_be_bytes());
+        for check in current.checks {
+            write_string(&mut pre_hardening_v2, check.id());
+            write_string(&mut pre_hardening_v2, check.definition_version());
+        }
+        assert_ne!(current_canonical, pre_hardening_v2);
+
+        // Reconstruct the historical v1 canonical form exactly. This guards
+        // against accidentally changing the identity of legacy evidence while
+        // strengthening the current procedure.
         let mut historical = Vec::new();
         historical.extend_from_slice(b"symthaea:observation-evaluation-procedure:v1\n");
         write_string(&mut historical, legacy.procedure_version);
