@@ -297,7 +297,10 @@ impl SqliteAuthorizationStore {
                WHERE boundary_id IS NOT NULL AND attempt_id IS NOT NULL;
              CREATE UNIQUE INDEX IF NOT EXISTS authorization_dispatch_native_replay_uq
                ON authorization_dispatches(native_replay_identity)
-               WHERE native_replay_identity <> '';",
+               WHERE native_replay_identity <> '';
+             CREATE UNIQUE INDEX IF NOT EXISTS authorization_dispatch_operation_uq
+               ON authorization_dispatches(operation_id)
+               WHERE operation_id <> '';",
         )?;
         Ok(store)
     }
@@ -1663,7 +1666,52 @@ mod tests {
     }
 
     #[test]
-    fn durable_state_survives_reopen_and_blocks_replay() {
+    fn durable_state_survives_reopen_and_blocks_replay() {    #[test]
+    fn operation_and_native_replay_identity_tampering_is_rejected() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-identity-fence-{}.db",std::process::id()));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=action.with_effect_binding(effect.clone());
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"identity-fence".into(),
+            action_id:action.id.clone(),
+            action_digest:action.canonical_action_digest(),
+            support_digest:witness.support_digest,
+            current_frame:witness.current_frame,
+            policy:witness.policy,
+            authority_epoch:witness.authority_epoch,
+        };
+        store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-identity","boundary-A").unwrap();
+        let record=store.mark_dispatch_pending_bound(
+            &witness.authorization_instance,"attempt-identity",&action,&effect,"boundary-A",
+            "operation:identity-fence","native-replay:identity-fence"
+        ).unwrap();
+
+        let mut wrong_operation=record.clone();
+        wrong_operation.operation_id.push_str("-forged");
+        assert!(matches!(
+            store.mark_invoked_bound(&wrong_operation),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let mut wrong_native=record.clone();
+        wrong_native.native_replay_identity.push_str("-forged");
+        assert!(matches!(
+            store.mark_invoked_bound(&wrong_native),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+
+        let mut evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        evidence.operation_id.push_str("-forged");
+        assert!(matches!(
+            store.commit_bound_verified(&record,&evidence,&TestProviderVerifier),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired))
+        ));
+
+        let _=std::fs::remove_file(path);
+    }
+
+
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
         store.prepare_for_execution(&witness,&action,"frame@1","attempt-1").unwrap();
@@ -1791,6 +1839,50 @@ mod tests {
             &TestProviderVerifier,
         ).unwrap();
         assert_eq!(receipt.provider_idempotency_key,record.provider_idempotency_key);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn native_replay_identity_cannot_be_reserved_twice() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-native-replay-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+
+        let action_a=EpistemicAction::new("native-a","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let action_b=EpistemicAction::new("native-b","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let witness_a=ActionAuthorizationWitness {
+            authorization_instance:"native-a".into(), action_id:action_a.id.clone(),
+            action_digest:action_a.canonical_action_digest(), support_digest:"support-a".into(),
+            current_frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
+        };
+        let witness_b=ActionAuthorizationWitness {
+            authorization_instance:"native-b".into(), action_id:action_b.id.clone(),
+            action_digest:action_b.canonical_action_digest(), support_digest:"support-b".into(),
+            current_frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new(
+            witness_a.authorization_instance.clone(), witness_a.action_id.clone(),
+            witness_a.action_digest.clone(), witness_a.support_digest.clone(),
+            witness_a.policy.clone(), witness_a.authority_epoch, 1
+        )).unwrap();
+        store.register_lease(&AuthorizationLease::new(
+            witness_b.authorization_instance.clone(), witness_b.action_id.clone(),
+            witness_b.action_digest.clone(), witness_b.support_digest.clone(),
+            witness_b.policy.clone(), witness_b.authority_epoch, 1
+        )).unwrap();
+        store.prepare_for_execution_bound(&witness_a,&action_a,"frame@1","attempt-native-a","boundary-A").unwrap();
+        store.prepare_for_execution_bound(&witness_b,&action_b,"frame@1","attempt-native-b","boundary-A").unwrap();
+        store.mark_dispatch_pending_bound(
+            &witness_a.authorization_instance,"attempt-native-a",&action_a,&effect,"boundary-A",
+            "operation:native-a","native-replay:shared"
+        ).unwrap();
+        let duplicate=store.mark_dispatch_pending_bound(
+            &witness_b.authorization_instance,"attempt-native-b",&action_b,&effect,"boundary-A",
+            "operation:native-b","native-replay:shared"
+        );
+        assert!(matches!(duplicate,Err(AuthorizationStoreError::Sqlite(_))));
         let _=std::fs::remove_file(path);
     }
 

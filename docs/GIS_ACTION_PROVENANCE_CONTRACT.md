@@ -281,6 +281,25 @@ The legacy outcome-only commit_bound and reconcile_indeterminate_bound paths are
 
 This remains an adapter boundary, not a universal proof of physical truth. The verifier's trust anchors, provider authentication, freshness rules, cancellation semantics, and semantic interpretation remain relying-party configuration. The store records which verifier/revision produced the accepted terminal attestation rather than pretending SQLite itself authenticated the provider.
 
+### Execution identity lattice
+
+The effect boundary now records the execution identities that must not be conflated:
+
+- **Authorization instance** identifies the durable grant of authority.
+- **Operation ID** identifies the logical operation being attempted.
+- **Native replay identity** identifies the one native grant of authority and is supplied by the native authorization path.
+- **Attempt ID** identifies one executor attempt.
+- **Action digest** identifies the frozen material action.
+- **Provider idempotency key** identifies the downstream replay-control value.
+
+The bound dispatch API requires the operation ID and native replay identity explicitly and rejects either when absent. Neither is derived from the attempt ID, provider idempotency key, wrapper, boundary label, or other local retry metadata. The durable dispatch row and terminal provider evidence carry both values, and the verifier must affirm both against the exact frozen record.
+
+The store also rejects reuse of a non-empty operation ID or native replay identity within its durable dispatch domain. This makes identity collisions visible at the persistence boundary rather than allowing a later attempt to reinterpret an existing operation or native grant.
+
+This layer deliberately does **not** claim that the native replay identity has been derived correctly merely because a caller supplied a string. The native authorization adapter remains responsible for authenticating the native authority and deriving its replay identity from the pinned authority namespace and native authorization identifier. The store's role is to require, freeze, bind, and durably fence that value once it crosses the execution boundary.
+
+The current provider idempotency-key derivation remains a separate compatibility concern. The AEB-07 draft specifies that a provider idempotency key should be derived from the native replay identity, optionally together with effecting target identity and action digest; it must not be derived from the operation identifier. The next hardening tranche should therefore move the provider-key derivation to the native replay identity rather than silently treating the authorization instance as an equivalent identity.
+
 ### Pre-entry recovery versus Indeterminate reconciliation
 
 The recovery boundary is intentionally split in two. A Prepared attempt that has not crossed DispatchPending can be recovered as a pre-entry stop only through the exact recovery witness and an atomic transition that records the not-entered marker. That transition prevents the stranded executor from dispatching the old attempt after recovery. A DispatchPending or Invoked attempt cannot use this release path; it remains occupied and follows the Indeterminate reconciliation path.
