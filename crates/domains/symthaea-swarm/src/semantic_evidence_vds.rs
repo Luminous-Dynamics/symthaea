@@ -3396,6 +3396,36 @@ mod tests {
     }
 
     #[test]
+    fn rfc9162_proof_decoders_reject_degenerate_metadata() {
+        let inclusion_zero_tree = vec![0x83, 0x00, 0x00, 0x80];
+        assert_eq!(
+            Rfc9162InclusionProof::from_cbor(&inclusion_zero_tree),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        let inclusion_leaf_out_of_range = vec![0x83, 0x01, 0x01, 0x80];
+        assert_eq!(
+            Rfc9162InclusionProof::from_cbor(&inclusion_leaf_out_of_range),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        let consistency_equal_sizes = vec![0x83, 0x02, 0x02, 0x01, 0x58, 0x20]
+            .into_iter()
+            .chain([0u8; 32])
+            .collect::<Vec<_>>();
+        assert_eq!(
+            Rfc9162ConsistencyProof::from_cbor(&consistency_equal_sizes),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+
+        let consistency_empty_path = vec![0x83, 0x01, 0x02, 0x80];
+        assert_eq!(
+            Rfc9162ConsistencyProof::from_cbor(&consistency_empty_path),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
+    #[test]
     fn rfc9162_verifiers_reject_extra_path_nodes() {
         let vds = Rfc9162Sha256Vds;
         let leaves = vec![b"a".to_vec(), b"b".to_vec()];
