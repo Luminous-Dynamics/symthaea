@@ -706,7 +706,7 @@ impl ReceiptAttestationVerificationReport {
 pub const VERIFICATION_CONTEXT_VERSION: &str =
     "symthaea-observation-verification-context-v4";
 pub const EVIDENCE_EVALUATION_VERSION: &str =
-    "symthaea-observation-evaluation-v6";
+    "symthaea-observation-evaluation-v7";
 pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
     "receipt-attestation-verification";
 
@@ -738,8 +738,10 @@ impl VerificationContext {
         Self {
             context_version: VERIFICATION_CONTEXT_VERSION,
             policy_fingerprint: report.policy_fingerprint.clone(),
+            verifier_id: VERIFIER_IMPLEMENTATION_ID,
             verifier_version: report.verifier_version,
             environment_fingerprint: report.environment_fingerprint.clone(),
+            procedure_id: EVALUATION_PROCEDURE_ID,
             procedure_fingerprint: report.procedure_fingerprint.clone(),
             evaluator_identity_fingerprint: None,
             resolution_snapshot_fingerprint: report.resolution_snapshot_fingerprint.clone(),
@@ -1118,7 +1120,7 @@ impl EvidenceEvaluation {
         }
 
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v6\n");
+        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v7\n");
         write_string(&mut bytes, self.evaluation_version);
         write_string(&mut bytes, &self.subject_fingerprint);
         write_string(&mut bytes, self.evaluation_type);
@@ -1139,7 +1141,7 @@ impl EvidenceEvaluation {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:evidence-evaluation:v6\n");
+        hasher.update(b"symthaea:evidence-evaluation:v7\n");
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -2309,7 +2311,7 @@ mod tests {
     }
 
     #[test]
-    fn evidence_evaluation_uses_v6_fingerprint_domain() {
+    fn evidence_evaluation_uses_v7_fingerprint_domain() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
