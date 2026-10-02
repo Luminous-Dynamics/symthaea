@@ -151,7 +151,12 @@ impl RemoteScene {
     }
 
     pub fn serialized_len(&self) -> usize {
-        serde_json::to_vec(self).map(|bytes| bytes.len()).unwrap_or(MAX_SCENE_BYTES + 1)
+        let mut writer = BoundedCountWriter::new(MAX_SCENE_BYTES);
+        if serde_json::to_writer(&mut writer, self).is_err() {
+            MAX_SCENE_BYTES + 1
+        } else {
+            writer.len()
+        }
     }
 
     pub fn is_supported(&self) -> bool {
@@ -172,6 +177,46 @@ impl RemoteScene {
 
     pub fn is_within_budget(&self) -> bool {
         self.serialized_len() <= MAX_SCENE_BYTES
+    }
+}
+
+struct BoundedCountWriter {
+    written: usize,
+    limit: usize,
+}
+
+impl BoundedCountWriter {
+    fn new(limit: usize) -> Self {
+        Self { written: 0, limit }
+    }
+
+    fn len(&self) -> usize {
+        self.written
+    }
+}
+
+impl std::io::Write for BoundedCountWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let Some(next) = self.written.checked_add(buf.len()) else {
+            self.written = self.limit.saturating_add(1);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::WriteZero,
+                "serialized scene size overflow",
+            ));
+        };
+        if next > self.limit {
+            self.written = self.limit.saturating_add(1);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::WriteZero,
+                "serialized scene exceeds bounded size",
+            ));
+        }
+        self.written = next;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
