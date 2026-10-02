@@ -886,14 +886,11 @@ impl KnowledgeManager {
                     cause,
                     effect,
                     strength,
-                    is_inhibitory: false,
+                    is_inhibitory: strength < 0.0,
                     cycle: 0,
                 })
                 .collect();
             let ontology_records = self.ontology.export_ontology_records();
-            if let Err(e) = p.save_facts(&facts) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
-            }
             let provenance_relations: Vec<ProvenanceRelationRecord> = self
                 .graph
                 .provenance_relations()
@@ -901,14 +898,14 @@ impl KnowledgeManager {
                 .cloned()
                 .map(Into::into)
                 .collect();
-            if let Err(e) = p.save_provenance_relations(&provenance_relations) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save provenance relations");
-            }
-            if let Err(e) = p.save_causal_edges(&edges) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save edges");
-            }
-            if let Err(e) = p.save_ontology(&ontology_records) {
-                tracing::warn!(error = %e, "Knowledge persistence: failed to save ontology");
+
+            if let Err(e) = p.save_snapshot(
+                &facts,
+                &provenance_relations,
+                &edges,
+                &ontology_records,
+            ) {
+                tracing::warn!(error = %e, "Knowledge persistence: failed to save atomic snapshot");
             }
         }
     }
