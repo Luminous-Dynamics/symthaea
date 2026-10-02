@@ -176,7 +176,7 @@ pub struct ExecutionLineageV1 {
     pub toolchain_versions: BTreeMap<String, String>,
     pub host_triple: String,
     pub target_triple: String,
-    pub nix_identity: String,
+    pub nix_identity: Option<String>,
     #[serde(deserialize_with = "deserialize_unique_string_set")]
     pub feature_flags: BTreeSet<String>,
     pub cwd: String,
@@ -205,7 +205,7 @@ struct ExecutionLineageV1Wire {
     pub toolchain_versions: BTreeMap<String, String>,
     pub host_triple: String,
     pub target_triple: String,
-    pub nix_identity: String,
+    pub nix_identity: Option<String>,
     #[serde(deserialize_with = "deserialize_unique_string_set")]
     pub feature_flags: BTreeSet<String>,
     pub cwd: String,
@@ -285,8 +285,7 @@ impl ExecutionLineageV1 {
         toolchain_versions: Vec<(String, String)>,
         host_triple: String,
         target_triple: String,
-        nix_identity: String,
-        feature_flags: Vec<String>,
+        nix_identity: Option<String>,        feature_flags: Vec<String>,
         cwd: String,
         argv: Vec<String>,
         allowed_env: Vec<(String, String)>,
@@ -356,9 +355,11 @@ impl ExecutionLineageV1 {
             ("source_tree", self.source_tree.as_str()),
             ("host_triple", self.host_triple.as_str()),
             ("target_triple", self.target_triple.as_str()),
-            ("nix_identity", self.nix_identity.as_str()),
         ] {
             validate_semantic_text("lineage field", name, value)?;
+        }
+        if let Some(nix_identity) = &self.nix_identity {
+            validate_semantic_text("lineage field", "nix_identity", nix_identity)?;
         }
         if self.cwd.trim().is_empty() {
             return Err("empty lineage field cwd".into());
@@ -409,7 +410,7 @@ impl ExecutionLineageV1 {
         append_map(hasher, "toolchain_versions", &self.toolchain_versions);
         append_str(hasher, "host_triple", &self.host_triple);
         append_str(hasher, "target_triple", &self.target_triple);
-        append_str(hasher, "nix_identity", &self.nix_identity);
+        append_optional_str(hasher, "nix_identity", self.nix_identity.as_deref());
         append_set(hasher, "feature_flags", &self.feature_flags);
         append_str(hasher, "cwd", &self.cwd);
         append_sequence(hasher, "argv", &self.argv);
@@ -612,6 +613,21 @@ fn append_set(hasher: &mut blake3::Hasher, field: &str, values: &BTreeSet<String
     hasher.update(&(values.len() as u64).to_be_bytes());
     for value in values {
         append_bytes(hasher, value.as_bytes());
+    }
+}
+
+fn append_optional_str(
+    hasher: &mut blake3::Hasher,
+    field: &str,
+    value: Option<&str>,
+) {
+    append_bytes(hasher, field.as_bytes());
+    match value {
+        Some(value) => {
+            hasher.update(&[1]);
+            append_bytes(hasher, value.as_bytes());
+        }
+        None => hasher.update(&[0]),
     }
 }
 
@@ -1143,7 +1159,7 @@ mod tests {
             vec![("rustc".into(), "1.96".into())],
             "x86_64-unknown-linux-gnu".into(),
             "wasm32-unknown-unknown".into(),
-            "nix".into(),
+            Some("nix".into()),
             vec!["feature".into()],
             "/work".into(),
             vec!["cargo".into(), "test".into()],
@@ -1165,7 +1181,7 @@ mod tests {
             vec![("rustc".into(), "1.96".into())],
             "x86_64-unknown-linux-gnu".into(),
             "wasm32-unknown-unknown".into(),
-            "nix".into(),
+            Some("nix".into()),
             vec!["feature".into(), "feature".into()],
             "/work".into(),
             vec!["cargo".into(), "test".into()],
@@ -1187,7 +1203,7 @@ mod tests {
             vec![("rustc".into(), "1.96".into())],
             "x86_64-unknown-linux-gnu".into(),
             "wasm32-unknown-unknown".into(),
-            "nix".into(),
+            Some("nix".into()),
             vec!["feature".into()],
             "/work".into(),
             vec!["cargo".into(), "test".into()],
@@ -1217,7 +1233,7 @@ mod tests {
             toolchain_versions: [("rustc".into(), "1.96.0".into())].into_iter().collect(),
             host_triple: "x86_64-unknown-linux-gnu".into(),
             target_triple: "x86_64-unknown-linux-gnu".into(),
-            nix_identity: "nixpkgs:deadbeef".into(),
+            nix_identity: Some("nixpkgs:deadbeef".into()),
             feature_flags: ["default".into()].into_iter().collect(),
             cwd: "/workspace/symthaea".into(),
             argv: vec![
@@ -1709,6 +1725,16 @@ mod tests {
         assert_ne!(base.digest(), revision.digest());
         assert_ne!(base.digest(), lock.digest());
         assert_ne!(base.digest(), argv.digest());
+    }
+
+    #[test]
+    fn execution_lineage_nix_presence_is_material() {
+        let with_nix = lineage_fixture();
+        let mut without_nix = with_nix.clone();
+        without_nix.nix_identity = None;
+
+        assert!(without_nix.validate().is_ok());
+        assert_ne!(with_nix.digest(), without_nix.digest());
     }
 
     #[test]
