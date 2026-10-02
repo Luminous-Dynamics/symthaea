@@ -1653,9 +1653,9 @@ mod tests {
     #[test]
     fn portrait_enforces_viewbox_and_scalar_numeric_arity() {
         for svg in [
-            r#"<svg viewBox="0 0 10"/></svg>"#,
-            r#"<svg viewBox="0 0 10 10 20"/></svg>"#,
-            r#"<svg width="1 2"/></svg>"#,
+            r#"<svg viewBox="0 0 10"><circle r="1"/></svg>"#,
+            r#"<svg viewBox="0 0 10 10 20"><circle r="1"/></svg>"#,
+            r#"<svg><rect width="1 2"/></svg>"#,
             r#"<svg><circle r="1 2"/></svg>"#,
         ] {
             assert!(
