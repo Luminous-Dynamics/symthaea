@@ -43,6 +43,8 @@ pub use svg_renderer::{SvgRenderOptions, render_svg, render_svg_with_options};
 pub use validation::{SnapshotLimits, SnapshotSanitization};
 #[cfg(feature = "webgpu")]
 pub use webgpu::{GpuScene, GpuVertex};
+#[cfg(target_arch = "wasm32")]
+pub use webgpu::WebGpuMovieRenderer;
 #[cfg(all(feature = "webgpu", target_arch = "wasm32"))]
 pub use webgpu::WebGpuRenderer;
 
