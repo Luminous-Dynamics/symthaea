@@ -814,26 +814,34 @@ fn delete_absent_keys(
     key_column: &str,
     retained: Vec<&str>,
 ) -> Result<(), String> {
-    if retained.is_empty() {
-        tx.execute(&format!("DELETE FROM {table}"), [])
-            .map_err(|e| format!("Reconcile {table}: {e}"))?;
-        return Ok(());
+    tx.execute_batch(
+        "CREATE TEMP TABLE IF NOT EXISTS epf_snapshot_keys_single (
+            key TEXT PRIMARY KEY
+        );
+        DELETE FROM epf_snapshot_keys_single;",
+    )
+    .map_err(|e| format!("Prepare {table} reconciliation: {e}"))?;
+
+    {
+        let mut stmt = tx
+            .prepare_cached("INSERT OR IGNORE INTO epf_snapshot_keys_single (key) VALUES (?1)")
+            .map_err(|e| format!("Prepare {table} reconciliation keys: {e}"))?;
+        for value in retained {
+            stmt.execute([value])
+                .map_err(|e| format!("Reconcile {table} key: {e}"))?;
+        }
     }
 
-    let placeholders = (1..=retained.len())
-        .map(|i| format!("?{i}"))
-        .collect::<Vec<_>>()
-        .join(", ");
     let sql = format!(
         "DELETE FROM {table}
          WHERE {key_column} IS NULL
-            OR {key_column} NOT IN ({placeholders})"
+            OR NOT EXISTS (
+                SELECT 1
+                FROM epf_snapshot_keys_single retained
+                WHERE retained.key = {table}.{key_column}
+            )"
     );
-    let params: Vec<&dyn rusqlite::ToSql> = retained
-        .iter()
-        .map(|value| value as &dyn rusqlite::ToSql)
-        .collect();
-    tx.execute(&sql, rusqlite::params_from_iter(params))
+    tx.execute(&sql, [])
         .map_err(|e| format!("Reconcile {table}: {e}"))?;
     Ok(())
 }
@@ -845,28 +853,39 @@ fn delete_absent_composite_keys(
     right_column: &str,
     retained: Vec<(&str, &str)>,
 ) -> Result<(), String> {
-    if retained.is_empty() {
-        tx.execute(&format!("DELETE FROM {table}"), [])
-            .map_err(|e| format!("Reconcile {table}: {e}"))?;
-        return Ok(());
+    tx.execute_batch(
+        "CREATE TEMP TABLE IF NOT EXISTS epf_snapshot_keys_pair (
+            left_key TEXT NOT NULL,
+            right_key TEXT NOT NULL,
+            PRIMARY KEY (left_key, right_key)
+        );
+        DELETE FROM epf_snapshot_keys_pair;",
+    )
+    .map_err(|e| format!("Prepare {table} reconciliation: {e}"))?;
+
+    {
+        let mut stmt = tx
+            .prepare_cached(
+                "INSERT OR IGNORE INTO epf_snapshot_keys_pair (left_key, right_key)
+                 VALUES (?1, ?2)",
+            )
+            .map_err(|e| format!("Prepare {table} reconciliation keys: {e}"))?;
+        for (left, right) in retained {
+            stmt.execute([left, right])
+                .map_err(|e| format!("Reconcile {table} composite key: {e}"))?;
+        }
     }
 
-    let clauses = retained
-        .iter()
-        .enumerate()
-        .map(|(i, _)| {
-            let base = i * 2 + 1;
-            format!("({left_column} = ?{base} AND {right_column} = ?{})", base + 1)
-        })
-        .collect::<Vec<_>>()
-        .join(" OR ");
-    let sql = format!("DELETE FROM {table} WHERE NOT ({clauses})");
-    let mut values: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(retained.len() * 2);
-    for (left, right) in retained {
-        values.push(left as &dyn rusqlite::ToSql);
-        values.push(right as &dyn rusqlite::ToSql);
-    }
-    tx.execute(&sql, rusqlite::params_from_iter(values))
+    let sql = format!(
+        "DELETE FROM {table}
+         WHERE NOT EXISTS (
+             SELECT 1
+             FROM epf_snapshot_keys_pair retained
+             WHERE retained.left_key = {table}.{left_column}
+               AND retained.right_key = {table}.{right_column}
+         )"
+    );
+    tx.execute(&sql, [])
         .map_err(|e| format!("Reconcile {table}: {e}"))?;
     Ok(())
 }
@@ -1030,6 +1049,73 @@ mod tests {
         let mut p = KnowledgePersistence::new(&db_path);
         let err = p.load_ontology().unwrap_err();
         assert!(err.contains("Load ontology row"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_reconciliation_handles_large_retained_sets() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_large_reconcile_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let facts: Vec<FactRecord> = (0..1200)
+            .map(|i| FactRecord {
+                memory_id: format!("memory-{i:04}"),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![(i % 251) as u8; BinaryHV::BYTES],
+                source_text: format!("fact {i}"),
+                confidence: 0.5,
+                domain: None,
+                cycle: i as u64,
+                is_causal: false,
+            })
+            .collect();
+        let edges: Vec<CausalEdgeRecord> = (0..1200)
+            .map(|i| CausalEdgeRecord {
+                cause: format!("cause-{i:04}"),
+                effect: format!("effect-{i:04}"),
+                strength: 0.5,
+                is_inhibitory: false,
+                cycle: i as u64,
+            })
+            .collect();
+        let ontology: Vec<OntologyRecord> = (0..1200)
+            .map(|i| OntologyRecord {
+                name: format!("primitive-{i:04}"),
+                vector_bytes: vec![(i % 251) as u8; BinaryHV::BYTES],
+                usage_count: 1,
+                utility: 0.5,
+                created_at_cycle: i as u64,
+                last_used_cycle: i as u64,
+                is_a_parent: None,
+            })
+            .collect();
+
+        p.save_snapshot(&facts, &[], &edges, &ontology).unwrap();
+        assert_eq!(p.load_facts().unwrap().len(), 1200);
+        assert_eq!(p.load_causal_edges().unwrap().len(), 1200);
+        assert_eq!(p.load_ontology().unwrap().len(), 1200);
+
+        let reduced_facts: Vec<_> = facts.iter().take(1000).cloned().collect();
+        let reduced_edges: Vec<_> = edges.iter().take(1000).cloned().collect();
+        let reduced_ontology: Vec<_> = ontology.iter().take(1000).cloned().collect();
+        p.save_snapshot(
+            &reduced_facts,
+            &[],
+            &reduced_edges,
+            &reduced_ontology,
+        )
+        .unwrap();
+
+        assert_eq!(p.load_facts().unwrap().len(), 1000);
+        assert_eq!(p.load_causal_edges().unwrap().len(), 1000);
+        assert_eq!(p.load_ontology().unwrap().len(), 1000);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
