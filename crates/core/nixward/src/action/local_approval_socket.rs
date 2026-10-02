@@ -923,6 +923,17 @@ mod tests {
     }
 
     #[test]
+    fn try_accept_and_consume_is_nonblocking_when_no_client_is_ready() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let (_parent, runtime) = private_runtime_path();
+        let server = LocalApprovalSocketServerV1::bind_in(&runtime, &daemon).unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+
+        let result = server.try_accept_and_consume(&store).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
     fn runtime_and_socket_are_private_same_uid_objects() {
         let daemon = LiveDaemonIncarnationV1::generate().unwrap();
         let (_parent, runtime) = private_runtime_path();
