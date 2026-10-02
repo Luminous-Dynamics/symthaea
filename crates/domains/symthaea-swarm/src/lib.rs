@@ -812,6 +812,8 @@ pub mod semantic_evidence_digest;
 pub mod semantic_evidence_history;
 #[cfg(feature = "semantic-digest")]
 pub mod semantic_evidence_anchor;
+#[cfg(feature = "semantic-digest")]
+pub mod semantic_evidence_vds;
 
 pub mod fault;
 #[cfg(feature = "networking")]
