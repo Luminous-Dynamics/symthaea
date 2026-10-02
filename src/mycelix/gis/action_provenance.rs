@@ -279,10 +279,7 @@ impl AuthorizationLease {
         /// Revoke authority before the effect boundary. Revocation is terminal and
     /// cannot be undone by presenting the old authorization witness again.
     pub fn revoke(&mut self) -> Result<(), AuthorizationConsumptionError> {
-        if matches!(
-            self.state,
-            AuthorizationLeaseState::Ready | AuthorizationLeaseState::Prepared { .. }
-        ) {
+        if matches!(self.state, AuthorizationLeaseState::Ready) {
             self.state = AuthorizationLeaseState::Revoked;
             Ok(())
         } else {
@@ -293,10 +290,7 @@ impl AuthorizationLease {
     /// Expire authority when its validity window is no longer acceptable.
     /// Like revocation, expiry is terminal and does not replenish budget.
     pub fn expire(&mut self) -> Result<(), AuthorizationConsumptionError> {
-        if matches!(
-            self.state,
-            AuthorizationLeaseState::Ready | AuthorizationLeaseState::Prepared { .. }
-        ) {
+        if matches!(self.state, AuthorizationLeaseState::Ready) {
             self.state = AuthorizationLeaseState::Expired;
             Ok(())
         } else {
@@ -864,6 +858,45 @@ mod tests {
             Err(AuthorizationConsumptionError::NotReady)
         );
         assert_eq!(expired.expire(), Err(AuthorizationConsumptionError::NotReady));
+    }
+
+    #[test]
+    fn prepared_lease_cannot_be_revoked_or_expired_without_reconciliation() {
+        let action = EpistemicAction::new("a-race", "intervention", ActionRisk::Critical);
+        let action_digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            action_id: "a-race".into(),
+            action_digest: action_digest.clone(),
+            frame: "f1".into(),
+            support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(),
+            expires_at: None,
+            authority_epoch: 1,
+        };
+        let mut lease = AuthorizationLease::new(
+            "a-race",
+            action_digest,
+            "sha256:support",
+            "policy-v1",
+            1,
+            1,
+        );
+        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
+
+        assert_eq!(
+            lease.revoke(),
+            Err(AuthorizationConsumptionError::NotReady)
+        );
+        assert_eq!(
+            lease.expire(),
+            Err(AuthorizationConsumptionError::NotReady)
+        );
+        assert_eq!(
+            lease.commit("attempt-1", ExecutionOutcome::Indeterminate).unwrap().outcome,
+            ExecutionOutcome::Indeterminate
+        );
     }
 
     #[test]
