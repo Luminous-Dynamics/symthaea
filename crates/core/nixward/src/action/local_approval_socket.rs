@@ -37,6 +37,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::Shutdown;
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::io::AsRawFd;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Component, Path, PathBuf};
@@ -194,6 +195,52 @@ impl LocalApprovalSocketServerV1 {
     /// evaluation time are deliberately distinct: `accept()` may block and frame
     /// receipt may take time, so sampling one `now` before accept would make a
     /// later legitimate client timestamp appear to come from the future.
+    /// Poll the listener without blocking the daemon tick.
+    ///
+    /// This preserves the blocking admission implementation while giving a
+    /// long-running daemon a safe, explicit polling seam. The listener itself
+    /// remains in blocking mode; readiness is checked with poll(2) first.
+    pub fn try_accept_and_consume(
+        &self,
+        store: &LocalApprovalRequestStoreV1,
+    ) -> Result<Option<ConsumedLocalApprovalDecisionV1>, LocalApprovalSocketErrorV1> {
+        let mut pollfd = libc::pollfd {
+            fd: self.listener.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        let rc = unsafe { libc::poll(&mut pollfd, 1, 0) };
+        if rc < 0 {
+            return Err(io_error(
+                "poll local approval socket",
+                &self.socket_path,
+                std::io::Error::last_os_error(),
+            ));
+        }
+        if rc == 0 || (pollfd.revents & libc::POLLIN) == 0 {
+            return Ok(None);
+        }
+
+        let (mut stream, _) = self
+            .listener
+            .accept()
+            .map_err(|err| io_error("accept local approval client", &self.socket_path, err))?;
+        configure_session_timeouts_v1(&stream, &self.socket_path)?;
+
+        let peer_observed_at = system_unix_millis_v1()?;
+        let verified_peer = observe_linux_unix_peer_v1(
+            &stream,
+            self.transport_instance_ref.clone(),
+            peer_observed_at,
+        )?;
+
+        let request: LocalApprovalWireRequestV2 = read_json_frame_v1(&mut stream)?;
+        request.validate_protocol()?;
+        let evaluation = AuthoritativeEvaluationV1::sample_from_system_clock()
+            .map_err(LocalApprovalSocketErrorV1::TemporalEvaluation)?;
+        self.consume_and_ack_v1(&mut stream, store, request, &verified_peer, evaluation)
+            .map(Some)
+    }
     pub fn accept_and_consume(
         &self,
         store: &LocalApprovalRequestStoreV1,
