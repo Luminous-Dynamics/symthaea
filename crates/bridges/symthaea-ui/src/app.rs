@@ -330,7 +330,29 @@ fn svg_single_number_is_bounded(value: &str) -> bool {
 
 fn svg_viewbox_is_bounded(value: &str) -> bool {
     svg_numeric_tokens(value)
-        .map(|numbers| numbers.len() == 4)
+        .map(|numbers| {
+            numbers.len() == 4
+                && numbers[2] > 0.0
+                && numbers[3] > 0.0
+        })
+        .unwrap_or(false)
+}
+
+fn svg_single_nonnegative_number_is_bounded(value: &str) -> bool {
+    svg_numeric_tokens(value)
+        .map(|numbers| {
+            numbers.len() == 1
+                && numbers[0] >= 0.0
+        })
+        .unwrap_or(false)
+}
+
+fn svg_single_unit_number_is_bounded(value: &str) -> bool {
+    svg_numeric_tokens(value)
+        .map(|numbers| {
+            numbers.len() == 1
+                && (0.0..=1.0).contains(&numbers[0])
+        })
         .unwrap_or(false)
 }
 
@@ -861,8 +883,17 @@ fn portrait_from_json(v: &Value) -> Option<String> {
                         return None;
                     }
                 }
-                "width" | "height" | "rx" | "ry" | "cx" | "cy" | "r" | "x" | "y" | "x1"
-                | "y1" | "x2" | "y2" | "stroke-width" | "opacity" => {
+                "width" | "height" | "rx" | "ry" | "r" | "stroke-width" => {
+                    if !svg_single_nonnegative_number_is_bounded(value) {
+                        return None;
+                    }
+                }
+                "opacity" => {
+                    if !svg_single_unit_number_is_bounded(value) {
+                        return None;
+                    }
+                }
+                "cx" | "cy" | "x" | "y" | "x1" | "y1" | "x2" | "y2" => {
                     if !svg_single_number_is_bounded(value) {
                         return None;
                     }
@@ -1817,6 +1848,22 @@ mod tests {
     }
 
     #[test]
+    fn portrait_rejects_invalid_numeric_domains() {
+        for svg in [
+            r#"<svg><circle r="-1"/></svg>"#,
+            r#"<svg><rect width="-1" height="1"/></svg>"#,
+            r#"<svg><circle opacity="1.1" r="1"/></svg>"#,
+            r#"<svg viewBox="0 0 0 10"><circle r="1"/></svg>"#,
+            r#"<svg viewBox="0 0 10 -1"><circle r="1"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(),
+                "accepted: {svg}"
+            );
+        }
+    }
+
+    #[test]
     fn portrait_accepts_valid_polyline_points() {
         let payload = serde_json::json!({
             "canvas_svg": r#"<svg viewBox="0 0 10 10"><polyline points="0,0 10,-5 10,10"/></svg>"#
@@ -1858,7 +1905,6 @@ mod tests {
         assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none());
 
         let allowed_attrs = [
-            ("id", "x"),
             ("transform", "translate(1)"),
             ("fill", "none"),
             ("stroke", "none"),
@@ -1866,14 +1912,10 @@ mod tests {
             ("opacity", "1"),
         ];
         let mut many_attrs = String::new();
-        for i in 0..171 {
-            many_attrs.push_str("<g ");
+        for i in 0..205 {
+            many_attrs.push_str(&format!("<g id="g{i}" "));
             for (key, value) in allowed_attrs {
-                if key == "id" {
-                    many_attrs.push_str(&format!("id="g{i}" "));
-                } else {
-                    many_attrs.push_str(&format!("{key}="{value}" "));
-                }
+                many_attrs.push_str(&format!("{key}="{value}" "));
             }
             many_attrs.push_str("/>");
         }
