@@ -109,7 +109,8 @@ impl SqliteAuthorizationStore {
                authority_epoch INTEGER NOT NULL,
                remaining_executions INTEGER NOT NULL,
                state TEXT NOT NULL,
-               attempt_id TEXT
+               attempt_id TEXT,
+               boundary_id TEXT
              );
              CREATE TABLE IF NOT EXISTS authorization_receipts (
                authorization_instance TEXT NOT NULL,
@@ -119,6 +120,7 @@ impl SqliteAuthorizationStore {
                outcome TEXT NOT NULL,
                action_digest TEXT NOT NULL,
                authority_epoch INTEGER NOT NULL,
+               boundary_id TEXT,
                PRIMARY KEY(authorization_instance, attempt_id, phase)
              );
              CREATE TABLE IF NOT EXISTS authorization_dispatches (
@@ -134,6 +136,22 @@ impl SqliteAuthorizationStore {
                state TEXT NOT NULL,
                PRIMARY KEY(authorization_instance, attempt_id)
              );",
+             CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
+               ON authorization_leases(attempt_id)
+               WHERE boundary_id IS NOT NULL AND attempt_id IS NOT NULL;
+             CREATE UNIQUE INDEX IF NOT EXISTS authorization_dispatch_attempt_id_uq
+               ON authorization_dispatches(attempt_id)
+               WHERE boundary_id IS NOT NULL AND attempt_id IS NOT NULL;",
+        )?;
+        ensure_column(&mut connection, "authorization_leases", "boundary_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
+        connection.execute_batch(
+            "CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
+               ON authorization_leases(attempt_id)
+               WHERE boundary_id IS NOT NULL AND attempt_id IS NOT NULL;
+             CREATE UNIQUE INDEX IF NOT EXISTS authorization_dispatch_attempt_id_uq
+               ON authorization_dispatches(attempt_id)
+               WHERE boundary_id IS NOT NULL AND attempt_id IS NOT NULL;",
         )?;
         Ok(store)
     }
@@ -147,8 +165,8 @@ impl SqliteAuthorizationStore {
         connection.execute(
             "INSERT INTO authorization_leases
              (authorization_instance, action_id, action_digest, support_digest, policy, authority_epoch,
-              remaining_executions, state, attempt_id)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+              remaining_executions, state, attempt_id, boundary_id)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,NULL)",
             params![
                 lease.authorization_instance, lease.action_id, lease.action_digest,
                 lease.support_digest, lease.policy, lease.authority_epoch as i64,
@@ -559,7 +577,8 @@ fn migrate_legacy_schema(connection: &mut Connection) -> Result<(), Authorizatio
            authority_epoch INTEGER NOT NULL,
            remaining_executions INTEGER NOT NULL,
            state TEXT NOT NULL,
-           attempt_id TEXT
+           attempt_id TEXT,
+           boundary_id TEXT
          );
 
          CREATE TABLE authorization_receipts (
@@ -570,22 +589,23 @@ fn migrate_legacy_schema(connection: &mut Connection) -> Result<(), Authorizatio
            outcome TEXT NOT NULL,
            action_digest TEXT NOT NULL,
            authority_epoch INTEGER NOT NULL,
+           boundary_id TEXT,
            PRIMARY KEY(authorization_instance, attempt_id, phase)
          );",
     )?;
     tx.execute(
         "INSERT INTO authorization_leases
          (authorization_instance,action_id,action_digest,support_digest,policy,
-          authority_epoch,remaining_executions,state,attempt_id)
+          authority_epoch,remaining_executions,state,attempt_id,boundary_id)
          SELECT action_id,action_id,action_digest,support_digest,policy,
-                authority_epoch,remaining_executions,state,attempt_id
+                authority_epoch,remaining_executions,state,attempt_id,NULL
          FROM authorization_leases_legacy",
         [],
     )?;
     tx.execute(
         "INSERT INTO authorization_receipts
-         (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch)
-         SELECT action_id,action_id,attempt_id,phase,outcome,action_digest,authority_epoch
+         (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,boundary_id)
+         SELECT action_id,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,NULL
          FROM authorization_receipts_legacy",
         [],
     )?;
@@ -659,7 +679,105 @@ fn load_lease(tx: &Transaction<'_>, id: &str) -> Result<Option<AuthorizationLeas
         },
     ).optional()
 }
+fn ensure_column(
+    connection: &mut Connection,
+    table: &str,
+    column: &str,
+    declaration: &str,
+) -> Result<(), AuthorizationStoreError> {
+    let names = connection
+        .prepare(&format!("PRAGMA table_info({table})"))?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?;
+    if names.iter().any(|name| name == column) {
+        return Ok(());
+    }
+    connection.execute(
+        &format!("ALTER TABLE {table} ADD COLUMN {column} {declaration}"),
+        [],
+    )?;
+    Ok(())
+}
+
+fn dispatch_boundary(
+    tx: &Transaction<'_>,
+    authorization_instance: &str,
+    attempt_id: &str,
+) -> Result<Option<String>, AuthorizationStoreError> {
+    tx.query_row(
+        "SELECT boundary_id FROM authorization_dispatches
+         WHERE authorization_instance=?1 AND attempt_id=?2",
+        params![authorization_instance, attempt_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+fn load_lease_boundary(
+    tx: &Transaction<'_>,
+    authorization_instance: &str,
+) -> Result<Option<String>, AuthorizationStoreError> {
+    tx.query_row(
+        "SELECT boundary_id FROM authorization_leases
+         WHERE authorization_instance=?1",
+        params![authorization_instance],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+fn is_pre_dispatch_state(
+    tx: &Transaction<'_>,
+    authorization_instance: &str,
+    attempt_id: &str,
+) -> Result<bool, AuthorizationStoreError> {
+    let state: Option<String> = tx
+        .query_row(
+            "SELECT state FROM authorization_leases
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![authorization_instance, attempt_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(matches!(state.as_deref(), Some("prepared")))
+}
+
 fn update_lease(tx: &Transaction<'_>, lease: &AuthorizationLease) -> Result<(), AuthorizationStoreError> {
+    update_lease_with_boundary(tx, lease, None)
+}
+
+fn update_lease_with_boundary(
+    tx: &Transaction<'_>,
+    lease: &AuthorizationLease,
+    boundary_id: Option<&str>,
+) -> Result<(), AuthorizationStoreError> {
+    let current_boundary = match lease.state {
+        AuthorizationLeaseState::Ready
+        | AuthorizationLeaseState::Exhausted
+        | AuthorizationLeaseState::Revoked
+        | AuthorizationLeaseState::Expired => None,
+        _ => boundary_id,
+    };
+    let changed = tx.execute(
+        "UPDATE authorization_leases
+         SET state=?2,attempt_id=?3,remaining_executions=?4,boundary_id=?5
+         WHERE authorization_instance=?1",
+        params![
+            lease.authorization_instance,
+            encode_state(&lease.state),
+            state_attempt(&lease.state),
+            lease.remaining_executions as i64,
+            current_boundary
+        ],
+    )?;
+    if changed != 1 {
+        return Err(AuthorizationStoreError::NotFound(lease.authorization_instance.clone()));
+    }
+    Ok(())
+}
+
     let changed = tx.execute(
         "UPDATE authorization_leases
          SET state=?2,attempt_id=?3,remaining_executions=?4
@@ -677,6 +795,15 @@ fn update_lease(tx: &Transaction<'_>, lease: &AuthorizationLease) -> Result<(), 
     Ok(())
 }
 fn insert_receipt(tx: &Transaction<'_>, r: &ExecutionReceipt, phase: &str) -> Result<(), AuthorizationStoreError> {
+    insert_receipt_with_boundary(tx, r, phase, None)
+}
+
+fn insert_receipt_with_boundary(
+    tx: &Transaction<'_>,
+    r: &ExecutionReceipt,
+    phase: &str,
+    boundary_id: Option<&str>,
+) -> Result<(), AuthorizationStoreError> {
     let outcome = match r.outcome {
         ExecutionOutcome::Succeeded => "succeeded",
         ExecutionOutcome::Failed => "failed",
@@ -684,11 +811,11 @@ fn insert_receipt(tx: &Transaction<'_>, r: &ExecutionReceipt, phase: &str) -> Re
     };
     tx.execute(
         "INSERT INTO authorization_receipts
-         (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch)
-         VALUES (?1,?2,?3,?4,?5,?6,?7)",
+         (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,boundary_id)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
         params![
             r.authorization_instance, r.action_id, r.attempt_id, phase, outcome,
-            r.action_digest, r.authority_epoch as i64
+            r.action_digest, r.authority_epoch as i64, boundary_id
         ],
     )?;
     Ok(())
