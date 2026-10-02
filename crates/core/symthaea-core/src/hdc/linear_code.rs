@@ -355,6 +355,65 @@ pub fn recover_direct_sum_bound(
     Some((factors.next()?, factors.next()?))
 }
 
+/// Recover a representative factorization for a clean XOR bound using the
+/// maximal-independent-subset construction from Raviv's Theorem 2.
+///
+/// The returned factorization is valid when one exists, but it is deliberately
+/// not labeled unique: overlapping factor subcodes can admit multiple valid
+/// decompositions. Each retained generator is assigned deterministically to the
+/// first factor whose supplied basis contains it. This is a faithful
+/// representation-level implementation of the paper's constructive recovery
+/// path; callers needing a uniqueness guarantee should use
+/// recover_independent_bound instead.
+pub fn recover_linear_bound(
+    target: &BinaryCodeword,
+    factors: &[&RandomLinearCode],
+) -> Option<Vec<BinaryCodeword>> {
+    if factors.is_empty() {
+        return None;
+    }
+
+    let dimension = target.dimension();
+    if factors.iter().any(|factor| factor.dimension() != dimension) {
+        return None;
+    }
+
+    // Raviv's Theorem 2 first constructs a maximal linearly independent subset
+    // of the union of all factor generator bases. Keeping the owner alongside
+    // each retained generator lets us project the recovered coefficients back
+    // into factor codewords without manufacturing a uniqueness claim.
+    let mut independent_basis = Vec::new();
+    let mut owners = Vec::new();
+
+    for (factor_index, factor) in factors.iter().enumerate() {
+        for generator in factor.basis() {
+            if extends_span(&independent_basis, generator) {
+                independent_basis.push(generator.clone());
+                owners.push(factor_index);
+            }
+        }
+    }
+
+    let coefficients = solve_linear_combination(target, &independent_basis)?;
+
+    let mut recovered = factors
+        .iter()
+        .map(|_| BinaryCodeword::zero(dimension))
+        .collect::<Vec<_>>();
+
+    for ((coefficient, generator), &owner) in coefficients
+        .iter()
+        .zip(&independent_basis)
+        .zip(&owners)
+    {
+        if *coefficient {
+            recovered[owner].xor_assign(generator);
+        }
+    }
+
+    Some(recovered)
+}
+
 /// Recover factors from a clean XOR bound when the participating linear-code
 /// generator bases are jointly independent.
 ///
