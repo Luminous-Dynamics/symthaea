@@ -7,6 +7,14 @@ on:
       - "crates/core/symthaea-core/tests/linear_code_ambiguity.rs"
       - "docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md"
       - ".github/workflows/hdc-linear-code-qualify.yml"
+  push:
+    branches:
+      - "research/hdc-linear-code-recovery-design-v1"
+    paths:
+      - "crates/core/symthaea-core/src/hdc/linear_code.rs"
+      - "crates/core/symthaea-core/tests/linear_code_ambiguity.rs"
+      - "docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md"
+      - ".github/workflows/hdc-linear-code-qualify.yml"
   workflow_dispatch:
 
 concurrency:
