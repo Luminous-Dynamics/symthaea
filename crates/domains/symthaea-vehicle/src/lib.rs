@@ -81,7 +81,6 @@ pub mod encoder;
 pub mod fep_agent;
 pub mod perturbations;
 pub mod plugin;
-pub mod regenerative_health;
 pub mod reward;
 pub mod road;
 pub mod scenarios;
@@ -96,7 +95,7 @@ pub use controller::VehicleController;
 pub use encoder::VehicleHdcEncoder;
 pub use fep_agent::{ActiveInferenceVehicleAgent, VehicleFepConfig, VehicleFepResult};
 pub use perturbations::{PerturbationSchedule, VehiclePerturbation};
-pub use regenerative_health::{
+pub use symthaea_regenerative_health::{
     HealthObservation, RecoveryEvidence, RegenerativeAction, RegenerativeDecision,
     RegenerativeHealthGate, RegenerativeHealthState, RegenerativeIssue, RegenerativePolicy,
 };
