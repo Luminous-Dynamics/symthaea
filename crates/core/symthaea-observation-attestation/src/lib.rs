@@ -149,7 +149,7 @@ pub enum ReceiptAttestationVerificationOutcome {
 ///
 /// Do not derive these from enum discriminants: inserting or reordering enum variants
 /// must never silently change the identity of historical evidence.
-fn verification_outcome_tag(outcome: ReceiptAttestationVerificationOutcome) -> u8 {
+const fn verification_outcome_tag(outcome: ReceiptAttestationVerificationOutcome) -> u8 {
     match outcome {
         ReceiptAttestationVerificationOutcome::Verified => 0,
         ReceiptAttestationVerificationOutcome::InvalidEnvelope => 1,
@@ -168,56 +168,6 @@ fn verification_outcome_tag(outcome: ReceiptAttestationVerificationOutcome) -> u
         ReceiptAttestationVerificationOutcome::VerificationMethodRevoked => 14,
         ReceiptAttestationVerificationOutcome::VerificationMethodExpired => 15,
         ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized => 16,
-    }
-}
-
-/// Prevent a structurally valid trace from pairing a check with an outcome that
-/// could never be emitted by that check in the bound procedure.
-fn outcome_allowed_for_check(
-    check: EvaluationCheck,
-    outcome: ReceiptAttestationVerificationOutcome,
-) -> bool {
-    match check {
-        EvaluationCheck::EnvelopeStructuralValidation =>
-            matches!(outcome, ReceiptAttestationVerificationOutcome::InvalidEnvelope),
-        EvaluationCheck::ReceiptCommitment =>
-            matches!(outcome, ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch),
-        EvaluationCheck::TemporalValidity =>
-            matches!(
-                outcome,
-                ReceiptAttestationVerificationOutcome::NotYetValid
-                    | ReceiptAttestationVerificationOutcome::Expired
-            ),
-        EvaluationCheck::CryptosuiteConformance =>
-            matches!(outcome, ReceiptAttestationVerificationOutcome::CryptosuiteMismatch),
-        EvaluationCheck::VerificationMethodResolution =>
-            matches!(
-                outcome,
-                ReceiptAttestationVerificationOutcome::VerificationMethodMismatch
-                    | ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable
-            ),
-        EvaluationCheck::VerificationMethodLifecycle =>
-            matches!(
-                outcome,
-                ReceiptAttestationVerificationOutcome::VerificationMethodRevoked
-                    | ReceiptAttestationVerificationOutcome::VerificationMethodExpired
-            ),
-        EvaluationCheck::ProofPurposeAuthorization =>
-            matches!(outcome, ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized),
-        EvaluationCheck::ProofPolicyConformance =>
-            matches!(
-                outcome,
-                ReceiptAttestationVerificationOutcome::ProofPurposeMismatch
-                    | ReceiptAttestationVerificationOutcome::DomainMismatch
-                    | ReceiptAttestationVerificationOutcome::ChallengeMismatch
-            ),
-        EvaluationCheck::CryptographicProof =>
-            matches!(
-                outcome,
-                ReceiptAttestationVerificationOutcome::MissingProof
-                    | ReceiptAttestationVerificationOutcome::InvalidProofEncoding
-                    | ReceiptAttestationVerificationOutcome::InvalidSignature
-            ),
     }
 }
 
@@ -3099,21 +3049,28 @@ mod tests {
         assert_ne!(current.fingerprint(), legacy.fingerprint());
 
         let current_canonical = current.canonical_bytes();
-        let legacy_canonical = legacy.canonical_bytes();
-
         for check in current.checks {
             let tags = check.allowed_failure_outcome_tags();
             assert!(!tags.is_empty());
             assert!(current_canonical.windows(tags.len()).any(|window| window == tags));
         }
 
-        // Historical v1 canonicalization remains exactly the pre-v2 shape:
-        // check definition revisions and failure semantics are intentionally
-        // excluded so old evidence remains reconstructable.
-        for check in legacy.checks {
-            assert!(!legacy_canonical.windows(check.definition_version().len())
-                .any(|window| window == check.definition_version().as_bytes()));
+        // Reconstruct the historical v1 canonical form exactly. This guards
+        // against accidentally changing the identity of legacy evidence while
+        // strengthening the current procedure.
+        fn write_string(bytes: &mut Vec<u8>, value: &str) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value.as_bytes());
         }
+        let mut historical = Vec::new();
+        historical.extend_from_slice(b"symthaea:observation-evaluation-procedure:v1\n");
+        write_string(&mut historical, legacy.procedure_version);
+        write_string(&mut historical, legacy.procedure_id);
+        historical.extend_from_slice(&(legacy.checks.len() as u64).to_be_bytes());
+        for check in legacy.checks {
+            write_string(&mut historical, check.id());
+        }
+        assert_eq!(legacy.canonical_bytes(), historical);
     }
 
     #[test]
