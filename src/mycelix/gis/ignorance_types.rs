@@ -1236,7 +1236,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reopen_does_not_report_missing_roots {
+    fn test_reopen_does_not_report_missing_roots() {
         let mut graph = ConclusionDependencyGraph::default();
         graph.add(EpistemicConclusion::new("c1", "A", "gis-default@1"));
 
