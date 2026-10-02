@@ -2070,6 +2070,40 @@ mod tests {
     }
 
     #[test]
+    fn test_load_causal_edges_rejects_out_of_range_strength() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_causal_invalid_strength_load_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_causal_edges (
+                    cause TEXT NOT NULL,
+                    effect TEXT NOT NULL,
+                    strength REAL NOT NULL,
+                    is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                    cycle INTEGER NOT NULL,
+                    PRIMARY KEY (cause, effect)
+                );
+                INSERT INTO knowledge_causal_edges
+                    (cause, effect, strength, is_inhibitory, cycle)
+                VALUES ('cause', 'effect', 1.5, 0, 1);",
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let error = p.load_causal_edges().unwrap_err();
+        assert!(error.contains("strength must be finite and in [-1, 1]"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_load_ontology_total_orders_equal_utility_by_name() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_ontology_equal_utility_order_test_{}",
