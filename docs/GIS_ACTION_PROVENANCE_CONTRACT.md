@@ -30,7 +30,7 @@ The core invariant is:
 
 A conclusion's lifecycle state is not a generic trust score. In particular, `Active` means the conclusion has not been reopened or superseded; it does not establish that its support is fresh, conflict-free, or provenance-complete.
 
-Current High/Critical authorization therefore evaluates these dimensions separately: frame binding, explicit dependency coverage, lifecycle state, freshness, conflict state, and provenance completeness. A current-support assessment must fail closed when any required dimension is unresolved. This preserves the distinction between historical epistemic state and current authorization while avoiding the false equivalence `Active == authoritative`.
+Current High/Critical authorization therefore evaluates these dimensions separately: frame binding, explicit dependency coverage, lifecycle state, freshness, conflict state, and provenance completeness. `CurrentConclusionSupport` encodes those orthogonal support dimensions and its authorization predicate requires `Active`, fresh, non-conflicted, provenance-complete support. A current-support assessment must fail closed when any required dimension is unresolved. This preserves the distinction between historical epistemic state and current authorization while avoiding the false equivalence `Active == authoritative`.
 
 ## Revision propagation
 
@@ -91,7 +91,7 @@ The current module includes focused tests for high-risk gating, ontology-only ty
 1. ontology-only revision gates ontology-dependent high-risk actions;
 2. causal revision gates causal interventions;
 3. evidence-boundary revision gates evidence-dependent actions;
-4. current high-risk execution rejects missing, reopened, qualified, superseded, cross-frame, or incompletely witnessed prerequisites;
+4. current high-risk execution rejects missing, reopened, qualified, superseded, stale, conflicted, provenance-incomplete, cross-frame, or incompletely witnessed prerequisites;
 5. unrelated actions remain unaffected;
 6. superseded conclusions never resurrect old action authorization;
 7. missing/stale provenance fails closed for high-risk actions;
