@@ -253,6 +253,8 @@ impl CognitiveLoopService {
             language_source: None,
             #[cfg(feature = "canvas")]
             canvas_svg: None,
+            #[cfg(feature = "canvas")]
+            canvas_scene: None,
             #[cfg(feature = "identity")]
             signed_output,
             #[cfg(feature = "identity")]
@@ -478,6 +480,8 @@ impl CognitiveLoopService {
             language_source: None,
             #[cfg(feature = "canvas")]
             canvas_svg: None,
+            #[cfg(feature = "canvas")]
+            canvas_scene: None,
             #[cfg(feature = "identity")]
             signed_output: None,
             #[cfg(feature = "identity")]
