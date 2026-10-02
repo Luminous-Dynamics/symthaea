@@ -2143,7 +2143,7 @@ mod tests {
         let evaluation = report.to_evidence_evaluation();
         assert!(evaluation
             .canonical_bytes()
-            .starts_with(b"symthaea:evidence-evaluation:v4\n"));
+            .starts_with(b"symthaea:evidence-evaluation:v5\n"));
     }
 
     #[test]
