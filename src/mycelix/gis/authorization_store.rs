@@ -647,6 +647,26 @@ impl SqliteAuthorizationStore {
     /// the external sink after its last durable local write. Any non-terminal
     /// prepared/dispatch-pending reservation therefore becomes Indeterminate
     /// before another execution can be admitted.
+    /// Recover one exact attempt owned by one execution boundary.
+    ///
+    /// This is the preferred recovery primitive for an external effect: the
+    /// boundary and attempt are both supplied explicitly, so recovery cannot
+    /// claim a sibling attempt merely because it shares the same boundary.
+    pub fn recover_incomplete_attempt_for_boundary(
+        &self,
+        boundary_id: &str,
+        attempt_id: &str,
+    ) -> Result<usize, AuthorizationStoreError> {
+        if boundary_id.is_empty() || attempt_id.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        self.recover_incomplete_attempts_scoped(Some(boundary_id), Some(attempt_id))
+    }
+
+    /// Recover all incomplete attempts owned by one boundary.
+    ///
+    /// This batch form is intended for executor startup maintenance. Any
+    /// per-attempt recovery authorization should use the exact-attempt API.
     pub fn recover_incomplete_attempts_for_boundary(
         &self,
         boundary_id: &str,
@@ -654,39 +674,66 @@ impl SqliteAuthorizationStore {
         if boundary_id.is_empty() {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
-        self.recover_incomplete_attempts_scoped(Some(boundary_id))
+        self.recover_incomplete_attempts_scoped(Some(boundary_id), None)
     }
 
     /// Recover only legacy/unscoped attempts. Bound effectful attempts should use
-    /// recover_incomplete_attempts_for_boundary.
+    /// one of the boundary-scoped recovery paths.
     pub fn recover_incomplete_attempts(&self) -> Result<usize, AuthorizationStoreError> {
-        self.recover_incomplete_attempts_scoped(None)
+        self.recover_incomplete_attempts_scoped(None, None)
     }
 
     fn recover_incomplete_attempts_scoped(
         &self,
         boundary_filter: Option<&str>,
+        attempt_filter: Option<&str>,
     ) -> Result<usize, AuthorizationStoreError> {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let mut recovered = Vec::new();
         {
-            let mut stmt = if boundary_filter.is_some() {
-                tx.prepare(
-                    "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
-                     FROM authorization_leases
-                     WHERE state IN ('prepared','dispatch_pending','invoked') AND boundary_id=?1",
-                )?
-            } else {
-                tx.prepare(
-                    "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
-                     FROM authorization_leases
-                     WHERE state IN ('prepared','dispatch_pending','invoked')
-                       AND boundary_id IS NULL",
-                )?
+            let (mut stmt, query_params) = match (boundary_filter, attempt_filter) {
+                (Some(_), Some(_)) => (
+                    tx.prepare(
+                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
+                         FROM authorization_leases
+                         WHERE state IN ('prepared','dispatch_pending','invoked')
+                           AND boundary_id=?1 AND attempt_id=?2",
+                    )?,
+                    vec![
+                        boundary_filter.unwrap().to_owned(),
+                        attempt_filter.unwrap().to_owned(),
+                    ],
+                ),
+                (Some(_), None) => (
+                    tx.prepare(
+                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
+                         FROM authorization_leases
+                         WHERE state IN ('prepared','dispatch_pending','invoked')
+                           AND boundary_id=?1",
+                    )?,
+                    vec![boundary_filter.unwrap().to_owned()],
+                ),
+                (None, Some(_)) => (
+                    tx.prepare(
+                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
+                         FROM authorization_leases
+                         WHERE state IN ('prepared','dispatch_pending','invoked')
+                           AND boundary_id IS NULL AND attempt_id=?1",
+                    )?,
+                    vec![attempt_filter.unwrap().to_owned()],
+                ),
+                (None, None) => (
+                    tx.prepare(
+                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
+                         FROM authorization_leases
+                         WHERE state IN ('prepared','dispatch_pending','invoked')
+                           AND boundary_id IS NULL",
+                    )?,
+                    Vec::new(),
+                ),
             };
-            let bound_params = boundary_filter.map(|id| vec![id.to_owned()]).unwrap_or_default();
-            let rows = stmt.query_map(rusqlite::params_from_iter(bound_params.iter()), |row| {
+            let rows = stmt.query_map(rusqlite::params_from_iter(query_params.iter()), |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -1275,7 +1322,13 @@ mod tests {
         drop(store);
 
         let boundary_b=SqliteAuthorizationStore::open(&path).unwrap();
-        assert_eq!(boundary_b.recover_incomplete_attempts_for_boundary("boundary-B").unwrap(),0);
+        assert_eq!(
+            boundary_b
+                .recover_incomplete_attempt_for_boundary("boundary-B","attempt-boundary")
+                .unwrap(),
+            0
+        );
+
         let mut wrong=record.clone();
         wrong.boundary_id="boundary-B".into();
         assert!(matches!(
@@ -1284,7 +1337,12 @@ mod tests {
         ));
 
         let boundary_a=SqliteAuthorizationStore::open(&path).unwrap();
-        assert_eq!(boundary_a.recover_incomplete_attempts_for_boundary("boundary-A").unwrap(),1);
+        assert_eq!(
+            boundary_a
+                .recover_incomplete_attempt_for_boundary("boundary-A","attempt-boundary")
+                .unwrap(),
+            1
+        );
         let receipt=boundary_a.reconcile_indeterminate_bound(&record,ExecutionOutcome::Succeeded).unwrap();
         assert_eq!(receipt.outcome,ExecutionOutcome::Succeeded);
         assert_eq!(receipt.authorization_instance,"approval-boundary");
