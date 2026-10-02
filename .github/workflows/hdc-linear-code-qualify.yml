@@ -52,6 +52,14 @@ jobs:
         with:
           components: rustfmt,clippy
 
+      - name: Capture source provenance
+        id: provenance
+        run: |
+          SOURCE_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/src/hdc/linear_code.rs" | cut -d" " -f1)"
+          TEST_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" | cut -d" " -f1)"
+          echo "source_sha256=$SOURCE_SHA256" >> "$GITHUB_OUTPUT"
+          echo "test_sha256=$TEST_SHA256" >> "$GITHUB_OUTPUT"
+
       - name: Focused formatting
         id: format
         run: |
@@ -88,10 +96,6 @@ jobs:
           cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" \
             "$HARNESS/tests/linear_code_ambiguity.rs"
 
-          SOURCE_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/src/hdc/linear_code.rs" | cut -d" " -f1)"
-          TEST_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" | cut -d" " -f1)"
-          echo "source_sha256=$SOURCE_SHA256" >> "$GITHUB_OUTPUT"
-          echo "test_sha256=$TEST_SHA256" >> "$GITHUB_OUTPUT"
           echo "path=$HARNESS" >> "$GITHUB_OUTPUT"
 
       - name: Linear-code unit tests
@@ -124,8 +128,8 @@ jobs:
           ======================================
           exact_head=${{ steps.head.outputs.sha }}
           rust_toolchain=1.96.0
-          source_sha256=${{ steps.harness.outputs.source_sha256 }}
-          integration_test_sha256=${{ steps.harness.outputs.test_sha256 }}
+          source_sha256=${{ steps.provenance.outputs.source_sha256 }}
+          integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
           representation=gf2_random_linear_code
           stage=A-C-algebraic-recovery+E-decoder-oracle
           stage_b_paper_fidelity=not-claimed
