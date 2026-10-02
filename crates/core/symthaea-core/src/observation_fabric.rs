@@ -825,6 +825,18 @@ pub struct ReceiptAttestationEnvelope {
     pub proof: Option<Vec<u8>>,
 }
 
+/// Time-relative validity of a detached receipt attestation envelope.
+///
+/// This is deliberately trust-neutral: it evaluates only the envelope's
+/// declared creation/expiry timestamps. It does not validate cryptographic
+/// proof material, attester identity, revocation, or the underlying receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReceiptAttestationTemporalStatus {
+    NotYetValid,
+    Valid,
+    Expired,
+}
+
 impl ReceiptAttestationEnvelope {
     /// Domain separator for the deterministic attestation payload.
     pub const DOMAIN_SEPARATOR: &'static [u8] =
@@ -857,6 +869,39 @@ impl ReceiptAttestationEnvelope {
         }
     }
 
+    /// Verify that the envelope still names the exact receipt it claims to attest.
+    ///
+    /// This is a commitment check only. It does not verify the external proof,
+    /// attester identity, or any substantive observation claim.
+    pub fn verify_against_receipt(
+        &self,
+        receipt: &IndependenceVerificationReceipt,
+    ) -> bool {
+        self.receipt_fingerprint == receipt.fingerprint()
+            && self.verifier_version == receipt.verifier_version
+            && self.examined_scope_fingerprint == receipt.examined_scope_fingerprint
+    }
+
+    /// Evaluate the declared temporal validity at an explicit Unix-nanosecond instant.
+    ///
+    /// Expiry is an exclusive boundary: an envelope is expired at the
+    /// declared expiry instant. This method intentionally does not consult
+    /// wall-clock time, revocation registries, or external trust policy.
+    pub fn temporal_status_at(&self, now_unix_ns: i128) -> ReceiptAttestationTemporalStatus {
+        if now_unix_ns < self.created_at_unix_ns {
+            ReceiptAttestationTemporalStatus::NotYetValid
+        } else if self.expires_at_unix_ns.is_some_and(|expires_at| now_unix_ns >= expires_at) {
+            ReceiptAttestationTemporalStatus::Expired
+        } else {
+            ReceiptAttestationTemporalStatus::Valid
+        }
+    }
+
+    /// Return whether the envelope is expired at an explicit instant.
+    pub fn is_expired_at(&self, now_unix_ns: i128) -> bool {
+        matches!(self.temporal_status_at(now_unix_ns), ReceiptAttestationTemporalStatus::Expired)
+    }
+
     /// Validate the envelope's structural commitments.
     ///
     /// This does not verify the external proof, resolve the attester, or
@@ -871,7 +916,7 @@ impl ReceiptAttestationEnvelope {
             || self.cryptosuite.as_deref().is_some_and(|v| v.trim().is_empty())
             || self.domain.as_deref().is_some_and(|v| v.trim().is_empty())
             || self.challenge.as_deref().is_some_and(|v| v.trim().is_empty())
-            || matches!(self.expires_at_unix_ns, Some(expiry) if expiry < self.created_at_unix_ns)
+            || matches!(self.expires_at_unix_ns, Some(expiry) if expiry <= self.created_at_unix_ns)
         {
             return Err(ObservationValidationError::InvalidReceiptAttestationEnvelope);
         }
@@ -892,7 +937,7 @@ impl ReceiptAttestationEnvelope {
         write_canonical_string_bytes(&mut bytes, &self.attester_id);
         write_canonical_string_bytes(&mut bytes, &self.proof_purpose);
         bytes.extend_from_slice(&self.created_at_unix_ns.to_be_bytes());
-        write_canonical_string_option_bytes(&mut bytes, self.expires_at_unix_ns.map(|v| v.to_string()).as_deref());
+        write_canonical_i128_option_bytes(&mut bytes, self.expires_at_unix_ns);
         write_canonical_string_option_bytes(&mut bytes, self.verification_method.as_deref());
         write_canonical_string_option_bytes(&mut bytes, self.cryptosuite.as_deref());
         write_canonical_string_option_bytes(&mut bytes, self.domain.as_deref());
@@ -908,6 +953,16 @@ impl ReceiptAttestationEnvelope {
 
 fn is_hex_fingerprint(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn write_canonical_i128_option_bytes(bytes: &mut Vec<u8>, value: Option<i128>) {
+    match value {
+        Some(value) => {
+            bytes.push(1);
+            bytes.extend_from_slice(&value.to_be_bytes());
+        }
+        None => bytes.push(0),
+    }
 }
 
 fn write_canonical_string_option_bytes(bytes: &mut Vec<u8>, value: Option<&str>) {
@@ -1589,6 +1644,87 @@ mod tests {
         }
     }
 
+    fn fixture_receipt() -> IndependenceVerificationReceipt {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph { observations: vec![fixture(), second], relations: vec![] };
+        let assessment = graph.assess_independence_detailed("obs-001", "obs-002").expect("assessment");
+        IndependenceVerificationReceipt::from_assessment(&assessment)
+    }
+
+    #[test]
+    fn receipt_attestation_temporal_status_is_deterministic() {
+        let receipt = fixture_receipt();
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        envelope.expires_at_unix_ns = Some(200);
+        assert_eq!(envelope.temporal_status_at(99), ReceiptAttestationTemporalStatus::NotYetValid);
+        assert_eq!(envelope.temporal_status_at(100), ReceiptAttestationTemporalStatus::Valid);
+        assert_eq!(envelope.temporal_status_at(199), ReceiptAttestationTemporalStatus::Valid);
+        assert_eq!(envelope.temporal_status_at(200), ReceiptAttestationTemporalStatus::Expired);
+        assert!(envelope.is_expired_at(200));
+        envelope.expires_at_unix_ns = None;
+        assert_eq!(envelope.temporal_status_at(i128::MAX), ReceiptAttestationTemporalStatus::Valid);
+    }
+
+    #[test]
+    fn receipt_attestation_rejects_zero_duration_expiry() {
+        let receipt = fixture_receipt();
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        envelope.expires_at_unix_ns = Some(100);
+        assert_eq!(envelope.validate(), Err(ObservationValidationError::InvalidReceiptAttestationEnvelope));
+    }
+
+    #[test]
+    fn receipt_attestation_proof_is_detached_from_payload_commitment() {
+        let receipt = fixture_receipt();
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        let payload = envelope.payload_fingerprint();
+        envelope.proof = Some(vec![1, 2, 3, 4]);
+        assert_eq!(payload, envelope.payload_fingerprint());
+    }
+
+    #[test]
+    fn receipt_attestation_commitment_rejects_scope_and_version_mutation() {
+        let receipt = fixture_receipt();
+        let envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        let mut changed_scope = envelope.clone();
+        changed_scope.examined_scope_fingerprint = "0".repeat(64);
+        assert!(!changed_scope.verify_against_receipt(&receipt));
+        let mut changed_version = envelope;
+        changed_version.verifier_version = "observation-fabric-independence-v999".into();
+        assert!(!changed_version.verify_against_receipt(&receipt));
+    }
+
+    #[test]
+    fn receipt_attestation_envelope_round_trips_through_serde() {
+        let receipt = fixture_receipt();
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(
+            &receipt,
+            "attester-1",
+            "assertion",
+            100,
+        );
+        envelope.expires_at_unix_ns = Some(200);
+        envelope.verification_method = Some("key-1".into());
+        envelope.cryptosuite = Some("suite-1".into());
+        envelope.domain = Some("example.org".into());
+        envelope.challenge = Some("nonce-1".into());
+        envelope.proof = Some(vec![1, 2, 3]);
+
+        let encoded = serde_json::to_string(&envelope).expect("serialize envelope");
+        let decoded: ReceiptAttestationEnvelope =
+            serde_json::from_str(&encoded).expect("deserialize envelope");
+
+        assert_eq!(decoded, envelope);
+        assert_eq!(decoded.validate(), Ok(()));
+        assert_eq!(
+            decoded.temporal_status_at(150),
+            ReceiptAttestationTemporalStatus::Valid
+        );
+        assert_eq!(decoded.payload_fingerprint(), envelope.payload_fingerprint());
+    }
+
     #[test]
     fn receipt_attestation_envelope_is_detached_and_validatable() {
         let mut second = fixture();
@@ -1610,6 +1746,10 @@ mod tests {
         );
         assert_eq!(envelope.validate(), Ok(()));
         assert_eq!(envelope.receipt_fingerprint, receipt.fingerprint());
+        assert!(envelope.verify_against_receipt(&receipt));
+        envelope.receipt_fingerprint = "00".repeat(32);
+        assert!(!envelope.verify_against_receipt(&receipt));
+        envelope.receipt_fingerprint = receipt.fingerprint();
         assert_eq!(envelope.examined_scope_fingerprint, receipt.examined_scope_fingerprint);
         assert_eq!(envelope.proof, None);
 
@@ -1622,6 +1762,14 @@ mod tests {
             envelope.validate(),
             Err(ObservationValidationError::InvalidReceiptAttestationEnvelope)
         );
+
+        envelope.expires_at_unix_ns = None;
+        let baseline = envelope.payload_fingerprint();
+        envelope.challenge = Some("challenge-1".into());
+        assert_ne!(baseline, envelope.payload_fingerprint());
+        envelope.challenge = None;
+        envelope.proof_purpose = "https://example.org/purpose/other".into();
+        assert_ne!(baseline, envelope.payload_fingerprint());
     }
 
     #[test]
