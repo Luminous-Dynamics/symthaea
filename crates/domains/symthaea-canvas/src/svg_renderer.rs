@@ -725,7 +725,7 @@ mod tests {
 
     #[test]
     fn remote_projection_caps_total_output_bytes() {
-        let path_data = "M 0 0 ".to_string() + &"L 1 1 ".repeat(2_048);
+        let path_data = "M 0 0 ".to_string() + &"L 1 1 ".repeat(2_047);
         assert!(path_data.len() <= MAX_REMOTE_PATH_DATA_BYTES);
 
         let mut root = SceneNode::group(None);
