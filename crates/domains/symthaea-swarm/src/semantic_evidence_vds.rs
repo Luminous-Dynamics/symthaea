@@ -16,6 +16,9 @@ pub const RFC9162_VDS_NAME: &str = "RFC9162_SHA256";
 pub const RFC9162_VDS_ID: u64 = 1;
 pub const RFC9162_INCLUSION_PROOF_ID: i64 = -1;
 pub const RFC9162_CONSISTENCY_PROOF_ID: i64 = -2;
+pub const RFC9942_RECEIPTS_HEADER_LABEL: i64 = 394;
+pub const RFC9942_VDS_HEADER_LABEL: i64 = 395;
+pub const RFC9942_VDP_HEADER_LABEL: i64 = 396;
 /// RFC 9942 proof type carried in the vdp header map.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rfc9942ProofKind {
@@ -850,6 +853,22 @@ mod tests {
             .chain([0x33; 32])
             .collect::<Vec<_>>();
         assert_eq!(consistency.to_cbor(), expected);
+    }
+
+    #[test]
+    fn rfc9942_vdp_encoding_matches_the_registered_label_shapes() {
+        let inclusion=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![inclusion]).unwrap();
+        let mut expected=vec![0xa1,0x20,0x81,0x58,0x26];
+        expected.extend_from_slice(&Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor());
+        assert_eq!(vdp.to_cbor(),expected);
+
+        let consistency=Rfc9162ConsistencyProof::new(1,2,vec![[0x22;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Consistency,vec![consistency]).unwrap();
+        let encoded=vdp.to_cbor();
+        assert_eq!(encoded[0..3],[0xa1,0x21,0x81]);
+        assert_eq!(encoded[3],0x58);
+        assert_eq!(encoded[4],34);
     }
 
     #[test]
