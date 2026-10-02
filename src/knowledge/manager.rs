@@ -1657,6 +1657,60 @@ mod tests {
     }
 
     #[test]
+    fn test_manager_persistence_collapses_repeated_causal_observations() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_manager_repeated_causal_persistence_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let config = KnowledgeManagerConfig {
+            db_path: Some(db_path.to_string_lossy().into_owned()),
+            ..Default::default()
+        };
+        let mut manager = KnowledgeManager::new(config.clone());
+
+        manager.causal_bridge.add_edge(super::causal_bridge::CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.4,
+            is_inhibitory: false,
+            is_negated: false,
+            source_text: "early".into(),
+            discovered_at_cycle: 3,
+        });
+        manager.causal_bridge.add_edge(super::causal_bridge::CausalEdge {
+            cause: "policy".into(),
+            effect: "growth".into(),
+            strength: 0.8,
+            is_inhibitory: true,
+            is_negated: false,
+            source_text: "latest".into(),
+            discovered_at_cycle: 9,
+        });
+
+        manager.persist_snapshot();
+
+        let restored = KnowledgeManager::new(config);
+        assert_eq!(
+            restored
+                .causal_bridge
+                .export_edge_records_with_metadata(),
+            vec![(
+                "policy".to_string(),
+                "growth".to_string(),
+                -0.8,
+                true,
+                9,
+            )]
+        );
+        assert!(!restored.persistence_degraded());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_manager_persistence_round_trip_preserves_canonical_state() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_manager_persistence_round_trip_test_{}",
