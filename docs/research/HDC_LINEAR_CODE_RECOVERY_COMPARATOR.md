@@ -146,7 +146,28 @@ The literature supports treating this as a distinct recovery family. Raviv repor
 - no 3-factor expansion before the two-factor comparator is validated.
 
 
+## Stage-C algebraic kernel status
+
+A first research-only recovery primitive is now implemented: `solve_linear_combination` solves a target codeword as a GF(2) linear combination of supplied basis vectors. The executable Stage-B fixture concatenates the two factor bases, verifies full column rank via the direct-sum condition, recovers the coefficient vector, and then compares that result against exhaustive factor-pair truth.
+
+This is deliberately a **kernel validation**, not yet a paper-fidelity claim. The implementation currently establishes:
+
+- clean bound recovery is exactly reducible to GF(2) linear algebra when the participating factor bases are jointly independent;
+- the recovered coefficient vector can be split back into the two factor domains;
+- the exhaustive oracle returns exactly one matching pair for the validated direct-sum fixture;
+- an outsider target is rejected when it is outside the supplied span.
+
+The remaining research obligation is to match the paper's precise multi-code/subcode construction and prove that the fixture used for the benchmark has the same structural assumptions. The published paper states that bound recovery uses the subspace structure of the participating linear codes for provably correct factorization; the public abstract does not by itself specify every construction detail needed to label this fixture paper-faithful. citeturn0search0turn0academia8
+
 ### Stage-B construction constraint
+The bound-recovery comparator must not use arbitrary factors from a single common linear code as its primary recovery fixture. Such factors are generally non-identifiable from XOR alone because multiple decompositions can exist within the same subspace. The paper's bound-recovery framework instead uses factors associated with participating linear-code subspaces and exploits their basis/subspace structure. Therefore Stage B requires an explicit fixture in which the participating factor domains are defined and the intended factorization is uniquely identifiable (or all valid ambiguity classes are exhaustively enumerated). No recovery-performance claim is valid until that construction is verified.
+
+The first executable fixture now uses two independently generated factor subspaces (C_1,C_2) in the same 96-bit ambient space and **checks** the direct-sum condition algebraically:
+[
+\operatorname{rank}(C_1 + C_2)=\operatorname{rank}(C_1)+\operatorname{rank}(C_2).
+]
+For such a direct sum, the decomposition of any element of (C_1+C_2) into one element of each factor subspace is unique. The test then exhaustively enumerates both small codebooks and requires exactly one pair to reproduce the clean bound. This is an algebraic validation fixture, not yet a claim that it reproduces Raviv's exact benchmark construction; the paper-specific construction still needs to be matched before Stage C.
+
 The bound-recovery comparator must not use arbitrary factors from a single common linear code as its primary recovery fixture. Such factors are generally non-identifiable from XOR alone because multiple decompositions can exist within the same subspace. The paper's bound-recovery framework instead uses factors associated with participating linear-code subspaces and exploits their basis/subspace structure. Therefore Stage B requires an explicit fixture in which the participating factor domains are defined and the intended factorization is uniquely identifiable (or all valid ambiguity classes are exhaustively enumerated). No recovery-performance claim is valid until that construction is verified.
 
 The first executable fixture now uses two independently generated factor subspaces (C_1,C_2) in the same 96-bit ambient space and **checks** the direct-sum condition algebraically:
