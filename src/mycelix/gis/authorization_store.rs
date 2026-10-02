@@ -91,12 +91,6 @@ pub enum ProviderVerificationPurpose {
 pub struct ProviderVerifierConfiguration {
     /// Stable relying-party-selected verifier implementation/profile identifier.
     pub verifier_id: String,
-    /// Digest of the pinned verifier implementation/profile configuration.
-    pub verifier_config_digest: String,
-    /// Digest/identifier of the configured trust-anchor set.
-    pub trust_anchor_digest: String,
-    /// Digest/identifier of the configured evidence schema/profile.
-    pub evidence_profile_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,6 +114,8 @@ pub struct ProviderTerminalEvidence {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedProviderOutcome {
     pub evidence: ProviderTerminalEvidence,
+    /// Relying-party-pinned verifier configuration.
+    pub configuration: ProviderVerifierConfiguration,
     /// Relying-party configured verifier identity/revision.
     pub verifier_id: String,
     /// Digest of the pinned verifier implementation/profile configuration.
