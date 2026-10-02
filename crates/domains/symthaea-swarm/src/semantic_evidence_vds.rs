@@ -32,6 +32,13 @@ pub const MAX_RFC9942_SIGNATURE_PAYLOAD_BYTES: usize = 8 * 1024 * 1024;
 pub const RFC9942_VDP_HEADER_LABEL: i64 = 396;
 pub const COSE_SIGN1_TAG: u64 = 18;
 pub const COSE_ALG_HEADER_LABEL: i64 = 1;
+pub const COSE_KTY_LABEL: i64 = 1;
+pub const COSE_KID_LABEL: i64 = 2;
+pub const COSE_KEY_ALG_LABEL: i64 = 3;
+pub const COSE_KEY_OPS_LABEL: i64 = 4;
+pub const COSE_EC2_KTY: i64 = 2;
+pub const COSE_P256_CRV: i64 = 1;
+pub const COSE_KEY_OP_VERIFY: i64 = 2;
 /// COSE algorithm identifier -8 is EdDSA. This adapter narrows it to Ed25519
 /// by requiring a 32-byte public key and is therefore not a generic EdDSA verifier.
 pub const COSE_ES256_ALGORITHM_ID: i64 = -7;
@@ -62,6 +69,106 @@ impl Rfc9942ReceiptPayload {
     }
     pub const fn attached_root(&self) -> Option<[u8;32]> {
         match self { Self::Detached => None, Self::Attached(root) => Some(*root) }
+    }
+}
+
+/// Validated COSE_Key for ES256 verification.
+///
+/// This adapter implements the EC2/P-256 public-key subset needed by ES256.
+/// It requires `kty=EC2`, `crv=P-256`, 32-byte x/y coordinates, and—when
+/// present—`alg=ES256`. If `key_ops` is present, it must include verify.
+/// The optional `kid` is retained for the caller's separate authorization
+/// and key-selection policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rfc9942Es256CoseKey {
+    kid: Option<Vec<u8>>,
+    x: [u8; 32],
+    y: [u8; 32],
+}
+
+impl Rfc9942Es256CoseKey {
+    pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9942VdpError> {
+        let mut reader=CborReader::new(bytes);
+        let len=reader.read_map_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        if len==0 || len>32 { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
+
+        let mut kty=None;
+        let mut crv=None;
+        let mut alg=None;
+        let mut kid=None;
+        let mut x=None;
+        let mut y=None;
+        let mut key_ops_seen=false;
+        let mut key_ops_verify=false;
+        let mut seen=std::collections::HashSet::new();
+
+        for _ in 0..len {
+            let label=reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            if !seen.insert(label.clone()) { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
+            match label {
+                CborLabelKey::Integer(COSE_KTY_LABEL) => {
+                    kty=Some(reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?);
+                }
+                CborLabelKey::Integer(COSE_KID_LABEL) => {
+                    kid=Some(reader.read_bstr_bounded(256).map_err(|_|Rfc9942VdpError::InvalidEncoding)?);
+                }
+                CborLabelKey::Integer(COSE_KEY_ALG_LABEL) => {
+                    alg=Some(reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?);
+                }
+                CborLabelKey::Integer(COSE_KEY_OPS_LABEL) => {
+                    key_ops_seen=true;
+                    let count=reader.read_array_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    if count>16 { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
+                    for _ in 0..count {
+                        if reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)? == COSE_KEY_OP_VERIFY {
+                            key_ops_verify=true;
+                        }
+                    }
+                }
+                CborLabelKey::Integer(-1) => {
+                    crv=Some(reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?);
+                }
+                CborLabelKey::Integer(-2) => {
+                    let value=reader.read_bstr_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    if value.len()!=32 { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
+                    let mut out=[0u8;32]; out.copy_from_slice(&value); x=Some(out);
+                }
+                CborLabelKey::Integer(-3) => {
+                    let value=reader.read_bstr_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    if value.len()!=32 { return Err(Rfc9942VdpError::InvalidEs256CoseKey); }
+                    let mut out=[0u8;32]; out.copy_from_slice(&value); y=Some(out);
+                }
+                _ => {
+                    reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                }
+            }
+        }
+        reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+
+        if kty != Some(COSE_EC2_KTY) || crv != Some(COSE_P256_CRV) {
+            return Err(Rfc9942VdpError::InvalidEs256CoseKey);
+        }
+        if alg.is_some() && alg != Some(COSE_ES256_ALGORITHM_ID) {
+            return Err(Rfc9942VdpError::Es256CoseKeyAlgorithmMismatch);
+        }
+        if key_ops_seen && !key_ops_verify {
+            return Err(Rfc9942VdpError::Es256CoseKeyOperationNotPermitted);
+        }
+        let x=x.ok_or(Rfc9942VdpError::InvalidEs256CoseKey)?;
+        let y=y.ok_or(Rfc9942VdpError::InvalidEs256CoseKey)?;
+        Ok(Self { kid, x, y })
+    }
+
+    pub fn kid(&self) -> Option<&[u8]> {
+        self.kid.as_deref()
+    }
+
+    pub fn public_key_sec1(&self) -> [u8; ES256_PUBLIC_KEY_BYTES] {
+        let mut key=[0u8; ES256_PUBLIC_KEY_BYTES];
+        key[0]=0x04;
+        key[1..33].copy_from_slice(&self.x);
+        key[33..65].copy_from_slice(&self.y);
+        key
     }
 }
 
@@ -190,6 +297,50 @@ impl Rfc9942ReceiptEnvelope {
         );
         key.verify(&tbs,&self.signature)
             .map_err(|_|Rfc9942VdpError::InvalidEs256Signature)
+    }
+
+    /// Verify the Receipt signature using a validated ES256 COSE_Key.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256_cose_key(
+        &self,
+        key: &Rfc9942Es256CoseKey,
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<(), Rfc9942VdpError> {
+        self.verify_es256(&key.public_key_sec1(),external_aad,detached_payload)
+    }
+
+    /// Verify RFC9942 inclusion using a validated ES256 COSE_Key.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256_cose_key_inclusion(
+        &self,
+        candidate_entry: &[u8],
+        key: &Rfc9942Es256CoseKey,
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        let head=match detached_payload {
+            Some(payload)=>self.verify_inclusion_with_detached_payload(candidate_entry,payload)?,
+            None=>self.verify_inclusion(candidate_entry)?,
+        };
+        self.verify_es256_cose_key(key,external_aad,detached_payload)?;
+        Ok(head)
+    }
+
+    /// Verify RFC9942 consistency using a validated ES256 COSE_Key.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256_cose_key_consistency(
+        &self,
+        older: VdsTreeHead,
+        key: &Rfc9942Es256CoseKey,
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.verify_es256_cose_key(key,external_aad,detached_payload)?;
+        match detached_payload {
+            Some(payload)=>self.verify_consistency_with_detached_payload(older,payload),
+            None=>self.verify_consistency(older),
+        }
     }
 
     /// Verify an RFC9942 inclusion Receipt with Ed25519: proof first, then
@@ -536,6 +687,16 @@ impl Rfc9942SignatureWithReceipts {
             .map_err(|_|Rfc9942VdpError::InvalidEd25519Signature)
     }
 
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256_cose_key(
+        &self,
+        key: &Rfc9942Es256CoseKey,
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<(), Rfc9942VdpError> {
+        self.verify_es256(&key.public_key_sec1(),external_aad,detached_payload)
+    }
+
     pub fn signature(&self) -> &[u8] {
         &self.signature
     }
@@ -873,6 +1034,12 @@ pub enum Rfc9942VdpError {
     InvalidEs256PublicKey,
     #[error("invalid ES256 signature")]
     InvalidEs256Signature,
+    #[error("invalid ES256 COSE_Key: required EC2/P-256 public parameters are missing or invalid")]
+    InvalidEs256CoseKey,
+    #[error("ES256 COSE_Key algorithm does not match the Receipt/COSE_Sign1 algorithm")]
+    Es256CoseKeyAlgorithmMismatch,
+    #[error("ES256 COSE_Key does not permit verification")]
+    Es256CoseKeyOperationNotPermitted,
     #[error("RFC 9942 vds header value {0} does not identify RFC9162_SHA256")]
     VdsMismatch(u64),
     #[error("proof collection contains an invalid RFC 9162 proof: {0}")]
@@ -2257,6 +2424,36 @@ mod tests {
             wrong_alg.verify_ed25519(signing_key.verifying_key().as_bytes(),b"",None),
             Err(Rfc9942VdpError::UnsupportedSignatureAlgorithm(-7))
         );
+    }
+
+    #[cfg(feature = "semantic-receipts")]
+    #[test]
+    fn rfc9942_es256_cose_key_checks_type_curve_algorithm_and_ops() {
+        use ring::{rand::SystemRandom, signature::{EcdsaKeyPair, KeyPair}};
+        let rng=SystemRandom::new();
+        let pkcs8=EcdsaKeyPair::generate_pkcs8(&ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,&rng).unwrap();
+        let keypair=EcdsaKeyPair::from_pkcs8(&ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,pkcs8.as_ref(),&rng).unwrap();
+        let public=keypair.public_key().as_ref();
+        assert_eq!(public.len(),65);
+        let mut cose=Vec::new();
+        cbor_map_len(&mut cose,5);
+        cbor_int(&mut cose,COSE_KTY_LABEL); cbor_int(&mut cose,COSE_EC2_KTY);
+        cbor_int(&mut cose,COSE_KEY_ALG_LABEL); cbor_int(&mut cose,COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut cose,COSE_KEY_OPS_LABEL); cbor_array_len(&mut cose,1); cbor_int(&mut cose,COSE_KEY_OP_VERIFY);
+        cbor_int(&mut cose,-1); cbor_int(&mut cose,COSE_P256_CRV);
+        cbor_int(&mut cose,-2); cbor_bytes(&mut cose,&public[1..33]);
+        cbor_int(&mut cose,-3); cbor_bytes(&mut cose,&public[33..65]);
+        let parsed=Rfc9942Es256CoseKey::from_cbor(&cose).unwrap();
+        assert_eq!(parsed.kid(),None);
+        assert_eq!(parsed.public_key_sec1(),public.try_into().unwrap());
+
+        let mut wrong=Vec::new();
+        cbor_map_len(&mut wrong,4);
+        cbor_int(&mut wrong,COSE_KTY_LABEL); cbor_int(&mut wrong,1);
+        cbor_int(&mut wrong,-1); cbor_int(&mut wrong,COSE_P256_CRV);
+        cbor_int(&mut wrong,-2); cbor_bytes(&mut wrong,&public[1..33]);
+        cbor_int(&mut wrong,-3); cbor_bytes(&mut wrong,&public[33..65]);
+        assert_eq!(Rfc9942Es256CoseKey::from_cbor(&wrong),Err(Rfc9942VdpError::InvalidEs256CoseKey));
     }
 
     #[cfg(feature = "semantic-receipts")]
