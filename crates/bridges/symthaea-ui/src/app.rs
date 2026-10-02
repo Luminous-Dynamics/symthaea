@@ -836,7 +836,7 @@ fn portrait_from_json(v: &Value) -> Option<String> {
                         return None;
                     }
                 }
-                "viewbox" => {
+                "viewBox" => {
                     if !svg_viewbox_is_bounded(value) {
                         return None;
                     }
@@ -1729,6 +1729,20 @@ mod tests {
             r#"<svg><polyline points="0,0 1"/></svg>"#,
             r#"<svg><polygon points="0 0 1"/></svg>"#,
             r#"<svg><polyline points="0,0 1,1 2"/></svg>"#,
+        ] {
+            assert!(
+                portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(),
+                "accepted: {svg}"
+            );
+        }
+    }
+
+    #[test]
+    fn portrait_rejects_unbounded_viewbox_numeric_geometry() {
+        for svg in [
+            r#"<svg viewBox="0 0 1e9999 10"><circle r="1"/></svg>"#,
+            r#"<svg viewBox="0 0 1000001 10"><circle r="1"/></svg>"#,
+            r#"<svg viewBox="0 0 1.2.3 10"><circle r="1"/></svg>"#,
         ] {
             assert!(
                 portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none(),
