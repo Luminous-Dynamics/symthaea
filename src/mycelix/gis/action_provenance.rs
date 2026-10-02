@@ -7,6 +7,11 @@
 use super::ignorance_types::{ConclusionDependencyGraph, EpistemicFrameImpact, EpistemicFrameRevision};
 use sha2::{Digest, Sha256};
 
+fn append_len_prefixed<H: Digest>(hasher: &mut H, value: &[u8]) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value);
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ActionRisk {
     Informational,
@@ -194,20 +199,37 @@ pub struct AuthorizationLease {
 }
 
 impl AuthorizationLease {
-    /// Derive the stable idempotency identity presented to a provider.
+    /// Derive the stable downstream replay identity from the native grant.
     ///
-    /// The authorization instance is the native replay unit; the canonical
-    /// action digest additionally fences the exact material action/effect.
-    /// Attempt IDs are deliberately excluded so executor retries cannot create
-    /// a fresh downstream effect identity.
-    pub fn provider_idempotency_key(&self) -> String {
+    /// The derivation is intentionally independent of authorization presentation,
+    /// operation IDs, attempt IDs, wrappers, sessions, and provider-selected
+    /// identifiers. The exact action digest and effecting target are included so
+    /// one native grant cannot be rebound to a materially different sink.
+    pub fn provider_idempotency_key_for_native_replay(
+        &self,
+        native_replay_identity: &str,
+        target_identity: &str,
+    ) -> Result<String, AuthorizationConsumptionError> {
+        if native_replay_identity.is_empty() || target_identity.is_empty() || self.action_digest.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidBinding);
+        }
         let mut hasher = Sha256::new();
-        hasher.update(b"symthaea:gis:provider-idempotency:v1\n");
-        hasher.update((self.authorization_instance.len() as u64).to_be_bytes());
-        hasher.update(self.authorization_instance.as_bytes());
-        hasher.update((self.action_digest.len() as u64).to_be_bytes());
-        hasher.update(self.action_digest.as_bytes());
-        format!("sha256:{}", hex::encode(hasher.finalize()))
+        hasher.update(b"symthaea:gis:provider-idempotency:v2\n");
+        append_len_prefixed(&mut hasher, native_replay_identity.as_bytes());
+        append_len_prefixed(&mut hasher, target_identity.as_bytes());
+        append_len_prefixed(&mut hasher, self.action_digest.as_bytes());
+        Ok(format!("sha256:{}", hex::encode(hasher.finalize())))
+    }
+
+    /// Legacy authorization-instance based derivation retained only for
+    /// compatibility with non-effectful callers. Effectful execution MUST use
+    /// provider_idempotency_key_for_native_replay.
+    #[deprecated(note = "effectful execution must derive provider idempotency from native replay identity")]
+    pub fn provider_idempotency_key(&self) -> String {
+        self.provider_idempotency_key_for_native_replay(
+            &self.authorization_instance,
+            "legacy-compat-target",
+        ).expect("authorization lease contains a non-empty action digest")
     }
 
     pub fn new(
@@ -777,6 +799,24 @@ impl ActionDependencyGraph {
     }
 }
 
+    #[test]
+    fn provider_idempotency_key_is_stable_across_attempt_metadata() {
+        let lease_a=AuthorizationLease::new_with_instance(
+            "authorization-A","action-A","sha256:action","support","policy",1,1
+        );
+        let lease_b=AuthorizationLease::new_with_instance(
+            "authorization-B","action-A","sha256:action","support","policy",1,1
+        );
+
+        let key_a=lease_a.provider_idempotency_key_for_native_replay("native-grant-1","target-A").unwrap();
+        let key_b=lease_b.provider_idempotency_key_for_native_replay("native-grant-1","target-A").unwrap();
+        assert_eq!(key_a,key_b);
+
+        let different_native=lease_a.provider_idempotency_key_for_native_replay("native-grant-2","target-A").unwrap();
+        let different_target=lease_a.provider_idempotency_key_for_native_replay("native-grant-1","target-B").unwrap();
+        assert_ne!(key_a,different_native);
+        assert_ne!(key_a,different_target);
+    }
 #[cfg(test)]
 mod tests {
     use super::*;
