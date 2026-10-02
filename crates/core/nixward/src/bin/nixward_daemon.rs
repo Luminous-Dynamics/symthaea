@@ -1464,16 +1464,8 @@ impl DaemonState {
                                         let apply_result = writer
                                             .set_option(option_path, value)
                                             .and_then(|patch| {
-                                                let observed_digest =
-                                                    blake3::hash(patch.original.as_bytes()).to_hex().to_string();
-                                                if &observed_digest != expected_config_digest {
-                                                    return Err(std::io::Error::new(
-                                                        std::io::ErrorKind::StaleData,
-                                                        "approved configuration digest no longer matches current configuration.nix",
-                                                    ));
-                                                }
                                                 let modified = patch.modified.clone();
-                                                writer.apply_patch(&patch)?;
+                                                writer.apply_patch_if_current(&patch, expected_config_digest)?;
                                                 Ok(modified)
                                             });
                                         // Do NOT proceed to `nixos-rebuild switch` if the
