@@ -548,19 +548,39 @@ mod tests {
     }
 
     #[test]
-    fn test_equal_similarity_prefers_lexicographically_stable_match() {
-        let config = AdaptiveOntologyConfig {
-            match_threshold: 0.0,
-            ..Default::default()
-        };
-        let mut ontology = AdaptiveOntology::new(config);
+    fn test_equal_similarity_lookup_prefers_lexicographically_stable_match() {
+        let mut ontology = AdaptiveOntology::default();
         let vector = BinaryHV::random(42);
-        ontology.learn("zeta", vector, vec![], 1);
-        let query = ontology.primitives().get("zeta").unwrap().vector;
-        ontology.learn("alpha", query, vec![], 2);
+        ontology.primitives.insert(
+            "zeta".into(),
+            PrimitiveUsage {
+                name: "zeta".into(),
+                vector,
+                usage_count: 0,
+                utility: 0.0,
+                created_at_cycle: 0,
+                last_used_cycle: 0,
+                parent_names: vec![],
+                is_a_parent: None,
+            },
+        );
+        ontology.primitives.insert(
+            "alpha".into(),
+            PrimitiveUsage {
+                name: "alpha".into(),
+                vector,
+                usage_count: 0,
+                utility: 0.0,
+                created_at_cycle: 0,
+                last_used_cycle: 0,
+                parent_names: vec![],
+                is_a_parent: None,
+            },
+        );
 
-        assert_eq!(ontology.primitives().len(), 1);
-        assert!(ontology.primitives().contains_key("alpha") || ontology.primitives().contains_key("zeta"));
+        assert_eq!(ontology.lookup(&vector, 7).map(|(name, _)| name), Some("alpha"));
+        assert_eq!(ontology.primitives.get("alpha").unwrap().usage_count, 1);
+        assert_eq!(ontology.primitives.get("zeta").unwrap().usage_count, 0);
     }
 
     #[test]
