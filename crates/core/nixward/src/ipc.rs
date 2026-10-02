@@ -151,6 +151,9 @@ pub struct DaemonSnapshot {
     /// A pending system action waiting for watchdog approval.
     #[serde(default)]
     pub pending_action: Option<String>,
+    /// Canonical V1 action-intent digest required to approve a governed pending action.
+    #[serde(default)]
+    pub pending_action_intent_digest: Option<String>,
     /// A conversational diagnostic response from Ollama.
     #[serde(default)]
     pub pending_response: Option<String>,
@@ -364,6 +367,7 @@ impl DaemonSnapshot {
             curiosity_weight: 0.3,
             causal_learning_rate: 0.1,
             pending_action: None,
+            pending_action_intent_digest: None,
             pending_response: None,
         }
     }
