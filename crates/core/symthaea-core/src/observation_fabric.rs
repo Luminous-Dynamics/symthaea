@@ -623,6 +623,7 @@ impl IndependenceVerifierContract {
     };
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IndependenceBasis {
     SharedSensor { sensor_id: String },
     SharedPlatform { platform_id: String },
