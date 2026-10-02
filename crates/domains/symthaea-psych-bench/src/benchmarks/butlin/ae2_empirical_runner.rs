@@ -51,7 +51,7 @@ use super::qualification_runtime::{
 use super::report::{EvidenceOutcome, SupportTier, classify_ablation};
 use std::collections::HashMap;
 use symthaea::cognitive_loop::CycleMetadata;
-use symthaea_evidence_plane::{EvidenceCounters, Expectation, check_integrity, config_hash};
+use symthaea_evidence_plane::{EvidenceCounters, Expectation, check_integrity, stable_config_hash};
 
 const NUM_CYCLES: usize = 200;
 const WARMUP: usize = 20;
@@ -236,14 +236,31 @@ fn run_arm(
     samples
 }
 
-/// Full exported record of one AE-2 empirical run — every field the design
+/// In-memory record of one AE-2 empirical run — every field the design
 /// review asked for: exact identities, hook-execution counters, pre/post
 /// manipulated-field values, the specificity health panel, the raw AE-2
 /// signal, the downstream behavioral metric, every `RuntimeQualification`
 /// field, and the final `EvidenceOutcome`.
+///
+/// This type is intentionally not itself a serialized artifact. The
+/// instrumentation positive control is also an in-memory data-mutation check,
+/// not a fourth live experiment arm. Persisted report provenance belongs at
+/// the report/evidence-bundle boundary, where source/artifact provenance can
+/// be attached without conflating it with semantic recipe identity.
 #[derive(Debug, Clone)]
 pub struct Ae2EmpiricalRun {
+    /// Stable semantic identity of the declared runner recipe.
+    pub config_identity: String,
+    /// Historical field name retained for compatibility with existing AE-2
+    /// diagnostics. It carries the same stable recipe identity as
+    /// `config_identity`; it is not a whole-run or artifact identity.
     pub config_hash: String,
+    /// Schema governing `config_identity`.
+    pub config_identity_schema: &'static str,
+    /// Historical field name retained for compatibility. In this deterministic
+    /// runner it identifies the fixed genesis/seed material, not a numeric RNG
+    /// seed; the value is a stable semantic identity rather than a claim of
+    /// multi-seed replication.
     pub seed_identity: String,
     pub target_lever_name: &'static str,
     pub sham_lever_name: &'static str,
@@ -290,7 +307,7 @@ pub struct Ae2EmpiricalRun {
     /// `DiagnosticEntry`.
     pub diagnostic_snapshot: Vec<DiagnosticEntry>,
 
-    /// Known scope limitations of THIS run, preserved as part of the
+    /// Known scope limitations of THIS run, carried with the in-memory
     /// evidence record rather than left as prose that could drift from the
     /// code. Not exhaustive, but each entry names a specific, checkable gap.
     pub known_limitations: Vec<&'static str>,
@@ -347,7 +364,7 @@ impl Ae2EmpiricalRun {
     }
 }
 
-/// Run the real, four-arm AE-2 empirical experiment. The only
+/// Run the real, three-arm AE-2 empirical experiment. The only
 /// backend-touching function in this module — everything else here is
 /// pure post-processing over its output.
 pub fn run_ae2_empirical() -> Ae2EmpiricalRun {
@@ -643,17 +660,33 @@ pub fn run_ae2_empirical() -> Ae2EmpiricalRun {
         classification.benchmark_degraded,
     );
 
-    // Canonical identity fingerprint, via the shared `symthaea-evidence-plane`
-    // `config_hash()` function instead of a locally hand-rolled
-    // `DefaultHasher`-over-format! computation. No existing test asserts a
-    // specific hash *value* (only presence/shape), so this is a safe
-    // behavior-preserving substitution -- the fingerprint's exact bytes
-    // change, but nothing depends on that.
-    let config_hash = config_hash(&(target_lever_name, sham_lever_name, functional_benchmark));
+    // Stable identity of the declared runner recipe, not a whole-run identity:
+    // include the selected levers, functional proxy, sampling window, stimulus
+    // set, and fixed loop-construction profile. The actual code commit, runtime
+    // environment, and produced artifact remain separate provenance layers.
+    // The legacy field name is retained for report compatibility.
+    let config_identity = stable_config_hash(&(
+        target_lever_name,
+        sham_lever_name,
+        functional_benchmark,
+        NUM_CYCLES,
+        WARMUP,
+        STIMULI,
+        "standard-profile-async-training-disabled-v1",
+    ));
+    // The runner has one fixed genesis phrase rather than a numeric RNG seed.
+    // Give that material an explicit stable identity so `seed_identity` cannot
+    // be mistaken for evidence of replicated seed sampling.
+    let seed_identity = format!(
+        "genesis-blake3:v1:{}",
+        stable_config_hash(&"ablation-matrix-deterministic")
+    );
 
     Ae2EmpiricalRun {
-        config_hash,
-        seed_identity: "ablation-matrix-deterministic".to_string(),
+        config_identity: config_identity.clone(),
+        config_hash: config_identity,
+        config_identity_schema: symthaea_evidence_plane::STABLE_CONFIG_IDENTITY_SCHEMA,
+        seed_identity,
         target_lever_name,
         sham_lever_name,
         functional_benchmark,
@@ -683,14 +716,14 @@ pub fn run_ae2_empirical() -> Ae2EmpiricalRun {
 mod tests {
     use super::*;
 
-    /// The first genuine empirical evidence produced by this campaign.
+    /// The first genuine empirical run produced by this campaign.
     /// Deliberately asserts only WIRING correctness (identity match,
     /// AE-2's known static eligibility) -- NOT the scientific outcome.
     /// Run with `--nocapture` to read the full bundle; per explicit
     /// direction, this is where the campaign stops for human review, not
     /// where it silently asserts `Supported`.
     #[test]
-    fn ae2_first_empirical_run_produces_a_complete_evidence_bundle() {
+    fn ae2_first_empirical_run_produces_a_complete_evidence_record() {
         let run = run_ae2_empirical();
 
         assert!(
@@ -716,7 +749,16 @@ mod tests {
              changes, claim_scope_note()'s text needs to change with it"
         );
 
-        println!("\n=== AE-2 first empirical run: full evidence bundle ===\n{run:#?}\n");
+        assert_eq!(
+            run.config_identity_schema,
+            symthaea_evidence_plane::STABLE_CONFIG_IDENTITY_SCHEMA
+        );
+        assert_eq!(run.config_hash, run.config_identity);
+        assert_eq!(run.config_identity.len(), 64);
+        assert_eq!(run.config_hash.len(), 64, "BLAKE3 hex identity must be 64 characters");
+        assert!(run.seed_identity.starts_with("genesis-blake3:v1:"));
+
+        println!("\n=== AE-2 first empirical run: full evidence record ===\n{run:#?}\n");
         println!("=== Outcome: {:?} ===", run.outcome);
         println!("=== Claim scope: {} ===", run.claim_scope_note());
         println!(
