@@ -1057,16 +1057,6 @@ pub enum EvaluationLimitation {
     AttesterIntentNotEvaluated,
 }
 
-#[deprecated(note = "use EvaluationBoundary instead")]
-fn evaluation_limitation_tag(limitation: EvaluationLimitation) -> u8 {
-    match limitation {
-        EvaluationLimitation::UnderlyingObservationTruthNotEvaluated => 0,
-        EvaluationLimitation::SemanticValidityNotEvaluated => 1,
-        EvaluationLimitation::ExternalWorldStateNotEvaluated => 2,
-        EvaluationLimitation::AttesterIntentNotEvaluated => 3,
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvidenceEvaluation {
     pub evaluation_version: &'static str,
