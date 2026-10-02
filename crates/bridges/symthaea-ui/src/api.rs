@@ -18,6 +18,16 @@ use gloo_net::websocket::futures::WebSocket;
 use serde_json::Value;
 use web_sys::Url;
 
+const MAX_HTTP_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+const MAX_WS_TEXT_BYTES: usize = 72 * 1024 * 1024;
+
+fn parse_json_with_limit(text: &str, max_bytes: usize) -> Result<Value, String> {
+    if text.len() > max_bytes {
+        return Err(format!("JSON payload exceeds {max_bytes} byte limit"));
+    }
+    serde_json::from_str::<Value>(text).map_err(|e| format!("failed to parse response: {e}"))
+}
+
 /// Parse and canonicalize the user-configured service gateway before it is
 /// used for either HTTP or WebSocket traffic.
 ///
@@ -70,9 +80,11 @@ pub async fn send_query(gateway: &str, content: &str) -> Result<Value, String> {
         .send()
         .await
         .map_err(|e| format!("request failed: {e}"))?;
-    resp.json::<Value>()
+    let text = resp
+        .text()
         .await
-        .map_err(|e| format!("failed to parse response: {e}"))
+        .map_err(|e| format!("failed to read response: {e}"))?;
+    parse_json_with_limit(&text, MAX_HTTP_RESPONSE_BYTES)
 }
 
 /// One request/response round-trip for status/introspect/etc — same shape
@@ -130,9 +142,18 @@ pub async fn stream_telemetry(
     let (_write, mut read) = ws.split();
     while let Some(msg) = read.next().await {
         match msg {
-            Ok(Message::Text(text)) => match serde_json::from_str::<Value>(&text) {
-                Ok(v) => on_message(v),
-                Err(e) => leptos::logging::warn!("telemetry payload was not JSON: {e}"),
+            Ok(Message::Text(text)) => {
+                if text.len() > MAX_WS_TEXT_BYTES {
+                    leptos::logging::warn!(
+                        "telemetry websocket message exceeded {} byte limit",
+                        MAX_WS_TEXT_BYTES
+                    );
+                    continue;
+                }
+                match serde_json::from_str::<Value>(&text) {
+                    Ok(v) => on_message(v),
+                    Err(e) => leptos::logging::warn!("telemetry payload was not JSON: {e}"),
+                }
             },
             Ok(Message::Bytes(_)) => {}
             Err(e) => {
@@ -142,4 +163,22 @@ pub async fn stream_telemetry(
         }
     }
     true
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_limit_accepts_boundary_and_rejects_overflow() {
+        let text = "{\"ok\":true}";
+        assert!(parse_json_with_limit(text, text.len()).is_ok());
+        assert!(parse_json_with_limit(text, text.len() - 1).is_err());
+    }
+
+    #[test]
+    fn json_limit_rejects_malformed_payload() {
+        assert!(parse_json_with_limit("{", MAX_HTTP_RESPONSE_BYTES).is_err());
+    }
 }
