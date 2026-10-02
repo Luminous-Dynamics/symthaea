@@ -128,7 +128,7 @@ A current authorization witness is still not sufficient for replay-resistant exe
       ↓ effect / observation
     Execution Receipt
 
-The lease carries an explicit execution budget and serialized state. Revocation and expiry are terminal states: neither can be reversed by replaying an earlier witness, and neither replenishes the execution budget. Prepared prevents two concurrent attempts from consuming the same reservation; Exhausted prevents a newly issued witness from silently replenishing a consumed canonical action budget; and Indeterminate blocks blind retry when the effect boundary cannot establish whether the effect happened. Reconciliation is an explicit state transition rather than a second authorization. In a distributed deployment, these transitions require a shared durable atomic consumption domain; an in-memory state machine demonstrates the invariant but does not by itself provide cross-process replay protection.
+The lease carries an explicit execution budget and serialized state. Revocation and expiry are terminal states: neither can be reversed by replaying an earlier witness, and neither replenishes the execution budget. Prepared prevents two concurrent attempts from consuming the same reservation; Exhausted prevents another presentation of the same authorization instance from silently replenishing its consumed budget; and Indeterminate blocks blind retry when the effect boundary cannot establish whether the effect happened. A genuinely new authorization is represented by a new explicit authorization instance, rather than by minting a fresh presentation identifier for the old instance. Reconciliation is an explicit state transition rather than a second authorization. In a distributed deployment, these transitions require a shared durable atomic consumption domain; an in-memory state machine demonstrates the invariant but does not by itself provide cross-process replay protection.
 
 This boundary also keeps execution evidence non-authorizing: an ExecutionReceipt records the action digest, attempt, authority epoch, and observed outcome, but does not contain the support/policy/frame fields required to authorize another execution.
 
@@ -147,11 +147,25 @@ Revocation and expiry are also fenced at the effect boundary. A lease in Ready m
 These rules align with current agent-authorization research: exact action hashing, a shared authorization instance/consumption key, terminal state transitions, and durable atomic consumption are being treated as distinct requirements rather than properties of a signed token alone. The relevant IETF work is still an Internet-Draft, not a final standard.
 
 
+## Authorization instance and semantic replay
+
+The authorization instance is the durable identity of one issuance of authority. It is intentionally distinct from the canonical action identity:
+
+    Canonical Action Digest
+      +
+    Authorization Instance
+      ↓
+    Durable Authorization Lease
+
+A fresh token, retry ID, wrapper, session, or presentation identifier MUST NOT create a new spendable authorization instance by itself. Re-presenting the same authorization instance remains subject to its existing budget and terminal state. If policy explicitly grants the same canonical action again, issuance creates a new authorization instance and persists it before execution admission. This makes semantic replay distinguishable from legitimate re-authorization.
+
+The durable store uses the authorization instance as the lease and receipt consumption key. Existing action-keyed state is migrated by preserving the historical action ID as its initial authorization instance, so the schema hardening does not silently discard prior consumption history.
+
 ## Durable shared consumption domain
 
 The in-memory authorization lease is now complemented by a SQLite-backed shared consumption domain. The durable store persists the lease state, remaining execution budget, attempt identity, and immutable execution observations.
 
-Reservation and consumption transitions execute inside SQLite write transactions. The store uses WAL mode and FULL synchronous durability. Concurrent processes therefore contend on one authoritative state machine rather than independently maintaining local budgets. Reopening the database preserves terminal consumption, and repeated commits for the same action/attempt return the recorded receipt instead of consuming authority again.
+Reservation and consumption transitions execute inside SQLite write transactions. The store uses WAL mode and FULL synchronous durability. Concurrent processes therefore contend on one authoritative state machine rather than independently maintaining local budgets. Reopening the database preserves terminal consumption, and repeated commits for the same authorization-instance/attempt return the recorded receipt instead of consuming authority again.
 
 This still does not make an external side effect transactionally atomic with the authorization database. The prepare/effect/commit gap remains an explicit failure boundary: an uncertain external effect becomes Indeterminate, and reconciliation is required before another attempt can be admitted.
 
