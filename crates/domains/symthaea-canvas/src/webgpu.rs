@@ -491,6 +491,8 @@ pub struct WebGpuRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
+    vertex_buffer: wgpu::Buffer,
+    vertex_buffer_bytes: usize,
     config: wgpu::SurfaceConfiguration,
 }
 
@@ -557,6 +559,14 @@ impl WebGpuRenderer {
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(WGSL_SHADER)),
         });
 
+        let vertex_buffer_bytes = MAX_GPU_VERTICES * std::mem::size_of::<f32>() * 6;
+        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Symthaea WebGPU Persistent Scene Vertex Buffer"),
+            size: vertex_buffer_bytes as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Symthaea WebGPU Canvas Pipeline"),
             layout: None,
@@ -603,6 +613,8 @@ impl WebGpuRenderer {
             device,
             queue,
             pipeline,
+            vertex_buffer,
+            vertex_buffer_bytes,
             config,
         })
     }
@@ -623,13 +635,16 @@ impl WebGpuRenderer {
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         let bytes = scene_to_bytes(&scene.vertices);
-        let buffer = self
-            .device
-            .create_buffer(&wgpu::util::BufferInitDescriptor {
-                label: Some("Symthaea WebGPU Scene Vertex Buffer"),
-                contents: &bytes,
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+        if bytes.len() > self.vertex_buffer_bytes {
+            frame.present();
+            return Err(format!(
+                "GPU scene upload exceeds {} byte bound",
+                self.vertex_buffer_bytes
+            ));
+        }
+        if !bytes.is_empty() {
+            self.queue.write_buffer(&self.vertex_buffer, 0, &bytes);
+        }
 
         let mut encoder = self
             .device
@@ -655,7 +670,7 @@ impl WebGpuRenderer {
             });
             pass.set_pipeline(&self.pipeline);
             if !scene.vertices.is_empty() {
-                pass.set_vertex_buffer(0, buffer.slice(..));
+                pass.set_vertex_buffer(0, self.vertex_buffer.slice(..bytes.len() as u64));
                 pass.draw(0..scene.vertices.len() as u32, 0..1);
             }
         }
