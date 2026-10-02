@@ -166,27 +166,33 @@ impl Movie {
         if total_rgba_bytes > MAX_MOVIE_RGBA_BYTES {
             return None;
         }
-        let frames_rgba: Vec<Vec<u8>> = frames
-            .iter()
-            .filter_map(|f| engine.decode(f.as_str()?).ok())
-            .filter(|raw| raw.len() == bytes_per_frame)
-            .map(|raw| {
-                let mut rgba = Vec::with_capacity(rgba_capacity);
-                for i in 0..px {
-                    let (r, g, b) = if channels >= 3 {
-                        (
-                            raw[i * channels],
-                            raw[i * channels + 1],
-                            raw[i * channels + 2],
-                        )
-                    } else {
-                        (raw[i], raw[i], raw[i])
-                    };
-                    rgba.extend_from_slice(&[r, g, b, 255]);
-                }
-                rgba
-            })
-            .collect();
+        // A malformed frame invalidates the whole projection. Silently
+        // dropping bad frames would make a partially accepted remote movie
+        // look authoritative while hiding transport corruption or hostile
+        // payloads from the caller.
+        let mut frames_rgba = Vec::with_capacity(frames.len());
+        for frame in frames {
+            let encoded = frame.as_str()?;
+            let raw = engine.decode(encoded).ok()?;
+            if raw.len() != bytes_per_frame {
+                return None;
+            }
+
+            let mut rgba = Vec::with_capacity(rgba_capacity);
+            for i in 0..px {
+                let (r, g, b) = if channels >= 3 {
+                    (
+                        raw[i * channels],
+                        raw[i * channels + 1],
+                        raw[i * channels + 2],
+                    )
+                } else {
+                    (raw[i], raw[i], raw[i])
+                };
+                rgba.extend_from_slice(&[r, g, b, 255]);
+            }
+            frames_rgba.push(rgba);
+        }
         if frames_rgba.is_empty() {
             return None;
         }
@@ -221,8 +227,19 @@ fn portrait_from_json(v: &Value) -> Option<String> {
         return None;
     }
 
+    // The byte-size cap bounds input, but a hostile document can still
+    // consume disproportionate parser work through deeply nested elements
+    // or huge attribute sets. Keep structural complexity bounded as well.
+    const MAX_PORTRAIT_ELEMENTS: usize = 256;
+    const MAX_PORTRAIT_NESTING: usize = 32;
+    const MAX_PORTRAIT_ATTRIBUTES: usize = 1024;
+    const MAX_PORTRAIT_ATTRIBUTE_BYTES: usize = 128 * 1024;
+
     let mut stack = Vec::<String>::new();
     let mut seen_root = false;
+    let mut element_count = 0usize;
+    let mut attribute_count = 0usize;
+    let mut attribute_bytes = 0usize;
     let mut cursor = 0usize;
 
     while cursor < svg.len() {
@@ -281,6 +298,11 @@ fn portrait_from_json(v: &Value) -> Option<String> {
         }
         let name = name.to_ascii_lowercase();
 
+        element_count = element_count.checked_add(1)?;
+        if element_count > MAX_PORTRAIT_ELEMENTS {
+            return None;
+        }
+
         const ALLOWED_TAGS: &[&str] = &[
             "svg", "g", "path", "rect", "circle", "ellipse", "line", "polyline",
             "polygon", "title", "desc",
@@ -309,10 +331,21 @@ fn portrait_from_json(v: &Value) -> Option<String> {
             return None;
         }
 
+        if !self_closing {
+            if stack.len() >= MAX_PORTRAIT_NESTING {
+                return None;
+            }
+        }
+
         let attrs = &body[name_end..];
         let mut rest = attrs.trim();
         let mut seen_attrs = Vec::<String>::new();
         while !rest.is_empty() {
+            attribute_count = attribute_count.checked_add(1)?;
+            if attribute_count > MAX_PORTRAIT_ATTRIBUTES {
+                return None;
+            }
+
             let key_end = rest
                 .find(|c: char| c.is_ascii_whitespace() || c == '=')
                 .unwrap_or(rest.len());
@@ -338,6 +371,13 @@ fn portrait_from_json(v: &Value) -> Option<String> {
             let value_end = rest.find(quote as char)?;
             let value = &rest[..value_end];
             rest = rest[value_end + 1..].trim_start();
+
+            attribute_bytes = attribute_bytes
+                .checked_add(key.len())?
+                .checked_add(value.len())?;
+            if attribute_bytes > MAX_PORTRAIT_ATTRIBUTE_BYTES {
+                return None;
+            }
 
             let allowed = match name.as_str() {
                 "svg" => matches!(key.as_str(), "viewbox" | "width" | "height" | "xmlns"),
@@ -1194,6 +1234,53 @@ mod tests {
             "canvas_svg": r#"<svg><metadata><foo/></metadata></svg>"#
         });
         assert!(portrait_from_json(&payload).is_none());
+    }
+
+    #[test]
+    fn portrait_rejects_excessive_structural_complexity() {
+        let nested = format!(
+            "<svg>{}</svg>",
+            "<g>".repeat(32) + &"</g>".repeat(32)
+        );
+        assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": nested })).is_none());
+
+        let too_many_elements = format!(
+            "<svg>{}</svg>",
+            "<g/>".repeat(256)
+        );
+        assert!(portrait_from_json(&serde_json::json!({
+            "canvas_svg": too_many_elements
+        })).is_none());
+    }
+
+    #[test]
+    fn portrait_rejects_excessive_attribute_budget() {
+        let svg = format!(
+            r#"<svg><g id="{}"/></svg>"#,
+            "a".repeat(65)
+        );
+        assert!(portrait_from_json(&serde_json::json!({ "canvas_svg": svg })).is_none());
+
+        let many_attrs = "<g ".to_string()
+            + &(0..1024).map(|i| format!("id{}="x" ", i)).collect::<String>()
+            + "/></svg>";
+        let many_attrs = "<svg>".to_string() + &many_attrs;
+        assert!(portrait_from_json(&serde_json::json!({
+            "canvas_svg": many_attrs
+        })).is_none());
+    }
+
+    #[test]
+    fn movie_rejects_any_malformed_frame_instead_of_silently_dropping_it() {
+        let payload = serde_json::json!({
+            "mental_movie": {
+                "width": 1,
+                "height": 1,
+                "channels": 1,
+                "frames_b64": ["AQ==", "not-base64"]
+            }
+        });
+        assert!(Movie::from_json(&payload).is_none());
     }
 
     #[test]
