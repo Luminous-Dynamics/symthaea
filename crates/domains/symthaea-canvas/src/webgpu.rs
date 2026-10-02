@@ -633,7 +633,7 @@ impl WebGpuRenderer {
         self.surface.configure(&self.device, &self.config);
     }
 
-    pub fn render(&self, scene: &GpuScene) -> Result<(), String> {
+    pub fn render(&mut self, scene: &GpuScene) -> Result<(), String> {
         let bytes = scene_to_bytes(&scene.vertices);
         if bytes.len() > self.vertex_buffer_bytes {
             return Err(format!(
@@ -642,10 +642,7 @@ impl WebGpuRenderer {
             ));
         }
 
-        let frame = self
-            .surface
-            .get_current_texture()
-            .map_err(|error| format!("failed to acquire WebGPU surface texture: {error}"))?;
+        let frame = self.acquire_surface_frame()?;
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -686,6 +683,27 @@ impl WebGpuRenderer {
         self.queue.submit(Some(encoder.finish()));
         frame.present();
         Ok(())
+    }
+
+    fn acquire_surface_frame(&mut self) -> Result<wgpu::SurfaceTexture, String> {
+        match self.surface.get_current_texture() {
+            Ok(frame) => Ok(frame),
+            Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
+                self.surface.configure(&self.device, &self.config);
+                self.surface
+                    .get_current_texture()
+                    .map_err(|error| format!("failed to reacquire WebGPU surface texture: {error}"))
+            }
+            Err(wgpu::SurfaceError::Timeout) => {
+                Err("WebGPU surface acquisition timed out".to_string())
+            }
+            Err(wgpu::SurfaceError::OutOfMemory) => {
+                Err("WebGPU surface acquisition ran out of memory".to_string())
+            }
+            Err(wgpu::SurfaceError::Other) => {
+                Err("WebGPU surface acquisition failed".to_string())
+            }
+        }
     }
 
 }
