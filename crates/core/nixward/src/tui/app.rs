@@ -133,6 +133,20 @@ pub struct App {
     mae_history: Vec<f64>,
 }
 
+fn watchdog_verdict_for_snapshot(
+    snapshot: &DaemonSnapshot,
+    approved: bool,
+) -> String {
+    let verdict = if approved { "Approved" } else { "Vetoed" };
+    snapshot
+        .pending_action_intent_digest
+        .as_deref()
+        .map_or_else(
+            || verdict.to_string(),
+            |digest| format!("{verdict}:{digest}"),
+        )
+}
+
 impl App {
     /// Create a new application.
     pub fn new(dry_run: bool) -> Self {
@@ -225,11 +239,7 @@ impl App {
                     let verdict = self
                         .daemon_snapshot
                         .as_ref()
-                        .and_then(|snapshot| snapshot.pending_action_intent_digest.as_deref())
-                        .map_or_else(
-                            || "Approved".to_string(),
-                            |digest| format!("Approved:{digest}"),
-                        );
+                        .map_or_else(|| "Approved".to_string(), |snapshot| watchdog_verdict_for_snapshot(snapshot, true));
                     let _ = std::fs::write(&wd_path, &verdict);
                     self.output.push(match verdict.strip_prefix("Approved:") {
                         Some(digest) => format!(
@@ -248,11 +258,7 @@ impl App {
                     let verdict = self
                         .daemon_snapshot
                         .as_ref()
-                        .and_then(|snapshot| snapshot.pending_action_intent_digest.as_deref())
-                        .map_or_else(
-                            || "Vetoed".to_string(),
-                            |digest| format!("Vetoed:{digest}"),
-                        );
+                        .map_or_else(|| "Vetoed".to_string(), |snapshot| watchdog_verdict_for_snapshot(snapshot, false));
                     let _ = std::fs::write(&wd_path, &verdict);
                     self.output.push(match verdict.strip_prefix("Vetoed:") {
                         Some(digest) => format!(
@@ -1106,6 +1112,28 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn watchdog_verdict_binds_typed_action_intent() {
+        let mut snapshot = DaemonSnapshot::test_default();
+        snapshot.pending_action_intent_digest = Some("0123456789abcdef".repeat(4));
+
+        assert_eq!(
+            watchdog_verdict_for_snapshot(&snapshot, true),
+            "Approved:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        );
+        assert_eq!(
+            watchdog_verdict_for_snapshot(&snapshot, false),
+            "Vetoed:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        );
+    }
+
+    #[test]
+    fn watchdog_verdict_keeps_legacy_fallback_without_intent() {
+        let snapshot = DaemonSnapshot::test_default();
+        assert_eq!(watchdog_verdict_for_snapshot(&snapshot, true), "Approved");
+        assert_eq!(watchdog_verdict_for_snapshot(&snapshot, false), "Vetoed");
+    }
 
     #[test]
     fn test_app_creation() {
