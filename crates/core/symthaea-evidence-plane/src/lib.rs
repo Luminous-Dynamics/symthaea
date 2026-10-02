@@ -1733,6 +1733,20 @@ mod tests {
     }
 
     #[test]
+    fn execution_lineage_optional_nix_roundtrips_as_null() {
+        let mut lineage = lineage_fixture();
+        lineage.nix_identity = None;
+
+        let json = serde_json::to_string(&lineage).expect("serialize lineage");
+        assert!(json.contains(""nix_identity":null"));
+
+        let restored: ExecutionLineageV1 =
+            serde_json::from_str(&json).expect("deserialize lineage");
+        assert_eq!(restored.nix_identity, None);
+        assert_eq!(restored.digest(), lineage.digest());
+    }
+
+    #[test]
     fn execution_lineage_nix_presence_is_material() {
         let with_nix = lineage_fixture();
         let mut without_nix = with_nix.clone();
