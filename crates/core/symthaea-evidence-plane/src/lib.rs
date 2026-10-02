@@ -798,6 +798,19 @@ mod tests {
     }
 
     #[test]
+    fn execution_lineage_serde_roundtrip_preserves_canonical_snapshot_id() {
+        let lineage = lineage_fixture();
+        let json = serde_json::to_string(&lineage).expect("serialize lineage");
+        let restored: ExecutionLineageV1 =
+            serde_json::from_str(&json).expect("deserialize lineage");
+        assert_eq!(
+            restored.repository_source_snapshot_id.as_str(),
+            "a".repeat(64)
+        );
+        assert_eq!(restored.digest(), lineage.digest());
+    }
+
+    #[test]
     fn execution_lineage_validation_rejects_invalid_repository_source_snapshot_id() {
         assert!(RepositorySourceSnapshotId::parse("not-a-sha256").is_err());
     }
