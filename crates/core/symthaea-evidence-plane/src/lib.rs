@@ -270,6 +270,10 @@ impl Serialize for ExecutionLineageV1 {
 
 impl ExecutionLineageV1 {
     pub const DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:execution-lineage:v1\n";
+    pub const WORKLOAD_DOMAIN_SEPARATOR: &'static [u8] =
+        b"symthaea:execution-workload:v1\n";
+    pub const ENVIRONMENT_DOMAIN_SEPARATOR: &'static [u8] =
+        b"symthaea:execution-environment:v1\n";
 
     /// Construct a lineage from untrusted named-entry sequences without first
     /// collapsing them into maps/sets. Duplicate names are rejected before
@@ -389,11 +393,68 @@ impl ExecutionLineageV1 {
         Ok(())
     }
 
+    /// Content identity of the computational workload independent of the
+    /// execution environment.
+    ///
+    /// This lets two reproducing executions prove that they consumed the same
+    /// workload while intentionally using different toolchains, hosts, Nix
+    /// environments, or declared environment variables.
+    pub fn workload_digest(&self) -> Result<String, String> {
+        self.validate()?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::WORKLOAD_DOMAIN_SEPARATOR);
+        self.write_workload_canonical(&mut hasher);
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+
+    /// Content identity of the declared execution environment independent of
+    /// the workload.
+    pub fn environment_digest(&self) -> Result<String, String> {
+        self.validate()?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::ENVIRONMENT_DOMAIN_SEPARATOR);
+        self.write_environment_canonical(&mut hasher);
+        Ok(hasher.finalize().to_hex().to_string())
+    }
+
     pub fn digest(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(Self::DOMAIN_SEPARATOR);
         self.write_canonical(&mut hasher);
         hasher.finalize().to_hex().to_string()
+    }
+
+    fn write_workload_canonical(&self, hasher: &mut blake3::Hasher) {
+        append_str(hasher, "source_repository", &self.source_repository);
+        append_str(hasher, "source_revision", &self.source_revision);
+        append_str(hasher, "source_tree", &self.source_tree);
+        append_str(
+            hasher,
+            "repository_source_snapshot_schema",
+            RepositorySourceSnapshotId::SCHEMA,
+        );
+        append_str(
+            hasher,
+            "repository_source_snapshot_id",
+            self.repository_source_snapshot_id.as_str(),
+        );
+        append_map(hasher, "lock_digests", &self.lock_digests);
+        append_set(hasher, "feature_flags", &self.feature_flags);
+        append_str(hasher, "cwd", &self.cwd);
+        append_sequence(hasher, "argv", &self.argv);
+        append_map(
+            hasher,
+            "immutable_input_digests",
+            &self.immutable_input_digests,
+        );
+    }
+
+    fn write_environment_canonical(&self, hasher: &mut blake3::Hasher) {
+        append_map(hasher, "toolchain_versions", &self.toolchain_versions);
+        append_str(hasher, "host_triple", &self.host_triple);
+        append_str(hasher, "target_triple", &self.target_triple);
+        append_optional_str(hasher, "nix_identity", self.nix_identity.as_deref());
+        append_map(hasher, "allowed_env", &self.allowed_env);
     }
 
     fn write_canonical(&self, hasher: &mut blake3::Hasher) {
@@ -1754,6 +1815,63 @@ mod tests {
             serde_json::from_str(&json).expect("deserialize lineage");
         assert_eq!(restored.nix_identity, None);
         assert_eq!(restored.digest(), lineage.digest());
+    }
+
+    #[test]
+    fn execution_lineage_workload_and_environment_identities_are_separable() {
+        let base = lineage_fixture();
+        let base_workload = base.workload_digest().expect("valid workload");
+        let base_environment = base.environment_digest().expect("valid environment");
+
+        let mut environment = base.clone();
+        environment.toolchain_versions.insert("cargo".into(), "2.0.0".into());
+        environment.host_triple = "aarch64-unknown-linux-gnu".into();
+        environment.target_triple = "wasm32-unknown-unknown".into();
+        environment.nix_identity = None;
+        environment
+            .allowed_env
+            .insert("RUSTFLAGS".into(), "-Copt-level=3".into());
+
+        assert_eq!(
+            environment.workload_digest().expect("valid workload"),
+            base_workload
+        );
+        assert_ne!(
+            environment.environment_digest().expect("valid environment"),
+            base_environment
+        );
+        assert_ne!(environment.digest(), base.digest());
+
+        let mut workload = base.clone();
+        workload.source_revision = "c".repeat(40);
+        assert_ne!(
+            workload.workload_digest().expect("valid workload"),
+            base_workload
+        );
+        assert_ne!(workload.digest(), base.digest());
+    }
+
+    #[test]
+    fn execution_lineage_workload_identity_binds_source_subject_and_inputs() {
+        let base = lineage_fixture();
+        let workload = base.workload_digest().expect("valid workload");
+
+        let mut snapshot = base.clone();
+        snapshot.repository_source_snapshot_id =
+            RepositorySourceSnapshotId::parse(&"c".repeat(64)).expect("valid snapshot id");
+        assert_ne!(
+            snapshot.workload_digest().expect("valid workload"),
+            workload
+        );
+
+        let mut artifact = base.clone();
+        artifact
+            .immutable_input_digests
+            .insert("dataset.bin".into(), "blake3:0011223344556677".into());
+        assert_ne!(
+            artifact.workload_digest().expect("valid workload"),
+            workload
+        );
     }
 
     #[test]
