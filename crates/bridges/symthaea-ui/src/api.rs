@@ -152,10 +152,10 @@ pub async fn stream_telemetry(
             Ok(Message::Text(text)) => {
                 if text.len() > MAX_WS_TEXT_BYTES {
                     leptos::logging::warn!(
-                        "telemetry websocket message exceeded {} byte limit",
+                        "telemetry websocket message exceeded {} byte limit; closing stream",
                         MAX_WS_TEXT_BYTES
                     );
-                    continue;
+                    break;
                 }
                 match serde_json::from_str::<Value>(&text) {
                     Ok(v) => on_message(v),
