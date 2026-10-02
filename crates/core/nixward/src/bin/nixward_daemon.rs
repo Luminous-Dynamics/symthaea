@@ -73,15 +73,6 @@ fn action_intent_digest_for_command(
     intent.digest()
 }
 
-fn approved_intent_digest(status: &str) -> Option<&str> {
-    let (verdict, digest) = status.trim().split_once(':')?;
-    if !verdict.eq_ignore_ascii_case("approved") {
-        return None;
-    }
-    let digest = digest.trim();
-    (!digest.is_empty()).then_some(digest)
-}
-
 /// Mutable daemon state collected across cycles.
 struct DaemonState {
     codebook: NixCodebook,
@@ -1288,17 +1279,11 @@ impl DaemonState {
                                 }
                             };
 
-                            let approved_digest = self
-                                .watchdog_status
-                                .as_deref()
-                                .and_then(approved_intent_digest);
-
                             // Every modifying command must have a governed V1 semantic
-                            // identity. Free-form Custom commands are rejected before
-                            // this gate and therefore cannot use a legacy verdict file.
-                            let is_approved = approved_digest.is_none()
-                                && self.local_approved_intent_digest.as_deref()
-                                    == Some(intent_digest.as_str())
+                            // identity and an approval consumed from the live V2 runtime.
+                            // The legacy watchdog verdict file is not an authority source.
+                            let is_approved = self.local_approved_intent_digest.as_deref()
+                                == Some(intent_digest.as_str())
                                 && self.pending_action_intent_digest.as_deref()
                                     == Some(intent_digest.as_str());
 
