@@ -1185,6 +1185,92 @@ mod tests {
     }
 
     #[test]
+    fn test_fact_restore_enforces_capacity_and_reports_policy_eviction() {
+        let mut graph = EnhancedKnowledgeGraph::new(2);
+        let records = [
+            super::super::persistence::FactRecord {
+                memory_id: "memory-low".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: "low".into(),
+                confidence: 0.2,
+                domain: Some("test".into()),
+                cycle: 1,
+                is_causal: false,
+            },
+            super::super::persistence::FactRecord {
+                memory_id: "memory-high".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![1u8; 2048],
+                source_text: "high".into(),
+                confidence: 0.9,
+                domain: Some("test".into()),
+                cycle: 2,
+                is_causal: false,
+            },
+            super::super::persistence::FactRecord {
+                memory_id: "memory-mid".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![2u8; 2048],
+                source_text: "mid".into(),
+                confidence: 0.8,
+                domain: Some("test".into()),
+                cycle: 3,
+                is_causal: false,
+            },
+        ];
+
+        assert!(graph.import_fact_record_with_outcome(&records[0]).accepted);
+        assert!(graph.import_fact_record_with_outcome(&records[1]).accepted);
+        let outcome = graph.import_fact_record_with_outcome(&records[2]);
+
+        assert_eq!(outcome.policy_evictions, 1);
+        assert_eq!(graph.len(), 2);
+        assert_eq!(graph.total_evictions(), 1);
+        assert!(graph.all_facts().all(|fact| fact.memory_id != "memory-low"));
+        assert_eq!(graph.domain_count(), 1);
+    }
+
+    #[test]
+    fn test_fact_restore_eviction_tie_break_is_deterministic() {
+        let mut graph = EnhancedKnowledgeGraph::new(1);
+        let first = super::super::persistence::FactRecord {
+            memory_id: "memory-z".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; 2048],
+            source_text: "z".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        let second = super::super::persistence::FactRecord {
+            memory_id: "memory-a".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![1u8; 2048],
+            source_text: "a".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 2,
+            is_causal: false,
+        };
+
+        assert!(graph.import_fact_record_with_outcome(&first).accepted);
+        let outcome = graph.import_fact_record_with_outcome(&second);
+
+        assert_eq!(outcome.policy_evictions, 1);
+        assert_eq!(
+            graph.all_facts().map(|fact| fact.memory_id.as_str()).collect::<Vec<_>>(),
+            vec!["memory-z"]
+        );
+    }
+
+    #[test]
     fn test_provenance_family_does_not_collapse_memory_identity() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
