@@ -182,6 +182,171 @@ impl Rfc9942ReceiptEnvelope {
     }
 }
 
+/// Structural outer COSE_Sign1 carrying an optional RFC 9942 receipts header.
+///
+/// RFC 9942 calls this `Signature_With_Receipt` and defines it as tagged
+/// COSE_Sign1. The `receipts` header parameter (394) may be conveyed in the
+/// protected or unprotected headers; this type supports either location and
+/// preserves unrelated header entries verbatim. The object's own signature is
+/// retained as opaque bytes; cryptographic verification is intentionally external.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rfc9942SignatureWithReceipts {
+    protected: Vec<Vec<u8>>,
+    unprotected_extensions: Vec<Vec<u8>>,
+    receipts: Option<Rfc9942ReceiptCollection>,
+    payload: Rfc9942ReceiptPayload,
+    signature: Vec<u8>,
+}
+
+impl Rfc9942SignatureWithReceipts {
+    pub fn new(
+        payload: Rfc9942ReceiptPayload,
+        signature: Vec<u8>,
+        receipts: Option<Rfc9942ReceiptCollection>,
+    ) -> Self {
+        Self {
+            protected: Vec::new(),
+            unprotected_extensions: Vec::new(),
+            receipts,
+            payload,
+            signature,
+        }
+    }
+
+    pub fn receipts(&self) -> Option<&Rfc9942ReceiptCollection> {
+        self.receipts.as_ref()
+    }
+
+    pub fn payload(&self) -> &Rfc9942ReceiptPayload {
+        &self.payload
+    }
+
+    pub fn signature(&self) -> &[u8] {
+        &self.signature
+    }
+
+    /// Encode the tagged COSE_Sign1 object, preserving all headers already
+    /// represented by this structural type.
+    pub fn to_cbor(&self) -> Vec<u8> {
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, self.protected.len() as u64);
+        for entry in &self.protected {
+            protected.extend_from_slice(entry);
+        }
+
+        let mut out = Vec::new();
+        cbor_tag(&mut out, COSE_SIGN1_TAG);
+        cbor_array_len(&mut out, 4);
+        cbor_bytes(&mut out, &protected);
+
+        cbor_map_len(
+            &mut out,
+            (self.unprotected_extensions.len() + usize::from(self.receipts.is_some())) as u64,
+        );
+        if let Some(receipts) = &self.receipts {
+            cbor_int(&mut out, RFC9942_RECEIPTS_HEADER_LABEL);
+            out.extend_from_slice(&receipts.to_cbor());
+        }
+        for entry in &self.unprotected_extensions {
+            out.extend_from_slice(entry);
+        }
+
+        match &self.payload {
+            Rfc9942ReceiptPayload::Detached => out.push(0xf6),
+            Rfc9942ReceiptPayload::Attached(root) => cbor_bytes(&mut out, root),
+        }
+        cbor_bytes(&mut out, &self.signature);
+        out
+    }
+
+    /// Decode the tagged COSE_Sign1 object and structurally parse header 394
+    /// wherever it occurs. Unknown headers are preserved as raw key/value pairs.
+    pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9942VdpError> {
+        let mut reader = CborReader::new(bytes);
+        if reader.read_tag().map_err(|_| Rfc9942VdpError::InvalidEncoding)? != COSE_SIGN1_TAG {
+            return Err(Rfc9942VdpError::InvalidStructure);
+        }
+        if reader.read_array_len().map_err(|_| Rfc9942VdpError::InvalidEncoding)? != 4 {
+            return Err(Rfc9942VdpError::InvalidStructure);
+        }
+
+        let protected_bytes = reader.read_bstr_bounded(4096)
+            .map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        let mut protected_reader = CborReader::new(&protected_bytes);
+        let protected_len = protected_reader.read_map_len()
+            .map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        if protected_len > 32 {
+            return Err(Rfc9942VdpError::ResourceLimitExceeded);
+        }
+        let mut protected = Vec::with_capacity(protected_len);
+        for _ in 0..protected_len {
+            let start = protected_reader.offset;
+            protected_reader.skip_label()
+                .map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+            protected_reader.skip_value(0)
+                .map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+            protected.push(protected_reader.bytes[start..protected_reader.offset].to_vec());
+        }
+        protected_reader.finish().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+
+        let unprotected_len = reader.read_map_len()
+            .map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        if unprotected_len > 32 {
+            return Err(Rfc9942VdpError::ResourceLimitExceeded);
+        }
+        let mut receipts = None;
+        let mut unprotected_extensions = Vec::new();
+        for _ in 0..unprotected_len {
+            let start = reader.offset;
+            let label = reader.read_cose_label()
+                .map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+            if label == Some(RFC9942_RECEIPTS_HEADER_LABEL) {
+                if receipts.is_some() {
+                    return Err(Rfc9942VdpError::InvalidStructure);
+                }
+                let value_start = reader.offset;
+                let mut probe = reader.bytes[value_start..].to_vec();
+                let mut sub = CborReader::new(&probe);
+                let count = sub.read_array_len()
+                    .map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+                if count == 0 {
+                    return Err(Rfc9942VdpError::EmptyReceiptCollection);
+                }
+                // Reparse through the canonical collection adapter by consuming
+                // exactly one CBOR value, retaining no ambiguity about boundaries.
+                let value = decode_cbor_value(&mut reader, MAX_RFC9942_RECEIPTS_BYTES_TOTAL)?;
+                receipts = Some(Rfc9942ReceiptCollection::from_cbor(&value)?);
+            } else {
+                reader.skip_value(0).map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+                unprotected_extensions.push(reader.bytes[start..reader.offset].to_vec());
+            }
+        }
+
+        let payload = match reader.peek_major_type().map_err(|_| Rfc9942VdpError::InvalidEncoding)? {
+            2 => {
+                let raw = reader.read_bstr_bounded(32).map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+                Rfc9942ReceiptPayload::from_bytes(Some(&raw))?
+            }
+            7 => {
+                reader.read_nil().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+                Rfc9942ReceiptPayload::Detached
+            }
+            _ => return Err(Rfc9942VdpError::InvalidEncoding),
+        };
+        let signature = reader.read_bstr_bounded(64 * 1024)
+            .map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+        reader.finish().map_err(|_| Rfc9942VdpError::InvalidEncoding)?;
+
+        Ok(Self {
+            protected,
+            unprotected_extensions,
+            receipts,
+            payload,
+            signature,
+        })
+    }
+}
+
 /// The value of RFC 9942 header parameter 394 (receipts).
 ///
 /// RFC 9942 defines this as a non-empty, priority-ordered array of bstr-wrapped
@@ -893,6 +1058,19 @@ impl<'a> CborReader<'a> {
     fn finish(self)->Result<(),Rfc9162ProofDecodeError>{ if self.offset==self.bytes.len(){Ok(())}else{Err(Rfc9162ProofDecodeError::TrailingBytes)} }
 }
 
+fn decode_cbor_value(
+    reader: &mut CborReader<'_>,
+    max_bytes: usize,
+) -> Result<Vec<u8>, Rfc9162ProofDecodeError> {
+    let start = reader.offset;
+    reader.skip_value(0)?;
+    let end = reader.offset;
+    if end.checked_sub(start).ok_or(Rfc9162ProofDecodeError::InvalidStructure)? > max_bytes {
+        return Err(Rfc9162ProofDecodeError::InvalidStructure);
+    }
+    Ok(reader.bytes[start..end].to_vec())
+}
+
 impl Rfc9162ConsistencyProof {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
         let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
@@ -1599,6 +1777,43 @@ mod tests {
             Rfc9942ReceiptCollection::from_cbor(&not_bstr),
             Err(Rfc9942VdpError::InvalidEncoding)
         );
+    }
+
+    #[test]
+    fn rfc9942_signature_with_receipts_round_trips_outer_shape() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA;64]).unwrap();
+        let collection=Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
+        let outer=Rfc9942SignatureWithReceipts::new(Rfc9942ReceiptPayload::Attached([0x22;32]),vec![0xBB;64],Some(collection));
+        let encoded=outer.to_cbor();
+        assert_eq!(encoded[0],0xd2);
+        let decoded=Rfc9942SignatureWithReceipts::from_cbor(&encoded).unwrap();
+        assert_eq!(decoded.receipts().unwrap().len(),1);
+        assert_eq!(decoded.payload(),&Rfc9942ReceiptPayload::Attached([0x22;32]));
+        assert_eq!(decoded.signature(),&[0xBB;64]);
+        assert_eq!(decoded.to_cbor(),encoded);
+    }
+
+    #[test]
+    fn rfc9942_signature_with_receipts_rejects_duplicate_receipts_header() {
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,1);
+        cbor_int(&mut protected,RFC9942_RECEIPTS_HEADER_LABEL);
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA]).unwrap();
+        let collection=Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
+        protected.extend_from_slice(&collection.to_cbor());
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG); cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,1); // unprotected receipts; duplicate across header planes is intentionally rejected
+        cbor_int(&mut bytes,RFC9942_RECEIPTS_HEADER_LABEL);
+        bytes.extend_from_slice(&collection.to_cbor());
+        bytes.push(0xf6); cbor_bytes(&mut bytes,&[0xAA]);
+        assert_eq!(Rfc9942SignatureWithReceipts::from_cbor(&bytes),Err(Rfc9942VdpError::InvalidStructure));
     }
 
     #[test]
