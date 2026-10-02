@@ -281,7 +281,7 @@ impl Rfc9942SignatureWithReceipts {
         self.unprotected_receipts.as_ref()
     }
 
-    pub fn payload(&self) -> &Rfc9942ReceiptPayload {
+    pub fn payload(&self) -> &Rfc9942SignaturePayload {
         &self.payload
     }
 
