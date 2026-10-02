@@ -40,7 +40,7 @@ jobs:
           nix develop . -c bash -lc '
             set -euo pipefail
             cd crates/bridges/symthaea-ui
-            trunk build --release --features browser-qualification
+            trunk build --release index-webgpu-qualification.html
           '
 
       - name: Run deterministic WebGPU + fallback qualification
