@@ -207,6 +207,188 @@ impl KnowledgePersistence {
         Ok(count)
     }
 
+    /// Atomically persist a complete knowledge snapshot across all identity-bearing domains.
+    ///
+    /// Facts, provenance, causal edges, and ontology are committed in one SQLite
+    /// transaction after all in-memory inputs have been preflighted.
+    pub fn save_snapshot(
+        &mut self,
+        facts: &[FactRecord],
+        relations: &[ProvenanceRelationRecord],
+        edges: &[CausalEdgeRecord],
+        ontology: &[OntologyRecord],
+    ) -> Result<(), String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+        if facts.iter().any(|fact| fact.memory_id.trim().is_empty()) {
+            return Err("FactRecord memory_id must be non-empty".into());
+        }
+        if facts.iter().any(|fact| fact.vector_bytes.len() != BinaryHV::BYTES) {
+            return Err(format!(
+                "FactRecord vector_bytes must be exactly {} bytes",
+                BinaryHV::BYTES
+            ));
+        }
+        if facts.iter().any(|fact| {
+            !fact.confidence.is_finite() || !(0.0..=1.0).contains(&fact.confidence)
+        }) {
+            return Err("FactRecord confidence must be finite and in [0, 1]".into());
+        }
+        if facts.iter().any(|fact| fact.cycle > i64::MAX as u64) {
+            return Err("FactRecord cycle exceeds SQLite INTEGER range".into());
+        }
+
+        for relation in relations {
+            ProvenanceRelation::from(relation.clone())
+                .validate()
+                .map_err(|e| format!("Invalid provenance relation: {e}"))?;
+        }
+
+        if edges.iter().any(|edge| !edge.strength.is_finite()) {
+            return Err("CausalEdgeRecord strength must be finite".into());
+        }
+        if edges.iter().any(|edge| edge.cycle > i64::MAX as u64) {
+            return Err("CausalEdgeRecord cycle exceeds SQLite INTEGER range".into());
+        }
+
+        if ontology.iter().any(|record| record.name.trim().is_empty()) {
+            return Err("OntologyRecord name must be non-empty".into());
+        }
+        if ontology
+            .iter()
+            .any(|record| record.vector_bytes.len() != BinaryHV::BYTES)
+        {
+            return Err(format!(
+                "OntologyRecord vector_bytes must be exactly {} bytes",
+                BinaryHV::BYTES
+            ));
+        }
+        if ontology.iter().any(|record| !record.utility.is_finite()) {
+            return Err("OntologyRecord utility must be finite".into());
+        }
+        if ontology.iter().any(|record| {
+            record.usage_count > i64::MAX as u64
+                || record.created_at_cycle > i64::MAX as u64
+                || record.last_used_cycle > i64::MAX as u64
+        }) {
+            return Err("OntologyRecord integer field exceeds SQLite INTEGER range".into());
+        }
+
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Begin snapshot transaction: {e}"))?;
+
+        let mut saved_count = 0usize;
+
+        for fact in facts {
+            tx.execute(
+                "INSERT INTO knowledge_facts (memory_id, canonical_identity, provenance_family, vector_blob, source_text, confidence, domain, cycle, is_causal)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                 ON CONFLICT(memory_id) DO UPDATE SET
+                    canonical_identity = excluded.canonical_identity,
+                    provenance_family = excluded.provenance_family,
+                    vector_blob = excluded.vector_blob,
+                    source_text = excluded.source_text,
+                    confidence = excluded.confidence,
+                    domain = excluded.domain,
+                    cycle = excluded.cycle,
+                    is_causal = excluded.is_causal",
+                rusqlite::params![
+                    fact.memory_id,
+                    fact.canonical_identity,
+                    fact.provenance_family,
+                    fact.vector_bytes,
+                    fact.source_text,
+                    fact.confidence,
+                    i64::try_from(fact.cycle).expect("fact cycle preflighted for SQLite INTEGER range"),
+                    fact.is_causal,
+                ],
+            )
+            .map_err(|e| format!("Snapshot fact: {e}"))?;
+            saved_count += 1;
+        }
+
+        for relation in relations {
+            saved_count += tx
+                .execute(
+                    "INSERT INTO knowledge_provenance_relations
+                     (source_memory_id, target_memory_id, kind, created_at)
+                     VALUES (?1, ?2, ?3, ?4)
+                     ON CONFLICT(source_memory_id, target_memory_id, kind, created_at) DO NOTHING",
+                    rusqlite::params![
+                        relation.source_memory_id,
+                        relation.target_memory_id,
+                        format!("{:?}", relation.kind),
+                        relation.created_at
+                    ],
+                )
+                .map_err(|e| format!("Snapshot provenance: {e}"))?;
+        }
+
+        for edge in edges {
+            tx.execute(
+                "INSERT INTO knowledge_causal_edges (cause, effect, strength, is_inhibitory, cycle)
+                 VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(cause, effect) DO UPDATE SET
+                    strength = excluded.strength,
+                    is_inhibitory = excluded.is_inhibitory,
+                    cycle = excluded.cycle",
+                rusqlite::params![
+                    edge.cause,
+                    edge.effect,
+                    edge.strength,
+                    edge.is_inhibitory,
+                    i64::try_from(edge.cycle)
+                        .expect("causal edge cycle preflighted for SQLite INTEGER range"),
+                ],
+            )
+            .map_err(|e| format!("Snapshot causal edge: {e}"))?;
+            saved_count += 1;
+        }
+
+        {
+            let mut stmt = tx
+                .prepare_cached(
+                    "INSERT INTO knowledge_ontology
+                     (name, vector_blob, usage_count, utility, created_at_cycle, last_used_cycle, is_a_parent)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                     ON CONFLICT(name) DO UPDATE SET
+                        vector_blob = excluded.vector_blob,
+                        usage_count = excluded.usage_count,
+                        utility = excluded.utility,
+                        created_at_cycle = excluded.created_at_cycle,
+                        last_used_cycle = excluded.last_used_cycle,
+                        is_a_parent = excluded.is_a_parent",
+                )
+                .map_err(|e| format!("Prepare snapshot ontology: {e}"))?;
+
+            for record in ontology {
+                stmt.execute(rusqlite::params![
+                    record.name,
+                    record.vector_bytes,
+                    i64::try_from(record.usage_count)
+                        .expect("ontology usage count preflighted for SQLite INTEGER range"),
+                    record.utility,
+                    i64::try_from(record.created_at_cycle)
+                        .expect("ontology creation cycle preflighted for SQLite INTEGER range"),
+                    i64::try_from(record.last_used_cycle)
+                        .expect("ontology last-used cycle preflighted for SQLite INTEGER range"),
+                    record.is_a_parent,
+                ])
+                .map_err(|e| format!("Snapshot ontology: {e}"))?;
+                saved_count += 1;
+            }
+        }
+
+        tx.commit()
+            .map_err(|e| format!("Commit snapshot transaction: {e}"))?;
+        self.total_saved += saved_count as u64;
+        Ok(())
+    }
+
     /// Load all fact records from the database.
     pub fn load_facts(&mut self) -> Result<Vec<FactRecord>, String> {
         if !self.is_configured() {
@@ -761,6 +943,47 @@ mod tests {
         let mut p = KnowledgePersistence::new(&db_path);
         let err = p.load_ontology().unwrap_err();
         assert!(err.contains("Load ontology row"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_snapshot_is_atomic_on_preflight_failure() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_atomic_preflight_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let valid_fact = FactRecord {
+            memory_id: "valid".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; BinaryHV::BYTES],
+            source_text: "valid".into(),
+            confidence: 0.8,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        let invalid_ontology = OntologyRecord {
+            name: "invalid".into(),
+            vector_bytes: vec![0u8; BinaryHV::BYTES - 1],
+            usage_count: 1,
+            utility: 0.2,
+            created_at_cycle: 1,
+            last_used_cycle: 1,
+            is_a_parent: None,
+        };
+
+        let err = p
+            .save_snapshot(&[valid_fact], &[], &[], &[invalid_ontology])
+            .unwrap_err();
+        assert!(err.contains("OntologyRecord vector_bytes"));
+        assert_eq!(p.total_saved(), 0);
+        assert!(!db_path.exists());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
