@@ -1734,7 +1734,26 @@ mod tests {
                 ))
                 .collect::<Vec<_>>()
         );
-        assert_eq!(second_relations, first_relations);
+        assert_eq!(
+            second_relations
+                .iter()
+                .map(|r| (
+                    r.source_memory_id.as_str(),
+                    r.target_memory_id.as_str(),
+                    format!("{:?}", r.kind),
+                    r.created_at.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            first_relations
+                .iter()
+                .map(|r| (
+                    r.source_memory_id.as_str(),
+                    r.target_memory_id.as_str(),
+                    format!("{:?}", r.kind),
+                    r.created_at.as_str()
+                ))
+                .collect::<Vec<_>>()
+        );
         assert_eq!(
             second_edges
                 .iter()
@@ -1795,7 +1814,33 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         assert_eq!(fourth.causal_bridge().export_edge_records(), first_edges);
-        assert_eq!(fourth.ontology().export_ontology_records().len(), first_ontology.len());
+        let fourth_ontology = fourth.ontology().export_ontology_records();
+        assert_eq!(
+            fourth_ontology
+                .iter()
+                .map(|o| (
+                    o.name.as_str(),
+                    o.vector_bytes.as_slice(),
+                    o.usage_count,
+                    o.utility.to_bits(),
+                    o.created_at_cycle,
+                    o.last_used_cycle,
+                    o.is_a_parent.as_deref()
+                ))
+                .collect::<Vec<_>>(),
+            first_ontology
+                .iter()
+                .map(|o| (
+                    o.name.as_str(),
+                    o.vector_bytes.as_slice(),
+                    o.usage_count,
+                    o.utility.to_bits(),
+                    o.created_at_cycle,
+                    o.last_used_cycle,
+                    o.is_a_parent.as_deref()
+                ))
+                .collect::<Vec<_>>()
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
