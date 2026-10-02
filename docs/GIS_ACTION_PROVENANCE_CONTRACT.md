@@ -211,6 +211,14 @@ The execution identities remain deliberately non-interchangeable:
 
 Consequently, a crash or executor replacement must not manufacture a new provider idempotency key merely because it has a new attempt ID. A freshly issued authorization instance receives a distinct provider identity. The provider key is a downstream replay-control identity, not a substitute for authorization and not evidence that the effect occurred.
 
+### Frozen durable dispatch record
+
+For effectful execution, the pre-dispatch transition is now backed by a first-class immutable dispatch record. It freezes, in one durable row, the authorization instance, attempt ID, action ID/digest, provider idempotency key, target identity, audience/environment, adapter/finality sink, and boundary identity. `mark_invoked_bound` re-reads and verifies those exact fields before allowing provider-entry evidence to advance the lease.
+
+The boundary identity scopes attempt ownership but is deliberately excluded from the shared action identity. This prevents two boundary instances sharing one durable store from claiming each other's attempt records while preserving one common same-action fence. A stale executor that presents a different target, audience, adapter, action digest, provider key, or boundary identity is rejected rather than being allowed to reinterpret the authorization after dispatch preparation.
+
+The legacy attempt-only transition remains available for non-effectful compatibility paths; external effect adapters should use the bound dispatch-record path. The durable record is not itself authorization and `Invoked` is not success evidence: it is frozen provider-entry evidence tied to the exact pre-dispatch contract.
+
 `DispatchPending` is therefore an evidence boundary, not an execution receipt. `Invoked` is the subsequent durable provider-entry marker; it is likewise not an execution receipt. It proves that the local executor durably recorded its intent immediately before the effect boundary; it does not prove that the provider accepted the effect.
 
 On restart, `Prepared`, `DispatchPending`, and `Invoked` non-terminal reservations are conservatively recovered to `Indeterminate`. `Invoked` records durable evidence that provider entry began; it still does not establish that the protected effect succeeded. This deliberately fails closed because local durable state cannot prove whether a crash occurred before or after an external sink accepted the effect. The recovered attempt remains occupied and cannot be retried until explicit reconciliation establishes a terminal outcome. Reconciliation consumes the existing authorization budget; it does not create a new authorization.
