@@ -224,3 +224,25 @@ The legacy attempt-only transition remains available for non-effectful compatibi
 On restart, `Prepared`, `DispatchPending`, and `Invoked` non-terminal reservations are conservatively recovered to `Indeterminate`. `Invoked` records durable evidence that provider entry began; it still does not establish that the protected effect succeeded. This deliberately fails closed because local durable state cannot prove whether a crash occurred before or after an external sink accepted the effect. The recovered attempt remains occupied and cannot be retried until explicit reconciliation establishes a terminal outcome. Reconciliation consumes the existing authorization budget; it does not create a new authorization.
 
 The store therefore does not claim atomicity between SQLite and an external provider. The safety property is narrower and auditable: authority is durably reserved before dispatch, dispatch intent is durably recorded before provider entry, ambiguous outcomes are preserved rather than guessed, and replay is blocked until authenticated reconciliation. This matches current distributed-systems analysis that a crashed executor cannot infer sink acceptance from its own database alone, and current agent-effect boundary work that requires a durable pre-dispatch state and an explicit indeterminate path. The cited IETF material is an Internet-Draft, not a final standard.
+
+### Boundary-scoped attempt ownership and recovery
+
+Attempt ownership is now durable before the effect boundary rather than being inferred only from a dispatch row. The prepare_for_execution_bound API persists the execution boundary alongside the Prepared reservation, so a crash before DispatchPending still leaves an attributable owner. Bound attempt identifiers are unique within the shared durable state domain, preventing the same attempt identifier from being reused by another boundary or authorization instance.
+
+For an effectful attempt, the preferred lifecycle is:
+
+    prepare_for_execution_bound
+      ↓
+    mark_dispatch_pending_bound
+      ↓
+    mark_invoked_bound
+      ↓
+    commit_bound
+      └────────→ Indeterminate → reconcile_indeterminate_bound
+
+recover_incomplete_attempts_for_boundary can recover only attempts whose durable lease names that exact boundary. It validates that any DispatchPending/Invoked attempt also has a matching frozen dispatch record before converting the attempt to Indeterminate. The legacy recover_incomplete_attempts path is intentionally limited to unscoped legacy attempts; it does not sweep boundary-owned attempts.
+
+The legacy attempt-only transition APIs are also fenced from boundary-owned attempts. Once an attempt has a durable boundary owner, mark_dispatch_pending, mark_invoked, commit, and reconcile_indeterminate cannot bypass the bound path. This prevents an older or less-specific caller from claiming an attempt merely because it knows the authorization instance and attempt identifier.
+
+Boundary identity remains a recovery/ownership field, not an action-identity field. It is persisted on attempt-bearing durable records so recovery credentials can be scoped to one execution boundary, while the canonical action digest and downstream provider idempotency identity remain common across boundaries for the same authorized action. This follows the current Action Evidence Boundary Internet-Draft's distinction between shared action identity and boundary-scoped attempt ownership, including its requirement that recovery of one attempt cannot close or release records belonging to another.
+
