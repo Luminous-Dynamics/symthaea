@@ -219,6 +219,17 @@ impl LocalApprovalRuntimeV1 {
         Ok(self.request_store.observe_currentness(installed.request_id(), now)?)
     }
 
+    /// Poll once for a local approval without blocking the daemon.
+    ///
+    /// A successful return is still approval evidence only; execution authority
+    /// remains a separate downstream theorem.
+    pub fn try_accept_and_consume(
+        &self,
+    ) -> Result<Option<ConsumedLocalApprovalDecisionV1>, LocalApprovalRuntimeErrorV1> {
+        Ok(self
+            .socket_server
+            .try_accept_and_consume(&self.request_store)?)
+    }
     /// Accept one LOCAL-007 socket submission and atomically consume its request.
     ///
     /// The returned affine-ish local token is still not execution authority.
