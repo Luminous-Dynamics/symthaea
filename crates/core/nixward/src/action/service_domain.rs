@@ -10,6 +10,7 @@ use serde::Serialize;
 use thiserror::Error;
 
 const SERVICE_OPERATION_DOMAIN_V1: &[u8] = b"nixward-service-operation-v1";
+const MAX_SERVICE_UNIT_BYTES_V1: usize = 255;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum NixServiceOperationKindV1 { Enable, Disable, Start, Stop, Restart, Reload }
@@ -27,12 +28,7 @@ impl NixServiceOperationV1 {
     pub fn unit(&self) -> &str { &self.unit }
     pub fn operation(&self) -> NixServiceOperationKindV1 { self.operation }
     pub fn validate_shape(&self) -> Result<(), NixServiceOperationErrorV1> {
-        if self.unit.is_empty() { return Err(NixServiceOperationErrorV1::EmptyUnit); }
-        if !self.unit.ends_with(".service") { return Err(NixServiceOperationErrorV1::NonServiceUnit); }
-        if self.unit.contains('/') || self.unit.contains('\\') { return Err(NixServiceOperationErrorV1::PathLikeUnit); }
-        if self.unit.chars().any(|c| c.is_whitespace() || c.is_control()) { return Err(NixServiceOperationErrorV1::WhitespaceOrControl); }
-        if self.unit.starts_with('.') || self.unit.ends_with('.') { return Err(NixServiceOperationErrorV1::AmbiguousUnit); }
-        Ok(())
+        validate_service_unit_shape_v1(&self.unit)
     }
     pub fn digest(&self) -> Result<String, NixServiceOperationErrorV1> {
         self.validate_shape()?;
@@ -50,12 +46,53 @@ impl NixServiceOperationV1 {
 }
 
 fn canonical_service_unit_v1(unit: &str) -> Result<String, NixServiceOperationErrorV1> {
-    if unit.is_empty() { return Err(NixServiceOperationErrorV1::EmptyUnit); }
-    if unit.chars().any(|c| c.is_whitespace() || c.is_control()) { return Err(NixServiceOperationErrorV1::WhitespaceOrControl); }
-    if unit.contains('/') || unit.contains('\\') { return Err(NixServiceOperationErrorV1::PathLikeUnit); }
-    if unit.ends_with(".service") { Ok(unit.to_string()) }
-    else if unit.contains('.') { Err(NixServiceOperationErrorV1::NonServiceUnit) }
-    else { Ok(format!("{unit}.service")) }
+    if unit.is_empty() {
+        return Err(NixServiceOperationErrorV1::EmptyUnit);
+    }
+    if unit.ends_with(".service") {
+        validate_service_unit_shape_v1(unit)?;
+        return Ok(unit.to_string());
+    }
+    if unit.contains('.') {
+        return Err(NixServiceOperationErrorV1::NonServiceUnit);
+    }
+    let canonical = format!("{unit}.service");
+    validate_service_unit_shape_v1(&canonical)?;
+    Ok(canonical)
+}
+
+fn validate_service_unit_shape_v1(unit: &str) -> Result<(), NixServiceOperationErrorV1> {
+    if unit.is_empty() {
+        return Err(NixServiceOperationErrorV1::EmptyUnit);
+    }
+    if unit.len() > MAX_SERVICE_UNIT_BYTES_V1 {
+        return Err(NixServiceOperationErrorV1::TooLong);
+    }
+    if !unit.is_ascii() {
+        return Err(NixServiceOperationErrorV1::InvalidCharacter);
+    }
+    if unit.starts_with('-') {
+        return Err(NixServiceOperationErrorV1::OptionLikeUnit);
+    }
+    if unit.starts_with('.') || unit.ends_with('.') {
+        return Err(NixServiceOperationErrorV1::AmbiguousUnit);
+    }
+    if !unit.ends_with(".service") {
+        return Err(NixServiceOperationErrorV1::NonServiceUnit);
+    }
+    if unit.contains('/') || unit.contains('\\') {
+        return Err(NixServiceOperationErrorV1::PathLikeUnit);
+    }
+    if unit.bytes().any(|byte| byte.is_ascii_whitespace() || byte.is_ascii_control()) {
+        return Err(NixServiceOperationErrorV1::WhitespaceOrControl);
+    }
+    if !unit.bytes().all(|byte| {
+        byte.is_ascii_alphanumeric()
+            || matches!(byte, b':' | b'-' | b'_' | b'.' | b'@')
+    }) {
+        return Err(NixServiceOperationErrorV1::InvalidCharacter);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -65,6 +102,9 @@ pub enum NixServiceOperationErrorV1 {
     #[error("service unit must not contain path separators")] PathLikeUnit,
     #[error("service unit must not contain whitespace or control characters")] WhitespaceOrControl,
     #[error("service unit has an ambiguous leading or trailing dot")] AmbiguousUnit,
+    #[error("service unit exceeds the systemd 255-byte maximum")] TooLong,
+    #[error("service unit must not be option-like")] OptionLikeUnit,
+    #[error("service unit contains a character outside the conservative v1 allowlist")] InvalidCharacter,
 }
 
 #[cfg(test)]
@@ -88,8 +128,45 @@ mod tests {
     }
     #[test]
     fn rejects_path_and_shell_like_unit_spelling() {
-        for unit in ["/tmp/nginx", "foo/bar", "foo\\bar", "foo bar", "foo\tbar"] {
+        for unit in [
+            "/tmp/nginx",
+            "foo/bar",
+            "foo\\bar",
+            "foo bar",
+            "foo\tbar",
+            "nginx*.service",
+            "nginx.service;reboot",
+            "$(reboot).service",
+        ] {
             assert!(NixServiceOperationV1::new(unit, NixServiceOperationKindV1::Start).is_err());
+        }
+    }
+
+    #[test]
+    fn rejects_option_like_and_oversized_units() {
+        assert_eq!(
+            NixServiceOperationV1::new("--now.service", NixServiceOperationKindV1::Start)
+                .unwrap_err(),
+            NixServiceOperationErrorV1::OptionLikeUnit
+        );
+
+        let oversized = format!("{}.service", "a".repeat(248));
+        assert_eq!(
+            NixServiceOperationV1::new(oversized, NixServiceOperationKindV1::Start).unwrap_err(),
+            NixServiceOperationErrorV1::TooLong
+        );
+    }
+
+    #[test]
+    fn accepts_conservative_systemd_service_names() {
+        for unit in [
+            "nginx.service",
+            "foo-bar_2.service",
+            "dbus-org.example.service",
+            "worker@instance.service",
+            "foo:bar.service",
+        ] {
+            assert!(NixServiceOperationV1::new(unit, NixServiceOperationKindV1::Start).is_ok());
         }
     }
     #[test]
