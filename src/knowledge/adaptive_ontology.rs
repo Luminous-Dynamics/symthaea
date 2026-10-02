@@ -118,7 +118,12 @@ impl AdaptiveOntology {
 
         for (name, usage) in &self.primitives {
             let sim = concept.similarity(&usage.vector);
-            if sim > best_sim {
+            if sim > best_sim
+                || (sim == best_sim
+                    && best_name
+                        .as_deref()
+                        .map_or(true, |current| name.as_str() < current))
+            {
                 best_sim = sim;
                 best_name = Some(name.clone());
             }
@@ -155,7 +160,12 @@ impl AdaptiveOntology {
         let mut best_match = None;
         for (existing_name, usage) in &self.primitives {
             let sim = vector.similarity(&usage.vector);
-            if sim > best_sim {
+            if sim > best_sim
+                || (sim == best_sim
+                    && best_match
+                        .as_deref()
+                        .map_or(true, |current| existing_name.as_str() < current))
+            {
                 best_sim = sim;
                 best_match = Some(existing_name.clone());
             }
@@ -190,6 +200,7 @@ impl AdaptiveOntology {
                     a.utility
                         .partial_cmp(&b.utility)
                         .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.name.cmp(&b.name))
                 })
                 .map(|(k, _)| k.clone());
 
@@ -294,7 +305,8 @@ impl AdaptiveOntology {
     ///
     /// Science: Collins & Quillian (1969) — bidirectional traversal of taxonomic hierarchies.
     pub fn children_of(&self, parent: &str) -> Vec<String> {
-        self.primitives
+        let mut children: Vec<String> = self
+            .primitives
             .iter()
             .filter_map(|(name, usage)| {
                 if usage.is_a_parent.as_deref() == Some(parent) {
@@ -303,7 +315,9 @@ impl AdaptiveOntology {
                     None
                 }
             })
-            .collect()
+            .collect();
+        children.sort();
+        children
     }
 
     /// Check whether `child` transitively IS-A `ancestor`.
@@ -346,14 +360,18 @@ impl AdaptiveOntology {
         if self.primitives.is_empty() {
             return 0.0;
         }
-        let sum: f64 = self.primitives.values().map(|u| u.utility).sum();
+        let mut usages: Vec<&PrimitiveUsage> = self.primitives.values().collect();
+        usages.sort_by(|a, b| a.name.cmp(&b.name));
+        let sum: f64 = usages.into_iter().map(|u| u.utility).sum();
         sum / self.primitives.len() as f64
     }
 
     /// Export all primitives as persistence records for SQLite storage.
     pub fn export_ontology_records(&self) -> Vec<OntologyRecord> {
-        self.primitives
-            .values()
+        let mut usages: Vec<&PrimitiveUsage> = self.primitives.values().collect();
+        usages.sort_by(|a, b| a.name.cmp(&b.name));
+        usages
+            .into_iter()
             .map(|u| OntologyRecord {
                 name: u.name.clone(),
                 vector_bytes: u.vector.0.to_vec(),
@@ -527,6 +545,40 @@ mod tests {
         let pruned = ontology.maybe_prune(50);
         assert_eq!(pruned, 1);
         assert_eq!(ontology.count(), 0);
+    }
+
+    #[test]
+    fn test_equal_similarity_prefers_lexicographically_stable_match() {
+        let config = AdaptiveOntologyConfig {
+            match_threshold: 0.0,
+            ..Default::default()
+        };
+        let mut ontology = AdaptiveOntology::new(config);
+        let vector = BinaryHV::random(42);
+        ontology.learn("zeta", vector, vec![], 1);
+        let query = ontology.primitives().get("zeta").unwrap().vector;
+        ontology.learn("alpha", query, vec![], 2);
+
+        assert_eq!(ontology.primitives().len(), 1);
+        assert!(ontology.primitives().contains_key("alpha") || ontology.primitives().contains_key("zeta"));
+    }
+
+    #[test]
+    fn test_equal_utility_capacity_eviction_is_name_stable() {
+        let config = AdaptiveOntologyConfig {
+            max_primitives: 2,
+            prune_min_age_cycles: 0,
+            match_threshold: 1.1,
+            ..Default::default()
+        };
+        let mut ontology = AdaptiveOntology::new(config);
+        ontology.learn("zeta", BinaryHV::random(1), vec![], 1);
+        ontology.learn("alpha", BinaryHV::random(2), vec![], 1);
+        ontology.learn("middle", BinaryHV::random(3), vec![], 1);
+
+        assert!(!ontology.primitives().contains_key("alpha"));
+        assert!(ontology.primitives().contains_key("middle"));
+        assert!(ontology.primitives().contains_key("zeta"));
     }
 
     #[test]
