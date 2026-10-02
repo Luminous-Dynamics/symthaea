@@ -1072,8 +1072,19 @@ mod tests {
             last_used_cycle: 1,
             is_a_parent: None,
         };
-        p.save_snapshot(&[old_fact], &[], &[old_edge], &[old_ontology])
-            .unwrap();
+        let historical_relation = ProvenanceRelationRecord {
+            source_memory_id: "old-fact".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:1".into(),
+        };
+        p.save_snapshot(
+            &[old_fact],
+            std::slice::from_ref(&historical_relation),
+            &[old_edge],
+            &[old_ontology],
+        )
+        .unwrap();
 
         let new_fact = FactRecord {
             memory_id: "new-fact".into(),
@@ -1108,6 +1119,7 @@ mod tests {
         let facts = p.load_facts().unwrap();
         let edges = p.load_causal_edges().unwrap();
         let ontology = p.load_ontology().unwrap();
+        let relations = p.load_provenance_relations().unwrap();
 
         assert_eq!(facts.len(), 1);
         assert_eq!(facts[0].memory_id, "new-fact");
@@ -1116,6 +1128,8 @@ mod tests {
         assert!(edges[0].is_inhibitory);
         assert_eq!(ontology.len(), 1);
         assert_eq!(ontology[0].name, "new-primitive");
+        assert_eq!(relations.len(), 1);
+        assert_eq!(relations[0].source_memory_id, "old-fact");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
