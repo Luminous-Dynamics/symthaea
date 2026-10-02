@@ -16,7 +16,7 @@
 
 use super::executor::{ChannelOperation, FlakeOperation, NixOSCommand, SafetyLevel};
 use super::local_approval_store::ConsumedLocalApprovalDecisionV1;
-use super::service_domain::{validate_canonical_service_operation_v1, NixServiceOperationKindV1};
+use super::service_domain::{NixServiceOperationKindV1, validate_canonical_service_operation_v1};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -71,19 +71,39 @@ pub enum NixActionDescriptorV1 {
         flake: Option<String>,
         extra_args: Vec<String>,
     },
-    EnvInstall { packages: Vec<String> },
-    EnvRemove { packages: Vec<String> },
+    EnvInstall {
+        packages: Vec<String>,
+    },
+    EnvRemove {
+        packages: Vec<String>,
+    },
     EnvRollback,
-    Search { query: String, json: bool },
-    ChannelUpdate { channel: Option<String> },
-    ChannelAdd { url: String, name: String },
-    ChannelRemove { name: String },
+    Search {
+        query: String,
+        json: bool,
+    },
+    ChannelUpdate {
+        channel: Option<String>,
+    },
+    ChannelAdd {
+        url: String,
+        name: String,
+    },
+    ChannelRemove {
+        name: String,
+    },
     ChannelList,
-    FlakeUpdate { inputs: Vec<String> },
-    FlakeLock { inputs: Vec<String> },
+    FlakeUpdate {
+        inputs: Vec<String>,
+    },
+    FlakeLock {
+        inputs: Vec<String>,
+    },
     FlakeShow,
     FlakeCheck,
-    HomeManagerSwitch { flake: Option<String> },
+    HomeManagerSwitch {
+        flake: Option<String>,
+    },
     CollectGarbage {
         older_than_days: Option<u32>,
         delete_all: bool,
@@ -176,7 +196,7 @@ impl TryFrom<&NixOSCommand> for NixActionDescriptorV1 {
                 expected_config_digest: expected_config_digest.clone(),
             },
             NixOSCommand::Custom { .. } => {
-                return Err(NixAuthorizationErrorV1::UnsupportedCustomCommand)
+                return Err(NixAuthorizationErrorV1::UnsupportedCustomCommand);
             }
         })
     }
@@ -583,13 +603,17 @@ fn validate_action_shape(action: &NixActionDescriptorV1) -> Result<(), NixAuthor
             expected_config_digest,
         } => {
             if option_path.trim().is_empty() {
-                return Err(NixAuthorizationErrorV1::EmptyField("config patch option path"));
+                return Err(NixAuthorizationErrorV1::EmptyField(
+                    "config patch option path",
+                ));
             }
             if value.trim().is_empty() {
                 return Err(NixAuthorizationErrorV1::EmptyField("config patch value"));
             }
             if expected_config_digest.len() != 64
-                || !expected_config_digest.bytes().all(|b| b.is_ascii_hexdigit())
+                || !expected_config_digest
+                    .bytes()
+                    .all(|b| b.is_ascii_hexdigit())
             {
                 return Err(NixAuthorizationErrorV1::InvalidTypedCommand(
                     "config patch expected config digest must be 64 hex characters".to_string(),
@@ -625,8 +649,9 @@ fn minimum_scope_for_action(action: &NixActionDescriptorV1) -> NixActionScopeV1 
         NixActionDescriptorV1::RebuildTest { .. }
         | NixActionDescriptorV1::RebuildBoot { .. }
         | NixActionDescriptorV1::Service { .. } => NixActionScopeV1::SystemModify,
-        NixActionDescriptorV1::ConfigPatch { .. }
-        | NixActionDescriptorV1::RebuildSwitch { .. } => NixActionScopeV1::SystemCritical,
+        NixActionDescriptorV1::ConfigPatch { .. } | NixActionDescriptorV1::RebuildSwitch { .. } => {
+            NixActionScopeV1::SystemCritical
+        }
         NixActionDescriptorV1::CollectGarbage { .. } => NixActionScopeV1::Destructive,
     }
 }
@@ -965,24 +990,18 @@ mod tests {
             value: "true".to_string(),
             expected_config_digest: "ab".repeat(32),
         };
-        let intent = NixActionIntentV1::from_command(
-            "host:x",
-            Some("generation:42".to_string()),
-            &a,
-        )
-        .unwrap();
+        let intent =
+            NixActionIntentV1::from_command("host:x", Some("generation:42".to_string()), &a)
+                .unwrap();
         assert_eq!(intent.maximum_scope, NixActionScopeV1::SystemCritical);
 
         let mut changed = a.clone();
         if let NixOSCommand::ConfigPatch { value, .. } = &mut changed {
             *value = "false".to_string();
         }
-        let changed_intent = NixActionIntentV1::from_command(
-            "host:x",
-            Some("generation:42".to_string()),
-            &changed,
-        )
-        .unwrap();
+        let changed_intent =
+            NixActionIntentV1::from_command("host:x", Some("generation:42".to_string()), &changed)
+                .unwrap();
         assert_ne!(intent.digest().unwrap(), changed_intent.digest().unwrap());
     }
 
