@@ -1194,6 +1194,37 @@ mod tests {
     }
 
     #[test]
+    fn test_graph_search_and_export_have_stable_tie_order() {
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        let vector = make_encoding("same-vector", 0.8).vector;
+        for memory_id in ["memory-b", "memory-a"] {
+            graph.import_fact_record(&super::super::persistence::FactRecord {
+                memory_id: memory_id.into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vector.0.to_vec(),
+                source_text: memory_id.into(),
+                confidence: 0.8,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            });
+        }
+
+        let results = graph.search(&vector, 2, 2);
+        assert_eq!(
+            results.iter().map(|result| result.fact_id).collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+
+        let exported = graph.export_fact_records();
+        assert_eq!(
+            exported.iter().map(|record| record.memory_id.as_str()).collect::<Vec<_>>(),
+            vec!["memory-a", "memory-b"]
+        );
+    }
+
+    #[test]
     fn test_fact_restore_enforces_capacity_and_reports_policy_eviction() {
         let mut graph = EnhancedKnowledgeGraph::new(2);
         let records = [
