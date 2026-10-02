@@ -177,6 +177,26 @@ impl Ed25519ReceiptVerifier {
         receipt: &IndependenceVerificationReceipt,
         resolver: &R,
     ) -> ReceiptAttestationVerificationOutcome {
+        // Reject malformed or irrelevant envelopes before invoking application
+        // resolution. Resolvers may consult databases or remote trust services, so
+        // untrusted input must not trigger that work until cheap local checks pass.
+        if envelope.validate().is_err() {
+            return ReceiptAttestationVerificationOutcome::InvalidEnvelope;
+        }
+        if !envelope.verify_against_receipt(receipt) {
+            return ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch;
+        }
+        match envelope.temporal_status_at(self.now_unix_ns) {
+            ReceiptAttestationTemporalStatus::NotYetValid =>
+                return ReceiptAttestationVerificationOutcome::NotYetValid,
+            ReceiptAttestationTemporalStatus::Expired =>
+                return ReceiptAttestationVerificationOutcome::Expired,
+            ReceiptAttestationTemporalStatus::Valid => {}
+        }
+        if envelope.cryptosuite.as_deref() != Some(CRYPTOSUITE) {
+            return ReceiptAttestationVerificationOutcome::CryptosuiteMismatch;
+        }
+
         let Some(method) = envelope.verification_method.as_deref() else {
             return ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable;
         };
@@ -443,6 +463,23 @@ mod tests {
         assert_eq!(
             verifier.verify_with_resolver(&envelope, &receipt, &resolver),
             ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized
+        );
+    }
+
+    #[test]
+    fn resolver_mode_rejects_invalid_envelope_before_resolution() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        envelope.attester_id.clear();
+        let resolver = InMemoryVerificationMethodResolver::new([]);
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            signing_key.verifying_key(),
+            150,
+        );
+
+        assert_eq!(
+            verifier.verify_with_resolver(&envelope, &receipt, &resolver),
+            ReceiptAttestationVerificationOutcome::InvalidEnvelope
         );
     }
 
