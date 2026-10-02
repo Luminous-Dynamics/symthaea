@@ -682,7 +682,13 @@ impl SqliteAuthorizationStore {
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
         if lease.action_id != record.action_id
             || lease.action_digest != record.action_digest
-            || lease.provider_idempotency_key() != record.provider_idempotency_key
+            || lease
+                .provider_idempotency_key_for_native_replay(
+                    &record.native_replay_identity,
+                    &record.target_identity,
+                )
+                .map_err(|_| AuthorizationConsumptionError::InvalidBinding)?
+                != record.provider_idempotency_key
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
@@ -693,7 +699,8 @@ impl SqliteAuthorizationStore {
             return Err(AuthorizationConsumptionError::IndeterminateRequiresReconciliation.into());
         }
 
-        let receipt = lease.commit(&record.attempt_id, evidence.outcome)?;
+        let mut receipt = lease.commit(&record.attempt_id, evidence.outcome)?;
+        receipt.provider_idempotency_key = record.provider_idempotency_key.clone();
         update_lease_with_boundary(&tx, &lease, Some(&record.boundary_id))?;
         tx.execute(
             "INSERT OR REPLACE INTO authorization_terminal_evidence
@@ -731,7 +738,8 @@ impl SqliteAuthorizationStore {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let row = tx.query_row(
-            "SELECT action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
+            "SELECT operation_id,native_replay_identity,action_id,action_digest,provider_idempotency_key,
+                    target_identity,audience,adapter,boundary_id,state
              FROM authorization_dispatches WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
             |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,
@@ -763,11 +771,18 @@ impl SqliteAuthorizationStore {
         let mut lease = load_lease(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
         if lease.action_id != record.action_id || lease.action_digest != record.action_digest
-            || lease.provider_idempotency_key() != record.provider_idempotency_key
+            || lease
+                .provider_idempotency_key_for_native_replay(
+                    &record.native_replay_identity,
+                    &record.target_identity,
+                )
+                .map_err(|_| AuthorizationConsumptionError::InvalidBinding)?
+                != record.provider_idempotency_key
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
-        let receipt = lease.commit(&record.attempt_id, outcome)?;
+        let mut receipt = lease.commit(&record.attempt_id, outcome)?;
+        receipt.provider_idempotency_key = record.provider_idempotency_key.clone();
         update_lease_with_boundary(&tx, &lease, Some(&record.boundary_id))?;
         let phase = if matches!(outcome, ExecutionOutcome::Indeterminate) { "indeterminate" } else { "final" };
         insert_receipt_with_boundary(&tx, &receipt, phase, Some(&record.boundary_id))?;
@@ -962,14 +977,16 @@ impl SqliteAuthorizationStore {
             |r| Ok((
                 r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
                 r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
-                r.get::<_,String>(6)?, r.get::<_,String>(7)?,
+                r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
+                r.get::<_,String>(9)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
 
-        if row.0 != record.action_id || row.1 != record.action_digest
-            || row.2 != record.provider_idempotency_key || row.3 != record.target_identity
-            || row.4 != record.audience || row.5 != record.adapter
-            || row.6 != record.boundary_id || row.7 != "indeterminate"
+        if row.0 != record.operation_id || row.1 != record.native_replay_identity
+            || row.2 != record.action_id || row.3 != record.action_digest
+            || row.4 != record.provider_idempotency_key || row.5 != record.target_identity
+            || row.6 != record.audience || row.7 != record.adapter
+            || row.8 != record.boundary_id || row.9 != "indeterminate"
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
@@ -992,7 +1009,8 @@ impl SqliteAuthorizationStore {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
 
-        let receipt = lease.reconcile_indeterminate(&record.attempt_id, outcome)?;
+        let mut receipt = lease.reconcile_indeterminate(&record.attempt_id, outcome)?;
+        receipt.provider_idempotency_key = record.provider_idempotency_key.clone();
         update_lease_with_boundary(&tx, &lease, Some(&record.boundary_id))?;
 
         let dispatch_state = if matches!(outcome, ExecutionOutcome::Succeeded) {
@@ -1012,10 +1030,11 @@ impl SqliteAuthorizationStore {
         insert_receipt_with_boundary(&tx, &receipt, "reconciled", Some(&record.boundary_id))?;
         tx.execute(
             "INSERT OR REPLACE INTO authorization_terminal_evidence
-             (authorization_instance,attempt_id,boundary_id,action_digest,provider_idempotency_key,
-              target_identity,audience,outcome,evidence_id,evidence_digest,verifier_id,
-              verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
+             (authorization_instance,attempt_id,operation_id,native_replay_identity,boundary_id,
+              action_digest,provider_idempotency_key,target_identity,audience,outcome,evidence_id,
+              evidence_digest,verifier_id,verifier_config_digest,trust_anchor_digest,
+              evidence_profile_digest,verification_digest)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
             params![
                 record.authorization_instance, record.attempt_id, record.boundary_id,
                 record.action_digest, record.provider_idempotency_key, record.target_identity,
@@ -1047,7 +1066,7 @@ impl SqliteAuthorizationStore {
         verifier: &V,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
         let verified = verifier
-            .verify_terminal_outcome(record, evidence)
+            .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
         Self::validate_verified_terminal_outcome(record, &verified)?;
         if !matches!(verified.evidence.outcome, ExecutionOutcome::Succeeded | ExecutionOutcome::Failed) {
@@ -1177,22 +1196,31 @@ impl SqliteAuthorizationStore {
                    AND attempt_id=?2",
                 params![instance, attempt_id],
             )?;
+            let recovered_provider_key: String = if lease_boundary.is_some() {
+                tx.query_row(
+                    "SELECT provider_idempotency_key
+                     FROM authorization_dispatches
+                     WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+                    params![instance, attempt_id, lease_boundary.as_deref()],
+                    |row| row.get(0),
+                )?
+            } else {
+                let lease = AuthorizationLease::new_with_instance(
+                    instance.clone(),
+                    action_id.clone(),
+                    action_digest.clone(),
+                    String::new(),
+                    String::new(),
+                    *authority_epoch,
+                    1,
+                );
+                lease.provider_idempotency_key()
+            };
             let receipt = ExecutionReceipt {
                 action_id: action_id.clone(),
                 authorization_instance: instance.clone(),
                 action_digest: action_digest.clone(),
-                provider_idempotency_key: {
-                    let lease = AuthorizationLease::new_with_instance(
-                        instance.clone(),
-                        action_id.clone(),
-                        action_digest.clone(),
-                        String::new(),
-                        String::new(),
-                        *authority_epoch,
-                        1,
-                    );
-                    lease.provider_idempotency_key()
-                },
+                provider_idempotency_key: recovered_provider_key,
                 attempt_id: attempt_id.clone(),
                 authority_epoch: *authority_epoch,
                 outcome: ExecutionOutcome::Indeterminate,
@@ -1691,6 +1719,11 @@ mod tests {
             &witness.authorization_instance,"attempt-provider-key",&action,&effect,"boundary-A",
             "operation:provider-key","native-grant:one"
         ).unwrap();
+        assert!(record.provider_idempotency_key != AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(), action.id.clone(), action.canonical_action_digest(),
+            witness.support_digest.clone(), witness.policy.clone(), witness.authority_epoch, 1
+        ).provider_idempotency_key());
+
         let expected=AuthorizationLease::new_with_instance(
             witness.authorization_instance.clone(),action.id.clone(),action.canonical_action_digest(),
             witness.support_digest.clone(),witness.policy.clone(),witness.authority_epoch,1
