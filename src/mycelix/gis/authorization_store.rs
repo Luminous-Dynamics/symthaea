@@ -624,10 +624,14 @@ impl SqliteAuthorizationStore {
             .query_row(
                 "SELECT authorization_instance,attempt_id,boundary_id
                  FROM authorization_dispatches
-                 WHERE target_identity=?1 AND action_digest=?2
+                 WHERE relying_party_id=?1 AND target_identity=?2 AND action_digest=?3
                    AND state IN ('dispatch_pending','invoked','indeterminate')
                  LIMIT 1",
-                params![expected_effect.target_identity.as_str(), expected_digest.as_str()],
+                params![
+                    self.relying_party_id.as_str(),
+                    expected_effect.target_identity.as_str(),
+                    expected_digest.as_str()
+                ],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .optional()?;
@@ -664,14 +668,15 @@ impl SqliteAuthorizationStore {
             "INSERT INTO authorization_dispatches
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
-              action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,'dispatch_pending')",
+              relying_party_id,action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,'dispatch_pending')",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity,
                 native_replay_provenance.map(|p| p.authority_namespace.as_str()),
                 native_replay_provenance.map(|p| p.native_authorization_id.as_str()),
                 native_replay_provenance.map(|p| p.derivation_digest.as_str()),
+                self.relying_party_id.as_str(),
                 record.action_id, record.action_digest, record.provider_idempotency_key,
                 record.target_identity, record.audience, record.adapter, record.boundary_id],
         )?;
