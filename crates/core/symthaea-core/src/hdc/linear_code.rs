@@ -31,8 +31,13 @@ impl BinaryCodeword {
             words_for(dimension),
             "packed word count must exactly match dimension"
         );
-        if let Some(last) = words.last_mut() {
-            *last &= last_word_mask(dimension);
+        let padding_mask = !last_word_mask(dimension);
+        if let Some(&last) = words.last() {
+            assert_eq!(
+                last & padding_mask,
+                0,
+                "packed representation contains set padding bits"
+            );
         }
         Self { dimension, words }
     }
@@ -564,10 +569,9 @@ mod tests {
     }
 
     #[test]
-    fn unused_high_bits_are_masked() {
-        let vector = BinaryCodeword::from_words(65, vec![u64::MAX, u64::MAX]);
-        assert_eq!(vector.weight(), 65);
-        assert!(vector.bit(64));
+    #[should_panic(expected = "packed representation contains set padding bits")]
+    fn set_padding_bits_are_rejected() {
+        let _ = BinaryCodeword::from_words(65, vec![u64::MAX, u64::MAX]);
     }
 
     #[test]
