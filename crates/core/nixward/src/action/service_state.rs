@@ -247,7 +247,7 @@ impl ServiceUnitFileStateV1 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NixServiceObservedStateV1 {
     unit: String,
     load_state: ServiceLoadStateV1,
