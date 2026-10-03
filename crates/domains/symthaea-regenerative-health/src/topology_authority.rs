@@ -65,6 +65,7 @@ pub struct TopologyAuthorityDecision {
     pub verification_report_digest: Option<String>,
     pub policy_fingerprint: Option<String>,
     pub environment_fingerprint: Option<String>,
+    pub freshness_policy_fingerprint: Option<String>,
     pub freshness_scheme: Option<String>,
     pub freshness_source_id: Option<String>,
     pub freshness_epoch: Option<u64>,
@@ -128,6 +129,7 @@ impl TopologyAuthorityGate {
             verification_report_digest: None,
             policy_fingerprint: None,
             environment_fingerprint: None,
+            freshness_policy_fingerprint: None,
             freshness_scheme: None,
             freshness_source_id: None,
             freshness_epoch: None,
@@ -184,6 +186,8 @@ impl TopologyAuthorityGate {
                 let policy_fingerprint = verification_decision.policy_fingerprint.clone();
                 let environment_fingerprint =
                     verification_decision.environment_fingerprint.clone();
+                let freshness_policy_fingerprint =
+                    verification_decision.freshness_policy_fingerprint.clone();
                 let freshness_scheme = verification_decision.freshness_scheme.clone();
                 let freshness_source_id = verification_decision.freshness_source_id.clone();
                 let freshness_epoch = verification_decision.freshness_epoch;
@@ -203,6 +207,7 @@ impl TopologyAuthorityGate {
                         verification_report_digest,
                         policy_fingerprint,
                         environment_fingerprint,
+                        freshness_policy_fingerprint,
                         freshness_scheme,
                         freshness_source_id,
                         freshness_epoch,
@@ -229,6 +234,7 @@ impl TopologyAuthorityGate {
                                 verification_report_digest: verification_report_digest.clone(),
                                 policy_fingerprint: policy_fingerprint.clone(),
                                 environment_fingerprint: environment_fingerprint.clone(),
+                                freshness_policy_fingerprint: freshness_policy_fingerprint.clone(),
                                 freshness_scheme: freshness_scheme.clone(),
                                 freshness_source_id: freshness_source_id.clone(),
                                 freshness_epoch,
@@ -257,6 +263,7 @@ impl TopologyAuthorityGate {
                         verification_report_digest: verification_report_digest.clone(),
                         policy_fingerprint: policy_fingerprint.clone(),
                         environment_fingerprint: environment_fingerprint.clone(),
+                        freshness_policy_fingerprint: freshness_policy_fingerprint.clone(),
                         freshness_scheme: freshness_scheme.clone(),
                         freshness_source_id: freshness_source_id.clone(),
                         freshness_epoch,
@@ -271,6 +278,7 @@ impl TopologyAuthorityGate {
                     verification_report_digest,
                     policy_fingerprint,
                     environment_fingerprint,
+                    freshness_policy_fingerprint,
                     freshness_scheme,
                     freshness_source_id,
                     freshness_epoch,
@@ -385,8 +393,10 @@ mod tests {
                 schema_version: "0.1".into(),
                 policy_id: "topology-resolution-verification-v1".into(),
                 expected_verifier_id: "mycelix-topology-verifier".into(),
+                required_freshness_scheme: Some("epoch-marker-v1".into()),
                 required_freshness_source_id: Some("topology-epoch-bell".into()),
                 minimum_freshness_epoch: Some(7),
+                expected_freshness_policy_fingerprint: Some("freshness-policy-7".into()),
             },
         })
         .unwrap()
@@ -427,6 +437,17 @@ mod tests {
                 TopologyResolutionVerificationIssue::MissingFreshness
             )
         )));
+    }
+
+    #[test]
+    fn authority_decision_preserves_freshness_policy_provenance() {
+        let a = branch("topology-v2a");
+        let r = resolution("topology-v2a", vec![a.clone()]);
+        let d = gate().assess(Some(&r), Some(&verification()), None, &[a], 3_000);
+        assert_eq!(
+            d.freshness_policy_fingerprint.as_deref(),
+            Some("freshness-policy-7")
+        );
     }
 
     #[test]
