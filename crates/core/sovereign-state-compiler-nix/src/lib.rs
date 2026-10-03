@@ -246,7 +246,7 @@ impl NixOSTargetAdapter {
             }
             Some(_) => Err(NixOSAdapterError::PropertyType {
                 key,
-                expected: "non-negative integer",
+                expected: "positive integer",
             }),
         }
     }
@@ -782,6 +782,27 @@ mod tests {
         assert_eq!(
             adapter().compile(&intent),
             Err(NixOSAdapterError::UnboundRollbackGeneration(42))
+        );
+    }
+
+    #[test]
+    fn rollback_rejects_snapshot_with_different_generation() {
+        let mut intent = DeploymentIntent::new("rollback-drift", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_KEY.into(), StateValue::Bool(true));
+        intent.desired_state.properties.insert(
+            ROLLBACK_GENERATION_KEY.into(),
+            StateValue::Integer(42),
+        );
+        intent.required_resources.insert(nixos_generation_resource(42));
+
+        assert_eq!(
+            rollback_adapter(43).compile(&intent),
+            Err(NixOSAdapterError::PlanValidation(
+                PlanValidationError::MissingTargetResource(nixos_generation_resource(42))
+            ))
         );
     }
 
