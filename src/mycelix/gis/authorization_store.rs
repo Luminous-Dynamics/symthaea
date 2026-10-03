@@ -3251,6 +3251,12 @@ fn validate_native_authority_pin_set(
         tx: &Transaction<'_>,
         record: &DurableDispatchRecord,
     ) -> Result<String, AuthorizationStoreError> {
+        validate_attempt_boundary_consistency_for_attempt(
+            tx,
+            &record.authorization_instance,
+            &record.attempt_id,
+            &record.boundary_id,
+        )?;
         let row = tx.query_row(
             "SELECT operation_id,native_replay_identity,native_issuer,native_authority_namespace,
                     native_authorization_id,native_replay_derivation_digest,
