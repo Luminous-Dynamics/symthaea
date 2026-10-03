@@ -2467,8 +2467,8 @@ fn verify_receipt_trigger_behavior(conn: &rusqlite::Connection) -> Result<(), St
                  VALUES (?1, ?2, ?3)",
                 rusqlite::params![
                     snapshot_generation + 1,
-                    "not-a-digest",
-                    "not-a-digest",
+                    "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+                    "0000000000000000000000000000000000000000000000000000000000000000",
                 ],
             )
             .is_ok()
@@ -2537,12 +2537,12 @@ fn verify_receipt_trigger_behavior(conn: &rusqlite::Connection) -> Result<(), St
                     format!("{validation_event}-bad"),
                     validation_sequence + 1,
                     snapshot_generation,
-                    "not-a-digest",
-                    "",
+                    "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+                    " ",
                     "probe-v1",
-                    "probe",
-                    2_i64,
-                    "not-a-digest",
+                    " ",
+                    1_i64,
+                    "0000000000000000000000000000000000000000000000000000000000000000",
                 ],
             )
             .is_ok()
