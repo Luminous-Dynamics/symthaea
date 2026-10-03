@@ -1780,7 +1780,7 @@ mod tests {
     fn execution_lineage_guard_requires_reprepare_before_evidence() {
         let base = lineage_fixture();
         let mut changed = base.clone();
-        changed.source_revision = "def456".into();
+        changed.source_revision = "d".repeat(40);
 
         let guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
         assert_eq!(
@@ -1793,7 +1793,7 @@ mod tests {
     fn execution_lineage_guard_refuses_mixing_after_evidence() {
         let base = lineage_fixture();
         let mut changed = base.clone();
-        changed.source_revision = "def456".into();
+        changed.source_revision = "d".repeat(40);
 
         let mut guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
         guard
@@ -2010,7 +2010,7 @@ mod tests {
     fn execution_lineage_qualification_distinguishes_all_perturbation_cases() {
         let base = lineage_fixture();
         let mut changed = base.clone();
-        changed.source_revision = "def456".into();
+        changed.source_revision = "d".repeat(40);
 
         assert_eq!(
             qualify_lineage_perturbation(&base, &base, false),
