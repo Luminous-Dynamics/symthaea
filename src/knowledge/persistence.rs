@@ -1505,7 +1505,11 @@ impl KnowledgePersistence {
 
     fn ensure_schema(&mut self, conn: &rusqlite::Connection) -> Result<(), String> {
         if self.initialized {
-            return Ok(());
+            // `initialized` is process-local state. Another connection/process can still
+            // mutate SQLite schema objects after this instance has initialized them, so do
+            // not let the fast path mask loss of the invariants that enforce stable identity,
+            // append-only receipts, and validation sequencing.
+            return verify_initialized_schema_integrity(conn);
         }
 
         // Serialize schema initialization across connections and keep the additive
@@ -2016,6 +2020,97 @@ impl KnowledgePersistence {
         self.initialized = true;
         Ok(())
     }
+}
+
+fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<(), String> {
+    const REQUIRED_TABLES: &[&str] = &[
+        "knowledge_facts",
+        "knowledge_provenance_relations",
+        "knowledge_causal_edges",
+        "knowledge_ontology",
+        "knowledge_snapshot_receipts",
+        "knowledge_snapshot_validation_receipts",
+    ];
+    const REQUIRED_TRIGGERS: &[&str] = &[
+        "trg_knowledge_facts_memory_id_required_insert",
+        "trg_knowledge_facts_memory_id_required_update",
+        "trg_knowledge_snapshot_validation_receipts_required_insert",
+        "trg_knowledge_snapshot_receipts_no_update",
+        "trg_knowledge_snapshot_receipts_no_delete",
+        "trg_knowledge_snapshot_validation_receipts_no_update",
+        "trg_knowledge_snapshot_validation_receipts_no_delete",
+    ];
+
+    for name in REQUIRED_TABLES {
+        let exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(
+                    SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1
+                )",
+                [*name],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Schema integrity table check for {name}: {e}"))?;
+        if !exists {
+            return Err(format!("Schema integrity check failed: missing table {name}"));
+        }
+    }
+
+    for name in REQUIRED_TRIGGERS {
+        let exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(
+                    SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = ?1
+                )",
+                [*name],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Schema integrity trigger check for {name}: {e}"))?;
+        if !exists {
+            return Err(format!("Schema integrity check failed: missing trigger {name}"));
+        }
+    }
+
+    // These two indexes enforce identity uniqueness rather than merely improving
+    // query performance, so a same-named replacement index must also be verified unique.
+    for (table, index) in [
+        ("knowledge_facts", "idx_facts_memory_id_unique"),
+        (
+            "knowledge_snapshot_validation_receipts",
+            "idx_snapshot_validation_receipts_sequence_unique",
+        ),
+    ] {
+        let pragma = format!("PRAGMA index_list({table})");
+        let mut stmt = conn
+            .prepare(&pragma)
+            .map_err(|e| format!("Schema integrity index check for {table}: {e}"))?;
+        let mut rows = stmt
+            .query([])
+            .map_err(|e| format!("Schema integrity index query for {table}: {e}"))?;
+        let mut found_unique = false;
+        while let Some(row) = rows
+            .next()
+            .map_err(|e| format!("Schema integrity index row for {table}: {e}"))?
+        {
+            let name: String = row
+                .get(1)
+                .map_err(|e| format!("Schema integrity index name for {table}: {e}"))?;
+            let unique: i64 = row
+                .get(2)
+                .map_err(|e| format!("Schema integrity index uniqueness for {table}: {e}"))?;
+            if name == index && unique != 0 {
+                found_unique = true;
+                break;
+            }
+        }
+        if !found_unique {
+            return Err(format!(
+                "Schema integrity check failed: missing unique index {index} on {table}"
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 
@@ -2771,6 +2866,82 @@ mod tests {
         let conn = p.open_connection().unwrap();
         let err = p.ensure_schema(&conn).unwrap_err();
         assert!(err.contains("unknown kind"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_initialized_schema_drift_is_not_masked_by_process_state() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_initialized_schema_drift_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "initialized-drift".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x21; BinaryHV::BYTES],
+            source_text: "initialized drift".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "DROP TRIGGER trg_knowledge_snapshot_receipts_no_update;",
+            )
+            .unwrap();
+        }
+
+        let conn = p.open_connection().unwrap();
+        let err = p.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains("Schema integrity check failed"));
+        assert!(err.contains("trg_knowledge_snapshot_receipts_no_update"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_initialized_schema_rejects_missing_unique_identity_index() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_initialized_unique_index_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "unique-index".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x31; BinaryHV::BYTES],
+            source_text: "unique index".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch("DROP INDEX idx_facts_memory_id_unique;")
+                .unwrap();
+        }
+
+        let conn = p.open_connection().unwrap();
+        let err = p.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains("Schema integrity check failed"));
+        assert!(err.contains("idx_facts_memory_id_unique"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
