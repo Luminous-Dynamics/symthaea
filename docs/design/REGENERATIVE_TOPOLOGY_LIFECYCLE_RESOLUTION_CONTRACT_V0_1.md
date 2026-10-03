@@ -85,7 +85,7 @@ Symthaea can enforce:
 
 but the authoritative provenance system must establish whether that authority statement is actually valid.
 
-This maps cleanly to the broader remote-attestation separation between evidence, verification, and relying-party decisions. Current IETF Epoch Marker work similarly treats shared freshness as something that should be established explicitly and securely conveyed rather than inferred solely from local clocks. Cite: IETF draft-ietf-rats-epoch-markers-05 and RATS architecture. 
+This maps cleanly to the broader remote-attestation separation between evidence, verification, and relying-party decisions. Current IETF Epoch Marker work similarly treats shared freshness as something that should be established explicitly and securely conveyed rather than inferred solely from local clocks. 
 
 ## Safety invariant
 
