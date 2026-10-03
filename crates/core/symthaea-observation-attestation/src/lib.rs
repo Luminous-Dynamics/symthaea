@@ -714,14 +714,20 @@ impl ReceiptAttestationVerificationReport {
     /// Once verification-method resolution has passed, a report must retain the
     /// method identity that was actually bound to that successful resolution.
     fn has_consistent_resolution_metadata(&self) -> bool {
-        match self.verification_method {
-            VerificationStage::Passed => self
-                .resolved_verification_method
-                .as_deref()
-                .is_some_and(|method| !method.is_empty()),
-            VerificationStage::Failed(_)
-            | VerificationStage::NotEvaluated => true,
-        }
+        let snapshot_is_well_formed = self
+            .resolution_snapshot_fingerprint
+            .as_deref()
+            .is_none_or(|snapshot| !snapshot.is_empty());
+
+        snapshot_is_well_formed
+            && match self.verification_method {
+                VerificationStage::Passed => self
+                    .resolved_verification_method
+                    .as_deref()
+                    .is_some_and(|method| !method.is_empty()),
+                VerificationStage::Failed(_)
+                | VerificationStage::NotEvaluated => true,
+            }
     }
 
     /// Validate that this report is internally coherent without requiring
@@ -1036,12 +1042,20 @@ impl VerificationContext {
             return false;
         };
 
+        let optional_identity_is_well_formed = |value: &Option<String>| {
+            value.as_deref().is_none_or(|identity| !identity.is_empty())
+        };
+
         self.context_version == VERIFICATION_CONTEXT_VERSION
             && self.verifier_id == VERIFIER_IMPLEMENTATION_ID
             && self.procedure_id == EVALUATION_PROCEDURE_ID
             && self.procedure_fingerprint == expected_procedure_fingerprint
             && !self.policy_fingerprint.is_empty()
             && !self.environment_fingerprint.is_empty()
+            && optional_identity_is_well_formed(&self.evaluator_identity_fingerprint)
+            && optional_identity_is_well_formed(&self.resolution_snapshot_fingerprint)
+            && optional_identity_is_well_formed(&self.trust_root_fingerprint)
+            && optional_identity_is_well_formed(&self.authorization_policy_fingerprint)
     }
 
     /// Verify that execution-bound context fields still correspond to the report.
@@ -3146,6 +3160,57 @@ mod tests {
             ..context.clone()
         }.fingerprint());
         assert!(!context.is_well_formed());
+    }
+
+    #[test]
+    fn verification_report_self_validation_rejects_empty_resolution_snapshot() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "ignored-by-resolver",
+            signing_key.verifying_key(),
+            150,
+        );
+        let method = ResolvedVerificationMethod {
+            verification_method: "did:example:attester-a#key-1".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([method]);
+        let mut report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
+
+        assert!(report.is_well_formed());
+        report.resolution_snapshot_fingerprint = Some(String::new());
+        assert!(!report.is_well_formed());
+    }
+
+    #[test]
+    fn verification_context_self_validation_rejects_empty_optional_identities() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let base = VerificationContext::from_report(&report);
+
+        for context in [
+            VerificationContext {
+                evaluator_identity_fingerprint: Some(String::new()),
+                ..base.clone()
+            },
+            VerificationContext {
+                trust_root_fingerprint: Some(String::new()),
+                ..base.clone()
+            },
+            VerificationContext {
+                authorization_policy_fingerprint: Some(String::new()),
+                ..base.clone()
+            },
+        ] {
+            assert!(!context.is_well_formed());
+        }
     }
 
     #[test]
