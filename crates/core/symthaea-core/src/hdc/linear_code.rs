@@ -8,7 +8,8 @@
 //! It is not integrated into the production HDC defaults and does not claim
 //! production-grade decoding or noise correction.
 
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha12Rng;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BinaryCodeword {
@@ -118,7 +119,10 @@ impl RandomLinearCode {
             rank > 0 && rank <= dimension,
             "rank must be in 1..=dimension"
         );
-        let mut rng = StdRng::seed_from_u64(seed);
+        // ChaCha12Rng is a named, portable generator; unlike StdRng, its
+        // algorithm is fixed, making seed-defined fixtures reproducible across
+        // supported platforms and rand releases that preserve this API.
+        let mut rng = ChaCha12Rng::seed_from_u64(seed);
         let mut basis = Vec::with_capacity(rank);
 
         while basis.len() < rank {
