@@ -163,7 +163,6 @@ pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
         Capability::Rollback,
         Capability::Reboot,
         Capability::ModifyBootChain,
-        Capability::CreateRecoveryEnvironment,
     ]
     .into_iter()
     .collect()
