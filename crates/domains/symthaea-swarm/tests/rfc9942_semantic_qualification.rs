@@ -78,21 +78,9 @@ fn rfc9942_outer_receipts_are_ordered_and_placement_is_not_normalized() {
         out
     }
 
-    fn uint(out: &mut Vec<u8>, value: u64) {
-        match value {
-            0..=23 => out.push(value as u8),
-            24..=255 => out.extend_from_slice(&[0x18, value as u8]),
-            _ => unreachable!(),
-        }
-    }
-
-    fn int(out: &mut Vec<u8>, value: i64) {
-        if value >= 0 {
-            uint(out, value as u64);
-        } else {
-            uint(out, (-1 - value) as u64);
-            out[0] = out[0] | 0x20;
-        }
+    // RFC 9942 label 394 requires a canonical two-byte unsigned integer.
+    fn int_394(out: &mut Vec<u8>) {
+        out.extend_from_slice(&[0x19, 0x01, 0x8a]);
     }
 
     let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x66; 32]]).to_cbor();
@@ -109,7 +97,7 @@ fn rfc9942_outer_receipts_are_ordered_and_placement_is_not_normalized() {
 
     let mut protected = Vec::new();
     protected.push(0xa1);
-    int(&mut protected, 394);
+    int_394(&mut protected);
     protected.extend_from_slice(&collection);
 
     let mut wire = Vec::new();
