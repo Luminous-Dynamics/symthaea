@@ -150,6 +150,16 @@ fn browser_qualification_scene() -> RemoteScene {
 }
 
 #[cfg(feature = "browser-qualification")]
+fn browser_qualification_portrait() -> String {
+    use base64::Engine as _;
+    const SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#0a0f1a"/><circle cx="256" cy="256" r="150" fill="#2eb8ea" fill-opacity=".22" stroke="#f2ead0" stroke-width="4"/><path d="M156 290 C196 210 232 210 256 270 C280 210 316 210 356 290" fill="none" stroke="#f2ead0" stroke-width="6"/><circle cx="210" cy="255" r="12" fill="#f2ead0"/><circle cx="302" cy="255" r="12" fill="#f2ead0"/></svg>"#;
+    format!(
+        "data:image/svg+xml;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(SVG.as_bytes())
+    )
+}
+
+#[cfg(feature = "browser-qualification")]
 fn browser_qualification_movie() -> Movie {
     let width = 32u32;
     let height = 24u32;
@@ -292,8 +302,14 @@ pub fn App() -> impl IntoView {
             .and_then(|window| window.location().search().ok())
             .is_some_and(|search| search.contains("symthaea_webgpu_fixture=1"));
         if enabled {
-            gpu_scene.set(Some(browser_qualification_scene()));
-            movie.set(Some(browser_qualification_movie()));
+            let scene = browser_qualification_scene();
+            let fixture_movie = browser_qualification_movie();
+            let fixture_portrait = browser_qualification_portrait();
+            Effect::new(move |_| {
+                gpu_scene.set(Some(scene.clone()));
+                movie.set(Some(fixture_movie.clone()));
+                portrait.set(Some(fixture_portrait.clone()));
+            });
         }
     }
     let webgpu_ready = RwSignal::new(false);
