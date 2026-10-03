@@ -5,6 +5,7 @@ pub mod sensor_temporal;
 pub mod sensor_topology;
 pub mod topology_lifecycle;
 pub mod topology_resolution;
+pub mod topology_revocation;
 pub mod adversarial_crucible;
 pub mod physics_evidence;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
