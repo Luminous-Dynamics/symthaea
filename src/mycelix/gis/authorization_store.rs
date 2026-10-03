@@ -415,6 +415,70 @@ pub struct DurableDispatchRecord {
     /// the shared action key, so separate boundary instances cannot claim one
     /// another's dispatch records.
     pub boundary_id: String,
+    /// Deterministic commitment over the immutable provenance tuple for this attempt.
+    /// Lifecycle state is intentionally excluded; transitions are protected separately.
+    pub attempt_binding_digest: String,
+}
+
+fn compute_attempt_binding_digest(
+    authorization_instance: &str,
+    attempt_id: &str,
+    operation_id: &str,
+    native_replay_identity: &str,
+    native_issuer: &str,
+    native_authority_namespace: &str,
+    native_authorization_id: &str,
+    native_replay_derivation_digest: &str,
+    native_authority_pin_set_id: &str,
+    native_authority_pin_set_digest: &str,
+    relying_party_id: &str,
+    action_id: &str,
+    action_digest: &str,
+    provider_idempotency_key: &str,
+    target_identity: &str,
+    audience: &str,
+    adapter: &str,
+    status_identifier: &str,
+    status_source_digest: &str,
+    status_observed_at: &str,
+    status_valid_until: &str,
+    status_evidence_digest: &str,
+    validity_issued_at: &str,
+    validity_expires_at: Option<&str>,
+    validity_policy_digest: &str,
+) -> String {
+    let mut material = Vec::with_capacity(512);
+    material.extend_from_slice(b"symthaea:gis:attempt-binding:v1\n");
+    for value in [
+        authorization_instance,
+        attempt_id,
+        operation_id,
+        native_replay_identity,
+        native_issuer,
+        native_authority_namespace,
+        native_authorization_id,
+        native_replay_derivation_digest,
+        native_authority_pin_set_id,
+        native_authority_pin_set_digest,
+        relying_party_id,
+        action_id,
+        action_digest,
+        provider_idempotency_key,
+        target_identity,
+        audience,
+        adapter,
+        status_identifier,
+        status_source_digest,
+        status_observed_at,
+        status_valid_until,
+        status_evidence_digest,
+        validity_issued_at,
+    ] {
+        append_len_prefixed(&mut material, value.as_bytes());
+    }
+    append_len_prefixed(&mut material, validity_expires_at.unwrap_or("").as_bytes());
+    append_len_prefixed(&mut material, validity_policy_digest.as_bytes());
+    format!("sha256:{}", hex::encode(Sha256::digest(material)))
 }
 
 impl DurableDispatchRecord {
@@ -432,31 +496,76 @@ impl DurableDispatchRecord {
         effect: &super::ActionEffectBinding,
         boundary_id: impl Into<String>,
         status: &ProviderStatusEvidence,
+        native_replay_derivation_digest: &str,
+        native_authority_pin_set_id: &str,
+        native_authority_pin_set_digest: &str,
+        relying_party_id: &str,
+        validity_issued_at: &str,
+        validity_expires_at: Option<&str>,
+        validity_policy_digest: &str,
     ) -> Self {
+        let authorization_instance = authorization_instance.into();
+        let attempt_id = attempt_id.into();
+        let operation_id = operation_id.into();
+        let native_replay_identity = native_replay_identity.into();
+        let native_issuer = native_issuer.into();
+        let native_authority_namespace = native_authority_namespace.into();
+        let native_authorization_id = native_authorization_id.into();
+        let action_id = action_id.into();
+        let action_digest = action_digest.into();
+        let provider_idempotency_key = provider_idempotency_key.into();
+        let boundary_id = boundary_id.into();
+        let attempt_binding_digest = compute_attempt_binding_digest(
+            &authorization_instance,
+            &attempt_id,
+            &operation_id,
+            &native_replay_identity,
+            &native_issuer,
+            &native_authority_namespace,
+            &native_authorization_id,
+            native_replay_derivation_digest,
+            native_authority_pin_set_id,
+            native_authority_pin_set_digest,
+            relying_party_id,
+            &action_id,
+            &action_digest,
+            &provider_idempotency_key,
+            &effect.target_identity,
+            &effect.audience,
+            &effect.adapter,
+            &status.status_identifier,
+            &status.status_source_digest,
+            &status.status_observed_at,
+            &status.status_valid_until,
+            &status.status_evidence_digest,
+            validity_issued_at,
+            validity_expires_at,
+            validity_policy_digest,
+        );
         Self {
-            authorization_instance: authorization_instance.into(),
-            attempt_id: attempt_id.into(),
-            operation_id: operation_id.into(),
-            native_replay_identity: native_replay_identity.into(),
-            native_issuer: native_issuer.into(),
-            native_authority_namespace: native_authority_namespace.into(),
-            native_authorization_id: native_authorization_id.into(),
+            authorization_instance,
+            attempt_id,
+            operation_id,
+            native_replay_identity,
+            native_issuer,
+            native_authority_namespace,
+            native_authorization_id,
             status_identifier: status.status_identifier.clone(),
             status_source_digest: status.status_source_digest.clone(),
             status_observed_at: status.status_observed_at.clone(),
             status_valid_until: status.status_valid_until.clone(),
             status_evidence_digest: status.status_evidence_digest.clone(),
-            action_id: action_id.into(),
-            action_digest: action_digest.into(),
-            provider_idempotency_key: provider_idempotency_key.into(),
+            action_id,
+            action_digest,
+            provider_idempotency_key,
             target_identity: effect.target_identity.clone(),
             audience: effect.audience.clone(),
             adapter: effect.adapter.clone(),
-            boundary_id: boundary_id.into(),
+            boundary_id,
+            attempt_binding_digest,
         }
     }
 }
-
 pub struct SqliteAuthorizationStore {
     path: PathBuf,
     relying_party_id: String,
@@ -641,6 +750,7 @@ impl SqliteAuthorizationStore {
                audience TEXT NOT NULL,
                adapter TEXT NOT NULL,
                boundary_id TEXT NOT NULL,
+               attempt_binding_digest TEXT NOT NULL,
                state TEXT NOT NULL,
                PRIMARY KEY(authorization_instance, attempt_id)
              );",
@@ -667,6 +777,7 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_dispatches", "validity_expires_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "validity_policy_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "relying_party_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "attempt_binding_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_issuer", "TEXT")?;
@@ -1918,6 +2029,13 @@ fn validate_native_authority_pin_set(
             expected_effect,
             boundary_id,
             status,
+            &native_replay_provenance.derivation_digest,
+            &native_authority_pin_set_id,
+            &native_authority_pin_set_digest,
+            self.relying_party_id.as_str(),
+            lease_validity.0.as_str(),
+            lease_validity.1.as_deref(),
+            lease_validity.2.as_str(),
         );
         if current_boundary.is_none() {
             tx.execute(
@@ -1934,8 +2052,8 @@ fn validate_native_authority_pin_set(
               native_authority_pin_set_id,native_authority_pin_set_digest,
               status_identifier,status_source_digest,status_observed_at,status_valid_until,status_evidence_digest,
               validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,
-              action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,'dispatch_pending')",
+              action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,attempt_binding_digest,state)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,'dispatch_pending')",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity,
@@ -1955,7 +2073,8 @@ fn validate_native_authority_pin_set(
                 lease_validity.2.as_str(),
                 self.relying_party_id.as_str(),
                 record.action_id, record.action_digest, record.provider_idempotency_key,
-                record.target_identity, record.audience, record.adapter, record.boundary_id],
+                record.target_identity, record.audience, record.adapter, record.boundary_id,
+                record.attempt_binding_digest],
         )?;
         let changed = tx.execute(
             "UPDATE authorization_leases SET state='dispatch_pending', attempt_id=?2
@@ -2454,6 +2573,7 @@ fn validate_native_authority_pin_set(
     /// Compare every immutable identity field of a caller-supplied dispatch
     /// record against the durable dispatch row before terminal settlement.
     fn validate_persisted_dispatch_record(
+        &self,
         tx: &Transaction<'_>,
         record: &DurableDispatchRecord,
     ) -> Result<String, AuthorizationStoreError> {
@@ -2462,7 +2582,7 @@ fn validate_native_authority_pin_set(
                     native_authorization_id,native_replay_derivation_digest,
                     native_authority_pin_set_id,native_authority_pin_set_digest,
                     relying_party_id,action_id,action_digest,provider_idempotency_key,
-                    target_identity,audience,adapter,boundary_id,state
+                    target_identity,audience,adapter,boundary_id,attempt_binding_digest,state
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
             params![record.authorization_instance, record.attempt_id, record.boundary_id],
@@ -2472,7 +2592,7 @@ fn validate_native_authority_pin_set(
                 r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
                 r.get::<_,String>(9)?, r.get::<_,String>(10)?, r.get::<_,String>(11)?,
                 r.get::<_,String>(12)?, r.get::<_,String>(13)?, r.get::<_,String>(14)?,
-                r.get::<_,String>(15)?, r.get::<_,String>(16)?,
+                r.get::<_,String>(15)?, r.get::<_,String>(16)?, r.get::<_,String>(17)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
 
@@ -2489,13 +2609,54 @@ fn validate_native_authority_pin_set(
             && row.12 == record.target_identity
             && row.13 == record.audience
             && row.14 == record.adapter
-            && row.15 == record.boundary_id;
+            && row.15 == record.boundary_id
+            && row.16 == record.attempt_binding_digest;
 
-        if !matches {
+        if !matches || row.16.is_empty() {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
 
-        Ok(row.16)
+        let validity: (Option<String>, Option<String>, Option<String>) = tx.query_row(
+            "SELECT validity_issued_at,validity_expires_at,validity_policy_digest
+             FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+            params![record.authorization_instance, record.attempt_id, record.boundary_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )?;
+
+        let expected = compute_attempt_binding_digest(
+            &record.authorization_instance,
+            &record.attempt_id,
+            &record.operation_id,
+            &record.native_replay_identity,
+            &record.native_issuer,
+            &record.native_authority_namespace,
+            &record.native_authorization_id,
+            &record.native_replay_derivation_digest,
+            &row.6,
+            &row.7,
+            &self.relying_party_id,
+            &record.action_id,
+            &record.action_digest,
+            &record.provider_idempotency_key,
+            &record.target_identity,
+            &record.audience,
+            &record.adapter,
+            &record.status_identifier,
+            &record.status_source_digest,
+            &record.status_observed_at,
+            &record.status_valid_until,
+            &record.status_evidence_digest,
+            validity.0.as_deref().unwrap_or(""),
+            validity.1.as_deref(),
+            validity.2.as_deref().unwrap_or(""),
+        );
+
+        if expected != record.attempt_binding_digest || expected != row.16 {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        Ok(row.17)
     }
 
     /// Commit a terminal provider outcome only after a relying-party configured
@@ -6578,3 +6739,91 @@ mod tests {
     }
 
 }
+    #[test]
+    fn persisted_attempt_binding_tampering_is_rejected() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-attempt-binding-tamper-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-A","audience-A","adapter-A");
+        let record=DurableDispatchRecord {
+            authorization_instance:"auth".into(),
+            attempt_id:"attempt".into(),
+            operation_id:"op-A".into(),
+            native_replay_identity:"replay-A".into(),
+            native_issuer:"issuer".into(),
+            native_authority_namespace:"ns".into(),
+            native_authorization_id:"native-A".into(),
+            status_identifier:"status-A".into(),
+            status_source_digest:"source-A".into(),
+            status_observed_at:"2026-10-03T10:00:00Z".into(),
+            status_valid_until:"2026-10-03T11:00:00Z".into(),
+            status_evidence_digest:"status-digest-A".into(),
+            action_id:"action-A".into(),
+            action_digest:"digest-A".into(),
+            provider_idempotency_key:"provider-key-A".into(),
+            target_identity:effect.target_identity.clone(),
+            audience:effect.audience.clone(),
+            adapter:effect.adapter.clone(),
+            boundary_id:"boundary-A".into(),
+            attempt_binding_digest:"sha256:uncomputed".into(),
+        };
+
+        let mut connection=store.connection().unwrap();
+        let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        tx.execute(
+            "INSERT INTO authorization_dispatches(
+                authorization_instance,attempt_id,operation_id,native_replay_identity,
+                native_issuer,native_authority_namespace,native_authorization_id,
+                native_replay_derivation_digest,native_authority_pin_set_id,
+                native_authority_pin_set_digest,relying_party_id,action_id,action_digest,
+                provider_idempotency_key,target_identity,audience,adapter,boundary_id,
+                attempt_binding_digest,state
+             ) VALUES(
+                ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20
+             )",
+            params![
+                record.authorization_instance,record.attempt_id,record.operation_id,
+                record.native_replay_identity,record.native_issuer,record.native_authority_namespace,
+                record.native_authorization_id,"derivation-A","pinset-A","digest-A",
+                store.relying_party_id(),record.action_id,record.action_digest,
+                record.provider_idempotency_key,record.target_identity,record.audience,record.adapter,
+                record.boundary_id,record.attempt_binding_digest,"dispatch_pending"
+            ],
+        ).unwrap();
+
+        let digest=compute_attempt_binding_digest(
+            &record.authorization_instance,&record.attempt_id,&record.operation_id,
+            &record.native_replay_identity,&record.native_issuer,&record.native_authority_namespace,
+            &record.native_authorization_id,"derivation-A","pinset-A","digest-A",
+            store.relying_party_id(),&record.action_id,&record.action_digest,
+            &record.provider_idempotency_key,&record.target_identity,&record.audience,&record.adapter,
+            &record.status_identifier,&record.status_source_digest,&record.status_observed_at,
+            &record.status_valid_until,&record.status_evidence_digest,"",None,""
+        );
+
+        tx.execute(
+            "UPDATE authorization_dispatches
+             SET attempt_binding_digest=?3
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id,digest],
+        ).unwrap();
+
+        tx.execute(
+            "UPDATE authorization_dispatches SET target_identity='target-B'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+
+        let err=store.validate_persisted_dispatch_record(&tx,&DurableDispatchRecord {
+            target_identity:"target-A".into(),
+            attempt_binding_digest:digest,
+            ..record
+        }).unwrap_err();
+        assert!(matches!(err, AuthorizationStoreError::Consumption(
+            AuthorizationConsumptionError::InvalidBinding
+        )));
+        tx.rollback().unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
