@@ -7,7 +7,6 @@ const CANONICAL_FIXTURE_DIMENSION: usize = 96;
 const CANONICAL_FIXTURE_RANK: usize = 8;
 const CANONICAL_FIXTURE_SEED: u64 = 0xC0DE;
 
-
 #[test]
 fn canonical_fixture_fingerprint_is_emitted() {
     let code = RandomLinearCode::generate(
@@ -459,8 +458,7 @@ fn general_recovery_rejects_target_outside_union_span() {
 #[test]
 fn overlapping_subspaces_without_shared_generators_still_recover_representatively() {
     let parent = RandomLinearCode::generate(96, 4, 0x7A7A);
-    let left =
-        RandomLinearCode::from_basis(parent.basis()[..2].to_vec()).expect("left subcode");
+    let left = RandomLinearCode::from_basis(parent.basis()[..2].to_vec()).expect("left subcode");
 
     // The right subcode intersects the left span, but shares no generator
     // vector literally: its first basis vector is g0 XOR g1 from the left
@@ -476,8 +474,8 @@ fn overlapping_subspaces_without_shared_generators_still_recover_representativel
     assert_ne!(left.basis()[1], right.basis()[0]);
 
     let target = shared.clone();
-    let recovered = recover_linear_bound(&target, &[&left, &right])
-        .expect("target is in the union span");
+    let recovered =
+        recover_linear_bound(&target, &[&left, &right]).expect("target is in the union span");
 
     assert_eq!(recovered.len(), 2);
     assert!(left.contains(&recovered[0]));
