@@ -32,6 +32,7 @@ pub enum SensorTopologyAttestationIssue {
     FutureAttestation,
     StaleAttestation,
     ConfigurationMismatch,
+    TopologyIdentityMismatch,
 }
 
 impl SensorTopologyAttestation {
@@ -61,7 +62,7 @@ impl SensorTopologyAttestation {
         }
 
         if self.asset_id != expected_asset_id || self.component_id != expected_component_id {
-            return Err(SensorTopologyAttestationIssue::EmptyIdentity);
+            return Err(SensorTopologyAttestationIssue::TopologyIdentityMismatch);
         }
 
         if self.configuration_digest != expected_configuration_digest {
@@ -123,6 +124,18 @@ mod tests {
     }
 
     #[test]
+    fn topology_binding_must_match_asset_and_component_identity() {
+        assert_eq!(
+            attestation().validate("vehicle-2", "wing-root", "cfg-1", 1_000),
+            Err(SensorTopologyAttestationIssue::TopologyIdentityMismatch)
+        );
+        assert_eq!(
+            attestation().validate("vehicle-1", "tail-root", "cfg-1", 1_000),
+            Err(SensorTopologyAttestationIssue::TopologyIdentityMismatch)
+        );
+    }
+
+    #[test]
     fn topology_binding_must_match_configuration() {
         assert_eq!(
             attestation().validate("vehicle-1", "wing-root", "cfg-attacker", 1_000),
@@ -130,15 +143,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn topology_identity_is_bound_to_asset_and_component() {
-        assert_eq!(
-            attestation().validate("vehicle-2", "wing-root", "cfg-1", 1_000),
-            Err(SensorTopologyAttestationIssue::EmptyIdentity)
-        );
-        assert_eq!(
-            attestation().validate("vehicle-1", "tail-root", "cfg-1", 1_000),
-            Err(SensorTopologyAttestationIssue::EmptyIdentity)
-        );
-    }
 }
