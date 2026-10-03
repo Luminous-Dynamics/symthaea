@@ -108,9 +108,15 @@ fn run_pair(
         previous_decision,
         current,
         current_decision,
-        independence_group: format!("group-{sensor_id}"),
-        independence_topology_digest: "topology-v1".into(),
-        independence_evidence_id: format!("independence-{sensor_id}"),
+        independence: crate::sensor_temporal::SensorIndependenceBinding {
+            schema_version: "0.1".into(),
+            sensor_id: sensor_id.into(),
+            component_id: "wing-root".into(),
+            independence_group: format!("group-{sensor_id}"),
+            topology_digest: "topology-v1".into(),
+            configuration_digest: "cfg-1".into(),
+            evidence_id: format!("independence-{sensor_id}"),
+        },
     }
 }
 
