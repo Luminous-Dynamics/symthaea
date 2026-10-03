@@ -64,7 +64,7 @@ async fn parse_service_response(resp: gloo_net::http::Response) -> Result<Value,
             let result = JsFuture::from(reader.read())
                 .await
                 .map_err(|error| format!("failed to read response chunk: {error:?}"))?;
-            let done = js_sys::Reflect::get(&result, &JsValue::from_str("done"))
+            let done = web_sys::js_sys::Reflect::get(&result, &JsValue::from_str("done"))
                 .map_err(|error| format!("failed to inspect response chunk: {error:?}"))?
                 .as_bool()
                 .unwrap_or(false);
@@ -74,7 +74,7 @@ async fn parse_service_response(resp: gloo_net::http::Response) -> Result<Value,
 
             let value = js_sys::Reflect::get(&result, &JsValue::from_str("value"))
                 .map_err(|error| format!("failed to inspect response chunk value: {error:?}"))?;
-            let chunk = js_sys::Uint8Array::new(&value);
+            let chunk = web_sys::js_sys::Uint8Array::new(&value);
             let chunk_len = chunk.length() as usize;
             let next_len = bytes
                 .len()
