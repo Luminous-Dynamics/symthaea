@@ -269,6 +269,22 @@ fn invalid_current_lineage_cannot_advance_guard_phase() {
 }
 
 #[test]
+fn drift_report_rejects_invalid_lineage() {
+    let prepared = fixture();
+    let mut observed = prepared.clone();
+    observed.source_revision = "not-a-git-object".into();
+
+    assert_eq!(
+        symthaea_evidence_plane::execution_lineage::ExecutionLineageDriftV1::between(
+            &prepared,
+            &observed,
+        )
+        .unwrap_err(),
+        "invalid or non-canonical Git object identity for source_revision: \"not-a-git-object\""
+    );
+}
+
+#[test]
 fn guard_refuses_cross_execution_evidence_after_commit() {
     let base = fixture();
     let mut changed = base.clone();
