@@ -65,10 +65,12 @@ jobs:
 
           mkdir -p "$tmp/sovereign-state-compiler/src"
           mkdir -p "$tmp/sovereign-state-compiler-nix/src"
+          mkdir -p "$tmp/nixward-ssc-bridge/src"
           cp crates/core/sovereign-state-compiler/Cargo.toml "$tmp/sovereign-state-compiler/"
           cp crates/core/sovereign-state-compiler/src/lib.rs "$tmp/sovereign-state-compiler/src/"
           cp crates/core/sovereign-state-compiler-nix/Cargo.toml "$tmp/sovereign-state-compiler-nix/"
           cp crates/core/sovereign-state-compiler-nix/src/lib.rs "$tmp/sovereign-state-compiler-nix/src/"
+          cp crates/core/nixward/src/ssc_bridge.rs "$tmp/nixward-ssc-bridge/src/lib.rs"
           cp Cargo.lock "$tmp/Cargo.lock"
 
           cat > "$tmp/Cargo.toml" <<'EOF'
@@ -77,6 +79,7 @@ jobs:
           members = [
               "sovereign-state-compiler",
               "sovereign-state-compiler-nix",
+              "nixward-ssc-bridge",
           ]
 
           [workspace.dependencies]
@@ -84,6 +87,18 @@ jobs:
           serde = { version = "1.0", features = ["derive"] }
           serde_json = "1.0"
           thiserror = "1.0"
+          cat > "$tmp/nixward-ssc-bridge/Cargo.toml" <<'EOF'
+          [package]
+          name = "nixward-ssc-bridge"
+          version = "0.1.0"
+          edition = "2024"
+
+          [dependencies]
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          thiserror = "1.0"
+          sovereign-state-compiler = { path = "../sovereign-state-compiler" }
+          sovereign-state-compiler-nix = { path = "../sovereign-state-compiler-nix" }
           EOF
 
           cargo +1.96.0 metadata --manifest-path "$tmp/Cargo.toml" --no-deps --locked
@@ -94,3 +109,4 @@ jobs:
         run: |
           test -f crates/core/sovereign-state-compiler/Cargo.toml
           test -f crates/core/sovereign-state-compiler-nix/Cargo.toml
+          test -f crates/core/nixward/src/ssc_bridge.rs
