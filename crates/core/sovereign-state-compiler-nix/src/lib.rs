@@ -458,8 +458,8 @@ mod tests {
                     (
                         PlanStepKind::ApplyDesiredState,
                         vec![
-                            Capability::ConfigureSystem,
                             Capability::ObserveHardware,
+                            Capability::ConfigureSystem,
                             Capability::UpdateSystem,
                         ],
                     ),
@@ -494,7 +494,15 @@ mod tests {
             let actual = plan
                 .steps
                 .iter()
-                .map(|step| (step.kind.clone(), step.required_capabilities.iter().copied().collect()))
+                .map(|step| {
+                    (
+                        step.kind.clone(),
+                        step.required_capabilities
+                            .iter()
+                            .copied()
+                            .collect::<BTreeSet<_>>(),
+                    )
+                })
                 .collect::<Vec<_>>();
 
             assert_eq!(actual, expected, "plan vector mismatch for {mode}");
