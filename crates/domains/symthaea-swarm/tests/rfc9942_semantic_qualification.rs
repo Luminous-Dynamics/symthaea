@@ -112,3 +112,35 @@ fn rfc9942_outer_receipts_are_ordered_and_placement_is_not_normalized() {
     assert!(decoded.unprotected_receipts().is_none());
     assert_eq!(decoded.to_cbor(), wire);
 }
+
+#[test]
+fn rfc9162_inclusion_and_consistency_path_bounds_are_distinct() {
+    let hash = [0x11; 32];
+
+    let mut inclusion = vec![
+        0x83, 0x18, 0x01, 0x00, // [tree_size=24? corrected below]
+    ];
+    // Construct [tree_size=2^64-1, leaf_index=0, inclusion_path[65]] with
+    // canonical uint64 and bounded 32-byte hashes.
+    inclusion.clear();
+    inclusion.extend_from_slice(&[0x83, 0x1b, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+    inclusion.extend_from_slice(&[0x00, 0x98, 0x41]);
+    for _ in 0..65 {
+        inclusion.push(0x58);
+        inclusion.push(0x20);
+        inclusion.extend_from_slice(&hash);
+    }
+    assert_eq!(
+        Rfc9162InclusionProof::from_cbor(&inclusion),
+        Err(symthaea_swarm::semantic_evidence_vds::Rfc9162ProofDecodeError::InvalidStructure)
+    );
+
+    let mut consistency = Vec::new();
+    consistency.extend_from_slice(&[0x83, 0x01, 0x02, 0x98, 0x41]);
+    for _ in 0..65 {
+        consistency.push(0x58);
+        consistency.push(0x20);
+        consistency.extend_from_slice(&hash);
+    }
+    assert!(Rfc9162ConsistencyProof::from_cbor(&consistency).is_ok());
+}
