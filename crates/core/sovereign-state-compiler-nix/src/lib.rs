@@ -32,9 +32,10 @@ const NIXOS_GENERATION_DIGEST_DOMAIN: &[u8] =
 /// Construct the resource identity used to bind a rollback to a specific
 /// observed NixOS generation.
 ///
-/// The digest uses a protocol-specific domain separator plus a fixed-width
-/// big-endian generation number, avoiding ambiguity with other SSC resource
-/// identities that may use the same hash function.
+/// The digest uses a protocol-specific domain separator, fixed-width
+/// generation number, length-prefixed realization identity, and BLAKE3. This
+/// prevents a generation ordinal from being treated as a reusable authority
+/// token when the underlying system realization has changed.
 pub fn nixos_generation_resource(
     generation: u64,
     realization: &str,
@@ -178,7 +179,11 @@ pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
 /// * `applications.remove`: list of logical package identifiers
 /// * `system.reboot`: boolean
 /// * `nixos.rollback`: boolean; `true` requires `nixos.rollback-generation`
-/// * `nixos.rollback-generation`: positive generation number, explicitly bound in `required_resources`
+/// * `nixos.rollback-generation`: positive generation number
+/// * `nixos.rollback-realization`: exact observed system-profile/store realization identity
+///
+/// Rollback requires both values and binds their canonical pair into the
+/// `nixos-generation` resource identity carried by `required_resources`.
 ///
 /// Unknown properties are rejected rather than silently ignored.
 #[derive(Debug, Clone)]
@@ -853,12 +858,22 @@ mod tests {
     #[test]
     fn rollback_generation_resource_identity_is_deterministic() {
         assert_eq!(
-            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"),
-            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource")
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource"),
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource")
         );
         assert_ne!(
-            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"),
-            nixos_generation_resource(43, "/nix/store/bbb-nixos-system-host").expect("generation resource")
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource"),
+            nixos_generation_resource(42, "/nix/store/bbb-nixos-system-host")
+                .expect("generation resource")
+        );
+        assert_ne!(
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource"),
+            nixos_generation_resource(43, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource")
         );
     }
 
@@ -1232,6 +1247,10 @@ mod tests {
         b.desired_state.properties.insert(
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(43),
+        );
+        b.desired_state.properties.insert(
+            ROLLBACK_REALIZATION_KEY.into(),
+            StateValue::String("/nix/store/bbb-nixos-system-host".into()),
         );
         b.required_resources.clear();
         b.required_resources.insert(nixos_generation_resource(43, "/nix/store/bbb-nixos-system-host").expect("generation resource"));
