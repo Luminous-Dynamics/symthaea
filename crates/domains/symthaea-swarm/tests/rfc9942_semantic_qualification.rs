@@ -517,6 +517,44 @@ fn rfc9942_es256_cose_key_inclusion_uses_detached_proof_derived_root() {
     );
 }
 
+
+#[test]
+fn rfc9942_es256_cose_key_consistency_preserves_signature_first_order() {
+    // The COSE_Key convenience helper must delegate to the canonical semantic
+    // verifier. Both the signature and consistency proof are deliberately
+    // invalid; RFC 9942 requires the signature failure to win.
+    let consistency_proof =
+        Rfc9162ConsistencyProof::new(1, 2, vec![[0x33; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Consistency, vec![consistency_proof])
+        .unwrap();
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Attached([0x44; 32]),
+        vec![0xBB; 63],
+    )
+    .unwrap();
+
+    let cose_key_wire = {
+        let mut out = vec![0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20];
+        out.extend_from_slice(&RFC8392_PUBLIC_X);
+        out.extend_from_slice(&[0x22, 0x58, 0x20]);
+        out.extend_from_slice(&RFC8392_PUBLIC_Y);
+        out
+    };
+    let cose_key = Rfc9942Es256CoseKey::from_cbor(&cose_key_wire).unwrap();
+
+    assert_eq!(
+        receipt.verify_es256_cose_key_consistency(
+            symthaea_swarm::semantic_evidence_vds::VdsTreeHead::new(1, [0x55; 32]),
+            &cose_key,
+            &[],
+            None,
+        ),
+        Err(Rfc9942VdpError::InvalidEs256Signature)
+    );
+}
+
 #[test]
 fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
     fn bstr(bytes: &[u8]) -> Vec<u8> {
