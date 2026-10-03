@@ -2168,6 +2168,16 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
         }
     }
 
+    let foreign_keys_enabled: i64 = conn
+        .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+        .map_err(|e| format!("Schema integrity foreign-key enforcement check: {e}"))?;
+    if foreign_keys_enabled != 1 {
+        return Err(
+            "Schema integrity check failed: foreign-key enforcement is disabled on this connection"
+                .into(),
+        );
+    }
+
     // Verify the declared FK itself, not only current row consistency. foreign_key_check
     // cannot prove a REFERENCES clause exists when the schema has drifted.
     let foreign_keys = {
@@ -3186,6 +3196,29 @@ mod tests {
         let err = p.ensure_schema(&conn).unwrap_err();
         assert!(err.contains("Schema integrity check failed"));
         assert!(err.contains("trg_knowledge_snapshot_receipts_no_update"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_initialized_schema_rejects_disabled_foreign_key_enforcement() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_fk_enforcement_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let conn = p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+
+        conn.execute_batch("PRAGMA foreign_keys = OFF;").unwrap();
+        let err = verify_initialized_schema_integrity(&conn).unwrap_err();
+        assert_eq!(
+            err,
+            "Schema integrity check failed: foreign-key enforcement is disabled on this connection"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
