@@ -16,6 +16,8 @@ on:
       - "crates/core/nixward/src/action/local_approval_submission.rs"
       - "crates/core/nixward/src/action/service_domain.rs"
       - "crates/core/nixward/src/action/service_manager.rs"
+      - "crates/core/nixward/src/action/service_state.rs"
+      - "crates/core/nixward/src/action/systemd_transport.rs"
       - "scripts/check-nixward-observation-boundary.sh"
       - "scripts/qualify_nixward_authority.sh"
       - "crates/core/nixward/src/action/mod.rs"
