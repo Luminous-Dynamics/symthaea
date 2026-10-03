@@ -32,6 +32,7 @@ pub struct NixGenerationObservation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixSystemObservation {
     pub generations: Vec<NixGenerationObservation>,
+    pub system_profile_generation: Option<u64>,
     pub system_profile_realization: String,
     pub current_system_realization: String,
     pub booted_system_realization: String,
@@ -68,6 +69,7 @@ impl NixSystemObservation {
 
         Ok(Self {
             generations,
+            system_profile_generation: read_profile_generation(Path::new(NIXOS_SYSTEM_PROFILE))?,
             system_profile_realization: read_realization(Path::new(NIXOS_SYSTEM_PROFILE))?,
             current_system_realization: read_realization(Path::new(NIXOS_CURRENT_SYSTEM))?,
             booted_system_realization: read_realization(Path::new(NIXOS_BOOTED_SYSTEM))?,
@@ -134,9 +136,8 @@ impl NixSystemObservation {
     }
 
     pub fn system_profile_generation(&self) -> Option<&NixGenerationObservation> {
-        self.generations
-            .iter()
-            .find(|entry| entry.realization == self.system_profile_realization)
+        let generation = self.system_profile_generation?;
+        self.generations.iter().find(|entry| entry.number == generation)
     }
 }
 
@@ -144,6 +145,28 @@ fn generation_link(generation: u64) -> PathBuf {
     PathBuf::from(format!(
         "/nix/var/nix/profiles/system-{generation}-link"
     ))
+}
+
+fn read_profile_generation(link: &Path) -> Result<Option<u64>, SscObservationError> {
+    let target = std::fs::read_link(link)?;
+    let name = target
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| {
+            SscObservationError::Io("NixOS system profile link has no UTF-8 filename".into())
+        })?;
+
+    let Some(number) = name
+        .strip_prefix("system-")
+        .and_then(|value| value.strip_suffix("-link"))
+    else {
+        return Ok(None);
+    };
+
+    number
+        .parse::<u64>()
+        .map(Some)
+        .map_err(|error| SscObservationError::Io(error.to_string()))
 }
 
 fn read_realization(link: &Path) -> Result<String, SscObservationError> {
@@ -158,6 +181,17 @@ fn read_realization(link: &Path) -> Result<String, SscObservationError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn profile_generation_parser_rejects_ambiguous_names() {
+        let path = PathBuf::from("/nix/var/nix/profiles/system-42-link");
+        assert_eq!(
+            read_profile_generation(&path).expect_err("missing live profile"),
+            SscObservationError::Io(
+                "No such file or directory (os error 2)".into()
+            )
+        );
+    }
 
     #[test]
     fn generation_link_is_deterministic() {
@@ -175,6 +209,7 @@ mod tests {
                 realization: "/nix/store/aaa-nixos-system-host".into(),
                 current: true,
             }],
+            system_profile_generation: Some(42),
             system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -202,6 +237,7 @@ mod tests {
                     current: false,
                 },
             ],
+            system_profile_generation: Some(43),
             system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
