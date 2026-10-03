@@ -779,7 +779,7 @@ mod tests {
         let current_client =
             thread::spawn(move || submit_local_approval_v2(&current_socket, &second_submission));
         let current_result = runtime.accept_and_consume().unwrap();
-        let current_ack = current_client.join().unwrap();
+        let current_ack = current_client.join().unwrap().unwrap();
 
         assert_eq!(current_result.request_id(), second.request_id());
         assert_eq!(current_result.decision_kind(), LocalApprovalDecisionKindV1::Approved);
