@@ -204,6 +204,129 @@ fn small_code_geometry_seed_sweep_is_exhaustively_self_consistent() {
 }
 
 #[test]
+fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
+    let dimensions = [500usize, 1000, 2000];
+    let ranks = [3usize, 5, 7];
+    let factor_counts = [3usize, 4, 5];
+    let repeats = 3usize;
+
+    let mut cases = 0usize;
+    let mut exact_original = 0usize;
+    let mut valid_representative = 0usize;
+    let mut jointly_dependent = 0usize;
+    let mut failures = 0usize;
+    let mut total_work = LinearCodeWork::default();
+
+    for &dimension in &dimensions {
+        for &rank in &ranks {
+            for &factor_count in &factor_counts {
+                for repeat in 0..repeats {
+                    let seed_base = 0xB100_0000u64
+                        ^ ((dimension as u64) << 16)
+                        ^ ((rank as u64) << 8)
+                        ^ factor_count as u64
+                        ^ ((repeat as u64) << 32);
+
+                    let codes: Vec<_> = (0..factor_count)
+                        .map(|factor_index| {
+                            RandomLinearCode::generate(
+                                dimension,
+                                rank,
+                                seed_base + factor_index as u64,
+                            )
+                        })
+                        .collect();
+                    let factors: Vec<&RandomLinearCode> = codes.iter().collect();
+
+                    let words: Vec<_> = factors
+                        .iter()
+                        .enumerate()
+                        .map(|(factor_index, factor)| {
+                            let message: Vec<bool> = (0..rank)
+                                .map(|bit| (bit + factor_index + repeat) % 3 == 0)
+                                .collect();
+                            factor.encode(&message)
+                        })
+                        .collect();
+
+                    let target = words
+                        .iter()
+                        .cloned()
+                        .reduce(|left, right| left.bound(&right))
+                        .expect("at least one factor");
+
+                    let mut combined_basis = Vec::with_capacity(rank * factor_count);
+                    for factor in &factors {
+                        combined_basis.extend(factor.basis().iter().cloned());
+                    }
+                    let jointly_independent =
+                        basis_rank(&combined_basis, dimension) == rank * factor_count;
+                    if !jointly_independent {
+                        jointly_dependent += 1;
+                    }
+
+                    let (recovered, work) = recover_linear_bound_with_work(&target, &factors);
+                    total_work.span_membership_checks += work.span_membership_checks;
+                    total_work.basis_rank_pivots += work.basis_rank_pivots;
+                    total_work.basis_rank_row_xor_words += work.basis_rank_row_xor_words;
+                    total_work.basis_rank_input_word_copies += work.basis_rank_input_word_copies;
+                    total_work.solve_basis_bit_probes += work.solve_basis_bit_probes;
+                    total_work.solve_matrix_word_cells += work.solve_matrix_word_cells;
+                    total_work.solve_pivots += work.solve_pivots;
+                    total_work.solve_row_xor_words += work.solve_row_xor_words;
+                    total_work.retained_generators += work.retained_generators;
+                    total_work.projection_word_xor_ops += work.projection_word_xor_ops;
+
+                    cases += 1;
+                    let Some(recovered) = recovered else {
+                        failures += 1;
+                        continue;
+                    };
+
+                    let valid = recovered.len() == factor_count
+                        && recovered
+                            .iter()
+                            .zip(&factors)
+                            .all(|(word, factor)| factor.contains(word))
+                        && recovered
+                            .iter()
+                            .skip(1)
+                            .fold(recovered[0].clone(), |bound, word| bound.bound(word))
+                            == target;
+                    assert!(
+                        valid,
+                        "recovered factors must belong to their factor codes and rebind to target"
+                    );
+                    valid_representative += 1;
+
+                    if jointly_independent {
+                        assert_eq!(
+                            recovered, words,
+                            "independent paper-style factors have unique exact recovery"
+                        );
+                        exact_original += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    assert_eq!(cases, dimensions.len() * ranks.len() * factor_counts.len() * repeats);
+    assert_eq!(cases, 81);
+    assert_eq!(failures, 0);
+    assert_eq!(valid_representative, cases);
+    assert_eq!(jointly_dependent, 0);
+
+    println!(
+        "PAPER_MATRIX=dimensions=500,1000,2000;ranks=3,5,7;factors=3,4,5;repeats={repeats};cases={cases};exact_original={exact_original};valid_representative={valid_representative};jointly_dependent={jointly_dependent};failures={failures};total_span_membership_checks={};total_basis_rank_pivots={};total_solve_pivots={};total_solve_row_xor_words={}",
+        total_work.span_membership_checks,
+        total_work.basis_rank_pivots,
+        total_work.solve_pivots,
+        total_work.solve_row_xor_words,
+    );
+}
+
+#[test]
 fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
     let (parent, left, right) =
         RandomLinearCode::generate_direct_sum(96, 6, 6, 0x1111).expect("valid direct sum");
