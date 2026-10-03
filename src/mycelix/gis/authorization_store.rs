@@ -3707,15 +3707,19 @@ fn validate_native_authority_pin_set(
             )?;
             tx.execute(
                 "INSERT OR IGNORE INTO authorization_receipts
-                 (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,boundary_id)
-                 VALUES (?1,?2,?3,'indeterminate','indeterminate',?4,?5,?6)",
+                 (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,
+                  boundary_id,attempt_scope_digest)
+                 VALUES (?1,?2,?3,'indeterminate','indeterminate',?4,?5,?6,?7)",
                 params![
                     receipt.authorization_instance,
                     receipt.action_id,
                     receipt.attempt_id,
                     receipt.action_digest,
                     receipt.authority_epoch as i64,
-                    lease_boundary
+                    lease_boundary,
+                    lease_boundary.map(|boundary|
+                        compute_attempt_scope_digest(boundary,&receipt.attempt_id)
+                    ).transpose()?,
                 ],
             )?;
         }
