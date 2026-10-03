@@ -63,13 +63,17 @@ fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
     assert!(first_work.solve_row_xor_words > 0);
 
     println!(
-        "WORK_LEDGER=span_membership_checks={};basis_rank_pivots={};basis_rank_row_xor_words={};solve_pivots={};solve_row_xor_words={};retained_generators={}",
+        "WORK_LEDGER=span_membership_checks={};basis_rank_pivots={};basis_rank_row_xor_words={};basis_rank_input_word_copies={};solve_basis_bit_probes={};solve_matrix_word_cells={};solve_pivots={};solve_row_xor_words={};retained_generators={};projection_word_xor_ops={}",
         first_work.span_membership_checks,
         first_work.basis_rank_pivots,
         first_work.basis_rank_row_xor_words,
+        first_work.basis_rank_input_word_copies,
+        first_work.solve_basis_bit_probes,
+        first_work.solve_matrix_word_cells,
         first_work.solve_pivots,
         first_work.solve_row_xor_words,
         first_work.retained_generators,
+        first_work.projection_word_xor_ops,
     );
 }
 
