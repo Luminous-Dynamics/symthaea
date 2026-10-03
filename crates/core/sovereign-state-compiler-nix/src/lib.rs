@@ -23,6 +23,34 @@ const INSTALL_KEY: &str = "applications.install";
 const REMOVE_KEY: &str = "applications.remove";
 const REBOOT_KEY: &str = "system.reboot";
 const ROLLBACK_KEY: &str = "nixos.rollback";
+const ROLLBACK_GENERATION_KEY: &str = "nixos.rollback-generation";
+
+/// Concrete NixOS activation semantics carried by the target adapter.
+///
+/// This type is deliberately NixOS-specific and never crosses into the
+/// platform-neutral SSC crate. Its discriminant is therefore part of the
+/// adapter's lowering decision while the resulting generic plan digest still
+/// binds the original desired state exactly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NixActivationMode {
+    Switch,
+    Test,
+    Boot,
+    DryActivate,
+    Rollback { generation: u64 },
+}
+
+impl NixActivationMode {
+    fn parse_rebuild(value: &str) -> Result<Self, NixOSAdapterError> {
+        match value {
+            "switch" => Ok(Self::Switch),
+            "test" => Ok(Self::Test),
+            "boot" => Ok(Self::Boot),
+            "dry-activate" => Ok(Self::DryActivate),
+            other => Err(NixOSAdapterError::InvalidRebuildMode(other.into())),
+        }
+    }
+}
 
 /// A conservative NixOS capability profile.
 ///
@@ -50,12 +78,13 @@ pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
 ///
 /// Supported state properties:
 ///
-/// * `nixos.rebuild`: "switch", "test", or "boot"
+/// * `nixos.rebuild`: "switch", "test", "boot", or "dry-activate"
 /// * `nixos.home-manager`: boolean
 /// * `applications.install`: list of logical artifact/package identifiers
 /// * `applications.remove`: list of logical package identifiers
 /// * `system.reboot`: boolean
-/// * `nixos.rollback`: boolean
+/// * `nixos.rollback`: boolean; `true` requires `nixos.rollback-generation`
+* `nixos.rollback-generation`: non-negative generation number
 ///
 /// Unknown properties are rejected rather than silently ignored.
 #[derive(Debug, Clone)]
@@ -143,6 +172,22 @@ impl NixOSTargetAdapter {
         }
     }
 
+    fn property_u64(
+        intent: &DeploymentIntent,
+        key: &'static str,
+    ) -> Result<Option<u64>, NixOSAdapterError> {
+        match intent.desired_state.properties.get(key) {
+            None => Ok(None),
+            Some(sovereign_state_compiler::StateValue::Integer(value)) if *value >= 0 => {
+                Ok(Some(*value as u64))
+            }
+            Some(_) => Err(NixOSAdapterError::PropertyType {
+                key,
+                expected: "non-negative integer",
+            }),
+        }
+    }
+
     fn property_string_list(
         intent: &DeploymentIntent,
         key: &'static str,
@@ -178,13 +223,14 @@ impl NixOSTargetAdapter {
     fn reject_unknown_properties(
         intent: &DeploymentIntent,
     ) -> Result<(), NixOSAdapterError> {
-        const SUPPORTED: [&str; 6] = [
+        const SUPPORTED: [&str; 7] = [
             REBUILD_KEY,
             HOME_MANAGER_KEY,
             INSTALL_KEY,
             REMOVE_KEY,
             REBOOT_KEY,
             ROLLBACK_KEY,
+            ROLLBACK_GENERATION_KEY,
         ];
 
         if let Some(key) = intent
@@ -230,11 +276,24 @@ impl TargetAdapter for NixOSTargetAdapter {
         }
 
         let rebuild = Self::property_string(intent, REBUILD_KEY)?;
+        let activation_mode = rebuild
+            .as_deref()
+            .map(NixActivationMode::parse_rebuild)
+            .transpose()?;
         let home_manager = Self::property_bool(intent, HOME_MANAGER_KEY)?.unwrap_or(false);
         let install = Self::property_string_list(intent, INSTALL_KEY)?;
         let remove = Self::property_string_list(intent, REMOVE_KEY)?;
         let reboot = Self::property_bool(intent, REBOOT_KEY)?.unwrap_or(false);
         let rollback_requested = Self::property_bool(intent, ROLLBACK_KEY)?.unwrap_or(false);
+        let rollback_generation = Self::property_u64(intent, ROLLBACK_GENERATION_KEY)?;
+
+        if rollback_requested != rollback_generation.is_some() {
+            return Err(NixOSAdapterError::RollbackGenerationRequired);
+        }
+
+        if matches!(activation_mode, Some(NixActivationMode::DryActivate)) && rollback_requested {
+            return Err(NixOSAdapterError::ConflictingActivationModes);
+        }
 
         let mut steps = Vec::new();
 
@@ -245,20 +304,39 @@ impl TargetAdapter for NixOSTargetAdapter {
             "observe target before applying state",
         );
 
-        if let Some(mode) = rebuild.as_deref() {
-            let required = match mode {
-                "switch" => [
-                    Capability::ConfigureSystem,
-                    Capability::UpdateSystem,
-                    Capability::ModifyBootChain,
-                ],
-                "test" => [Capability::ConfigureSystem, Capability::UpdateSystem, Capability::ObserveHardware],
-                "boot" => [
-                    Capability::ConfigureSystem,
-                    Capability::UpdateSystem,
-                    Capability::ModifyBootChain,
-                ],
-                other => return Err(NixOSAdapterError::InvalidRebuildMode(other.into())),
+        if let Some(mode) = activation_mode {
+            let (required, description) = match mode {
+                NixActivationMode::Switch => (
+                    [
+                        Capability::ConfigureSystem,
+                        Capability::UpdateSystem,
+                        Capability::ModifyBootChain,
+                    ],
+                    "activate the NixOS configuration and make its generation current",
+                ),
+                NixActivationMode::Test => (
+                    [
+                        Capability::ConfigureSystem,
+                        Capability::UpdateSystem,
+                        Capability::ObserveHardware,
+                    ],
+                    "temporarily activate the NixOS configuration without changing the boot default",
+                ),
+                NixActivationMode::Boot => (
+                    [
+                        Capability::ConfigureSystem,
+                        Capability::UpdateSystem,
+                        Capability::ModifyBootChain,
+                    ],
+                    "build the NixOS configuration and select it for the next boot without activating now",
+                ),
+                NixActivationMode::DryActivate => (
+                    [Capability::ConfigureSystem, Capability::UpdateSystem],
+                    "evaluate NixOS activation changes without activating the configuration",
+                ),
+                NixActivationMode::Rollback { .. } => {
+                    return Err(NixOSAdapterError::ConflictingActivationModes);
+                }
             };
 
             if !intent.artifacts.is_empty() {
@@ -274,7 +352,7 @@ impl TargetAdapter for NixOSTargetAdapter {
                 &mut steps,
                 PlanStepKind::ApplyDesiredState,
                 required,
-                format!("apply NixOS rebuild mode: {mode}"),
+                description,
             );
         }
 
@@ -311,12 +389,12 @@ impl TargetAdapter for NixOSTargetAdapter {
             );
         }
 
-        if rollback_requested {
+        if let Some(generation) = rollback_generation {
             Self::push_step(
                 &mut steps,
                 PlanStepKind::Rollback,
                 [Capability::Rollback],
-                "roll back to the previous NixOS generation if requested",
+                format!("roll back to NixOS generation {generation}"),
             );
         }
 
@@ -342,13 +420,18 @@ impl TargetAdapter for NixOSTargetAdapter {
         };
 
         let has_mutation = steps.iter().any(|step| {
-            matches!(
+            if !matches!(
                 step.kind,
                 PlanStepKind::StageArtifacts
                     | PlanStepKind::ApplyDesiredState
                     | PlanStepKind::Reboot
                     | PlanStepKind::Rollback
-            )
+            ) {
+                return false;
+            }
+
+            !matches!(activation_mode, Some(NixActivationMode::DryActivate))
+                || matches!(step.kind, PlanStepKind::Rollback | PlanStepKind::Reboot)
         });
 
         let rollback_allowed = has_mutation
@@ -393,6 +476,10 @@ pub enum NixOSAdapterError {
     EmptyListItem { key: &'static str },
     #[error("unsupported nixos.rebuild mode: {0}")]
     InvalidRebuildMode(String),
+    #[error("nixos.rollback=true requires a non-negative nixos.rollback-generation")]
+    RollbackGenerationRequired,
+    #[error("NixOS activation modes cannot be combined in one intent")]
+    ConflictingActivationModes,
     #[error("compiled plan violates neutral compiler invariants: {0}")]
     PlanValidation(PlanValidationError),
 }
@@ -492,6 +579,17 @@ mod tests {
                     (PlanStepKind::Verify, vec![Capability::ObserveHardware]),
                 ],
             ),
+            (
+                "dry-activate",
+                vec![
+                    (PlanStepKind::Observe, vec![Capability::ObserveHardware]),
+                    (
+                        PlanStepKind::ApplyDesiredState,
+                        vec![Capability::ConfigureSystem, Capability::UpdateSystem],
+                    ),
+                    (PlanStepKind::Verify, vec![Capability::ObserveHardware]),
+                ],
+            ),
         ];
 
         for (mode, expected) in vectors {
@@ -580,6 +678,72 @@ mod tests {
         let snapshot = adapter.describe_target().expect("snapshot");
         assert_eq!(snapshot.profile.platform, NIXOS_PLATFORM);
         assert_eq!(snapshot.profile.identity, TargetId::from("host-01"));
+    }
+
+    #[test]
+    fn rollback_requires_explicit_generation_identity() {
+        let mut intent = DeploymentIntent::new("rollback-1", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_KEY.into(), StateValue::Bool(true));
+
+        assert_eq!(
+            adapter().compile(&intent),
+            Err(NixOSAdapterError::RollbackGenerationRequired)
+        );
+    }
+
+    #[test]
+    fn rollback_plan_binds_generation_identity() {
+        let mut intent = DeploymentIntent::new("rollback-2", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_KEY.into(), StateValue::Bool(true));
+        intent.desired_state.properties.insert(
+            ROLLBACK_GENERATION_KEY.into(),
+            StateValue::Integer(42),
+        );
+
+        let plan = adapter().compile(&intent).expect("compile");
+        assert!(plan.steps.iter().any(|step| {
+            step.kind == PlanStepKind::Rollback && step.description.contains("generation 42")
+        }));
+        assert!(plan.digest().is_ok());
+    }
+
+    #[test]
+    fn dry_activate_is_not_marked_as_mutating_for_rollback_policy() {
+        let mut intent = DeploymentIntent::new("dry-1", "host-01");
+        intent.desired_state.properties.insert(
+            REBUILD_KEY.into(),
+            StateValue::String("dry-activate".into()),
+        );
+
+        let plan = adapter().compile(&intent).expect("compile");
+        assert!(!plan.rollback.allowed);
+        assert_eq!(plan.rollback.max_attempts, 0);
+    }
+
+    #[test]
+    fn activation_mode_is_typed_before_lowering() {
+        assert_eq!(
+            NixActivationMode::parse_rebuild("switch").expect("switch"),
+            NixActivationMode::Switch
+        );
+        assert_eq!(
+            NixActivationMode::parse_rebuild("test").expect("test"),
+            NixActivationMode::Test
+        );
+        assert_eq!(
+            NixActivationMode::parse_rebuild("boot").expect("boot"),
+            NixActivationMode::Boot
+        );
+        assert_eq!(
+            NixActivationMode::parse_rebuild("dry-activate").expect("dry-activate"),
+            NixActivationMode::DryActivate
+        );
     }
 
     #[test]
