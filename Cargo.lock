@@ -25189,3 +25189,22 @@ dependencies = [
  "syn 2.0.117",
  "winnow 1.0.3",
 ]
+
+
+[[package]]
+name = "sovereign-state-compiler"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "sovereign-state-compiler-nix"
+version = "0.1.0"
+dependencies = [
+ "sovereign-state-compiler",
+ "thiserror 1.0.69",
+]
