@@ -1,0 +1,281 @@
+#!/usr/bin/env node
+/**
+ * Deterministic browser qualification for the Symthaea UI WebGPU projection.
+ *
+ * The harness deliberately separates:
+ *   1. browser capability preflight + WebGPU rendering, and
+ *   2. forced-GPU-disabled fallback rendering.
+ *
+ * It does not score visual quality. It records renderer visibility and
+ * content hashes so changes are reviewable without a subjective screenshot gate.
+ *
+ * Build first:
+ *   trunk build --release --features browser-qualification --dist dist
+ *
+ * Then:
+ *   node ../symthaea-web/test-webgpu-qualification.mjs
+ */
+
+import { createHash } from 'crypto';
+import { execFileSync, spawn } from 'child_process';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import path from 'path';
+import puppeteer from 'puppeteer-core';
+
+const ROOT = path.resolve(import.meta.dirname, '..', 'symthaea-ui');
+const DIST = process.env.WEBGPU_DIST
+  ? path.resolve(process.env.WEBGPU_DIST)
+  : path.join(ROOT, 'dist');
+const URL = process.env.WEBGPU_URL || 'http://127.0.0.1:8402/?symthaea_webgpu_fixture=1';
+const ARTIFACT = path.resolve(
+  process.env.WEBGPU_ARTIFACT || path.join(ROOT, 'webgpu-qualification.json'),
+);
+const SCREENSHOT_DIR = path.resolve(
+  process.env.WEBGPU_SCREENSHOTS || path.join(ROOT, 'webgpu-qualification-screenshots'),
+);
+const CHROMIUM = process.env.CHROMIUM_PATH || execFileSync('which', ['chromium'], { encoding: 'utf8' }).trim();
+const MODES = (process.env.WEBGPU_MODES || 'webgpu,fallback')
+  .split(',')
+  .map(value => value.trim())
+  .filter(Boolean);
+
+mkdirSync(path.dirname(ARTIFACT), { recursive: true });
+mkdirSync(SCREENSHOT_DIR, { recursive: true });
+
+if (!existsSync(DIST)) {
+  throw new Error(`UI dist directory not found: ${DIST}. Run trunk build first.`);
+}
+
+let server;
+if (URL.startsWith('http://127.0.0.1:') || URL.startsWith('http://localhost:')) {
+  server = spawn(
+    'python3',
+    ['-m', 'http.server', '8402', '--bind', '127.0.0.1', '--directory', DIST],
+    { stdio: 'ignore', detached: true },
+  );
+}
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function canvasPngHash(page, selector) {
+  const dataUrl = await page.$eval(selector, canvas => {
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      throw new Error(`${selector} is not a canvas`);
+    }
+    return canvas.toDataURL('image/png');
+  });
+  const payload = Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64');
+  if (payload.length < 100) {
+    throw new Error(`${selector} produced an unexpectedly small PNG`);
+  }
+  return createHash('sha256').update(payload).digest('hex');
+}
+
+async function blankCanvasHash(page, width, height) {
+  const dataUrl = await page.evaluate(([w, h]) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    return canvas.toDataURL('image/png');
+  }, [width, height]);
+  return createHash('sha256')
+    .update(Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64'))
+    .digest('hex');
+}
+
+async function capabilityPreflight(page) {
+  return page.evaluate(async () => {
+    if (!navigator.gpu) {
+      return { navigator_gpu: false, adapter: false, device: false, reason: 'navigator.gpu unavailable' };
+    }
+    try {
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) {
+        return { navigator_gpu: true, adapter: false, device: false, reason: 'requestAdapter returned null' };
+      }
+      const device = await adapter.requestDevice();
+      const features = [...adapter.features.values()].sort();
+      device.destroy();
+      return {
+        navigator_gpu: true,
+        adapter: true,
+        device: true,
+        adapter_name: adapter.name || null,
+        features,
+      };
+    } catch (error) {
+      return {
+        navigator_gpu: true,
+        adapter: false,
+        device: false,
+        reason: String(error),
+      };
+    }
+  });
+}
+
+async function waitForProjection(page, selector, display) {
+  await page.waitForFunction(
+    ({ selector, display }) => {
+      const element = document.querySelector(selector);
+      return element && getComputedStyle(element).display === display;
+    },
+    { timeout: 30_000 },
+    { selector, display },
+  );
+}
+
+async function runMode(mode) {
+  const gpuMode = mode === 'webgpu';
+  if (!gpuMode && mode !== 'fallback') {
+    throw new Error(`unsupported qualification mode: ${mode}`);
+  }
+
+  const args = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+  ];
+  if (gpuMode) {
+    args.push(
+      '--enable-unsafe-webgpu',
+      '--use-webgpu-adapter=swiftshader',
+      '--use-gpu-in-tests',
+    );
+  } else {
+    args.push('--disable-gpu');
+  }
+
+  const browser = await puppeteer.launch({
+    executablePath: CHROMIUM,
+    headless: 'new',
+    args,
+  });
+
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  try {
+    await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+
+    const capability = await capabilityPreflight(page);
+
+    if (gpuMode) {
+      if (!capability.navigator_gpu || !capability.adapter || !capability.device) {
+        throw new Error(`WebGPU capability preflight failed: ${JSON.stringify(capability)}`);
+      }
+
+      await waitForProjection(page, '#webgpu-cognitive-canvas', 'block');
+      await waitForProjection(page, '#webgpu-movie-canvas', 'block');
+      await sleep(250);
+
+      const firstSceneHash = await canvasPngHash(page, '#webgpu-cognitive-canvas');
+      const firstMovieHash = await canvasPngHash(page, '#webgpu-movie-canvas');
+      const blankSceneHash = await blankCanvasHash(page, 512, 512);
+      const blankMovieHash = await blankCanvasHash(page, 192, 192);
+
+      if (firstSceneHash === blankSceneHash) {
+        throw new Error('WebGPU cognitive canvas is indistinguishable from a blank canvas');
+      }
+      if (firstMovieHash === blankMovieHash) {
+        throw new Error('WebGPU movie canvas is indistinguishable from a blank canvas');
+      }
+
+      await page.screenshot({
+        path: path.join(SCREENSHOT_DIR, 'webgpu.png'),
+        fullPage: false,
+      });
+
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
+      await waitForProjection(page, '#webgpu-cognitive-canvas', 'block');
+      await waitForProjection(page, '#webgpu-movie-canvas', 'block');
+      await sleep(250);
+
+      const repeatSceneHash = await canvasPngHash(page, '#webgpu-cognitive-canvas');
+      const repeatMovieHash = await canvasPngHash(page, '#webgpu-movie-canvas');
+
+      if (repeatSceneHash !== firstSceneHash || repeatMovieHash !== firstMovieHash) {
+        throw new Error(
+          `non-deterministic WebGPU capture: first=(${firstSceneHash},${firstMovieHash}) repeat=(${repeatSceneHash},${repeatMovieHash})`,
+        );
+      }
+
+      return {
+        mode,
+        capability,
+        scene_hash: firstSceneHash,
+        movie_hash: firstMovieHash,
+        deterministic_repeat: true,
+        page_errors: pageErrors,
+      };
+    }
+
+    await waitForProjection(page, '#canvas2d-movie-fallback', 'block');
+    await waitForProjection(page, 'img.portrait', 'block').catch(() => {});
+    await sleep(100);
+
+    const fallback = await page.evaluate(() => {
+      const canvas = document.querySelector('#canvas2d-movie-fallback');
+      const image = document.querySelector('img.portrait');
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        return { canvas: false, pixels: null, portrait: false };
+      }
+      const ctx = canvas.getContext('2d');
+      const pixels = ctx ? [...ctx.getImageData(31, 23, 1, 1).data] : null;
+      return {
+        canvas: true,
+        pixels,
+        portrait: !!image && getComputedStyle(image).display !== 'none' && image.getAttribute('src')?.startsWith('data:image/svg+xml;base64,'),
+        gpu_canvas_hidden: getComputedStyle(document.querySelector('#webgpu-cognitive-canvas')).display === 'none',
+      };
+    });
+
+    if (!fallback.canvas || JSON.stringify(fallback.pixels) !== JSON.stringify([255, 255, 255, 255])) {
+      throw new Error(`Canvas2D fallback fixture was not rendered as expected: ${JSON.stringify(fallback)}`);
+    }
+    if (!fallback.portrait || !fallback.gpu_canvas_hidden) {
+      throw new Error(`SVG fallback state was not preserved: ${JSON.stringify(fallback)}`);
+    }
+
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, 'fallback.png'),
+      fullPage: false,
+    });
+
+    return {
+      mode,
+      capability,
+      fallback,
+      deterministic_fixture: true,
+      page_errors: pageErrors,
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
+const results = {};
+try {
+  for (const mode of MODES) {
+    results[mode] = await runMode(mode);
+  }
+
+  const artifact = {
+    schema: 'symthaea-ui-webgpu-qualification-v1',
+    url: URL,
+    chromium: CHROMIUM,
+    results,
+  };
+  writeFileSync(ARTIFACT, JSON.stringify(artifact, null, 2) + '\n');
+  console.log(JSON.stringify(artifact, null, 2));
+} finally {
+  if (server?.pid) {
+    try {
+      process.kill(-server.pid);
+    } catch {
+      // Process may already have exited.
+    }
+  }
+}
