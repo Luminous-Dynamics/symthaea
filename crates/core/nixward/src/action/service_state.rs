@@ -324,11 +324,12 @@ impl NixServiceObservedStateV1 {
         }
 
         let observed_id = observed_id.ok_or(NixServiceStateErrorV1::MissingId)?;
-        if observed_id != requested_unit {
-            return Err(NixServiceStateErrorV1::IdentityMismatch);
-        }
+        let observed_names = observed_names.ok_or(NixServiceStateErrorV1::MissingNames)?;
+        let observed_id = canonical_service_unit(observed_id)
+            .map_err(|_| NixServiceStateErrorV1::InvalidObservedUnitIdentity)?;
+        validate_observed_identity(&requested_unit, &observed_id, &observed_names)?;
 
-        Self::new(
+        let mut state = Self::new(
             requested_unit,
             load_state.ok_or(NixServiceStateErrorV1::MissingLoadState)?,
             active_state.ok_or(NixServiceStateErrorV1::MissingActiveState)?,
@@ -636,6 +637,24 @@ UnitFileState=disabled
         assert_eq!(value.unit(), "nginx.service");
         assert_eq!(value.resolved_id(), "nginx.service");
         assert_eq!(value.unit_file_state(), ServiceUnitFileStateV1::Disabled);
+    }
+
+    #[test]
+    fn narrow_state_parser_binds_alias_identity_through_observed_names() {
+        let value = NixServiceObservedStateV1::parse_systemd_properties(
+            "dbus-org.freedesktop.network1.service",
+            "Id=systemd-networkd.service
+Names=systemd-networkd.service dbus-org.freedesktop.network1.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+",
+        )
+        .unwrap();
+
+        assert_eq!(value.unit(), "dbus-org.freedesktop.network1.service");
+        assert_eq!(value.resolved_id(), "systemd-networkd.service");
     }
 
     #[test]
