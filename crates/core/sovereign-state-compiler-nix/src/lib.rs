@@ -9,8 +9,8 @@
 use std::collections::BTreeSet;
 
 use sovereign_state_compiler::{
-    Capability, DeploymentIntent, DeploymentPlan, PlanStep, PlanStepKind, PlanValidationError,
-    RollbackPolicy, TargetAdapter, TargetId, TargetSnapshot, VerificationPolicy,
+    Capability, DeploymentDisposition, DeploymentIntent, DeploymentPlan, PlanStep, PlanStepKind,
+    PlanValidationError, RollbackPolicy, TargetAdapter, TargetId, TargetSnapshot, VerificationPolicy,
 };
 use thiserror::Error;
 
@@ -117,6 +117,19 @@ impl NixActivationMode {
 
     pub fn mutates_target_state(self) -> bool {
         !matches!(self, Self::DryActivate)
+    }
+
+    /// Map the native NixOS transition into the neutral SSC verification
+    /// disposition. The adapter owns this mapping; the core owns only the
+    /// abstract post-state contract.
+    pub fn verification_disposition(self) -> DeploymentDisposition {
+        match self {
+            Self::Switch => DeploymentDisposition::Applied,
+            Self::Test => DeploymentDisposition::TemporarilyApplied,
+            Self::Boot => DeploymentDisposition::SelectedForNextActivation,
+            Self::DryActivate => DeploymentDisposition::NotActivated,
+            Self::Rollback { .. } => DeploymentDisposition::RollbackTarget,
+        }
     }
 }
 
@@ -470,8 +483,17 @@ impl TargetAdapter for NixOSTargetAdapter {
             "verify declared target state after execution",
         );
 
+        let disposition = match activation_mode {
+            Some(mode) => mode.verification_disposition(),
+            None if !install.is_empty() || !remove.is_empty() || home_manager => {
+                DeploymentDisposition::Applied
+            }
+            None => DeploymentDisposition::Unchanged,
+        };
+
         let verification = VerificationPolicy {
             expected_state: intent.desired_state.clone(),
+            disposition,
             require_attestation: false,
         };
 
@@ -593,6 +615,10 @@ mod tests {
         assert_eq!(
             plan.verification.expected_state,
             intent.desired_state
+        );
+        assert_eq!(
+            plan.verification.disposition,
+            DeploymentDisposition::Applied
         );
     }
 
@@ -908,6 +934,30 @@ mod tests {
     }
 
     #[test]
+    fn activation_modes_map_to_distinct_verification_dispositions() {
+        assert_eq!(
+            NixActivationMode::Switch.verification_disposition(),
+            DeploymentDisposition::Applied
+        );
+        assert_eq!(
+            NixActivationMode::Test.verification_disposition(),
+            DeploymentDisposition::TemporarilyApplied
+        );
+        assert_eq!(
+            NixActivationMode::Boot.verification_disposition(),
+            DeploymentDisposition::SelectedForNextActivation
+        );
+        assert_eq!(
+            NixActivationMode::DryActivate.verification_disposition(),
+            DeploymentDisposition::NotActivated
+        );
+        assert_eq!(
+            NixActivationMode::Rollback { generation: 42 }.verification_disposition(),
+            DeploymentDisposition::RollbackTarget
+        );
+    }
+
+    #[test]
     fn activation_mode_owns_its_semantics() {
         assert_eq!(
             NixActivationMode::Switch.required_capabilities(),
@@ -997,6 +1047,17 @@ mod tests {
         assert!(plan_b.steps.iter().any(|step| {
             step.kind == PlanStepKind::Rollback && step.description.contains("generation 43")
         }));
+    }
+
+    #[test]
+    fn no_state_transition_uses_unchanged_disposition() {
+        let intent = DeploymentIntent::new("noop-1", "host-01");
+        let plan = adapter().compile(&intent).expect("compile");
+
+        assert_eq!(
+            plan.verification.disposition,
+            DeploymentDisposition::Unchanged
+        );
     }
 
     #[test]
