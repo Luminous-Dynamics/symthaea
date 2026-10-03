@@ -147,6 +147,7 @@ pub enum SensorTopologyAttestationIssue {
     EmptyIdentity,
     EmptyAttestationReference,
     AttestationIssuerMismatch,
+    VerifierIdentityMismatch,
     InvalidValidityWindow,
     FutureAttestation,
     StaleAttestation,
@@ -331,6 +332,16 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn verifier_identity_is_present_but_not_authoritative_without_policy_binding() {
+        let mut a = attestation();
+        a.verification_result.verifier_id.clear();
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::EmptyVerificationResult)
+        );
+    }
 
     #[test]
     fn verification_result_must_match_attestation_reference() {
