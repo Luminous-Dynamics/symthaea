@@ -272,6 +272,17 @@ impl DeploymentPlan {
 
     /// Validate OS-independent structural, identity, and capability invariants.
     pub fn validate(&self) -> Result<(), PlanValidationError> {
+        if self.schema_version != SCHEMA_VERSION {
+            return Err(PlanValidationError::UnsupportedSchemaVersion(
+                self.schema_version.clone(),
+            ));
+        }
+        if self.intent.schema_version != SCHEMA_VERSION {
+            return Err(PlanValidationError::UnsupportedSchemaVersion(
+                self.intent.schema_version.clone(),
+            ));
+        }
+
         if self.intent.target != self.target_snapshot.profile.identity {
             return Err(PlanValidationError::TargetMismatch);
         }
@@ -406,10 +417,13 @@ impl AuthorizationEvidence {
         {
             return Err(PlanValidationError::AuthorizationWindowInvalid);
         }
-        if self.valid_from_ms.is_some_and(|from| now_ms < from) {
-            return Err(PlanValidationError::AuthorizationNotYetValid);
+        let Some(valid_until_ms) = self.valid_until_ms else {
+            return Err(PlanValidationError::AuthorizationMissingExpiry);
+        };
+        if now_ms > valid_until_ms {
+            return Err(PlanValidationError::AuthorizationExpired);
         }
-        if self.valid_until_ms.is_some_and(|until| now_ms > until) {
+        if self.valid_from_ms.is_some_and(|from| now_ms < from) {
             return Err(PlanValidationError::AuthorizationExpired);
         }
 
@@ -531,6 +545,10 @@ pub enum PlanValidationError {
     AuthorizationNotYetValid,
     #[error("authorization has expired")]
     AuthorizationExpired,
+    #[error("authorization must contain an explicit expiry")]
+    AuthorizationMissingExpiry,
+    #[error("unsupported Sovereign State Compiler schema version: {0}")]
+    UnsupportedSchemaVersion(String),
     #[error("canonical serialization failed: {0}")]
     Serialization(serde_json::Error),
 }
@@ -719,6 +737,44 @@ mod tests {
         assert_eq!(
             plan.authorize(auth, 150),
             Err(PlanValidationError::IntentExpired)
+        );
+    }
+
+    #[test]
+    fn rejects_authorization_without_expiry() {
+        let plan = sample_plan();
+        let mut auth = authorization_for(&plan);
+        auth.valid_until_ms = None;
+
+        assert_eq!(
+            plan.authorize(auth, 150),
+            Err(PlanValidationError::AuthorizationMissingExpiry)
+        );
+    }
+
+    #[test]
+    fn rejects_unsupported_plan_schema_version() {
+        let mut plan = sample_plan();
+        plan.schema_version = "ssc/v999".into();
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::UnsupportedSchemaVersion(
+                "ssc/v999".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_unsupported_intent_schema_version() {
+        let mut plan = sample_plan();
+        plan.intent.schema_version = "ssc/v999".into();
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::UnsupportedSchemaVersion(
+                "ssc/v999".into()
+            ))
         );
     }
 
