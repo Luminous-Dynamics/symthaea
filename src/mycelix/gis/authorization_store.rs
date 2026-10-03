@@ -476,6 +476,7 @@ fn compute_attempt_binding_digest(
     ] {
         append_len_prefixed(&mut material, value.as_bytes());
     }
+    material.push(u8::from(validity_expires_at.is_some()));
     append_len_prefixed(&mut material, validity_expires_at.unwrap_or("").as_bytes());
     append_len_prefixed(&mut material, validity_policy_digest.as_bytes());
     format!("sha256:{}", hex::encode(Sha256::digest(material)))
@@ -2206,6 +2207,16 @@ fn validate_native_authority_pin_set(
         if record.status_source_digest != pinned_status_source_digest {
             return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
         }
+        {
+            let mut precheck_connection = self.connection()?;
+            let precheck_tx = precheck_connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+            let persisted_state = self.validate_persisted_dispatch_record(&precheck_tx, record)?;
+            if persisted_state != "dispatch_pending" {
+                return Err(AuthorizationConsumptionError::InvalidBinding.into());
+            }
+            precheck_tx.commit()?;
+        }
+
         let pre_entry_status = match status_verifier.verify_current_status(
             ProviderStatusVerificationPurpose::PreEntry,
             &record.native_issuer,
@@ -2582,7 +2593,9 @@ fn validate_native_authority_pin_set(
                     native_authorization_id,native_replay_derivation_digest,
                     native_authority_pin_set_id,native_authority_pin_set_digest,
                     relying_party_id,action_id,action_digest,provider_idempotency_key,
-                    target_identity,audience,adapter,boundary_id,attempt_binding_digest,state
+                    target_identity,audience,adapter,boundary_id,attempt_binding_digest,
+                    status_identifier,status_source_digest,status_observed_at,status_valid_until,
+                    status_evidence_digest,validity_issued_at,validity_expires_at,validity_policy_digest,state
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
             params![record.authorization_instance, record.attempt_id, record.boundary_id],
@@ -2592,37 +2605,48 @@ fn validate_native_authority_pin_set(
                 r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
                 r.get::<_,String>(9)?, r.get::<_,String>(10)?, r.get::<_,String>(11)?,
                 r.get::<_,String>(12)?, r.get::<_,String>(13)?, r.get::<_,String>(14)?,
-                r.get::<_,String>(15)?, r.get::<_,String>(16)?, r.get::<_,String>(17)?,
+                r.get::<_,String>(15)?, r.get::<_,String>(16)?, r.get::<_,Option<String>>(17)?,
+                r.get::<_,Option<String>>(18)?, r.get::<_,Option<String>>(19)?,
+                r.get::<_,Option<String>>(20)?, r.get::<_,Option<String>>(21)?,
+                r.get::<_,Option<String>>(22)?, r.get::<_,Option<String>>(23)?,
+                r.get::<_,Option<String>>(24)?, r.get::<_,String>(25)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
 
-        let matches = row.0 == record.operation_id
-            && row.1 == record.native_replay_identity
-            && row.2 == record.native_issuer
-            && row.3 == record.native_authority_namespace
-            && row.4 == record.native_authorization_id
-            && row.5 == record.native_replay_derivation_digest
-            && row.8 == self.relying_party_id
-            && row.9 == record.action_id
-            && row.10 == record.action_digest
-            && row.11 == record.provider_idempotency_key
-            && row.12 == record.target_identity
-            && row.13 == record.audience
-            && row.14 == record.adapter
-            && row.15 == record.boundary_id
-            && row.16 == record.attempt_binding_digest;
+        let (
+            operation_id, native_replay_identity, native_issuer, native_authority_namespace,
+            native_authorization_id, native_replay_derivation_digest,
+            native_authority_pin_set_id, native_authority_pin_set_digest,
+            relying_party_id, action_id, action_digest, provider_idempotency_key,
+            target_identity, audience, adapter, boundary_id, attempt_binding_digest,
+            status_identifier, status_source_digest, status_observed_at, status_valid_until,
+            status_evidence_digest, validity_issued_at, validity_expires_at,
+            validity_policy_digest, state,
+        ) = row;
 
-        if !matches || row.16.is_empty() {
+        if operation_id != record.operation_id
+            || native_replay_identity != record.native_replay_identity
+            || native_issuer != record.native_issuer
+            || native_authority_namespace != record.native_authority_namespace
+            || native_authorization_id != record.native_authorization_id
+            || native_replay_derivation_digest != record.native_replay_derivation_digest
+            || relying_party_id != self.relying_party_id
+            || action_id != record.action_id
+            || action_digest != record.action_digest
+            || provider_idempotency_key != record.provider_idempotency_key
+            || target_identity != record.target_identity
+            || audience != record.audience
+            || adapter != record.adapter
+            || boundary_id != record.boundary_id
+            || attempt_binding_digest != record.attempt_binding_digest
+            || status_identifier.as_deref() != Some(record.status_identifier.as_str())
+            || status_source_digest.as_deref() != Some(record.status_source_digest.as_str())
+            || status_observed_at.as_deref() != Some(record.status_observed_at.as_str())
+            || status_valid_until.as_deref() != Some(record.status_valid_until.as_str())
+            || status_evidence_digest.as_deref() != Some(record.status_evidence_digest.as_str())
+        {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
-
-        let validity: (Option<String>, Option<String>, Option<String>) = tx.query_row(
-            "SELECT validity_issued_at,validity_expires_at,validity_policy_digest
-             FROM authorization_dispatches
-             WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
-            params![record.authorization_instance, record.attempt_id, record.boundary_id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-        )?;
 
         let expected = compute_attempt_binding_digest(
             &record.authorization_instance,
@@ -2633,8 +2657,8 @@ fn validate_native_authority_pin_set(
             &record.native_authority_namespace,
             &record.native_authorization_id,
             &record.native_replay_derivation_digest,
-            &row.6,
-            &row.7,
+            &native_authority_pin_set_id,
+            &native_authority_pin_set_digest,
             &self.relying_party_id,
             &record.action_id,
             &record.action_digest,
@@ -2647,16 +2671,18 @@ fn validate_native_authority_pin_set(
             &record.status_observed_at,
             &record.status_valid_until,
             &record.status_evidence_digest,
-            validity.0.as_deref().unwrap_or(""),
-            validity.1.as_deref(),
-            validity.2.as_deref().unwrap_or(""),
+            validity_issued_at.as_deref().unwrap_or(""),
+            validity_expires_at.as_deref(),
+            validity_policy_digest.as_deref().unwrap_or(""),
         );
 
-        if expected != record.attempt_binding_digest || expected != row.16 {
+        if attempt_binding_digest.is_empty() || expected != record.attempt_binding_digest
+            || expected != attempt_binding_digest
+        {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
 
-        Ok(row.17)
+        Ok(state)
     }
 
     /// Commit a terminal provider outcome only after a relying-party configured
@@ -6728,6 +6754,7 @@ mod tests {
             audience: "audience-A".into(),
             adapter: "adapter-A".into(),
             boundary_id: "boundary".into(),
+            attempt_binding_digest: "sha256:forged-binding".into(),
         };
 
         let err = store.validate_persisted_dispatch_record(&tx, &record).unwrap_err();
@@ -6739,6 +6766,77 @@ mod tests {
     }
 
 }
+    #[test]
+    fn persisted_status_tampering_is_rejected_by_attempt_binding() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-binding-tamper-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let record=DurableDispatchRecord {
+            authorization_instance:"auth-status".into(),
+            attempt_id:"attempt-status".into(),
+            operation_id:"op-status".into(),
+            native_replay_identity:"replay-status".into(),
+            native_issuer:"issuer-status".into(),
+            native_authority_namespace:"ns-status".into(),
+            native_authorization_id:"native-status".into(),
+            status_identifier:"status-A".into(),
+            status_source_digest:"source-A".into(),
+            status_observed_at:"2026-10-03T10:00:00Z".into(),
+            status_valid_until:"2026-10-03T11:00:00Z".into(),
+            status_evidence_digest:"evidence-A".into(),
+            action_id:"action-status".into(),
+            action_digest:"digest-status".into(),
+            provider_idempotency_key:"provider-status".into(),
+            target_identity:"target-status".into(),
+            audience:"audience-status".into(),
+            adapter:"adapter-status".into(),
+            boundary_id:"boundary-status".into(),
+            attempt_binding_digest:"sha256:binding-status".into(),
+        };
+        let mut connection=store.connection().unwrap();
+        let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        tx.execute(
+            "INSERT INTO authorization_dispatches(
+                authorization_instance,attempt_id,operation_id,native_replay_identity,
+                native_issuer,native_authority_namespace,native_authorization_id,
+                native_replay_derivation_digest,native_authority_pin_set_id,
+                native_authority_pin_set_digest,relying_party_id,action_id,action_digest,
+                provider_idempotency_key,target_identity,audience,adapter,boundary_id,
+                attempt_binding_digest,status_identifier,status_source_digest,status_observed_at,
+                status_valid_until,status_evidence_digest,validity_issued_at,validity_expires_at,
+                validity_policy_digest,state
+             ) VALUES(
+                ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,
+                ?19,?20,?21,?22,?23,?24,?25,?26,?27,?28
+             )",
+            params![
+                record.authorization_instance,record.attempt_id,record.operation_id,
+                record.native_replay_identity,record.native_issuer,record.native_authority_namespace,
+                record.native_authorization_id,"derivation-status","pinset-status","digest-status",
+                store.relying_party_id(),record.action_id,record.action_digest,record.provider_idempotency_key,
+                record.target_identity,record.audience,record.adapter,record.boundary_id,
+                record.attempt_binding_digest,record.status_identifier,record.status_source_digest,
+                record.status_observed_at,record.status_valid_until,record.status_evidence_digest,
+                "",Option::<String>::None,"", "dispatch_pending"
+            ],
+        ).unwrap();
+
+        tx.execute(
+            "UPDATE authorization_dispatches
+             SET status_evidence_digest='tampered-evidence'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+
+        let err=store.validate_persisted_dispatch_record(&tx,&record).unwrap_err();
+        assert!(matches!(err,AuthorizationStoreError::Consumption(
+            AuthorizationConsumptionError::InvalidBinding
+        )));
+        tx.rollback().unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
     #[test]
     fn persisted_attempt_binding_tampering_is_rejected() {
         let path=std::env::temp_dir().join(format!(
