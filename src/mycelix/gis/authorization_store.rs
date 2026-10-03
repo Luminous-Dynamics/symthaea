@@ -598,8 +598,8 @@ impl SqliteAuthorizationStore {
     /// from the pinned authority namespace and native authorization ID.
     ///
     /// This is the preferred entry point for production native authorization
-    /// handoffs. The older free-form replay-identity API remains for staged
-    /// migration but is deprecated because it cannot prove its derivation inputs.
+    /// handoffs. The former free-form replay-identity APIs are retained only as
+    /// deprecated hard-fail shims; they cannot prove their derivation inputs.
     /// Canonical native-authorization entry point. The issuer is only a
     /// lookup key; the relying-party-pinned authority namespace is resolved
     /// inside the boundary before replay identity derivation.
@@ -2012,6 +2012,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn legacy_provenance_less_bound_apis_fail_closed() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-legacy-fence-{}.db",std::process::id()
