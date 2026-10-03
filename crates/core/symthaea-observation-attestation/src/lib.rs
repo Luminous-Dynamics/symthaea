@@ -1734,10 +1734,10 @@ impl Ed25519ReceiptVerifier {
         }
         let mut report =
             self.verify_with_resolved_key_report(envelope, receipt, method, &resolved.verifying_key);
-        report.resolution_snapshot_fingerprint = self
-            .resolution_snapshot_fingerprint
-            .clone()
-            .or(resolved_snapshot.snapshot_fingerprint);
+        // The resolver's paired result is authoritative once resolution occurs.
+        // In particular, a paired None means that no resolver snapshot was supplied;
+        // do not silently substitute a later verifier-side observation.
+        report.resolution_snapshot_fingerprint = resolved_snapshot.snapshot_fingerprint;
         report
     }
 
