@@ -381,6 +381,7 @@ Authorization validation now requires:
   non-empty reference metadata;
 - every compiled deployment plan contains a terminal `Verify` lifecycle step;
 - adapters must reject declared artifact inputs that have no corresponding realization operation rather than silently dropping them;
+- authorization input must carry concrete intent, target, observation, and resource identities; empty identity material cannot be promoted into an authorized plan;
 - verification carries exact expected state values and a typed transition disposition rather than property names alone;
 - the transition disposition is included in the compiled plan digest and therefore in authorization;
 - execution receipts separately bind observed transition disposition and mechanical execution outcome from typed postcondition outcome;
