@@ -31,7 +31,7 @@ use super::local_approval_store::{
     LocalApprovalRequestStoreV1, PendingRequestCurrentnessV1, PendingRequestInstallV1,
 };
 use super::temporal::UnixMillisV1;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use thiserror::Error;
 
 /// One request minted by, and installed into, this exact live approval runtime.
