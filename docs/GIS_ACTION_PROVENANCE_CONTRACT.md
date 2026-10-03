@@ -338,7 +338,7 @@ This closes a distinct class of provenance failure from operation-ID substitutio
 
 ### Terminal verifier configuration is relying-party pinned
 
-Terminal provider evidence is now accepted only under a write-once relying-party pin for the complete verifier configuration: relying-party identity, verifier implementation/profile identifier, verifier configuration digest, trust-anchor digest, and evidence-profile digest. Missing pin metadata or a verifier result that differs from the pinned tuple is rejected before terminal settlement or authenticated reconciliation.
+Terminal provider evidence is now accepted only under a write-once relying-party pin for the complete verifier configuration: relying-party identity, verifier implementation/profile identifier, verifier configuration digest, trust-anchor digest, and evidence-profile digest. Missing pin metadata or a verifier result that differs from the pinned tuple is rejected before terminal settlement or authenticated reconciliation. The pin is itself write-once: re-pinning a different verifier identity, configuration digest, trust-anchor digest, or evidence-profile digest fails closed.
 
 The verifier's returned configuration is therefore evidence about what verifier claims it used, not a presenter-controlled trust root. The durable store selects the accepted configuration and requires an exact match before consuming the authorization. This follows the AEB-07 requirement that verifier revisions, trust anchors, and related validation inputs be relying-party-selected rather than introduced by presented data. citeturn102081search0turn102081search2
 
