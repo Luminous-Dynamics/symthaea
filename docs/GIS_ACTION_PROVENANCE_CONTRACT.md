@@ -329,3 +329,9 @@ The recovery boundary is intentionally split in two. A Prepared attempt that has
 ### Operation identity is frozen at preparation
 
 The effectful lifecycle now treats the logical operation identifier as an attempt-bound authorization input, not caller metadata that can be replaced at the `DispatchPending` transition. `prepare_for_execution_bound_with_operation` persists the operation identity before dispatch; both the precondition check and the authoritative `DispatchPending` transaction require the exact persisted value. A caller cannot prepare operation A and enter the provider as operation B while retaining the same action, native replay, target, and status evidence.
+
+### Terminal settlement rejects record splicing
+
+Terminal settlement and reconciliation now compare the caller-supplied durable dispatch record against the authoritative persisted dispatch row across the complete immutable identity surface: operation ID, native replay identity and derivation inputs, issuer/namespace/native authorization ID, relying-party domain, action identity/digest, provider idempotency key, target, audience, adapter, and boundary. A record that combines fields from different attempts is rejected before lease settlement.
+
+This closes a distinct class of provenance failure from operation-ID substitution: a valid attempt cannot be paired with a forged target, audience, adapter, or operation while retaining a valid action digest. The persisted row remains the source of truth; terminal provider evidence is accepted only after the record itself is proven to be the exact durable attempt.
