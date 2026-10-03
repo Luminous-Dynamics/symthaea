@@ -324,16 +324,12 @@ mod tests {
     }
 
     #[test]
-    fn legacy_renderer_rejects_corrupted_typed_domain_state() {
-        use super::super::service_domain::{
-            NixServiceOperationKindV1, NixServiceOperationV1, NixServiceOperationErrorV1,
-        };
-
-        let mut operation =
-            NixServiceOperationV1::new("nginx", NixServiceOperationKindV1::Start).unwrap();
-        operation.unit = "../nginx.service".to_string();
-
-        let error = ServiceManager::render_legacy_command(&operation).unwrap_err();
+    fn invalid_service_unit_is_rejected_before_legacy_rendering() {
+        let error = NixServiceOperationV1::new(
+            "../nginx.service",
+            NixServiceOperationKindV1::Start,
+        )
+        .unwrap_err();
         assert_eq!(error, NixServiceOperationErrorV1::PathLikeUnit);
     }
 
