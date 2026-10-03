@@ -2014,7 +2014,7 @@ fn validate_native_authority_pin_set(
                 r.get::<_,String>(9)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
-        if row.0 != record.operation_id || row.1 != record.native_replay_identity
+        if persisted_state != row.10 || row.0 != record.operation_id || row.1 != record.native_replay_identity
             || row.2 != record.action_id || row.3 != record.action_digest
             || row.4 != record.provider_idempotency_key || row.5 != record.target_identity
             || row.6 != record.audience || row.7 != record.adapter
@@ -2334,6 +2334,55 @@ fn validate_native_authority_pin_set(
         Ok(())
     }
 
+    /// Compare every immutable identity field of a caller-supplied dispatch
+    /// record against the durable dispatch row before terminal settlement.
+    fn validate_persisted_dispatch_record(
+        tx: &Transaction<'_>,
+        record: &DurableDispatchRecord,
+    ) -> Result<String, AuthorizationStoreError> {
+        let row = tx.query_row(
+            "SELECT operation_id,native_replay_identity,native_issuer,native_authority_namespace,
+                    native_authorization_id,native_replay_derivation_digest,
+                    native_authority_pin_set_id,native_authority_pin_set_digest,
+                    relying_party_id,action_id,action_digest,provider_idempotency_key,
+                    target_identity,audience,adapter,boundary_id,state
+             FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+            params![record.authorization_instance, record.attempt_id, record.boundary_id],
+            |r| Ok((
+                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
+                r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
+                r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
+                r.get::<_,String>(9)?, r.get::<_,String>(10)?, r.get::<_,String>(11)?,
+                r.get::<_,String>(12)?, r.get::<_,String>(13)?, r.get::<_,String>(14)?,
+                r.get::<_,String>(15)?, r.get::<_,String>(16)?,
+            )),
+        ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
+
+        let matches = row.0 == record.operation_id
+            && row.1 == record.native_replay_identity
+            && row.2 == record.native_issuer
+            && row.3 == record.native_authority_namespace
+            && row.4 == record.native_authorization_id
+            && row.5 == record.native_replay_derivation_digest
+            && row.6 == record.native_authority_pin_set_id
+            && row.7 == record.native_authority_pin_set_digest
+            && row.8 == self.relying_party_id
+            && row.9 == record.action_id
+            && row.10 == record.action_digest
+            && row.11 == record.provider_idempotency_key
+            && row.12 == record.target_identity
+            && row.13 == record.audience
+            && row.14 == record.adapter
+            && row.15 == record.boundary_id;
+
+        if !matches {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        Ok(row.16)
+    }
+
     /// Commit a terminal provider outcome only after a relying-party configured
     /// verifier has authenticated and semantically bound the provider evidence
     /// to this exact frozen dispatch record.
@@ -2350,6 +2399,7 @@ fn validate_native_authority_pin_set(
 
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
         let row: (
             String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>,
             Option<String>, Option<String>, Option<String>, Option<String>
@@ -2380,6 +2430,9 @@ fn validate_native_authority_pin_set(
         self.validate_native_authority_pin_set_snapshot(
             &tx, row.5.as_deref(), row.6.as_deref()
         )?;
+        if persisted_state != row.0 {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
         if !matches!(row.0.as_str(), "dispatch_pending" | "invoked" | "indeterminate") {
             if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
                 return Ok(receipt);
@@ -2693,6 +2746,7 @@ fn validate_native_authority_pin_set(
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
+        let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
         let row = tx.query_row(
             "SELECT operation_id,native_replay_identity,relying_party_id,action_id,action_digest,
                     provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
