@@ -121,3 +121,22 @@ This also aligns with the RATS freshness model: freshness is not the same thing 
 
 A fork is evidence of unresolved lifecycle divergence, not evidence that either branch is correct.
 
+
+
+## Verifier identity binding
+
+A verification result now has two distinct properties:
+
+- it is internally consistent with the attestation reference; and
+- its verifier identity is bound to the verifier expected by the temporal policy.
+
+The first prevents reference substitution. The second prevents a locally well-formed result from becoming admissible merely because it names *some* verifier.
+
+The local layer still does not establish the verifier's cryptographic trust anchor. It consumes the verifier identity as an explicit policy input and fails closed when the result names a different verifier.
+
+The evidence progression is therefore:
+
+**attestation issuer → attestation reference → exact verification result → expected verifier identity → topology epoch continuity → temporal corroboration.**
+
+This is intentionally narrower than declaring a verifier trustworthy. Authority and trust-anchor validation remain the responsibility of the provenance layer.
+
