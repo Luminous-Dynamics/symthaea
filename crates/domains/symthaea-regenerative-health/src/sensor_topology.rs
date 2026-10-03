@@ -87,6 +87,43 @@ impl AuthoritativeAttestationReference {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TopologyEpochBinding {
+    /// Monotonic lifecycle epoch for the topology statement.
+    pub epoch: u64,
+    /// Digest of the immediately preceding topology epoch, when one exists.
+    pub predecessor_topology_digest: Option<String>,
+    /// Lifecycle time at which this epoch became effective.
+    pub effective_from_ms: u64,
+    /// Stable lifecycle event that created or superseded this epoch.
+    pub lifecycle_event_id: String,
+}
+
+impl TopologyEpochBinding {
+    fn validate(&self) -> Result<(), SensorTopologyAttestationIssue> {
+        if self.epoch == 0
+            || self.lifecycle_event_id.trim().is_empty()
+            || self.effective_from_ms == 0
+        {
+            return Err(SensorTopologyAttestationIssue::InvalidEpochBinding);
+        }
+        if self.epoch == 1 {
+            if self.predecessor_topology_digest.is_some() {
+                return Err(SensorTopologyAttestationIssue::InvalidEpochBinding);
+            }
+        } else if self
+            .predecessor_topology_digest
+            .as_deref()
+            .map(str::trim)
+            .unwrap_or("")
+            .is_empty()
+        {
+            return Err(SensorTopologyAttestationIssue::MissingEpochPredecessor);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SensorTopologyAttestation {
     pub schema_version: String,
     pub asset_id: String,
@@ -95,6 +132,7 @@ pub struct SensorTopologyAttestation {
     pub topology_version: String,
     pub topology_digest: String,
     pub configuration_digest: String,
+    pub epoch_binding: TopologyEpochBinding,
     pub issued_at_ms: u64,
     pub valid_until_ms: u64,
     pub evidence_id: String,
@@ -115,6 +153,11 @@ pub enum SensorTopologyAttestationIssue {
     ConfigurationMismatch,
     TopologyIdentityMismatch,
     AttestationReferenceMismatch,
+    InvalidEpochBinding,
+    MissingEpochPredecessor,
+    EpochEffectiveTimeMismatch,
+    TopologyEpochRollback,
+    InvalidEpochTransition,
     EmptyVerificationResult,
     InvalidVerificationWindow,
     VerificationReferenceMismatch,
@@ -146,6 +189,15 @@ impl SensorTopologyAttestation {
         }
 
         self.authoritative_reference.validate(expected_issuer_id)?;
+        self.epoch_binding.validate()?;
+        if self.epoch_binding.effective_from_ms > self.issued_at_ms {
+            return Err(SensorTopologyAttestationIssue::EpochEffectiveTimeMismatch);
+        }
+        if self.epoch_binding.epoch > 1
+            && self.epoch_binding.predecessor_topology_digest.as_deref() == Some(self.topology_digest.as_str())
+        {
+            return Err(SensorTopologyAttestationIssue::InvalidEpochBinding);
+        }
         self.verification_result
             .validate_against(&self.authoritative_reference, observation_timestamp_ms)?;
 
@@ -190,6 +242,12 @@ mod tests {
             topology_version: "1".into(),
             topology_digest: "topology-v1".into(),
             configuration_digest: "cfg-1".into(),
+            epoch_binding: TopologyEpochBinding {
+                epoch: 1,
+                predecessor_topology_digest: None,
+                effective_from_ms: 500,
+                lifecycle_event_id: "topology-created-1".into(),
+            },
             issued_at_ms: 500,
             valid_until_ms: 2_500,
             evidence_id: "topology-e-1".into(),
@@ -297,6 +355,49 @@ mod tests {
         assert_eq!(
             a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
             Err(SensorTopologyAttestationIssue::FutureVerificationResult)
+        );
+    }
+
+    #[test]
+    fn epoch_one_cannot_claim_a_predecessor() {
+        let mut a = attestation();
+        a.epoch_binding.predecessor_topology_digest = Some("topology-v0".into());
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::InvalidEpochBinding)
+        );
+    }
+
+    #[test]
+    fn later_epoch_requires_predecessor_binding() {
+        let mut a = attestation();
+        a.epoch_binding.epoch = 2;
+        a.epoch_binding.predecessor_topology_digest = None;
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::MissingEpochPredecessor)
+        );
+    }
+
+    #[test]
+    fn epoch_cannot_become_effective_after_attestation_issue_time() {
+        let mut a = attestation();
+        a.epoch_binding.effective_from_ms = 501;
+        a.issued_at_ms = 500;
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::EpochEffectiveTimeMismatch)
+        );
+    }
+
+    #[test]
+    fn epoch_cannot_self_reference_its_own_topology_digest() {
+        let mut a = attestation();
+        a.epoch_binding.epoch = 2;
+        a.epoch_binding.predecessor_topology_digest = Some("topology-v1".into());
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::InvalidEpochBinding)
         );
     }
 
