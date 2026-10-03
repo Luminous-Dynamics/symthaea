@@ -194,7 +194,13 @@ jobs:
           test "$PAPER_MATRIX_COUNT" -eq 1
           PAPER_MATRIX="$(printf '%s\n' "$OUTPUT" | sed -n 's/^PAPER_MATRIX=//p')"
           test -n "$PAPER_MATRIX"
+          RESULT_DIGEST="$(printf '%s\n' "$PAPER_MATRIX" | sed -n 's/.*result_digest=\([0-9a-f]\{64\}\);.*/\1/p')"
+          test "${#RESULT_DIGEST}" -eq 64
+          case "$RESULT_DIGEST" in
+            (*[!0-9a-f]*) exit 1 ;;
+          esac
           printf 'paper_matrix=%s\n' "$PAPER_MATRIX" >> "$GITHUB_OUTPUT"
+          printf 'paper_matrix_result_digest=%s\n' "$RESULT_DIGEST" >> "$GITHUB_OUTPUT"
 
       - name: Capture deterministic work ledger
         id: work
@@ -277,9 +283,10 @@ jobs:
           geometry_sweep_schema=linear-code-geometry-sweep-v2
           geometry_sweep_status=${{ steps.geometry_sweep.outcome }}
           geometry_sweep=${{ steps.geometry_sweep.outputs.geometry_sweep }}
-          paper_matrix_schema=linear-code-paper-matrix-v1
+          paper_matrix_schema=linear-code-paper-matrix-v2
           paper_matrix_status=${{ steps.paper_matrix.outcome }}
           paper_matrix=${{ steps.paper_matrix.outputs.paper_matrix }}
+          paper_matrix_result_digest=${{ steps.paper_matrix.outputs.paper_matrix_result_digest }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
