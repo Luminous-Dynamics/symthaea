@@ -286,11 +286,18 @@ SSC distinguishes four evidence moments rather than collapsing them into one
    by the receipt.
 
 The receipt records mechanical `ExecutionOutcome` separately from a typed
-`PostconditionOutcome`. A mechanically successful execution may therefore be
-`Unproven` until fresh observation establishes the requested postcondition.
-A verified-success interpretation requires an execution outcome of
-`Succeeded` and `PostconditionOutcome::Satisfied`; `Recovered` remains a distinct
-recovery disposition rather than forward deployment success.
+`PostconditionOutcome`, and also records the `DeploymentDisposition` actually
+observed after execution. The observed disposition MUST equal the disposition
+authorized by the compiled plan; a receipt cannot silently reinterpret the
+transition it was authorized to perform.
+
+A mechanically successful execution may therefore be `Unproven` until fresh
+observation establishes the requested postcondition. A verified-success
+interpretation requires an execution outcome of `Succeeded` and
+`PostconditionOutcome::Satisfied`; `Recovered` remains a distinct recovery
+disposition rather than forward deployment success. Verified or violated
+postconditions require a concrete verification evidence digest, while
+`Unproven` explicitly represents missing or insufficient proof.
 
 The post-state digest is allowed to differ from the pre-state digest because a
 successful deployment is expected to change state. Verification semantics
@@ -376,7 +383,8 @@ Authorization validation now requires:
 - adapters must reject declared artifact inputs that have no corresponding realization operation rather than silently dropping them;
 - verification carries exact expected state values and a typed transition disposition rather than property names alone;
 - the transition disposition is included in the compiled plan digest and therefore in authorization;
-- execution receipts separate mechanical execution outcome from typed postcondition outcome;
+- execution receipts separately bind observed transition disposition and mechanical execution outcome from typed postcondition outcome;
+- an observed disposition that differs from the authorized disposition invalidates the receipt;
 - `Satisfied` and `Violated` postcondition outcomes require a concrete verification evidence digest;
 - an `Unproven` outcome remains representable without proof, and a mechanical `Succeeded` receipt is not treated as verified success unless the postcondition is `Satisfied`;
 - execution receipts bind the exact authorized plan, pre-execution snapshot, and
