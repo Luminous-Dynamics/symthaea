@@ -2166,6 +2166,8 @@ mod tests {
         assert_eq!(persisted,record.provider_idempotency_key);
         let _=std::fs::remove_file(path);
     }
+
+    #[test]
     fn provider_idempotency_key_is_derived_from_native_replay_identity() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-provider-key-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
@@ -2185,10 +2187,16 @@ mod tests {
             &witness.authorization_instance,"attempt-provider-key",&action,&effect,"boundary-A",
             "operation:provider-key","native-grant:one"
         ).unwrap();
+        let native_replay=super::super::NativeReplayDerivation::derive(
+            "test-authority/v1","native-grant:one"
+        ).unwrap();
+        assert_eq!(record.native_replay_identity,native_replay.native_replay_identity);
         let expected=AuthorizationLease::new_with_instance(
             witness.authorization_instance.clone(),action.id.clone(),action.canonical_action_digest(),
             witness.support_digest.clone(),witness.policy.clone(),witness.authority_epoch,1
-        ).provider_idempotency_key_for_native_replay("native-grant:one","target-A").unwrap();
+        ).provider_idempotency_key_for_native_replay(
+            &native_replay.native_replay_identity,"target-A"
+        ).unwrap();
         assert_eq!(record.provider_idempotency_key,expected);
         let mut operation_changed=record.clone();
         operation_changed.operation_id="operation:provider-key-renamed".into();
@@ -2225,10 +2233,16 @@ mod tests {
             witness.support_digest.clone(), witness.policy.clone(), witness.authority_epoch, 1
         ).provider_idempotency_key());
 
+        let native_replay=super::super::NativeReplayDerivation::derive(
+            "test-authority/v1","native-grant:one"
+        ).unwrap();
+        assert_eq!(record.native_replay_identity,native_replay.native_replay_identity);
         let expected=AuthorizationLease::new_with_instance(
             witness.authorization_instance.clone(),action.id.clone(),action.canonical_action_digest(),
             witness.support_digest.clone(),witness.policy.clone(),witness.authority_epoch,1
-        ).provider_idempotency_key_for_native_replay("native-grant:one","target-A").unwrap();
+        ).provider_idempotency_key_for_native_replay(
+            &native_replay.native_replay_identity,"target-A"
+        ).unwrap();
         assert_eq!(record.provider_idempotency_key,expected);
         let mut operation_changed=record.clone();
         operation_changed.operation_id="operation:provider-key-renamed".into();
