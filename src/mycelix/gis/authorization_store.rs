@@ -525,7 +525,48 @@ fn backfill_status_check_boundary_ownership(
     Ok(())
 }
 
+fn backfill_attempt_scope_digests(
+    connection: &mut Connection,
+) -> Result<(), AuthorizationStoreError> {
+    for table in [
+        "authorization_leases",
+        "authorization_receipts",
+        "authorization_status_checks",
+        "authorization_recovery_markers",
+        "authorization_terminal_evidence",
+        "authorization_dispatches",
+    ] {
+        let rows: Vec<(String,String)> = {
+            let mut stmt = connection.prepare(&format!(
+                "SELECT attempt_id,boundary_id
+                 FROM {table}
+                 WHERE attempt_id IS NOT NULL AND attempt_id <> ''
+                   AND boundary_id IS NOT NULL AND boundary_id <> ''
+                   AND (attempt_scope_digest IS NULL OR attempt_scope_digest='')"
+            ))?;
+            let mapped = stmt.query_map([], |row| {
+                Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))
+            })?;
+            mapped.collect::<Result<Vec<_>,_>>()?
+        };
+        for (attempt_id,boundary_id) in rows {
+            let scope=compute_attempt_scope_digest(&boundary_id,&attempt_id)?;
+            connection.execute(
+                &format!(
+                    "UPDATE {table}
+                     SET attempt_scope_digest=?1
+                     WHERE attempt_id=?2 AND boundary_id=?3
+                       AND (attempt_scope_digest IS NULL OR attempt_scope_digest='')"
+                ),
+                params![scope,attempt_id,boundary_id],
+            )?;
+        }
+    }
+    Ok(())
+}
+
 fn compute_attempt_binding_digest(
+
     authorization_instance: &str,
     attempt_id: &str,
     operation_id: &str,
@@ -782,6 +823,7 @@ impl SqliteAuthorizationStore {
                attempt_id TEXT,
                operation_id TEXT,
                boundary_id TEXT,
+               attempt_scope_digest TEXT,
                validity_issued_at TEXT,
                validity_expires_at TEXT,
                validity_policy_digest TEXT
@@ -796,6 +838,7 @@ impl SqliteAuthorizationStore {
                authority_epoch INTEGER NOT NULL,
                provider_idempotency_key TEXT,
                boundary_id TEXT,
+               attempt_scope_digest TEXT,
                PRIMARY KEY(authorization_instance, attempt_id, phase)
              );
              CREATE TABLE IF NOT EXISTS authorization_status_checks (
@@ -819,6 +862,7 @@ impl SqliteAuthorizationStore {
                action_digest TEXT NOT NULL,
                authority_epoch INTEGER NOT NULL,
                marker TEXT NOT NULL,
+               attempt_scope_digest TEXT,
                PRIMARY KEY(authorization_instance, attempt_id, marker)
              );
              CREATE TABLE IF NOT EXISTS authorization_terminal_evidence (
@@ -833,6 +877,7 @@ impl SqliteAuthorizationStore {
                native_authority_pin_set_digest TEXT,
                relying_party_id TEXT,
                boundary_id TEXT NOT NULL,
+               attempt_scope_digest TEXT,
                action_digest TEXT NOT NULL,
                provider_idempotency_key TEXT NOT NULL,
                target_identity TEXT NOT NULL,
@@ -879,6 +924,7 @@ impl SqliteAuthorizationStore {
                adapter_revision TEXT NOT NULL,
                adapter_implementation_digest TEXT NOT NULL,
                boundary_id TEXT NOT NULL,
+               attempt_scope_digest TEXT,
                attempt_binding_digest TEXT NOT NULL,
                state TEXT NOT NULL,
                PRIMARY KEY(authorization_instance, attempt_id)
@@ -886,6 +932,7 @@ impl SqliteAuthorizationStore {
         )?;
         ensure_column(&mut connection, "authorization_leases", "operation_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "boundary_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_leases", "attempt_scope_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "validity_issued_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "validity_expires_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "validity_policy_digest", "TEXT")?;
@@ -909,6 +956,7 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_dispatches", "adapter_revision", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_dispatches", "adapter_implementation_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_dispatches", "attempt_binding_digest", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_dispatches", "attempt_scope_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_issuer", "TEXT")?;
@@ -924,16 +972,20 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_terminal_evidence", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "provider_idempotency_key", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_receipts", "attempt_scope_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_recovery_markers", "operation_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_recovery_markers", "attempt_scope_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "trust_anchor_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "adapter_revision", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "adapter_implementation_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "attempt_binding_digest", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "attempt_scope_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "evidence_profile_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_status_checks", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_status_checks", "attempt_scope_digest", "TEXT")?;
         backfill_status_check_boundary_ownership(&mut connection)?;
+        backfill_attempt_scope_digests(&mut connection)?;
         connection.execute_batch(
             "CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
                ON authorization_leases(attempt_id)
