@@ -464,11 +464,11 @@ pub fn recover_linear_bound_with_work(
         }
     }
 
-    let coefficients = match solve_linear_combination_counted(target, &independent_basis, &mut work)
-    {
-        Some(coefficients) => coefficients,
-        None => return (None, work),
-    };
+    let coefficients =
+        match solve_linear_combination_counted(target, &independent_basis, &mut work) {
+            Some(coefficients) => coefficients,
+            None => return (None, work),
+        };
 
     let mut recovered = factors
         .iter()
