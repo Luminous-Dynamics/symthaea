@@ -72,7 +72,7 @@ async fn parse_service_response(resp: gloo_net::http::Response) -> Result<Value,
                 break;
             }
 
-            let value = js_sys::Reflect::get(&result, &JsValue::from_str("value"))
+            let value = web_sys::js_sys::Reflect::get(&result, &JsValue::from_str("value"))
                 .map_err(|error| format!("failed to inspect response chunk value: {error:?}"))?;
             let chunk = web_sys::js_sys::Uint8Array::new(&value);
             let chunk_len = chunk.length() as usize;
