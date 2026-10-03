@@ -2014,7 +2014,7 @@ fn validate_native_authority_pin_set(
                 r.get::<_,String>(9)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
-        if persisted_state != row.10 || row.0 != record.operation_id || row.1 != record.native_replay_identity
+        if row.0 != record.operation_id || row.1 != record.native_replay_identity
             || row.2 != record.action_id || row.3 != record.action_digest
             || row.4 != record.provider_idempotency_key || row.5 != record.target_identity
             || row.6 != record.audience || row.7 != record.adapter
