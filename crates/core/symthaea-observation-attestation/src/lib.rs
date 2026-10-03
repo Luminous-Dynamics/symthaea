@@ -3522,6 +3522,17 @@ mod tests {
         paired.resolution_snapshot_fingerprint = Some("opaque-snapshot-1".into());
         assert_ne!(resolved_method.fingerprint(), paired.fingerprint());
         assert_ne!(snapshot.fingerprint(), paired.fingerprint());
+
+        let evaluation = report.to_evidence_evaluation();
+
+        let mut rebound_method = report.clone();
+        rebound_method.resolved_verification_method =
+            Some("did:example:attester-a#key-2".into());
+        assert!(!evaluation.is_consistent_with_report(&rebound_method));
+
+        let mut rebound_snapshot = report.clone();
+        rebound_snapshot.resolution_snapshot_fingerprint = Some("opaque-snapshot-1".into());
+        assert!(!evaluation.is_consistent_with_report(&rebound_snapshot));
     }
 
 }
