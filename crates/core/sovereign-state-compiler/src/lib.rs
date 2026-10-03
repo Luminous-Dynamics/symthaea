@@ -216,7 +216,11 @@ pub struct PlanStep {
 /// Policy describing what evidence must be observed after execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct VerificationPolicy {
-    pub required_properties: BTreeSet<String>,
+    /// Exact desired-state values that the executor must verify after mutation.
+    ///
+    /// Keeping values rather than property names makes verification
+    /// non-ambiguous while remaining platform-neutral.
+    pub expected_state: DesiredState,
     pub require_attestation: bool,
 }
 
@@ -341,6 +345,95 @@ impl DeploymentPlan {
 pub struct AuthorizedDeploymentPlan {
     pub plan: DeploymentPlan,
     pub authorization: AuthorizationEvidence,
+}
+
+/// Result of applying an authorized deployment plan.
+///
+/// The executor/adapter may attach platform-specific evidence separately;
+/// this enum intentionally describes only the protocol-level lifecycle outcome.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExecutionOutcome {
+    Succeeded,
+    Failed,
+    RolledBack,
+    Recovered,
+}
+
+/// Append-only receipt emitted by a target-specific executor.
+///
+/// A receipt is bound to the exact authorized plan and target snapshot. It is
+/// evidence of what the executor reports, not a substitute for independent
+/// verification of the underlying target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionReceipt {
+    pub schema_version: String,
+    pub plan_digest: ContentDigest,
+    pub target_snapshot_digest: ContentDigest,
+    pub started_at_ms: u64,
+    pub finished_at_ms: u64,
+    pub outcome: ExecutionOutcome,
+    pub verification_digest: Option<ContentDigest>,
+    pub evidence: Vec<AttestationRef>,
+}
+
+impl ExecutionReceipt {
+    pub fn validate_for(
+        &self,
+        plan: &AuthorizedDeploymentPlan,
+    ) -> Result<(), ReceiptValidationError> {
+        if self.schema_version != SCHEMA_VERSION {
+            return Err(ReceiptValidationError::UnsupportedSchemaVersion(
+                self.schema_version.clone(),
+            ));
+        }
+
+        let plan_digest = plan
+            .plan
+            .digest()
+            .map_err(ReceiptValidationError::Serialization)?;
+        if self.plan_digest != plan_digest {
+            return Err(ReceiptValidationError::PlanDigestMismatch);
+        }
+
+        if self.target_snapshot_digest != plan.authorization.target_snapshot_digest {
+            return Err(ReceiptValidationError::TargetSnapshotDigestMismatch);
+        }
+
+        if self.finished_at_ms < self.started_at_ms {
+            return Err(ReceiptValidationError::TimestampOrderInvalid);
+        }
+
+        Ok(())
+    }
+}
+
+/// Target-specific execution boundary.
+///
+/// The neutral crate defines the handoff and receipt contract but never
+/// chooses a transport, process API, shell, operating system, or privilege
+/// mechanism.
+pub trait DeploymentExecutor {
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    fn execute(
+        &mut self,
+        plan: &AuthorizedDeploymentPlan,
+        now_ms: u64,
+    ) -> Result<ExecutionReceipt, Self::Error>;
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ReceiptValidationError {
+    #[error("unsupported Sovereign State Compiler schema version: {0}")]
+    UnsupportedSchemaVersion(String),
+    #[error("execution receipt plan digest does not match authorized plan")]
+    PlanDigestMismatch,
+    #[error("execution receipt target snapshot digest does not match authorization")]
+    TargetSnapshotDigestMismatch,
+    #[error("execution receipt timestamps are out of order")]
+    TimestampOrderInvalid,
+    #[error("canonical serialization failed: {0}")]
+    Serialization(serde_json::Error),
 }
 
 impl AuthorizedDeploymentPlan {
@@ -880,7 +973,73 @@ mod tests {
     }
 
     #[test]
-    fn btree_state_serializes_deterministically() {
+    fn receipt_binds_exact_authorized_plan_and_snapshot() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            started_at_ms: 151,
+            finished_at_ms: 200,
+            outcome: ExecutionOutcome::Succeeded,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert!(receipt.validate_for(&authorized).is_ok());
+    }
+
+    #[test]
+    fn rejects_receipt_for_tampered_plan() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: ContentDigest::blake3(b"wrong-plan"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            started_at_ms: 151,
+            finished_at_ms: 200,
+            outcome: ExecutionOutcome::Succeeded,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::PlanDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_receipt_with_invalid_timestamp_order() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            started_at_ms: 200,
+            finished_at_ms: 199,
+            outcome: ExecutionOutcome::Failed,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::TimestampOrderInvalid)
+        );
+    }
+
+    #[test]
+    fn btree_state_serializes_deterministically {
         let mut intent = DeploymentIntent::new("intent-1", "host-01");
         intent
             .desired_state
