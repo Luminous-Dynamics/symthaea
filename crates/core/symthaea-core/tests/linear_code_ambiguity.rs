@@ -619,8 +619,8 @@ fn overlapping_recovery_is_order_deterministic_but_not_permutation_invariant() {
     let parent = RandomLinearCode::generate(96, 4, 0x7B7B);
     let left = RandomLinearCode::from_basis(parent.basis()[..2].to_vec()).expect("left subcode");
     let shared = parent.basis()[0].bound(&parent.basis()[1]);
-    let right =
-        RandomLinearCode::from_basis(vec![shared, parent.basis()[2].clone()]).expect("right subcode");
+    let right = RandomLinearCode::from_basis(vec![shared, parent.basis()[2].clone()])
+        .expect("right subcode");
 
     let target = parent.basis()[0].clone();
     let first = recover_linear_bound(&target, &[&left, &right]).expect("forward recovery");
@@ -631,8 +631,7 @@ fn overlapping_recovery_is_order_deterministic_but_not_permutation_invariant() {
     assert!(right.contains(&first[1]));
     assert_eq!(first[0].bound(&first[1]), target);
 
-    let reversed =
-        recover_linear_bound(&target, &[&right, &left]).expect("reversed recovery");
+    let reversed = recover_linear_bound(&target, &[&right, &left]).expect("reversed recovery");
     assert_eq!(reversed.len(), 2);
     assert!(right.contains(&reversed[0]));
     assert!(left.contains(&reversed[1]));
