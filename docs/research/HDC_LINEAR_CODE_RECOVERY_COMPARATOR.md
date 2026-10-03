@@ -132,7 +132,10 @@ The comparator now exposes a research-only `LinearCodeWork` ledger rather than r
 - span-membership checks used while constructing the maximal independent subset;
 - rank pivots and packed-word XOR work during rank tests;
 - solve pivots and packed-word XOR work during the GF(2) solve;
-- retained generators in the resulting independent basis.
+- retained generators in the resulting independent basis;
+- input-word copies performed by rank construction;
+- basis-bit probes and augmented-matrix word cells initialized by the GF(2) solver;
+- packed-word XOR operations used to project the recovered coefficients back into factor codewords.
 
 Repeated execution of the same deterministic fixture must produce both the same recovered result and the same ledger. These counters are algorithmic work units, not a universal hardware-independent runtime estimate, and must not be collapsed into a composite performance score.
 
