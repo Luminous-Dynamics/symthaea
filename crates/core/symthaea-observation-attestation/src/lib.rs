@@ -716,6 +716,22 @@ impl ReceiptAttestationVerificationReport {
             && self.procedure_fingerprint == expected_procedure_fingerprint
     }
 
+    /// Validate metadata that accompanies the execution trace but is not itself
+    /// represented by a trace result.
+    ///
+    /// Once verification-method resolution has passed, a report must retain the
+    /// method identity that was actually bound to that successful resolution.
+    fn has_consistent_resolution_metadata(&self) -> bool {
+        match self.verification_method {
+            VerificationStage::Passed => self
+                .resolved_verification_method
+                .as_deref()
+                .is_some_and(|method| !method.is_empty()),
+            VerificationStage::Failed(_)
+            | VerificationStage::NotEvaluated => true,
+        }
+    }
+
     /// Validate that this report is internally coherent without requiring
     /// construction of an EvidenceEvaluation.
     ///
@@ -723,7 +739,9 @@ impl ReceiptAttestationVerificationReport {
     /// because first-class execution traces were not part of the v3 evidence identity.
     /// Current v4 reports must validate their captured execution trace directly.
     pub fn is_well_formed(&self) -> bool {
-        if !self.has_consistent_identity_bindings() {
+        if !self.has_consistent_identity_bindings()
+            || !self.has_consistent_resolution_metadata()
+        {
             return false;
         }
 
@@ -3579,6 +3597,23 @@ mod tests {
 
         assert!(!report.has_consistent_identity_bindings());
         assert!(!report.to_evidence_evaluation().is_consistent_with_report(&report));
+    }
+
+    #[test]
+    fn verification_report_self_validation_rejects_resolution_metadata_mutation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        assert!(report.is_well_formed());
+        assert_eq!(report.verification_method, VerificationStage::Passed);
+
+        report.resolved_verification_method = None;
+        assert!(!report.is_well_formed());
     }
 
     #[test]
