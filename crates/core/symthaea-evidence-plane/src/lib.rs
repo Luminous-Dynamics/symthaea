@@ -270,10 +270,8 @@ impl Serialize for ExecutionLineageV1 {
 
 impl ExecutionLineageV1 {
     pub const DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:execution-lineage:v1\n";
-    pub const WORKLOAD_DOMAIN_SEPARATOR: &'static [u8] =
-        b"symthaea:execution-workload:v1\n";
-    pub const ENVIRONMENT_DOMAIN_SEPARATOR: &'static [u8] =
-        b"symthaea:execution-environment:v1\n";
+    pub const WORKLOAD_DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:execution-workload:v1\n";
+    pub const ENVIRONMENT_DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:execution-environment:v1\n";
 
     /// Construct a lineage from untrusted named-entry sequences without first
     /// collapsing them into maps/sets. Duplicate names are rejected before
