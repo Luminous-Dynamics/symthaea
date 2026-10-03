@@ -74,6 +74,89 @@ async function canvasPngHash(page, selector) {
   return createHash('sha256').update(payload).digest('hex');
 }
 
+async function canvasPixelSamples(page, selector, points) {
+  return page.$eval(
+    selector,
+    async (canvas, points) => {
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        throw new Error(`${selector} is not a canvas`);
+      }
+      const dataUrl = canvas.toDataURL('image/png');
+      const image = new Image();
+      image.src = dataUrl;
+      await image.decode();
+      const probe = document.createElement('canvas');
+      probe.width = canvas.width;
+      probe.height = canvas.height;
+      const context = probe.getContext('2d');
+      if (!context) {
+        throw new Error(`could not create probe context for ${selector}`);
+      }
+      context.drawImage(image, 0, 0);
+      const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      return points.map(({ name, x, y }) => {
+        if (!Number.isInteger(x) || !Number.isInteger(y)
+          || x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) {
+          throw new Error(`invalid semantic probe ${name}: (${x},${y})`);
+        }
+        const offset = (y * canvas.width + x) * 4;
+        return {
+          name,
+          x,
+          y,
+          rgba: [...rgba.slice(offset, offset + 4)],
+        };
+      });
+    },
+    points,
+  );
+}
+
+function assertSemanticSceneSamples(samples) {
+  const byName = new Map(samples.map(sample => [sample.name, sample.rgba]));
+  const background = byName.get('background');
+  const polygon = byName.get('polygon');
+  const transformedLine = byName.get('transformed-line');
+  const circle = byName.get('circle');
+
+  if (!background || !polygon || !transformedLine || !circle) {
+    throw new QualificationError(
+      `WebGPU semantic scene probes missing: ${JSON.stringify(samples)}`,
+      'renderer',
+    );
+  }
+
+  if (!(background[2] > background[0])) {
+    throw new QualificationError(
+      `WebGPU background probe has unexpected channel ordering: ${JSON.stringify(background)}`,
+      'renderer',
+    );
+  }
+  if (!(polygon[0] > polygon[2] + 40 && polygon[1] > polygon[2])) {
+    throw new QualificationError(
+      `WebGPU polygon probe does not preserve the fixture's warm fill: ${JSON.stringify(polygon)}`,
+      'renderer',
+    );
+  }
+  if (!(
+    circle[2] > circle[0] + 40
+    && circle[1] > circle[0]
+  )) {
+    throw new QualificationError(
+      `WebGPU circle probe does not preserve the fixture's cool fill: ${JSON.stringify(circle)}`,
+      'renderer',
+    );
+  }
+
+  const lineBrightness = (transformedLine[0] + transformedLine[1] + transformedLine[2]) / 3;
+  if (lineBrightness < 120 || transformedLine[3] === 0) {
+    throw new QualificationError(
+      `WebGPU transformed-line probe is unexpectedly dark: ${JSON.stringify(transformedLine)}`,
+      'renderer',
+    );
+  }
+}
+
 async function blankCanvasHash(page, width, height) {
   const dataUrl = await page.evaluate(([w, h]) => {
     const canvas = document.createElement('canvas');
@@ -244,6 +327,14 @@ async function runMode(mode) {
       const blankSceneHash = await blankCanvasHash(page, 512, 512);
       const blankMovieHash = await blankCanvasHash(page, 192, 192);
 
+      const semanticSceneSamples = await canvasPixelSamples(page, '#webgpu-cognitive-canvas', [
+        { name: 'background', x: 10, y: 10 },
+        { name: 'polygon', x: 100, y: 100 },
+        { name: 'transformed-line', x: 43, y: 371 },
+        { name: 'circle', x: 360, y: 350 },
+      ]);
+      assertSemanticSceneSamples(semanticSceneSamples);
+
       if (firstSceneHash === blankSceneHash) {
         throw new QualificationError(
           'WebGPU cognitive canvas is indistinguishable from a blank canvas',
@@ -288,6 +379,7 @@ async function runMode(mode) {
         capability,
         scene_hash: firstSceneHash,
         movie_hash: firstMovieHash,
+        semantic_scene_samples: semanticSceneSamples,
         deterministic_repeat: true,
         page_errors: pageErrors,
       };
