@@ -154,6 +154,14 @@ jobs:
           WORK_LEDGER="$(printf '%s\\n' "$OUTPUT" | awk -F= '/WORK_LEDGER=/ { print $2; exit }')"
           test -n "$WORK_LEDGER"
           printf 'work_ledger=%s\\n' "$WORK_LEDGER" >> "$GITHUB_OUTPUT"
+      - name: Capture small-fixture scaling ledger
+        id: scaling
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_work_scales_over_small_structural_fixtures -- --nocapture 2>&1)"
+          SCALING_LEDGER="$(printf '%s\\n' "$OUTPUT" | awk -F= '/SCALING_LEDGER=/ { if (count++) printf "|"; printf "%s", $2 } END { if (count) print ""; }')"
+          test -n "$SCALING_LEDGER"
+          printf 'scaling_ledger=%s\\n' "$SCALING_LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Strict Clippy
         id: clippy
         run: |
@@ -184,6 +192,9 @@ jobs:
           fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
           fixture_fingerprint_schema=blake3-256-symthaea-hdc-linear-code-v1
           work_ledger_schema=linear-code-work-v1
+          scaling_ledger_schema=linear-code-scaling-v1
+          scaling_ledger_status=${{ steps.scaling.outcome }}
+          scaling_ledger=${{ steps.scaling.outputs.scaling_ledger }}
           work_ledger_status=${{ steps.work.outcome }}
           work_ledger=${{ steps.work.outputs.work_ledger }}
           rng_algorithm=rand_chacha::ChaCha12Rng
