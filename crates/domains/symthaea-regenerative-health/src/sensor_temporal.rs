@@ -398,7 +398,12 @@ mod tests {
         p.independence.topology_attestation.topology_digest.clear();
         let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
         assert_eq!(d.state, TemporalFusionState::Conflicted);
-        assert!(d.issues.contains(&TemporalFusionIssue::InvalidIndependenceProvenance));
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::TopologyIdentityMismatch
+            )
+        )));
     }
 
     #[test]
