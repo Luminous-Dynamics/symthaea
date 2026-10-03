@@ -2971,7 +2971,29 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         assert!(!columns.iter().any(|column| column == "validation_sequence"));
-        assert!(!columns.iter().any(|column| column == "receipt_digest_hex"));
+        assert!(columns.iter().any(|column| column == "receipt_digest_hex"));
+
+        let validation_digest: String = conn
+            .query_row(
+                "SELECT receipt_digest_hex
+                 FROM knowledge_snapshot_validation_receipts
+                 WHERE validation_event = 'validation:legacy'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(validation_digest, "definitely-not-a-valid-epf-011-digest");
+
+        let snapshot_digest: String = conn
+            .query_row(
+                "SELECT receipt_digest_hex
+                 FROM knowledge_snapshot_receipts
+                 WHERE generation = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(snapshot_digest, "placeholder");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
