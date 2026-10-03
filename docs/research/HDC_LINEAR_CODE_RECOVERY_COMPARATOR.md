@@ -219,6 +219,7 @@ Implemented:
 - The general API preserves factor order and returns a valid representative factorization without labeling it unique.
 - The independent API remains fail-closed on overlapping/dependent factors when a uniqueness-guaranteed decomposition is required.
 - For overlapping factors, representative recovery is deterministic for a fixed factor ordering, but the representative may change when factor order changes; permutation-invariance is not claimed.
+- Generator-basis ordering is likewise presentation-level: bounded exhaustive tests require every reordered basis presentation to preserve factor membership and the recovered XOR target, without claiming the representative coefficients are invariant.
 - The existing exhaustive two-factor oracle remains the ground truth.
 - A three-factor parent-basis-partition fixture validates exact recovery against exhaustive truth.
 - An overlap fixture now validates that representative recovery works while exhaustive enumeration demonstrates multiple valid decompositions.
