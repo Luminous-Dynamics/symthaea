@@ -10,9 +10,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::topology_resolution::TopologyBranchReference;
 use crate::topology_resolution::{
-    TopologyLifecycleResolution, TopologyResolutionDecision, TopologyResolutionGate,
+    TopologyBranchReference, TopologyLifecycleResolution, TopologyResolutionGate,
     TopologyResolutionIssue, TopologyResolutionPolicy, TopologyResolutionState,
 };
 use crate::topology_revocation::{
@@ -23,6 +22,7 @@ use crate::topology_revocation::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TopologyAuthorityState {
     Current,
+    PendingActivation,
     InsufficientEvidence,
     Conflicted,
     Revoked,
@@ -34,6 +34,7 @@ pub enum TopologyAuthorityIssue {
     Resolution(TopologyResolutionIssue),
     Revocation(TopologyRevocationIssue),
     RevocationWithoutResolvedAuthority,
+    SuccessorNotYetEffective,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -51,6 +52,7 @@ pub struct TopologyAuthorityDecision {
     pub state: TopologyAuthorityState,
     pub resolution_id: Option<String>,
     pub resolution_epoch: Option<u64>,
+    pub selected_successor_effective_from_ms: Option<u64>,
     pub preserved_branches: Vec<TopologyBranchReference>,
     pub revocation_id: Option<String>,
     pub issues: Vec<TopologyAuthorityIssue>,
@@ -100,6 +102,8 @@ impl TopologyAuthorityGate {
             state: TopologyAuthorityState::Quarantined,
             resolution_id: resolution_decision.resolution_id.clone(),
             resolution_epoch: resolution_decision.resolution_epoch,
+            selected_successor_effective_from_ms: resolution
+                .map(|item| item.selected_successor_effective_from_ms),
             preserved_branches: resolution_decision.preserved_branches.clone(),
             revocation_id: revocation.map(|item| item.revocation_id.clone()),
             issues: Vec::new(),
@@ -131,6 +135,23 @@ impl TopologyAuthorityGate {
                 ..base
             },
             TopologyResolutionState::Resolved => {
+                let Some(resolution) = resolution else {
+                    return TopologyAuthorityDecision {
+                        state: TopologyAuthorityState::Quarantined,
+                        issues,
+                        ..base
+                    };
+                };
+
+                if now_ms < resolution.selected_successor_effective_from_ms {
+                    issues.push(TopologyAuthorityIssue::SuccessorNotYetEffective);
+                    return TopologyAuthorityDecision {
+                        state: TopologyAuthorityState::PendingActivation,
+                        issues,
+                        ..base
+                    };
+                }
+
                 let Some(revocation) = revocation else {
                     return TopologyAuthorityDecision {
                         state: TopologyAuthorityState::Current,
@@ -259,12 +280,33 @@ mod tests {
     }
 
     #[test]
+    fn resolved_future_effective_topology_is_not_current() {
+        let a = branch("topology-v2a");
+        let mut r = resolution("topology-v2a", vec![a.clone()]);
+        r.selected_successor_effective_from_ms = 4_000;
+        let d = gate().assess(Some(&r), None, &[a], 3_000);
+        assert_eq!(d.state, TopologyAuthorityState::PendingActivation);
+        assert!(d
+            .issues
+            .contains(&TopologyAuthorityIssue::SuccessorNotYetEffective));
+    }
+
+    #[test]
     fn valid_revocation_overrides_resolved_authority() {
         let a = branch("topology-v2a");
         let r = resolution("topology-v2a", vec![a.clone()]);
         let d = gate().assess(Some(&r), Some(&revocation()), &[a], 3_001);
         assert_eq!(d.state, TopologyAuthorityState::Revoked);
         assert_eq!(d.revocation_id.as_deref(), Some("revocation-2"));
+    }
+
+    #[test]
+    fn revocation_does_not_make_future_topology_current() {
+        let a = branch("topology-v2a");
+        let mut r = resolution("topology-v2a", vec![a.clone()]);
+        r.selected_successor_effective_from_ms = 4_000;
+        let d = gate().assess(Some(&r), Some(&revocation()), &[a], 3_001);
+        assert_eq!(d.state, TopologyAuthorityState::PendingActivation);
     }
 
     #[test]
