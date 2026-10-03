@@ -62,6 +62,10 @@ pub struct SensorIndependenceBinding {
     /// Stable physical/common-mode dependency domain.
     pub independence_group: String,
     /// Qualified topology/dependency declaration governing this binding.
+    /// Topology state governing the previous observation. When present, this
+    /// permits an explicit lifecycle transition to the current topology epoch.
+    pub previous_topology_attestation: Option<SensorTopologyAttestation>,
+    /// Topology state governing the current observation.
     pub topology_attestation: SensorTopologyAttestation,
 }
 
@@ -164,6 +168,41 @@ impl TemporalFusionGate {
                     SensorTopologyAttestationIssue::TopologyIdentityMismatch,
                 ));
                 continue;
+            }
+
+            if let Some(previous_topology) = &pair.independence.previous_topology_attestation {
+                if let Err(issue) = previous_topology.validate(
+                    &self.policy.expected_asset_id,
+                    &self.policy.expected_component_id,
+                    &pair.previous.configuration_digest,
+                    &self.policy.expected_attestation_issuer_id,
+                    pair.previous.timestamp_ms,
+                ) {
+                    issues.push(TemporalFusionIssue::TopologyAttestation(issue));
+                    continue;
+                }
+
+                let current_topology = &pair.independence.topology_attestation;
+                if current_topology.epoch_binding.epoch < previous_topology.epoch_binding.epoch {
+                    issues.push(TemporalFusionIssue::TopologyAttestation(
+                        SensorTopologyAttestationIssue::TopologyEpochRollback,
+                    ));
+                    continue;
+                }
+
+                if current_topology.epoch_binding.epoch > previous_topology.epoch_binding.epoch {
+                    if current_topology.epoch_binding.epoch
+                        != previous_topology.epoch_binding.epoch.saturating_add(1)
+                        || current_topology.epoch_binding.predecessor_topology_digest.as_deref()
+                            != Some(previous_topology.topology_digest.as_str())
+                        || current_topology.epoch_binding.effective_from_ms > pair.current.timestamp_ms
+                    {
+                        issues.push(TemporalFusionIssue::TopologyAttestation(
+                            SensorTopologyAttestationIssue::InvalidEpochTransition,
+                        ));
+                        continue;
+                    }
+                }
             }
 
             if let Err(issue) = pair.independence.topology_attestation.validate(
