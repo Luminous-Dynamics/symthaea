@@ -551,13 +551,16 @@ impl Rfc9942ReceiptEnvelope {
         // Keep the legacy head-returning API on the same proof-derived semantic
         // path as the capability-returning verifier. This prevents callers from
         // accidentally making detached roots authoritative merely by supplying them.
-        self.verify_es256_inclusion_state(
+        let state = self.verify_es256_inclusion_state(
             candidate_entry,
             public_key,
             external_aad,
             detached_payload,
-        )
-        .map(|state| state.proof().inclusion_head().expect("inclusion state"))
+        )?;
+        state
+            .proof()
+            .inclusion_head()
+            .ok_or(Rfc9942VdpError::WrongProofKind)
     }
 
     /// Verify an RFC9942 consistency Receipt with ES256: signature first,
