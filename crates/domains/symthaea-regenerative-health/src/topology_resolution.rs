@@ -92,6 +92,8 @@ pub struct TopologyResolutionDecision {
     /// lifecycle does not erase competing statements.
     pub preserved_branches: Vec<TopologyBranchReference>,
     pub resolution_id: Option<String>,
+    pub resolution_epoch: Option<u64>,
+    pub authority_statement_digest: Option<String>,
     pub issues: Vec<TopologyResolutionIssue>,
 }
 
@@ -168,6 +170,8 @@ impl TopologyResolutionGate {
                 selected_successor: None,
                 preserved_branches: unique_observed.into_iter().collect(),
                 resolution_id: None,
+                resolution_epoch: None,
+                authority_statement_digest: None,
                 issues,
             };
         };
@@ -268,6 +272,8 @@ impl TopologyResolutionGate {
                 selected_successor: Some(selected),
                 preserved_branches: unique_observed.into_iter().collect(),
                 resolution_id: Some(resolution.resolution_id.clone()),
+                resolution_epoch: Some(resolution.resolution_epoch),
+                authority_statement_digest: Some(resolution.authority_statement_digest.clone()),
                 issues,
             }
         } else {
@@ -278,6 +284,8 @@ impl TopologyResolutionGate {
                 selected_successor: None,
                 preserved_branches: unique_observed.into_iter().collect(),
                 resolution_id: Some(resolution.resolution_id.clone()),
+                resolution_epoch: Some(resolution.resolution_epoch),
+                authority_statement_digest: Some(resolution.authority_statement_digest.clone()),
                 issues,
             }
         }
@@ -377,6 +385,17 @@ mod tests {
         let d = gate().assess(Some(&r), &[a.clone(), b.clone()], 3_000);
         assert_eq!(d.state, TopologyResolutionState::Resolved);
         assert_eq!(d.preserved_branches, vec![a, b]);
+    }
+
+    #[test]
+    fn resolved_decision_exposes_authority_chain_identity() {
+        let a = branch("topology-v2a");
+        let r = resolution("topology-v2a", vec![a.clone()]);
+        let d = gate().assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Resolved);
+        assert_eq!(d.resolution_id.as_deref(), Some("resolution-2"));
+        assert_eq!(d.resolution_epoch, Some(1));
+        assert_eq!(d.authority_statement_digest.as_deref(), Some("resolution-digest-2"));
     }
 
     #[test]
