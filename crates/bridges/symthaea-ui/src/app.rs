@@ -45,7 +45,7 @@ struct Vitals {
     moral_score: f64,
     coherence: f64,
     gwt_broadcast: bool,
-    dream_insights: usize,
+    dream_insights: u64,
     surprise_triggered: bool,
     reasoning_confidence: f32,
 }
@@ -69,7 +69,7 @@ impl Vitals {
             moral_score: f64_at("value_evaluator_score"),
             coherence: f64_at("harmonic_field_coherence"),
             gwt_broadcast: v["gwt_broadcast"].as_bool().unwrap_or(false),
-            dream_insights: v["dream_insights"].as_u64().unwrap_or(0) as usize,
+            dream_insights: v["dream_insights"].as_u64().unwrap_or(0),
             surprise_triggered: v["surprise_triggered"].as_bool().unwrap_or(false),
             reasoning_confidence: f64_at("reasoning_confidence") as f32,
         }
