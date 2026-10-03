@@ -261,10 +261,10 @@ jobs:
           packing_boundary=${{ steps.packing.outputs.packing_boundary }}
           work_ledger_status=${{ steps.work.outcome }}
           work_ledger=${{ steps.work.outputs.work_ledger }}
-          geometry_ledger_schema=linear-code-geometry-v1
+          geometry_ledger_schema=linear-code-geometry-v2
           geometry_ledger_status=${{ steps.geometry.outcome }}
           geometry_ledger=${{ steps.geometry.outputs.geometry_ledger }}
-          geometry_sweep_schema=linear-code-geometry-sweep-v1
+          geometry_sweep_schema=linear-code-geometry-sweep-v2
           geometry_sweep_status=${{ steps.geometry_sweep.outcome }}
           geometry_sweep=${{ steps.geometry_sweep.outputs.geometry_sweep }}
           rng_algorithm=rand_chacha::ChaCha12Rng
