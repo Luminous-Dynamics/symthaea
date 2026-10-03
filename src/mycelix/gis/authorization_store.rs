@@ -109,6 +109,8 @@ impl Default for AuthorizationClockPolicy {
 }
 
 impl AuthorizationClockPolicy {
+    const CLOCK_SOURCE_ID: &'static str = "system-utc-wall-clock-v1";
+
     fn validate_configuration(&self) -> Result<(), AuthorizationStoreError> {
         if self.max_age_seconds == 0 || self.allowed_skew_seconds > self.max_age_seconds {
             return Err(AuthorizationStoreError::InvalidState(
@@ -121,6 +123,7 @@ impl AuthorizationClockPolicy {
     fn digest(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.update(b"symthaea:gis:authorization-clock-policy:v1\n");
+        hasher.update(Self::CLOCK_SOURCE_ID.as_bytes());
         hasher.update(self.max_age_seconds.to_be_bytes());
         hasher.update(self.allowed_skew_seconds.to_be_bytes());
         hasher.update([self.require_expiry as u8]);
@@ -173,6 +176,7 @@ impl AuthorizationClockPolicy {
 }
 
 fn trusted_utc_now() -> Result<DateTime<Utc>, AuthorizationStoreError> {
+    // This explicit UTC wall-clock source is committed into the policy digest.
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| AuthorizationStoreError::InvalidState(
