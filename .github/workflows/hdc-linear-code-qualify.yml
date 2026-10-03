@@ -162,6 +162,14 @@ jobs:
           test -n "$SCALING_LEDGER"
           printf 'scaling_ledger=%s\\n' "$SCALING_LEDGER" >> "$GITHUB_OUTPUT"
 
+      - name: Capture packing-boundary qualification
+        id: packing
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_crosses_u64_packing_boundaries -- --nocapture 2>&1)"
+          PACKING_BOUNDARY="$(printf '%s\\n' "$OUTPUT" | awk -F= '/PACKING_BOUNDARY=/ { if (count++) printf "|"; printf "%s", $2 } END { if (count) print ""; }')"
+          test -n "$PACKING_BOUNDARY"
+          printf 'packing_boundary=%s\\n' "$PACKING_BOUNDARY" >> "$GITHUB_OUTPUT"
+
       - name: Strict Clippy
         id: clippy
         run: |
@@ -195,6 +203,9 @@ jobs:
           scaling_ledger_schema=linear-code-scaling-v1
           scaling_ledger_status=${{ steps.scaling.outcome }}
           scaling_ledger=${{ steps.scaling.outputs.scaling_ledger }}
+          packing_boundary_schema=linear-code-packing-v1
+          packing_boundary_status=${{ steps.packing.outcome }}
+          packing_boundary=${{ steps.packing.outputs.packing_boundary }}
           work_ledger_status=${{ steps.work.outcome }}
           work_ledger=${{ steps.work.outputs.work_ledger }}
           rng_algorithm=rand_chacha::ChaCha12Rng
