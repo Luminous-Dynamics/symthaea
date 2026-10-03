@@ -349,7 +349,7 @@ action.
 
 ## Interoperability and canonicalization
 
-The v0.2 Rust crate uses deterministic serde/JSON serialization for its internal
+The v0.3 Rust crate uses deterministic serde/JSON serialization for its internal
 preview digests. This is sufficient to bind objects inside the same
 implementation, but it is deliberately **not** presented as a cross-language
 cryptographic canonicalization standard.
@@ -368,7 +368,9 @@ content-addressable artifacts and platform-specific image variants. The
 compiler should bind these references into its plan rather than inventing
 parallel provenance semantics.
 
-## New invariants in the v0.2 prototype
+## New invariants in the v0.3 prototype
+
+The current v0.3 preview adds the neutral `ObserveState` semantic capability, explicit verification-policy construction, future-dated observation rejection, and receipt-side attestation evidence validation. These changes alter serialized capability values and therefore intentionally advance the schema from v0.2 to v0.3.
 
 Authorization validation now requires:
 
