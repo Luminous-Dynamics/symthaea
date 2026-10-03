@@ -1586,4 +1586,100 @@ mod tests {
             "frame@2"
         );
     }
+
+    #[test]
+    fn authorization_validity_requires_finite_window() {
+        let action = EpistemicAction::new("validity-test", "effect", ActionRisk::Critical);
+        let digest = action.canonical_action_digest();
+        let mut lease = AuthorizationLease::new_with_instance(
+            "auth-validity",
+            action.id.clone(),
+            digest.clone(),
+            "support",
+            "policy",
+            1,
+            1,
+        );
+        let witness = ActionAuthorizationWitness {
+            action_id: action.id,
+            authorization_instance: "auth-validity".into(),
+            action_digest: digest,
+            frame: "frame@1".into(),
+            support_digest: "support".into(),
+            policy: "policy".into(),
+            decision: "execute".into(),
+            issued_at: chrono::Utc::now().to_rfc3339(),
+            expires_at: None,
+            authority_epoch: 1,
+        };
+        assert!(matches!(
+            lease.freeze_validity(&witness),
+            Err(AuthorizationConsumptionError::AuthorizationValidityMissing)
+        ));
+    }
+
+    #[test]
+    fn authorization_validity_rejects_future_and_expired_windows() {
+        let action = EpistemicAction::new("validity-window-test", "effect", ActionRisk::Critical);
+        let digest = action.canonical_action_digest();
+        let mut lease = AuthorizationLease::new_with_instance(
+            "auth-validity-window",
+            action.id.clone(),
+            digest.clone(),
+            "support",
+            "policy",
+            1,
+            1,
+        );
+        let now = chrono::Utc::now();
+        let future = ActionAuthorizationWitness {
+            action_id: action.id.clone(),
+            authorization_instance: "auth-validity-window".into(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "support".into(),
+            policy: "policy".into(),
+            decision: "execute".into(),
+            issued_at: (now + chrono::Duration::minutes(1)).to_rfc3339(),
+            expires_at: Some((now + chrono::Duration::minutes(2)).to_rfc3339()),
+            authority_epoch: 1,
+        };
+        lease.freeze_validity(&future).unwrap();
+        assert!(matches!(
+            lease.validate_validity_now(),
+            Err(AuthorizationConsumptionError::AuthorizationNotYetValid)
+        ));
+
+        lease.issued_at = (now - chrono::Duration::minutes(2)).to_rfc3339();
+        lease.expires_at = Some((now - chrono::Duration::minutes(1)).to_rfc3339());
+        assert!(matches!(
+            lease.validate_validity_now(),
+            Err(AuthorizationConsumptionError::AuthorizationExpired)
+        ));
+    }
+
+    #[test]
+    fn expired_pre_entry_cannot_transition_to_provider_entry() {
+        let action = EpistemicAction::new("validity-expiry-fence", "effect", ActionRisk::Critical);
+        let digest = action.canonical_action_digest();
+        let mut lease = AuthorizationLease::new_with_instance(
+            "auth-expiry-fence",
+            action.id,
+            digest,
+            "support",
+            "policy",
+            1,
+            1,
+        );
+        lease.state = AuthorizationLeaseState::DispatchPending {
+            attempt_id: "attempt-expired".into(),
+        };
+        assert!(lease.expire_before_entry("attempt-expired").is_ok());
+        assert!(matches!(lease.state, AuthorizationLeaseState::Expired));
+        assert!(matches!(
+            lease.mark_invoked("attempt-expired"),
+            Err(AuthorizationConsumptionError::AttemptMismatch)
+        ));
+    }
+
 }
