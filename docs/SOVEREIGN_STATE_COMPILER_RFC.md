@@ -287,7 +287,23 @@ SSC distinguishes four evidence moments rather than collapsing them into one
 
 The post-state digest is allowed to differ from the pre-state digest because a
 successful deployment is expected to change state. Verification semantics
-determine whether that change matches the exact expected desired state.
+determine whether that change matches the exact expected desired state **and
+the intended transition disposition**.
+
+The neutral disposition vocabulary is deliberately small:
+
+- **Applied** — the requested state became the resulting applied state;
+- **TemporarilyApplied** — the requested state was applied only for a bounded/test transition;
+- **SelectedForNextActivation** — the requested state was selected for a future activation but is not claimed active now;
+- **NotActivated** — the requested state was evaluated without activation;
+- **Unchanged** — no state transition was requested and existing state should remain;
+- **RollbackTarget** — an explicitly identified prior state was reached as the rollback target.
+
+Target adapters map native mechanisms into these dispositions. The neutral core
+does not encode NixOS terms such as "generation" or "bootloader". The
+disposition is part of the compiled plan digest, so authorization covers not
+only the desired values but also the kind of transition the verifier must
+prove.
 
 This gives the eventual standalone protocol a clean evidence chain without
 requiring the core to trust a platform-specific command log.
@@ -315,7 +331,7 @@ action.
 
 ## Interoperability and canonicalization
 
-The v0.1 Rust crate uses deterministic serde/JSON serialization for its internal
+The v0.2 Rust crate uses deterministic serde/JSON serialization for its internal
 preview digests. This is sufficient to bind objects inside the same
 implementation, but it is deliberately **not** presented as a cross-language
 cryptographic canonicalization standard.
@@ -334,7 +350,7 @@ content-addressable artifacts and platform-specific image variants. The
 compiler should bind these references into its plan rather than inventing
 parallel provenance semantics.
 
-## New invariants in the v0.1 prototype
+## New invariants in the v0.2 prototype
 
 Authorization validation now requires:
 
@@ -349,7 +365,8 @@ Authorization validation now requires:
 - no granted capability may be unrelated to the compiled authority requirements;
 - artifact and external attestation references must carry concrete digests and
   non-empty reference metadata;
-- verification carries exact expected state values rather than property names alone;
+- verification carries exact expected state values and a typed transition disposition rather than property names alone;
+- the transition disposition is included in the compiled plan digest and therefore in authorization;
 - execution receipts bind the exact authorized plan, pre-execution snapshot, and
   post-execution observation;
 - receipt timestamps must remain within the authorization validity window.
