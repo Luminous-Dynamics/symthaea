@@ -1427,7 +1427,10 @@ mod tests {
 
     #[test]
     fn large_nested_transform_keeps_line_geometry_finite() {
-        let mut root = SceneNode::line(0.0, 0.0, 1.0, 1.0);
+        let mut root = SceneNode::line(0.0, 0.0, 1.0, 1.0).with_style(Style {
+            stroke: Some(Color::rgb(1.0, 1.0, 1.0)),
+            ..Style::default()
+        });
         for _ in 0..24 {
             root = SceneNode::group(None)
                 .with_transform(Transform {
