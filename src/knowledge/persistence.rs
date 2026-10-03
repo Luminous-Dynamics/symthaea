@@ -1771,6 +1771,15 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Validation schema migration receipt_digest_hex: {e}"))?;
         }
 
+        // Existing databases may already have the append-only validation trigger from
+        // the immediately preceding tranche. Drop that trigger inside this same atomic
+        // migration transaction so a legacy v1 self-digest can be upgraded; if any later
+        // migration step fails, the transaction rollback restores the trigger unchanged.
+        tx.execute_batch(
+            "DROP TRIGGER IF EXISTS trg_knowledge_snapshot_validation_receipts_no_update;",
+        )
+        .map_err(|e| format!("Schema validation receipt migration guard: {e}"))?;
+
         // Normalize every persisted validation receipt to the current sequence-bound
         // v2 self-digest. Rows from the immediately preceding tranche use v1; rows
         // without a digest are deterministically initialized from their existing fields.
@@ -3682,6 +3691,173 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+
+    #[test]
+    fn test_schema_migration_upgrades_sequence_bound_digest_behind_existing_append_only_trigger() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_validation_digest_v1_trigger_migration_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let canonical_digest = "c".repeat(64);
+        let legacy_receipt = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:legacy-v1".into(),
+            generation: 1,
+            snapshot_digest_hex: canonical_digest.clone(),
+            validator_ref: "legacy-validator".into(),
+            validator_version: "v1".into(),
+            validation_profile: "legacy-profile".into(),
+            conforms: true,
+            report_digest_hex: None,
+        };
+        let legacy_digest = legacy_receipt.legacy_canonical_digest_hex();
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id TEXT,
+                    canonical_identity TEXT,
+                    provenance_family TEXT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                CREATE TABLE knowledge_causal_edges (
+                    cause TEXT NOT NULL,
+                    effect TEXT NOT NULL,
+                    strength REAL NOT NULL,
+                    is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                    cycle INTEGER NOT NULL,
+                    PRIMARY KEY (cause, effect)
+                );
+                CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT
+                );
+                CREATE TABLE knowledge_snapshot_receipts (
+                    generation INTEGER PRIMARY KEY AUTOINCREMENT,
+                    canonical_digest_hex TEXT NOT NULL,
+                    receipt_digest_hex TEXT NOT NULL CHECK (length(receipt_digest_hex) = 64)
+                );
+                CREATE TABLE knowledge_snapshot_validation_receipts (
+                    validation_event TEXT PRIMARY KEY,
+                    validation_sequence INTEGER NOT NULL UNIQUE CHECK (validation_sequence > 0),
+                    generation INTEGER NOT NULL,
+                    snapshot_digest_hex TEXT NOT NULL,
+                    validator_ref TEXT NOT NULL,
+                    validator_version TEXT NOT NULL,
+                    validation_profile TEXT NOT NULL,
+                    conforms INTEGER NOT NULL CHECK (conforms IN (0, 1)),
+                    report_digest_hex TEXT,
+                    receipt_digest_hex TEXT NOT NULL CHECK (length(receipt_digest_hex) = 64),
+                    FOREIGN KEY (generation) REFERENCES knowledge_snapshot_receipts(generation)
+                );
+                CREATE INDEX idx_snapshot_validation_receipts_generation
+                    ON knowledge_snapshot_validation_receipts(generation, validation_event);
+                CREATE INDEX idx_facts_domain ON knowledge_facts(domain);
+                CREATE INDEX idx_facts_cycle ON knowledge_facts(cycle);
+                CREATE UNIQUE INDEX idx_facts_memory_id_unique
+                    ON knowledge_facts(memory_id);
+                CREATE UNIQUE INDEX idx_snapshot_validation_receipts_sequence_unique
+                    ON knowledge_snapshot_validation_receipts(validation_sequence);
+                CREATE TRIGGER trg_knowledge_snapshot_validation_receipts_no_update
+                BEFORE UPDATE ON knowledge_snapshot_validation_receipts
+                BEGIN
+                    SELECT RAISE(ABORT, 'knowledge_snapshot_validation_receipts is append-only: UPDATE prohibited');
+                END;
+                CREATE TRIGGER trg_knowledge_snapshot_validation_receipts_no_delete
+                BEFORE DELETE ON knowledge_snapshot_validation_receipts
+                BEGIN
+                    SELECT RAISE(ABORT, 'knowledge_snapshot_validation_receipts is append-only: DELETE prohibited');
+                END;",
+            )
+            .unwrap();
+
+            conn.execute(
+                "INSERT INTO knowledge_snapshot_receipts
+                 (generation, canonical_digest_hex, receipt_digest_hex)
+                 VALUES (1, ?1, ?2)",
+                rusqlite::params![
+                    canonical_digest.as_str(),
+                    KnowledgeSnapshotReceipt {
+                        generation: 1,
+                        canonical_digest_hex: canonical_digest.clone(),
+                        receipt_digest_hex: String::new(),
+                    }
+                    .canonical_receipt_digest_hex(),
+                ],
+            )
+            .unwrap();
+
+            conn.execute(
+                "INSERT INTO knowledge_snapshot_validation_receipts
+                 (validation_event, validation_sequence, generation, snapshot_digest_hex,
+                  validator_ref, validator_version, validation_profile, conforms,
+                  report_digest_hex, receipt_digest_hex)
+                 VALUES (?1, 1, 1, ?2, ?3, ?4, ?5, 1, NULL, ?6)",
+                rusqlite::params![
+                    legacy_receipt.validation_event.as_str(),
+                    legacy_receipt.snapshot_digest_hex.as_str(),
+                    legacy_receipt.validator_ref.as_str(),
+                    legacy_receipt.validator_version.as_str(),
+                    legacy_receipt.validation_profile.as_str(),
+                    legacy_digest.as_str(),
+                ],
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let conn = p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+
+        let stored_digest: String = conn
+            .query_row(
+                "SELECT receipt_digest_hex
+                 FROM knowledge_snapshot_validation_receipts
+                 WHERE validation_event = 'validation:legacy-v1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            stored_digest,
+            legacy_receipt.canonical_digest_hex_for_sequence(1)
+        );
+
+        let blocked = conn
+            .execute(
+                "UPDATE knowledge_snapshot_validation_receipts
+                 SET validator_version = 'blocked'
+                 WHERE validation_event = 'validation:legacy-v1'",
+                [],
+            )
+            .unwrap_err();
+        assert!(blocked.to_string().contains("UPDATE prohibited"));
+
+        p.verify_snapshot_validation_receipts().unwrap();
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_schema_migration_rejects_malformed_legacy_validation_metadata() {
