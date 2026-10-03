@@ -251,7 +251,7 @@ impl Default for DeploymentDisposition {
 }
 
 /// Policy describing what evidence must be observed after execution.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationPolicy {
     /// Exact desired-state values that the executor must verify after mutation.
     ///
@@ -302,6 +302,20 @@ pub struct DeploymentPlan {
     pub steps: Vec<PlanStep>,
     pub verification: VerificationPolicy,
     pub rollback: RollbackPolicy,
+}
+
+impl VerificationPolicy {
+    pub fn new(
+        expected_state: DesiredState,
+        disposition: DeploymentDisposition,
+        require_attestation: bool,
+    ) -> Self {
+        Self {
+            expected_state,
+            disposition,
+            require_attestation,
+        }
+    }
 }
 
 impl DeploymentPlan {
@@ -540,6 +554,19 @@ impl ExecutionReceipt {
             return Err(ReceiptValidationError::MissingVerificationEvidence);
         }
 
+        for evidence in &self.evidence {
+            if evidence.media_type.is_empty()
+                || evidence.uri.is_empty()
+                || !has_concrete_digest(Some(&evidence.digest))
+            {
+                return Err(ReceiptValidationError::InvalidAttestationEvidence);
+            }
+        }
+
+        if plan.plan.verification.require_attestation && self.evidence.is_empty() {
+            return Err(ReceiptValidationError::MissingAttestationEvidence);
+        }
+
         Ok(())
     }
 
@@ -588,6 +615,10 @@ pub enum ReceiptValidationError {
     FinishedAfterAuthorizationExpiry,
     #[error("postcondition claims a verified result but carries no concrete verification evidence digest")]
     MissingVerificationEvidence,
+    #[error("required attestation verification carries no attestation evidence")]
+    MissingAttestationEvidence,
+    #[error("execution receipt carries incomplete attestation evidence")]
+    InvalidAttestationEvidence,
     #[error("canonical serialization failed: {0}")]
     Serialization(serde_json::Error),
 }
@@ -960,7 +991,11 @@ mod tests {
                     description: "verify target state".into(),
                 },
             ],
-            verification: VerificationPolicy::default(),
+            verification: VerificationPolicy {
+                expected_state: DesiredState::default(),
+                disposition: DeploymentDisposition::Applied,
+                require_attestation: false,
+            },
             rollback: RollbackPolicy {
                 allowed: true,
                 max_attempts: 1,
@@ -1576,6 +1611,67 @@ mod tests {
         assert_eq!(
             receipt.validate_for(&authorized),
             Err(ReceiptValidationError::MissingVerificationEvidence)
+        );
+    }
+
+    #[test]
+    fn required_attestation_needs_concrete_receipt_evidence() {
+        let mut plan = sample_plan();
+        plan.verification.require_attestation = true;
+        plan.target_snapshot
+            .profile
+            .capabilities
+            .insert(Capability::AttestState);
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
+            started_at_ms: 151,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Satisfied,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::MissingAttestationEvidence)
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_incomplete_attestation_evidence() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
+            started_at_ms: 151,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Satisfied,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+            evidence: vec![AttestationRef {
+                media_type: "application/json".into(),
+                uri: String::new(),
+                digest: ContentDigest::blake3(b"attestation"),
+            }],
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::InvalidAttestationEvidence)
         );
     }
 
