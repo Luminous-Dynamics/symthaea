@@ -574,11 +574,19 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        self.verify_es256(public_key,external_aad,detached_payload)?;
-        match detached_payload {
-            Some(payload)=>self.verify_consistency_with_detached_payload(older,payload),
-            None=>self.verify_consistency(older),
-        }
+        // Keep the legacy head-returning API on the same signature-first
+        // semantic path as the capability-returning verifier.
+        let state = self.verify_es256_consistency_state(
+            older,
+            public_key,
+            external_aad,
+            detached_payload,
+        )?;
+        state
+            .proof()
+            .consistency_heads()
+            .map(|(_, newer)| newer)
+            .ok_or(Rfc9942VdpError::WrongProofKind)
     }
 
     /// Return a single semantic verification capability for an inclusion
