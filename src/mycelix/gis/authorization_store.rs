@@ -2365,8 +2365,6 @@ fn validate_native_authority_pin_set(
             && row.3 == record.native_authority_namespace
             && row.4 == record.native_authorization_id
             && row.5 == record.native_replay_derivation_digest
-            && row.6 == record.native_authority_pin_set_id
-            && row.7 == record.native_authority_pin_set_digest
             && row.8 == self.relying_party_id
             && row.9 == record.action_id
             && row.10 == record.action_digest
@@ -6170,6 +6168,57 @@ mod tests {
                 AuthorizationConsumptionError::InvalidBinding
             ))
         ));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_record_splicing_is_rejected_before_settlement() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-record-splice-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open_with_relying_party(&path, "rp-test").unwrap();
+        let mut connection = store.connection().unwrap();
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        tx.execute(
+            "INSERT INTO authorization_dispatches
+             (authorization_instance,attempt_id,operation_id,native_replay_identity,
+              native_issuer,native_authority_namespace,native_authorization_id,
+              action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,
+              boundary_id,state,relying_party_id)
+             VALUES ('auth','attempt','op-A','replay-A','issuer','ns','native-A',
+                     'action','digest','provider-key-A','target-A','audience-A','adapter-A',
+                     'boundary','invoked','rp-test')",
+            [],
+        ).unwrap();
+
+        let record = DurableDispatchRecord {
+            authorization_instance: "auth".into(),
+            attempt_id: "attempt".into(),
+            operation_id: "op-B".into(),
+            native_replay_identity: "replay-A".into(),
+            native_issuer: "issuer".into(),
+            native_authority_namespace: "ns".into(),
+            native_authorization_id: "native-A".into(),
+            status_identifier: "status".into(),
+            status_source_digest: "source".into(),
+            status_observed_at: "2026-10-03T10:00:00Z".into(),
+            status_valid_until: "2026-10-03T11:00:00Z".into(),
+            status_evidence_digest: "status-digest".into(),
+            action_id: "action".into(),
+            action_digest: "digest".into(),
+            provider_idempotency_key: "provider-key-A".into(),
+            target_identity: "target-A".into(),
+            audience: "audience-A".into(),
+            adapter: "adapter-A".into(),
+            boundary_id: "boundary".into(),
+        };
+
+        let err = store.validate_persisted_dispatch_record(&tx, &record).unwrap_err();
+        assert!(matches!(err, AuthorizationStoreError::Consumption(
+            AuthorizationConsumptionError::InvalidBinding
+        )));
+        tx.rollback().unwrap();
         let _ = std::fs::remove_file(path);
     }
 
