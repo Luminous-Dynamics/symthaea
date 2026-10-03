@@ -36,12 +36,12 @@ pub struct FreshnessAnchorCapabilities {
 impl FreshnessAnchorCapabilities {
     pub const fn software_only() -> Self {
         Self {
-            integrity_protected: true,
+            integrity_protected: false,
             authenticated: false,
             monotonic: false,
             rollback_resistant: false,
             atomic_update: false,
-            crash_persistent: true,
+            crash_persistent: false,
         }
     }
 
@@ -155,6 +155,11 @@ impl FreshnessAnchorProfile {
         if provenance.trim().is_empty() {
             return Err("anchor provenance must not be empty");
         }
+        if matches!(backing, FreshnessAnchorBacking::SoftwareOnly)
+            && capabilities.is_authoritative()
+        {
+            return Err("software-only backing cannot declare authoritative capabilities");
+        }
 
         Ok(Self {
             schema_version: "0.1".into(),
@@ -192,15 +197,12 @@ mod tests {
     #[test]
     fn software_only_anchor_is_explicitly_non_authoritative() {
         let capabilities = FreshnessAnchorCapabilities::software_only();
-        assert_eq!(
-            capabilities.assurance(),
-            FreshnessAnchorAssurance::IntegrityOnly
-        );
+        assert_eq!(capabilities.assurance(), FreshnessAnchorAssurance::Untrusted);
         assert!(!capabilities.is_authoritative());
         assert!(capabilities.require_authoritative().is_err());
         assert!(capabilities
             .missing_authoritative_capabilities()
-            .contains(&FreshnessAnchorCapability::RollbackResistance));
+            .contains(&FreshnessAnchorCapability::IntegrityProtection));
     }
 
     #[test]
@@ -244,6 +246,16 @@ mod tests {
             FreshnessAnchorBacking::RemoteAuthority,
             FreshnessAnchorCapabilities::authoritative(),
             " "
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn software_only_backing_cannot_declare_authoritative_capabilities() {
+        assert!(FreshnessAnchorProfile::new(
+            FreshnessAnchorBacking::SoftwareOnly,
+            FreshnessAnchorCapabilities::authoritative(),
+            "local-file"
         )
         .is_err());
     }
