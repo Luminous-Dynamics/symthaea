@@ -2278,7 +2278,10 @@ mod tests {
         ));
         let normalized_a=normalize_native_issuer("HTTPS://Issuer.Example.:443/");
         let normalized_b=normalize_native_issuer("https://issuer.example");
+        let normalized_short_url=normalize_native_issuer("https:issuer.example");
+        let normalized_explicit_url=normalize_native_issuer("https://issuer.example");
         assert_eq!(normalized_a,normalized_b);
+        assert_eq!(normalized_short_url,normalized_explicit_url);
 
         let _=std::fs::remove_file(path);
     }
