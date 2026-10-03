@@ -758,6 +758,38 @@ fn validate_native_authority_pin_set(
         Ok((pin_set_id, pin_set_digest))
     }
 
+    fn validate_native_authority_pin_binding(
+        &self,
+        tx: &Transaction<'_>,
+        issuer: Option<&str>,
+        authority_namespace: Option<&str>,
+    ) -> Result<(), AuthorizationStoreError> {
+        let (Some(issuer), Some(namespace)) = (issuer, authority_namespace) else {
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+        };
+        let normalized = normalize_native_issuer(issuer);
+        let mut stmt = tx.prepare(
+            "SELECT issuer,authority_namespace
+             FROM authorization_native_authority_pins",
+        )?;
+        let mut rows = stmt.query([])?;
+        let mut matched = false;
+        while let Some(row) = rows.next()? {
+            let pinned_issuer: String = row.get(0)?;
+            let pinned_namespace: String = row.get(1)?;
+            if normalize_native_issuer(&pinned_issuer) == normalized {
+                if pinned_namespace != namespace {
+                    return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+                }
+                matched = true;
+            }
+        }
+        if !matched {
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+        }
+        Ok(())
+    }
+
     fn validate_native_authority_pin_set_snapshot(
         &self,
         tx: &Transaction<'_>,
@@ -1039,6 +1071,7 @@ fn validate_native_authority_pin_set(
             boundary_id,
             operation_id,
             &replay.native_replay_identity,
+            issuer,
             &replay,
         )
     }
@@ -1081,12 +1114,14 @@ fn validate_native_authority_pin_set(
         boundary_id: &str,
         operation_id: &str,
         native_replay_identity: &str,
+        native_issuer: &str,
         native_replay_provenance: &super::NativeReplayDerivation,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         if action.effect_binding.as_ref() != Some(expected_effect)
             || boundary_id.is_empty()
             || operation_id.is_empty()
             || native_replay_identity.is_empty()
+            || native_issuer.is_empty()
             || native_replay_provenance.authority_namespace.is_empty()
             || native_replay_provenance.native_authorization_id.is_empty()
             || native_replay_provenance.derivation_digest.is_empty()
@@ -1226,14 +1261,15 @@ fn validate_native_authority_pin_set(
         tx.execute(
             "INSERT INTO authorization_dispatches
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
-              native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+              native_issuer,native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
               native_authority_pin_set_id,native_authority_pin_set_digest,
               validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,
               action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,'dispatch_pending')",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,'dispatch_pending')",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity,
+                native_issuer,
                 native_replay_provenance.authority_namespace.as_str(),
                 native_replay_provenance.native_authorization_id.as_str(),
                 native_replay_provenance.derivation_digest.as_str(),
@@ -2726,6 +2762,64 @@ mod tests {
             |r| r.get(0)
         ).unwrap();
         assert_eq!(adapter,record.adapter);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn native_issuer_provenance_is_persisted_and_validated() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-native-issuer-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-native-issuer","prod","adapter-native-issuer"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"native-issuer".into(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T07:00:00Z".into(),
+            expires_at:Some("2026-10-04T07:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-native-issuer","boundary-native-issuer"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_from_native_authority_for_test(
+            &store,&witness.authorization_instance,"attempt-native-issuer",
+            &action,&effect,"boundary-native-issuer","operation:native-issuer",
+            "https://issuer.example","native-auth-native-issuer"
+        ).unwrap();
+
+        let issuer:String=store.connection().unwrap().query_row(
+            "SELECT native_issuer FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(issuer,"https://issuer.example");
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_dispatches SET native_issuer='https://other.example'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+        assert!(matches!(
+            store.mark_invoked_bound(&record),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidNativeReplayProvenance
+            ))
+        ));
         let _=std::fs::remove_file(path);
     }
 
