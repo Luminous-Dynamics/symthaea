@@ -476,42 +476,49 @@ impl SqliteAuthorizationStore {
     }
 
 fn normalize_native_issuer(issuer: &str) -> String {
-    let candidate = if issuer.len() > 5 {
-        let lower = issuer.as_bytes();
-        let http = lower[..5].eq_ignore_ascii_case(b"http:");
-        let https = issuer.len() > 6 && lower[..6].eq_ignore_ascii_case(b"https:");
-        if (http || https) && !issuer[issuer.find(':').unwrap_or(0) + 1..].starts_with("//") {
-            let colon = issuer.find(':').unwrap_or(0);
-            format!("{}//{}", &issuer[..colon + 1], &issuer[colon + 1..])
+    let candidate = issuer
+        .find(':')
+        .map(|colon| format!("{}{}", issuer[..colon].to_ascii_lowercase(), &issuer[colon..]))
+        .unwrap_or_else(|| issuer.to_owned());
+
+    let candidate = if candidate.len() > 5 {
+        let prefix = candidate.as_bytes();
+        let http = prefix[..5].eq_ignore_ascii_case(b"http:");
+        let https = candidate.len() > 6 && prefix[..6].eq_ignore_ascii_case(b"https:");
+        if (http || https)
+            && !candidate[candidate.find(':').unwrap_or(0) + 1..].starts_with("//")
+        {
+            let colon = candidate.find(':').unwrap_or(0);
+            format!("{}//{}", &candidate[..colon + 1], &candidate[colon + 1..])
         } else {
-            issuer.to_owned()
+            candidate
         }
     } else {
-        issuer.to_owned()
+        candidate
     };
 
     let Ok(mut url) = Url::parse(&candidate) else {
         return issuer.to_owned();
     };
-    let Some(host) = url.host_str() else {
-        return issuer.to_owned();
-    };
 
-    if url.scheme().eq_ignore_ascii_case("http") && url.port() == Some(80)
-        || url.scheme().eq_ignore_ascii_case("https") && url.port() == Some(443)
+    if (url.scheme() == "http" && url.port() == Some(80))
+        || (url.scheme() == "https" && url.port() == Some(443))
     {
         let _ = url.set_port(None);
     }
 
-    let normalized_host = host.strip_suffix('.').unwrap_or(host);
-    if normalized_host != host {
-        if let Err(_) = url.set_host(Some(normalized_host)) {
-            return issuer.to_owned();
+    if let Some(host) = url.host_str().map(str::to_owned) {
+        let normalized_host = host.strip_suffix('.').unwrap_or(&host);
+        if normalized_host != host {
+            if url.set_host(Some(normalized_host)).is_err() {
+                return issuer.to_owned();
+            }
         }
+        let path = url.path().trim_end_matches('/');
+        url.set_path(path);
+        return url.to_string();
     }
 
-    let path = url.path().trim_end_matches('/');
-    url.set_path(path);
     url.to_string()
 }
 
