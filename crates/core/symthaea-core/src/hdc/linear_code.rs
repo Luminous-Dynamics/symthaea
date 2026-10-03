@@ -359,7 +359,7 @@ impl LinearCodeAlgebra {
             && self.raw_factor_tuple_count.exponent()
                 == self.reachable_target_count.exponent()
                     + self.factorization_count_per_target.exponent()
-            && self.unique_factorization == self.kernel_dimension == 0
+            && self.unique_factorization == (self.kernel_dimension == 0)
             && self.factorization_count_per_target.is_one() == self.unique_factorization
     }
 
@@ -791,6 +791,7 @@ mod tests {
         assert_eq!(algebra.raw_factor_tuple_count.exponent(), parent.rank());
         assert_eq!(algebra.reachable_target_count.exponent(), parent.rank());
         assert_eq!(algebra.factorization_count_per_target.exponent(), 0);
+        assert!(algebra.satisfies_conservation_law());
         assert_eq!(algebra.dependency_order, None);
     }
 
@@ -817,6 +818,7 @@ mod tests {
         assert!(!algebra.unique_factorization);
         assert_eq!(algebra.dependency_order, Some(3));
         assert_eq!(algebra.factorization_count_per_target.exponent(), 1);
+        assert!(algebra.satisfies_conservation_law());
     }
     #[test]
     fn direct_sum_subcodes_partition_a_parent_basis() {
