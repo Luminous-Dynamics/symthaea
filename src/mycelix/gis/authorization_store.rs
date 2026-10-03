@@ -1184,14 +1184,16 @@ fn normalize_native_issuer(issuer: &str) -> String {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
         let native_provenance: (
-            Option<String>, Option<String>, Option<String>, Option<String>, Option<String>
+            Option<String>, Option<String>, Option<String>, Option<String>, Option<String>,
+            Option<String>, Option<String>, Option<String>
         ) = tx.query_row(
             "SELECT native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
-                    native_authority_pin_set_id,native_authority_pin_set_digest
+                    native_authority_pin_set_id,native_authority_pin_set_digest,
+                    validity_issued_at,validity_expires_at,validity_policy_digest
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?)),
         )?;
         Self::validate_persisted_native_replay_provenance(
             record,
@@ -1204,6 +1206,55 @@ fn normalize_native_issuer(issuer: &str) -> String {
             native_provenance.3.as_deref(),
             native_provenance.4.as_deref(),
         )?;
+        if self.validate_persisted_authorization_validity(
+            native_provenance.5.as_deref(),
+            native_provenance.6.as_deref(),
+            native_provenance.7.as_deref(),
+            true,
+        ).is_err() {
+            let changed = tx.execute(
+                "UPDATE authorization_dispatches
+                 SET state='not_entered'
+                 WHERE authorization_instance=?1 AND attempt_id=?2
+                   AND boundary_id=?3 AND state='dispatch_pending'",
+                params![
+                    record.authorization_instance.as_str(),
+                    record.attempt_id.as_str(),
+                    record.boundary_id.as_str(),
+                ],
+            )?;
+            if changed != 1 {
+                return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+            }
+            let changed = tx.execute(
+                "UPDATE authorization_leases
+                 SET state='ready',attempt_id=NULL,boundary_id=NULL
+                 WHERE authorization_instance=?1 AND state='dispatch_pending'
+                   AND attempt_id=?2 AND boundary_id=?3",
+                params![
+                    record.authorization_instance.as_str(),
+                    record.attempt_id.as_str(),
+                    record.boundary_id.as_str(),
+                ],
+            )?;
+            if changed != 1 {
+                return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+            }
+            tx.execute(
+                "INSERT OR IGNORE INTO authorization_recovery_markers
+                 (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
+                 VALUES (?1,?2,?3,?4,?5,'not_entered_validity')",
+                params![
+                    record.authorization_instance.as_str(),
+                    record.attempt_id.as_str(),
+                    record.boundary_id.as_str(),
+                    record.action_digest.as_str(),
+                    0i64,
+                ],
+            )?;
+            tx.commit()?;
+            return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+        }
         let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
         if current_boundary != record.boundary_id {
