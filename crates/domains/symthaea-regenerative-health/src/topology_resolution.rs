@@ -53,6 +53,10 @@ pub struct TopologyLifecycleResolution {
     pub predecessor_topology_digest: String,
     pub selected_successor_epoch: u64,
     pub selected_successor_topology_digest: String,
+    /// Monotonic authority-resolution sequence. Later resolutions link to
+    /// the digest of the prior resolution rather than mutating it.
+    pub resolution_epoch: u64,
+    pub predecessor_resolution_digest: Option<String>,
     /// Every competing successor considered by the authority, including the
     /// selected branch. Keeping these references makes the resolution
     /// append-only rather than destructive.
@@ -74,6 +78,8 @@ pub struct TopologyResolutionPolicy {
     pub expected_component_id: String,
     pub expected_configuration_digest: String,
     pub expected_authority_id: String,
+    pub expected_resolution_epoch: u64,
+    pub expected_predecessor_resolution_digest: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -102,6 +108,7 @@ impl TopologyResolutionGate {
             || policy.expected_component_id.trim().is_empty()
             || policy.expected_configuration_digest.trim().is_empty()
             || policy.expected_authority_id.trim().is_empty()
+            || policy.expected_resolution_epoch == 0
         {
             return Err("invalid topology resolution policy");
         }
@@ -202,6 +209,23 @@ impl TopologyResolutionGate {
             issues.push(TopologyResolutionIssue::SuccessorEpochMismatch);
         }
 
+        if resolution.resolution_epoch == 0 {
+            issues.push(TopologyResolutionIssue::SuccessorEpochMismatch);
+        } else if resolution.resolution_epoch != self.policy.expected_resolution_epoch {
+            issues.push(TopologyResolutionIssue::SuccessorEpochMismatch);
+        }
+
+        match (
+            resolution.resolution_epoch,
+            resolution.predecessor_resolution_digest.as_deref(),
+            self.policy.expected_predecessor_resolution_digest.as_deref(),
+        ) {
+            (1, None, None) => {}
+            (1, _, _) => issues.push(TopologyResolutionIssue::PredecessorMismatch),
+            (_, Some(actual), Some(expected)) if actual == expected => {}
+            (_, _, _) => issues.push(TopologyResolutionIssue::PredecessorMismatch),
+        }
+
         for branch in &unique_observed {
             if branch.predecessor_epoch == resolution.predecessor_epoch
                 && branch.predecessor_topology_digest == resolution.predecessor_topology_digest
@@ -272,6 +296,8 @@ mod tests {
             expected_component_id: "wing-root".into(),
             expected_configuration_digest: "cfg-1".into(),
             expected_authority_id: "mycelix-topology-authority".into(),
+            expected_resolution_epoch: 1,
+            expected_predecessor_resolution_digest: None,
         })
         .unwrap()
     }
@@ -294,6 +320,8 @@ mod tests {
             predecessor_topology_digest: "topology-v1".into(),
             selected_successor_epoch: 2,
             selected_successor_topology_digest: selected.into(),
+            resolution_epoch: 1,
+            predecessor_resolution_digest: None,
             observed_successors: observed,
             resolution_id: "resolution-2".into(),
             authority_id: "mycelix-topology-authority".into(),
