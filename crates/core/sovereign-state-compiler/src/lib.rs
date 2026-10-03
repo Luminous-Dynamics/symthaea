@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
-pub const SCHEMA_VERSION: &str = "ssc/v0.1";
+pub const SCHEMA_VERSION: &str = "ssc/v0.2";
 const INTENT_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/INTENT-DIGEST/v1\0";
 const TARGET_PROFILE_DIGEST_DOMAIN: &[u8] =
     b"LUMINOUS-DYNAMICS/SSC/TARGET-PROFILE-DIGEST/v1\0";
@@ -213,6 +213,34 @@ pub struct PlanStep {
     pub description: String,
 }
 
+/// Platform-neutral disposition that the post-state verifier must establish.
+///
+/// Adapters map their native transition semantics into this vocabulary. The
+/// disposition is deliberately about the resulting transition, not about the
+/// native command/mechanism used to realize it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeploymentDisposition {
+    /// The requested state became the resulting applied state.
+    Applied,
+    /// The requested state was applied only for a bounded/test transition.
+    TemporarilyApplied,
+    /// The requested state was selected for a future activation, but is not
+    /// claimed to be active now.
+    SelectedForNextActivation,
+    /// The requested state was evaluated without activating it.
+    NotActivated,
+    /// No state transition was requested; existing target state should remain.
+    Unchanged,
+    /// An explicitly identified prior state was reached as the rollback target.
+    RollbackTarget,
+}
+
+impl Default for DeploymentDisposition {
+    fn default() -> Self {
+        Self::Applied
+    }
+}
+
 /// Policy describing what evidence must be observed after execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct VerificationPolicy {
@@ -221,6 +249,8 @@ pub struct VerificationPolicy {
     /// Keeping values rather than property names makes verification
     /// non-ambiguous while remaining platform-neutral.
     pub expected_state: DesiredState,
+    /// The transition disposition that the post-state verifier must establish.
+    pub disposition: DeploymentDisposition,
     pub require_attestation: bool,
 }
 
@@ -1090,6 +1120,17 @@ mod tests {
             plan.validate(),
             Err(PlanValidationError::RollbackAttemptsWithoutPermission)
         );
+    }
+
+    #[test]
+    fn verification_disposition_is_part_of_plan_digest() {
+        let plan = sample_plan();
+        let before = plan.digest().expect("digest");
+
+        let mut changed = plan;
+        changed.verification.disposition = DeploymentDisposition::NotActivated;
+
+        assert_ne!(before, changed.digest().expect("digest"));
     }
 
     #[test]
