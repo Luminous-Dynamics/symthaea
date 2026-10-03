@@ -1,0 +1,580 @@
+//! Read-only bridge from Nixward's live NixOS observation into SSC.
+//!
+//! This module deliberately stops at observation. It does not authorize,
+//! execute, reboot, or mutate the target. The exact NixOS realization identity
+//! is captured alongside running/booted/profile facts so the SSC/Nix adapter
+//! can bind generation-sensitive operations to what was actually observed.
+
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use sovereign_state_compiler::{
+    ContentDigest, ResourceRef, TargetId, TargetProfile, TargetSnapshot,
+};
+use sovereign_state_compiler_nix::{default_nixos_capabilities, nixos_generation_resource};
+use thiserror::Error;
+
+pub const NIXOS_SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
+pub const NIXOS_CURRENT_SYSTEM: &str = "/run/current-system";
+pub const NIXOS_BOOTED_SYSTEM: &str = "/run/booted-system";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NixGenerationObservation {
+    pub number: u64,
+    pub realization: String,
+    pub current: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NixSystemObservation {
+    pub generations: Vec<NixGenerationObservation>,
+    pub system_profile_generation: u64,
+    pub system_profile_realization: String,
+    pub current_system_realization: String,
+    pub booted_system_realization: String,
+}
+
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
+pub enum SscObservationError {
+    #[error("failed to observe NixOS state: {0}")]
+    Io(String),
+    #[error("failed to serialize NixOS observation: {0}")]
+    Serialization(String),
+    #[error("NixOS generation observation has no exact realization")]
+    MissingRealization,
+    #[error("NixOS generation observation contains multiple current generations")]
+    MultipleCurrentGenerations,
+    #[error("NixOS generation observation contains a zero generation ordinal")]
+    InvalidGenerationNumber,
+    #[error("NixOS realization is not rooted in /nix/store")]
+    InvalidRealizationPath,
+    #[error("NixOS generation observation contains a duplicate generation ordinal")]
+    DuplicateGenerationNumber,
+    #[error("NixOS generation marked current does not match /run/current-system")]
+    CurrentGenerationRealizationMismatch,
+    #[error("NixOS system profile does not identify an exact generation")]
+    MissingSystemProfileGeneration,
+    #[error("NixOS system profile contains no generation links")]
+    NoSystemGenerations,
+    #[error("NixOS system profile generation does not match its exact realization")]
+    SystemProfileRealizationMismatch,
+}
+
+impl From<std::io::Error> for SscObservationError {
+    fn from(value: std::io::Error) -> Self {
+        Self::Io(value.to_string())
+    }
+}
+
+impl From<serde_json::Error> for SscObservationError {
+    fn from(value: serde_json::Error) -> Self {
+        Self::Serialization(value.to_string())
+    }
+}
+
+impl NixSystemObservation {
+    pub fn observe() -> Result<Self, SscObservationError> {
+        let current_system_realization = read_realization(Path::new(NIXOS_CURRENT_SYSTEM))?;
+        let generations = observe_generations(&current_system_realization)?;
+
+        let observation = Self {
+            generations,
+            system_profile_generation: read_profile_generation(Path::new(NIXOS_SYSTEM_PROFILE))?,
+            system_profile_realization: read_realization(Path::new(NIXOS_SYSTEM_PROFILE))?,
+            current_system_realization: read_realization(Path::new(NIXOS_CURRENT_SYSTEM))?,
+            booted_system_realization: read_realization(Path::new(NIXOS_BOOTED_SYSTEM))?,
+        };
+        observation.validate()?;
+        Ok(observation)
+    }
+
+    pub fn validate(&self) -> Result<(), SscObservationError> {
+        if self.system_profile_generation == 0 {
+            return Err(SscObservationError::InvalidGenerationNumber);
+        }
+        if self.system_profile_realization.is_empty()
+            || self.current_system_realization.is_empty()
+            || self.booted_system_realization.is_empty()
+        {
+            return Err(SscObservationError::MissingRealization);
+        }
+
+        let mut previous_number = None;
+        for entry in &self.generations {
+            if entry.number == 0 {
+                return Err(SscObservationError::InvalidGenerationNumber);
+            }
+            if entry.realization.is_empty() {
+                return Err(SscObservationError::MissingRealization);
+            }
+            if previous_number == Some(entry.number) {
+                return Err(SscObservationError::DuplicateGenerationNumber);
+            }
+            previous_number = Some(entry.number);
+        }
+
+        let mut current = self.generations.iter().filter(|entry| entry.current);
+        let Some(current_generation) = current.next() else {
+            return Err(SscObservationError::CurrentGenerationRealizationMismatch);
+        };
+        if current.next().is_some() {
+            return Err(SscObservationError::MultipleCurrentGenerations);
+        }
+        if current_generation.realization != self.current_system_realization {
+            return Err(SscObservationError::CurrentGenerationRealizationMismatch);
+        }
+
+        let Some(entry) = self
+            .generations
+            .iter()
+            .find(|entry| entry.number == self.system_profile_generation)
+        else {
+            return Err(SscObservationError::SystemProfileRealizationMismatch);
+        };
+        if entry.realization != self.system_profile_realization {
+            return Err(SscObservationError::SystemProfileRealizationMismatch);
+        }
+
+        Ok(())
+    }
+
+    pub fn observation_digest(&self) -> Result<ContentDigest, SscObservationError> {
+        let bytes = serde_json::to_vec(self)?;
+        Ok(ContentDigest::blake3(&bytes))
+    }
+
+    pub fn generation_resource(&self, generation: u64) -> Option<ResourceRef> {
+        self.generations
+            .iter()
+            .find(|entry| entry.number == generation)
+            .and_then(|entry| nixos_generation_resource(entry.number, &entry.realization).ok())
+    }
+
+    pub fn target_snapshot(
+        &self,
+        target: impl Into<TargetId>,
+        observed_at_ms: u64,
+    ) -> Result<TargetSnapshot, SscObservationError> {
+        self.validate()?;
+        let observation_digest = self.observation_digest()?;
+        let resources = self
+            .generations
+            .iter()
+            .map(|entry| {
+                nixos_generation_resource(entry.number, &entry.realization)
+                    .map_err(|error| SscObservationError::Io(error.to_string()))
+            })
+            .collect::<Result<_, _>>()?;
+
+        Ok(TargetSnapshot {
+            profile: TargetProfile {
+                identity: target.into(),
+                platform: "nixos".into(),
+                capabilities: default_nixos_capabilities(),
+            },
+            observed_at_ms,
+            observation_digest,
+            resources,
+        })
+    }
+
+    pub fn current_generation(&self) -> Option<&NixGenerationObservation> {
+        self.generations.iter().find(|entry| entry.current)
+    }
+
+    pub fn system_profile_generation(&self) -> Option<&NixGenerationObservation> {
+        self.generations
+            .iter()
+            .find(|entry| entry.number == self.system_profile_generation)
+    }
+}
+
+fn observe_generations(
+    current_system_realization: &str,
+) -> Result<Vec<NixGenerationObservation>, SscObservationError> {
+    let mut generations = Vec::new();
+
+    for entry in std::fs::read_dir(Path::new("/nix/var/nix/profiles"))? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        let Some(number) = parse_generation_link_name(name)? else {
+            continue;
+        };
+
+        let realization = read_realization(&entry.path())?;
+        generations.push(NixGenerationObservation {
+            number,
+            current: realization == current_system_realization,
+            realization,
+        });
+    }
+
+    generations.sort_by_key(|entry| entry.number);
+    if generations.is_empty() {
+        return Err(SscObservationError::NoSystemGenerations);
+    }
+    Ok(generations)
+}
+
+fn parse_generation_link_name(name: &str) -> Result<Option<u64>, SscObservationError> {
+    let Some(number) = name
+        .strip_prefix("system-")
+        .and_then(|value| value.strip_suffix("-link"))
+    else {
+        return Ok(None);
+    };
+
+    let number = number
+        .parse::<u64>()
+        .map_err(|error| SscObservationError::Io(error.to_string()))?;
+    if number == 0 {
+        return Err(SscObservationError::MissingSystemProfileGeneration);
+    }
+    Ok(Some(number))
+}
+
+fn generation_link(generation: u64) -> PathBuf {
+    PathBuf::from(format!("/nix/var/nix/profiles/system-{generation}-link"))
+}
+
+fn read_profile_generation(link: &Path) -> Result<u64, SscObservationError> {
+    let target = std::fs::read_link(link)?;
+    let name = target
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| {
+            SscObservationError::Io("NixOS system profile link has no UTF-8 filename".into())
+        })?;
+
+    parse_generation_link_name(name)?.ok_or(SscObservationError::MissingSystemProfileGeneration)
+}
+
+fn validate_realization_path(value: &str) -> Result<(), SscObservationError> {
+    if value.starts_with("/nix/store/") && value != "/nix/store/" {
+        Ok(())
+    } else {
+        Err(SscObservationError::InvalidRealizationPath)
+    }
+}
+
+fn read_realization(link: &Path) -> Result<String, SscObservationError> {
+    let resolved = std::fs::canonicalize(link)?;
+    let value = resolved.to_string_lossy().into_owned();
+    if value.is_empty() {
+        return Err(SscObservationError::MissingRealization);
+    }
+    validate_realization_path(&value)?;
+    Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generation_link_parser_is_exact() {
+        assert_eq!(
+            parse_generation_link_name("system-42-link")
+                .expect("generation")
+                .expect("link"),
+            42
+        );
+        assert_eq!(
+            parse_generation_link_name("system-0042-link")
+                .expect("generation")
+                .expect("link"),
+            42
+        );
+        assert_eq!(
+            parse_generation_link_name("system-current-link").expect_err("non-generation"),
+            SscObservationError::Io("invalid digit found in string".into())
+        );
+        assert_eq!(
+            parse_generation_link_name("system-42").expect("non-generation"),
+            None
+        );
+    }
+
+    #[test]
+    fn profile_generation_parser_rejects_zero() {
+        assert_eq!(
+            parse_generation_link_name("system-0-link").expect_err("generation zero"),
+            SscObservationError::MissingSystemProfileGeneration
+        );
+    }
+
+    #[test]
+    fn observation_validation_rejects_missing_generation_realization() {
+        let observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: String::new(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert_eq!(
+            observation.validate().expect_err("missing realization"),
+            SscObservationError::MissingRealization
+        );
+    }
+
+    #[test]
+    fn realization_path_validation_rejects_non_store_paths() {
+        assert_eq!(
+            validate_realization_path("/etc/nixos"),
+            Err(SscObservationError::InvalidRealizationPath)
+        );
+        assert_eq!(
+            validate_realization_path("/nix/store/example-system"),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn observation_validation_rejects_zero_generation_number() {
+        let observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 0,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert_eq!(
+            observation.validate().expect_err("zero generation"),
+            SscObservationError::InvalidGenerationNumber
+        );
+    }
+
+    #[test]
+    fn observation_validation_rejects_duplicate_generation_numbers() {
+        let observation = NixSystemObservation {
+            generations: vec![
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: true,
+                },
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: false,
+                },
+            ],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert_eq!(
+            observation.validate().expect_err("duplicate generation"),
+            SscObservationError::DuplicateGenerationNumber
+        );
+    }
+
+    #[test]
+    fn generation_link_is_deterministic() {
+        assert_eq!(
+            generation_link(42),
+            PathBuf::from("/nix/var/nix/profiles/system-42-link")
+        );
+    }
+
+    #[test]
+    fn observation_digest_changes_when_realization_changes() {
+        let mut observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        let before = observation.observation_digest().expect("digest");
+        observation.generations[0].realization = "/nix/store/bbb-nixos-system-host".into();
+        let after = observation.observation_digest().expect("digest");
+
+        assert_ne!(before, after);
+    }
+
+    #[test]
+    fn observation_validation_requires_current_realization_match() {
+        let mut observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert!(observation.validate().is_ok());
+
+        observation.current_system_realization = "/nix/store/bbb-nixos-system-host".into();
+        assert_eq!(
+            observation.validate().expect_err("mismatch"),
+            SscObservationError::CurrentGenerationRealizationMismatch
+        );
+    }
+
+    #[test]
+    fn observation_validation_rejects_multiple_current_generations() {
+        let observation = NixSystemObservation {
+            generations: vec![
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: true,
+                },
+                NixGenerationObservation {
+                    number: 43,
+                    realization: "/nix/store/bbb-nixos-system-host".into(),
+                    current: true,
+                },
+            ],
+            system_profile_generation: 43,
+            system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert_eq!(
+            observation.validate().expect_err("multiple current"),
+            SscObservationError::MultipleCurrentGenerations
+        );
+    }
+
+    #[test]
+    fn observation_validation_requires_profile_realization_match() {
+        let observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert_eq!(
+            observation.validate().expect_err("profile mismatch"),
+            SscObservationError::SystemProfileRealizationMismatch
+        );
+    }
+
+    #[test]
+    fn target_snapshot_contains_exact_generation_resources() {
+        let observation = NixSystemObservation {
+            generations: vec![
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: true,
+                },
+                NixGenerationObservation {
+                    number: 43,
+                    realization: "/nix/store/bbb-nixos-system-host".into(),
+                    current: false,
+                },
+            ],
+            system_profile_generation: 43,
+            system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        let snapshot = observation
+            .target_snapshot("host-01", 123)
+            .expect("snapshot");
+        assert_eq!(snapshot.profile.identity, TargetId::from("host-01"));
+        assert_eq!(snapshot.profile.platform, "nixos");
+        assert!(
+            snapshot
+                .profile
+                .capabilities
+                .contains(&sovereign_state_compiler::Capability::ObserveState)
+        );
+        assert_eq!(snapshot.observed_at_ms, 123);
+        assert_eq!(snapshot.resources.len(), 2);
+        assert!(
+            snapshot.resources.contains(
+                &nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                    .expect("generation resource")
+            )
+        );
+        assert!(
+            snapshot.resources.contains(
+                &nixos_generation_resource(43, "/nix/store/bbb-nixos-system-host")
+                    .expect("generation resource")
+            )
+        );
+    }
+
+    #[test]
+    fn generation_resource_tracks_exact_observed_realization() {
+        let observation = NixSystemObservation {
+            generations: vec![
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: true,
+                },
+                NixGenerationObservation {
+                    number: 43,
+                    realization: "/nix/store/bbb-nixos-system-host".into(),
+                    current: false,
+                },
+            ],
+            system_profile_generation: 43,
+            system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert_eq!(
+            observation.generation_resource(42).expect("resource"),
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("resource")
+        );
+        assert_eq!(
+            observation
+                .system_profile_generation()
+                .expect("profile generation")
+                .number,
+            43
+        );
+        assert_eq!(
+            observation
+                .current_generation()
+                .expect("current generation")
+                .number,
+            42
+        );
+        assert_ne!(
+            observation.current_system_realization,
+            observation.system_profile_realization
+        );
+        assert_eq!(super::NIXOS_GENERATION_RESOURCE_KIND, "nixos-generation");
+    }
+}

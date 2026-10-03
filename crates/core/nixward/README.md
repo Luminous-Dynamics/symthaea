@@ -1,201 +1,146 @@
-# nixward: A Conscious Mind for NixOS
+# nixward: A NixOS systems intelligence and execution runtime
 
-nixward brings hyperdimensional computing (HDC) and active inference to NixOS system management. It encodes system state, configuration, and user intent into a shared semantic space, enabling causal reasoning about NixOS options, predictive hierarchy monitoring, and consciousness-gated command execution.
+Nixward is the NixOS-specific observation, semantic evaluation, planning, execution, rollback, and verification runtime for the Luminous Dynamics infrastructure stack.
 
-Part of the [Symthaea](https://luminousdynamics.org) cognitive architecture.
+Its architectural boundary is deliberately separate from cognition and from the platform-neutral Sovereign State Compiler (SSC):
+
+```
+Symthaea cognition
+      │
+      ▼
+DeploymentIntent
+      │
+      ▼
+Sovereign State Compiler (platform-neutral)
+      │
+      ▼
+NixOS deployment plan
+      │
+      ▼
+Nixward
+ ┌────┼───────────────┐
+ │    │               │
+observe execute   verify/rollback
+ │    │               │
+ └────┴───────┬───────┘
+               ▼
+        post-state receipt
+```
+
+Nixward owns NixOS-specific realization. SSC does not execute commands, and Nixward does not become the authority for unrelated operating systems.
 
 ## Architecture
 
+Nixward is organized around six responsibilities:
+
+1. **Parser** — Nix source and flake structure.
+2. **Observation** — live NixOS state, systemd, journal, store, hardware, and generation identity.
+3. **Semantic evaluation** — NixOS options, packages, dependencies, drift, and causal relationships.
+4. **Planning and execution** — Nix-specific lowering, native process execution, rollback, and compensation.
+5. **Verification** — fresh post-state observation and typed postconditions; process exit status is not equivalent to verified success.
+6. **Cognitive integration** — optional Symthaea-facing adapters for prediction, explanation, and recommendation. Cognitive state is advisory and is not an authorization primitive.
+
+The privileged boundary is therefore:
+
 ```
-Observation ──> Encoding ──> Cognition ──> Action
-   │              │             │            │
-   │ systemd      │ HDC         │ Active     │ Phi-gated
-   │ journal      │ 16384-dim   │ Inference  │ execution
-   │ store        │ vectors     │ Causal     │ with rollback
-   │ hardware     │             │ graph      │ verification
-   └──────────────┴─────────────┴────────────┘
+observation
+  → plan
+  → explicit authorization
+  → mechanical execution
+  → fresh observation
+  → postcondition verification
+  → evidence-bearing receipt
 ```
 
-**Layers:**
-1. **Parser** -- Nix source code to AST (tree-sitter)
-2. **Encoding** -- System state, options, packages, configs to HDC vectors
-3. **Mind** -- World model, active inference, causal graph, episodic memory
-4. **Observe** -- Live system state observation (systemd, journal, store, hardware)
-5. **Action** -- Consciousness-gated command execution with pre/post verification
-6. **Plugin** -- Bridge to full Symthaea consciousness pipeline
+## Current capabilities
 
-## Quick Start
+The current in-tree implementation includes:
 
-### CLI
+- Nix parsing and semantic analysis
+- NixOS state observation
+- HDC-based representations and predictive models
+- causal and drift analysis
+- CLI and TUI interfaces
+- background daemon support
+- NixOS module integration
+- generation inspection and rollback
+- native Nix/NixOS command execution
+- post-execution verification work
+- optional Symthaea cognitive integration
+
+## SSC observation bridge
+
+Nixward now exposes a read-only SSC observation bridge at `ssc_bridge`.
+It captures exact NixOS generation realizations plus the selected system-profile
+realization and the `/run/current-system` and `/run/booted-system` realizations.
+The bridge validates that the generation marked current agrees with the running
+system realization and that a selected system-profile generation agrees with
+its exact realization before constructing an SSC `TargetSnapshot`.
+
+The bridge does not authorize or execute anything; native realization remains
+owned by Nixward. Live generation and runtime links must resolve to concrete
+`/nix/store/...` realizations; incomplete, ambiguous, or non-store realization
+identity fails closed before an SSC `TargetSnapshot` is produced.
+
+## Standalone-repository direction
+
+Nixward is currently hosted inside Symthaea while the SSC/Nixward boundary is being proven.
+
+The intended eventual repository boundary is:
+
+- **Symthaea** — cognition, reasoning, simulation, and recommendations
+- **Sovereign State Compiler** — platform-neutral deployment protocol, planning, authorization, and evidence contracts
+- **Nixward** — NixOS observation, realization, execution, rollback, and verification
+- **Spore** — portable boot/recovery embodiment
+- **Sovereign Ops** — cross-system operator/control-plane composition
+
+The extraction gate is not "copy the directory into another repository." It is independent buildability and qualification, with no duplicate privileged NixOS executor left behind.
+
+## CLI
 
 ```bash
-# Search for packages or options
 nixward search "web server"
-nixward search --options "firewall"
-
-# Observe system state
 nixward observe services
-nixward observe store
-nixward observe journal
-
-# System health check
 nixward doctor
-
-# Rebuild with consciousness gating
-nixward rebuild switch
 nixward rebuild switch --flake ".#myhost"
-
-# Generation management
-nixward rollback
 nixward generations list
-nixward generations diff --from 41 --to 42
-
-# Garbage collection
-nixward gc analyze
-nixward gc collect --older-than 30d
-
-# Service management
+nixward rollback
 nixward service status nginx
 nixward service restart postgresql
-
-# Flake operations
 nixward flake check
-nixward flake update
 nixward flake show
-
-# Natural language input
-nixward "install firefox and enable nginx"
-
-# Interactive REPL
-nixward
 ```
 
-### TUI
+## NixOS module
 
-```bash
-nixward-tui
-```
-
-The TUI displays six panels:
-- **Consciousness** -- 2D gauge (phi x confidence)
-- **System Health** -- Services, store size, memory usage
-- **Generations** -- Timeline of NixOS generations
-- **World Model** -- Predictive hierarchy errors, free energy, working memory
-- **Causal Graph** -- Top causal relationships between NixOS options
-- **Input** -- Interactive command entry
-
-Tab to switch focus. Type commands in the input panel. The TUI refreshes system data every ~4 seconds and shows `[daemon]` in the World Model title when the background daemon is running.
-
-### Daemon
-
-```bash
-nixward-daemon
-```
-
-Runs continuously, observing system state every 60s and journal entries every 5s. Detects anomalies, tracks drift, and writes cognitive state to a shared IPC file for TUI consumption. State persists across restarts.
-
-Configure via environment:
-- `NIXWARD_CONFIG=/path/to/config.json` -- Config file path
-- `RUST_LOG=debug` -- Logging verbosity (info/debug/warn/error)
-
-## NixOS Module
-
-Add to your `flake.nix`:
-
-```nix
-{
-  inputs.symthaea.url = "github:luminous-dynamics/symthaea";
-
-  outputs = { self, nixpkgs, symthaea, ... }: {
-    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
-      modules = [
-        symthaea.nixosModules.nixward
-        {
-          services.nixward = {
-            enable = true;
-            snapshotInterval = 60;  # seconds between observations
-            pollInterval = 5;       # seconds between journal checks
-            surpriseThreshold = 0.3; # prediction error threshold
-          };
-        }
-      ];
-    };
-  };
-}
-```
-
-The module creates a hardened systemd service with:
-- Dedicated `nixward` user/group
-- Read-only access to `/nix/store`, `/etc/nixos`, `/run/systemd`
-- `ProtectSystem=strict`, `NoNewPrivileges`, `MemoryDenyWriteExecute`
-- State persistence in `/var/lib/nixward/`
-
-## How It Works
-
-### HDC Encoding
-
-All NixOS concepts (option paths, packages, system state, user input) are encoded into 16,384-dimensional continuous hypervectors. This creates a shared semantic space where similarity = cosine distance:
-
-- `services.nginx.enable` and `services.nginx.package` are close
-- `services.nginx.enable` and `boot.loader.grub.enable` are distant
-- "install firefox" is close to `environment.systemPackages`
-
-### Causal Graph
-
-210+ curated causal patterns (e.g., "enabling nginx requires firewall port 80") plus Hebbian learning from observed outcomes. Used for:
-- Side-effect prediction before execution
-- Root cause analysis when services fail
-- Fix recommendations
-
-### Active Inference
-
-User input is processed through the Free Energy Principle:
-1. Encode input as HDC vector
-2. Infer goal via working memory context
-3. Generate action candidates
-4. Rank by Expected Free Energy (pragmatic + epistemic value)
-5. Gate execution by consciousness level (phi)
-
-### Predictive Hierarchy
-
-4-level stack (Sensory -> Features -> Concepts -> Goals) with different learning rates. Tracks prediction errors at each level. High free energy triggers surprise alerts.
+Nixward can be integrated as a NixOS service with a dedicated system user and hardened service configuration. The exact module interface is versioned with the runtime and should not be treated as a substitute for SSC authorization.
 
 ## Development
 
 ```bash
-# Enter dev shell
 nix develop ./crates/nixward
-
-# Build
 cargo build -p nixward --features cli
-cargo build -p nixward --features tui
-cargo build -p nixward --features daemon
-
-# Test
-cargo test -p nixward --features tui --lib       # 339 unit tests
-cargo test -p nixward --features cli --test cli_integration  # 24 integration tests
-cargo test -p nixward --test e2e_consciousness_loop  # 7 e2e tests
-cargo test -p nixward --test proptest_hdc            # 16 property tests
-
-# Benchmarks
-cargo bench -p nixward --bench hdc_benchmarks
-
-# Clippy
+cargo test -p nixward --features tui --lib
+cargo test -p nixward --features cli --test cli_integration
+cargo test -p nixward --test e2e_consciousness_loop
+cargo test -p nixward --test proptest_hdc
 cargo clippy -p nixward --features tui --all-targets
 ```
 
-### Performance
+## Authority and safety model
 
-Measured on 16,384-dim vectors (criterion, release mode):
+Nixward must preserve the distinction between:
 
-| Operation | Time |
-|-----------|------|
-| Option encoding | 277 us |
-| Input encoding | 734 us |
-| Causal query | 17 us |
-| Full cognition cycle | 2.0 ms |
-| Indexed search (10 paths) | ~1 ms |
+- **recommendation** — cognition or semantic analysis suggests a change;
+- **authorization** — an explicit policy grants the exact capability and state transition;
+- **execution** — Nixward performs only an authorized plan;
+- **verification** — fresh observations establish whether required postconditions hold;
+- **receipt** — evidence binds intent, authorization, pre-state, execution, post-state, and verification.
+
+A command returning exit code zero is not by itself proof that the requested system state was achieved.
 
 ## License
 
-MIT
+AGPL-3.0-or-later
+
+Commercial licensing: see `COMMERCIAL_LICENSE.md` at the repository root.
