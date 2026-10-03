@@ -155,7 +155,10 @@ fn read_profile_generation(link: &Path) -> Result<Option<u64>, SscObservationErr
         .ok_or_else(|| {
             SscObservationError::Io("NixOS system profile link has no UTF-8 filename".into())
         })?;
+    Ok(parse_profile_generation_name(name)?)
+}
 
+fn parse_profile_generation_name(name: &str) -> Result<Option<u64>, SscObservationError> {
     let Some(number) = name
         .strip_prefix("system-")
         .and_then(|value| value.strip_suffix("-link"))
@@ -183,13 +186,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn profile_generation_parser_rejects_ambiguous_names() {
-        let path = PathBuf::from("/nix/var/nix/profiles/system-42-link");
+    fn profile_generation_parser_is_exact() {
         assert_eq!(
-            read_profile_generation(&path).expect_err("missing live profile"),
-            SscObservationError::Io(
-                "No such file or directory (os error 2)".into()
-            )
+            parse_profile_generation_name("system-42-link").expect("generation"),
+            Some(42)
+        );
+        assert_eq!(
+            parse_profile_generation_name("system-0042-link").expect("generation"),
+            Some(42)
+        );
+        assert_eq!(
+            parse_profile_generation_name("system-current-link").expect("non-generation"),
+            None
+        );
+        assert_eq!(
+            parse_profile_generation_name("system-42").expect("non-generation"),
+            None
         );
     }
 
