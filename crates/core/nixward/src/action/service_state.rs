@@ -329,8 +329,7 @@ impl NixServiceObservedStateV1 {
 
         let observed_id = observed_id.ok_or(NixServiceStateErrorV1::MissingId)?;
         let observed_names = observed_names.ok_or(NixServiceStateErrorV1::MissingNames)?;
-        let observed_id = canonical_service_unit(observed_id)
-            .map_err(|_| NixServiceStateErrorV1::InvalidObservedUnitIdentity)?;
+        let observed_id = canonical_observed_service_unit(observed_id)?;
         let observed_names = normalize_observed_names(&observed_names)?;
         validate_observed_identity(&requested_unit, &observed_id, &observed_names)?;
 
@@ -482,6 +481,15 @@ fn canonical_service_unit(unit: String) -> Result<String, NixServiceStateErrorV1
     .map(|operation| operation.unit().to_string())
 }
 
+fn canonical_observed_service_unit(value: String) -> Result<String, NixServiceStateErrorV1> {
+    let canonical = canonical_service_unit(value.clone())
+        .map_err(|_| NixServiceStateErrorV1::InvalidObservedUnitIdentity)?;
+    if canonical != value {
+        return Err(NixServiceStateErrorV1::InvalidObservedUnitIdentity);
+    }
+    Ok(canonical)
+}
+
 fn validate_observed_identity(
     requested_unit: &str,
     observed_id: &str,
@@ -506,14 +514,11 @@ fn validate_observed_identity_set(
 }
 
 fn normalize_observed_names(raw: &str) -> Result<Vec<String>, NixServiceStateErrorV1> {
-    let mut names = raw
+    let names = raw
         .split_whitespace()
-        .map(|name| {
-            canonical_service_unit(name.to_string())
-                .map_err(|_| NixServiceStateErrorV1::InvalidObservedUnitIdentity)
-        })
+        .map(|name| canonical_observed_service_unit(name.to_string()))
         .collect::<Result<Vec<_>, _>>()?;
-    normalize_observed_names_from_vec(&mut names)
+    normalize_observed_names_from_vec(&names)
 }
 
 fn normalize_observed_names_from_vec(
@@ -809,6 +814,48 @@ CanReload=yes
         .0;
 
         assert_ne!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn observed_identity_requires_systemd_canonical_unit_spelling() {
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_observation(
+                "nginx",
+                "Id=nginx
+Names=nginx
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::InvalidObservedUnitIdentity
+        );
+    }
+
+    #[test]
+    fn observed_alias_names_must_be_canonical() {
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_observation(
+                "nginx",
+                "Id=nginx.service
+Names=nginx.service nginx
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::InvalidObservedUnitIdentity
+        );
     }
 
     #[test]
