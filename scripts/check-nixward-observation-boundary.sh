@@ -45,6 +45,7 @@ REVERSE_SERVICE_CONVERSION_PATTERN='impl[[:space:]]+(TryFrom|From)<[^>]*NixOSCom
 IMPLICIT_SERVICE_RESTART_PATTERN='_[[:space:]]*=>[[:space:]]*NixOSCommand::Custom[[:space:]]*\{[[:space:]]*command:[[:space:]]*["\x27]systemctl["\x27]'
 VALIDATED_OPERATION_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceOperationV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceOperationV1\b'
 OBSERVED_STATE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceObservedStateV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceObservedStateV1\b'
+OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceObservedStateV1[[:space:]]*\{.*?pub[[:space:]]+fn[[:space:]]+new[[:space:]]*\('
 
 scan_diagnostic_boundary() {
   local file="$1"
@@ -147,6 +148,11 @@ run_boundary_check() {
   fi
   if matches="$(rg -U -n --pcre2 "${OBSERVED_STATE_DESERIALIZATION_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
     echo "ERROR: NixServiceObservedStateV1 must not deserialize around its observation boundary" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+  if matches="$(rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
+    echo "ERROR: NixServiceObservedStateV1 constructor must not be public" >&2
     echo "${matches}" >&2
     failed=1
   fi
@@ -262,6 +268,21 @@ run_self_test() {
   printf '%s\n' 'impl Deserialize for NixServiceOperationV1 { }' > "${tmp}/aggregate-custom-deserialize.rs"
   if rg -U -n --pcre2 "${VALIDATED_OPERATION_DESERIALIZATION_PATTERN}" "${tmp}/aggregate-custom-deserialize.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect custom aggregate deserialization" >&2
+    return 1
+  fi
+
+  printf '%s\n' 
+}
+
+run_self_test
+run_boundary_check
+echo "CROSS-015: Nixward governed observation boundary is clean."
+impl NixServiceObservedStateV1 {
+    pub fn new(
+        unit: String,
+    ) {}' > "${tmp}/observed-state-public-constructor.rs"
+  if rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/observed-state-public-constructor.rs"; then :; else
+    echo "ERROR: CROSS-022 self-test failed to detect public observed-state constructor" >&2
     return 1
   fi
 }
