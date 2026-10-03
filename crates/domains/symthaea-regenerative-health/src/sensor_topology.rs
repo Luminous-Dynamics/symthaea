@@ -156,6 +156,8 @@ pub enum SensorTopologyAttestationIssue {
     InvalidEpochBinding,
     MissingEpochPredecessor,
     EpochEffectiveTimeMismatch,
+    TopologyEpochRollback,
+    InvalidEpochTransition,
     EmptyVerificationResult,
     InvalidVerificationWindow,
     VerificationReferenceMismatch,
