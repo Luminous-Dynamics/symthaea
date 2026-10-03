@@ -519,7 +519,7 @@ impl Rfc9942ReceiptEnvelope {
             let entry_start=ph.offset;
             let label_key=ph.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !protected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
-            let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Text(_)=>None };
+            let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_)=>None };
             match label{
                 Some(COSE_ALG_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if algorithm.replace(value).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
                 Some(RFC9942_VDS_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if value<0{return Err(Rfc9942VdpError::InvalidStructure);}if vds.replace(value as u64).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
@@ -1593,6 +1593,8 @@ enum CborLabelKey {
     Integer(i64),
     /// Positive CBOR labels above i64::MAX remain distinguishable from signed labels.
     Unsigned(u64),
+    /// Negative CBOR labels below i64::MIN remain distinguishable from ordinary signed labels.
+    Negative(u64),
     Text(Vec<u8>),
 }
 
@@ -1703,7 +1705,14 @@ impl<'a> CborReader<'a> {
                     Err(_) => Ok(CborLabelKey::Unsigned(value)),
                 }
             }
-            1 => self.read_i64().map(CborLabelKey::Integer),
+            1 => {
+                let argument = self.read_u64()?;
+                if argument <= i64::MAX as u64 {
+                    Ok(CborLabelKey::Integer(-(argument as i64) - 1))
+                } else {
+                    Ok(CborLabelKey::Negative(argument))
+                }
+            },
             3 => self.read_text_bounded(256).map(CborLabelKey::Text),
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
