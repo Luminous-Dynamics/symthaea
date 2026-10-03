@@ -737,6 +737,19 @@ impl SqliteAuthorizationStore {
         if persisted_relying_party.as_deref() != Some(self.relying_party_id.as_str()) {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+        let native_provenance: (Option<String>, Option<String>, Option<String>) = tx.query_row(
+            "SELECT native_authority_namespace,native_authorization_id,native_replay_derivation_digest
+             FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance, record.attempt_id],
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+        )?;
+        Self::validate_persisted_native_replay_provenance(
+            record,
+            native_provenance.0.as_deref(),
+            native_provenance.1.as_deref(),
+            native_provenance.2.as_deref(),
+        )?;
         let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
         if current_boundary != record.boundary_id {
@@ -784,6 +797,28 @@ impl SqliteAuthorizationStore {
         }
         tx.commit()?;
         Ok(())
+    }
+
+    fn validate_persisted_native_replay_provenance(
+        record: &DurableDispatchRecord,
+        authority_namespace: Option<&str>,
+        native_authorization_id: Option<&str>,
+        derivation_digest: Option<&str>,
+    ) -> Result<(), AuthorizationStoreError> {
+        match (authority_namespace, native_authorization_id, derivation_digest) {
+            (None, None, None) => Ok(()),
+            (Some(namespace), Some(native_id), Some(digest)) => {
+                let derived = super::NativeReplayDerivation::derive(namespace, native_id)
+                    .map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
+                if derived.native_replay_identity != record.native_replay_identity
+                    || derived.derivation_digest != digest
+                {
+                    return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+                }
+                Ok(())
+            }
+            _ => Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into()),
+        }
     }
 
     /// Commit an outcome only through the frozen dispatch record. The record
@@ -855,6 +890,9 @@ impl SqliteAuthorizationStore {
         if persisted_relying_party.as_deref() != Some(self.relying_party_id.as_str()) {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+        Self::validate_persisted_native_replay_provenance(
+            record, row.1.as_deref(), row.2.as_deref(), row.3.as_deref()
+        )?;
         if !matches!(row.0.as_str(), "dispatch_pending" | "invoked" | "indeterminate") {
             if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
                 return Ok(receipt);
@@ -1191,6 +1229,12 @@ impl SqliteAuthorizationStore {
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
             |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+        )?;
+        Self::validate_persisted_native_replay_provenance(
+            record,
+            native_provenance.0.as_deref(),
+            native_provenance.1.as_deref(),
+            native_provenance.2.as_deref(),
         )?;
 
         if let Some(r) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "reconciled")? {
@@ -2048,6 +2092,26 @@ mod tests {
         assert_eq!(persisted.0,Some(expected.authority_namespace.clone()));
         assert_eq!(persisted.1,Some(expected.native_authorization_id.clone()));
         assert_eq!(persisted.2,Some(expected.derivation_digest.clone()));
+
+        connection.execute(
+            "UPDATE authorization_dispatches
+             SET native_replay_derivation_digest='sha256:forged'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        assert!(matches!(
+            store.commit_bound_verified(&record,&evidence,&TestProviderVerifier),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidNativeReplayProvenance
+            ))
+        ));
+        connection.execute(
+            "UPDATE authorization_dispatches
+             SET native_replay_derivation_digest=?3
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id,expected.derivation_digest.as_str()],
+        ).unwrap();
 
         let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
         store.commit_bound_verified(&record,&evidence,&TestProviderVerifier).unwrap();
