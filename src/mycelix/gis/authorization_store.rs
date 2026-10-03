@@ -5037,6 +5037,61 @@ mod tests {
     }
 
     #[test]
+    fn terminal_evidence_attempt_commitment_cannot_be_substituted() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-terminal-binding-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new("target-terminal-binding","prod","adapter-terminal");
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"terminal-binding".into(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T07:20:00Z".into(),
+            expires_at:Some("2026-10-04T07:20:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-terminal-binding","boundary-terminal-binding"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-terminal-binding",
+            &action,&effect,"boundary-terminal-binding",
+            "operation:terminal-binding","native-terminal-binding"
+        ).unwrap();
+        let mut evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        evidence.attempt_binding_digest="sha256:forged-attempt-binding".into();
+
+        let err=store.commit_bound_verified(
+            &record,&evidence,&TestProviderVerifier
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"dispatch_pending");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn verified_terminal_evidence_is_exact_attempt_and_sink_bound() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-verifier-binding-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
