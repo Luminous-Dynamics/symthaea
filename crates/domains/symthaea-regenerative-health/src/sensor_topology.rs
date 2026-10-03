@@ -23,6 +23,52 @@ pub struct AuthoritativeAttestationReference {
     pub verification_reference: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttestationVerificationResult {
+    /// Stable verifier identity. This is a claim supplied by the authoritative layer.
+    pub verifier_id: String,
+    /// Exact attestation reference this result evaluated.
+    pub attestation_id: String,
+    pub attestation_digest: String,
+    /// Evidence/result identity produced by the verifier.
+    pub verification_reference: String,
+    /// Verification time and validity horizon, in the verifier's clock domain.
+    pub verified_at_ms: u64,
+    pub valid_until_ms: u64,
+}
+
+impl AttestationVerificationResult {
+    fn validate_against(
+        &self,
+        reference: &AuthoritativeAttestationReference,
+        observation_timestamp_ms: u64,
+    ) -> Result<(), SensorTopologyAttestationIssue> {
+        if self.verifier_id.trim().is_empty()
+            || self.attestation_id.trim().is_empty()
+            || self.attestation_digest.trim().is_empty()
+            || self.verification_reference.trim().is_empty()
+        {
+            return Err(SensorTopologyAttestationIssue::EmptyVerificationResult);
+        }
+        if self.verified_at_ms > self.valid_until_ms {
+            return Err(SensorTopologyAttestationIssue::InvalidVerificationWindow);
+        }
+        if self.attestation_id != reference.attestation_id
+            || self.attestation_digest != reference.attestation_digest
+            || self.verification_reference != reference.verification_reference
+        {
+            return Err(SensorTopologyAttestationIssue::VerificationReferenceMismatch);
+        }
+        if observation_timestamp_ms < self.verified_at_ms {
+            return Err(SensorTopologyAttestationIssue::FutureVerificationResult);
+        }
+        if observation_timestamp_ms > self.valid_until_ms {
+            return Err(SensorTopologyAttestationIssue::StaleVerificationResult);
+        }
+        Ok(())
+    }
+}
+
 impl AuthoritativeAttestationReference {
     fn validate(&self, expected_issuer_id: &str) -> Result<(), SensorTopologyAttestationIssue> {
         if self.attestation_id.trim().is_empty()
@@ -54,6 +100,8 @@ pub struct SensorTopologyAttestation {
     pub evidence_id: String,
     /// Reference into the authoritative provenance/attestation layer.
     pub authoritative_reference: AuthoritativeAttestationReference,
+    /// Result returned by the authoritative verifier for this reference.
+    pub verification_result: AttestationVerificationResult,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +115,11 @@ pub enum SensorTopologyAttestationIssue {
     ConfigurationMismatch,
     TopologyIdentityMismatch,
     AttestationReferenceMismatch,
+    EmptyVerificationResult,
+    InvalidVerificationWindow,
+    VerificationReferenceMismatch,
+    FutureVerificationResult,
+    StaleVerificationResult,
 }
 
 impl SensorTopologyAttestation {
@@ -93,6 +146,8 @@ impl SensorTopologyAttestation {
         }
 
         self.authoritative_reference.validate(expected_issuer_id)?;
+        self.verification_result
+            .validate_against(&self.authoritative_reference, observation_timestamp_ms)?;
 
         if self.issued_at_ms > self.valid_until_ms {
             return Err(SensorTopologyAttestationIssue::InvalidValidityWindow);
@@ -143,6 +198,14 @@ mod tests {
                 issuer_id: "mycelix-topology-authority".into(),
                 attestation_digest: "att-digest-1".into(),
                 verification_reference: "verify-1".into(),
+            },
+            verification_result: AttestationVerificationResult {
+                verifier_id: "mycelix-topology-verifier".into(),
+                attestation_id: "att-topology-1".into(),
+                attestation_digest: "att-digest-1".into(),
+                verification_reference: "verify-1".into(),
+                verified_at_ms: 500,
+                valid_until_ms: 2_500,
             },
         }
     }
@@ -207,6 +270,33 @@ mod tests {
         assert_eq!(
             a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
             Err(SensorTopologyAttestationIssue::EmptyAttestationReference)
+        );
+    }
+
+
+    #[test]
+    fn verification_result_must_match_attestation_reference() {
+        let mut a = attestation();
+        a.verification_result.attestation_digest = "wrong".into();
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::VerificationReferenceMismatch)
+        );
+    }
+
+    #[test]
+    fn verification_result_cannot_be_stale_or_future() {
+        let mut a = attestation();
+        a.verification_result.valid_until_ms = 999;
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::StaleVerificationResult)
+        );
+        a = attestation();
+        a.verification_result.verified_at_ms = 1_001;
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::FutureVerificationResult)
         );
     }
 

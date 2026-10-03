@@ -354,6 +354,14 @@ mod tests {
                         attestation_digest: "att-digest-1".into(),
                         verification_reference: "verify-1".into(),
                     },
+                    verification_result: crate::sensor_topology::AttestationVerificationResult {
+                        verifier_id: "mycelix-topology-verifier".into(),
+                        attestation_id: "att-topology-1".into(),
+                        attestation_digest: "att-digest-1".into(),
+                        verification_reference: "verify-1".into(),
+                        verified_at_ms: 500,
+                        valid_until_ms: 2_500,
+                    },
                 },
             },
         }
@@ -495,6 +503,35 @@ mod tests {
             issue,
             TemporalFusionIssue::TopologyAttestation(
                 SensorTopologyAttestationIssue::TopologyIdentityMismatch
+            )
+        )));
+    }
+
+    #[test]
+    fn stale_verification_result_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.verification_result.valid_until_ms = 999;
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::StaleVerificationResult
+            )
+        )));
+    }
+
+    #[test]
+    fn verification_reference_substitution_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.verification_result.verification_reference =
+            "verify-attacker".into();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::VerificationReferenceMismatch
             )
         )));
     }
