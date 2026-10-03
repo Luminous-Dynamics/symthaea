@@ -70,12 +70,13 @@ scan_legacy_service_constructor() {
 }
 
 scan_public_observation_factory() {
+  local file="$1"
+  rg -n --pcre2 "${OBSERVATION_PUBLIC_FACTORY_PATTERN}" "$file"
+}
+
 scan_public_systemd_transport_api() {
   local file="$1"
   rg -n --pcre2 "${SYSTEMD_TRANSPORT_PUBLIC_API_PATTERN}" "$file"
-}
-  local file="$1"
-  rg -n --pcre2 "${OBSERVATION_PUBLIC_FACTORY_PATTERN}" "$file"
 }
 
 scan_legacy_service_renderer() {
