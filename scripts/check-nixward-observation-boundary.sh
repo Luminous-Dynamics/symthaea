@@ -168,18 +168,7 @@ run_boundary_check() {
     echo "${matches}" >&2
     failed=1
   fi
-  if matches="$(scan_public_observation_factory "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
-  if matches="$(rg -n '^pub[[:space:]]+mod[[:space:]]+systemd_transport;' "${ROOT}/crates/core/nixward/src/action/mod.rs")"; then
-    echo "ERROR: raw systemd transport module must remain crate-private" >&2
-    echo "${matches}" >&2
-    failed=1
-  fi
-  if matches="$(scan_public_systemd_transport_api "${ROOT}/crates/core/nixward/src/action/systemd_transport.rs")"; then
-    echo "ERROR: raw systemd transport entry point must remain crate-private" >&2
-    echo "${matches}" >&2
-    failed=1
-  fi
-
+  if matches="$(rg -n '^pub[[:space:]]+mod[[:space:]]+systemd_transport;' "${ROOT}/crates/core/nixward/src/action/mod.rs")"; then,    echo "ERROR: raw systemd transport module must remain crate-private" >&2,    echo "${matches}" >&2,    failed=1,  fi,  if matches="$(scan_public_systemd_transport_api "${ROOT}/crates/core/nixward/src/action/systemd_transport.rs")"; then,    echo "ERROR: raw systemd transport entry point must remain crate-private" >&2,    echo "${matches}" >&2,    failed=1,  fi,,  if matches="$(scan_public_observation_factory "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
   if matches="$(scan_public_observation_factory "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
     echo "ERROR: observed-state parsers/factories must not be public" >&2
     echo "${matches}" >&2
@@ -321,56 +310,7 @@ run_self_test() {
     return 1
   fi
 
-  printf '%s\n' 'pub(crate) fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-crate-parser.rs"
-  printf '%s\n' 'pub fn observe_service_properties(...) {}' > "${tmp}/systemd-transport-public.rs"
-  if scan_public_systemd_transport_api "${tmp}/systemd-transport-public.rs"; then :; else
-    echo "ERROR: CROSS-024 self-test failed to detect public systemd transport entry point" >&2
-    return 1
-  fi
-
-  printf '%s\n' 'pub async fn observe_service_properties(...) {}' > "${tmp}/systemd-transport-public-async.rs"
-  if scan_public_systemd_transport_api "${tmp}/systemd-transport-public-async.rs"; then :; else
-    echo "ERROR: CROSS-024 self-test failed to detect public async systemd transport entry point" >&2
-    return 1
-  fi
-
-  printf '%s\n' 'pub(crate) fn observe_service_properties(...) {}' > "${tmp}/systemd-transport-crate-private.rs"
-  if scan_public_systemd_transport_api "${tmp}/systemd-transport-crate-private.rs"; then
-    echo "ERROR: CROSS-024 self-test falsely rejected crate-private systemd transport entry point" >&2
-    return 1
-  fi
-
-  printf '%s\n' 'pub mod systemd_transport;' > "${tmp}/systemd-transport-public-module.rs"
-  if rg -n '^pub[[:space:]]+mod[[:space:]]+systemd_transport;' "${tmp}/systemd-transport-public-module.rs"; then :; else
-    echo "ERROR: CROSS-024 self-test failed to detect public systemd transport module" >&2
-    return 1
-  fi
-
-  printf '%s\n' 'pub(crate) mod systemd_transport;' > "${tmp}/systemd-transport-crate-private-module.rs"
-  if rg -n '^pub[[:space:]]+mod[[:space:]]+systemd_transport;' "${tmp}/systemd-transport-crate-private-module.rs"; then
-    echo "ERROR: CROSS-024 self-test falsely rejected crate-private systemd transport module" >&2
-    return 1
-  fi
-  if scan_public_observation_factory "${tmp}/observed-state-crate-parser.rs"; then
-    echo "ERROR: CROSS-023 self-test falsely rejected crate-private observation parser" >&2
-    return 1
-  fi
-
-  printf '%s\n' 'pub async fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-public-async-parser.rs"
-  if scan_public_observation_factory "${tmp}/observed-state-public-async-parser.rs"; then :; else
-    echo "ERROR: CROSS-023 self-test failed to detect public async observed-state parser" >&2
-    return 1
-  fi
-
-  printf '%s\n' 'impl NixServiceObservedStateV1 {
-    pub async fn new(
-        unit: String,
-    ) {}' > "${tmp}/observed-state-public-async-constructor.rs"
-  if rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/observed-state-public-async-constructor.rs"; then :; else
-    echo "ERROR: CROSS-022 self-test failed to detect public async observed-state constructor" >&2
-    return 1
-  fi
-}
+  printf '%s\n' 'pub(crate) fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-crate-parser.rs",  if scan_public_observation_factory "${tmp}/observed-state-crate-parser.rs"; then,    echo "ERROR: CROSS-023 self-test falsely rejected crate-private observation parser" >&2,    return 1,  fi,,  printf '%s\n' 'pub async fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-public-async-parser.rs",  if scan_public_observation_factory "${tmp}/observed-state-public-async-parser.rs"; then :; else,    echo "ERROR: CROSS-023 self-test failed to detect public async observed-state parser" >&2,    return 1,  fi,,  printf '%s\n' 'impl NixServiceObservedStateV1 {,    pub async fn new(,        unit: String,,    ) {}' > "${tmp}/observed-state-public-async-constructor.rs",  if rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/observed-state-public-async-constructor.rs"; then :; else,    echo "ERROR: CROSS-022 self-test failed to detect public async observed-state constructor" >&2,    return 1,  fi,,  printf '%s\n' 'pub fn observe_service_properties(...) {}' > "${tmp}/systemd-transport-public.rs",  if scan_public_systemd_transport_api "${tmp}/systemd-transport-public.rs"; then :; else,    echo "ERROR: CROSS-024 self-test failed to detect public systemd transport entry point" >&2,    return 1,  fi,,  printf '%s\n' 'pub async fn observe_service_properties(...) {}' > "${tmp}/systemd-transport-public-async.rs",  if scan_public_systemd_transport_api "${tmp}/systemd-transport-public-async.rs"; then :; else,    echo "ERROR: CROSS-024 self-test failed to detect public async systemd transport entry point" >&2,    return 1,  fi,,  printf '%s\n' 'pub(crate) fn observe_service_properties(...) {}' > "${tmp}/systemd-transport-crate-private.rs",  if scan_public_systemd_transport_api "${tmp}/systemd-transport-crate-private.rs"; then,    echo "ERROR: CROSS-024 self-test falsely rejected crate-private systemd transport entry point" >&2,    return 1,  fi,,  printf '%s\n' 'pub mod systemd_transport;' > "${tmp}/systemd-transport-public-module.rs",  if rg -n '^pub[[:space:]]+mod[[:space:]]+systemd_transport;' "${tmp}/systemd-transport-public-module.rs"; then :; else,    echo "ERROR: CROSS-024 self-test failed to detect public systemd transport module" >&2,    return 1,  fi,,  printf '%s\n' 'pub(crate) mod systemd_transport;' > "${tmp}/systemd-transport-crate-private-module.rs",  if rg -n '^pub[[:space:]]+mod[[:space:]]+systemd_transport;' "${tmp}/systemd-transport-crate-private-module.rs"; then,    echo "ERROR: CROSS-024 self-test falsely rejected crate-private systemd transport module" >&2,    return 1,  fi,}
 
 
 run_self_test
