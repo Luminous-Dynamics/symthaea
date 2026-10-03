@@ -309,7 +309,11 @@ impl TopologyResolutionGate {
             }
         }
 
-        if issues.is_empty() {
+        let fatal_issue = issues
+            .iter()
+            .any(|issue| !matches!(issue, TopologyResolutionIssue::DuplicateObservedBranch));
+
+        if !fatal_issue {
             TopologyResolutionDecision {
                 schema_version: self.policy.schema_version.clone(),
                 policy_id: self.policy.policy_id.clone(),
@@ -427,6 +431,15 @@ mod tests {
         let d = gate().assess(Some(&r), &[a], 3_000);
         assert_eq!(d.state, TopologyResolutionState::Quarantined);
         assert!(d.issues.contains(&TopologyResolutionIssue::InvalidSuccessorEffectiveTime));
+    }
+
+    #[test]
+    fn duplicate_observed_branch_evidence_does_not_block_resolution() {
+        let a = branch("topology-v2a");
+        let r = resolution("topology-v2a", vec![a.clone()]);
+        let d = gate().assess(Some(&r), &[a.clone(), a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Resolved);
+        assert!(d.issues.contains(&TopologyResolutionIssue::DuplicateObservedBranch));
     }
 
     #[test]
