@@ -25,6 +25,7 @@ fn branch_set_digest(branches: &[TopologyBranchReference]) -> String {
         bytes.extend_from_slice(&(branch.predecessor_topology_digest.len() as u64).to_be_bytes());
         bytes.extend_from_slice(branch.predecessor_topology_digest.as_bytes());
         bytes.extend_from_slice(&branch.successor_epoch.to_be_bytes());
+        bytes.extend_from_slice(&branch.successor_effective_from_ms.to_be_bytes());
         bytes.extend_from_slice(&(branch.successor_topology_digest.len() as u64).to_be_bytes());
         bytes.extend_from_slice(branch.successor_topology_digest.as_bytes());
     }
@@ -408,6 +409,14 @@ mod tests {
             branch_set_digest(&[a.clone(), b.clone()]),
             branch_set_digest(&[b, a]),
         );
+    }
+
+    #[test]
+    fn branch_set_digest_commits_successor_effective_time() {
+        let a = branch("topology-v2a");
+        let mut changed = a.clone();
+        changed.successor_effective_from_ms = 1_501;
+        assert_ne!(branch_set_digest(&[a]), branch_set_digest(&[changed]));
     }
 
     #[test]
