@@ -202,6 +202,11 @@ A linear-code comparator tests a different hypothesis: whether algebraic represe
 
 The literature supports treating this as a distinct recovery family. Raviv reports that random linear codes retain favorable storage properties while exposing subspace structure that enables specialized recovery; the paper reports substantial speed advantages in its own benchmark, but those results must not be transplanted to Symthaea without a matched implementation and experiment.
 
+### Paper-scale binding-recovery smoke matrix
+
+The qualification harness now covers the paper's published \(n\in\{500,1000,2000\}\), \(k\in\{3,5,7\}\), and \(F\in\{3,4,5\}\) binding-recovery parameter grid, using three deterministic repeats per setting. The smoke matrix deliberately records validity and joint-basis independence rather than timing or superiority. When the sampled factor bases are jointly independent, the unique GF(2) representation makes exact original-factor recovery testable; when dependence occurs, the fixture is classified instead of being silently treated as uniquely identifiable.
+
+
 ## Non-goals
 
 - no production default change;
