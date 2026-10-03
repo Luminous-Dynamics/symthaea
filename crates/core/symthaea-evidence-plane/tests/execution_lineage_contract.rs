@@ -51,8 +51,10 @@ fn public_execution_lineage_namespace_exposes_checked_admission_paths() {
         LineagePerturbationResult::UnexpectedCollateralChange
     );
     assert_eq!(
-        symthaea_evidence_plane::execution_lineage::try_qualify_lineage_perturbation(&base, &changed, true)
-            .unwrap(),
+        symthaea_evidence_plane::execution_lineage::try_qualify_lineage_perturbation(
+            &base, &changed, true,
+        )
+        .unwrap(),
         LineagePerturbationResult::ExpectedDependencyChanged
     );
     assert_eq!(base.validated_digest().unwrap(), base.digest());
@@ -233,12 +235,11 @@ fn every_canonical_lineage_field_changes_identity_and_drift_report() {
             changed.digest(),
             "{name} must be identity-material"
         );
-        let report =
-            symthaea_evidence_plane::execution_lineage::ExecutionLineageDriftV1::between(
-                &base, &changed,
-            )
-            .unwrap()
-            .expect("changed lineage must report drift");
+        let report = symthaea_evidence_plane::execution_lineage::ExecutionLineageDriftV1::between(
+            &base, &changed,
+        )
+        .unwrap()
+        .expect("changed lineage must report drift");
         assert_eq!(
             report.changed_fields,
             vec![expected_field],
@@ -278,8 +279,7 @@ fn drift_report_rejects_invalid_lineage() {
 
     assert_eq!(
         symthaea_evidence_plane::execution_lineage::ExecutionLineageDriftV1::between(
-            &prepared,
-            &observed,
+            &prepared, &observed,
         )
         .unwrap_err(),
         "invalid or non-canonical Git object identity for source_revision: \"not-a-git-object\""
