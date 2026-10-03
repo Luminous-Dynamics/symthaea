@@ -2105,6 +2105,34 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
         }
     }
 
+    // Verify the declared FK itself, not only current row consistency. foreign_key_check
+    // cannot prove a REFERENCES clause exists when the schema has drifted.
+    let foreign_keys = {
+        let mut stmt = conn
+            .prepare("PRAGMA foreign_key_list(knowledge_snapshot_validation_receipts)")
+            .map_err(|e| format!("Schema integrity foreign-key prepare: {e}"))?;
+        stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+            ))
+        })
+        .map_err(|e| format!("Schema integrity foreign-key query: {e}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Schema integrity foreign-key row: {e}"))?
+    };
+    if !foreign_keys.iter().any(|(parent, child_col, parent_col)| {
+        parent == "knowledge_snapshot_receipts"
+            && child_col == "generation"
+            && parent_col == "generation"
+    }) {
+        return Err(
+            "Schema integrity check failed: missing validation receipt generation foreign key"
+                .into(),
+        );
+    }
+
     // These two indexes enforce identity uniqueness rather than merely improving
     // query performance, so a same-named replacement index must also be verified unique.
     for (table, index) in [
@@ -3007,6 +3035,64 @@ mod tests {
         let err = p.ensure_schema(&conn).unwrap_err();
         assert!(err.contains("Schema integrity check failed"));
         assert!(err.contains("trg_knowledge_snapshot_receipts_no_update"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_initialized_schema_rejects_missing_validation_receipt_foreign_key() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_initialized_fk_drift_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "fk-drift".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x41; BinaryHV::BYTES],
+            source_text: "foreign key drift".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        // Rebuild the validation ledger without its FK, preserving the row shape.
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "PRAGMA foreign_keys = OFF;
+                 BEGIN;
+                 ALTER TABLE knowledge_snapshot_validation_receipts
+                    RENAME TO validation_receipts_with_fk;
+                 CREATE TABLE knowledge_snapshot_validation_receipts (
+                    validation_event TEXT PRIMARY KEY,
+                    generation INTEGER NOT NULL,
+                    snapshot_digest_hex TEXT NOT NULL,
+                    validator_ref TEXT NOT NULL,
+                    validator_version TEXT NOT NULL,
+                    validation_profile TEXT NOT NULL,
+                    conforms INTEGER NOT NULL,
+                    report_digest_hex TEXT,
+                    validation_sequence INTEGER NOT NULL DEFAULT 0,
+                    receipt_digest_hex TEXT
+                 );
+                 INSERT INTO knowledge_snapshot_validation_receipts
+                    SELECT * FROM validation_receipts_with_fk;
+                 DROP TABLE validation_receipts_with_fk;
+                 COMMIT;",
+            )
+            .unwrap();
+        }
+
+        let conn = p.open_connection().unwrap();
+        let err = p.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains("missing validation receipt generation foreign key"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
