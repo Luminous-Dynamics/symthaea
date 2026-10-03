@@ -143,6 +143,34 @@ impl TopologyAuthorityGate {
                     };
                 };
 
+                if let Some(revocation) = revocation {
+                    let revocation_decision = self.revocation_gate.assess(revocation, now_ms);
+                    issues.extend(
+                        revocation_decision
+                            .issues
+                            .iter()
+                            .cloned()
+                            .map(TopologyAuthorityIssue::Revocation),
+                    );
+
+                    match revocation_decision.state {
+                        TopologyRevocationState::Revoked => {
+                            return TopologyAuthorityDecision {
+                                state: TopologyAuthorityState::Revoked,
+                                issues,
+                                ..base
+                            };
+                        }
+                        TopologyRevocationState::Quarantined => {
+                            return TopologyAuthorityDecision {
+                                state: TopologyAuthorityState::Quarantined,
+                                issues,
+                                ..base
+                            };
+                        }
+                    }
+                }
+
                 if now_ms < resolution.selected_successor_effective_from_ms {
                     issues.push(TopologyAuthorityIssue::SuccessorNotYetEffective);
                     return TopologyAuthorityDecision {
@@ -152,34 +180,10 @@ impl TopologyAuthorityGate {
                     };
                 }
 
-                let Some(revocation) = revocation else {
-                    return TopologyAuthorityDecision {
-                        state: TopologyAuthorityState::Current,
-                        issues,
-                        ..base
-                    };
-                };
-
-                let revocation_decision = self.revocation_gate.assess(revocation, now_ms);
-                issues.extend(
-                    revocation_decision
-                        .issues
-                        .iter()
-                        .cloned()
-                        .map(TopologyAuthorityIssue::Revocation),
-                );
-
-                match revocation_decision.state {
-                    TopologyRevocationState::Revoked => TopologyAuthorityDecision {
-                        state: TopologyAuthorityState::Revoked,
-                        issues,
-                        ..base
-                    },
-                    TopologyRevocationState::Quarantined => TopologyAuthorityDecision {
-                        state: TopologyAuthorityState::Quarantined,
-                        issues,
-                        ..base
-                    },
+                TopologyAuthorityDecision {
+                    state: TopologyAuthorityState::Current,
+                    issues,
+                    ..base
                 }
             }
         }
@@ -298,6 +302,18 @@ mod tests {
         let d = gate().assess(Some(&r), Some(&revocation()), &[a], 3_001);
         assert_eq!(d.state, TopologyAuthorityState::Revoked);
         assert_eq!(d.revocation_id.as_deref(), Some("revocation-2"));
+    }
+
+    #[test]
+    fn valid_revocation_precedes_future_activation() {
+        let a = branch("topology-v2a");
+        let mut r = resolution("topology-v2a", vec![a.clone()]);
+        r.selected_successor_effective_from_ms = 4_000;
+        let d = gate().assess(Some(&r), Some(&revocation()), &[a], 3_001);
+        assert_eq!(d.state, TopologyAuthorityState::Revoked);
+        assert!(!d
+            .issues
+            .contains(&TopologyAuthorityIssue::SuccessorNotYetEffective));
     }
 
     #[test]
