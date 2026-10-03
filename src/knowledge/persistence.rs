@@ -2091,17 +2091,80 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
     }
 
     for name in REQUIRED_TRIGGERS {
-        let exists: bool = conn
+        let sql: Option<String> = conn
             .query_row(
-                "SELECT EXISTS(
-                    SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = ?1
-                )",
+                "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?1",
                 [*name],
                 |row| row.get(0),
             )
+            .optional()
             .map_err(|e| format!("Schema integrity trigger check for {name}: {e}"))?;
-        if !exists {
-            return Err(format!("Schema integrity check failed: missing trigger {name}"));
+        let sql = sql.ok_or_else(|| {
+            format!("Schema integrity check failed: missing trigger {name}")
+        })?;
+        let normalized = sql.split_whitespace().collect::<Vec<_>>().join(" ").to_ascii_lowercase();
+
+        let required_fragments: &[&str] = match *name {
+            "trg_knowledge_facts_memory_id_required_insert" => &[
+                "before insert on knowledge_facts",
+                "new.memory_id is null or trim(new.memory_id) = ''",
+                "raise(abort, 'knowledge_facts memory_id must be non-empty')",
+            ],
+            "trg_knowledge_facts_memory_id_required_update" => &[
+                "before update of memory_id on knowledge_facts",
+                "new.memory_id is null or trim(new.memory_id) = ''",
+                "raise(abort, 'knowledge_facts memory_id must be non-empty')",
+            ],
+            "trg_knowledge_provenance_relation_required_insert" => &[
+                "before insert on knowledge_provenance_relations",
+                "new.source_memory_id is null",
+                "new.target_memory_id is null",
+                "new.source_memory_id = new.target_memory_id",
+                "new.created_at is null",
+                "new.kind not in (",
+                "raise(abort, 'knowledge_provenance_relations requires valid identities, timestamp, and stable kind')",
+            ],
+            "trg_knowledge_provenance_relation_required_update" => &[
+                "before update of source_memory_id, target_memory_id, kind, created_at on knowledge_provenance_relations",
+                "new.source_memory_id is null",
+                "new.target_memory_id is null",
+                "new.source_memory_id = new.target_memory_id",
+                "new.created_at is null",
+                "new.kind not in (",
+                "raise(abort, 'knowledge_provenance_relations requires valid identities, timestamp, and stable kind')",
+            ],
+            "trg_knowledge_snapshot_validation_receipts_required_insert" => &[
+                "before insert on knowledge_snapshot_validation_receipts",
+                "new.validation_event is null",
+                "new.validation_sequence is null",
+                "new.validation_sequence <= 0",
+                "raise(abort, 'knowledge_snapshot_validation_receipts requires a valid event and positive sequence')",
+            ],
+            "trg_knowledge_snapshot_receipts_no_update" => &[
+                "before update on knowledge_snapshot_receipts",
+                "raise(abort, 'knowledge_snapshot_receipts is append-only: update prohibited')",
+            ],
+            "trg_knowledge_snapshot_receipts_no_delete" => &[
+                "before delete on knowledge_snapshot_receipts",
+                "raise(abort, 'knowledge_snapshot_receipts is append-only: delete prohibited')",
+            ],
+            "trg_knowledge_snapshot_validation_receipts_no_update" => &[
+                "before update on knowledge_snapshot_validation_receipts",
+                "raise(abort, 'knowledge_snapshot_validation_receipts is append-only: update prohibited')",
+            ],
+            "trg_knowledge_snapshot_validation_receipts_no_delete" => &[
+                "before delete on knowledge_snapshot_validation_receipts",
+                "raise(abort, 'knowledge_snapshot_validation_receipts is append-only: delete prohibited')",
+            ],
+            _ => &[],
+        };
+
+        for fragment in required_fragments {
+            if !normalized.contains(fragment) {
+                return Err(format!(
+                    "Schema integrity check failed: trigger {name} is missing required contract fragment: {fragment}"
+                ));
+            }
         }
     }
 
@@ -2134,12 +2197,13 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
     }
 
     // These two indexes enforce identity uniqueness rather than merely improving
-    // query performance, so a same-named replacement index must also be verified unique.
-    for (table, index) in [
-        ("knowledge_facts", "idx_facts_memory_id_unique"),
+    // query performance, so verify both uniqueness and the exact key-column contract.
+    for (table, index, expected_columns) in [
+        ("knowledge_facts", "idx_facts_memory_id_unique", &["memory_id"][..]),
         (
             "knowledge_snapshot_validation_receipts",
             "idx_snapshot_validation_receipts_sequence_unique",
+            &["validation_sequence"][..],
         ),
     ] {
         let pragma = format!("PRAGMA index_list({table})");
@@ -2161,13 +2225,29 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
                 .get(2)
                 .map_err(|e| format!("Schema integrity index uniqueness for {table}: {e}"))?;
             if name == index && unique != 0 {
-                found_unique = true;
+                let info_pragma = format!("PRAGMA index_info({index})");
+                let mut info_stmt = conn
+                    .prepare(&info_pragma)
+                    .map_err(|e| format!("Schema integrity index columns for {index}: {e}"))?;
+                let index_columns = info_stmt
+                    .query_map([], |info_row| info_row.get::<_, Option<String>>(2))
+                    .map_err(|e| format!("Schema integrity index column query for {index}: {e}"))?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| format!("Schema integrity index column row for {index}: {e}"))?;
+                if index_columns.len() == expected_columns.len()
+                    && index_columns
+                        .iter()
+                        .map(Option::as_deref)
+                        .eq(expected_columns.iter().copied().map(Some))
+                {
+                    found_unique = true;
+                }
                 break;
             }
         }
         if !found_unique {
             return Err(format!(
-                "Schema integrity check failed: missing unique index {index} on {table}"
+                "Schema integrity check failed: unique index {index} on {table} has the wrong definition"
             ));
         }
     }
