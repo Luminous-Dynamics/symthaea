@@ -3602,4 +3602,41 @@ mod tests {
         assert!(!evaluation.is_consistent_with_report(&rebound_snapshot));
     }
 
+
+    #[test]
+    fn resolver_snapshot_is_retained_when_resolution_reaches_terminal_failure() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let method = ResolvedVerificationMethod {
+            verification_method: envelope.attester_id.clone(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Revoked,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([method]);
+        let expected_snapshot = resolver
+            .snapshot_fingerprint_for(&envelope.attester_id)
+            .expect("revoked method has a scoped snapshot");
+
+        let report = Ed25519ReceiptVerifier::new(
+            envelope.attester_id.clone(),
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_with_resolver_report(&envelope, &receipt, &resolver);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::VerificationMethodRevoked
+        );
+        assert_eq!(
+            report.resolved_verification_method.as_deref(),
+            Some(envelope.attester_id.as_str())
+        );
+        assert_eq!(
+            report.resolution_snapshot_fingerprint.as_deref(),
+            Some(expected_snapshot.as_str())
+        );
+        assert!(report.execution_trace.is_well_formed());
+    }
+
 }
