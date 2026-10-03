@@ -459,6 +459,7 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_leases", "validity_policy_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_dispatches", "native_issuer", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_namespace", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authorization_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_replay_derivation_digest", "TEXT")?;
@@ -470,6 +471,7 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_dispatches", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "native_issuer", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_namespace", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authorization_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_derivation_digest", "TEXT")?;
