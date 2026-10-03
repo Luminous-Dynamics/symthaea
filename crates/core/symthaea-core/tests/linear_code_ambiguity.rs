@@ -226,10 +226,8 @@ fn published_parameter_storage_ledger_is_exact_and_packed_consistent() {
             for &factor_count in &factor_counts {
                 let arbitrary_codebook_bits =
                     (factor_count as u128 * codeword_count + 1) * dimension as u128;
-                let generator_matrix_bits =
-                    (factor_count * rank + 1) as u128 * dimension as u128;
-                let packed_generator_bytes =
-                    (factor_count * rank) as u128 * packed_words * 8;
+                let generator_matrix_bits = (factor_count * rank + 1) as u128 * dimension as u128;
+                let packed_generator_bytes = (factor_count * rank) as u128 * packed_words * 8;
 
                 total_theoretical_codebook_bits += arbitrary_codebook_bits;
                 total_theoretical_generator_bits += generator_matrix_bits;
@@ -239,9 +237,7 @@ fn published_parameter_storage_ledger_is_exact_and_packed_consistent() {
 
                 assert_eq!(
                     packed_generator_bytes * 8,
-                    (factor_count * rank) as u128
-                        * packed_words
-                        * 64
+                    (factor_count * rank) as u128 * packed_words * 64
                 );
                 assert!(generator_matrix_bits <= arbitrary_codebook_bits);
             }
