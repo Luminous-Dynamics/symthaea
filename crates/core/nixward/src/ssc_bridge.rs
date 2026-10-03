@@ -44,6 +44,8 @@ pub enum SscObservationError {
     MissingRealization,
     #[error("NixOS generation observation contains multiple current generations")]
     MultipleCurrentGenerations,
+    #[error("NixOS generation observation contains a zero generation ordinal")]
+    InvalidGenerationNumber,
     #[error("NixOS generation observation contains a duplicate generation ordinal")]
     DuplicateGenerationNumber,
     #[error("NixOS generation marked current does not match /run/current-system")]
@@ -85,8 +87,24 @@ impl NixSystemObservation {
     }
 
     pub fn validate(&self) -> Result<(), SscObservationError> {
+        if self.system_profile_generation == 0 {
+            return Err(SscObservationError::InvalidGenerationNumber);
+        }
+        if self.system_profile_realization.is_empty()
+            || self.current_system_realization.is_empty()
+            || self.booted_system_realization.is_empty()
+        {
+            return Err(SscObservationError::MissingRealization);
+        }
+
         let mut previous_number = None;
         for entry in &self.generations {
+            if entry.number == 0 {
+                return Err(SscObservationError::InvalidGenerationNumber);
+            }
+            if entry.realization.is_empty() {
+                return Err(SscObservationError::MissingRealization);
+            }
             if previous_number == Some(entry.number) {
                 return Err(SscObservationError::DuplicateGenerationNumber);
             }
@@ -274,6 +292,46 @@ mod tests {
         assert_eq!(
             parse_generation_link_name("system-0-link").expect_err("generation zero"),
             SscObservationError::MissingSystemProfileGeneration
+        );
+    }
+
+    #[test]
+    fn observation_validation_rejects_missing_generation_realization() {
+        let observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: String::new(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert_eq!(
+            observation.validate().expect_err("missing realization"),
+            SscObservationError::MissingRealization
+        );
+    }
+
+    #[test]
+    fn observation_validation_rejects_zero_generation_number() {
+        let observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 0,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert_eq!(
+            observation.validate().expect_err("zero generation"),
+            SscObservationError::InvalidGenerationNumber
         );
     }
 
