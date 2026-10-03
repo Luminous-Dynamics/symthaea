@@ -14,7 +14,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 pub const SCHEMA_VERSION: &str = "ssc/v0.1";
-const DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/PLAN-DIGEST/v1\0";
+const INTENT_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/INTENT-DIGEST/v1\0";
+const TARGET_PROFILE_DIGEST_DOMAIN: &[u8] =
+    b"LUMINOUS-DYNAMICS/SSC/TARGET-PROFILE-DIGEST/v1\0";
+const TARGET_SNAPSHOT_DIGEST_DOMAIN: &[u8] =
+    b"LUMINOUS-DYNAMICS/SSC/TARGET-SNAPSHOT-DIGEST/v1\0";
+const PLAN_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/PLAN-DIGEST/v1\0";
 
 /// A content-addressed digest.
 ///
@@ -174,7 +179,7 @@ impl DeploymentIntent {
     }
 
     pub fn digest(&self) -> Result<ContentDigest, serde_json::Error> {
-        canonical_digest(self, DIGEST_DOMAIN)
+        canonical_digest(self, TARGET_PROFILE_DIGEST_DOMAIN)
     }
 }
 
@@ -253,7 +258,7 @@ impl DeploymentPlan {
     /// The authorization object is intentionally excluded, avoiding a
     /// circular digest dependency.
     pub fn digest(&self) -> Result<ContentDigest, serde_json::Error> {
-        canonical_digest(self, DIGEST_DOMAIN)
+        canonical_digest(self, INTENT_DIGEST_DOMAIN)
     }
 
     /// Validate OS-independent structural, identity, and capability invariants.
