@@ -1869,8 +1869,8 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
             authorization_instance:"native-derived".into(),action_id:action.id.clone(),
-            action_digest:action.canonical_action_digest(),support_digest:witness.support_digest,
-            current_frame:witness.current_frame,policy:witness.policy,authority_epoch:witness.authority_epoch,
+            action_digest:action.canonical_action_digest(),frame:witness.frame, support_digest:witness.support_digest,
+            policy:witness.policy,authority_epoch:witness.authority_epoch,
         };
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-native-derived","boundary-A").unwrap();
         let record=store.mark_dispatch_pending_bound_from_native_authority(
