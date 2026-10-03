@@ -205,21 +205,28 @@ impl Movie {
             return None;
         }
         let frame_bytes = px.checked_mul(4)?;
+        let expected_raw_bytes = px.checked_mul(channels)?;
         let frames = m["frames_b64"].as_array()?;
         if frames.is_empty() || frames.len() > MAX_MOVIE_FRAMES {
             return None;
         }
+        let total_rgba_bytes = frame_bytes.checked_mul(frames.len())?;
+        if total_rgba_bytes > MAX_MOVIE_RGBA_BYTES {
+            return None;
+        }
 
-        let mut total_rgba_bytes = 0usize;
         let mut frames_rgba = Vec::with_capacity(frames.len());
         for encoded in frames {
-            let raw = engine.decode(encoded.as_str()?).ok()?;
-            let expected_raw_bytes = px.checked_mul(channels)?;
-            if raw.len() != expected_raw_bytes {
+            let encoded = encoded.as_str()?;
+            let max_encoded_len = expected_raw_bytes
+                .checked_add(2)?
+                .checked_div(3)?
+                .checked_mul(4)?;
+            if encoded.len() > max_encoded_len {
                 return None;
             }
-            total_rgba_bytes = total_rgba_bytes.checked_add(frame_bytes)?;
-            if total_rgba_bytes > MAX_MOVIE_RGBA_BYTES {
+            let raw = engine.decode(encoded).ok()?;
+            if raw.len() != expected_raw_bytes {
                 return None;
             }
 
