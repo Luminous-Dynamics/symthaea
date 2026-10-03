@@ -1341,7 +1341,7 @@ fn validate_native_authority_pin_set(
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?)),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?)),
         )?;
         Self::validate_persisted_native_replay_provenance(
             record,
@@ -1977,9 +1977,9 @@ fn validate_native_authority_pin_set(
             native_provenance.5.as_deref(),
         )?;
         self.validate_persisted_authorization_validity(
-            native_provenance.5.as_deref(),
             native_provenance.6.as_deref(),
             native_provenance.7.as_deref(),
+            native_provenance.8.as_deref(),
             false,
         )?;
 
