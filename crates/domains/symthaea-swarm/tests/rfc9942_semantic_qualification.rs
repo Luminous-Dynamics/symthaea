@@ -740,6 +740,13 @@ fn detached_inclusion_state_derives_and_binds_root() {
         receipt.verify_es256_inclusion_state(candidate, &key, &[], Some(&[0xA5; 32])),
         Err(Rfc9942VdpError::NoMatchingProof)
     );
+
+    // The legacy head-returning API now shares the proof-derived detached path:
+    // no externally supplied Merkle root is needed.
+    assert_eq!(
+        receipt.verify_es256_inclusion(candidate, &key, &[], None),
+        Ok(head)
+    );
 }
 
 #[test]
