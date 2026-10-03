@@ -1397,6 +1397,8 @@ impl EvidenceEvaluation {
     pub fn is_well_formed(&self) -> bool {
         self.evaluation_version == EVIDENCE_EVALUATION_VERSION
             && self.evaluation_type == ATTESTATION_VERIFICATION_EVALUATION_TYPE
+            && !self.subject_fingerprint.is_empty()
+            && !self.verification_report_fingerprint.is_empty()
             && self.context.is_well_formed()
             && self.context_fingerprint == self.context.fingerprint()
             && self.execution_trace.is_well_formed()
@@ -3112,6 +3114,14 @@ mod tests {
         let mut changed_context = evaluation.clone();
         changed_context.context_fingerprint = "tampered-context".into();
         assert!(!changed_context.is_well_formed());
+
+        let mut empty_subject = evaluation.clone();
+        empty_subject.subject_fingerprint.clear();
+        assert!(!empty_subject.is_well_formed());
+
+        let mut empty_report_binding = evaluation.clone();
+        empty_report_binding.verification_report_fingerprint.clear();
+        assert!(!empty_report_binding.is_well_formed());
 
         let mut recomputed_context = evaluation.clone();
         recomputed_context.context.verifier_id = "attacker-verifier";
