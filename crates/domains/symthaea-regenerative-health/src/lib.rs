@@ -8,6 +8,7 @@ pub mod topology_resolution;
 pub mod topology_revocation;
 pub mod topology_authority;
 pub mod topology_resolution_verification;
+pub mod freshness_reconciliation;
 pub mod adversarial_crucible;
 pub mod physics_evidence;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
