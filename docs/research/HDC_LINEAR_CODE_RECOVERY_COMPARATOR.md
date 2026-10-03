@@ -138,6 +138,10 @@ Repeated execution of the same deterministic fixture must produce both the same 
 
 This ledger is intended to test the structure of the recovery algorithm before timing or energy measurements are introduced. In particular, the measurement should preserve the distinction between the maximal-independent-subset construction and the final linear solve described by the paper.
 
+#### Small-fixture scaling qualification
+
+The qualification harness now executes a deterministic structural sweep at dimensions 32, 64, and 96 with two equal factor ranks. For each fixture it records the recovery ledger and verifies the implementation-level invariant that an independent parent basis of total rank Δ produces exactly Δ retained generators, Δ span-membership checks, and Δ² rank pivots across the before/after rank tests used by the maximal-independent-subset construction. This is an implementation invariant, not a new theorem; it exists to make the measured ledger auditable before introducing larger matrices or wall-clock measurements.
+
 ### Stage D — matched resonator control
 
 Run the existing two-factor resonator harness against an ordinary bipolar random-code fixture with the same dimensions and codebook cardinality.
