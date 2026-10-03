@@ -214,6 +214,8 @@ pub enum AuthorizationConsumptionError {
     AttemptMismatch,
     /// Another unresolved attempt currently occupies the same effect action key.
     ActionAlreadyInFlight,
+    /// The same action instance already reached an executed terminal state.
+    ActionAlreadyClosed,
     InvalidNativeReplayProvenance,
     IndeterminateRequiresReconciliation,
     PreDispatchRecoveryNotAllowed,
