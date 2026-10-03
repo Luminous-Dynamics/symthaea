@@ -15,7 +15,7 @@ use std::collections::BTreeSet;
 
 const BRANCH_SET_DOMAIN: &[u8] = b"symthaea:topology-branch-set:v1\n";
 
-fn branch_set_digest(branches: &[TopologyBranchReference]) -> String {
+pub(crate) fn branch_set_digest(branches: &[TopologyBranchReference]) -> String {
     let mut unique = BTreeSet::new();
     unique.extend(branches.iter().cloned());
     let mut bytes = Vec::new();
