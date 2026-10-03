@@ -32,8 +32,10 @@ pub enum TopologyResolutionVerificationIssue {
     FutureVerification,
     StaleVerification,
     MissingFreshness,
+    WrongFreshnessScheme,
     WrongFreshnessSource,
     FreshnessRollback,
+    FreshnessPolicyMismatch,
     EmptyFreshnessMarker,
 }
 
@@ -63,6 +65,8 @@ pub struct TopologyResolutionVerificationResult {
     pub policy_fingerprint: String,
     /// Fingerprint of the verifier execution environment identity.
     pub environment_fingerprint: String,
+    /// Fingerprint of the exact freshness acceptance policy applied by the verifier.
+    pub freshness_policy_fingerprint: Option<String>,
     pub freshness: Option<TopologyResolutionFreshness>,
     pub verified_at_ms: u64,
     pub valid_until_ms: u64,
@@ -73,8 +77,10 @@ pub struct TopologyResolutionVerificationPolicy {
     pub schema_version: String,
     pub policy_id: String,
     pub expected_verifier_id: String,
+    pub required_freshness_scheme: Option<String>,
     pub required_freshness_source_id: Option<String>,
     pub minimum_freshness_epoch: Option<u64>,
+    pub expected_freshness_policy_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -91,6 +97,7 @@ pub struct TopologyResolutionVerificationDecision {
     pub freshness_source_id: Option<String>,
     pub freshness_epoch: Option<u64>,
     pub freshness_marker_digest: Option<String>,
+    pub freshness_policy_fingerprint: Option<String>,
     pub issues: Vec<TopologyResolutionVerificationIssue>,
 }
 
@@ -126,6 +133,7 @@ impl TopologyResolutionVerificationGate {
                     .freshness
                     .as_ref()
                     .map(|item| item.marker_digest.clone()),
+                freshness_policy_fingerprint: verification.freshness_policy_fingerprint.clone(),
                 issues,
             }
         }
@@ -163,6 +171,7 @@ impl TopologyResolutionVerificationGate {
                 freshness_source_id: None,
                 freshness_epoch: None,
                 freshness_marker_digest: None,
+                freshness_policy_fingerprint: None,
                 issues: vec![],
             };
         };
@@ -211,12 +220,39 @@ impl TopologyResolutionVerificationGate {
             {
                 issues.push(TopologyResolutionVerificationIssue::EmptyFreshnessMarker);
             }
+            if let Some(expected_scheme) =
+                self.policy.required_freshness_scheme.as_deref()
+            {
+                if freshness.scheme != expected_scheme {
+                    issues.push(TopologyResolutionVerificationIssue::WrongFreshnessScheme);
+                }
+            }
             if freshness.source_id != expected_source {
                 issues.push(TopologyResolutionVerificationIssue::WrongFreshnessSource);
             }
             if let Some(minimum_epoch) = self.policy.minimum_freshness_epoch {
                 if freshness.epoch < minimum_epoch {
                     issues.push(TopologyResolutionVerificationIssue::FreshnessRollback);
+                }
+            }
+            let Some(policy_fingerprint) =
+                verification.freshness_policy_fingerprint.as_deref()
+            else {
+                issues.push(TopologyResolutionVerificationIssue::FreshnessPolicyMismatch);
+                return Self::decision(
+                    self.policy.schema_version.clone(),
+                    self.policy.policy_id.clone(),
+                    verification,
+                    issues,
+                );
+            };
+            if let Some(expected) = self
+                .policy
+                .expected_freshness_policy_fingerprint
+                .as_deref()
+            {
+                if policy_fingerprint != expected {
+                    issues.push(TopologyResolutionVerificationIssue::FreshnessPolicyMismatch);
                 }
             }
         } else if let Some(freshness) = verification.freshness.as_ref() {
@@ -287,6 +323,7 @@ mod tests {
             verification_report_digest: "report-digest-2".into(),
             policy_fingerprint: "policy-fingerprint-2".into(),
             environment_fingerprint: "environment-fingerprint-2".into(),
+            freshness_policy_fingerprint: Some("freshness-policy-7".into()),
             freshness: Some(TopologyResolutionFreshness {
                 scheme: "epoch-marker-v1".into(),
                 source_id: "topology-epoch-bell".into(),
@@ -304,8 +341,10 @@ mod tests {
                 schema_version: "0.1".into(),
                 policy_id: "topology-resolution-verification-v1".into(),
                 expected_verifier_id: "mycelix-topology-verifier".into(),
+                required_freshness_scheme: Some("epoch-marker-v1".into()),
                 required_freshness_source_id: Some("topology-epoch-bell".into()),
                 minimum_freshness_epoch: Some(7),
+                expected_freshness_policy_fingerprint: Some("freshness-policy-7".into()),
             },
         )
         .unwrap()
@@ -317,7 +356,6 @@ mod tests {
         assert_eq!(d.state, TopologyResolutionVerificationState::Verified);
     }
 
-    #[test]
     #[test]
     fn missing_required_freshness_is_quarantined() {
         let mut r = result();
@@ -337,6 +375,17 @@ mod tests {
     }
 
     #[test]
+    fn freshness_policy_fingerprint_must_match() {
+        let mut r = result();
+        r.freshness_policy_fingerprint = Some("wrong-policy".into());
+        let d = gate().assess(&resolution(), Some(&r), 3_000);
+        assert_eq!(d.state, TopologyResolutionVerificationState::Quarantined);
+        assert!(d
+            .issues
+            .contains(&TopologyResolutionVerificationIssue::FreshnessPolicyMismatch));
+    }
+
+    #[test]
     fn freshness_source_must_match_policy() {
         let mut r = result();
         r.freshness.as_mut().unwrap().source_id = "unexpected-bell".into();
@@ -345,6 +394,7 @@ mod tests {
         assert!(d.issues.contains(&TopologyResolutionVerificationIssue::WrongFreshnessSource));
     }
 
+    #[test]
     fn missing_verifier_result_is_insufficient_evidence() {
         let d = gate().assess(&resolution(), None, 3_000);
         assert_eq!(d.state, TopologyResolutionVerificationState::InsufficientEvidence);
