@@ -780,6 +780,33 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_solver_matches_membership_on_small_space() {
+        let dimension = 8;
+        let code = RandomLinearCode::generate(dimension, 4, 0x5A5A);
+
+        for mask in 0..(1usize << dimension) {
+            let target = BinaryCodeword::from_words(dimension, vec![mask as u64]);
+            let solved = solve_linear_combination(&target, code.basis());
+
+            if code.contains(&target) {
+                let coefficients = solved.expect("every codeword has a basis representation");
+                let mut reconstructed = BinaryCodeword::zero(dimension);
+                for (coefficient, generator) in coefficients.iter().zip(code.basis()) {
+                    if *coefficient {
+                        reconstructed.xor_assign(generator);
+                    }
+                }
+                assert_eq!(reconstructed, target);
+            } else {
+                assert!(
+                    solved.is_none(),
+                    "solver must reject every target outside the code span: mask={mask:#x}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn linear_combination_solver_rejects_outside_span() {
         let code = RandomLinearCode::generate(64, 5, 0x5151);
         let outsider = BinaryCodeword::from_words(64, vec![u64::MAX]);
