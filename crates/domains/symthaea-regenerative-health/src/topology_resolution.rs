@@ -391,6 +391,47 @@ mod tests {
     }
 
     #[test]
+    fn later_resolution_requires_predecessor_resolution_digest() {
+        let a = branch("topology-v2a");
+        let b = branch("topology-v2b");
+        let mut r = resolution("topology-v2a", vec![a.clone(), b]);
+        r.resolution_epoch = 2;
+        r.predecessor_resolution_digest = None;
+        let mut g = gate();
+        g.policy.expected_resolution_epoch = 2;
+        let d = g.assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionIssue::PredecessorMismatch));
+    }
+
+    #[test]
+    fn later_resolution_must_link_to_the_expected_previous_resolution() {
+        let a = branch("topology-v2a");
+        let b = branch("topology-v2b");
+        let mut r = resolution("topology-v2a", vec![a.clone(), b]);
+        r.resolution_epoch = 2;
+        r.predecessor_resolution_digest = Some("resolution-digest-1".into());
+        let mut g = gate();
+        g.policy.expected_resolution_epoch = 2;
+        g.policy.expected_predecessor_resolution_digest = Some("resolution-digest-1".into());
+        let d = g.assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Resolved);
+    }
+
+    #[test]
+    fn old_resolution_epoch_cannot_be_replayed_as_current() {
+        let a = branch("topology-v2a");
+        let mut r = resolution("topology-v2a", vec![a.clone()]);
+        r.resolution_epoch = 1;
+        let mut g = gate();
+        g.policy.expected_resolution_epoch = 2;
+        g.policy.expected_predecessor_resolution_digest = Some("resolution-digest-1".into());
+        let d = g.assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionIssue::SuccessorEpochMismatch));
+    }
+
+    #[test]
     fn future_resolution_cannot_be_admitted() {
         let a = branch("topology-v2a");
         let mut r = resolution("topology-v2a", vec![a.clone()]);
