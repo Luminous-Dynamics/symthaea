@@ -1657,7 +1657,18 @@ mod tests {
     }
 
     #[test]
-    #[test]\n    fn canonical_domain_separators_use_actual_newline_delimiters() {\n        for domain in [\n            IndependenceVerificationReceipt::DOMAIN_SEPARATOR,\n            ReceiptAttestationEnvelope::DOMAIN_SEPARATOR,\n            b"symthaea:observation-independence-scope:v1\\n",\n        ] {\n            assert!(domain.ends_with(b"\\n"));\n            assert!(!domain.ends_with(b"\\\\n"));\n        }\n    }\n\n    fn receipt_attestation_temporal_status_is_deterministic() {
+    fn canonical_domain_separators_use_actual_newline_delimiters() {
+        for domain in [
+            IndependenceVerificationReceipt::DOMAIN_SEPARATOR,
+            ReceiptAttestationEnvelope::DOMAIN_SEPARATOR,
+            b"symthaea:observation-independence-scope:v1\n",
+        ] {
+            assert!(domain.ends_with(b"\n"));
+            assert!(!domain.ends_with(b"\\n"));
+        }
+    }
+
+    fn receipt_attestation_temporal_status_is_deterministic() {
         let receipt = fixture_receipt();
         let mut envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
         envelope.expires_at_unix_ns = Some(200);
