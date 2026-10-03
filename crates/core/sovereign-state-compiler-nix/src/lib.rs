@@ -910,7 +910,6 @@ mod tests {
         a.required_resources.insert(nixos_generation_resource(42));
 
         let mut b = a.clone();
-        b.intent_id = "rollback-b".into();
         b.desired_state.properties.insert(
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(43),
