@@ -114,33 +114,72 @@ fn rfc9942_outer_receipts_are_ordered_and_placement_is_not_normalized() {
 }
 
 #[test]
-fn rfc9162_inclusion_and_consistency_path_bounds_are_distinct() {
+fn rfc9162_inclusion_and_consistency_path_bounds_are_tree_size_derived() {
     let hash = [0x11; 32];
 
-    let mut inclusion = vec![
-        0x83, 0x18, 0x01, 0x00, // [tree_size=24? corrected below]
-    ];
-    // Construct [tree_size=2^64-1, leaf_index=0, inclusion_path[65]] with
-    // canonical uint64 and bounded 32-byte hashes.
-    inclusion.clear();
-    inclusion.extend_from_slice(&[0x83, 0x1b, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-    inclusion.extend_from_slice(&[0x00, 0x98, 0x41]);
-    for _ in 0..65 {
-        inclusion.push(0x58);
-        inclusion.push(0x20);
-        inclusion.extend_from_slice(&hash);
+    // Raw RFC 9162 permits an empty singleton inclusion path.
+    let singleton = [0x83, 0x01, 0x00, 0x80];
+    assert!(Rfc9162InclusionProof::from_cbor(&singleton).is_ok());
+
+    // RFC 9942's profile uses [+ bstr] for inclusion paths, so the
+    // singleton proof is rejected when promoted into an RFC 9942 VDP.
+    assert_eq!(
+        Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![singleton.to_vec()]),
+        Err(Rfc9942VdpError::InvalidProof(
+            symthaea_swarm::semantic_evidence_vds::Rfc9162ProofDecodeError::InvalidStructure
+        ))
+    );
+
+    // For a two-leaf tree, ceil(log2(2)) == 1. A two-node path is impossible.
+    let mut short_tree = Vec::new();
+    short_tree.extend_from_slice(&[0x83, 0x01, 0x00, 0x82]);
+    for _ in 0..2 {
+        short_tree.push(0x58);
+        short_tree.push(0x20);
+        short_tree.extend_from_slice(&hash);
     }
     assert_eq!(
-        Rfc9162InclusionProof::from_cbor(&inclusion),
+        Rfc9162InclusionProof::from_cbor(&short_tree),
         Err(symthaea_swarm::semantic_evidence_vds::Rfc9162ProofDecodeError::InvalidStructure)
     );
 
-    let mut consistency = Vec::new();
-    consistency.extend_from_slice(&[0x83, 0x01, 0x02, 0x98, 0x41]);
-    for _ in 0..65 {
-        consistency.push(0x58);
-        consistency.push(0x20);
-        consistency.extend_from_slice(&hash);
+    // At the u64 ceiling, an inclusion path may reach 64 hashes.
+    let mut max_inclusion = Vec::new();
+    max_inclusion.extend_from_slice(&[
+        0x83, 0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // tree_size=u64::MAX
+        0x00, 0x98, 0x40, // leaf_index=0, path length=64
+    ]);
+    for _ in 0..64 {
+        max_inclusion.push(0x58);
+        max_inclusion.push(0x20);
+        max_inclusion.extend_from_slice(&hash);
     }
-    assert!(Rfc9162ConsistencyProof::from_cbor(&consistency).is_ok());
+    assert!(Rfc9162InclusionProof::from_cbor(&max_inclusion).is_ok());
+
+    // Consistency uses ceil(log2(second)) + 1. For second=2, three nodes are impossible.
+    let mut short_consistency = Vec::new();
+    short_consistency.extend_from_slice(&[0x83, 0x01, 0x02, 0x83]);
+    for _ in 0..3 {
+        short_consistency.push(0x58);
+        short_consistency.push(0x20);
+        short_consistency.extend_from_slice(&hash);
+    }
+    assert_eq!(
+        Rfc9162ConsistencyProof::from_cbor(&short_consistency),
+        Err(symthaea_swarm::semantic_evidence_vds::Rfc9162ProofDecodeError::InvalidStructure)
+    );
+
+    // At the u64 ceiling, RFC 9162's consistency bound reaches 65.
+    let mut max_consistency = Vec::new();
+    max_consistency.extend_from_slice(&[
+        0x83, 0x01, 0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0x98, 0x41, // old=1, new=u64::MAX, path length=65
+    ]);
+    for _ in 0..65 {
+        max_consistency.push(0x58);
+        max_consistency.push(0x20);
+        max_consistency.extend_from_slice(&hash);
+    }
+    assert!(Rfc9162ConsistencyProof::from_cbor(&max_consistency).is_ok());
 }
+
