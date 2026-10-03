@@ -2267,14 +2267,15 @@ fn validate_native_authority_pin_set(
             }
             tx.execute(
                 "INSERT OR IGNORE INTO authorization_recovery_markers
-                 (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
-                 VALUES (?1,?2,?3,?4,?5,'not_entered_validity')",
+                 (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker,attempt_scope_digest)
+                 VALUES (?1,?2,?3,?4,?5,'not_entered_validity',?6)",
                 params![
                     authorization_instance,
                     attempt_id,
                     boundary_id,
                     action.canonical_action_digest(),
                     authority_epoch as i64,
+                    compute_attempt_scope_digest(boundary_id, attempt_id)?,
                 ],
             )?;
             tx.commit()?;
@@ -2399,9 +2400,16 @@ fn validate_native_authority_pin_set(
 
         tx.execute(
             "INSERT OR IGNORE INTO authorization_recovery_markers
-             (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
-             VALUES (?1,?2,?3,?4,?5,'not_entered_status')",
-            params![authorization_instance, attempt_id, boundary_id, action_digest, authority_epoch],
+             (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker,attempt_scope_digest)
+             VALUES (?1,?2,?3,?4,?5,'not_entered_status',?6)",
+            params![
+                authorization_instance,
+                attempt_id,
+                boundary_id,
+                action_digest,
+                authority_epoch,
+                compute_attempt_scope_digest(boundary_id, attempt_id)?,
+            ],
         )?;
         tx.commit()?;
         Ok(())
@@ -2454,14 +2462,15 @@ fn validate_native_authority_pin_set(
         )?;
         tx.execute(
             "INSERT OR IGNORE INTO authorization_recovery_markers
-             (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
-             VALUES (?1,?2,?3,?4,?5,'not_entered_status')",
+             (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker,attempt_scope_digest)
+             VALUES (?1,?2,?3,?4,?5,'not_entered_status',?6)",
             params![
                 record.authorization_instance.as_str(),
                 record.attempt_id.as_str(),
                 record.boundary_id.as_str(),
                 record.action_digest.as_str(),
                 authority_epoch,
+                compute_attempt_scope_digest(&record.boundary_id,&record.attempt_id)?,
             ],
         )?;
         tx.commit()?;
@@ -2630,14 +2639,15 @@ fn validate_native_authority_pin_set(
             )?;
             tx.execute(
                 "INSERT OR IGNORE INTO authorization_recovery_markers
-                 (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
-                 VALUES (?1,?2,?3,?4,?5,'not_entered_validity')",
+                 (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker,attempt_scope_digest)
+                 VALUES (?1,?2,?3,?4,?5,'not_entered_validity',?6)",
                 params![
                     record.authorization_instance.as_str(),
                     record.attempt_id.as_str(),
                     record.boundary_id.as_str(),
                     record.action_digest.as_str(),
                     authority_epoch,
+                    compute_attempt_scope_digest(&record.boundary_id,&record.attempt_id)?,
                 ],
             )?;
             tx.commit()?;
