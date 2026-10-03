@@ -63,6 +63,7 @@ jobs:
           cp crates/core/sovereign-state-compiler/src/lib.rs "$tmp/sovereign-state-compiler/src/"
           cp crates/core/sovereign-state-compiler-nix/Cargo.toml "$tmp/sovereign-state-compiler-nix/"
           cp crates/core/sovereign-state-compiler-nix/src/lib.rs "$tmp/sovereign-state-compiler-nix/src/"
+          cp Cargo.lock "$tmp/Cargo.lock"
 
           cat > "$tmp/Cargo.toml" <<'EOF'
           [workspace]
@@ -79,9 +80,9 @@ jobs:
           thiserror = "1.0"
           EOF
 
-          cargo +1.96.0 metadata --manifest-path "$tmp/Cargo.toml" --no-deps
-          cargo +1.96.0 check --manifest-path "$tmp/Cargo.toml" --workspace
-          cargo +1.96.0 test --manifest-path "$tmp/Cargo.toml" --workspace
+          cargo +1.96.0 metadata --manifest-path "$tmp/Cargo.toml" --no-deps --locked
+          cargo +1.96.0 check --manifest-path "$tmp/Cargo.toml" --workspace --locked
+          cargo +1.96.0 test --manifest-path "$tmp/Cargo.toml" --workspace --locked
 
       - name: Verify source boundary remains workspace-portable
         run: |
