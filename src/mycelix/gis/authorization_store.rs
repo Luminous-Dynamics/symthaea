@@ -2452,7 +2452,7 @@ fn validate_native_authority_pin_set(
             let authority_epoch = lease.authority_epoch;
             let changed = tx.execute(
                 "UPDATE authorization_leases
-                 SET state='expired',attempt_id=NULL,boundary_id=NULL
+                 SET state='expired',attempt_id=NULL,boundary_id=NULL,attempt_scope_digest=NULL
                  WHERE authorization_instance=?1 AND state='prepared' AND attempt_id=?2",
                 params![authorization_instance, attempt_id],
             )?;
@@ -2729,7 +2729,11 @@ fn validate_native_authority_pin_set(
 
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let row = tx.query_row(
+        let row = tx.query_row(        self.validate_persisted_provider_status_verifier_configuration(
+            &tx,
+            &pinned_status_verifier_configuration,
+        )?;
+
             "SELECT operation_id,native_replay_identity,action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
              FROM authorization_dispatches WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
@@ -2813,7 +2817,7 @@ fn validate_native_authority_pin_set(
             }
             let changed = tx.execute(
                 "UPDATE authorization_leases
-                 SET state='expired',attempt_id=NULL,boundary_id=NULL
+                 SET state='expired',attempt_id=NULL,boundary_id=NULL,attempt_scope_digest=NULL
                  WHERE authorization_instance=?1 AND state='dispatch_pending'
                    AND attempt_id=?2 AND boundary_id=?3",
                 params![
