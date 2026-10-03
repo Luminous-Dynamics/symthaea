@@ -3658,6 +3658,77 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn resolver_snapshot_is_retained_when_resolver_returns_mismatched_method() {
+        struct MismatchedResolver {
+            expected: String,
+            returned: ResolvedVerificationMethod,
+            snapshot: String,
+        }
+
+        impl VerificationMethodResolver for MismatchedResolver {
+            fn resolve(
+                &self,
+                verification_method: &str,
+            ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
+                assert_eq!(verification_method, self.expected);
+                Ok(self.returned.clone())
+            }
+
+            fn resolve_with_snapshot(
+                &self,
+                verification_method: &str,
+            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+                Ok(ResolvedVerificationMethodSnapshot {
+                    resolved: self.resolve(verification_method)?,
+                    snapshot_fingerprint: Some(self.snapshot.clone()),
+                })
+            }
+        }
+
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let requested_method = envelope.attester_id.clone();
+        let returned_method = ResolvedVerificationMethod {
+            verification_method: "did:example:unexpected#key-9".into(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = MismatchedResolver {
+            expected: requested_method.clone(),
+            returned: returned_method,
+            snapshot: "mismatched-resolution-snapshot".into(),
+        };
+
+        let report = Ed25519ReceiptVerifier::new(
+            requested_method.clone(),
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_with_resolver_report(&envelope, &receipt, &resolver);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable
+        );
+        assert_eq!(
+            report.resolved_verification_method.as_deref(),
+            Some(requested_method.as_str())
+        );
+        assert_eq!(
+            report.resolution_snapshot_fingerprint.as_deref(),
+            Some("mismatched-resolution-snapshot")
+        );
+        assert!(report.execution_trace.is_well_formed());
+        assert_eq!(
+            report.execution_trace.results.last().map(|result| result.stage),
+            Some(VerificationStage::Failed(
+                ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable
+            ))
+        );
+    }
+
     #[test]
     fn resolver_snapshot_is_retained_when_proof_purpose_is_unauthorized() {
         let (envelope, signing_key, receipt) = envelope_and_key();
