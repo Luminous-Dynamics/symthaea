@@ -400,6 +400,8 @@ pub struct DurableDispatchRecord {
     pub native_authority_namespace: String,
     /// Stable native authorization identifier from which native replay identity was derived.
     pub native_authorization_id: String,
+    /// Digest proving how the native replay identity was derived.
+    pub native_replay_derivation_digest: String,
     pub status_identifier: String,
     pub status_source_digest: String,
     pub status_observed_at: String,
@@ -551,6 +553,7 @@ impl DurableDispatchRecord {
             native_issuer,
             native_authority_namespace,
             native_authorization_id,
+            native_replay_derivation_digest: native_replay_derivation_digest.to_owned(),
             status_identifier: status.status_identifier.clone(),
             status_source_digest: status.status_source_digest.clone(),
             status_observed_at: status.status_observed_at.clone(),
@@ -6742,6 +6745,7 @@ mod tests {
             native_issuer: "issuer".into(),
             native_authority_namespace: "ns".into(),
             native_authorization_id: "native-A".into(),
+            native_replay_derivation_digest: "derivation".into(),
             status_identifier: "status".into(),
             status_source_digest: "source".into(),
             status_observed_at: "2026-10-03T10:00:00Z".into(),
@@ -6780,6 +6784,7 @@ mod tests {
             native_issuer:"issuer-status".into(),
             native_authority_namespace:"ns-status".into(),
             native_authorization_id:"native-status".into(),
+            native_replay_derivation_digest:"derivation-status".into(),
             status_identifier:"status-A".into(),
             status_source_digest:"source-A".into(),
             status_observed_at:"2026-10-03T10:00:00Z".into(),
