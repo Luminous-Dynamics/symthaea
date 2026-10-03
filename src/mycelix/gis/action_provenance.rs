@@ -1292,7 +1292,7 @@ mod tests {
             "approval-old", action.id.clone(), digest.clone(),
             "sha256:support", "policy-v1", 1, 1,
         );
-        old.&witness, &action, "f1", "attempt-old").unwrap();
+        old.prepare_for_execution(&witness, &action, "f1", "attempt-old").unwrap();
 
         old.mark_dispatch_pending("attempt-old").unwrap();
         old.commit("attempt-old", ExecutionOutcome::Succeeded).unwrap();
