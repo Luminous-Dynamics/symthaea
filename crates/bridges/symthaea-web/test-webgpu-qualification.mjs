@@ -157,6 +157,33 @@ function assertSemanticSceneSamples(samples) {
   }
 }
 
+function assertSemanticMovieSamples(samples) {
+  const byName = new Map(samples.map(sample => [sample.name, sample.rgba]));
+  const left = byName.get('left');
+  const right = byName.get('right');
+  const top = byName.get('top');
+  const bottom = byName.get('bottom');
+
+  if (!left || !right || !top || !bottom) {
+    throw new QualificationError(
+      `WebGPU semantic movie probes missing: ${JSON.stringify(samples)}`,
+      'renderer',
+    );
+  }
+  if (!(left[0] + 20 < right[0])) {
+    throw new QualificationError(
+      `WebGPU movie horizontal gradient is not increasing red left-to-right: ${JSON.stringify(samples)}`,
+      'renderer',
+    );
+  }
+  if (!(top[1] + 20 < bottom[1])) {
+    throw new QualificationError(
+      `WebGPU movie vertical gradient is not increasing green top-to-bottom: ${JSON.stringify(samples)}`,
+      'renderer',
+    );
+  }
+}
+
 async function blankCanvasHash(page, width, height) {
   const dataUrl = await page.evaluate(([w, h]) => {
     const canvas = document.createElement('canvas');
@@ -335,6 +362,14 @@ async function runMode(mode) {
       ]);
       assertSemanticSceneSamples(semanticSceneSamples);
 
+      const semanticMovieSamples = await canvasPixelSamples(page, '#webgpu-movie-canvas', [
+        { name: 'left', x: 48, y: 96 },
+        { name: 'right', x: 144, y: 96 },
+        { name: 'top', x: 96, y: 48 },
+        { name: 'bottom', x: 96, y: 144 },
+      ]);
+      assertSemanticMovieSamples(semanticMovieSamples);
+
       if (firstSceneHash === blankSceneHash) {
         throw new QualificationError(
           'WebGPU cognitive canvas is indistinguishable from a blank canvas',
@@ -380,6 +415,7 @@ async function runMode(mode) {
         scene_hash: firstSceneHash,
         movie_hash: firstMovieHash,
         semantic_scene_samples: semanticSceneSamples,
+        semantic_movie_samples: semanticMovieSamples,
         deterministic_repeat: true,
         page_errors: pageErrors,
       };
