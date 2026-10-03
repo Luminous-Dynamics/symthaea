@@ -697,7 +697,7 @@ pub struct WebGpuRenderer {
 impl WebGpuRenderer {
     /// Initialize the cognitive scene renderer for the supplied canvas.
     pub async fn new(canvas: HtmlCanvasElement) -> Result<Self, String> {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::BROWSER_WEBGPU,
             ..Default::default()
         });
@@ -822,7 +822,7 @@ impl WebGpuRenderer {
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
+            multiview: None,
             cache: None,
         });
 
@@ -980,7 +980,7 @@ pub struct WebGpuMovieRenderer {
 #[cfg(target_arch = "wasm32")]
 impl WebGpuMovieRenderer {
     pub async fn new(canvas: HtmlCanvasElement) -> Result<Self, String> {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::BROWSER_WEBGPU,
             ..Default::default()
         });
@@ -1112,7 +1112,7 @@ impl WebGpuMovieRenderer {
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
+            multiview: None,
             cache: None,
         });
 
