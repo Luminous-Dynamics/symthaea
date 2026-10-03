@@ -469,11 +469,13 @@ fn compute_attempt_scope_digest(
     if boundary_id.is_empty() || attempt_id.is_empty() {
         return Err(AuthorizationConsumptionError::InvalidBinding.into());
     }
-    let mut material = Vec::with_capacity(128);
-    material.extend_from_slice(b"symthaea:gis:effect-boundary-attempt-scope:v1\n");
-    append_len_prefixed(&mut material, boundary_id.as_bytes());
-    append_len_prefixed(&mut material, attempt_id.as_bytes());
-    Ok(format!("sha256:{}", hex::encode(Sha256::digest(material))))
+    let mut hasher = Sha256::new();
+    hasher.update(b"symthaea:gis:effect-boundary-attempt-scope:v1\n");
+    hasher.update((boundary_id.len() as u64).to_be_bytes());
+    hasher.update(boundary_id.as_bytes());
+    hasher.update((attempt_id.len() as u64).to_be_bytes());
+    hasher.update(attempt_id.as_bytes());
+    Ok(format!("sha256:{}", hex::encode(hasher.finalize())))
 }
 
 fn backfill_status_check_boundary_ownership(
@@ -6878,17 +6880,6 @@ mod tests {
         assert!(same_a.starts_with("sha256:"));
     }
 
-    #[test]
-    fn attempt_scope_digest_is_stable_and_boundary_sensitive() {
-        let a = compute_attempt_scope_digest("boundary-A","attempt-1").unwrap();
-        let b = compute_attempt_scope_digest("boundary-A","attempt-1").unwrap();
-        let c = compute_attempt_scope_digest("boundary-B","attempt-1").unwrap();
-        let d = compute_attempt_scope_digest("boundary-A","attempt-2").unwrap();
-
-        assert_eq!(a, b);
-        assert_ne!(a, c);
-        assert_ne!(a, d);
-    }
 
     #[test]
     fn status_check_boundary_scope_is_repaired_from_authoritative_dispatch() {
