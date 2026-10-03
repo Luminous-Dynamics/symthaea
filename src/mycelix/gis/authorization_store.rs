@@ -1333,37 +1333,42 @@ fn validate_native_authority_pin_set(
         }
         let native_provenance: (
             Option<String>, Option<String>, Option<String>, Option<String>, Option<String>,
-            Option<String>, Option<String>, Option<String>
+            Option<String>, Option<String>, Option<String>, Option<String>
         ) = tx.query_row(
-            "SELECT native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+            "SELECT native_issuer,native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
                     native_authority_pin_set_id,native_authority_pin_set_digest,
                     validity_issued_at,validity_expires_at,validity_policy_digest
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?)),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?)),
         )?;
         Self::validate_persisted_native_replay_provenance(
             record,
-            native_provenance.0.as_deref(),
             native_provenance.1.as_deref(),
             native_provenance.2.as_deref(),
+            native_provenance.3.as_deref(),
+        )?;
+        self.validate_native_authority_pin_binding(
+            &tx,
+            native_provenance.0.as_deref(),
+            native_provenance.1.as_deref(),
         )?;
         self.validate_native_authority_pin_set_snapshot(
             &tx,
-            native_provenance.3.as_deref(),
             native_provenance.4.as_deref(),
+            native_provenance.5.as_deref(),
         )?;
         self.validate_persisted_authorization_validity(
-            native_provenance.5.as_deref(),
             native_provenance.6.as_deref(),
             native_provenance.7.as_deref(),
+            native_provenance.8.as_deref(),
             false,
         )?;
         if self.validate_persisted_authorization_validity(
-            native_provenance.5.as_deref(),
             native_provenance.6.as_deref(),
             native_provenance.7.as_deref(),
+            native_provenance.8.as_deref(),
             true,
         ).is_err() {
             let changed = tx.execute(
