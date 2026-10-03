@@ -692,6 +692,11 @@ fn validate_native_authority_pin_set(
     while let Some(row) = rows.next()? {
         let issuer: String = row.get(0)?;
         let namespace: String = row.get(1)?;
+        if issuer.is_empty() || namespace.is_empty() {
+            return Err(AuthorizationStoreError::InvalidState(
+                "invalid native authority pin set: issuer and authority namespace must be non-empty".into(),
+            ));
+        }
         let normalized = normalize_native_issuer(&issuer);
         if let Some((existing_issuer, existing_namespace)) =
             seen.iter().find(|(existing, _)| normalize_native_issuer(existing) == normalized)
@@ -1593,7 +1598,7 @@ fn validate_native_authority_pin_set(
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
             params![record.authorization_instance, record.attempt_id, record.boundary_id],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?)),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?)),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
         let persisted_relying_party: Option<String> = tx.query_row(
             "SELECT relying_party_id FROM authorization_dispatches
