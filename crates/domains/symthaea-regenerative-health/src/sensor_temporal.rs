@@ -340,6 +340,37 @@ mod tests {
     }
 
     #[test]
+    fn malformed_independence_binding_cannot_enter_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_digest.clear();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.contains(&TemporalFusionIssue::InvalidIndependenceProvenance));
+    }
+
+    #[test]
+    fn independence_binding_configuration_must_match_observation() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.configuration_digest = "cfg-attacker".into();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.contains(&TemporalFusionIssue::IndependenceConfigurationMismatch));
+    }
+
+    #[test]
+    fn independent_group_identity_is_auditable() {
+        let d = fusion_gate().assess(&[
+            pair("strain-a", 0.5, 1.5),
+            pair("strain-b", 0.6, 1.6),
+        ]);
+        assert_eq!(d.independent_group_count, 2);
+        assert_eq!(
+            d.independent_group_ids,
+            vec!["group-strain-a", "group-strain-b"]
+        );
+    }
+
+    #[test]
     fn non_monotonic_observation_is_not_admitted() {
         let mut p = pair("strain-a", 0.5, 1.5);
         p.current.timestamp_ms = 1_000;
