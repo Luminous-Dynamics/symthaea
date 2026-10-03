@@ -12799,6 +12799,8 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sovereign-state-compiler",
+ "sovereign-state-compiler-nix",
  "strsim",
  "symthaea-core",
  "tempfile",
