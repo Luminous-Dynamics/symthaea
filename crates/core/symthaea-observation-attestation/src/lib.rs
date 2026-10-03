@@ -1011,6 +1011,29 @@ impl VerificationContext {
         self
     }
 
+    /// Validate semantic context identity independently of any source report.
+    ///
+    /// A matching self-fingerprint is not sufficient: the fingerprint can be
+    /// recomputed after semantic identifiers are maliciously replaced. The
+    /// context therefore also has to use the supported schema, verifier identity,
+    /// procedure identity, and the procedure fingerprint bound to its report version.
+    pub fn is_well_formed(&self) -> bool {
+        let expected_procedure_fingerprint = if self.verifier_version == VERIFIER_VERSION {
+            EvaluationProcedure::attestation_ed25519().fingerprint()
+        } else if self.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
+            EvaluationProcedure::attestation_ed25519_v1().fingerprint()
+        } else {
+            return false;
+        };
+
+        self.context_version == VERIFICATION_CONTEXT_VERSION
+            && self.verifier_id == VERIFIER_IMPLEMENTATION_ID
+            && self.procedure_id == EVALUATION_PROCEDURE_ID
+            && self.procedure_fingerprint == expected_procedure_fingerprint
+            && !self.policy_fingerprint.is_empty()
+            && !self.environment_fingerprint.is_empty()
+    }
+
     /// Verify that execution-bound context fields still correspond to the report.
     /// Supplemental evaluator/trust/authorization identities are deliberately
     /// excluded because they can be supplied by an external evaluation authority.
@@ -1356,6 +1379,7 @@ impl EvidenceEvaluation {
     pub fn is_well_formed(&self) -> bool {
         self.evaluation_version == EVIDENCE_EVALUATION_VERSION
             && self.evaluation_type == ATTESTATION_VERIFICATION_EVALUATION_TYPE
+            && self.context.is_well_formed()
             && self.context_fingerprint == self.context.fingerprint()
             && self.execution_trace.is_well_formed()
             && self.execution_trace.terminal_outcome() == Some(self.outcome)
@@ -3074,6 +3098,27 @@ mod tests {
         let mut changed_trace = evaluation;
         changed_trace.execution_trace = EvaluationTrace::default();
         assert!(!changed_trace.is_well_formed());
+    }
+
+    #[test]
+    fn verification_context_self_validation_rejects_semantic_identifier_mutation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let mut context = VerificationContext::from_report(&report);
+
+        assert!(context.is_well_formed());
+
+        context.verifier_id = "attacker-verifier";
+        assert_eq!(context.fingerprint(), VerificationContext {
+            verifier_id: "attacker-verifier",
+            ..context.clone()
+        }.fingerprint());
+        assert!(!context.is_well_formed());
     }
 
     #[test]
