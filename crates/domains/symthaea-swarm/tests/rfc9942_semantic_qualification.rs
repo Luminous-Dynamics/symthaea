@@ -224,3 +224,22 @@ fn rfc9942_receipt_decode_rejects_malformed_rfc9162_vdp_content() {
         ))
     );
 }
+
+#[test]
+fn cose_extension_accepts_full_range_unsigned_integer_labels() {
+    // label = 2^63, represented canonically as CBOR uint64.
+    // RFC 9052 permits int labels; the adapter must not collapse or reject
+    // this value merely because its internal signed representation is narrower.
+    let protected = [
+        0xa1, 0x1b, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20,
+    ];
+
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(&[0xd2, 0x84, 0x4b]);
+    encoded.extend_from_slice(&protected);
+    encoded.extend_from_slice(&[0xa0, 0xf6, 0x41, 0xaa]);
+
+    let decoded = Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+        .expect("full-range unsigned COSE label must be accepted");
+    assert_eq!(decoded.to_cbor(), encoded);
+}
