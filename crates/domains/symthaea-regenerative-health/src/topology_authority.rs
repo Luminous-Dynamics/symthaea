@@ -15,7 +15,7 @@ use crate::topology_resolution::{
     TopologyResolutionIssue, TopologyResolutionPolicy, TopologyResolutionState,
 };
 use crate::topology_resolution_verification::{
-    TopologyResolutionVerificationDecision, TopologyResolutionVerificationGate,
+    TopologyResolutionVerificationGate,
     TopologyResolutionVerificationIssue, TopologyResolutionVerificationPolicy,
     TopologyResolutionVerificationResult, TopologyResolutionVerificationState,
 };
@@ -345,7 +345,7 @@ mod tests {
         let a = branch("topology-v2a");
         let mut r = resolution("topology-v2a", vec![a.clone()]);
         r.selected_successor_effective_from_ms = 4_000;
-        let d = gate().assess(Some(&r), None, &[a], 3_000);
+        let d = gate().assess(Some(&r), Some(&verification()), None, &[a], 3_000);
         assert_eq!(d.state, TopologyAuthorityState::PendingActivation);
         assert!(d
             .issues
@@ -371,15 +371,6 @@ mod tests {
         assert!(!d
             .issues
             .contains(&TopologyAuthorityIssue::SuccessorNotYetEffective));
-    }
-
-    #[test]
-    fn revocation_does_not_make_future_topology_current() {
-        let a = branch("topology-v2a");
-        let mut r = resolution("topology-v2a", vec![a.clone()]);
-        r.selected_successor_effective_from_ms = 4_000;
-        let d = gate().assess(Some(&r), Some(&revocation()), &[a], 3_001);
-        assert_eq!(d.state, TopologyAuthorityState::PendingActivation);
     }
 
     #[test]
@@ -420,11 +411,23 @@ mod tests {
     }
 
     #[test]
+    fn missing_resolution_verification_cannot_create_current_authority() {
+        let a = branch("topology-v2a");
+        let r = resolution("topology-v2a", vec![a.clone()]);
+        let d = gate().assess(Some(&r), None, None, &[a], 3_000);
+        assert_eq!(d.state, TopologyAuthorityState::Quarantined);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TopologyAuthorityIssue::Verification(_)
+        )));
+    }
+
+    #[test]
     fn invalid_resolution_cannot_be_rescued_by_revocation() {
         let a = branch("topology-v2a");
         let mut r = resolution("topology-v2a", vec![a.clone()]);
         r.authority_id = "unexpected-authority".into();
-        let d = gate().assess(Some(&r), Some(&revocation()), &[a], 3_001);
+        let d = gate().assess(Some(&r), Some(&verification()), Some(&revocation()), &[a], 3_001);
         assert_eq!(d.state, TopologyAuthorityState::Quarantined);
         assert!(d
             .issues
