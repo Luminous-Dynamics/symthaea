@@ -273,6 +273,25 @@ Possible protocol namespace:
 "Sovereign Deploy" can remain an informal descriptive phrase during migration, but the architecture should avoid freezing the shorter name into public APIs if a more exact name is accepted.
 
 
+## Execution/evidence lifecycle
+
+SSC distinguishes four evidence moments rather than collapsing them into one
+"deployment succeeded" flag:
+
+1. **Observed pre-state** — the target snapshot used to compile and authorize.
+2. **Authorized plan** — exact intent, target, resources, capabilities, and policy.
+3. **Execution receipt** — what the target executor reports, bounded by the
+   authorization window.
+4. **Observed post-state** — a fresh target observation whose digest is carried
+   by the receipt.
+
+The post-state digest is allowed to differ from the pre-state digest because a
+successful deployment is expected to change state. Verification semantics
+determine whether that change matches the exact expected desired state.
+
+This gives the eventual standalone protocol a clean evidence chain without
+requiring the core to trust a platform-specific command log.
+
 ## Relationship to existing world-interface contracts
 
 The repository family already contains higher-level world-interface concepts such
@@ -331,7 +350,9 @@ Authorization validation now requires:
 - artifact and external attestation references must carry concrete digests and
   non-empty reference metadata;
 - verification carries exact expected state values rather than property names alone;
-- execution receipts bind the exact plan and target snapshot and enforce timestamp ordering.
+- execution receipts bind the exact authorized plan, pre-execution snapshot, and
+  post-execution observation;
+- receipt timestamps must remain within the authorization validity window.
 
 This deliberately separates the four sets that matter:
 
