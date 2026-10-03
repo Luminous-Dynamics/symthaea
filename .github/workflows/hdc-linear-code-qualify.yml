@@ -28,12 +28,14 @@ env:
 jobs:
   qualify:
     name: Exact-head linear-code qualification
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout exact PR head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
@@ -48,9 +50,17 @@ jobs:
           fi
 
       - name: Install pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58
         with:
           components: rustfmt,clippy
+
+      - name: Capture runner provenance
+        id: runner
+        run: |
+          echo "runner_os=$RUNNER_OS" >> "$GITHUB_OUTPUT"
+          echo "runner_arch=$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+          echo "runner_image=$ImageOS" >> "$GITHUB_OUTPUT"
+          echo "runner_image_version=$ImageVersion" >> "$GITHUB_OUTPUT"
 
       - name: Capture source provenance
         id: provenance
@@ -186,6 +196,10 @@ jobs:
           HDC Linear-Code Recovery Qualification
           ======================================
           exact_head=${{ steps.head.outputs.sha }}
+          runner_os=${{ steps.runner.outputs.runner_os }}
+          runner_arch=${{ steps.runner.outputs.runner_arch }}
+          runner_image=${{ steps.runner.outputs.runner_image }}
+          runner_image_version=${{ steps.runner.outputs.runner_image_version }}
           rust_toolchain=1.96.0
           source_sha256=${{ steps.provenance.outputs.source_sha256 }}
           integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
@@ -233,7 +247,7 @@ jobs:
 
       - name: Upload qualification receipt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: hdc-linear-code-qualification-${{ steps.head.outputs.sha }}
           path: hdc-linear-code-evidence
