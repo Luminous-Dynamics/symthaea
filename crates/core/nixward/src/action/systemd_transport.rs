@@ -10,7 +10,7 @@
 
 use std::process::Command;
 
-const GOVERNED_PROPERTIES: &str = "Id,LoadState,ActiveState,SubState,UnitFileState,CanStart,CanStop,CanReload";
+const GOVERNED_PROPERTIES: &str = "Id,Names,LoadState,ActiveState,SubState,UnitFileState,CanStart,CanStop,CanReload";
 
 /// Read the exact governed systemd property projection for one canonical unit.
 ///
@@ -56,7 +56,7 @@ mod tests {
     fn governed_property_projection_is_frozen() {
         assert_eq!(
             GOVERNED_PROPERTIES,
-            "Id,LoadState,ActiveState,SubState,UnitFileState,CanStart,CanStop,CanReload"
+            "Id,Names,LoadState,ActiveState,SubState,UnitFileState,CanStart,CanStop,CanReload"
         );
     }
 }
