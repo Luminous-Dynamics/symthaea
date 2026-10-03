@@ -25,7 +25,7 @@ impl BinaryCodeword {
         }
     }
 
-    pub fn from_words(dimension: usize, mut words: Vec<u64>) -> Self {
+    pub fn from_words(dimension: usize, words: Vec<u64>) -> Self {
         assert_eq!(
             words.len(),
             words_for(dimension),
