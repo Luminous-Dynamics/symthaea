@@ -1477,6 +1477,34 @@ mod tests {
     }
 
     #[test]
+    fn large_nested_transform_keeps_polygon_area_and_cross_finite() {
+        let mut root = SceneNode::polygon(
+            vec![(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)],
+            true,
+        )
+        .with_style(Style {
+            fill: Some(Color::rgb(0.9, 0.4, 0.2)),
+            ..Style::default()
+        });
+        for _ in 0..24 {
+            root = SceneNode::group(None)
+                .with_transform(Transform {
+                    scale: 8.0,
+                    ..Transform::identity()
+                })
+                .with_child(root);
+        }
+
+        let scene = GpuScene::from_scene(&root);
+        assert!(scene.vertex_count() >= 3);
+        assert_eq!(scene.skipped_nodes, 0);
+        assert!(scene.vertices.iter().all(|vertex| {
+            vertex.position.iter().all(|value| value.is_finite())
+                && vertex.color.iter().all(|value| value.is_finite())
+        }));
+    }
+
+    #[test]
     fn canonical_cognitive_scene_uses_gpu_supported_primitives() {
         let snapshot = crate::CognitiveSnapshot::dormant();
         let mut engine = crate::AestheticEngine::new();
