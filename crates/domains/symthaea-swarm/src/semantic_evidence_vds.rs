@@ -636,10 +636,10 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<Rfc9942VerifiedReceipt, Rfc9942VdpError> {
-        // The signature covers the exact attached payload or the explicitly
-        // supplied detached bytes. Consistency verification consumes that same
-        // payload root, preserving the signature/proof binding without making
-        // detached transport mandatory at this API layer.
+        // RFC 9942 consistency verification is intentionally signature-first:
+        // authenticate the exact newer-tree root payload before evaluating the
+        // append-only proof.
+        self.verify_es256(public_key, external_aad, detached_payload)?;
         self.vdp.validate_vds_id(self.vds_id)?;
         let (proof_index, newer) = match detached_payload {
             Some(payload) => self.vdp.verify_consistency_with_payload_index(older, payload)?,
@@ -648,7 +648,6 @@ impl Rfc9942ReceiptEnvelope {
                 self.vdp.verify_consistency_with_payload_index(older, &root)?
             }
         };
-        self.verify_es256(public_key, external_aad, detached_payload)?;
         Ok(self.verified_state(Rfc9942VerifiedProof::Consistency { proof_index, older, newer }))
     }
 
