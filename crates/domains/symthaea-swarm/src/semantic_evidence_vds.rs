@@ -1788,6 +1788,7 @@ impl<'a> CborReader<'a> {
             }
             1 => {
                 let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                if initial>>5 != 1 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
                 self.offset+=1;
                 let ai=initial&0x1f;
                 let argument=match ai {
