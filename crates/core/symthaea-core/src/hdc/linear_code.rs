@@ -646,10 +646,7 @@ mod tests {
 
         word.set_bit(0, true);
         assert_eq!(word.to_bipolar(), vec![-1, 1, 1]);
-        assert_eq!(
-            BinaryCodeword::from_bipolar(&[-1, 1, 1]),
-            Some(word)
-        );
+        assert_eq!(BinaryCodeword::from_bipolar(&[-1, 1, 1]), Some(word));
     }
 
     #[test]
