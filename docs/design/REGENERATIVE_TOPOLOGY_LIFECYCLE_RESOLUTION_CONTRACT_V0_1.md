@@ -159,3 +159,18 @@ These are deliberately distinct. The resolution ID names the lifecycle decision,
 A downstream evidence envelope can therefore reference the decision without copying or reinterpreting the authority statement itself.
 
 The contract still does not calculate or cryptographically verify that digest. It treats the digest as an authoritative-layer identity claim and leaves verification to the trust/provenance system.
+
+
+## Branch-set commitment
+
+An authority resolution now carries a deterministic digest of the canonicalized observed successor set.
+
+This closes a narrower audit seam: the resolution record and the locally supplied evidence set must describe the same branch set. Reordering duplicate representations does not change the digest, while adding, removing, or altering a branch produces a different digest and quarantines the resolution.
+
+This is **not** a proof that the authority observed every branch that existed globally. It is a commitment to the exact evidence set the resolution claims to have considered.
+
+That distinction matters in distributed systems:
+
+**evidence-set integrity ≠ global knowledge**
+
+A future Mycelix transparency layer can strengthen this with durable statement receipts and synchronization evidence without changing the local semantics.
