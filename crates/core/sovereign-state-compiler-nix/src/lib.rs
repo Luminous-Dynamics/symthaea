@@ -53,7 +53,7 @@ pub enum NixActivationMode {
 }
 
 impl NixActivationMode {
-    fn parse_rebuild(value: &str) -> Result<Self, NixOSAdapterError> {
+    pub fn parse_rebuild(value: &str) -> Result<Self, NixOSAdapterError> {
         match value {
             "switch" => Ok(Self::Switch),
             "test" => Ok(Self::Test),
@@ -429,7 +429,6 @@ impl TargetAdapter for NixOSTargetAdapter {
                 "apply Home Manager user state",
             );
         }
-
 
         if reboot {
             Self::push_step(
@@ -873,6 +872,62 @@ mod tests {
             NixActivationMode::parse_rebuild("dry-activate").expect("dry-activate"),
             NixActivationMode::DryActivate
         );
+    }
+
+    #[test]
+    fn activation_modes_produce_distinct_authorized_plan_digests() {
+        let modes = ["switch", "test", "boot", "dry-activate"];
+        let digests = modes
+            .iter()
+            .map(|mode| {
+                let mut intent = DeploymentIntent::new(*mode, "host-01");
+                intent.desired_state.properties.insert(
+                    REBUILD_KEY.into(),
+                    StateValue::String((*mode).into()),
+                );
+                adapter()
+                    .compile(&intent)
+                    .expect("compile")
+                    .digest()
+                    .expect("digest")
+            })
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(digests.len(), modes.len());
+    }
+
+    #[test]
+    fn rollback_generation_changes_plan_digest() {
+        let mut a = DeploymentIntent::new("rollback-a", "host-01");
+        a.desired_state.properties.insert(
+            ROLLBACK_KEY.into(),
+            StateValue::Bool(true),
+        );
+        a.desired_state.properties.insert(
+            ROLLBACK_GENERATION_KEY.into(),
+            StateValue::Integer(42),
+        );
+        a.required_resources.insert(nixos_generation_resource(42));
+
+        let mut b = a.clone();
+        b.intent_id = "rollback-b".into();
+        b.desired_state.properties.insert(
+            ROLLBACK_GENERATION_KEY.into(),
+            StateValue::Integer(43),
+        );
+        b.required_resources.clear();
+        b.required_resources.insert(nixos_generation_resource(43));
+
+        let plan_a = adapter().compile(&a).expect("compile a");
+        let plan_b = adapter().compile(&b).expect("compile b");
+
+        assert_ne!(
+            plan_a.digest().expect("digest a"),
+            plan_b.digest().expect("digest b")
+        );
+        assert!(plan_b.steps.iter().any(|step| {
+            step.kind == PlanStepKind::Rollback && step.description.contains("generation 43")
+        }));
     }
 
     #[test]
