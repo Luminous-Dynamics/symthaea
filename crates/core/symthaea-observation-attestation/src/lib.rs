@@ -171,6 +171,64 @@ const fn verification_outcome_tag(outcome: ReceiptAttestationVerificationOutcome
     }
 }
 
+const CURRENT_ENVELOPE_STRUCTURAL_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidEnvelope)];
+const CURRENT_RECEIPT_COMMITMENT_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch)];
+const CURRENT_TEMPORAL_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
+];
+const CURRENT_CRYPTOSUITE_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch)];
+const CURRENT_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodMismatch),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable),
+];
+const CURRENT_VERIFICATION_METHOD_LIFECYCLE_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodRevoked),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodExpired),
+];
+const CURRENT_PROOF_PURPOSE_AUTHORIZATION_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(
+    ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
+)];
+const CURRENT_PROOF_POLICY_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::ProofPurposeMismatch),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::DomainMismatch),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::ChallengeMismatch),
+];
+const CURRENT_CRYPTOGRAPHIC_PROOF_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::MissingProof),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidProofEncoding),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidSignature),
+];
+
+const LEGACY_ENVELOPE_STRUCTURAL_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidEnvelope)];
+const LEGACY_RECEIPT_COMMITMENT_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch)];
+const LEGACY_TEMPORAL_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
+];
+const LEGACY_CRYPTOSUITE_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch)];
+const LEGACY_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodMismatch),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable),
+];
+const LEGACY_VERIFICATION_METHOD_LIFECYCLE_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodRevoked),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodExpired),
+];
+const LEGACY_PROOF_PURPOSE_AUTHORIZATION_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(
+    ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
+)];
+const LEGACY_PROOF_POLICY_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::ProofPurposeMismatch),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::DomainMismatch),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::ChallengeMismatch),
+];
+const LEGACY_CRYPTOGRAPHIC_PROOF_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::MissingProof),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidProofEncoding),
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidSignature),
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationStage {
     Passed,
@@ -231,96 +289,30 @@ impl EvaluationCheck {
     /// outcomes a check may emit changes, the procedure identity must change too.
     pub const fn allowed_failure_outcome_tags(self) -> &'static [u8] {
         match self {
-            Self::EnvelopeStructuralValidation => &[verification_outcome_tag(
-                ReceiptAttestationVerificationOutcome::InvalidEnvelope,
-            )],
-            Self::ReceiptCommitment => &[verification_outcome_tag(
-                ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
-            )],
-            Self::TemporalValidity => &[
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
-            ],
-            Self::CryptosuiteConformance => &[verification_outcome_tag(
-                ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
-            )],
-            Self::VerificationMethodResolution => &[
-                verification_outcome_tag(
-                    ReceiptAttestationVerificationOutcome::VerificationMethodMismatch,
-                ),
-                verification_outcome_tag(
-                    ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
-                ),
-            ],
-            Self::VerificationMethodLifecycle => &[
-                verification_outcome_tag(
-                    ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
-                ),
-                verification_outcome_tag(
-                    ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
-                ),
-            ],
-            Self::ProofPurposeAuthorization => &[verification_outcome_tag(
-                ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
-            )],
-            Self::ProofPolicyConformance => &[
-                verification_outcome_tag(
-                    ReceiptAttestationVerificationOutcome::ProofPurposeMismatch,
-                ),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::DomainMismatch),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::ChallengeMismatch),
-            ],
-            Self::CryptographicProof => &[
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::MissingProof),
-                verification_outcome_tag(
-                    ReceiptAttestationVerificationOutcome::InvalidProofEncoding,
-                ),
-                verification_outcome_tag(
-                    ReceiptAttestationVerificationOutcome::InvalidSignature,
-                ),
-            ],
+            Self::EnvelopeStructuralValidation => CURRENT_ENVELOPE_STRUCTURAL_FAILURE_TAGS,
+            Self::ReceiptCommitment => CURRENT_RECEIPT_COMMITMENT_FAILURE_TAGS,
+            Self::TemporalValidity => CURRENT_TEMPORAL_FAILURE_TAGS,
+            Self::CryptosuiteConformance => CURRENT_CRYPTOSUITE_FAILURE_TAGS,
+            Self::VerificationMethodResolution => CURRENT_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS,
+            Self::VerificationMethodLifecycle => CURRENT_VERIFICATION_METHOD_LIFECYCLE_FAILURE_TAGS,
+            Self::ProofPurposeAuthorization => CURRENT_PROOF_PURPOSE_AUTHORIZATION_FAILURE_TAGS,
+            Self::ProofPolicyConformance => CURRENT_PROOF_POLICY_FAILURE_TAGS,
+            Self::CryptographicProof => CURRENT_CRYPTOGRAPHIC_PROOF_FAILURE_TAGS,
         }
     }
 
     /// Frozen failure-outcome semantics for the historical v1 procedure.
     const fn legacy_allowed_failure_outcome_tags(self) -> &'static [u8] {
         match self {
-            Self::EnvelopeStructuralValidation => &[verification_outcome_tag(
-                ReceiptAttestationVerificationOutcome::InvalidEnvelope,
-            )],
-            Self::ReceiptCommitment => &[verification_outcome_tag(
-                ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
-            )],
-            Self::TemporalValidity => &[
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
-            ],
-            Self::CryptosuiteConformance => &[verification_outcome_tag(
-                ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
-            )],
-            Self::VerificationMethodResolution => &[
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodMismatch),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable),
-            ],
-            Self::VerificationMethodLifecycle => &[
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodRevoked),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodExpired),
-            ],
-            Self::ProofPurposeAuthorization => &[verification_outcome_tag(
-                ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
-            )],
-            Self::ProofPolicyConformance => &[
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::ProofPurposeMismatch),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::DomainMismatch),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::ChallengeMismatch),
-            ],
-            Self::CryptographicProof => &[
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::MissingProof),
-                verification_outcome_tag(
-                    ReceiptAttestationVerificationOutcome::InvalidProofEncoding,
-                ),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidSignature),
-            ],
+            Self::EnvelopeStructuralValidation => LEGACY_ENVELOPE_STRUCTURAL_FAILURE_TAGS,
+            Self::ReceiptCommitment => LEGACY_RECEIPT_COMMITMENT_FAILURE_TAGS,
+            Self::TemporalValidity => LEGACY_TEMPORAL_FAILURE_TAGS,
+            Self::CryptosuiteConformance => LEGACY_CRYPTOSUITE_FAILURE_TAGS,
+            Self::VerificationMethodResolution => LEGACY_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS,
+            Self::VerificationMethodLifecycle => LEGACY_VERIFICATION_METHOD_LIFECYCLE_FAILURE_TAGS,
+            Self::ProofPurposeAuthorization => LEGACY_PROOF_PURPOSE_AUTHORIZATION_FAILURE_TAGS,
+            Self::ProofPolicyConformance => LEGACY_PROOF_POLICY_FAILURE_TAGS,
+            Self::CryptographicProof => LEGACY_CRYPTOGRAPHIC_PROOF_FAILURE_TAGS,
         }
     }
 
