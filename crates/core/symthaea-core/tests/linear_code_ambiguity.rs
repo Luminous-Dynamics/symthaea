@@ -57,8 +57,7 @@ fn canonical_fixture_fingerprint_is_emitted() {
                 .sum::<usize>();
             pairwise_min_distance = pairwise_min_distance.min(distance);
             pairwise_max_distance = pairwise_max_distance.max(distance);
-            let inner_product =
-                CANONICAL_FIXTURE_DIMENSION as isize - 2 * distance as isize;
+            let inner_product = CANONICAL_FIXTURE_DIMENSION as isize - 2 * distance as isize;
             max_inner_product = max_inner_product.max(inner_product);
             min_inner_product = min_inner_product.min(inner_product);
         }
@@ -754,8 +753,7 @@ fn exhaustive_overlapping_recovery_preserves_valid_factorization() {
 fn exhaustive_overlapping_recovery_existence_matches_truth_oracle() {
     let parent = RandomLinearCode::generate(10, 5, 0x5A13);
     let left = RandomLinearCode::from_basis(parent.basis()[..3].to_vec()).expect("left subcode");
-    let right =
-        RandomLinearCode::from_basis(parent.basis()[2..5].to_vec()).expect("right subcode");
+    let right = RandomLinearCode::from_basis(parent.basis()[2..5].to_vec()).expect("right subcode");
 
     let left_words = left.enumerate();
     let right_words = right.enumerate();
