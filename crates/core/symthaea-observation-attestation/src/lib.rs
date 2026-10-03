@@ -552,13 +552,10 @@ impl EvaluationTrace {
         }
 
         let matches_trace = if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
-            if report.execution_trace.is_legacy_absent_placeholder() {
-                self.results == EvaluationTrace::from_report_legacy(report).results
-            } else {
-                // The execution_trace field did not exist in legacy v3 evidence.
-                // Never treat a newer field as part of a historical v3 identity.
-                false
-            }
+            // The execution_trace field did not exist in legacy v3 evidence.
+            // Validate only the historical stage projection, regardless of any
+            // newer field that may have been attached by a forward serializer.
+            self == &EvaluationTrace::from_report_legacy(report)
         } else if report.execution_trace.is_well_formed() {
             self == &report.execution_trace
         } else {
