@@ -403,6 +403,15 @@ impl TargetAdapter for NixOSTargetAdapter {
             return Err(NixOSAdapterError::ConflictingActivationModes);
         }
 
+        if !intent.artifacts.is_empty()
+            && activation_mode.is_none()
+            && install.is_empty()
+            && remove.is_empty()
+            && !home_manager
+        {
+            return Err(NixOSAdapterError::ArtifactsRequireRealization);
+        }
+
         let mut steps = Vec::new();
 
         Self::push_step(
@@ -573,6 +582,8 @@ pub enum NixOSAdapterError {
     UnboundRollbackGeneration(u64),
     #[error("NixOS activation modes cannot be combined in one intent")]
     ConflictingActivationModes,
+    #[error("artifacts were provided without a NixOS realization operation")]
+    ArtifactsRequireRealization,
     #[error("requested NixOS transition has ambiguous post-state semantics")]
     ConflictingTransitionSemantics,
     #[error("compiled plan violates neutral compiler invariants: {0}")]
@@ -945,6 +956,22 @@ mod tests {
         let plan = adapter().compile(&intent).expect("compile");
         assert!(!plan.rollback.allowed);
         assert_eq!(plan.rollback.max_attempts, 0);
+    }
+
+    #[test]
+    fn artifacts_cannot_be_silently_dropped() {
+        let mut intent = DeploymentIntent::new("artifact-only", "host-01");
+        intent.artifacts.push(ArtifactRef {
+            id: ArtifactId::from("system-config"),
+            version: Some("2026.10.03".into()),
+            digest: ContentDigest::blake3(b"system-config"),
+            provenance: Vec::new(),
+        });
+
+        assert_eq!(
+            adapter().compile(&intent),
+            Err(NixOSAdapterError::ArtifactsRequireRealization)
+        );
     }
 
     #[test]
