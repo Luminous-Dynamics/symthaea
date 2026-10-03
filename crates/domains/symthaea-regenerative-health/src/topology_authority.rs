@@ -164,23 +164,6 @@ impl TopologyAuthorityGate {
         }
     }
 
-    #[allow(dead_code)]
-    fn evaluate_components(
-        &self,
-        resolution: Option<&TopologyLifecycleResolution>,
-        revocation: Option<&TopologyLifecycleRevocation>,
-        observed_successors: &[TopologyBranchReference],
-        now_ms: u64,
-    ) -> (
-        TopologyResolutionDecision,
-        Option<TopologyRevocationDecision>,
-    ) {
-        let resolution_decision =
-            self.resolution_gate
-                .assess(resolution, observed_successors, now_ms);
-        let revocation_decision = revocation.map(|item| self.revocation_gate.assess(item, now_ms));
-        (resolution_decision, revocation_decision)
-    }
 }
 
 #[cfg(test)]
