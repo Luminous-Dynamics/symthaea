@@ -162,6 +162,28 @@ impl RandomLinearCode {
         &self.basis
     }
 
+    /// Compute a canonical fingerprint of the generated codebook.
+    ///
+    /// The fingerprint commits to the representation version, dimension, rank,
+    /// basis ordering, and packed basis words. It is an evidence identifier,
+    /// not a security credential or a substitute for the recorded source and
+    /// dependency provenance.
+    pub fn fingerprint(&self) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-hdc-linear-code-v1\\0");
+        hasher.update(&(self.dimension as u64).to_le_bytes());
+        hasher.update(&(self.rank as u64).to_le_bytes());
+        hasher.update(&(self.basis.len() as u64).to_le_bytes());
+        for vector in &self.basis {
+            hasher.update(&(vector.dimension() as u64).to_le_bytes());
+            hasher.update(&(vector.words().len() as u64).to_le_bytes());
+            for word in vector.words() {
+                hasher.update(&word.to_le_bytes());
+            }
+        }
+        *hasher.finalize().as_bytes()
+    }
+
     /// Construct a code from an explicitly supplied independent basis.
     ///
     /// This is useful for reproducing the paper's subcode construction:
@@ -533,6 +555,15 @@ mod tests {
         let mut dependent = code.basis().to_vec();
         dependent.push(code.basis()[0].clone());
         assert!(RandomLinearCode::from_basis(dependent).is_none());
+    }
+
+    #[test]
+    fn codebook_fingerprint_is_reproducible_and_seed_sensitive() {
+        let a = RandomLinearCode::generate(96, 8, 0xC0DE);
+        let b = RandomLinearCode::generate(96, 8, 0xC0DE);
+        let c = RandomLinearCode::generate(96, 8, 0xC0DF);
+        assert_eq!(a.fingerprint(), b.fingerprint());
+        assert_ne!(a.fingerprint(), c.fingerprint());
     }
 
     #[test]
