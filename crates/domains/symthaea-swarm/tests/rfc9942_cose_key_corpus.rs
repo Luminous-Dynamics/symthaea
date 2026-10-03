@@ -42,11 +42,7 @@ fn neg1_field(value: u8) -> Vec<u8> {
 }
 fn bstr_field(label: u8, bytes: &[u8]) -> Vec<u8> {
     let mut out = vec![label];
-    out.extend_from_slice(&if bytes.len() < 24 {
-        bstr(bytes)
-    } else {
-        panic!("fixture too large")
-    });
+    out.extend_from_slice(&bstr(bytes));
     out
 }
 fn valid_fields() -> Vec<Vec<u8>> {
