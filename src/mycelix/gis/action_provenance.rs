@@ -216,6 +216,8 @@ pub enum AuthorizationConsumptionError {
     ActionAlreadyInFlight,
     /// The same action instance already reached an executed terminal state.
     ActionAlreadyClosed,
+    /// The authorization validity window is absent, malformed, stale, or expired.
+    AuthorizationValidityWindowFailed,
     InvalidNativeReplayProvenance,
     IndeterminateRequiresReconciliation,
     PreDispatchRecoveryNotAllowed,
