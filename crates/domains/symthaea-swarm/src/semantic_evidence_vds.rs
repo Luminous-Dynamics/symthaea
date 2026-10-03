@@ -863,7 +863,7 @@ impl Rfc9942SignatureWithReceipts {
             }
             let label = match &label_key {
                 CborLabelKey::Integer(value) => Some(*value),
-                CborLabelKey::Text(_) => None,
+                CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_) => None,
             };
             if label == Some(RFC9942_RECEIPTS_HEADER_LABEL) {
                 if protected_receipts.is_some() {
@@ -920,7 +920,7 @@ impl Rfc9942SignatureWithReceipts {
             }
             let label = match &label_key {
                 CborLabelKey::Integer(value) => Some(*value),
-                CborLabelKey::Text(_) => None,
+                CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_) => None,
             };
             if label == Some(COSE_CRIT_HEADER_LABEL) {
                 return Err(Rfc9942VdpError::CriticalHeaderNotProtected);
