@@ -1507,6 +1507,48 @@ mod tests {
     }
 
     #[test]
+    fn non_adjacent_touching_polygon_edges_are_rejected() {
+        let polygon = SceneNode::polygon(
+            vec![
+                (20.0, 20.0),
+                (140.0, 20.0),
+                (140.0, 140.0),
+                (80.0, 80.0),
+                (20.0, 140.0),
+            ],
+            true,
+        )
+        .with_style(Style {
+            fill: Some(Color::rgb(0.3, 0.5, 0.8)),
+            ..Style::default()
+        });
+        let scene = GpuScene::from_scene(&polygon);
+        assert!(scene.vertices.is_empty());
+        assert_eq!(scene.skipped_nodes, 1);
+    }
+
+    #[test]
+    fn non_adjacent_repeated_polygon_vertex_is_rejected() {
+        let polygon = SceneNode::polygon(
+            vec![
+                (20.0, 20.0),
+                (140.0, 20.0),
+                (140.0, 140.0),
+                (20.0, 140.0),
+                (20.0, 20.0),
+            ],
+            true,
+        )
+        .with_style(Style {
+            fill: Some(Color::rgb(0.3, 0.5, 0.8)),
+            ..Style::default()
+        });
+        let scene = GpuScene::from_scene(&polygon);
+        assert!(scene.vertices.is_empty());
+        assert_eq!(scene.skipped_nodes, 1);
+    }
+
+    #[test]
     fn adjacent_duplicate_polygon_vertices_are_normalized() {
         let polygon = SceneNode::polygon(
             vec![
