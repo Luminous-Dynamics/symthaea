@@ -145,9 +145,12 @@ run_boundary_check() {
   fi
 
   # Domain invariants must be established by NixServiceOperationV1::new().
-  # A derived Deserialize implementation could bypass that constructor.
-  if matches="$(rg -n '\bDeserialize\b' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
-    echo "ERROR: typed service domain must not deserialize around its validating constructor" >&2
+  # The closed operation enum itself may deserialize because it has no free-form
+  # data or normalization boundary. The aggregate NixServiceOperationV1 must not
+  # derive/implement Deserialize, because that would bypass its validating
+  # constructor and admit non-canonical unit strings.
+  if matches="$(rg -n --pcre2 'Deserialize[^\\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\\n]*Deserialize' "+'"${ROOT}/crates/core/nixward/src/action/service_domain.rs"'+")"; then
+    echo "ERROR: validated NixServiceOperationV1 must not deserialize around its constructor" >&2
     echo "${matches}" >&2
     failed=1
   fi
