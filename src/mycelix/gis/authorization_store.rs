@@ -573,6 +573,7 @@ fn normalize_native_issuer(issuer: &str) -> String {
     }
 
     fn validate_native_authority_pin_set_snapshot(
+        &self,
         tx: &Transaction<'_>,
         pin_set_id: Option<&str>,
         pin_set_digest: Option<&str>,
@@ -580,6 +581,9 @@ fn normalize_native_issuer(issuer: &str) -> String {
         let (Some(pin_set_id), Some(pin_set_digest)) = (pin_set_id, pin_set_digest) else {
             return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
         };
+        if pin_set_id != self.native_authority_pin_set_id() {
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+        }
         let snapshot: String = tx.query_row(
             "SELECT snapshot
              FROM authorization_native_authority_pin_sets
@@ -1018,12 +1022,12 @@ fn normalize_native_issuer(issuer: &str) -> String {
             native_provenance.1.as_deref(),
             native_provenance.2.as_deref(),
         )?;
-        Self::validate_native_authority_pin_set_snapshot(
+        self.validate_native_authority_pin_set_snapshot(
             &tx,
             native_provenance.3.as_deref(),
             native_provenance.4.as_deref(),
         )?;
-        Self::validate_native_authority_pin_set_snapshot(
+        self.validate_native_authority_pin_set_snapshot(
             &tx,
             native_provenance.3.as_deref(),
             native_provenance.4.as_deref(),
@@ -1174,7 +1178,7 @@ fn normalize_native_issuer(issuer: &str) -> String {
         Self::validate_persisted_native_replay_provenance(
             record, row.1.as_deref(), row.2.as_deref(), row.3.as_deref()
         )?;
-        Self::validate_native_authority_pin_set_snapshot(
+        self.validate_native_authority_pin_set_snapshot(
             &tx, row.4.as_deref(), row.5.as_deref()
         )?;
         if !matches!(row.0.as_str(), "dispatch_pending" | "invoked" | "indeterminate") {
@@ -2333,6 +2337,26 @@ mod tests {
         ).unwrap();
 
         store.pin_native_authority_namespace("issuer-b","authority/v1").unwrap();
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_dispatches
+             SET native_authority_pin_set_digest='sha256:forged'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        assert!(matches!(
+            store.commit_bound_verified(&record,&evidence,&TestProviderVerifier),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidNativeReplayProvenance
+            ))
+        ));
+        store.connection().unwrap().execute(
+            "UPDATE authorization_dispatches
+             SET native_authority_pin_set_digest=?3
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id,snapshot.1.as_str()],
+        ).unwrap();
 
         let later_digest:String=store.connection().unwrap().query_row(
             "SELECT native_authority_pin_set_digest FROM authorization_dispatches
