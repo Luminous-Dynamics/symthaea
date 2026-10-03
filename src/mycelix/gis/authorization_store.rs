@@ -6879,6 +6879,69 @@ mod tests {
     }
 
     #[test]
+    fn attempt_scope_digest_is_stable_and_boundary_sensitive() {
+        let a = compute_attempt_scope_digest("boundary-A","attempt-1").unwrap();
+        let b = compute_attempt_scope_digest("boundary-A","attempt-1").unwrap();
+        let c = compute_attempt_scope_digest("boundary-B","attempt-1").unwrap();
+        let d = compute_attempt_scope_digest("boundary-A","attempt-2").unwrap();
+
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+        assert_ne!(a, d);
+    }
+
+    #[test]
+    fn status_check_boundary_scope_is_repaired_from_authoritative_dispatch() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-status-scope-backfill-{}.db",std::process::id()
+        ));
+        {
+            let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-status").unwrap();
+            let conn=store.connection().unwrap();
+            conn.execute(
+                "INSERT INTO authorization_dispatches(
+                    authorization_instance,attempt_id,operation_id,native_replay_identity,
+                    action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,
+                    adapter_revision,adapter_implementation_digest,boundary_id,
+                    attempt_binding_digest,state)
+                 VALUES(
+                    'auth-status','attempt-status','op-status','replay-status',
+                    'action-status','digest-status','provider-status','target-status','aud-status','adapter-status',
+                    'adapter/v1','sha256:impl','boundary-authoritative',
+                    'sha256:binding','dispatch_pending'
+                 )",
+                [],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO authorization_status_checks(
+                    authorization_instance,attempt_id,phase,status_identifier,status_source_digest,
+                    status_observed_at,status_valid_until,status_evidence_digest)
+                 VALUES(
+                    'auth-status','attempt-status','pre_entry','status:attempt-status','sha256:source',
+                    '2026-10-03T10:00:00Z','2026-10-03T10:30:00Z','sha256:evidence'
+                 )",
+                [],
+            ).unwrap();
+        }
+
+        let reopened=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-status").unwrap();
+        let conn=reopened.connection().unwrap();
+        let (boundary,scope):(String,String)=conn.query_row(
+            "SELECT boundary_id,attempt_scope_digest
+             FROM authorization_status_checks
+             WHERE authorization_instance='auth-status' AND attempt_id='attempt-status'",
+            [],
+            |row| Ok((row.get(0)?,row.get(1)?)),
+        ).unwrap();
+        assert_eq!(boundary,"boundary-authoritative");
+        assert_eq!(
+            scope,
+            compute_attempt_scope_digest("boundary-authoritative","attempt-status").unwrap()
+        );
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn bound_attempt_id_cannot_be_reused_across_boundaries() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-attempt-scope-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
