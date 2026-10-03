@@ -2632,12 +2632,50 @@ mod tests {
         )
         .with_resolution_snapshot_fingerprint("resolver-snapshot-a");
         let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
-        assert_eq!(report.resolution_snapshot_fingerprint.as_deref(), Some("resolver-snapshot-a"));
-        let other = verifier
+        assert_eq!(
+            report.resolution_snapshot_fingerprint,
+            resolver.snapshot_fingerprint_for(&envelope.attester_id)
+        );
+
+        // A paired resolver result is authoritative for the resolution event.
+        // The verifier's compatibility snapshot must not overwrite a snapshot
+        // returned by the resolver, because doing so would recombine two
+        // independently observed states.
+        let explicit_snapshot = verifier
             .clone()
-            .with_resolution_snapshot_fingerprint("resolver-snapshot-b")
+            .with_resolution_snapshot_fingerprint("verifier-observed-later-state")
             .verify_with_resolver_report(&envelope, &receipt, &resolver);
-        assert_ne!(report.fingerprint(), other.fingerprint());
+        assert_eq!(
+            explicit_snapshot.resolution_snapshot_fingerprint,
+            report.resolution_snapshot_fingerprint
+        );
+        assert_eq!(explicit_snapshot.fingerprint(), report.fingerprint());
+    }
+
+    #[test]
+    fn explicit_snapshot_is_preserved_when_resolution_never_occurs() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        envelope.attester_id.clear();
+
+        let resolver = InMemoryVerificationMethodResolver::default();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .with_resolution_snapshot_fingerprint("prebound-verifier-state");
+
+        let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::InvalidEnvelope
+        );
+        assert_eq!(report.resolved_verification_method, None);
+        assert_eq!(
+            report.resolution_snapshot_fingerprint.as_deref(),
+            Some("prebound-verifier-state")
+        );
     }
 
     #[test]
