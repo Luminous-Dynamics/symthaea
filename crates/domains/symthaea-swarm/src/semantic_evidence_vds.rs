@@ -88,10 +88,12 @@ impl Rfc9942ReceiptPayload {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rfc9942VerifiedProof {
     Inclusion {
+        proof_index: usize,
         head: VdsTreeHead,
         candidate_leaf: [u8; 32],
     },
     Consistency {
+        proof_index: usize,
         older: VdsTreeHead,
         newer: VdsTreeHead,
     },
@@ -143,6 +145,12 @@ impl Rfc9942VerifiedSignatureWithReceipt {
 }
 
 impl Rfc9942VerifiedProof {
+    pub const fn proof_index(&self) -> usize {
+        match self {
+            Self::Inclusion { proof_index, .. } | Self::Consistency { proof_index, .. } => *proof_index,
+        }
+    }
+
     pub const fn inclusion_head(&self) -> Option<VdsTreeHead> {
         match self {
             Self::Inclusion { head, .. } => Some(*head),
@@ -576,32 +584,34 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<Rfc9942VerifiedReceipt, Rfc9942VdpError> {
-        let (head, signature_payload) = match (&self.payload, detached_payload) {
+        let (proof_index, head, signature_payload) = match (&self.payload, detached_payload) {
             (Rfc9942ReceiptPayload::Attached(_), Some(_)) => {
                 return Err(Rfc9942VdpError::InvalidStructure);
             }
             (Rfc9942ReceiptPayload::Attached(_), None) => {
-                let head = self.verify_inclusion(candidate_entry)?;
-                (head, None)
+                let root = self.payload.attached_root().ok_or(Rfc9942VdpError::InvalidPayloadLength)?;
+                let (proof_index, head) = self.vdp.verify_inclusion_with_payload_index(candidate_entry, &root)?;
+                (proof_index, head, None)
             }
             (Rfc9942ReceiptPayload::Detached, supplied) => {
                 // Inclusion proof verification derives the root first. A
                 // caller-supplied detached payload, when present, must equal
                 // that derived root byte-for-byte before signature checking.
-                let head = self.vdp.validate_vds_id(self.vds_id)
-                    .and_then(|_| self.vdp.derive_inclusion_root(candidate_entry))?;
+                self.vdp.validate_vds_id(self.vds_id)?;
+                let (proof_index, head) = self.vdp.derive_inclusion_root_index(candidate_entry)?;
                 if let Some(payload) = supplied {
                     if payload != head.root() {
                         return Err(Rfc9942VdpError::NoMatchingProof);
                     }
                 }
                 let root = head.root();
-                (head, Some(root))
+                (proof_index, head, Some(root))
             }
         };
 
         self.verify_es256(public_key, external_aad, signature_payload.as_ref().map(|root| root.as_slice()))?;
         Ok(self.verified_state(Rfc9942VerifiedProof::Inclusion {
+            proof_index,
             head,
             candidate_leaf: leaf_hash(candidate_entry),
         }))
@@ -622,12 +632,16 @@ impl Rfc9942ReceiptEnvelope {
         // supplied detached bytes. Consistency verification consumes that same
         // payload root, preserving the signature/proof binding without making
         // detached transport mandatory at this API layer.
-        self.verify_es256(public_key, external_aad, detached_payload)?;
-        let newer = match detached_payload {
-            Some(payload) => self.verify_consistency_with_detached_payload(older, payload)?,
-            None => self.verify_consistency(older)?,
+        self.vdp.validate_vds_id(self.vds_id)?;
+        let (proof_index, newer) = match detached_payload {
+            Some(payload) => self.vdp.verify_consistency_with_payload_index(older, payload)?,
+            None => {
+                let root = self.payload.attached_root().ok_or(Rfc9942VdpError::DetachedPayloadRequired)?;
+                self.vdp.verify_consistency_with_payload_index(older, &root)?
+            }
         };
-        Ok(self.verified_state(Rfc9942VerifiedProof::Consistency { older, newer }))
+        self.verify_es256(public_key, external_aad, detached_payload)?;
+        Ok(self.verified_state(Rfc9942VerifiedProof::Consistency { proof_index, older, newer }))
     }
 
     pub fn signature1_tbs(
@@ -1486,6 +1500,15 @@ impl Rfc9942Vdp {
         candidate_entry: &[u8],
         payload: &[u8],
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.verify_inclusion_with_payload_index(candidate_entry, payload)
+            .map(|(_, head)| head)
+    }
+
+    fn verify_inclusion_with_payload_index(
+        &self,
+        candidate_entry: &[u8],
+        payload: &[u8],
+    ) -> Result<(usize, VdsTreeHead), Rfc9942VdpError> {
         if self.kind != Rfc9942ProofKind::Inclusion {
             return Err(Rfc9942VdpError::WrongProofKind);
         }
@@ -1494,11 +1517,12 @@ impl Rfc9942Vdp {
         }
         let mut root = [0u8; 32];
         root.copy_from_slice(payload);
-        for proof_bytes in &self.proofs {
+        let vds = Rfc9162Sha256Vds;
+        for (proof_index, proof_bytes) in self.proofs.iter().enumerate() {
             let proof = Rfc9162InclusionProof::from_cbor(proof_bytes)?;
             let head = VdsTreeHead::new(proof.tree_size, root);
             if vds.verify_inclusion(candidate_entry, root, &proof) {
-                return Ok(head);
+                return Ok((proof_index, head));
             }
         }
         Err(Rfc9942VdpError::NoMatchingProof)
@@ -1511,14 +1535,21 @@ impl Rfc9942Vdp {
         &self,
         candidate_entry: &[u8],
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.derive_inclusion_root_index(candidate_entry)
+            .map(|(_, head)| head)
+    }
+
+    fn derive_inclusion_root_index(
+        &self,
+        candidate_entry: &[u8],
+    ) -> Result<(usize, VdsTreeHead), Rfc9942VdpError> {
         if self.kind != Rfc9942ProofKind::Inclusion {
             return Err(Rfc9942VdpError::WrongProofKind);
         }
-        let vds = Rfc9162Sha256Vds;
-        for proof_bytes in &self.proofs {
+        for (proof_index, proof_bytes) in self.proofs.iter().enumerate() {
             let proof = Rfc9162InclusionProof::from_cbor(proof_bytes)?;
             if let Some(root) = derive_rfc9162_inclusion_root(candidate_entry, &proof) {
-                return Ok(VdsTreeHead::new(proof.tree_size, root));
+                return Ok((proof_index, VdsTreeHead::new(proof.tree_size, root)));
             }
         }
         Err(Rfc9942VdpError::NoMatchingProof)
@@ -1585,6 +1616,16 @@ impl Rfc9942Vdp {
         older: VdsTreeHead,
         payload: &[u8],
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.verify_consistency_with_payload_index(older, payload)
+            .map(|(_, newer)| newer)
+    }
+
+    fn verify_consistency_with_payload_index(
+        &self,
+        older: VdsTreeHead,
+        payload: &[u8],
+    ) -> Result<(usize, VdsTreeHead), Rfc9942VdpError> {
+
         if self.kind != Rfc9942ProofKind::Consistency {
             return Err(Rfc9942VdpError::WrongProofKind);
         }
@@ -1594,14 +1635,14 @@ impl Rfc9942Vdp {
         let mut root = [0u8; 32];
         root.copy_from_slice(payload);
         let vds = Rfc9162Sha256Vds;
-        for proof_bytes in &self.proofs {
+        for (proof_index, proof_bytes) in self.proofs.iter().enumerate() {
             let proof = Rfc9162ConsistencyProof::from_cbor(proof_bytes)?;
             if proof.first != older.tree_size() {
                 continue;
             }
             let newer = VdsTreeHead::new(proof.second, root);
             if vds.verify(older.root(), root, &proof) {
-                return Ok(newer);
+                return Ok((proof_index, newer));
             }
         }
         Err(Rfc9942VdpError::NoMatchingProof)
