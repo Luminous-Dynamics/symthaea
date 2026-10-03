@@ -85,6 +85,9 @@ fn validate_service_unit_shape_v1(unit: &str) -> Result<(), NixServiceOperationE
     if unit.starts_with('-') {
         return Err(NixServiceOperationErrorV1::OptionLikeUnit);
     }
+    if unit.contains('/') || unit.contains('\\') {
+        return Err(NixServiceOperationErrorV1::PathLikeUnit);
+    }
     if unit.starts_with('.') || unit.ends_with('.') {
         return Err(NixServiceOperationErrorV1::AmbiguousUnit);
     }
@@ -96,9 +99,6 @@ fn validate_service_unit_shape_v1(unit: &str) -> Result<(), NixServiceOperationE
         if at == 0 || name[at + 1..].contains('@') {
             return Err(NixServiceOperationErrorV1::InvalidCharacter);
         }
-    }
-    if unit.contains('/') || unit.contains('\\') {
-        return Err(NixServiceOperationErrorV1::PathLikeUnit);
     }
     if unit.bytes().any(|byte| byte.is_ascii_whitespace() || byte.is_ascii_control()) {
         return Err(NixServiceOperationErrorV1::WhitespaceOrControl);
