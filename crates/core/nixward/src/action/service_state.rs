@@ -388,8 +388,7 @@ impl NixServiceObservedStateV1 {
 
         let observed_id = observed_id.ok_or(NixServiceStateErrorV1::MissingId)?;
         let observed_names = observed_names.ok_or(NixServiceStateErrorV1::MissingNames)?;
-        let observed_id = canonical_service_unit(observed_id)
-            .map_err(|_| NixServiceStateErrorV1::InvalidObservedUnitIdentity)?;
+        let observed_id = canonical_observed_service_unit(observed_id)?;
         let observed_names = normalize_observed_names(&observed_names)?;
         validate_observed_identity(&requested_unit, &observed_id, &observed_names)?;
 
@@ -851,6 +850,27 @@ CanReload=yes
                 "nginx",
                 "Id=nginx
 Names=nginx
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::InvalidObservedUnitIdentity
+        );
+    }
+
+    #[test]
+    fn complete_observation_requires_canonical_resolved_id() {
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_observation(
+                "nginx",
+                "Id=nginx
+Names=nginx.service
 LoadState=loaded
 ActiveState=active
 SubState=running
