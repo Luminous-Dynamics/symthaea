@@ -24,6 +24,7 @@ const REMOVE_KEY: &str = "applications.remove";
 const REBOOT_KEY: &str = "system.reboot";
 const ROLLBACK_KEY: &str = "nixos.rollback";
 const ROLLBACK_GENERATION_KEY: &str = "nixos.rollback-generation";
+const ROLLBACK_REALIZATION_KEY: &str = "nixos.rollback-realization";
 pub const NIXOS_GENERATION_RESOURCE_KIND: &str = "nixos-generation";
 const NIXOS_GENERATION_DIGEST_DOMAIN: &[u8] =
     b"LUMINOUS-DYNAMICS/SSC/NIXOS-GENERATION/v1\0";
@@ -34,15 +35,26 @@ const NIXOS_GENERATION_DIGEST_DOMAIN: &[u8] =
 /// The digest uses a protocol-specific domain separator plus a fixed-width
 /// big-endian generation number, avoiding ambiguity with other SSC resource
 /// identities that may use the same hash function.
-pub fn nixos_generation_resource(generation: u64) -> sovereign_state_compiler::ResourceRef {
-    let mut bytes = Vec::with_capacity(NIXOS_GENERATION_DIGEST_DOMAIN.len() + 8);
+pub fn nixos_generation_resource(
+    generation: u64,
+    realization: &str,
+) -> Result<sovereign_state_compiler::ResourceRef, NixOSAdapterError> {
+    if realization.is_empty() {
+        return Err(NixOSAdapterError::InvalidGenerationRealization);
+    }
+
+    let realization_bytes = realization.as_bytes();
+    let mut bytes =
+        Vec::with_capacity(NIXOS_GENERATION_DIGEST_DOMAIN.len() + 8 + 8 + realization_bytes.len());
     bytes.extend_from_slice(NIXOS_GENERATION_DIGEST_DOMAIN);
     bytes.extend_from_slice(&generation.to_be_bytes());
+    bytes.extend_from_slice(&(realization_bytes.len() as u64).to_be_bytes());
+    bytes.extend_from_slice(realization_bytes);
 
-    sovereign_state_compiler::ResourceRef {
+    Ok(sovereign_state_compiler::ResourceRef {
         kind: NIXOS_GENERATION_RESOURCE_KIND.into(),
         identity: sovereign_state_compiler::ContentDigest::blake3(&bytes),
-    }
+    })
 }
 
 /// Concrete NixOS activation semantics carried by the target adapter.
@@ -308,7 +320,7 @@ impl NixOSTargetAdapter {
     fn reject_unknown_properties(
         intent: &DeploymentIntent,
     ) -> Result<(), NixOSAdapterError> {
-        const SUPPORTED: [&str; 7] = [
+        const SUPPORTED: [&str; 8] = [
             REBUILD_KEY,
             HOME_MANAGER_KEY,
             INSTALL_KEY,
@@ -316,6 +328,7 @@ impl NixOSTargetAdapter {
             REBOOT_KEY,
             ROLLBACK_KEY,
             ROLLBACK_GENERATION_KEY,
+            ROLLBACK_REALIZATION_KEY,
         ];
 
         if let Some(key) = intent
@@ -367,9 +380,18 @@ impl TargetAdapter for NixOSTargetAdapter {
         let reboot = Self::property_bool(intent, REBOOT_KEY)?.unwrap_or(false);
         let rollback_requested = Self::property_bool(intent, ROLLBACK_KEY)?.unwrap_or(false);
         let rollback_generation = Self::property_u64(intent, ROLLBACK_GENERATION_KEY)?;
+        let rollback_realization = Self::property_string(intent, ROLLBACK_REALIZATION_KEY)?;
 
-        if rollback_requested != rollback_generation.is_some() {
+        if rollback_requested && rollback_generation.is_none() {
             return Err(NixOSAdapterError::RollbackGenerationRequired);
+        }
+        if rollback_requested && rollback_realization.is_none() {
+            return Err(NixOSAdapterError::RollbackRealizationRequired);
+        }
+        if !rollback_requested
+            && (rollback_generation.is_some() || rollback_realization.is_some())
+        {
+            return Err(NixOSAdapterError::UnexpectedRollbackTargetIdentity);
         }
 
         let activation_mode = match (rebuild.as_deref(), rollback_generation) {
@@ -392,7 +414,10 @@ impl TargetAdapter for NixOSTargetAdapter {
         }
 
         if let Some(NixActivationMode::Rollback { generation }) = activation_mode {
-            let required_resource = nixos_generation_resource(generation);
+            let realization = rollback_realization
+                .as_deref()
+                .expect("validated rollback realization");
+            let required_resource = nixos_generation_resource(generation, realization)?;
             if !intent.required_resources.contains(&required_resource) {
                 return Err(NixOSAdapterError::UnboundRollbackGeneration(generation));
             }
@@ -580,6 +605,12 @@ pub enum NixOSAdapterError {
     RollbackGenerationRequired,
     #[error("nixos.rollback-generation must be greater than zero")]
     InvalidRollbackGeneration,
+    #[error("rollback target realization identity must not be empty")]
+    InvalidGenerationRealization,
+    #[error("nixos.rollback=true requires an exact nixos.rollback-realization")]
+    RollbackRealizationRequired,
+    #[error("rollback target identity is only valid when rollback is requested")]
+    UnexpectedRollbackTargetIdentity,
     #[error("rollback generation {0} is not bound to an observed NixOS generation resource")]
     UnboundRollbackGeneration(u64),
     #[error("NixOS activation modes cannot be combined in one intent")]
@@ -603,9 +634,12 @@ mod tests {
         NixOSTargetAdapter::new("host-01", 1_000)
     }
 
-    fn rollback_adapter(generation: u64) -> NixOSTargetAdapter {
+    fn rollback_adapter(generation: u64, realization: &str) -> NixOSTargetAdapter {
         let mut snapshot = adapter().describe_target().expect("snapshot");
-        snapshot.resources.insert(nixos_generation_resource(generation));
+        snapshot.resources.insert(
+            nixos_generation_resource(generation, realization)
+                .expect("generation resource"),
+        );
         NixOSTargetAdapter::from_snapshot(snapshot).expect("nixos snapshot")
     }
 
@@ -819,12 +853,71 @@ mod tests {
     #[test]
     fn rollback_generation_resource_identity_is_deterministic() {
         assert_eq!(
-            nixos_generation_resource(42),
-            nixos_generation_resource(42)
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"),
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource")
         );
         assert_ne!(
-            nixos_generation_resource(42),
-            nixos_generation_resource(43)
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"),
+            nixos_generation_resource(43, "/nix/store/bbb-nixos-system-host").expect("generation resource")
+        );
+    }
+
+    #[test]
+    fn rollback_generation_resource_binds_exact_realization() {
+        assert_eq!(
+            nixos_generation_resource(42, "/nix/store/aaa")
+                .expect("resource"),
+            nixos_generation_resource(42, "/nix/store/aaa")
+                .expect("resource")
+        );
+        assert_ne!(
+            nixos_generation_resource(42, "/nix/store/aaa")
+                .expect("resource"),
+            nixos_generation_resource(42, "/nix/store/bbb")
+                .expect("resource")
+        );
+        assert_ne!(
+            nixos_generation_resource(42, "/nix/store/aaa")
+                .expect("resource"),
+            nixos_generation_resource(43, "/nix/store/aaa")
+                .expect("resource")
+        );
+        assert_eq!(
+            nixos_generation_resource(42, "")
+                .expect_err("empty realization"),
+            NixOSAdapterError::InvalidGenerationRealization
+        );
+    }
+
+    #[test]
+    fn rollback_requires_exact_realization_identity() {
+        let mut intent = DeploymentIntent::new("rollback-realization-1", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_KEY.into(), StateValue::Bool(true));
+        intent.desired_state.properties.insert(
+            ROLLBACK_GENERATION_KEY.into(),
+            StateValue::Integer(42),
+        );
+
+        assert_eq!(
+            adapter().compile(&intent),
+            Err(NixOSAdapterError::RollbackRealizationRequired)
+        );
+    }
+
+    #[test]
+    fn rollback_rejects_unexpected_realization_without_rollback() {
+        let mut intent = DeploymentIntent::new("rollback-realization-2", "host-01");
+        intent.desired_state.properties.insert(
+            ROLLBACK_REALIZATION_KEY.into(),
+            StateValue::String("/nix/store/aaa-nixos-system-host".into()),
+        );
+
+        assert_eq!(
+            adapter().compile(&intent),
+            Err(NixOSAdapterError::UnexpectedRollbackTargetIdentity)
         );
     }
 
@@ -839,6 +932,10 @@ mod tests {
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(42),
         );
+        intent.desired_state.properties.insert(
+            ROLLBACK_REALIZATION_KEY.into(),
+            StateValue::String("/nix/store/aaa-nixos-system-host".into()),
+        );
 
         assert_eq!(
             adapter().compile(&intent),
@@ -847,7 +944,7 @@ mod tests {
     }
 
     #[test]
-    fn rollback_rejects_snapshot_with_different_generation() {
+    fn rollback_rejects_snapshot_with_different_generation_or_realization() {
         let mut intent = DeploymentIntent::new("rollback-drift", "host-01");
         intent
             .desired_state
@@ -857,12 +954,16 @@ mod tests {
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(42),
         );
-        intent.required_resources.insert(nixos_generation_resource(42));
+        intent.desired_state.properties.insert(
+            ROLLBACK_REALIZATION_KEY.into(),
+            StateValue::String("/nix/store/aaa-nixos-system-host".into()),
+        );
+        intent.required_resources.insert(nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"));
 
         assert_eq!(
-            rollback_adapter(43).compile(&intent),
+            rollback_adapter(43, "/nix/store/bbb-nixos-system-host").compile(&intent),
             Err(NixOSAdapterError::PlanValidation(
-                PlanValidationError::MissingTargetResource(nixos_generation_resource(42))
+                PlanValidationError::MissingTargetResource(nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"))
             ))
         );
     }
@@ -896,11 +997,15 @@ mod tests {
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(7),
         );
-        intent.required_resources.insert(nixos_generation_resource(7));
+        intent.desired_state.properties.insert(
+            ROLLBACK_REALIZATION_KEY.into(),
+            StateValue::String("/nix/store/aaa-nixos-system-host".into()),
+        );
+        intent.required_resources.insert(nixos_generation_resource(7, "/nix/store/aaa-nixos-system-host").expect("generation resource"));
 
         let mode = NixActivationMode::Rollback { generation: 7 };
         assert_eq!(mode, NixActivationMode::Rollback { generation: 7 });
-        let plan = rollback_adapter(7).compile(&intent).expect("compile");
+        let plan = rollback_adapter(7, "/nix/store/aaa-nixos-system-host").compile(&intent).expect("compile");
         assert_eq!(plan.steps[1].kind, PlanStepKind::Rollback);
     }
 
@@ -919,7 +1024,11 @@ mod tests {
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(7),
         );
-        intent.required_resources.insert(nixos_generation_resource(7));
+        intent.desired_state.properties.insert(
+            ROLLBACK_REALIZATION_KEY.into(),
+            StateValue::String("/nix/store/aaa-nixos-system-host".into()),
+        );
+        intent.required_resources.insert(nixos_generation_resource(7, "/nix/store/aaa-nixos-system-host").expect("generation resource"));
 
         assert_eq!(
             adapter().compile(&intent),
@@ -938,9 +1047,13 @@ mod tests {
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(42),
         );
-        intent.required_resources.insert(nixos_generation_resource(42));
+        intent.desired_state.properties.insert(
+            ROLLBACK_REALIZATION_KEY.into(),
+            StateValue::String("/nix/store/aaa-nixos-system-host".into()),
+        );
+        intent.required_resources.insert(nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"));
 
-        let plan = rollback_adapter(42).compile(&intent).expect("compile");
+        let plan = rollback_adapter(42, "/nix/store/aaa-nixos-system-host").compile(&intent).expect("compile");
         assert!(plan.steps.iter().any(|step| {
             step.kind == PlanStepKind::Rollback && step.description.contains("generation 42")
         }));
@@ -1113,7 +1226,7 @@ mod tests {
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(42),
         );
-        a.required_resources.insert(nixos_generation_resource(42));
+        a.required_resources.insert(nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"));
 
         let mut b = a.clone();
         b.desired_state.properties.insert(
@@ -1121,10 +1234,10 @@ mod tests {
             StateValue::Integer(43),
         );
         b.required_resources.clear();
-        b.required_resources.insert(nixos_generation_resource(43));
+        b.required_resources.insert(nixos_generation_resource(43, "/nix/store/bbb-nixos-system-host").expect("generation resource"));
 
-        let plan_a = rollback_adapter(42).compile(&a).expect("compile a");
-        let plan_b = rollback_adapter(43).compile(&b).expect("compile b");
+        let plan_a = rollback_adapter(42, "/nix/store/aaa-nixos-system-host").compile(&a).expect("compile a");
+        let plan_b = rollback_adapter(43, "/nix/store/bbb-nixos-system-host").compile(&b).expect("compile b");
 
         assert_ne!(
             plan_a.digest().expect("digest a"),
