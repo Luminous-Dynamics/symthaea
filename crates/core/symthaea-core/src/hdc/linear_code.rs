@@ -25,7 +25,11 @@ impl BinaryCodeword {
     }
 
     pub fn from_words(dimension: usize, mut words: Vec<u64>) -> Self {
-        words.resize(words_for(dimension), 0);
+        assert_eq!(
+            words.len(),
+            words_for(dimension),
+            "packed word count must exactly match dimension"
+        );
         if let Some(last) = words.last_mut() {
             *last &= last_word_mask(dimension);
         }
@@ -560,6 +564,12 @@ mod tests {
         let vector = BinaryCodeword::from_words(65, vec![u64::MAX, u64::MAX]);
         assert_eq!(vector.weight(), 65);
         assert!(vector.bit(64));
+    }
+
+    #[test]
+    #[should_panic(expected = "packed word count must exactly match dimension")]
+    fn packed_word_count_mismatch_is_rejected() {
+        let _ = BinaryCodeword::from_words(65, vec![0; 1]);
     }
 
     #[test]
