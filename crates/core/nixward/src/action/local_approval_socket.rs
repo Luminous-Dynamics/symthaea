@@ -27,7 +27,9 @@ use super::local_approval_store::{
     ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1,
     LocalApprovalRequestStoreV1,
 };
-use super::local_approval_submission::LocalApprovalSubmissionV2;
+use super::local_approval_submission::{
+    LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV2,
+};
 use super::temporal::{AuthoritativeEvaluationV1, NixTimeErrorV1, UnixMillisV1};
 use blake3::Hasher;
 use serde::de::DeserializeOwned;
