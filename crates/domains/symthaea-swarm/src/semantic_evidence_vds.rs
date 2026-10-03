@@ -2449,28 +2449,8 @@ fn verify_rfc9162_inclusion(
     root: [u8; 32],
     proof: &Rfc9162InclusionProof,
 ) -> bool {
-    let mut fn_ = proof.leaf_index;
-    let mut sn = proof.tree_size - 1;
-    let mut r = leaf_hash(leaf);
-
-    for p in &proof.inclusion_path {
-        if sn == 0 { return false; }
-        if (fn_ & 1) == 1 || fn_ == sn {
-            r = node_hash(p, &r);
-            if fn_ & 1 == 0 {
-                while fn_ & 1 == 0 && fn_ != 0 {
-                    fn_ >>= 1;
-                    sn >>= 1;
-                }
-            }
-        } else {
-            r = node_hash(&r, p);
-        }
-        fn_ >>= 1;
-        sn >>= 1;
-    }
-
-    sn == 0 && r == root
+    derive_rfc9162_inclusion_root(leaf, proof)
+        .is_some_and(|derived_root| derived_root == root)
 }
 
 fn consistency_subproof(m: usize, leaves: &[Vec<u8>], complete: bool) -> Vec<[u8; 32]> {
@@ -2595,6 +2575,25 @@ mod tests {
                     "consistency failed for first={first}, second={tree_size}, path_len={}",
                     proof.consistency_path.len()
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn inclusion_verification_and_root_derivation_share_one_walk() {
+        let vds = Rfc9162Sha256Vds;
+        for tree_size in 1usize..=32 {
+            let leaves: Vec<Vec<u8>> = (0..tree_size)
+                .map(|i| format!("leaf-{i}").into_bytes())
+                .collect();
+            let head = vds.tree_head(&leaves);
+            for leaf_index in 0..tree_size {
+                let proof = vds.inclusion_proof(&leaves, leaf_index).unwrap();
+                assert_eq!(
+                    derive_rfc9162_inclusion_root(&leaves[leaf_index], &proof),
+                    Some(head.root())
+                );
+                assert!(vds.verify_inclusion(&leaves[leaf_index], head.root(), &proof));
             }
         }
     }
