@@ -400,6 +400,34 @@ References:
 - Android Management API policies.
 
 
+
+## NixOS transition semantics and rollback identity
+
+The NixOS adapter MUST preserve the semantic distinction between:
+
+- `switch` — activate the new generation now and make it the boot default;
+- `test` — activate the new generation now without making it the boot default;
+- `boot` — build and select the new generation for the next boot without activating it now;
+- `dry-activate` — compute/report activation changes without activating;
+- rollback — transition to an existing generation rather than building the requested candidate.
+
+These are distinct state transitions even when they originate from the same desired configuration. The adapter therefore models them as a typed `NixActivationMode`, while the neutral SSC core remains unaware of Nix-specific vocabulary.
+
+Rollback requires stronger identity binding than a bare generation number. A rollback request MUST identify the target generation as an observed resource in the target snapshot:
+
+`required_resources ⊇ { nixos-generation(generation) }`
+
+The generation resource identity is content-addressed and is included in the authorized plan digest. This prevents a later executor from interpreting an otherwise identical authorization as permission to operate on a different generation identity.
+
+A rollback request without the corresponding observed generation resource is rejected. Rollback is also mutually exclusive with rebuild, application installation/removal, and Home Manager mutation in the same intent. Reboot may be composed afterward because it is an explicit subsequent lifecycle step.
+
+This establishes the stronger invariant:
+
+`same host + same authority + same nominal generation number`
+does not constitute the same rollback authorization unless the observed generation resource is also the same.
+
+The adapter remains plan-only. The existence, current/default/active status, and successful transition to that generation remain Nixward verification responsibilities.
+
 ## Resource binding
 
 Capabilities alone are insufficient for operations that mutate a concrete
