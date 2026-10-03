@@ -26,7 +26,7 @@ const ROLLBACK_KEY: &str = "nixos.rollback";
 const ROLLBACK_GENERATION_KEY: &str = "nixos.rollback-generation";
 pub const NIXOS_GENERATION_RESOURCE_KIND: &str = "nixos-generation";
 const NIXOS_GENERATION_DIGEST_DOMAIN: &[u8] =
-    b"LUMINOUS-DYNAMICS/SSC/NIXOS-GENERATION/v1\\0";
+    b"LUMINOUS-DYNAMICS/SSC/NIXOS-GENERATION/v1\0";
 
 /// Construct the resource identity used to bind a rollback to a specific
 /// observed NixOS generation.
