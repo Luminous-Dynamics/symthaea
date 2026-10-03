@@ -125,8 +125,10 @@ impl Affine {
         ]
     }
 
-    fn scale_abs(self) -> f32 {
-        (self.a * self.a + self.b * self.b).sqrt().max(1e-6)
+    fn scale_abs(self) -> f64 {
+        let a = f64::from(self.a);
+        let b = f64::from(self.b);
+        a.mul_add(a, b * b).sqrt().max(1e-6)
     }
 }
 
@@ -326,7 +328,12 @@ fn stroke_width(style: &Style, transform: Affine) -> f32 {
         .stroke_width
         .map(|value| finite(value, DEFAULT_STROKE_WIDTH).max(MIN_LINE_WIDTH))
         .unwrap_or(DEFAULT_STROKE_WIDTH);
-    (base * transform.scale_abs()).max(MIN_LINE_WIDTH)
+    let scaled = f64::from(base) * transform.scale_abs();
+    if scaled.is_finite() {
+        scaled.min(f64::from(f32::MAX)) as f32
+    } else {
+        base
+    }
 }
 
 fn emit_ellipse(
@@ -415,9 +422,10 @@ fn emit_polygon_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) -
         .enumerate()
         .map(|(i, &a)| {
             let b = polygon[(i + 1) % polygon.len()];
-            points[a][0] * points[b][1] - points[a][1] * points[b][0]
+            f64::from(points[a][0]) * f64::from(points[b][1])
+                - f64::from(points[a][1]) * f64::from(points[b][0])
         })
-        .sum::<f32>();
+        .sum::<f64>();
     if !area2.is_finite() || area2.abs() <= 1e-6 {
         return false;
     }
@@ -594,21 +602,33 @@ fn emit_thick_segment(
     width: f32,
     color: [f32; 4],
 ) {
-    let dx = end[0] - start[0];
-    let dy = end[1] - start[1];
-    let len = (dx * dx + dy * dy).sqrt();
+    let dx = f64::from(end[0]) - f64::from(start[0]);
+    let dy = f64::from(end[1]) - f64::from(start[1]);
+    let len = dx.mul_add(dx, dy * dy).sqrt();
     if !len.is_finite() || len <= 1e-6 {
         return;
     }
-    let half = width.max(MIN_LINE_WIDTH) * 0.5;
+    let half = f64::from(width.max(MIN_LINE_WIDTH)) * 0.5;
     let nx = -dy / len * half;
     let ny = dx / len * half;
-    let a = [start[0] + nx, start[1] + ny];
-    let b = [start[0] - nx, start[1] - ny];
-    let c = [end[0] - nx, end[1] - ny];
-    let d = [end[0] + nx, end[1] + ny];
-    push_triangle(out, a, b, c, color);
-    push_triangle(out, a, c, d, color);
+    let a = [f64::from(start[0]) + nx, f64::from(start[1]) + ny];
+    let b = [f64::from(start[0]) - nx, f64::from(start[1]) - ny];
+    let c = [f64::from(end[0]) - nx, f64::from(end[1]) - ny];
+    let d = [f64::from(end[0]) + nx, f64::from(end[1]) + ny];
+    push_triangle(
+        out,
+        [a[0] as f32, a[1] as f32],
+        [b[0] as f32, b[1] as f32],
+        [c[0] as f32, c[1] as f32],
+        color,
+    );
+    push_triangle(
+        out,
+        [a[0] as f32, a[1] as f32],
+        [c[0] as f32, c[1] as f32],
+        [d[0] as f32, d[1] as f32],
+        color,
+    );
 }
 
 fn push_triangle(
