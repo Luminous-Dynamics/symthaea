@@ -402,13 +402,18 @@ fn digest_f64(hasher: &mut blake3::Hasher, value: f64) {
 }
 
 fn provenance_kind_tag(kind: ProvenanceRelationKind) -> &'static str {
-    match kind {
-        ProvenanceRelationKind::DerivedFrom => "DerivedFrom",
-        ProvenanceRelationKind::RevisedFrom => "RevisedFrom",
-        ProvenanceRelationKind::Supersedes => "Supersedes",
-        ProvenanceRelationKind::Contradicts => "Contradicts",
-        ProvenanceRelationKind::Corroborates => "Corroborates",
-        ProvenanceRelationKind::RepresentationOf => "RepresentationOf",
+    kind.stable_code()
+}
+
+fn provenance_kind_from_persisted(value: &str) -> Option<ProvenanceRelationKind> {
+    match value {
+        "derived_from" | "DerivedFrom" => Some(ProvenanceRelationKind::DerivedFrom),
+        "revised_from" | "RevisedFrom" => Some(ProvenanceRelationKind::RevisedFrom),
+        "supersedes" | "Supersedes" => Some(ProvenanceRelationKind::Supersedes),
+        "contradicts" | "Contradicts" => Some(ProvenanceRelationKind::Contradicts),
+        "corroborates" | "Corroborates" => Some(ProvenanceRelationKind::Corroborates),
+        "representation_of" | "RepresentationOf" => Some(ProvenanceRelationKind::RepresentationOf),
+        _ => None,
     }
 }
 
@@ -697,7 +702,7 @@ impl KnowledgePersistence {
                     rusqlite::params![
                         relation.source_memory_id,
                         relation.target_memory_id,
-                        format!("{:?}", relation.kind),
+                        relation.kind.stable_code(),
                         relation.created_at
                     ],
                 )
@@ -1257,15 +1262,9 @@ impl KnowledgePersistence {
         let mut stmt = conn.prepare("SELECT source_memory_id, target_memory_id, kind, created_at FROM knowledge_provenance_relations ORDER BY created_at, source_memory_id, target_memory_id, kind").map_err(|e| e.to_string())?;
         let relations = stmt.query_map([], |row| {
             let kind: String = row.get(2)?;
-            let kind = match kind.as_str() {
-                "DerivedFrom" => ProvenanceRelationKind::DerivedFrom,
-                "RevisedFrom" => ProvenanceRelationKind::RevisedFrom,
-                "Supersedes" => ProvenanceRelationKind::Supersedes,
-                "Contradicts" => ProvenanceRelationKind::Contradicts,
-                "Corroborates" => ProvenanceRelationKind::Corroborates,
-                "RepresentationOf" => ProvenanceRelationKind::RepresentationOf,
-                _ => return Err(rusqlite::Error::InvalidColumnType(2, "kind".into(), rusqlite::types::Type::Text)),
-            };
+            let kind = provenance_kind_from_persisted(&kind).ok_or_else(|| {
+                rusqlite::Error::InvalidColumnType(2, "kind".into(), rusqlite::types::Type::Text)
+            })?;
             Ok(ProvenanceRelationRecord { source_memory_id: row.get(0)?, target_memory_id: row.get(1)?, kind, created_at: row.get(3)? })
         }).map_err(|e| e.to_string())?;
         let mut loaded = Vec::new();
@@ -1510,7 +1509,7 @@ impl KnowledgePersistence {
         tx.execute_batch(
             "CREATE TABLE IF NOT EXISTS knowledge_facts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                memory_id TEXT,
+                memory_id TEXT NOT NULL,
                 canonical_identity TEXT,
                 provenance_family TEXT,
                 vector_blob BLOB NOT NULL,
@@ -1620,6 +1619,63 @@ impl KnowledgePersistence {
                     rowid
                 ));
             }
+        }
+
+        // Canonicalize persisted provenance relation kinds to the stable shared wire codes.
+        // The loader accepts the legacy Rust Debug spellings above for compatibility, but after
+        // migration the database has one representation that is independent of Rust variant names.
+        let legacy_kind_rows: Vec<(i64, String)> = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT rowid, kind
+                     FROM knowledge_provenance_relations
+                     WHERE kind IN (
+                         'DerivedFrom', 'RevisedFrom', 'Supersedes',
+                         'Contradicts', 'Corroborates', 'RepresentationOf'
+                     )
+                     ORDER BY rowid ASC",
+                )
+                .map_err(|e| format!("Provenance kind normalization prepare: {e}"))?;
+            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                .map_err(|e| format!("Provenance kind normalization query: {e}"))?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| format!("Provenance kind normalization row: {e}"))?
+        };
+        for (rowid, legacy_kind) in legacy_kind_rows.drain(..) {
+            let kind = provenance_kind_from_persisted(&legacy_kind)
+                .ok_or_else(|| format!("Unknown persisted provenance kind: {legacy_kind}"))?;
+            tx.execute(
+                "UPDATE knowledge_provenance_relations
+                 SET kind = ?1
+                 WHERE rowid = ?2",
+                rusqlite::params![kind.stable_code(), rowid],
+            )
+            .map_err(|e| format!("Provenance kind normalization update: {e}"))?;
+        }
+
+        // Validate the complete persisted relation-kind domain after normalization so an
+        // out-of-band unknown kind cannot survive migration and merely surface later at load.
+        let mut invalid_kind_stmt = tx
+            .prepare(
+                "SELECT rowid, kind
+                 FROM knowledge_provenance_relations
+                 WHERE kind NOT IN (
+                     'derived_from', 'revised_from', 'supersedes',
+                     'contradicts', 'corroborates', 'representation_of'
+                 )
+                 ORDER BY rowid ASC",
+            )
+            .map_err(|e| format!("Provenance kind integrity prepare: {e}"))?;
+        let invalid_kind_rows = invalid_kind_stmt
+            .query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))
+            .map_err(|e| format!("Provenance kind integrity query: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Provenance kind integrity row: {e}"))?;
+        if let Some((rowid, kind)) = invalid_kind_rows.first() {
+            return Err(format!(
+                "Persisted provenance relation row {} has unknown kind: {}",
+                rowid, kind
+            ));
         }
 
         // Add snapshot-receipt self-digest support to databases created by the
@@ -1995,19 +2051,13 @@ fn read_snapshot_from_transaction(
             let rows = stmt
                 .query_map([], |row| {
                     let kind: String = row.get(2)?;
-                    let kind = match kind.as_str() {
-                        "DerivedFrom" => ProvenanceRelationKind::DerivedFrom,
-                        "RevisedFrom" => ProvenanceRelationKind::RevisedFrom,
-                        "Supersedes" => ProvenanceRelationKind::Supersedes,
-                        "Contradicts" => ProvenanceRelationKind::Contradicts,
-                        "Corroborates" => ProvenanceRelationKind::Corroborates,
-                        "RepresentationOf" => ProvenanceRelationKind::RepresentationOf,
-                        _ => return Err(rusqlite::Error::InvalidColumnType(
+                    let kind = provenance_kind_from_persisted(&kind).ok_or_else(|| {
+                        rusqlite::Error::InvalidColumnType(
                             2,
                             "kind".into(),
                             rusqlite::types::Type::Text,
-                        )),
-                    };
+                        )
+                    })?;
                     Ok(ProvenanceRelationRecord {
                         source_memory_id: row.get(0)?,
                         target_memory_id: row.get(1)?,
@@ -2432,7 +2482,133 @@ mod tests {
     }
 
     #[test]
-    fn test_fact_memory_identity_cannot_be_blank_after_schema_migration() {
+    fn test_provenance_storage_uses_stable_wire_codes() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_provenance_wire_code_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let relation = ProvenanceRelationRecord {
+            source_memory_id: "source".into(),
+            target_memory_id: "target".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "event:1".into(),
+        };
+        assert_eq!(p.save_provenance_relations(&[relation]).unwrap(), 1);
+
+        let conn = p.open_connection().unwrap();
+        let stored: String = conn
+            .query_row(
+                "SELECT kind FROM knowledge_provenance_relations
+                 WHERE source_memory_id = 'source'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "derived_from");
+
+        let loaded = p.load_provenance_relations().unwrap();
+        assert_eq!(loaded[0].kind, ProvenanceRelationKind::DerivedFrom);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_schema_migration_normalizes_legacy_provenance_wire_codes() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_legacy_provenance_wire_code_migration_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id TEXT,
+                    canonical_identity TEXT,
+                    provenance_family TEXT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                INSERT INTO knowledge_provenance_relations
+                    (source_memory_id, target_memory_id, kind, created_at)
+                VALUES ('source', 'target', 'DerivedFrom', 'event:1');",
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let conn = p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+
+        let stored: String = conn
+            .query_row(
+                "SELECT kind FROM knowledge_provenance_relations",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "derived_from");
+
+        let loaded = p.load_provenance_relations().unwrap();
+        assert_eq!(loaded[0].kind, ProvenanceRelationKind::DerivedFrom);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_schema_migration_rejects_unknown_provenance_kind() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_unknown_provenance_kind_migration_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                INSERT INTO knowledge_provenance_relations
+                    (source_memory_id, target_memory_id, kind, created_at)
+                VALUES ('source', 'target', 'future_kind', 'event:1');",
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let conn = p.open_connection().unwrap();
+        let err = p.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains("unknown kind"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_fact_memory_identity_cannot_be_blank_after_schema_migration {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_fact_memory_identity_trigger_test_{}",
             std::process::id()
