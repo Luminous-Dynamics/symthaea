@@ -73,6 +73,20 @@ jobs:
           cp crates/core/nixward/src/ssc_bridge.rs "$tmp/nixward-ssc-bridge/src/lib.rs"
           cp Cargo.lock "$tmp/Cargo.lock"
 
+          cat >> "$tmp/Cargo.lock" <<'EOF'
+
+          [[package]]
+          name = "nixward-ssc-bridge"
+          version = "0.1.0"
+          dependencies = [
+              "serde",
+              "serde_json",
+              "sovereign-state-compiler",
+              "sovereign-state-compiler-nix",
+              "thiserror 1.0.69",
+          ]
+          EOF
+
           cat > "$tmp/Cargo.toml" <<'EOF'
           [workspace]
           resolver = "2"
