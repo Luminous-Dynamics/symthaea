@@ -584,61 +584,65 @@ mod tests {
 
     #[test]
     fn deterministic_nixos_rebuild_plan_vectors() {
+        let set = |capabilities: &[Capability]| capabilities.iter().copied().collect::<BTreeSet<_>>();
         let vectors = [
             (
                 "switch",
                 vec![
-                    (PlanStepKind::Observe, vec![Capability::ObserveHardware]),
+                    (PlanStepKind::Observe, set(&[Capability::ObserveHardware])),
                     (
                         PlanStepKind::ApplyDesiredState,
-                        vec![
+                        set(&[
                             Capability::ConfigureSystem,
                             Capability::UpdateSystem,
                             Capability::ModifyBootChain,
-                        ],
+                        ]),
                     ),
-                    (PlanStepKind::Verify, vec![Capability::ObserveHardware]),
+                    (PlanStepKind::Verify, set(&[Capability::ObserveHardware])),
                 ],
             ),
             (
                 "test",
                 vec![
-                    (PlanStepKind::Observe, vec![Capability::ObserveHardware]),
+                    (PlanStepKind::Observe, set(&[Capability::ObserveHardware])),
                     (
                         PlanStepKind::ApplyDesiredState,
-                        vec![
+                        set(&[
                             Capability::ObserveHardware,
                             Capability::ConfigureSystem,
                             Capability::UpdateSystem,
-                        ],
+                        ]),
                     ),
-                    (PlanStepKind::Verify, vec![Capability::ObserveHardware]),
+                    (PlanStepKind::Verify, set(&[Capability::ObserveHardware])),
                 ],
             ),
             (
                 "boot",
                 vec![
-                    (PlanStepKind::Observe, vec![Capability::ObserveHardware]),
+                    (PlanStepKind::Observe, set(&[Capability::ObserveHardware])),
                     (
                         PlanStepKind::ApplyDesiredState,
-                        vec![
+                        set(&[
                             Capability::ConfigureSystem,
                             Capability::UpdateSystem,
                             Capability::ModifyBootChain,
-                        ],
+                        ]),
                     ),
-                    (PlanStepKind::Verify, vec![Capability::ObserveHardware]),
+                    (PlanStepKind::Verify, set(&[Capability::ObserveHardware])),
                 ],
             ),
             (
                 "dry-activate",
                 vec![
-                    (PlanStepKind::Observe, vec![Capability::ObserveHardware]),
+                    (PlanStepKind::Observe, set(&[Capability::ObserveHardware])),
                     (
                         PlanStepKind::ApplyDesiredState,
-                        vec![Capability::ConfigureSystem, Capability::UpdateSystem],
+                        set(&[
+                            Capability::ConfigureSystem,
+                            Capability::UpdateSystem,
+                        ]),
                     ),
-                    (PlanStepKind::Verify, vec![Capability::ObserveHardware]),
+                    (PlanStepKind::Verify, set(&[Capability::ObserveHardware])),
                 ],
             ),
         ];
