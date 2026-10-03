@@ -63,7 +63,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function canvasPngHash(page, selector) {
   const dataUrl = await page.$eval(selector, canvas => {
     if (!(canvas instanceof HTMLCanvasElement)) {
-      throw new Error(`${selector} is not a canvas`);
+      throw new Error(`selected element is not a canvas`);
     }
     return canvas.toDataURL('image/png');
   });
@@ -90,7 +90,7 @@ async function canvasPixelSamples(page, selector, points) {
       probe.height = canvas.height;
       const context = probe.getContext('2d');
       if (!context) {
-        throw new Error(`could not create probe context for ${selector}`);
+        throw new Error(`could not create probe context for selected canvas`);
       }
       context.drawImage(image, 0, 0);
       const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
