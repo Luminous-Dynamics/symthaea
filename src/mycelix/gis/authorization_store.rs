@@ -9,8 +9,8 @@
 //! Indeterminate and requires explicit reconciliation.
 
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use chrono::{DateTime, SecondsFormat, Utc};
+use std::time::{SystemTime, UNIX_EPOCH};
+use chrono::{Duration, DateTime, SecondsFormat, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use sha2::{Digest, Sha256};
 use url::Url;
@@ -140,9 +140,9 @@ impl AuthorizationClockPolicy {
             None => None,
         };
 
-        let skew = Duration::from_secs(self.allowed_skew_seconds);
+        let skew = Duration::seconds(self.allowed_skew_seconds as i64);
         if issued > now + skew
-            || now > issued + Duration::from_secs(self.max_age_seconds) + skew
+            || now > issued + Duration::seconds(self.max_age_seconds as i64) + skew
         {
             return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
         }
