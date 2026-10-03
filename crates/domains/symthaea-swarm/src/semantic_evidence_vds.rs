@@ -1675,26 +1675,6 @@ impl<'a> CborReader<'a> {
         Ok(bytes)
     }
 
-    fn read_bstr(&mut self) -> Result<Vec<u8>, Rfc9162ProofDecodeError> {
-        let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
-        self.offset+=1;
-        if initial>>5!=2 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
-        let ai=initial&0x1f;
-        let n=match ai {
-            0..=23=>ai as u64,
-            24=>self.read_uint(1,24)?,
-            25=>self.read_uint(2,256)?,
-            26=>self.read_uint(4,65_536)?,
-            27=>self.read_uint(8,4_294_967_296)?,
-            _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
-        };
-        let n=usize::try_from(n).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
-        let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
-        if end>self.bytes.len() { return Err(Rfc9162ProofDecodeError::UnexpectedEof); }
-        let bytes=self.bytes[self.offset..end].to_vec();
-        self.offset=end;
-        Ok(bytes)
-    }
     fn read_array_len(&mut self)->Result<usize,Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure) }
     fn read_bstr32(&mut self)->Result<[u8;32],Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=2{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; if n!=32{return Err(Rfc9162ProofDecodeError::InvalidHashLength)} let end=self.offset.checked_add(32).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?; if end>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)} let mut out=[0u8;32]; out.copy_from_slice(&self.bytes[self.offset..end]); self.offset=end; Ok(out) }
     fn peek_major_type(&self) -> Result<u8, Rfc9162ProofDecodeError> {
