@@ -3571,6 +3571,46 @@ mod tests {
         }
     }
 
+    struct TestProviderVerifierForRp {
+        relying_party_id: String,
+    }
+
+    impl ProviderEvidenceVerifier for TestProviderVerifierForRp {
+        fn verify(
+            &self,
+            purpose: ProviderVerificationPurpose,
+            record: &DurableDispatchRecord,
+            evidence: &ProviderTerminalEvidence,
+        ) -> Result<VerifiedProviderOutcome, ProviderVerificationError> {
+            if !matches!(purpose, ProviderVerificationPurpose::TerminalOutcome)
+                || evidence.action_id != record.action_id
+                || evidence.action_digest != record.action_digest
+                || evidence.attempt_id != record.attempt_id
+                || evidence.operation_id != record.operation_id
+                || evidence.native_replay_identity != record.native_replay_identity
+                || evidence.provider_idempotency_key != record.provider_idempotency_key
+                || evidence.target_identity != record.target_identity
+                || evidence.audience != record.audience
+                || evidence.adapter != record.adapter
+                || evidence.boundary_id != record.boundary_id
+                || matches!(evidence.outcome, ExecutionOutcome::Indeterminate)
+            {
+                return Err(ProviderVerificationError::VerificationFailed);
+            }
+            Ok(VerifiedProviderOutcome {
+                evidence: evidence.clone(),
+                configuration: ProviderVerifierConfiguration {
+                    relying_party_id: self.relying_party_id.clone(),
+                    verifier_id: "test-verifier/v1".into(),
+                    verifier_config_digest: "sha256:test-verifier-config".into(),
+                    trust_anchor_digest: "sha256:test-trust-anchors".into(),
+                    evidence_profile_digest: "sha256:test-evidence-profile".into(),
+                },
+                verification_digest: "sha256:test-verification".into(),
+            })
+        }
+    }
+
     struct AdmissionStatusFailsVerifier;
 
     impl ProviderStatusVerifier for AdmissionStatusFailsVerifier {
@@ -3685,6 +3725,15 @@ mod tests {
                 "sha256:test-status-verifier-config",
             )
         )?;
+        store.pin_provider_evidence_verifier_configuration(
+            &ProviderVerifierConfiguration {
+                relying_party_id: store.relying_party_id().to_owned(),
+                verifier_id: "test-verifier/v1".into(),
+                verifier_config_digest: "sha256:test-verifier-config".into(),
+                trust_anchor_digest: "sha256:test-trust-anchors".into(),
+                evidence_profile_digest: "sha256:test-evidence-profile".into(),
+            }
+        )?;
         const NAMESPACE: &str = "test-authority/v1";
         store.pin_native_authority_namespace(ISSUER, NAMESPACE)?;
         let status_identifier = format!("status:{}", native_authorization_id.as_ref());
@@ -3762,6 +3811,60 @@ mod tests {
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidBinding
             ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_commit_requires_relying_party_pinned_verifier_configuration() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-verifier-pin-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-verifier-pin","prod","adapter-verifier-pin"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"verifier-pin".into(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:40:00Z".into(),
+            expires_at:Some("2026-10-04T06:40:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-verifier-pin","boundary-verifier-pin"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-verifier-pin",
+            &action,&effect,"boundary-verifier-pin",
+            "operation:verifier-pin","native-verifier-pin"
+        ).unwrap();
+
+        store.connection().unwrap().execute(
+            "DELETE FROM authorization_store_metadata
+             WHERE key LIKE 'provider_evidence_verifier_%'",
+            [],
+        ).unwrap();
+
+        let err=store.commit_bound_verified(
+            &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
+            )
         ));
         let _=std::fs::remove_file(path);
     }
@@ -4110,7 +4213,7 @@ mod tests {
         ).unwrap();
         let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
         assert!(matches!(
-            store.commit_bound_verified(&record,&evidence,&TestProviderVerifier),
+            store.commit_bound_verified(&record,&evidence,&TestProviderVerifierForRp { relying_party_id: store.relying_party_id().to_owned() }),
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidNativeReplayProvenance
             ))
@@ -4131,7 +4234,7 @@ mod tests {
         assert_eq!(later_digest,snapshot.1);
 
         let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
-        store.commit_bound_verified(&record,&evidence,&TestProviderVerifier).unwrap();
+        store.commit_bound_verified(&record,&evidence,&TestProviderVerifierForRp { relying_party_id: store.relying_party_id().to_owned() }).unwrap();
 
         let terminal:(String,String,String,String,String)=store.connection().unwrap().query_row(
             "SELECT native_authority_pin_set_id,native_authority_pin_set_digest,
@@ -4304,7 +4407,7 @@ mod tests {
             "operation:validity-immutable-1","native-validity-immutable-1"
         ).unwrap();
         store.commit_bound_verified(
-            &record,&verified_evidence(&record,ExecutionOutcome::Failed),&TestProviderVerifier
+            &record,&verified_evidence(&record,ExecutionOutcome::Failed),&TestProviderVerifierForRp { relying_party_id: store.relying_party_id().to_owned() }
         ).unwrap();
 
         let extended=ActionAuthorizationWitness {
@@ -5451,7 +5554,7 @@ mod tests {
         store.commit_bound_verified(
             &record_a,
             &verified_evidence(&record_a,ExecutionOutcome::Succeeded),
-            &TestProviderVerifier,
+            &TestProviderVerifierForRp { relying_party_id: store.relying_party_id().to_owned() },
         ).unwrap();
 
         let witness_b=ActionAuthorizationWitness {
