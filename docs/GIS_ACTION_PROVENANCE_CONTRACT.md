@@ -261,37 +261,17 @@ This is an implementation hardening of AEB-07, not a claim that the draft mandat
 
 ### Provider-verifier boundary
 
-Terminal provider outcomes are now a separate authority boundary from the durable dispatch record.
+Terminal provider outcomes are a separate authority boundary from the durable dispatch record.
 
 A DispatchPending or Invoked record proves only local lifecycle facts. A raw Succeeded/Failed enum returned by an adapter is not terminal evidence by itself. Effectful terminal commitment and reconciliation therefore require a relying-party-configured ProviderEvidenceVerifier.
 
-The verifier is passed:
+The verifier configuration is now pinned as a complete provenance tuple: relying-party ID, verifier/profile ID, exact verifier revision, exact verifier implementation ID, exact verifier implementation digest, verifier configuration digest, trust-anchor-set digest, and accepted evidence-profile/schema digest. The newly explicit revision and implementation fields are persisted as terminal evidence alongside the verification digest. Presented verifier metadata cannot become its own trust root or silently select a new implementation.
 
-- the exact frozen DurableDispatchRecord;
-- evidence explicitly classified as TerminalOutcome;
-- the exact action ID/digest;
-- exact attempt ID;
-- provider idempotency key;
-- target identity;
-- audience/environment;
-- adapter/finality sink;
-- boundary identity.
+The pin remains write-once. For historical stores that have only the earlier five-field verifier pin, an explicit re-pinning call may fill only the previously absent revision/implementation fields while requiring every existing value to match exactly; subsequent changes to any field fail closed. Terminal settlement and authenticated reconciliation also re-read the relying-party verifier pin inside their authoritative transaction before consuming the authorization.
 
-The verifier configuration is itself relying-party-pinned and auditable: verifier implementation/profile identifier and digest, trust-anchor-set digest, and accepted evidence-profile/schema digest are persisted with the terminal evidence. The verifier is invoked with an explicit `TerminalOutcome` purpose; a verifier result that does not affirm that purpose is not terminal authority. This makes `verified` an inspectable statement about a configured verification procedure, rather than an opaque Boolean. The verifier must return an explicit affirmative VerifiedProviderOutcome, including verifier identity and a verification digest. The durable store re-checks the returned binding before committing the terminal state and persists the evidence/verifier digests alongside the terminal receipt.
+A PreEntryLookup is a different evidence kind and is rejected by terminal commitment/reconciliation. The verifier is invoked with an explicit TerminalOutcome purpose and the exact frozen dispatch record; a verifier result that does not affirm that purpose or the relying-party-selected configuration is not terminal authority.
 
-A PreEntryLookup is a different evidence kind and is rejected by terminal commitment/reconciliation. It cannot be converted into Failed for an attempt that reached DispatchPending.
-
-The legacy outcome-only commit_bound and reconcile_indeterminate_bound paths are fenced for terminal outcomes. They may no longer turn a locally observed enum into provider truth. The intended effectful path is:
-
-    provider evidence
-      ↓
-    ProviderEvidenceVerifier
-      ↓ explicit terminal affirmation
-    exact frozen dispatch record
-      ↓
-    EXECUTED | FAILED
-
-This remains an adapter boundary, not a universal proof of physical truth. The verifier's trust anchors, provider authentication, freshness rules, cancellation semantics, and semantic interpretation remain relying-party configuration. The store records which verifier/revision produced the accepted terminal attestation rather than pretending SQLite itself authenticated the provider.
+This is an implementation hardening of AEB-07, not a claim that the draft mandates this exact storage schema. The current AEB-07 text explicitly calls for a pinned verifier revision and verifier implementation identifier/digest in the relying-party compilation/verification contract. citeturn227865search0turn227865search1
 
 ### Execution identity lattice
 
