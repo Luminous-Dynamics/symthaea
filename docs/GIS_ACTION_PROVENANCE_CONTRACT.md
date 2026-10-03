@@ -351,6 +351,12 @@ Lifecycle state is deliberately excluded from the commitment because state trans
 
 This is an implementation-level provenance commitment rather than a new AEB standard requirement; it strengthens the AEB-07 rule that an operation record must bind the native replay identity and action key to the executor-owned action and operation identifier, and that reconciliation must remain attached to the original attempt. citeturn914749search0turn914749search1
 
+### Adapter revision and implementation pin
+
+Strict effectful admission now requires the adapter identifier named by the frozen effect to resolve to a relying-party-pinned adapter revision and implementation digest. The pin is durable and write-once. The dispatch record and terminal evidence carry the exact selected revision and implementation digest, and the attempt provenance commitment covers both values.
+
+Settlement additionally re-reads the adapter pin and requires it to match the frozen record. A later adapter replacement, database-side pin mutation, or presenter-selected revision therefore cannot silently reinterpret an already-authorized attempt. This aligns with AEB-07's requirement that the relying party pin every adapter revision and, in the native compilation contract, the verifier/adapter implementation identity and digest. citeturn281056view0
+
 ### Bound receipts preserve the native provider replay key
 
 Bound terminal receipts now persist the exact provider idempotency key used by the native-replay-derived dispatch. Re-reading or idempotently replaying a terminal receipt therefore returns that same key rather than reconstructing the legacy authorization-instance-derived key.
