@@ -16,7 +16,6 @@ use sovereign_state_compiler_nix::{
 };
 use thiserror::Error;
 
-use crate::observe::generations::{GenerationInfo, GenerationObserver};
 
 pub const NIXOS_SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
 pub const NIXOS_CURRENT_SYSTEM: &str = "/run/current-system";
@@ -411,6 +410,47 @@ mod tests {
             observation.validate().expect_err("profile mismatch"),
             SscObservationError::SystemProfileRealizationMismatch
         );
+    }
+
+    #[test]
+    fn target_snapshot_contains_exact_generation_resources() {
+        let observation = NixSystemObservation {
+            generations: vec![
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: true,
+                },
+                NixGenerationObservation {
+                    number: 43,
+                    realization: "/nix/store/bbb-nixos-system-host".into(),
+                    current: false,
+                },
+            ],
+            system_profile_generation: 43,
+            system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        let snapshot = observation
+            .target_snapshot("host-01", 123)
+            .expect("snapshot");
+        assert_eq!(snapshot.profile.identity, TargetId::from("host-01"));
+        assert_eq!(snapshot.profile.platform, "nixos");
+        assert!(snapshot.profile.capabilities.contains(
+            &sovereign_state_compiler::Capability::ObserveState
+        ));
+        assert_eq!(snapshot.observed_at_ms, 123);
+        assert_eq!(snapshot.resources.len(), 2);
+        assert!(snapshot.resources.contains(
+            &nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource")
+        ));
+        assert!(snapshot.resources.contains(
+            &nixos_generation_resource(43, "/nix/store/bbb-nixos-system-host")
+                .expect("generation resource")
+        ));
     }
 
     #[test]
