@@ -540,6 +540,12 @@ mod tests {
         NixOSTargetAdapter::new("host-01", 1_000)
     }
 
+    fn rollback_adapter(generation: u64) -> NixOSTargetAdapter {
+        let mut snapshot = adapter().describe_target().expect("snapshot");
+        snapshot.resources.insert(nixos_generation_resource(generation));
+        NixOSTargetAdapter::from_snapshot(snapshot).expect("nixos snapshot")
+    }
+
     #[test]
     fn compiles_a_nixos_switch_without_native_commands() {
         let adapter = adapter();
@@ -802,7 +808,7 @@ mod tests {
 
         let mode = NixActivationMode::Rollback { generation: 7 };
         assert_eq!(mode, NixActivationMode::Rollback { generation: 7 });
-        let plan = adapter().compile(&intent).expect("compile");
+        let plan = rollback_adapter(7).compile(&intent).expect("compile");
         assert_eq!(plan.steps[1].kind, PlanStepKind::Rollback);
     }
 
@@ -842,7 +848,7 @@ mod tests {
         );
         intent.required_resources.insert(nixos_generation_resource(42));
 
-        let plan = adapter().compile(&intent).expect("compile");
+        let plan = rollback_adapter(42).compile(&intent).expect("compile");
         assert!(plan.steps.iter().any(|step| {
             step.kind == PlanStepKind::Rollback && step.description.contains("generation 42")
         }));
@@ -925,8 +931,8 @@ mod tests {
         b.required_resources.clear();
         b.required_resources.insert(nixos_generation_resource(43));
 
-        let plan_a = adapter().compile(&a).expect("compile a");
-        let plan_b = adapter().compile(&b).expect("compile b");
+        let plan_a = rollback_adapter(42).compile(&a).expect("compile a");
+        let plan_b = rollback_adapter(43).compile(&b).expect("compile b");
 
         assert_ne!(
             plan_a.digest().expect("digest a"),
