@@ -32,7 +32,7 @@ pub struct NixGenerationObservation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixSystemObservation {
     pub generations: Vec<NixGenerationObservation>,
-    pub system_profile_generation: Option<u64>,
+    pub system_profile_generation: u64,
     pub system_profile_realization: String,
     pub current_system_realization: String,
     pub booted_system_realization: String,
@@ -50,6 +50,8 @@ pub enum SscObservationError {
     MultipleCurrentGenerations,
     #[error("NixOS generation marked current does not match /run/current-system")]
     CurrentGenerationRealizationMismatch,
+    #[error("NixOS system profile does not identify an exact generation")]
+    MissingSystemProfileGeneration,
     #[error("NixOS system profile generation does not match its exact realization")]
     SystemProfileRealizationMismatch,
 }
@@ -110,17 +112,15 @@ impl NixSystemObservation {
             return Err(SscObservationError::CurrentGenerationRealizationMismatch);
         }
 
-        if let Some(generation) = self.system_profile_generation {
-            let Some(entry) = self
-                .generations
-                .iter()
-                .find(|entry| entry.number == generation)
-            else {
-                return Err(SscObservationError::SystemProfileRealizationMismatch);
-            };
-            if entry.realization != self.system_profile_realization {
-                return Err(SscObservationError::SystemProfileRealizationMismatch);
-            }
+        let Some(entry) = self
+            .generations
+            .iter()
+            .find(|entry| entry.number == self.system_profile_generation)
+        else {
+            return Err(SscObservationError::SystemProfileRealizationMismatch);
+        };
+        if entry.realization != self.system_profile_realization {
+            return Err(SscObservationError::SystemProfileRealizationMismatch);
         }
 
         Ok(())
@@ -183,7 +183,7 @@ fn generation_link(generation: u64) -> PathBuf {
     ))
 }
 
-fn read_profile_generation(link: &Path) -> Result<Option<u64>, SscObservationError> {
+fn read_profile_generation(link: &Path) -> Result<u64, SscObservationError> {
     let target = std::fs::read_link(link)?;
     let name = target
         .file_name()
@@ -191,20 +191,19 @@ fn read_profile_generation(link: &Path) -> Result<Option<u64>, SscObservationErr
         .ok_or_else(|| {
             SscObservationError::Io("NixOS system profile link has no UTF-8 filename".into())
         })?;
-    Ok(parse_profile_generation_name(name)?)
+    parse_profile_generation_name(name)
 }
 
-fn parse_profile_generation_name(name: &str) -> Result<Option<u64>, SscObservationError> {
+fn parse_profile_generation_name(name: &str) -> Result<u64, SscObservationError> {
     let Some(number) = name
         .strip_prefix("system-")
         .and_then(|value| value.strip_suffix("-link"))
     else {
-        return Ok(None);
+        return Err(SscObservationError::MissingSystemProfileGeneration);
     };
 
     number
         .parse::<u64>()
-        .map(Some)
         .map_err(|error| SscObservationError::Io(error.to_string()))
 }
 
@@ -257,7 +256,7 @@ mod tests {
                 realization: "/nix/store/aaa-nixos-system-host".into(),
                 current: true,
             }],
-            system_profile_generation: Some(42),
+            system_profile_generation: 42,
             system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -278,7 +277,7 @@ mod tests {
                 realization: "/nix/store/aaa-nixos-system-host".into(),
                 current: true,
             }],
-            system_profile_generation: Some(42),
+            system_profile_generation: 42,
             system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -308,7 +307,7 @@ mod tests {
                     current: true,
                 },
             ],
-            system_profile_generation: Some(43),
+            system_profile_generation: 43,
             system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -328,7 +327,7 @@ mod tests {
                 realization: "/nix/store/aaa-nixos-system-host".into(),
                 current: true,
             }],
-            system_profile_generation: Some(42),
+            system_profile_generation: 42,
             system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -355,7 +354,7 @@ mod tests {
                     current: false,
                 },
             ],
-            system_profile_generation: Some(43),
+            system_profile_generation: 43,
             system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
