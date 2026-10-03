@@ -1729,7 +1729,7 @@ impl<'a> CborReader<'a> {
         if depth>16 { return Err(Rfc9162ProofDecodeError::InvalidStructure); }
         let major=self.peek_major_type()?;
         match major {
-            0 | 1 => { self.read_i64().map(|_|()) }
+            0 | 1 => { self.skip_integer().map(|_|()) }
             2 => { self.read_bstr_bounded(4096).map(|_|()) }
             3 => { self.read_text_bounded(4096).map(|_|()) }
             4 => { let n=self.read_array_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_value(depth+1)?;} Ok(()) },
@@ -1752,6 +1752,24 @@ impl<'a> CborReader<'a> {
                     _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
                 }
             },
+            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        }
+    }
+
+    fn skip_integer(&mut self) -> Result<(), Rfc9162ProofDecodeError> {
+        let initial = *self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        let major = initial >> 5;
+        if major != 0 && major != 1 {
+            return Err(Rfc9162ProofDecodeError::InvalidEncoding);
+        }
+        self.offset += 1;
+        let ai = initial & 0x1f;
+        match ai {
+            0..=23 => Ok(()),
+            24 => { self.read_uint(1, 24)?; Ok(()) },
+            25 => { self.read_uint(2, 256)?; Ok(()) },
+            26 => { self.read_uint(4, 65_536)?; Ok(()) },
+            27 => { self.read_uint(8, 4_294_967_296)?; Ok(()) },
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
     }
