@@ -1721,7 +1721,7 @@ fn validate_native_authority_pin_set(
 
         if let Err(error) = lease.validate_validity_now() {
             if matches!(error, AuthorizationConsumptionError::AuthorizationExpired) {
-                lease.expire()?;
+                lease.expire_before_entry(attempt_id)?;
                 update_lease_with_boundary(&tx, &lease, Some(boundary_id))?;
                 tx.execute(
                     "INSERT OR IGNORE INTO authorization_recovery_markers (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker) VALUES (?1,?2,?3,?4,?5,'expired_not_entered')",
@@ -2138,7 +2138,7 @@ fn validate_native_authority_pin_set(
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
         if let Err(error) = lease.validate_validity_now() {
             if matches!(error, AuthorizationConsumptionError::AuthorizationExpired) {
-                lease.expire()?;
+                lease.expire_before_entry(&record.attempt_id)?;
                 update_lease_with_boundary(&tx, &lease, Some(&record.boundary_id))?;
                 tx.execute(
                     "UPDATE authorization_dispatches SET state='expired' WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3 AND state='dispatch_pending'",
