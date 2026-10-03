@@ -25,13 +25,18 @@ use serde_json::Value;
 /// before a second full JSON object is materialized in the WASM heap.
 const MAX_TELEMETRY_TEXT_BYTES: usize = 40 * 1024 * 1024;
 
-fn parse_telemetry_text(text: &str) -> Result<Value, String> {
-    if text.len() > MAX_TELEMETRY_TEXT_BYTES {
+fn validate_telemetry_text_len(byte_len: usize) -> Result<(), String> {
+    if byte_len > MAX_TELEMETRY_TEXT_BYTES {
         return Err(format!(
             "telemetry websocket frame exceeds {} byte bound",
             MAX_TELEMETRY_TEXT_BYTES
         ));
     }
+    Ok(())
+}
+
+fn parse_telemetry_text(text: &str) -> Result<Value, String> {
+    validate_telemetry_text_len(text.len())?;
     serde_json::from_str::<Value>(text).map_err(|error| format!("telemetry payload was not JSON: {error}"))
 }
 
@@ -110,15 +115,14 @@ mod tests {
 
     #[test]
     fn telemetry_text_budget_accepts_boundary() {
-        assert!(MAX_TELEMETRY_TEXT_BYTES > 32 * 1024 * 1024);
+        assert!(validate_telemetry_text_len(MAX_TELEMETRY_TEXT_BYTES).is_ok());
         assert!(parse_telemetry_text("{}").is_ok());
     }
 
     #[test]
-    fn telemetry_text_budget_rejects_oversize_without_parsing() {
-        let mut text = String::with_capacity(MAX_TELEMETRY_TEXT_BYTES + 1);
-        text.extend(std::iter::repeat_n('{', MAX_TELEMETRY_TEXT_BYTES + 1));
-        let error = parse_telemetry_text(&text).expect_err("oversized telemetry must be rejected");
+    fn telemetry_text_budget_rejects_oversize_before_parsing() {
+        let error = validate_telemetry_text_len(MAX_TELEMETRY_TEXT_BYTES + 1)
+            .expect_err("oversized telemetry must be rejected");
         assert!(error.contains("exceeds"));
     }
 
