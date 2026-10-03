@@ -706,7 +706,7 @@ impl SqliteAuthorizationStore {
              FROM authorization_dispatches WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
             |r| Ok((
-                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
+                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,Option<String>>(2)?,
                 r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
                 r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
                 r.get::<_,String>(9)?,
@@ -718,6 +718,15 @@ impl SqliteAuthorizationStore {
             || row.6 != record.audience || row.7 != record.adapter
             || row.8 != record.boundary_id || row.9 != "dispatch_pending"
         {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        let persisted_relying_party: Option<String> = tx.query_row(
+            "SELECT relying_party_id FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance, record.attempt_id],
+            |r| r.get(0),
+        )?;
+        if persisted_relying_party.as_deref() != Some(self.relying_party_id.as_str()) {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
         let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
@@ -827,6 +836,15 @@ impl SqliteAuthorizationStore {
             params![record.authorization_instance, record.attempt_id, record.boundary_id],
             |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
+        let persisted_relying_party: Option<String> = tx.query_row(
+            "SELECT relying_party_id FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+            params![record.authorization_instance, record.attempt_id, record.boundary_id],
+            |r| r.get(0),
+        )?;
+        if persisted_relying_party.as_deref() != Some(self.relying_party_id.as_str()) {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
         if !matches!(row.0.as_str(), "dispatch_pending" | "invoked" | "indeterminate") {
             if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
                 return Ok(receipt);
@@ -866,13 +884,13 @@ impl SqliteAuthorizationStore {
         tx.execute(
             "INSERT OR REPLACE INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
-              native_authority_namespace,native_authorization_id,native_replay_derivation_digest,boundary_id,
+              native_authority_namespace,native_authorization_id,native_replay_derivation_digest,relying_party_id,boundary_id,
               action_digest,provider_idempotency_key,target_identity,audience,outcome,evidence_id,
               evidence_digest,verifier_id,verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
-                record.native_replay_identity, row.1, row.2, row.3, record.boundary_id, record.action_digest,
+                record.native_replay_identity, row.1, row.2, row.3, self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
                 record.provider_idempotency_key, record.target_identity, record.audience,
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 evidence.evidence_id, evidence.evidence_digest, verified.configuration.verifier_id,
@@ -899,7 +917,7 @@ impl SqliteAuthorizationStore {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let row = tx.query_row(
-            "SELECT operation_id,native_replay_identity,action_id,action_digest,provider_idempotency_key,
+            "SELECT operation_id,native_replay_identity,relying_party_id,action_id,action_digest,provider_idempotency_key,
                     target_identity,audience,adapter,boundary_id,state
              FROM authorization_dispatches WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
@@ -1149,10 +1167,11 @@ impl SqliteAuthorizationStore {
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
 
         if row.0 != record.operation_id || row.1 != record.native_replay_identity
-            || row.2 != record.action_id || row.3 != record.action_digest
-            || row.4 != record.provider_idempotency_key || row.5 != record.target_identity
-            || row.6 != record.audience || row.7 != record.adapter
-            || row.8 != record.boundary_id || row.9 != "indeterminate"
+            || row.2.as_deref() != Some(self.relying_party_id.as_str())
+            || row.3 != record.action_id || row.4 != record.action_digest
+            || row.5 != record.provider_idempotency_key || row.6 != record.target_identity
+            || row.7 != record.audience || row.8 != record.adapter
+            || row.9 != record.boundary_id || row.10 != "indeterminate"
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
@@ -1209,14 +1228,16 @@ impl SqliteAuthorizationStore {
         insert_receipt_with_boundary(&tx, &receipt, "reconciled", Some(&record.boundary_id))?;
         tx.execute(
             "INSERT OR REPLACE INTO authorization_terminal_evidence
-             (authorization_instance,attempt_id,operation_id,native_replay_identity,boundary_id,
+             (authorization_instance,attempt_id,operation_id,native_replay_identity,
+              native_authority_namespace,native_authorization_id,native_replay_derivation_digest,relying_party_id,boundary_id,
               action_digest,provider_idempotency_key,target_identity,audience,outcome,evidence_id,
               evidence_digest,verifier_id,verifier_config_digest,trust_anchor_digest,
               evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
-                record.native_replay_identity, record.boundary_id, record.action_digest,
+                record.native_replay_identity, native_provenance.0, native_provenance.1, native_provenance.2,
+                self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
                 record.provider_idempotency_key, record.target_identity, record.audience,
                 if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 verified.evidence.evidence_id, verified.evidence.evidence_digest,
