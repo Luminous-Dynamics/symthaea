@@ -56,6 +56,8 @@ impl From<AuthorizationConsumptionError> for AuthorizationStoreError {
 pub struct RecoveryAuthorizationWitness {
     pub authorization_instance: String,
     pub attempt_id: String,
+    /// Logical operation identity supplied by the recovery authority.
+    pub operation_id: String,
     pub boundary_id: String,
     pub action_digest: String,
     pub policy: String,
@@ -67,10 +69,12 @@ impl RecoveryAuthorizationWitness {
     pub fn is_bound_to(&self, lease: &AuthorizationLease) -> bool {
         !self.authorization_instance.is_empty()
             && !self.attempt_id.is_empty()
+            && !self.operation_id.is_empty()
             && !self.boundary_id.is_empty()
             && !self.policy.is_empty()
             && !self.issued_at.is_empty()
             && self.authorization_instance == lease.authorization_instance
+            && self.operation_id == lease.operation_id.as_deref().unwrap_or("")
             && self.action_digest == lease.action_digest
             && self.policy == lease.policy
             && self.authority_epoch == lease.authority_epoch
@@ -491,6 +495,7 @@ impl SqliteAuthorizationStore {
                remaining_executions INTEGER NOT NULL,
                state TEXT NOT NULL,
                attempt_id TEXT,
+               operation_id TEXT,
                boundary_id TEXT,
                validity_issued_at TEXT,
                validity_expires_at TEXT,
@@ -521,6 +526,7 @@ impl SqliteAuthorizationStore {
              CREATE TABLE IF NOT EXISTS authorization_recovery_markers (
                authorization_instance TEXT NOT NULL,
                attempt_id TEXT NOT NULL,
+               operation_id TEXT,
                boundary_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
                authority_epoch INTEGER NOT NULL,
@@ -584,6 +590,7 @@ impl SqliteAuthorizationStore {
                PRIMARY KEY(authorization_instance, attempt_id)
              );",
         )?;
+        ensure_column(&mut connection, "authorization_leases", "operation_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "validity_issued_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "validity_expires_at", "TEXT")?;
@@ -619,6 +626,7 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_terminal_evidence", "adapter", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_recovery_markers", "operation_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "trust_anchor_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "evidence_profile_digest", "TEXT NOT NULL DEFAULT ''")?;
@@ -1044,8 +1052,8 @@ fn validate_native_authority_pin_set(
         connection.execute(
             "INSERT INTO authorization_leases
              (authorization_instance, action_id, action_digest, support_digest, policy, authority_epoch,
-              remaining_executions, state, attempt_id, boundary_id)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,NULL)",
+              remaining_executions, state, attempt_id, operation_id, boundary_id)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,NULL,NULL)",
             params![
                 lease.authorization_instance, lease.action_id, lease.action_digest,
                 lease.support_digest, lease.policy, lease.authority_epoch as i64,
@@ -2822,12 +2830,13 @@ fn state_attempt(s: &AuthorizationLeaseState) -> Option<&str> {
 fn load_lease(tx: &Transaction<'_>, id: &str) -> Result<Option<AuthorizationLease>, rusqlite::Error> {
     tx.query_row(
         "SELECT authorization_instance,action_id,action_digest,support_digest,policy,authority_epoch,
-                remaining_executions,state,attempt_id FROM authorization_leases
+                remaining_executions,state,attempt_id,operation_id FROM authorization_leases
          WHERE authorization_instance=?1",
         params![id],
         |r| {
             let state: String = r.get(7)?;
             let attempt: Option<String> = r.get(8)?;
+            let operation_id: Option<String> = r.get(9)?;
             let decoded = match state.as_str() {
                 "ready" => AuthorizationLeaseState::Ready,
                 "prepared" => AuthorizationLeaseState::Prepared {
@@ -2849,6 +2858,7 @@ fn load_lease(tx: &Transaction<'_>, id: &str) -> Result<Option<AuthorizationLeas
             };
             Ok(AuthorizationLease {
                 authorization_instance: r.get(0)?,
+                operation_id,
                 action_id: r.get(1)?,
                 action_digest: r.get(2)?,
                 support_digest: r.get(3)?,
@@ -2927,12 +2937,13 @@ fn update_lease_with_boundary(
     };
     let changed = tx.execute(
         "UPDATE authorization_leases
-         SET state=?2,attempt_id=?3,remaining_executions=?4,boundary_id=?5
+         SET state=?2,attempt_id=?3,operation_id=?4,remaining_executions=?5,boundary_id=?6
          WHERE authorization_instance=?1",
         params![
             lease.authorization_instance,
             encode_state(&lease.state),
             state_attempt(&lease.state),
+            if current_boundary.is_some() { lease.operation_id.as_deref() } else { None },
             lease.remaining_executions as i64,
             current_boundary
         ],
