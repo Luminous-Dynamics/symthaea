@@ -204,3 +204,23 @@ fn cose_extension_values_accept_well_formed_simple_items_and_round_trip_exactly(
         assert_eq!(decoded.to_cbor(), encoded);
     }
 }
+
+#[test]
+fn rfc9942_receipt_decode_rejects_malformed_rfc9162_vdp_content() {
+    // COSE_Sign1 protected = {1: -7, 395: 1}; unprotected = {396: {-1: [h'01']}}.
+    // The inner inclusion proof is not an RFC 9162 proof array and must be
+    // rejected during receipt decoding rather than being deferred to verify().
+    let protected = [0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01];
+    let encoded = [
+        0xd2, 0x84, 0x47, protected[0], protected[1], protected[2], protected[3],
+        protected[4], protected[5], protected[6],
+        0xa1, 0x19, 0x01, 0x8c, 0xa1, 0x20, 0x81, 0x41, 0x01,
+        0xf6, 0x40,
+    ];
+    assert_eq!(
+        Rfc9942ReceiptEnvelope::from_cbor(&encoded),
+        Err(Rfc9942VdpError::InvalidProof(
+            symthaea_swarm::semantic_evidence_vds::Rfc9162ProofDecodeError::InvalidStructure
+        ))
+    );
+}
