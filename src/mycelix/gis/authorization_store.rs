@@ -109,6 +109,15 @@ impl Default for AuthorizationClockPolicy {
 }
 
 impl AuthorizationClockPolicy {
+    fn validate_configuration(&self) -> Result<(), AuthorizationStoreError> {
+        if self.max_age_seconds == 0 || self.allowed_skew_seconds > self.max_age_seconds {
+            return Err(AuthorizationStoreError::InvalidState(
+                "authorization clock policy must have a non-zero max age and skew no greater than max age".into(),
+            ));
+        }
+        Ok(())
+    }
+
     fn digest(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.update(b"symthaea:gis:authorization-clock-policy:v1\n");
@@ -320,6 +329,7 @@ impl SqliteAuthorizationStore {
         relying_party_id: impl Into<String>,
         clock_policy: AuthorizationClockPolicy,
     ) -> Result<Self, AuthorizationStoreError> {
+        clock_policy.validate_configuration()?;
         let path = path.as_ref().to_path_buf();
         let relying_party_id = relying_party_id.into();
         if relying_party_id.is_empty() {
@@ -1810,6 +1820,17 @@ fn normalize_native_issuer(issuer: &str) -> String {
             native_provenance.1.as_deref(),
             native_provenance.2.as_deref(),
         )?;
+        self.validate_native_authority_pin_set_snapshot(
+            &tx,
+            native_provenance.3.as_deref(),
+            native_provenance.4.as_deref(),
+        )?;
+        self.validate_persisted_authorization_validity(
+            native_provenance.5.as_deref(),
+            native_provenance.6.as_deref(),
+            native_provenance.7.as_deref(),
+            false,
+        )?;
 
         if let Some(r) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "reconciled")? {
             return Ok(r);
@@ -2668,6 +2689,49 @@ mod tests {
             format!("sha256:{}",hex::encode(Sha256::digest(snapshot_bytes))),
             snapshot.1
         );
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn clock_policy_is_durable_and_cannot_be_changed_on_reopen() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-clock-policy-{}.db",std::process::id()
+        ));
+        let policy=AuthorizationClockPolicy {
+            max_age_seconds: 3600,
+            allowed_skew_seconds: 30,
+            require_expiry: true,
+        };
+        let store=SqliteAuthorizationStore::open_with_relying_party_and_clock_policy(
+            &path,"rp-clock-policy",policy
+        ).unwrap();
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party_and_clock_policy(
+                &path,
+                "rp-clock-policy",
+                AuthorizationClockPolicy {
+                    max_age_seconds: 7200,
+                    allowed_skew_seconds: 30,
+                    require_expiry: true,
+                }
+            ),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party_and_clock_policy(
+                &std::env::temp_dir().join(format!(
+                    "symthaea-gis-auth-clock-policy-invalid-{}.db",std::process::id()
+                )),
+                "rp-clock-policy-invalid",
+                AuthorizationClockPolicy {
+                    max_age_seconds: 0,
+                    allowed_skew_seconds: 0,
+                    require_expiry: true,
+                }
+            ),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        drop(store);
         let _=std::fs::remove_file(path);
     }
 
