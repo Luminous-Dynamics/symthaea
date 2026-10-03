@@ -4084,6 +4084,13 @@ mod tests {
                 evidence_profile_digest: "sha256:test-evidence-profile".into(),
             }
         )?;
+        store.pin_provider_adapter_configuration(
+            &ProviderAdapterConfiguration::new(
+                expected_effect.adapter.clone(),
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            )
+        )?;
         const NAMESPACE: &str = "test-authority/v1";
         store.pin_native_authority_namespace(ISSUER, NAMESPACE)?;
         let status_identifier = format!("status:{}", native_authorization_id.as_ref());
@@ -4113,6 +4120,13 @@ mod tests {
         native_authorization_id: &str,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         const ISSUER: &str = "test-explicit-issuer";
+        store.pin_provider_adapter_configuration(
+            &ProviderAdapterConfiguration::new(
+                expected_effect.adapter.clone(),
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            )
+        )?;
         store.pin_native_authority_namespace(ISSUER, authority_namespace)?;
         let status_identifier = format!("status:{}", native_authorization_id);
         store.mark_dispatch_pending_bound_from_pinned_native_authority(
@@ -4241,6 +4255,34 @@ mod tests {
             &TestProviderVerifier
         ).unwrap();
 
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn provider_adapter_configuration_is_write_once_and_required() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-adapter-pin-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-adapter-pin"
+        ).unwrap();
+        let pinned=ProviderAdapterConfiguration::new(
+            "adapter/v1","rev-1","sha256:adapter-impl-1"
+        );
+        store.pin_provider_adapter_configuration(&pinned).unwrap();
+        store.pin_provider_adapter_configuration(&pinned).unwrap();
+        assert!(matches!(
+            store.pin_provider_adapter_configuration(&ProviderAdapterConfiguration::new(
+                "adapter/v1","rev-2","sha256:adapter-impl-2"
+            )),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        assert!(matches!(
+            store.pinned_provider_adapter_configuration("missing/adapter"),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
         let _=std::fs::remove_file(path);
     }
 
@@ -7039,6 +7081,8 @@ mod tests {
             target_identity: "target-A".into(),
             audience: "audience-A".into(),
             adapter: "adapter-A".into(),
+            adapter_revision: "test-adapter/v1".into(),
+            adapter_implementation_digest: "sha256:test-adapter-implementation".into(),
             boundary_id: "boundary".into(),
             attempt_binding_digest: "sha256:forged-binding".into(),
         };
@@ -7078,6 +7122,8 @@ mod tests {
             target_identity:"target-status".into(),
             audience:"audience-status".into(),
             adapter:"adapter-status".into(),
+            adapter_revision:"test-adapter/v1".into(),
+            adapter_implementation_digest:"sha256:test-adapter-implementation".into(),
             boundary_id:"boundary-status".into(),
             attempt_binding_digest:"sha256:binding-status".into(),
         };
@@ -7150,6 +7196,8 @@ mod tests {
             target_identity:effect.target_identity.clone(),
             audience:effect.audience.clone(),
             adapter:effect.adapter.clone(),
+            adapter_revision:"test-adapter/v1".into(),
+            adapter_implementation_digest:"sha256:test-adapter-implementation".into(),
             boundary_id:"boundary-A".into(),
             attempt_binding_digest:"sha256:uncomputed".into(),
         };
