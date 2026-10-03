@@ -8,7 +8,7 @@
 use symthaea_swarm::semantic_evidence_vds::{
     Rfc9942ProofKind, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload, Rfc9942SignatureWithReceipts,
     Rfc9162ConsistencyProof, Rfc9162InclusionProof, Rfc9942VdpError, Rfc9942Vdp,
-    Rfc9942SignaturePayload, Rfc9942ReceiptCollection, COSE_ES256_ALGORITHM_ID,
+    Rfc9942ReceiptCollection, COSE_ES256_ALGORITHM_ID,
 };
 
 #[test]
