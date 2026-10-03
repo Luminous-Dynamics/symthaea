@@ -288,29 +288,60 @@ fn extends_span(basis: &[BinaryCodeword], candidate: &BinaryCodeword) -> bool {
     basis_rank(&extended, candidate.dimension) > before
 }
 
-/// Solve target = XOR_i(coefficients[i] * basis[i]) over GF(2).
-///
-/// This is the algebraic core of the research bound-recovery comparator.
-/// It returns one coefficient vector when a solution exists. Callers that
-/// require unique factorization must independently verify that the supplied
-/// basis is linearly independent (for example, by checking
-/// basis_rank(basis, dimension) == basis.len()).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct LinearCodeWork {
+    pub span_membership_checks: usize,
+    pub basis_rank_pivots: usize,
+    pub basis_rank_row_xor_words: usize,
+    pub solve_pivots: usize,
+    pub solve_row_xor_words: usize,
+    pub retained_generators: usize,
+}
+
+fn extends_span_with_work(
+    basis: &[BinaryCodeword],
+    candidate: &BinaryCodeword,
+    work: &mut LinearCodeWork,
+) -> bool {
+    if candidate.words.iter().all(|word| *word == 0) {
+        return false;
+    }
+    work.span_membership_checks += 1;
+    let before = basis_rank_counted(basis, candidate.dimension, work);
+    let mut extended = basis.to_vec();
+    extended.push(candidate.clone());
+    basis_rank_counted(&extended, candidate.dimension, work) > before
+}
 pub fn solve_linear_combination(
     target: &BinaryCodeword,
     basis: &[BinaryCodeword],
+) -> Option<Vec<bool>> {
+    solve_linear_combination_with_work(target, basis).0
+}
+
+/// Solve a GF(2) linear combination and return deterministic packed-work
+/// counters alongside the result. These counters are algorithmic work units,
+/// not wall-clock measurements.
+pub fn solve_linear_combination_with_work(
+    target: &BinaryCodeword,
+    basis: &[BinaryCodeword],
+) -> (Option<Vec<bool>>, LinearCodeWork) {
+    let mut work = LinearCodeWork::default();
+    let result = solve_linear_combination_counted(target, basis, &mut work);
+    (result, work)
+}
+
+fn solve_linear_combination_counted(
+    target: &BinaryCodeword,
+    basis: &[BinaryCodeword],
+    work: &mut LinearCodeWork,
 ) -> Option<Vec<bool>> {
     let dimension = target.dimension();
     if basis.iter().any(|vector| vector.dimension() != dimension) {
         return None;
     }
 
-    // Each equation row is stored as packed u64 words:
-    // [basis coefficients | target bit]. This keeps the research kernel's
-    // Gaussian elimination proportional to machine words rather than allocating
-    // one bool per coefficient/coordinate.
     let coefficient_words = basis.len().div_ceil(64);
-    // Store the augmented target bit in a dedicated word immediately after
-    // the packed coefficient words, making the matrix layout explicit.
     let augmented_word = coefficient_words;
     let augmented_mask = 1u64;
     let mut rows: Vec<Vec<u64>> = (0..dimension)
@@ -339,17 +370,16 @@ pub fn solve_linear_combination(
         };
         rows.swap(pivot_row, found);
 
-        // Reduced row echelon form makes the pivot coefficient directly
-        // readable from the augmented bit below. XOR whole machine words so
-        // the implementation remains compact and deterministic.
         for row in 0..rows.len() {
             if row != pivot_row && rows[row][word] & mask != 0 {
+                work.solve_row_xor_words += rows[row].len();
                 for cell in 0..rows[row].len() {
                     rows[row][cell] ^= rows[pivot_row][cell];
                 }
             }
         }
 
+        work.solve_pivots += 1;
         pivot_columns.push((pivot_row, column));
         pivot_row += 1;
         if pivot_row == rows.len() {
@@ -357,8 +387,6 @@ pub fn solve_linear_combination(
         }
     }
 
-    // A zero coefficient row with a one augmented bit is an inconsistency:
-    // the target is outside the supplied span.
     if rows.iter().any(|row| {
         row[..coefficient_words].iter().all(|word| *word == 0)
             && row[augmented_word] & augmented_mask != 0
@@ -366,9 +394,6 @@ pub fn solve_linear_combination(
         return None;
     }
 
-    // For a full-rank basis this is the unique coefficient vector. If the
-    // basis is dependent, free variables remain zero and one valid solution
-    // is returned; callers requiring uniqueness must check rank separately.
     let mut coefficients = vec![false; basis.len()];
     for &(row, column) in &pivot_columns {
         let word = column / 64;
@@ -406,32 +431,44 @@ pub fn recover_linear_bound(
     target: &BinaryCodeword,
     factors: &[&RandomLinearCode],
 ) -> Option<Vec<BinaryCodeword>> {
+    recover_linear_bound_with_work(target, factors).0
+}
+
+/// Recover a clean bound and return deterministic work counters for the
+/// maximal-independent-subset construction and GF(2) solve.
+pub fn recover_linear_bound_with_work(
+    target: &BinaryCodeword,
+    factors: &[&RandomLinearCode],
+) -> (Option<Vec<BinaryCodeword>>, LinearCodeWork) {
+    let mut work = LinearCodeWork::default();
+
     if factors.is_empty() {
-        return None;
+        return (None, work);
     }
 
     let dimension = target.dimension();
     if factors.iter().any(|factor| factor.dimension() != dimension) {
-        return None;
+        return (None, work);
     }
 
-    // Raviv's Theorem 2 first constructs a maximal linearly independent subset
-    // of the union of all factor generator bases. Keeping the owner alongside
-    // each retained generator lets us project the recovered coefficients back
-    // into factor codewords without manufacturing a uniqueness claim.
     let mut independent_basis = Vec::new();
     let mut owners = Vec::new();
 
     for (factor_index, factor) in factors.iter().enumerate() {
         for generator in factor.basis() {
-            if extends_span(&independent_basis, generator) {
+            if extends_span_with_work(&independent_basis, generator, &mut work) {
                 independent_basis.push(generator.clone());
                 owners.push(factor_index);
+                work.retained_generators += 1;
             }
         }
     }
 
-    let coefficients = solve_linear_combination(target, &independent_basis)?;
+    let coefficients =
+        match solve_linear_combination_counted(target, &independent_basis, &mut work) {
+            Some(coefficients) => coefficients,
+            None => return (None, work),
+        };
 
     let mut recovered = factors
         .iter()
@@ -446,7 +483,7 @@ pub fn recover_linear_bound(
         }
     }
 
-    Some(recovered)
+    (Some(recovered), work)
 }
 
 /// Recover factors from a clean XOR bound when the participating linear-code
@@ -494,6 +531,15 @@ pub fn recover_independent_bound(
     Some(recovered)
 }
 pub fn basis_rank(vectors: &[BinaryCodeword], dimension: usize) -> usize {
+    let mut work = LinearCodeWork::default();
+    basis_rank_counted(vectors, dimension, &mut work)
+}
+
+fn basis_rank_counted(
+    vectors: &[BinaryCodeword],
+    dimension: usize,
+    work: &mut LinearCodeWork,
+) -> usize {
     let mut rows: Vec<BinaryCodeword> = vectors
         .iter()
         .filter(|vector| vector.dimension == dimension)
@@ -511,9 +557,11 @@ pub fn basis_rank(vectors: &[BinaryCodeword], dimension: usize) -> usize {
         };
 
         rows.swap(rank, pivot);
+        work.basis_rank_pivots += 1;
         let pivot_row = rows[rank].clone();
         for (row, current) in rows.iter_mut().enumerate() {
             if row != rank && current.bit(column) {
+                work.basis_rank_row_xor_words += current.words.len();
                 current.xor_assign(&pivot_row);
             }
         }
