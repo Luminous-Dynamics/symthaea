@@ -1027,11 +1027,6 @@ fn normalize_native_issuer(issuer: &str) -> String {
             native_provenance.3.as_deref(),
             native_provenance.4.as_deref(),
         )?;
-        self.validate_native_authority_pin_set_snapshot(
-            &tx,
-            native_provenance.3.as_deref(),
-            native_provenance.4.as_deref(),
-        )?;
         let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
         if current_boundary != record.boundary_id {
