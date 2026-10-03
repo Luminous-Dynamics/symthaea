@@ -52,7 +52,10 @@ fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
     assert_eq!(first_work.span_membership_checks, parent.rank());
     assert!(first_work.basis_rank_pivots > 0);
     assert!(first_work.solve_pivots > 0);
-    assert_eq!(first_work.solve_basis_bit_probes, parent.dimension() * parent.rank());
+    assert_eq!(
+        first_work.solve_basis_bit_probes,
+        parent.dimension() * parent.rank()
+    );
     assert_eq!(
         first_work.solve_matrix_word_cells,
         parent.dimension() * (parent.rank().div_ceil(64) + 1)
@@ -79,7 +82,11 @@ fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
 
 #[test]
 fn recovery_work_scales_over_small_structural_fixtures() {
-    let fixtures = [(32usize, 2usize, 2usize, 0x3202u64), (64, 4, 4, 0x6404), (96, 6, 6, 0x9606)];
+    let fixtures = [
+        (32usize, 2usize, 2usize, 0x3202u64),
+        (64, 4, 4, 0x6404),
+        (96, 6, 6, 0x9606),
+    ];
 
     for &(dimension, left_rank, right_rank, seed) in &fixtures {
         let (parent, left, right) =
@@ -118,26 +125,21 @@ fn recovery_work_scales_over_small_structural_fixtures() {
 fn recovery_crosses_u64_packing_boundaries() {
     for &(dimension, seed) in &[(63usize, 0x6301u64), (64, 0x6401), (65, 0x6501)] {
         let (parent, left, right) =
-            RandomLinearCode::generate_direct_sum(dimension, 2, 2, seed)
-                .expect("valid direct sum");
+            RandomLinearCode::generate_direct_sum(dimension, 2, 2, seed).expect("valid direct sum");
         let left_message = [true, false];
         let right_message = [false, true];
         let left_word = left.encode(&left_message);
         let right_word = right.encode(&right_message);
         let target = left_word.bound(&right_word);
 
-        let (recovered, work) =
-            recover_linear_bound_with_work(&target, &[&left, &right]);
+        let (recovered, work) = recover_linear_bound_with_work(&target, &[&left, &right]);
         let recovered = recovered.expect("packing-boundary fixture must recover");
         assert_eq!(recovered, vec![left_word, right_word]);
         assert_eq!(work.retained_generators, parent.rank());
         assert_eq!(work.basis_rank_pivots, parent.rank() * parent.rank());
 
         let bipolar = target.to_bipolar();
-        assert_eq!(
-            BinaryCodeword::from_bipolar(&bipolar),
-            Some(target.clone())
-        );
+        assert_eq!(BinaryCodeword::from_bipolar(&bipolar), Some(target.clone()));
         println!(
             "PACKING_BOUNDARY=dimension={dimension};rank={};seed=0x{seed:X};retained_generators={};basis_rank_pivots={}",
             parent.rank(),
@@ -217,8 +219,7 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
         })
         .collect();
 
-    assert_eq!(matches.len(), 1);
-    assert_eq!(matches[0], (a, b));
+    assert_eq!(matches.len(), 1);    assert_eq!(matches[0], (a, b));
 
     // A corrupted query is classified explicitly. Choose a one-bit flip that
     // leaves the jointly generated factor span; this must not be silently
@@ -417,8 +418,7 @@ fn exhaustive_bounded_distance_oracle_separates_detection_from_correction() {
         .filter(|word| word.weight() > 0)
         .map(|word| hamming_distance(word, &BinaryCodeword::zero(16)))
         .min()
-        .expect("non-zero codeword must exist");
-    assert!(
+        .expect("non-zero codeword must exist");    assert!(
         min_distance >= 3,
         "deterministic noise fixture must admit a non-trivial correction radius"
     );
