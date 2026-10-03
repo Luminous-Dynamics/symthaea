@@ -3854,4 +3854,84 @@ mod tests {
     }
 
 
+    #[test]
+    fn rfc9942_registry_and_required_field_boundaries_fail_closed() {
+        let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x99; 32]]).to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+        fn receipt_wire(protected: &[u8], unprotected: &[u8]) -> Vec<u8> {
+            let mut out = Vec::new();
+            cbor_tag(&mut out, COSE_SIGN1_TAG);
+            cbor_array_len(&mut out, 4);
+            cbor_bytes(&mut out, protected);
+            out.extend_from_slice(unprotected);
+            cbor_bytes(&mut out, &[0x11; 32]);
+            cbor_bytes(&mut out, &[0x22; 64]);
+            out
+        }
+
+        let mut good_protected = Vec::new();
+        cbor_map_len(&mut good_protected, 2);
+        cbor_int(&mut good_protected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut good_protected, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut good_protected, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut good_protected, RFC9162_VDS_ID);
+
+        let mut good_unprotected = Vec::new();
+        cbor_map_len(&mut good_unprotected, 1);
+        cbor_int(&mut good_unprotected, RFC9942_VDP_HEADER_LABEL);
+        good_unprotected.extend_from_slice(&vdp.to_cbor());
+
+        assert!(Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&good_protected, &good_unprotected)).is_ok());
+
+        let mut unknown_vds = good_protected.clone();
+        let vds_pos = unknown_vds
+            .windows(2)
+            .position(|w| w == [0x03, 0x01])
+            .expect("vds label/value fixture");
+        unknown_vds[vds_pos + 1] = 0x02;
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&unknown_vds, &good_unprotected)),
+            Err(Rfc9942VdpError::VdsMismatch(2))
+        );
+
+        let mut unknown_vdp = Vec::new();
+        cbor_map_len(&mut unknown_vdp, 1);
+        cbor_int(&mut unknown_vdp, RFC9942_VDP_HEADER_LABEL);
+        cbor_map_len(&mut unknown_vdp, 1);
+        cbor_int(&mut unknown_vdp, -3);
+        cbor_array_len(&mut unknown_vdp, 1);
+        cbor_bytes(&mut unknown_vdp, &[0x80]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&good_protected, &unknown_vdp)),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        let mut missing_alg = Vec::new();
+        cbor_map_len(&mut missing_alg, 1);
+        cbor_int(&mut missing_alg, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut missing_alg, RFC9162_VDS_ID);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&missing_alg, &good_unprotected)),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        let mut missing_vds = Vec::new();
+        cbor_map_len(&mut missing_vds, 1);
+        cbor_int(&mut missing_vds, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut missing_vds, COSE_ES256_ALGORITHM_ID);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&missing_vds, &good_unprotected)),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        let mut missing_vdp = Vec::new();
+        cbor_map_len(&mut missing_vdp, 0);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&good_protected, &missing_vdp)),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+    }
+
+
 }
