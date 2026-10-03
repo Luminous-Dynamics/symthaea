@@ -1,6 +1,7 @@
 use symthaea_evidence_plane::execution_lineage::{
-    qualify_lineage_perturbation, EvidenceLineageDecision, EvidenceLineageGuardV1,
-    ExecutionLineageDriftFieldV1, ExecutionLineageV1, LineagePerturbationResult,
+    qualify_lineage_perturbation, EvidenceLineageCommitError, EvidenceLineageDecision,
+    EvidenceLineageGuardV1, ExecutionLineageDriftFieldV1, ExecutionLineageV1,
+    LineagePerturbationResult,
     RepositorySourceSnapshotId,
 };
 
@@ -255,7 +256,7 @@ fn invalid_current_lineage_cannot_advance_guard_phase() {
 
     assert!(matches!(
         error,
-        symthaea_evidence_plane::execution_lineage::EvidenceLineageCommitError::InvalidCurrentLineage(_)
+        EvidenceLineageCommitError::InvalidCurrentLineage(_)
     ));
     assert_eq!(
         guard.try_check(&base).unwrap(),
