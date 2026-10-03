@@ -266,9 +266,9 @@ Possible CLI:
 
 `ssc`
 
-Possible protocol namespace:
+Current preview protocol namespace:
 
-`ssc/v1`
+`ssc/v0`
 
 "Sovereign Deploy" can remain an informal descriptive phrase during migration, but the architecture should avoid freezing the shorter name into public APIs if a more exact name is accepted.
 
@@ -375,7 +375,8 @@ Authorization validation now requires:
 - verification carries exact expected state values and a typed transition disposition rather than property names alone;
 - the transition disposition is included in the compiled plan digest and therefore in authorization;
 - execution receipts separate mechanical execution outcome from typed postcondition outcome;
-- a mechanical `Succeeded` receipt is not treated as verified success unless the postcondition is `Satisfied`;
+- `Satisfied` and `Violated` postcondition outcomes require a concrete verification evidence digest;
+- an `Unproven` outcome remains representable without proof, and a mechanical `Succeeded` receipt is not treated as verified success unless the postcondition is `Satisfied`;
 - execution receipts bind the exact authorized plan, pre-execution snapshot, and
   post-execution observation;
 - receipt timestamps must remain within the authorization validity window.
