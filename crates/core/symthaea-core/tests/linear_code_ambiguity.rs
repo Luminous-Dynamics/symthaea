@@ -72,7 +72,10 @@ fn small_code_geometry_ledger_is_exhaustively_self_consistent() {
     }
 
     assert_eq!(pairwise_min_distance, min_distance);
-    assert_eq!(max_inner_product, dimension as isize - 2 * min_distance as isize);
+    assert_eq!(
+        max_inner_product,
+        dimension as isize - 2 * min_distance as isize
+    );
 
     println!(
         "GEOMETRY_LEDGER=dimension={dimension};rank={};seed=0x6E01;codewords={};min_distance={min_distance};max_bipolar_inner_product={max_inner_product}",
@@ -707,8 +710,7 @@ fn overlapping_recovery_is_order_deterministic_but_not_permutation_invariant() {
 fn overlapping_recovery_remains_valid_under_basis_reordering() {
     let parent = RandomLinearCode::generate(12, 6, 0xB515);
     let left = RandomLinearCode::from_basis(parent.basis()[..4].to_vec()).expect("left subcode");
-    let right =
-        RandomLinearCode::from_basis(parent.basis()[2..6].to_vec()).expect("right subcode");
+    let right = RandomLinearCode::from_basis(parent.basis()[2..6].to_vec()).expect("right subcode");
 
     let mut left_reordered_basis = left.basis().to_vec();
     left_reordered_basis.reverse();
