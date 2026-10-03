@@ -110,7 +110,9 @@ jobs:
           echo "lock_sha256=$LOCK_SHA256" >> "$GITHUB_OUTPUT"
           echo "cargo_version=$CARGO_VERSION" >> "$GITHUB_OUTPUT"
           echo "rustc_version=$RUSTC_VERSION" >> "$GITHUB_OUTPUT"
+          test "$UNIT_TEST_COUNT" -gt 0
           echo "unit_test_count=$UNIT_TEST_COUNT" >> "$GITHUB_OUTPUT"
+          test "$INTEGRATION_TEST_COUNT" -gt 0
           echo "integration_test_count=$INTEGRATION_TEST_COUNT" >> "$GITHUB_OUTPUT"
 
       - name: Linear-code unit tests
@@ -136,7 +138,10 @@ jobs:
           FINGERPRINT="$(printf '%s\\n' "$OUTPUT" | awk -F= '/FIXTURE_FINGERPRINT=/ { print $2; exit }')"
           FIXTURE_SPEC="$(printf '%s\\n' "$OUTPUT" | awk -F= '/FIXTURE_SPEC=/ { print $2; exit }')"
           test -n "$FIXTURE_SPEC"
-          test "$(printf '%s' "$FINGERPRINT" | wc -c)" -eq 64
+          test "${#FINGERPRINT}" -eq 64
+          case "$FINGERPRINT" in
+            (*[!0-9a-f]*) exit 1 ;;
+          esac
           printf 'fingerprint=%s\\n' "$FINGERPRINT" >> "$GITHUB_OUTPUT"
           printf 'fixture_spec=%s\\n' "$FIXTURE_SPEC" >> "$GITHUB_OUTPUT"
 
