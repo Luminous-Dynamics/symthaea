@@ -316,6 +316,22 @@ impl DeploymentPlan {
                 self.intent.schema_version.clone(),
             ));
         }
+        if self.intent.intent_id.is_empty() || self.intent.target.0.is_empty() {
+            return Err(PlanValidationError::InvalidIntentIdentity);
+        }
+        if self.target_snapshot.profile.identity.0.is_empty()
+            || self.target_snapshot.profile.platform.is_empty()
+        {
+            return Err(PlanValidationError::InvalidTargetIdentity);
+        }
+        if !has_concrete_digest(Some(&self.target_snapshot.observation_digest)) {
+            return Err(PlanValidationError::InvalidObservationDigest);
+        }
+        for resource in &self.target_snapshot.resources {
+            if resource.kind.is_empty() || !has_concrete_digest(Some(&resource.identity)) {
+                return Err(PlanValidationError::InvalidResourceIdentity);
+            }
+        }
 
         if self.intent.target != self.target_snapshot.profile.identity {
             return Err(PlanValidationError::TargetMismatch);
@@ -768,6 +784,14 @@ pub trait TargetAdapter {
 pub enum PlanValidationError {
     #[error("intent target does not match target profile")]
     TargetMismatch,
+    #[error("deployment intent has an empty identity")]
+    InvalidIntentIdentity,
+    #[error("target profile has an empty identity or platform")]
+    InvalidTargetIdentity,
+    #[error("target snapshot observation digest is empty or incomplete")]
+    InvalidObservationDigest,
+    #[error("target resource has an empty kind or incomplete identity")]
+    InvalidResourceIdentity,
     #[error("required capability {0:?} is not supported by target")]
     MissingTargetCapability(Capability),
     #[error("required capability {0:?} is not granted")]
@@ -917,6 +941,51 @@ mod tests {
             valid_from_ms: Some(100),
             valid_until_ms: Some(200),
         }
+    }
+
+    #[test]
+    fn rejects_empty_deployment_identity() {
+        let mut plan = sample_plan();
+        plan.intent.intent_id.clear();
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::InvalidIntentIdentity)
+        );
+    }
+
+    #[test]
+    fn rejects_empty_target_observation_identity() {
+        let mut plan = sample_plan();
+        plan.target_snapshot.observation_digest = ContentDigest {
+            algorithm: String::new(),
+            value: String::new(),
+        };
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::InvalidObservationDigest)
+        );
+    }
+
+    #[test]
+    fn rejects_empty_observed_resource_identity() {
+        let mut plan = sample_plan();
+        let mut resource = plan
+            .target_snapshot
+            .resources
+            .iter()
+            .next()
+            .expect("resource")
+            .clone();
+        resource.identity = ContentDigest {
+            algorithm: String::new(),
+            value: String::new(),
+        };
+        plan.target_snapshot.resources.clear();
+        plan.target_snapshot.resources.insert(resource);
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::InvalidResourceIdentity)
+        );
     }
 
     #[test]
