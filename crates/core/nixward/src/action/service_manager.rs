@@ -12,7 +12,7 @@ use super::executor::{NixOSCommand, SafetyLevel};
 use super::service_state::{
     NixServiceEnablementEvidenceV1, NixServiceObservedStateV1, NixServiceOperationCapabilitiesV1,
 };
-use super::systemd_transport::observe_service_properties;
+use super::systemd_transport::{observe_service_properties, observe_service_state_properties};
 
 /// Manages systemd services: start, stop, restart, enable, disable.
 pub struct ServiceManager;
@@ -210,14 +210,12 @@ impl ServiceManager {
     pub fn observed_state(service: &str) -> Result<NixServiceObservedStateV1, std::io::Error> {
         let unit = Self::validated_governed_unit(service)?;
 
-        let properties = observe_service_properties(&unit)?;
-        let (state, _capabilities) =
-            NixServiceObservedStateV1::parse_systemd_observation(&unit, &properties)
-                .map_err(|error| std::io::Error::other(format!(
-                    "invalid governed systemd observation for '{}': {error}",
-                    unit
-                )))?;
-        Ok(state)
+        let properties = observe_service_state_properties(&unit)?;
+        NixServiceObservedStateV1::parse_systemd_properties(&unit, &properties)
+            .map_err(|error| std::io::Error::other(format!(
+                "invalid governed systemd observation for '{}': {error}",
+                unit
+            )))
     }
 
     /// Observe unit-file enablement evidence from the same exact
