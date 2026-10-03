@@ -129,25 +129,36 @@ pub enum ProviderStatusVerificationError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderStatusVerifierConfiguration {
     pub verifier_id: String,
+    pub verifier_revision: String,
+    pub verifier_implementation_id: String,
+    pub verifier_implementation_digest: String,
     pub verifier_config_digest: String,
 }
 
 impl ProviderStatusVerifierConfiguration {
     pub fn new(
         verifier_id: impl Into<String>,
+        verifier_revision: impl Into<String>,
+        verifier_implementation_id: impl Into<String>,
+        verifier_implementation_digest: impl Into<String>,
         verifier_config_digest: impl Into<String>,
     ) -> Self {
         Self {
             verifier_id: verifier_id.into(),
-            verifier_revision: "test-verifier/rev1".into(),
-            verifier_implementation_id: "test-verifier".into(),
-            verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
+            verifier_revision: verifier_revision.into(),
+            verifier_implementation_id: verifier_implementation_id.into(),
+            verifier_implementation_digest: verifier_implementation_digest.into(),
             verifier_config_digest: verifier_config_digest.into(),
         }
     }
 
     fn validate(&self) -> Result<(), AuthorizationStoreError> {
-        if self.verifier_id.is_empty() || self.verifier_config_digest.is_empty() {
+        if self.verifier_id.is_empty()
+            || self.verifier_revision.is_empty()
+            || self.verifier_implementation_id.is_empty()
+            || self.verifier_implementation_digest.is_empty()
+            || self.verifier_config_digest.is_empty()
+        {
             return Err(
                 AuthorizationConsumptionError::ProviderStatusVerificationRequired.into()
             );
@@ -161,7 +172,7 @@ pub trait ProviderStatusVerifier {
     /// Legacy implementations return an unconfigured value and are rejected by
     /// the strict effectful boundary until explicitly pinned.
     fn configuration(&self) -> ProviderStatusVerifierConfiguration {
-        ProviderStatusVerifierConfiguration::new("", "")
+        ProviderStatusVerifierConfiguration::new("", "", "", "", "")
     }
 
     fn verify_current_status(
@@ -1196,16 +1207,62 @@ impl SqliteAuthorizationStore {
                 |row| row.get(0),
             )
             .optional()?;
-        match (existing_id, existing_digest) {
-            (Some(id), Some(digest))
+        let existing_revision: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_verifier_revision'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let existing_implementation_id: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_verifier_implementation_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let existing_implementation_digest: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_verifier_implementation_digest'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match (existing_id, existing_digest, existing_revision, existing_implementation_id, existing_implementation_digest) {
+            (Some(id), Some(digest), Some(revision), Some(implementation_id), Some(implementation_digest))
                 if id == configuration.verifier_id
+                    && revision == configuration.verifier_revision
+                    && implementation_id == configuration.verifier_implementation_id
+                    && implementation_digest == configuration.verifier_implementation_digest
                     && digest == configuration.verifier_config_digest => {}
-            (Some(id), Some(digest)) => {
+            (Some(id), Some(digest), None, None, None)
+                if id == configuration.verifier_id
+                    && digest == configuration.verifier_config_digest => {
+                for (key, value) in [
+                    ("provider_status_verifier_revision", configuration.verifier_revision.as_str()),
+                    ("provider_status_verifier_implementation_id", configuration.verifier_implementation_id.as_str()),
+                    ("provider_status_verifier_implementation_digest", configuration.verifier_implementation_digest.as_str()),
+                ] {
+                    tx.execute(
+                        "INSERT INTO authorization_store_metadata(key,value) VALUES(?1,?2)",
+                        params![key, value],
+                    )?;
+                }
+            }
+            (Some(id), Some(digest), revision, implementation_id, implementation_digest) => {
                 return Err(AuthorizationStoreError::InvalidState(format!(
                     "provider status verifier mismatch: pinned {id}/{digest}"
                 )));
             }
-            (None, None) => {
+            _ => {
+                return Err(AuthorizationStoreError::InvalidState(
+                    "provider status verifier metadata is partially configured".into()
+                ));
+            }
+            (None, None, None, None, None) => {
                 tx.execute(
                     "INSERT INTO authorization_store_metadata(key,value)
                      VALUES('provider_status_verifier_id',?1)",
@@ -1213,14 +1270,24 @@ impl SqliteAuthorizationStore {
                 )?;
                 tx.execute(
                     "INSERT INTO authorization_store_metadata(key,value)
+                     VALUES('provider_status_verifier_revision',?1)",
+                    params![configuration.verifier_revision.as_str()],
+                )?;
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value)
+                     VALUES('provider_status_verifier_implementation_id',?1)",
+                    params![configuration.verifier_implementation_id.as_str()],
+                )?;
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value)
+                     VALUES('provider_status_verifier_implementation_digest',?1)",
+                    params![configuration.verifier_implementation_digest.as_str()],
+                )?;
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value)
                      VALUES('provider_status_verifier_config_digest',?1)",
                     params![configuration.verifier_config_digest.as_str()],
                 )?;
-            }
-            _ => {
-                return Err(AuthorizationStoreError::InvalidState(
-                    "provider status verifier metadata is partially configured".into()
-                ));
             }
         }
         tx.commit()?;
@@ -1372,6 +1439,30 @@ impl SqliteAuthorizationStore {
                 |row| row.get(0),
             )
             .optional()?;
+        let verifier_revision: Option<String> = connection
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_verifier_revision'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let verifier_implementation_id: Option<String> = connection
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_verifier_implementation_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let verifier_implementation_digest: Option<String> = connection
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_verifier_implementation_digest'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
         let verifier_config_digest: Option<String> = connection
             .query_row(
                 "SELECT value FROM authorization_store_metadata
@@ -1380,9 +1471,22 @@ impl SqliteAuthorizationStore {
                 |row| row.get(0),
             )
             .optional()?;
-        let configuration = match (verifier_id, verifier_config_digest) {
-            (Some(verifier_id), Some(verifier_config_digest)) =>
-                ProviderStatusVerifierConfiguration::new(verifier_id, verifier_config_digest),
+        let configuration = match (
+            verifier_id,
+            verifier_revision,
+            verifier_implementation_id,
+            verifier_implementation_digest,
+            verifier_config_digest,
+        ) {
+            (Some(verifier_id), Some(verifier_revision), Some(verifier_implementation_id),
+             Some(verifier_implementation_digest), Some(verifier_config_digest)) =>
+                ProviderStatusVerifierConfiguration::new(
+                    verifier_id,
+                    verifier_revision,
+                    verifier_implementation_id,
+                    verifier_implementation_digest,
+                    verifier_config_digest,
+                ),
             _ => return Err(
                 AuthorizationConsumptionError::ProviderStatusVerificationRequired.into()
             ),
