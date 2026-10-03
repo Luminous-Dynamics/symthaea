@@ -3427,6 +3427,29 @@ mod tests {
     }
 
     #[test]
+    fn current_report_does_not_repair_malformed_execution_trace() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        report.execution_trace = EvaluationTrace::default();
+
+        let evaluation = report.to_evidence_evaluation();
+
+        assert!(evaluation.execution_trace.results.is_empty());
+        assert_eq!(
+            evaluation.execution_trace,
+            EvaluationTrace::default()
+        );
+        assert!(!evaluation.execution_trace.is_well_formed());
+        assert!(!evaluation.is_consistent_with_report(&report));
+    }
+
+    #[test]
     fn legacy_v3_report_can_materialize_current_evidence_evaluation() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let mut report = Ed25519ReceiptVerifier::new(
