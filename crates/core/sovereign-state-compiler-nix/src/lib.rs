@@ -64,6 +64,10 @@ pub struct NixOSTargetAdapter {
 }
 
 impl NixOSTargetAdapter {
+    /// Synthetic constructor for deterministic adapter tests and local contract
+    /// development. Production callers should prefer `from_observation` so
+    /// the capability/resource surface and observation digest come from the
+    /// actual target.
     pub fn new(target: impl Into<TargetId>, observed_at_ms: u64) -> Self {
         Self {
             snapshot: TargetSnapshot {
@@ -77,6 +81,27 @@ impl NixOSTargetAdapter {
                     b"nixos-target-observation-v0.1",
                 ),
                 resources: BTreeSet::new(),
+            },
+        }
+    }
+
+    pub fn from_observation(
+        target: impl Into<TargetId>,
+        observed_at_ms: u64,
+        observation_digest: sovereign_state_compiler::ContentDigest,
+        capabilities: BTreeSet<Capability>,
+        resources: BTreeSet<sovereign_state_compiler::ResourceRef>,
+    ) -> Self {
+        Self {
+            snapshot: TargetSnapshot {
+                profile: sovereign_state_compiler::TargetProfile {
+                    identity: target.into(),
+                    platform: NIXOS_PLATFORM.into(),
+                    capabilities,
+                },
+                observed_at_ms,
+                observation_digest,
+                resources,
             },
         }
     }
