@@ -3036,7 +3036,12 @@ mod tests {
                     1,
                     NULL,
                     'definitely-not-a-valid-epf-011-digest'
-                );",
+                );
+                CREATE TRIGGER trg_knowledge_snapshot_validation_receipts_no_update
+                BEFORE UPDATE ON knowledge_snapshot_validation_receipts
+                BEGIN
+                    SELECT RAISE(ABORT, 'knowledge_snapshot_validation_receipts is append-only: UPDATE prohibited');
+                END;",
             )
             .unwrap();
         }
@@ -3080,6 +3085,18 @@ mod tests {
             )
             .unwrap();
         assert_eq!(snapshot_digest, "placeholder");
+
+        let trigger_sql: String = conn
+            .query_row(
+                "SELECT sql
+                 FROM sqlite_master
+                 WHERE type = 'trigger'
+                   AND name = 'trg_knowledge_snapshot_validation_receipts_no_update'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(trigger_sql.contains("UPDATE prohibited"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
