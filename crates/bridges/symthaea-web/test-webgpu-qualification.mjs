@@ -172,13 +172,13 @@ function assertSemanticMovieSamples(samples, label = 'WebGPU') {
   }
   if (!(left[0] + 20 < right[0])) {
     throw new QualificationError(
-      `${label} movie horizontal gradient is not increasing red left-to-right: ${JSON.stringify(samples)},
+      `${label} movie horizontal gradient is not increasing red left-to-right: ${JSON.stringify(samples)}`,
       'renderer',
     );
   }
   if (!(top[1] + 20 < bottom[1])) {
     throw new QualificationError(
-      `${label} movie vertical gradient is not increasing green top-to-bottom: ${JSON.stringify(samples)},
+      `${label} movie vertical gradient is not increasing green top-to-bottom: ${JSON.stringify(samples)}`,
       'renderer',
     );
   }
