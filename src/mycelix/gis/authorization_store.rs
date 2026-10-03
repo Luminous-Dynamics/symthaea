@@ -501,6 +501,7 @@ impl SqliteAuthorizationStore {
         )?;
 
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        validate_native_authority_pin_set(&tx)?;
         let clock_policy_digest = store.clock_policy.digest();
         let configured_policy: Option<String> = tx
             .query_row(
@@ -672,6 +673,35 @@ fn normalize_native_issuer(issuer: &str) -> String {
     }
 
     url.to_string()
+}
+
+fn validate_native_authority_pin_set(
+    tx: &Transaction<'_>,
+) -> Result<(), AuthorizationStoreError> {
+    let mut stmt = tx.prepare(
+        "SELECT issuer,authority_namespace
+         FROM authorization_native_authority_pins
+         ORDER BY issuer ASC",
+    )?;
+    let mut rows = stmt.query([])?;
+    let mut seen: Vec<(String, String)> = Vec::new();
+    while let Some(row) = rows.next()? {
+        let issuer: String = row.get(0)?;
+        let namespace: String = row.get(1)?;
+        let normalized = normalize_native_issuer(&issuer);
+        if let Some((existing_issuer, existing_namespace)) =
+            seen.iter().find(|(existing, _)| normalize_native_issuer(existing) == normalized)
+        {
+            if existing_namespace != &namespace {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "invalid native authority pin set: {issuer} normalizes with {existing_issuer} but namespaces differ"
+                )));
+            }
+        } else {
+            seen.push((issuer, namespace));
+        }
+    }
+    Ok(())
 }
 
     fn native_authority_pin_set_id(&self) -> String {
@@ -2625,6 +2655,31 @@ mod tests {
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidBinding
             ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reopening_rejects_preexisting_normalized_issuer_conflict() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-issuer-reopen-conflict-{}.db",std::process::id()
+        ));
+        {
+            let store=SqliteAuthorizationStore::open_with_relying_party(
+                &path,"rp-issuer-reopen-conflict"
+            ).unwrap();
+            store.connection().unwrap().execute(
+                "INSERT INTO authorization_native_authority_pins(issuer,authority_namespace)
+                 VALUES ('https://issuer.example/','authority/v1'),
+                        ('HTTPS://ISSUER.EXAMPLE:443','authority/v2')",
+                [],
+            ).unwrap();
+        }
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party(
+                &path,"rp-issuer-reopen-conflict"
+            ),
+            Err(AuthorizationStoreError::InvalidState(_))
         ));
         let _=std::fs::remove_file(path);
     }
