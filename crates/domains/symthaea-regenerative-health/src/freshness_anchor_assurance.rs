@@ -146,6 +146,14 @@ pub struct FreshnessAnchorProfile {
 }
 
 impl FreshnessAnchorProfile {
+    /// Compute the exact content commitment for the profile's security
+    /// semantics. The commitment changes if backing, provenance, or any
+    /// capability changes.
+    pub fn fingerprint(&self) -> Result<String, serde_json::Error> {
+        let bytes = serde_json::to_vec(self)?;
+        Ok(blake3::hash(&bytes).to_hex().to_string())
+    }
+
     pub fn new(
         backing: FreshnessAnchorBacking,
         capabilities: FreshnessAnchorCapabilities,
@@ -181,9 +189,77 @@ impl FreshnessAnchorProfile {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FreshnessAnchorVerificationReceipt {
+    pub schema_version: String,
+    pub profile_fingerprint: String,
+    pub verifier_reference: String,
+    pub evidence_reference: String,
+    pub evidence_digest: String,
+}
+
+pub trait FreshnessAnchorEvidenceVerifier {
+    fn verify(
+        &self,
+        profile: &FreshnessAnchorProfile,
+        receipt: &FreshnessAnchorVerificationReceipt,
+    ) -> bool;
+}
+
+/// Non-serializable capability minted only after an evidence verifier accepts
+/// a receipt bound to the exact anchor profile.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedFreshnessAnchor {
+    profile: FreshnessAnchorProfile,
+    receipt: FreshnessAnchorVerificationReceipt,
+}
+
+impl VerifiedFreshnessAnchor {
+    pub fn verify<V: FreshnessAnchorEvidenceVerifier>(
+        profile: FreshnessAnchorProfile,
+        receipt: FreshnessAnchorVerificationReceipt,
+        verifier: &V,
+    ) -> Result<Self, FreshnessAnchorAssuranceError> {
+        profile
+            .require_authoritative()
+            .map_err(|_| FreshnessAnchorAssuranceError::InsufficientCapabilities {
+                missing: profile.capabilities.missing_authoritative_capabilities(),
+            })?;
+        if receipt.schema_version != "0.1"
+            || receipt.verifier_reference.trim().is_empty()
+            || receipt.evidence_reference.trim().is_empty()
+            || receipt.evidence_digest.trim().is_empty()
+        {
+            return Err(FreshnessAnchorAssuranceError::InvalidReceipt);
+        }
+        let profile_fingerprint = profile
+            .fingerprint()
+            .map_err(|_| FreshnessAnchorAssuranceError::InvalidReceipt)?;
+        if receipt.profile_fingerprint != profile_fingerprint {
+            return Err(FreshnessAnchorAssuranceError::ProfileBindingMismatch);
+        }
+        if !verifier.verify(&profile, &receipt) {
+            return Err(FreshnessAnchorAssuranceError::EvidenceVerificationFailed);
+        }
+
+        Ok(Self { profile, receipt })
+    }
+
+    pub fn profile(&self) -> &FreshnessAnchorProfile {
+        &self.profile
+    }
+
+    pub fn receipt(&self) -> &FreshnessAnchorVerificationReceipt {
+        &self.receipt
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FreshnessAnchorAssuranceError {
     InvalidProfile,
+    InvalidReceipt,
+    ProfileBindingMismatch,
+    EvidenceVerificationFailed,
     InsufficientCapabilities {
         missing: Vec<FreshnessAnchorCapability>,
     },
@@ -248,6 +324,75 @@ mod tests {
             " "
         )
         .is_err());
+    }
+
+    #[test]
+    fn profile_fingerprint_changes_with_security_semantics() {
+        let a = FreshnessAnchorProfile::new(
+            FreshnessAnchorBacking::RemoteAuthority,
+            FreshnessAnchorCapabilities::authoritative(),
+            "remote://authority-a",
+        )
+        .unwrap();
+        let mut b = a.clone();
+        b.provenance = "remote://authority-b".into();
+        assert_ne!(a.fingerprint().unwrap(), b.fingerprint().unwrap());
+    }
+
+    #[test]
+    fn verification_receipt_must_bind_exact_profile() {
+        struct Accept;
+        impl FreshnessAnchorEvidenceVerifier for Accept {
+            fn verify(
+                &self,
+                _: &FreshnessAnchorProfile,
+                _: &FreshnessAnchorVerificationReceipt,
+            ) -> bool { true }
+        }
+
+        let profile = FreshnessAnchorProfile::new(
+            FreshnessAnchorBacking::RemoteAuthority,
+            FreshnessAnchorCapabilities::authoritative(),
+            "remote://authority-a",
+        )
+        .unwrap();
+        let receipt = FreshnessAnchorVerificationReceipt {
+            schema_version: "0.1".into(),
+            profile_fingerprint: "wrong".into(),
+            verifier_reference: "verifier-1".into(),
+            evidence_reference: "evidence-1".into(),
+            evidence_digest: "digest-1".into(),
+        };
+        let err = VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap_err();
+        assert_eq!(err, FreshnessAnchorAssuranceError::ProfileBindingMismatch);
+    }
+
+    #[test]
+    fn evidence_verifier_is_required_to_mint_opaque_capability() {
+        struct Reject;
+        impl FreshnessAnchorEvidenceVerifier for Reject {
+            fn verify(
+                &self,
+                _: &FreshnessAnchorProfile,
+                _: &FreshnessAnchorVerificationReceipt,
+            ) -> bool { false }
+        }
+
+        let profile = FreshnessAnchorProfile::new(
+            FreshnessAnchorBacking::RemoteAuthority,
+            FreshnessAnchorCapabilities::authoritative(),
+            "remote://authority-a",
+        )
+        .unwrap();
+        let receipt = FreshnessAnchorVerificationReceipt {
+            schema_version: "0.1".into(),
+            profile_fingerprint: profile.fingerprint().unwrap(),
+            verifier_reference: "verifier-1".into(),
+            evidence_reference: "evidence-1".into(),
+            evidence_digest: "digest-1".into(),
+        };
+        let err = VerifiedFreshnessAnchor::verify(profile, receipt, &Reject).unwrap_err();
+        assert_eq!(err, FreshnessAnchorAssuranceError::EvidenceVerificationFailed);
     }
 
     #[test]
