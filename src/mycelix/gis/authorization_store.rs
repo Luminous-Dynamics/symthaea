@@ -536,30 +536,43 @@ fn backfill_attempt_scope_digests(
         "authorization_terminal_evidence",
         "authorization_dispatches",
     ] {
-        let rows: Vec<(String,String)> = {
+        let rows: Vec<(String,String,Option<String>)> = {
             let mut stmt = connection.prepare(&format!(
-                "SELECT attempt_id,boundary_id
+                "SELECT attempt_id,boundary_id,attempt_scope_digest
                  FROM {table}
                  WHERE attempt_id IS NOT NULL AND attempt_id <> ''
-                   AND boundary_id IS NOT NULL AND boundary_id <> ''
-                   AND (attempt_scope_digest IS NULL OR attempt_scope_digest='')"
+                   AND boundary_id IS NOT NULL AND boundary_id <> ''"
             ))?;
             let mapped = stmt.query_map([], |row| {
-                Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))
+                Ok((
+                    row.get::<_,String>(0)?,
+                    row.get::<_,String>(1)?,
+                    row.get::<_,Option<String>>(2)?,
+                ))
             })?;
             mapped.collect::<Result<Vec<_>,_>>()?
         };
-        for (attempt_id,boundary_id) in rows {
-            let scope=compute_attempt_scope_digest(&boundary_id,&attempt_id)?;
-            connection.execute(
-                &format!(
-                    "UPDATE {table}
-                     SET attempt_scope_digest=?1
-                     WHERE attempt_id=?2 AND boundary_id=?3
-                       AND (attempt_scope_digest IS NULL OR attempt_scope_digest='')"
-                ),
-                params![scope,attempt_id,boundary_id],
-            )?;
+        for (attempt_id,boundary_id,stored_scope) in rows {
+            let expected=compute_attempt_scope_digest(&boundary_id,&attempt_id)?;
+            match stored_scope.as_deref() {
+                None | Some("") => {
+                    connection.execute(
+                        &format!(
+                            "UPDATE {table}
+                             SET attempt_scope_digest=?1
+                             WHERE attempt_id=?2 AND boundary_id=?3
+                               AND (attempt_scope_digest IS NULL OR attempt_scope_digest='')"
+                        ),
+                        params![expected,attempt_id,boundary_id],
+                    )?;
+                }
+                Some(scope) if scope == expected => {}
+                Some(_) => {
+                    return Err(AuthorizationStoreError::InvalidState(format!(
+                        "attempt scope digest mismatch in {table} for attempt {attempt_id}"
+                    )));
+                }
+            }
         }
     }
     Ok(())
