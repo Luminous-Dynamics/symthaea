@@ -120,7 +120,7 @@ impl NixActivationMode {
                 "temporarily activate the NixOS configuration without changing the boot default"
             }
             Self::Boot => {
-                "build the NixOS configuration and select it for the next boot without activating now",
+                "build the NixOS configuration and select it for the next boot without activating now"
             }
             Self::DryActivate => {
                 "evaluate NixOS activation changes without activating the configuration"
