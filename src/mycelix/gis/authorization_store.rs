@@ -1159,6 +1159,11 @@ impl SqliteAuthorizationStore {
              CREATE UNIQUE INDEX IF NOT EXISTS authorization_dispatch_operation_uq
                ON authorization_dispatches(operation_id)
                WHERE operation_id <> '';
+             CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_operation_uq
+               ON authorization_leases(operation_id)
+               WHERE operation_id IS NOT NULL AND operation_id <> '';
+               ON authorization_dispatches(operation_id)
+               WHERE operation_id <> '';
              DROP INDEX IF EXISTS authorization_dispatch_action_fence_idx;
              CREATE INDEX authorization_dispatch_action_fence_idx
                ON authorization_dispatches(relying_party_id, target_identity, action_digest, state);",
@@ -2143,6 +2148,22 @@ fn validate_native_authority_pin_set(
         if prior_owner.is_some() {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+        if let Some(operation_id) = operation_id {
+            let prior_operation_owner: Option<String> = tx
+                .query_row(
+                    "SELECT authorization_instance
+                     FROM authorization_leases
+                     WHERE operation_id=?1
+                       AND authorization_instance<>?2",
+                    params![operation_id, witness.authorization_instance.as_str()],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if prior_operation_owner.is_some() {
+                return Err(AuthorizationConsumptionError::InvalidBinding.into());
+            }
+        }
+
 
         let mut lease = load_lease(&tx, &witness.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
@@ -7782,6 +7803,69 @@ mod tests {
         let _=std::fs::remove_file(path);
     }
 
+
+    #[test]
+    fn prepared_operation_id_cannot_be_reused_across_authorizations() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-operation-reuse-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action_a=EpistemicAction::new(
+            "operation-a","a",super::super::ActionRisk::Critical
+        );
+        let action_b=EpistemicAction::new(
+            "operation-b","b",super::super::ActionRisk::Critical
+        );
+        let digest_a=action_a.canonical_action_digest();
+        let digest_b=action_b.canonical_action_digest();
+        let witness_a=ActionAuthorizationWitness {
+            action_id:action_a.id.clone(),
+            authorization_instance:"operation-approval-a".into(),
+            action_digest:digest_a.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        let witness_b=ActionAuthorizationWitness {
+            action_id:action_b.id.clone(),
+            authorization_instance:"operation-approval-b".into(),
+            action_digest:digest_b.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:01Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness_a.authorization_instance.clone(),action_a.id.clone(),digest_a,
+            witness_a.support_digest.clone(),witness_a.policy.clone(),1,1
+        )).unwrap();
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness_b.authorization_instance.clone(),action_b.id.clone(),digest_b,
+            witness_b.support_digest.clone(),witness_b.policy.clone(),1,1
+        )).unwrap();
+
+        store.prepare_for_execution_bound_with_operation(
+            &witness_a,&action_a,"frame@1","attempt-operation-a",
+            "boundary-A","operation-shared"
+        ).unwrap();
+        assert!(matches!(
+            store.prepare_for_execution_bound_with_operation(
+                &witness_b,&action_b,"frame@1","attempt-operation-b",
+                "boundary-B","operation-shared"
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
 
     #[test]
     fn attempt_scope_digest_is_stable_and_boundary_sensitive() {
