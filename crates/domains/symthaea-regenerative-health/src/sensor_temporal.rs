@@ -45,18 +45,28 @@ pub struct TemporalFusionPolicy {
     pub maximum_delta_disagreement_milli: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SensorIndependenceBinding {
+    pub schema_version: String,
+    pub sensor_id: String,
+    pub component_id: String,
+    /// Stable physical/common-mode dependency domain.
+    pub independence_group: String,
+    /// Digest of the qualified topology/dependency declaration.
+    pub topology_digest: String,
+    /// Configuration under which the topology binding was qualified.
+    pub configuration_digest: String,
+    /// Provenance identity for the topology binding.
+    pub evidence_id: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemporalSensorPair {
     pub previous: SensorObservation,
     pub previous_decision: SensorHealthDecision,
     pub current: SensorObservation,
     pub current_decision: SensorHealthDecision,
-    /// Provenance-bound physical/common-mode independence domain.
-    pub independence_group: String,
-    /// Digest identifying the topology/dependency declaration behind the group.
-    pub independence_topology_digest: String,
-    /// Evidence identity for the independence declaration.
-    pub independence_evidence_id: String,
+    pub independence: SensorIndependenceBinding,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -115,15 +125,19 @@ impl TemporalFusionGate {
                 continue;
             }
 
-            if pair.independence_group.trim().is_empty()
-                || pair.independence_topology_digest.trim().is_empty()
-                || pair.independence_evidence_id.trim().is_empty()
+            if pair.independence.schema_version.trim().is_empty()
+                || pair.independence.sensor_id != pair.current.sensor_id
+                || pair.independence.component_id.trim().is_empty()
+                || pair.independence.independence_group.trim().is_empty()
+                || pair.independence.topology_digest.trim().is_empty()
+                || pair.independence.evidence_id.trim().is_empty()
             {
                 issues.push(TemporalFusionIssue::InvalidIndependenceProvenance);
                 continue;
             }
             if pair.previous.configuration_digest != pair.current.configuration_digest
                 || pair.current.configuration_digest.trim().is_empty()
+                || pair.independence.configuration_digest != pair.current.configuration_digest
             {
                 issues.push(TemporalFusionIssue::IndependenceConfigurationMismatch);
                 continue;
@@ -139,7 +153,7 @@ impl TemporalFusionGate {
         let required = self.policy.minimum_trusted_sensors as usize;
         let independent_groups: std::collections::BTreeSet<_> = trusted
             .iter()
-            .map(|pair| pair.independence_group.as_str())
+            .map(|pair| pair.independence.independence_group.as_str())
             .filter(|group| !group.trim().is_empty())
             .collect();
         let required_groups = self.policy.minimum_independent_groups as usize;
@@ -257,9 +271,15 @@ mod tests {
             previous_decision,
             current: current_observation,
             current_decision,
-            independence_group: format!("group-{sensor_id}"),
-            independence_topology_digest: "topology-v1".into(),
-            independence_evidence_id: format!("independence-{sensor_id}"),
+            independence: SensorIndependenceBinding {
+                schema_version: "0.1".into(),
+                sensor_id: sensor_id.into(),
+                component_id: "wing-root".into(),
+                independence_group: format!("group-{sensor_id}"),
+                topology_digest: "topology-v1".into(),
+                configuration_digest: "cfg-1".into(),
+                evidence_id: format!("independence-{sensor_id}"),
+            },
         }
     }
 
@@ -312,10 +332,8 @@ mod tests {
     fn colocated_sensors_do_not_create_independent_quorum() {
         let mut a = pair("strain-a", 0.5, 1.5);
         let mut b = pair("strain-b", 0.6, 1.6);
-        a.independence_group = "wing-root-a".into();
-        b.independence_group = "wing-root-a".into();
-        a.independence_topology_digest = "topology-v1".into();
-        b.independence_topology_digest = "topology-v1".into();
+        a.independence.independence_group = "wing-root-a".into();
+        b.independence.independence_group = "wing-root-a".into();
         let d = fusion_gate().assess(&[a, b]);
         assert_eq!(d.state, TemporalFusionState::InsufficientEvidence);
         assert!(d.issues.contains(&TemporalFusionIssue::InsufficientIndependentGroups));
