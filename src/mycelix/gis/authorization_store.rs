@@ -3656,6 +3656,12 @@ fn validate_native_authority_pin_set(
         if !witness.is_bound_to(&lease) {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+        validate_attempt_boundary_consistency_for_attempt(
+            &tx,
+            &witness.authorization_instance,
+            &witness.attempt_id,
+            &witness.boundary_id,
+        )?;
 
         if let Some((boundary_id, action_digest, stored_scope)) = tx
             .query_row(
@@ -7807,6 +7813,72 @@ mod tests {
             Err(AuthorizationStoreError::InvalidState(message))
                 if message.contains("attempt scope digest mismatch")
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn cross_table_attempt_boundary_splice_is_rejected() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-cross-table-boundary-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-cross-table").unwrap();
+        let effect=super::super::ActionEffectBinding::new(
+            "target-cross","audience-cross","adapter-cross"
+        );
+        let action=EpistemicAction::new(
+            "cross-table-action","effect",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"approval-cross-table".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-cross-table",&action,&effect,
+            "boundary-A","operation-cross-table","native-cross-table"
+        ).unwrap();
+
+        let boundary_b_scope=
+            compute_attempt_scope_digest("boundary-B",&record.attempt_id).unwrap();
+        store.connection().unwrap().execute(
+            "INSERT INTO authorization_receipts(
+                authorization_instance,action_id,attempt_id,phase,outcome,action_digest,
+                authority_epoch,provider_idempotency_key,boundary_id,attempt_scope_digest
+             ) VALUES(?1,?2,?3,'indeterminate','indeterminate',?4,?5,?6,?7,?8)",
+            params![
+                record.authorization_instance,
+                record.action_id,
+                record.attempt_id,
+                record.action_digest,
+                witness.authority_epoch as i64,
+                record.provider_idempotency_key,
+                "boundary-B",
+                boundary_b_scope,
+            ],
+        ).unwrap();
+
+        let mut connection=store.connection().unwrap();
+        let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        let err=store.validate_persisted_dispatch_record(&tx,&record).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+        tx.rollback().unwrap();
         let _=std::fs::remove_file(path);
     }
 
