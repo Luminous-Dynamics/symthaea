@@ -447,3 +447,119 @@ fn rfc9942_consistency_state_binds_signature_to_detached_root() {
         Err(Rfc9942VdpError::InvalidEs256Signature)
     );
 }
+
+
+#[test]
+fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
+    fn bstr(bytes: &[u8]) -> Vec<u8> {
+        assert!(bytes.len() < 24);
+        let mut out = vec![0x40 | bytes.len() as u8];
+        out.extend_from_slice(bytes);
+        out
+    }
+
+    fn outer_wire(receipt: &Rfc9942ReceiptEnvelope, payload: &[u8], signature: &[u8]) -> Vec<u8> {
+        let collection = Rfc9942ReceiptCollection::new(vec![receipt.clone()]).unwrap().to_cbor();
+        let protected = [0xa1, 0x01, 0x26]; // { alg: -7 }
+        let mut unprotected = Vec::new();
+        unprotected.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8a]);
+        unprotected.extend_from_slice(&collection);
+
+        let mut out = Vec::new();
+        out.extend_from_slice(&[0xd2, 0x84, 0x43]);
+        out.extend_from_slice(&protected);
+        out.extend_from_slice(&unprotected);
+        out.extend_from_slice(&bstr(payload));
+        out.extend_from_slice(&[0x58, signature.len() as u8]);
+        out.extend_from_slice(signature);
+        out
+    }
+
+    fn signed_outer(receipt: &Rfc9942ReceiptEnvelope, payload: &[u8]) -> Rfc9942SignatureWithReceipts {
+        let unsigned_wire = outer_wire(receipt, payload, &[0u8; 64]);
+        let unsigned = Rfc9942SignatureWithReceipts::from_cbor(&unsigned_wire).unwrap();
+        let rng = SystemRandom::new();
+        let signing_key = EcdsaKeyPair::from_private_key_and_public_key(
+            &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+            &RFC8392_PRIVATE_D,
+            &rfc8392_public_key(),
+            &rng,
+        )
+        .unwrap();
+        let tbs = unsigned.signature1_tbs(&[], None).unwrap();
+        let signature = signing_key.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+        Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(receipt, payload, &signature)).unwrap()
+    }
+
+    fn signed_receipt(candidate: &[u8]) -> Rfc9942ReceiptEnvelope {
+        let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
+        let vds = Rfc9162Sha256Vds;
+        let head = vds.tree_head(&leaves);
+        let proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+        let unsigned = Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp.clone(),
+            Rfc9942ReceiptPayload::Attached(head.root()),
+            vec![0u8; 64],
+        )
+        .unwrap();
+
+        let rng = SystemRandom::new();
+        let signing_key = EcdsaKeyPair::from_private_key_and_public_key(
+            &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+            &RFC8392_PRIVATE_D,
+            &rfc8392_public_key(),
+            &rng,
+        )
+        .unwrap();
+        let tbs = unsigned.signature1_tbs(&[], None).unwrap();
+        let signature = signing_key.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+
+        Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp,
+            Rfc9942ReceiptPayload::Attached(head.root()),
+            signature,
+        )
+        .unwrap()
+    }
+
+    let receipt = signed_receipt(b"candidate");
+    let key = rfc8392_public_key();
+
+    let valid_outer = signed_outer(&receipt, b"candidate");
+    let state = valid_outer
+        .verify_es256_inclusion_receipt_state(
+            0, &key, &key, &[], &[], None,
+        )
+        .unwrap();
+
+    assert_eq!(state.outer_algorithm_id(), COSE_ES256_ALGORITHM_ID);
+    assert_eq!(state.receipt_index(), 0);
+    assert_eq!(
+        state.receipt_placement(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Unprotected
+    );
+    let mut candidate_digest = Vec::new();
+    candidate_digest.extend_from_slice(b"candidate");
+    assert_eq!(
+        state.outer_payload_sha256(),
+        sha2::Sha256::digest(&candidate_digest).into()
+    );
+
+    // Sign the outer object over different payload bytes while retaining the
+    // same valid inner Receipt. The outer signature is valid, but the Receipt
+    // no longer proves the exact outer payload. The combined verifier must fail.
+    let mismatched_outer = signed_outer(&receipt, b"different");
+    mismatched_outer
+        .verify_es256(&key, &[], None)
+        .expect("outer signature over the mismatched payload is still valid");
+    assert_eq!(
+        mismatched_outer.verify_es256_inclusion_receipt_state(
+            0, &key, &key, &[], &[], None,
+        ),
+        Err(Rfc9942VdpError::NoMatchingProof)
+    );
+}
