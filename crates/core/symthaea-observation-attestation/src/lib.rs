@@ -3659,6 +3659,43 @@ mod tests {
 
 
 
+
+    #[test]
+    fn failed_resolution_report_binds_snapshot_into_evidence_evaluation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let method = ResolvedVerificationMethod {
+            verification_method: envelope.attester_id.clone(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Revoked,
+            allowed_proof_purposes: vec!["observation-independence".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([method]);
+        let report = Ed25519ReceiptVerifier::new(
+            envelope.attester_id.clone(),
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_with_resolver_report(&envelope, &receipt, &resolver);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::VerificationMethodRevoked
+        );
+        assert!(report.resolution_snapshot_fingerprint.is_some());
+
+        let mut evaluation = report.to_evidence_evaluation();
+        assert!(evaluation.is_consistent_with_report(&report));
+
+        evaluation.verification_report_fingerprint = {
+            let mut mutated = report.clone();
+            mutated.resolution_snapshot_fingerprint =
+                Some("different-resolution-state".into());
+            mutated.fingerprint()
+        };
+
+        assert!(!evaluation.is_consistent_with_report(&report));
+    }
+
     #[test]
     fn resolver_snapshot_is_retained_when_resolver_returns_mismatched_method() {
         struct MismatchedResolver {
