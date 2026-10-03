@@ -67,6 +67,43 @@ fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
 }
 
 #[test]
+fn recovery_work_scales_over_small_structural_fixtures() {
+    let fixtures = [(32usize, 2usize, 2usize, 0x3202u64), (64, 4, 4, 0x6404), (96, 6, 6, 0x9606)];
+
+    for &(dimension, left_rank, right_rank, seed) in &fixtures {
+        let (parent, left, right) =
+            RandomLinearCode::generate_direct_sum(dimension, left_rank, right_rank, seed)
+                .expect("valid direct sum");
+        let target = left.basis()[0].bound(&right.basis()[0]);
+        let (recovered, work) = recover_linear_bound_with_work(&target, &[&left, &right]);
+
+        assert!(recovered.is_some());
+        assert_eq!(work.retained_generators, parent.rank());
+        assert_eq!(work.span_membership_checks, parent.rank());
+        // Every new independent generator increases the rank by exactly one.
+        // The implementation performs one rank test before and after adding
+        // each generator, giving 2 * sum(0..Delta) + Delta = Delta^2 pivots.
+        assert_eq!(
+            work.basis_rank_pivots,
+            parent.rank() * parent.rank(),
+            "rank-ledger contract at dimension {dimension}, rank {}",
+            parent.rank()
+        );
+
+        println!(
+            "SCALING_LEDGER=dimension={dimension};rank={};span_checks={};rank_pivots={};rank_row_xor_words={};solve_pivots={};solve_row_xor_words={};retained_generators={}",
+            parent.rank(),
+            work.span_membership_checks,
+            work.basis_rank_pivots,
+            work.basis_rank_row_xor_words,
+            work.solve_pivots,
+            work.solve_row_xor_words,
+            work.retained_generators,
+        );
+    }
+}
+
+#[test]
 fn arbitrary_same_subspace_bound_is_not_uniquely_identifiable() {
     let code = RandomLinearCode::generate(96, 8, 0xD00D);
     let a = code.encode(&[true, false, true, false, false, true, false, true]);
