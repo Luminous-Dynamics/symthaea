@@ -20,7 +20,7 @@ use crate::topology_resolution::TopologyLifecycleResolution;
 use crate::topology_resolution_verification::{
     TopologyResolutionVerificationDecision, TopologyResolutionVerificationGate,
     TopologyResolutionVerificationIssue, TopologyResolutionVerificationState,
-    TopologyResolutionFreshnessVerificationResult,
+    TopologyResolutionVerificationResult,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
