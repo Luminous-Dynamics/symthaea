@@ -6876,12 +6876,15 @@ mod tests {
             "symthaea-gis-auth-status-failure-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open_with_relying_party(
-        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
-        store.pin_provider_status_verifier_configuration(&ProviderStatusVerifierConfiguration::new(
-            "test-status-verifier/v1","test-status-verifier/rev1",
-            "test-status-verifier","sha256:test-status-verifier-implementation",
-            "sha256:test-status-verifier-config")).unwrap();
             &path,"rp-status-failure"
+        ).unwrap();
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
+        store.pin_provider_status_verifier_configuration(
+            &ProviderStatusVerifierConfiguration::new(
+                "test-status-verifier/v1","test-status-verifier/rev1",
+                "test-status-verifier","sha256:test-status-verifier-implementation",
+                "sha256:test-status-verifier-config"
+            )
         ).unwrap();
         store.pin_native_authority_namespace("issuer.status","issuer.status/authority/v1").unwrap();
 
