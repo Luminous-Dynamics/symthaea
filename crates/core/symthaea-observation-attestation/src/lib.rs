@@ -742,6 +742,7 @@ impl ReceiptAttestationVerificationReport {
         };
 
         supported_version
+            && !self.receipt_fingerprint.is_empty()
             && self.policy_inputs.is_well_formed()
             && self.environment_identity.is_well_formed()
             && self.policy_fingerprint == self.policy_inputs.fingerprint()
@@ -3336,6 +3337,21 @@ mod tests {
             "did:example:attester-a#key-1".into(),
         );
         assert!(report.is_well_formed());
+    }
+
+    #[test]
+    fn verification_report_self_validation_rejects_empty_receipt_identity() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let mut report = verifier.verify_report(&envelope, &receipt);
+
+        assert!(report.is_well_formed());
+        report.receipt_fingerprint.clear();
+        assert!(!report.is_well_formed());
     }
 
     #[test]
