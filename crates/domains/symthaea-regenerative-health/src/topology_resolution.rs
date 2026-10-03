@@ -15,6 +15,22 @@ use std::collections::BTreeSet;
 
 const BRANCH_SET_DOMAIN: &[u8] = b"symthaea:topology-branch-set:v1\n";
 
+fn branch_set_digest(branches: &[TopologyBranchReference]) -> String {
+    let mut unique = BTreeSet::new();
+    unique.extend(branches.iter().cloned());
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(BRANCH_SET_DOMAIN);
+    for branch in unique {
+        bytes.extend_from_slice(&branch.predecessor_epoch.to_be_bytes());
+        bytes.extend_from_slice(&(branch.predecessor_topology_digest.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(branch.predecessor_topology_digest.as_bytes());
+        bytes.extend_from_slice(&branch.successor_epoch.to_be_bytes());
+        bytes.extend_from_slice(&(branch.successor_topology_digest.len() as u64).to_be_bytes());
+        bytes.extend_from_slice(branch.successor_topology_digest.as_bytes());
+    }
+    blake3::hash(&bytes).to_hex().to_string()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TopologyResolutionState {
     Resolved,
@@ -328,21 +344,7 @@ mod tests {
         .unwrap()
     }
 
-    fn branch_set_digest(branches: &[TopologyBranchReference]) -> String {
-        let mut unique = BTreeSet::new();
-        unique.extend(branches.iter().cloned());
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(BRANCH_SET_DOMAIN);
-        for branch in unique {
-            bytes.extend_from_slice(&branch.predecessor_epoch.to_be_bytes());
-            bytes.extend_from_slice(&(branch.predecessor_topology_digest.len() as u64).to_be_bytes());
-            bytes.extend_from_slice(branch.predecessor_topology_digest.as_bytes());
-            bytes.extend_from_slice(&branch.successor_epoch.to_be_bytes());
-            bytes.extend_from_slice(&(branch.successor_topology_digest.len() as u64).to_be_bytes());
-            bytes.extend_from_slice(branch.successor_topology_digest.as_bytes());
-        }
-        blake3::hash(&bytes).to_hex().to_string()
-    }
+
 
     fn branch(digest: &str) -> TopologyBranchReference {
         TopologyBranchReference {
