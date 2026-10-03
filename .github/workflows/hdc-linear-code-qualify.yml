@@ -124,6 +124,18 @@ jobs:
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_ambiguity
 
+      - name: Capture canonical fixture fingerprint
+        id: fingerprint
+        run: |
+          OUTPUT="$(cargo test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_ambiguity canonical_fixture_fingerprint_is_emitted -- --nocapture 2>&1)"
+          FINGERPRINT="$(printf '%s
+' "$OUTPUT" | awk -F= '/FIXTURE_FINGERPRINT=/ { print $2; exit }')"
+          test "$(printf '%s' "$FINGERPRINT" | wc -c)" -eq 64
+          printf 'fingerprint=%s
+' "$FINGERPRINT" >> "$GITHUB_OUTPUT"
+
       - name: Strict Clippy
         id: clippy
         run: |
