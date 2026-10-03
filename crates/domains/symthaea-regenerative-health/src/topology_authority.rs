@@ -10,7 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::topology_lifecycle::TopologyBranchReference;
+use crate::topology_resolution::TopologyBranchReference;
 use crate::topology_resolution::{
     TopologyLifecycleResolution, TopologyResolutionDecision, TopologyResolutionGate,
     TopologyResolutionIssue, TopologyResolutionPolicy, TopologyResolutionState,
