@@ -243,3 +243,20 @@ fn cose_extension_accepts_full_range_unsigned_integer_labels() {
         .expect("full-range unsigned COSE label must be accepted");
     assert_eq!(decoded.to_cbor(), encoded);
 }
+
+#[test]
+fn cose_extension_accepts_full_range_negative_integer_labels() {
+    // label = -2^64, encoded canonically as CBOR major type 1 with argument u64::MAX.
+    let protected = [
+        0xa1, 0x3b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x20,
+    ];
+
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(&[0xd2, 0x84, 0x4b]);
+    encoded.extend_from_slice(&protected);
+    encoded.extend_from_slice(&[0xa0, 0xf6, 0x41, 0xaa]);
+
+    let decoded = Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+        .expect("full-range negative COSE label must be accepted");
+    assert_eq!(decoded.to_cbor(), encoded);
+}
