@@ -109,7 +109,8 @@ fn cose_key_rejects_wrong_curve() {
 #[test]
 fn cose_key_rejects_mismatched_algorithm() {
     let mut bytes = valid_key();
-    bytes[bytes.windows(2).position(|w| w == [0x03, 0x26]).unwrap() + 1] = 0x38;
+    let alg_pos = bytes.windows(2).position(|w| w == [0x03, 0x26]).unwrap();
+    bytes[alg_pos + 1] = 0x38;
     bytes.insert(
         bytes.windows(2).position(|w| w == [0x03, 0x38]).unwrap() + 2,
         0x22,
