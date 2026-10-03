@@ -211,11 +211,13 @@ impl ServiceManager {
         let unit = Self::normalize_name(service);
 
         let properties = observe_service_properties(&unit)?;
-        NixServiceObservedStateV1::parse_systemd_properties(&unit, &properties)
-            .map_err(|error| std::io::Error::other(format!(
-                "invalid governed systemd observation for '{}': {error}",
-                unit
-            )))
+        let (state, _capabilities) =
+            NixServiceObservedStateV1::parse_systemd_observation(&unit, &properties)
+                .map_err(|error| std::io::Error::other(format!(
+                    "invalid governed systemd observation for '{}': {error}",
+                    unit
+                )))?;
+        Ok(state)
     }
 
     /// Observe unit-file enablement evidence from the same exact
