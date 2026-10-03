@@ -163,6 +163,10 @@ jobs:
           integration_test_inventory=${{ steps.harness.outputs.integration_test_count }}
           fixture_fingerprint_status=${{ steps.fingerprint.outcome == 'success' && 'captured' || 'not-captured' }}
           fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
+          fixture_fingerprint_schema=blake3-256-symthaea-hdc-linear-code-v1
+          fixture_seed=0xC0DE
+          fixture_dimension=96
+          fixture_rank=8
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
