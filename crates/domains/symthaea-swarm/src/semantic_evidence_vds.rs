@@ -576,11 +576,31 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<Rfc9942VerifiedReceipt, Rfc9942VdpError> {
-        let head = match detached_payload {
-            Some(payload) => self.verify_inclusion_with_detached_payload(candidate_entry, payload)?,
-            None => self.verify_inclusion(candidate_entry)?,
+        let (head, signature_payload) = match (&self.payload, detached_payload) {
+            (Rfc9942ReceiptPayload::Attached(_), Some(_)) => {
+                return Err(Rfc9942VdpError::InvalidStructure);
+            }
+            (Rfc9942ReceiptPayload::Attached(_), None) => {
+                let head = self.verify_inclusion(candidate_entry)?;
+                (head, None)
+            }
+            (Rfc9942ReceiptPayload::Detached, supplied) => {
+                // Inclusion proof verification derives the root first. A
+                // caller-supplied detached payload, when present, must equal
+                // that derived root byte-for-byte before signature checking.
+                let head = self.vdp.validate_vds_id(self.vds_id)
+                    .and_then(|_| self.vdp.derive_inclusion_root(candidate_entry))?;
+                if let Some(payload) = supplied {
+                    if payload != head.root() {
+                        return Err(Rfc9942VdpError::NoMatchingProof);
+                    }
+                }
+                let root = head.root();
+                (head, Some(root))
+            }
         };
-        self.verify_es256(public_key, external_aad, detached_payload)?;
+
+        self.verify_es256(public_key, external_aad, signature_payload.as_ref().map(|root| root.as_slice()))?;
         Ok(self.verified_state(Rfc9942VerifiedProof::Inclusion {
             head,
             candidate_leaf: leaf_hash(candidate_entry),
@@ -1491,6 +1511,26 @@ impl Rfc9942Vdp {
         Err(Rfc9942VdpError::NoMatchingProof)
     }
 
+    /// Derive the Merkle root directly from the inclusion proof and candidate
+    /// entry. This is the RFC 9942 inclusion ordering primitive: the proof is
+    /// evaluated first, and the resulting root becomes the COSE payload.
+    pub fn derive_inclusion_root(
+        &self,
+        candidate_entry: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        if self.kind != Rfc9942ProofKind::Inclusion {
+            return Err(Rfc9942VdpError::WrongProofKind);
+        }
+        let vds = Rfc9162Sha256Vds;
+        for proof_bytes in &self.proofs {
+            let proof = Rfc9162InclusionProof::from_cbor(proof_bytes)?;
+            if let Some(root) = derive_rfc9162_inclusion_root(candidate_entry, &proof) {
+                return Ok(VdsTreeHead::new(proof.tree_size, root));
+            }
+        }
+        Err(Rfc9942VdpError::NoMatchingProof)
+    }
+
     pub fn verify_inclusion(
         &self,
         candidate_entry: &[u8],
@@ -2361,12 +2401,45 @@ fn inclusion_path(index: usize, leaves: &[Vec<u8>]) -> Vec<[u8; 32]> {
     }
 }
 
+fn derive_rfc9162_inclusion_root(
+    leaf: &[u8],
+    proof: &Rfc9162InclusionProof,
+) -> Option<[u8; 32]> {
+    if proof.tree_size == 0 || proof.leaf_index >= proof.tree_size {
+        return None;
+    }
+
+    let mut fn_ = proof.leaf_index;
+    let mut sn = proof.tree_size - 1;
+    let mut r = leaf_hash(leaf);
+
+    for p in &proof.inclusion_path {
+        if sn == 0 {
+            return None;
+        }
+        if (fn_ & 1) == 1 || fn_ == sn {
+            r = node_hash(p, &r);
+            if fn_ & 1 == 0 {
+                while fn_ & 1 == 0 && fn_ != 0 {
+                    fn_ >>= 1;
+                    sn >>= 1;
+                }
+            }
+        } else {
+            r = node_hash(&r, p);
+        }
+        fn_ >>= 1;
+        sn >>= 1;
+    }
+
+    (sn == 0).then_some(r)
+}
+
 fn verify_rfc9162_inclusion(
     leaf: &[u8],
     root: [u8; 32],
     proof: &Rfc9162InclusionProof,
 ) -> bool {
-    if proof.tree_size == 0 || proof.leaf_index >= proof.tree_size { return false; }
     let mut fn_ = proof.leaf_index;
     let mut sn = proof.tree_size - 1;
     let mut r = leaf_hash(leaf);
