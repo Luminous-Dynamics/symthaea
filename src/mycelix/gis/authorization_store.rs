@@ -1188,8 +1188,8 @@ fn validate_native_authority_pin_set(
         if lease.action_id != action.id
             || lease.action_digest != action.canonical_action_digest()
             || !matches!(
-                lease.state,
-                AuthorizationLeaseState::Prepared { ref attempt_id: id }
+                &lease.state,
+                AuthorizationLeaseState::Prepared { attempt_id: id }
                     if id == attempt_id
             )
         {
