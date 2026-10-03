@@ -319,8 +319,8 @@ fn cose_extension_accepts_full_range_integer_values() {
 
 #[test]
 fn rfc9942_semantic_state_cannot_confuse_valid_signature_with_wrong_entry() {
-    fn signed_receipt(candidate: &[u8]) -> Rfc9942ReceiptEnvelope {
-        let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
+    fn signed_receipt(candidate: &[u8], other_entry: &[u8]) -> Rfc9942ReceiptEnvelope {
+        let leaves = vec![candidate.to_vec(), other_entry.to_vec()];
         let vds = Rfc9162Sha256Vds;
         let head = vds.tree_head(&leaves);
         let proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
@@ -354,7 +354,7 @@ fn rfc9942_semantic_state_cannot_confuse_valid_signature_with_wrong_entry() {
         .unwrap()
     }
 
-    let receipt = signed_receipt(b"candidate");
+    let receipt = signed_receipt(b"candidate", b"other-entry");
     let key = rfc8392_public_key();
 
     // Signature verification alone proves only that the protected headers and
@@ -458,25 +458,58 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         out
     }
 
-    fn outer_wire(receipt: &Rfc9942ReceiptEnvelope, payload: &[u8], signature: &[u8]) -> Vec<u8> {
+    fn outer_wire(
+        receipt: &Rfc9942ReceiptEnvelope,
+        payload: &[u8],
+        signature: &[u8],
+        protect_receipts: bool,
+    ) -> Vec<u8> {
         let collection = Rfc9942ReceiptCollection::new(vec![receipt.clone()]).unwrap().to_cbor();
-        let protected = [0xa1, 0x01, 0x26]; // { alg: -7 }
+
+        fn cbor_bstr(bytes: &[u8]) -> Vec<u8> {
+            assert!(bytes.len() < 256);
+            let mut out = if bytes.len() < 24 {
+                vec![0x40 | bytes.len() as u8]
+            } else {
+                vec![0x58, bytes.len() as u8]
+            };
+            out.extend_from_slice(bytes);
+            out
+        }
+
+        let mut protected_map = Vec::new();
+        protected_map.push(if protect_receipts { 0xa2 } else { 0xa1 });
+        protected_map.extend_from_slice(&[0x01, 0x26]); // { alg: -7 }
+        if protect_receipts {
+            protected_map.extend_from_slice(&[0x19, 0x01, 0x8a]);
+            protected_map.extend_from_slice(&collection);
+        }
+
         let mut unprotected = Vec::new();
-        unprotected.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8a]);
-        unprotected.extend_from_slice(&collection);
+        if protect_receipts {
+            unprotected.push(0xa0);
+        } else {
+            unprotected.push(0xa1);
+            unprotected.extend_from_slice(&[0x19, 0x01, 0x8a]);
+            unprotected.extend_from_slice(&collection);
+        }
 
         let mut out = Vec::new();
-        out.extend_from_slice(&[0xd2, 0x84, 0x43]);
-        out.extend_from_slice(&protected);
+        out.extend_from_slice(&[0xd2, 0x84]);
+        out.extend_from_slice(&cbor_bstr(&protected_map));
         out.extend_from_slice(&unprotected);
-        out.extend_from_slice(&bstr(payload));
+        out.extend_from_slice(&cbor_bstr(payload));
         out.extend_from_slice(&[0x58, signature.len() as u8]);
         out.extend_from_slice(signature);
         out
     }
 
-    fn signed_outer(receipt: &Rfc9942ReceiptEnvelope, payload: &[u8]) -> Rfc9942SignatureWithReceipts {
-        let unsigned_wire = outer_wire(receipt, payload, &[0u8; 64]);
+    fn signed_outer(
+        receipt: &Rfc9942ReceiptEnvelope,
+        payload: &[u8],
+        protect_receipts: bool,
+    ) -> Rfc9942SignatureWithReceipts {
+        let unsigned_wire = outer_wire(receipt, payload, &[0u8; 64], protect_receipts);
         let unsigned = Rfc9942SignatureWithReceipts::from_cbor(&unsigned_wire).unwrap();
         let rng = SystemRandom::new();
         let signing_key = EcdsaKeyPair::from_private_key_and_public_key(
@@ -488,7 +521,13 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         .unwrap();
         let tbs = unsigned.signature1_tbs(&[], None).unwrap();
         let signature = signing_key.sign(&rng, &tbs).unwrap().as_ref().to_vec();
-        Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(receipt, payload, &signature)).unwrap()
+        Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(
+            receipt,
+            payload,
+            &signature,
+            protect_receipts,
+        ))
+        .unwrap()
     }
 
     fn signed_receipt(candidate: &[u8]) -> Rfc9942ReceiptEnvelope {
@@ -560,7 +599,7 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         ).unwrap()
     };
 
-    let detached_outer = signed_outer(&detached_receipt, b"candidate");
+    let detached_outer = signed_outer(&detached_receipt, b"candidate", false);
     let detached_state = detached_outer
         .verify_es256_inclusion_receipt_state(0, &key, &key, &[], &[], None)
         .unwrap();
@@ -569,7 +608,7 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         2
     );
 
-    let valid_outer = signed_outer(&receipt, b"candidate");
+    let valid_outer = signed_outer(&receipt, b"candidate", false);
     let state = valid_outer
         .verify_es256_inclusion_receipt_state(
             0, &key, &key, &[], &[], None,
@@ -599,6 +638,57 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
             0, &key, &key, &[], &[], None,
         ),
         Err(Rfc9942VdpError::NoMatchingProof)
+    );
+
+    // The same proof must also work when the RFC 9942 receipts parameter is
+    // carried in the protected header. This placement is covered by the outer
+    // COSE Sig_structure, so replacing it invalidates the outer signature.
+    let valid_protected = signed_outer(&receipt, b"candidate", true);
+    let protected_state = valid_protected
+        .verify_es256_inclusion_receipt_state(
+            0, &key, &key, &[], &[], None,
+        )
+        .unwrap();
+    assert_eq!(
+        protected_state.receipt_placement(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Protected
+    );
+
+    let alternate_receipt = signed_receipt(b"candidate", b"alternate-tree-entry");
+    let replaced_protected = Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(
+        &alternate_receipt,
+        b"candidate",
+        valid_protected.signature(),
+        true,
+    ))
+    .unwrap();
+    assert_eq!(
+        replaced_protected.verify_es256_inclusion_receipt_state(
+            0, &key, &key, &[], &[], None,
+        ),
+        Err(Rfc9942VdpError::InvalidEs256Signature)
+    );
+
+    // Selection semantics are explicit and deterministic: there is no implicit
+    // fallback to a different receipt, and absence is a distinct failure.
+    assert_eq!(
+        valid_outer.verify_es256_inclusion_receipt_state(
+            1, &key, &key, &[], &[], None,
+        ),
+        Err(Rfc9942VdpError::ReceiptIndexOutOfBounds)
+    );
+    let without_receipts = Rfc9942SignatureWithReceipts::new(
+        symthaea_swarm::semantic_evidence_vds::Rfc9942SignaturePayload::Attached(
+            b"candidate".to_vec(),
+        ),
+        vec![0u8; 64],
+        None,
+    );
+    assert_eq!(
+        without_receipts.verify_es256_inclusion_receipt_state(
+            0, &key, &key, &[], &[], None,
+        ),
+        Err(Rfc9942VdpError::ReceiptsMissing)
     );
 }
 
