@@ -1441,31 +1441,100 @@ fn validate_native_authority_pin_set(
     /// Cross the provider-entry boundary only for the exact immutable record
     /// created before dispatch. All identity/effect fields are checked again,
     /// preventing a stale executor from substituting a different sink or key.
+    fn close_pre_entry_status_failure(
+        &self,
+        record: &DurableDispatchRecord,
+    ) -> Result<(), AuthorizationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        let changed = tx.execute(
+            "UPDATE authorization_dispatches
+             SET state='not_entered'
+             WHERE authorization_instance=?1 AND attempt_id=?2
+               AND boundary_id=?3 AND relying_party_id=?4
+               AND state='dispatch_pending'",
+            params![
+                record.authorization_instance.as_str(),
+                record.attempt_id.as_str(),
+                record.boundary_id.as_str(),
+                self.relying_party_id.as_str(),
+            ],
+        )?;
+        if changed != 1 {
+            return Err(AuthorizationConsumptionError::IndeterminateRequiresReconciliation.into());
+        }
+
+        let changed = tx.execute(
+            "UPDATE authorization_leases
+             SET state='ready',attempt_id=NULL,boundary_id=NULL
+             WHERE authorization_instance=?1 AND state='dispatch_pending'
+               AND attempt_id=?2 AND boundary_id=?3",
+            params![
+                record.authorization_instance.as_str(),
+                record.attempt_id.as_str(),
+                record.boundary_id.as_str(),
+            ],
+        )?;
+        if changed != 1 {
+            return Err(AuthorizationConsumptionError::IndeterminateRequiresReconciliation.into());
+        }
+
+        let authority_epoch: i64 = tx.query_row(
+            "SELECT authority_epoch FROM authorization_leases
+             WHERE authorization_instance=?1",
+            params![record.authorization_instance.as_str()],
+            |row| row.get(0),
+        )?;
+        tx.execute(
+            "INSERT OR IGNORE INTO authorization_recovery_markers
+             (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
+             VALUES (?1,?2,?3,?4,?5,'not_entered_status')",
+            params![
+                record.authorization_instance.as_str(),
+                record.attempt_id.as_str(),
+                record.boundary_id.as_str(),
+                record.action_digest.as_str(),
+                authority_epoch,
+            ],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn mark_invoked_bound<V: ProviderStatusVerifier>(
         &self,
         record: &DurableDispatchRecord,
         status_verifier: &V,
     ) -> Result<(), AuthorizationStoreError> {
-        let pre_entry_status = status_verifier
-            .verify_current_status(
-                ProviderStatusVerificationPurpose::PreEntry,
-                &record.native_issuer,
-                &record.native_authority_namespace,
-                &record.native_replay_identity,
-                &record.status_identifier,
-                &record.action_digest,
-                &record.target_identity,
-                &record.audience,
-                &record.adapter,
-                Some(&record.status_source_digest),
-            )
-            .map_err(|_| AuthorizationConsumptionError::ProviderStatusVerificationRequired)?;
-        self.validate_provider_status_evidence(
-            &pre_entry_status,
+        let pre_entry_status = match status_verifier.verify_current_status(
+            ProviderStatusVerificationPurpose::PreEntry,
+            &record.native_issuer,
+            &record.native_authority_namespace,
+            &record.native_replay_identity,
+            &record.status_identifier,
+            &record.action_digest,
+            &record.target_identity,
+            &record.audience,
+            &record.adapter,
             Some(&record.status_source_digest),
-            true,
-        )?;
-        if pre_entry_status.status_identifier != record.status_identifier {
+        ) {
+            Ok(status) => status,
+            Err(_) => {
+                self.close_pre_entry_status_failure(record)?;
+                return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+            }
+        };
+        if self
+            .validate_provider_status_evidence(
+                &pre_entry_status,
+                Some(&record.status_source_digest),
+                true,
+            )
+            .is_err()
+            || pre_entry_status.status_identifier != record.status_identifier
+        {
+            self.close_pre_entry_status_failure(record)?;
             return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
         }
 
@@ -4038,7 +4107,7 @@ mod tests {
                 &EpistemicAction::new("missing-action","intervention",super::super::ActionRisk::Critical),
                 &super::super::ActionEffectBinding::new("target-missing","prod","adapter"),
                 "boundary","operation","issuer.unpinned","native-auth",
-                "status:missing","&TestProviderStatusVerifier"
+                "status:missing",&TestProviderStatusVerifier
             ),
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidNativeReplayProvenance
@@ -4311,6 +4380,70 @@ mod tests {
                 AuthorizationConsumptionError::ActionAlreadyInFlight
             ))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn pre_entry_status_failure_closes_attempt_without_provider_entry() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-failure-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-status-failure"
+        ).unwrap();
+        store.pin_native_authority_namespace("issuer.status","issuer.status/authority/v1").unwrap();
+
+        let effect=super::super::ActionEffectBinding::new("target-status-failure","prod","adapter");
+        let action=EpistemicAction::new(
+            "status-failure","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"status-failure".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "status-failure",action.id.clone(),digest,"support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-status-failure","boundary-status"
+        ).unwrap();
+        let record=store.mark_dispatch_pending_bound_from_pinned_native_authority(
+            "status-failure","attempt-status-failure",&action,&effect,"boundary-status",
+            "operation:status-failure","issuer.status","native-status-failure",
+            "status:native-status-failure",&TestProviderStatusVerifier
+        ).unwrap();
+
+        assert!(matches!(
+            store.mark_invoked_bound(&record,&PreEntryStatusFailsVerifier),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderStatusVerificationRequired
+            ))
+        ));
+
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"not_entered");
+
+        let marker:String=store.connection().unwrap().query_row(
+            "SELECT marker FROM authorization_recovery_markers
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(marker,"not_entered_status");
         let _=std::fs::remove_file(path);
     }
 
