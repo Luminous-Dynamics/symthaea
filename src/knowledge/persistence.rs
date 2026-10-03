@@ -401,7 +401,20 @@ fn digest_f64(hasher: &mut blake3::Hasher, value: f64) {
     digest_u64(hasher, value.to_bits());
 }
 
+/// Frozen representation used by the version-1 snapshot digest. Do not switch this
+/// to the storage wire code without versioning the snapshot digest domain.
 fn provenance_kind_tag(kind: ProvenanceRelationKind) -> &'static str {
+    match kind {
+        ProvenanceRelationKind::DerivedFrom => "DerivedFrom",
+        ProvenanceRelationKind::RevisedFrom => "RevisedFrom",
+        ProvenanceRelationKind::Supersedes => "Supersedes",
+        ProvenanceRelationKind::Contradicts => "Contradicts",
+        ProvenanceRelationKind::Corroborates => "Corroborates",
+        ProvenanceRelationKind::RepresentationOf => "RepresentationOf",
+    }
+}
+
+fn provenance_kind_storage_code(kind: ProvenanceRelationKind) -> &'static str {
     kind.stable_code()
 }
 
@@ -702,7 +715,7 @@ impl KnowledgePersistence {
                     rusqlite::params![
                         relation.source_memory_id,
                         relation.target_memory_id,
-                        relation.kind.stable_code(),
+                        provenance_kind_storage_code(relation.kind),
                         relation.created_at
                     ],
                 )
@@ -1648,7 +1661,7 @@ impl KnowledgePersistence {
                 "UPDATE knowledge_provenance_relations
                  SET kind = ?1
                  WHERE rowid = ?2",
-                rusqlite::params![kind.stable_code(), rowid],
+                rusqlite::params![provenance_kind_storage_code(kind), rowid],
             )
             .map_err(|e| format!("Provenance kind normalization update: {e}"))?;
         }
@@ -2512,6 +2525,56 @@ mod tests {
 
         let loaded = p.load_provenance_relations().unwrap();
         assert_eq!(loaded[0].kind, ProvenanceRelationKind::DerivedFrom);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_provenance_storage_normalization_preserves_v1_snapshot_digest() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_provenance_digest_compatibility_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let facts = [FactRecord {
+            memory_id: "digest-compatible".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x19; BinaryHV::BYTES],
+            source_text: "digest compatible".into(),
+            confidence: 0.6,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }];
+        let relations = [ProvenanceRelationRecord {
+            source_memory_id: "digest-compatible".into(),
+            target_memory_id: "external-source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "event:1".into(),
+        }];
+
+        p.save_snapshot(&facts, &relations, &[], &[]).unwrap();
+        let committed = p.latest_snapshot_receipt().unwrap().unwrap();
+        let before = p.load_snapshot().unwrap().canonical_digest_hex();
+        assert_eq!(before, committed.canonical_digest_hex);
+
+        let conn = p.open_connection().unwrap();
+        let stored_kind: String = conn
+            .query_row(
+                "SELECT kind FROM knowledge_provenance_relations
+                 WHERE source_memory_id = 'digest-compatible'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored_kind, "derived_from");
+
+        let after = p.load_snapshot().unwrap().canonical_digest_hex();
+        assert_eq!(after, committed.canonical_digest_hex);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
