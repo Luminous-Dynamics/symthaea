@@ -219,6 +219,11 @@ pub fn generate_and_rank_sonata_return_with_model(
             max_melodic_leap_semitones: 24,
             check_strong_beat_consonance: false,
             check_parallel_perfect_motion: false,
+            // A local intervention should not become ineligible because the
+            // baseline score already violates a whole-piece ending invariant
+            // outside its target region. Keep final-tonic validation when the
+            // intervention actually targets the terminal recapitulation region.
+            require_final_tonic: target_kind == SonataSectionKind::RecapitulationSecondary,
             ..ScoreValidationConfig::default()
         };
         let theory_validation = validate_score(&score, &validation_config);
