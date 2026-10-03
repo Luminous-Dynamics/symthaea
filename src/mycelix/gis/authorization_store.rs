@@ -317,6 +317,40 @@ pub struct ProviderVerifierConfiguration {
     pub evidence_profile_digest: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderAdapterConfiguration {
+    /// Stable adapter identity selected by the relying party.
+    pub adapter_id: String,
+    /// Exact adapter revision selected by the relying party.
+    pub adapter_revision: String,
+    /// Digest of the exact adapter implementation/configuration.
+    pub implementation_digest: String,
+}
+
+impl ProviderAdapterConfiguration {
+    pub fn new(
+        adapter_id: impl Into<String>,
+        adapter_revision: impl Into<String>,
+        implementation_digest: impl Into<String>,
+    ) -> Self {
+        Self {
+            adapter_id: adapter_id.into(),
+            adapter_revision: adapter_revision.into(),
+            implementation_digest: implementation_digest.into(),
+        }
+    }
+
+    fn validate(&self) -> Result<(), AuthorizationStoreError> {
+        if self.adapter_id.is_empty()
+            || self.adapter_revision.is_empty()
+            || self.implementation_digest.is_empty()
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        Ok(())
+    }
+}
+
 impl ProviderVerifierConfiguration {
     fn validate(&self) -> Result<(), AuthorizationStoreError> {
         if self.relying_party_id.is_empty()
@@ -352,6 +386,8 @@ pub struct ProviderTerminalEvidence {
     pub target_identity: String,
     pub audience: String,
     pub adapter: String,
+    pub adapter_revision: String,
+    pub adapter_implementation_digest: String,
     pub boundary_id: String,
     /// Commitment of the exact durable attempt whose effect is being evidenced.
     pub attempt_binding_digest: String,
@@ -415,6 +451,8 @@ pub struct DurableDispatchRecord {
     pub target_identity: String,
     pub audience: String,
     pub adapter: String,
+    pub adapter_revision: String,
+    pub adapter_implementation_digest: String,
     /// Stable boundary identity. It scopes attempt ownership without entering
     /// the shared action key, so separate boundary instances cannot claim one
     /// another's dispatch records.
@@ -442,6 +480,8 @@ fn compute_attempt_binding_digest(
     target_identity: &str,
     audience: &str,
     adapter: &str,
+    adapter_revision: &str,
+    adapter_implementation_digest: &str,
     status_identifier: &str,
     status_source_digest: &str,
     status_observed_at: &str,
@@ -471,6 +511,8 @@ fn compute_attempt_binding_digest(
         target_identity,
         audience,
         adapter,
+        adapter_revision,
+        adapter_implementation_digest,
         status_identifier,
         status_source_digest,
         status_observed_at,
@@ -499,6 +541,7 @@ impl DurableDispatchRecord {
         action_digest: impl Into<String>,
         provider_idempotency_key: impl Into<String>,
         effect: &super::ActionEffectBinding,
+        adapter_configuration: &ProviderAdapterConfiguration,
         boundary_id: impl Into<String>,
         status: &ProviderStatusEvidence,
         native_replay_derivation_digest: &str,
@@ -538,6 +581,8 @@ impl DurableDispatchRecord {
             &effect.target_identity,
             &effect.audience,
             &effect.adapter,
+            &adapter_configuration.adapter_revision,
+            &adapter_configuration.implementation_digest,
             &status.status_identifier,
             &status.status_source_digest,
             &status.status_observed_at,
@@ -567,6 +612,8 @@ impl DurableDispatchRecord {
             target_identity: effect.target_identity.clone(),
             audience: effect.audience.clone(),
             adapter: effect.adapter.clone(),
+            adapter_revision: adapter_configuration.adapter_revision.clone(),
+            adapter_implementation_digest: adapter_configuration.implementation_digest.clone(),
             boundary_id,
             attempt_binding_digest,
         }
