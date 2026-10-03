@@ -51,6 +51,7 @@ pub struct TemporalFusionPolicy {
     pub expected_topology_digest: String,
     pub expected_topology_epoch: u64,
     pub expected_attestation_issuer_id: String,
+    pub expected_verifier_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -110,6 +111,7 @@ impl TemporalFusionGate {
             || policy.expected_topology_digest.trim().is_empty()
             || policy.expected_topology_epoch == 0
             || policy.expected_attestation_issuer_id.trim().is_empty()
+            || policy.expected_verifier_id.trim().is_empty()
         {
             return Err("invalid temporal fusion policy");
         }
@@ -223,6 +225,15 @@ impl TemporalFusionGate {
                 pair.current.timestamp_ms,
             ) {
                 issues.push(TemporalFusionIssue::TopologyAttestation(issue));
+                continue;
+            }
+
+            if pair.independence.topology_attestation.verification_result.verifier_id
+                != self.policy.expected_verifier_id
+            {
+                issues.push(TemporalFusionIssue::TopologyAttestation(
+                    SensorTopologyAttestationIssue::VerifierIdentityMismatch,
+                ));
                 continue;
             }
 
@@ -424,6 +435,7 @@ mod tests {
             expected_topology_digest: "topology-v1".into(),
             expected_topology_epoch: 1,
             expected_attestation_issuer_id: "mycelix-topology-authority".into(),
+            expected_verifier_id: "mycelix-topology-verifier".into(),
         })
         .unwrap()
     }
