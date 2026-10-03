@@ -2917,7 +2917,8 @@ fn validate_native_authority_pin_set(
                 r.get::<_,Option<String>>(20)?, r.get::<_,Option<String>>(21)?,
                 r.get::<_,Option<String>>(22)?, r.get::<_,Option<String>>(23)?,
                 r.get::<_,Option<String>>(24)?, r.get::<_,Option<String>>(25)?,
-                r.get::<_,String>(25)?,
+                r.get::<_,Option<String>>(26)?, r.get::<_,Option<String>>(27)?,
+                r.get::<_,String>(28)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
 
