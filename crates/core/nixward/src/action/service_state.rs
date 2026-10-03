@@ -655,6 +655,27 @@ CanReload=yes
     }
 
     #[test]
+    fn canonical_identity_requires_id_membership_in_names() {
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_observation(
+                "nginx",
+                "Id=nginx.service
+Names=other.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::IdentityMismatch
+        );
+    }
+
+    #[test]
     fn alias_identity_rejects_unrelated_name_set() {
         assert_eq!(
             NixServiceObservedStateV1::parse_systemd_observation(
