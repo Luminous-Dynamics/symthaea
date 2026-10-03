@@ -1930,6 +1930,8 @@ fn validate_native_authority_pin_set(
             native_authorization_id,
         )
         .map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
+        let adapter_configuration =
+            self.pinned_provider_adapter_configuration(&expected_effect.adapter)?;
         let pinned_status_source_digest =
             self.pinned_provider_status_source_digest()?;
         let pinned_status_verifier_configuration =
@@ -1978,6 +1980,7 @@ fn validate_native_authority_pin_set(
             issuer,
             &replay,
             &status,
+            &adapter_configuration,
         )
     }
 
@@ -2022,6 +2025,7 @@ fn validate_native_authority_pin_set(
         native_issuer: &str,
         native_replay_provenance: &super::NativeReplayDerivation,
         status: &ProviderStatusEvidence,
+        adapter_configuration: &ProviderAdapterConfiguration,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         if action.effect_binding.as_ref() != Some(expected_effect)
             || boundary_id.is_empty()
@@ -2172,6 +2176,7 @@ fn validate_native_authority_pin_set(
                 )
                 .map_err(|_| AuthorizationConsumptionError::InvalidBinding)?,
             expected_effect,
+            adapter_configuration,
             boundary_id,
             status,
             &native_replay_provenance.derivation_digest,
