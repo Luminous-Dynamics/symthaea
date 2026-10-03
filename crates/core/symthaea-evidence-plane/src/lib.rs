@@ -1909,7 +1909,7 @@ mod tests {
         lineage.nix_identity = None;
 
         let json = serde_json::to_string(&lineage).expect("serialize lineage");
-        assert!(json.contains(""nix_identity":null"));
+        assert!(json.contains("\"nix_identity\":null"));
 
         let restored: ExecutionLineageV1 =
             serde_json::from_str(&json).expect("deserialize lineage");
