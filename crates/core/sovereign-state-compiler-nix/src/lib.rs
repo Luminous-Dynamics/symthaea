@@ -62,6 +62,54 @@ impl NixActivationMode {
             other => Err(NixOSAdapterError::InvalidRebuildMode(other.into())),
         }
     }
+
+    pub fn required_capabilities(self) -> BTreeSet<Capability> {
+        match self {
+            Self::Switch | Self::Boot => [
+                Capability::ConfigureSystem,
+                Capability::UpdateSystem,
+                Capability::ModifyBootChain,
+            ]
+            .into_iter()
+            .collect(),
+            Self::Test => [
+                Capability::ConfigureSystem,
+                Capability::UpdateSystem,
+                Capability::ObserveHardware,
+            ]
+            .into_iter()
+            .collect(),
+            Self::DryActivate => [
+                Capability::ConfigureSystem,
+                Capability::UpdateSystem,
+            ]
+            .into_iter()
+            .collect(),
+            Self::Rollback { .. } => [Capability::Rollback].into_iter().collect(),
+        }
+    }
+
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::Switch => {
+                "activate the NixOS configuration and make its generation current"
+            }
+            Self::Test => {
+                "temporarily activate the NixOS configuration without changing the boot default"
+            }
+            Self::Boot => {
+                "build the NixOS configuration and select it for the next boot without activating now"
+            }
+            Self::DryActivate => {
+                "evaluate NixOS activation changes without activating the configuration"
+            }
+            Self::Rollback { .. } => "rollback to an explicitly identified NixOS generation",
+        }
+    }
+
+    pub fn mutates_target_state(self) -> bool {
+        !matches!(self, Self::DryActivate)
+    }
 }
 
 /// A conservative NixOS capability profile.
@@ -332,52 +380,12 @@ impl TargetAdapter for NixOSTargetAdapter {
         );
 
         match activation_mode {
-            Some(NixActivationMode::Switch)
-            | Some(NixActivationMode::Test)
-            | Some(NixActivationMode::Boot)
-            | Some(NixActivationMode::DryActivate) => {
-                let (required, description) = match activation_mode {
-                    Some(NixActivationMode::Switch) => (
-                        [
-                            Capability::ConfigureSystem,
-                            Capability::UpdateSystem,
-                            Capability::ModifyBootChain,
-                        ]
-                        .into_iter()
-                        .collect::<BTreeSet<_>>(),
-                        "activate the NixOS configuration and make its generation current",
-                    ),
-                    Some(NixActivationMode::Test) => (
-                        [
-                            Capability::ConfigureSystem,
-                            Capability::UpdateSystem,
-                            Capability::ObserveHardware,
-                        ]
-                        .into_iter()
-                        .collect::<BTreeSet<_>>(),
-                        "temporarily activate the NixOS configuration without changing the boot default",
-                    ),
-                    Some(NixActivationMode::Boot) => (
-                        [
-                            Capability::ConfigureSystem,
-                            Capability::UpdateSystem,
-                            Capability::ModifyBootChain,
-                        ]
-                        .into_iter()
-                        .collect::<BTreeSet<_>>(),
-                        "build the NixOS configuration and select it for the next boot without activating now",
-                    ),
-                    Some(NixActivationMode::DryActivate) => (
-                        [Capability::ConfigureSystem, Capability::UpdateSystem]
-                            .into_iter()
-                            .collect::<BTreeSet<_>>(),
-                        "evaluate NixOS activation changes without activating the configuration",
-                    ),
-                    Some(NixActivationMode::Rollback { .. }) | None => {
-                        unreachable!("matched non-rollback activation mode")
-                    }
-                };
-
+            Some(
+                mode @ (NixActivationMode::Switch
+                | NixActivationMode::Test
+                | NixActivationMode::Boot
+                | NixActivationMode::DryActivate),
+            ) => {
                 if !intent.artifacts.is_empty() {
                     Self::push_step(
                         &mut steps,
@@ -390,8 +398,8 @@ impl TargetAdapter for NixOSTargetAdapter {
                 Self::push_step(
                     &mut steps,
                     PlanStepKind::ApplyDesiredState,
-                    required,
-                    description,
+                    mode.required_capabilities(),
+                    mode.description(),
                 );
             }
             Some(NixActivationMode::Rollback { generation }) => {
@@ -399,7 +407,7 @@ impl TargetAdapter for NixOSTargetAdapter {
                     &mut steps,
                     PlanStepKind::Rollback,
                     [Capability::Rollback],
-                    format!("roll back to NixOS generation {generation}"),
+                    format!("{} {generation}", NixActivationMode::Rollback { generation }.description()),
                 );
             }
             None => {}
@@ -461,15 +469,13 @@ impl TargetAdapter for NixOSTargetAdapter {
 
         let has_mutation = steps.iter().any(|step| {
             match step.kind {
-                PlanStepKind::StageArtifacts => {
-                    !matches!(activation_mode, Some(NixActivationMode::DryActivate))
-                }
-                PlanStepKind::ApplyDesiredState => {
-                    !matches!(activation_mode, Some(NixActivationMode::DryActivate))
-                        || !install.is_empty()
-                        || !remove.is_empty()
-                        || home_manager
-                }
+                PlanStepKind::StageArtifacts => activation_mode
+                    .is_none_or(|mode| mode.mutates_target_state()),
+                PlanStepKind::ApplyDesiredState => activation_mode
+                    .is_none_or(|mode| mode.mutates_target_state())
+                    || !install.is_empty()
+                    || !remove.is_empty()
+                    || home_manager,
                 PlanStepKind::Reboot | PlanStepKind::Rollback => true,
                 _ => false,
             }
@@ -870,6 +876,23 @@ mod tests {
         let plan = adapter().compile(&intent).expect("compile");
         assert!(!plan.rollback.allowed);
         assert_eq!(plan.rollback.max_attempts, 0);
+    }
+
+    #[test]
+    fn activation_mode_owns_its_semantics() {
+        assert_eq!(
+            NixActivationMode::Switch.required_capabilities(),
+            NixActivationMode::Boot.required_capabilities()
+        );
+        assert_ne!(
+            NixActivationMode::Switch.description(),
+            NixActivationMode::Boot.description()
+        );
+        assert!(NixActivationMode::Switch.mutates_target_state());
+        assert!(!NixActivationMode::DryActivate.mutates_target_state());
+        assert!(NixActivationMode::Rollback { generation: 42 }
+            .description()
+            .contains("explicitly identified"));
     }
 
     #[test]
