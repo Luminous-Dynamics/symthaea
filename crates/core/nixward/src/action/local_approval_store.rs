@@ -197,7 +197,7 @@ impl LocalApprovalRequestStoreV1 {
             record.projection_digest.clone(),
             verified_peer,
             evaluation,
-        )?
+        )
     }
 
     pub fn pending_count(&self) -> Result<usize, LocalApprovalRequestStoreErrorV1> {
