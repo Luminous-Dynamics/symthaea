@@ -375,6 +375,79 @@ fn serde_rejects_duplicate_map_keys_before_canonicalization() {
     assert!(serde_json::from_str::<ExecutionLineageV1>(text).is_err());
 }
 
+
+#[test]
+fn serde_reordering_does_not_change_lineage_identity() {
+    let first = r#"{
+        "source_repository":"luminous-dynamics/symthaea",
+        "source_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "repository_source_snapshot_id":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "lock_digests":{
+            "Cargo.toml":"sha256:8899aabbccddeeff",
+            "Cargo.lock":"sha256:0011223344556677"
+        },
+        "toolchain_versions":{
+            "cargo":"1.96.0",
+            "rustc":"1.96.0"
+        },
+        "host_triple":"x86_64-unknown-linux-gnu",
+        "target_triple":"x86_64-unknown-linux-gnu",
+        "nix_identity":"nix:fixture",
+        "feature_flags":["research","default"],
+        "cwd":"/workspace",
+        "argv":["cargo","test"],
+        "allowed_env":{
+            "RUSTFLAGS":"-Copt-level=3",
+            "RUST_BACKTRACE":"0"
+        },
+        "immutable_input_digests":{
+            "z":"blake3:8899aabbccddeeff",
+            "a":"blake3:0011223344556677"
+        }
+    }"#;
+
+    let second = r#"{
+        "immutable_input_digests":{
+            "a":"blake3:0011223344556677",
+            "z":"blake3:8899aabbccddeeff"
+        },
+        "argv":["cargo","test"],
+        "cwd":"/workspace",
+        "feature_flags":["default","research"],
+        "nix_identity":"nix:fixture",
+        "target_triple":"x86_64-unknown-linux-gnu",
+        "host_triple":"x86_64-unknown-linux-gnu",
+        "toolchain_versions":{
+            "rustc":"1.96.0",
+            "cargo":"1.96.0"
+        },
+        "lock_digests":{
+            "Cargo.lock":"sha256:0011223344556677",
+            "Cargo.toml":"sha256:8899aabbccddeeff"
+        },
+        "repository_source_snapshot_id":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_repository":"luminous-dynamics/symthaea",
+        "allowed_env":{
+            "RUST_BACKTRACE":"0",
+            "RUSTFLAGS":"-Copt-level=3"
+        }
+    }"#;
+
+    let first: ExecutionLineageV1 = serde_json::from_str(first).unwrap();
+    let second: ExecutionLineageV1 = serde_json::from_str(second).unwrap();
+
+    assert_eq!(first, second);
+    assert_eq!(first.digest(), second.digest());
+    assert_eq!(first.workload_digest().unwrap(), second.workload_digest().unwrap());
+    assert_eq!(
+        first.environment_digest().unwrap(),
+        second.environment_digest().unwrap()
+    );
+}
+
 #[test]
 fn serde_rejects_duplicate_keys_in_every_named_map_family() {
     let cases = [
