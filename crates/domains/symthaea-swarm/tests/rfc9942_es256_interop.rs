@@ -56,6 +56,20 @@ fn sec1_public_key() -> [u8; 65] {
     key
 }
 
+fn rfc8392_detached_signed_cwt() -> Vec<u8> {
+    const PAYLOAD_START: usize = 29;
+    const PAYLOAD_END: usize = 109;
+    const SIGNATURE_START: usize = 111;
+
+    let mut detached = Vec::with_capacity(
+        RFC8392_SIGNED_CWT.len() - (PAYLOAD_END - PAYLOAD_START) - 1,
+    );
+    detached.extend_from_slice(&RFC8392_SIGNED_CWT[..PAYLOAD_START]);
+    detached.push(0xf6);
+    detached.extend_from_slice(&RFC8392_SIGNED_CWT[SIGNATURE_START..]);
+    detached
+}
+
 #[test]
 fn rfc8392_es256_known_answer_verifies() {
     assert_eq!(RFC8392_SIGNED_CWT.len(), 175, "RFC 8392 Appendix A.3 wire fixture length changed");
@@ -106,5 +120,54 @@ fn rfc8392_es256_known_answer_binds_protected_algorithm() {
     assert_eq!(
         message.verify_es256(&sec1_public_key(), &[], None),
         Err(Rfc9942VdpError::UnsupportedSignatureAlgorithm(-8))
+    );
+}
+
+#[test]
+fn rfc8392_es256_known_answer_detached_payload_requires_and_binds_external_bytes() {
+    const PAYLOAD_START: usize = 29;
+    const PAYLOAD_END: usize = 109;
+
+    let encoded = rfc8392_detached_signed_cwt();
+    assert_eq!(encoded.len(), 94);
+
+    let message = Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+        .expect("RFC 8392 detached variant must parse");
+    assert_eq!(message.payload(), &Rfc9942SignaturePayload::Detached);
+
+    assert_eq!(
+        message.verify_es256(&sec1_public_key(), &[], None),
+        Err(Rfc9942VdpError::DetachedPayloadRequired)
+    );
+
+    message
+        .verify_es256(
+            &sec1_public_key(),
+            &[],
+            Some(&RFC8392_SIGNED_CWT[PAYLOAD_START..PAYLOAD_END]),
+        )
+        .expect("RFC 8392 signature must verify with its externally supplied payload");
+
+    assert_eq!(
+        message.verify_es256(&sec1_public_key(), &[], Some(&[0x00; 80])),
+        Err(Rfc9942VdpError::InvalidEs256Signature)
+    );
+}
+
+#[test]
+fn rfc8392_es256_known_answer_rejects_external_payload_for_attached_content() {
+    const PAYLOAD_START: usize = 29;
+    const PAYLOAD_END: usize = 109;
+
+    let message = Rfc9942SignatureWithReceipts::from_cbor(RFC8392_SIGNED_CWT)
+        .expect("RFC 8392 signed CWT must parse");
+
+    assert_eq!(
+        message.verify_es256(
+            &sec1_public_key(),
+            &[],
+            Some(&RFC8392_SIGNED_CWT[PAYLOAD_START..PAYLOAD_END]),
+        ),
+        Err(Rfc9942VdpError::InvalidStructure)
     );
 }
