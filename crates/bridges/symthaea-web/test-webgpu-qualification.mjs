@@ -37,6 +37,7 @@ const SCREENSHOT_DIR = path.resolve(
   process.env.WEBGPU_SCREENSHOTS || path.join(ROOT, 'webgpu-qualification-screenshots'),
 );
 const CHROMIUM = process.env.CHROMIUM_PATH || execFileSync('which', ['chromium'], { encoding: 'utf8' }).trim();
+const HEADLESS = process.env.WEBGPU_HEADLESS === 'false' ? false : 'new';
 const MODES = (process.env.WEBGPU_MODES || 'webgpu-swiftshader,fallback')
   .split(',')
   .map(value => value.trim())
@@ -294,6 +295,12 @@ async function runMode(mode) {
       '--enable-unsafe-webgpu',
       '--use-gpu-in-tests',
       '--enable-accelerated-2d-canvas',
+      '--disable-dev-shm-usage',
+      '--enable-features=Vulkan',
+      '--use-angle=vulkan',
+      '--use-vulkan=swiftshader',
+      '--use-webgpu-adapter=swiftshader',
+      '--disable-vulkan-surface',
     );
     if (swiftShaderMode) {
       args.push(
@@ -311,7 +318,7 @@ async function runMode(mode) {
 
   const browser = await puppeteer.launch({
     executablePath: CHROMIUM,
-    headless: 'new',
+    headless: HEADLESS,
     args,
   });
 
