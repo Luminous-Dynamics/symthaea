@@ -311,6 +311,7 @@ The neutral disposition vocabulary is deliberately small:
 - **SelectedForNextActivation** — the requested state was selected for a future activation but is not claimed active now;
 - **NotActivated** — the requested state was evaluated without activation;
 - **Unchanged** — no state transition was requested and existing state should remain;
+- **Rebooted** — an explicit reboot lifecycle transition completed without another deployment disposition being primary;
 - **RollbackTarget** — an explicitly identified prior state was reached as the rollback target.
 
 Target adapters map native mechanisms into these dispositions. The neutral core
