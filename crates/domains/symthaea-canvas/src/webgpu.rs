@@ -695,7 +695,7 @@ pub struct WebGpuRenderer {
 
 #[cfg(target_arch = "wasm32")]
 impl WebGpuRenderer {
-    /// Initialize a movie renderer for the supplied canvas.
+    /// Initialize the cognitive scene renderer for the supplied canvas.
     pub async fn new(canvas: HtmlCanvasElement) -> Result<Self, String> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::BROWSER_WEBGPU,
