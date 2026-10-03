@@ -297,6 +297,24 @@ fn exhaustive_direct_sum_recovery_matches_all_factor_pairs() {
 }
 
 #[test]
+fn exhaustive_general_recovery_matches_product_code_truth() {
+    let (parent, left, right) =
+        RandomLinearCode::generate_direct_sum(10, 2, 2, 0x5A12).expect("valid direct sum");
+
+    for left_word in left.enumerate() {
+        for right_word in right.enumerate() {
+            let target = left_word.bound(&right_word);
+            let recovered =
+                recover_linear_bound(&target, &[&left, &right]).expect("product recovery");
+            assert_eq!(recovered, vec![left_word.clone(), right_word.clone()]);
+            assert_eq!(recovered[0].bound(&recovered[1]), target);
+        }
+    }
+
+    assert_eq!(parent.rank(), left.rank() + right.rank());
+}
+
+#[test]
 fn arbitrary_same_subspace_bound_is_not_uniquely_identifiable() {
     let code = RandomLinearCode::generate(96, 8, 0xD00D);
     let a = code.encode(&[true, false, true, false, false, true, false, true]);
