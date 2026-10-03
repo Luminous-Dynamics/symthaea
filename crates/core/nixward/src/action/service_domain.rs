@@ -6,13 +6,13 @@
 //! Domain data only: no command conversion, executor handle, or authority.
 
 use blake3::Hasher;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 const SERVICE_OPERATION_DOMAIN_V1: &[u8] = b"nixward-service-operation-v1";
 const MAX_SERVICE_UNIT_BYTES_V1: usize = 255;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NixServiceOperationKindV1 { Enable, Disable, Start, Stop, Restart, Reload }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
