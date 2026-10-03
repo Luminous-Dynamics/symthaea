@@ -16,7 +16,9 @@ use gloo_net::http::Request;
 use gloo_net::websocket::Message;
 use gloo_net::websocket::futures::WebSocket;
 use serde_json::Value;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsValue;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::JsFuture;
 
 /// Bound one inbound telemetry text frame before handing it to serde_json.
@@ -78,7 +80,11 @@ async fn parse_service_response(resp: gloo_net::http::Response) -> Result<Value,
                 .len()
                 .checked_add(chunk_len)
                 .ok_or_else(|| "service response size overflow".to_string())?;
-            validate_service_response_len(next_len)?;
+            if let Err(error) = validate_service_response_len(next_len) {
+                let _ = JsFuture::from(reader.cancel()).await;
+                reader.release_lock();
+                return Err(error);
+            }
 
             let old_len = bytes.len();
             bytes.resize(next_len, 0);
