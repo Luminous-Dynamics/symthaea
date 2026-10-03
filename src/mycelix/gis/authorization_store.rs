@@ -2630,6 +2630,14 @@ mod tests {
             "boundary-pin","operation:pin-snapshot","native-pin-snapshot"
         ).unwrap();
 
+        let validity:(String,String,String)=store.connection().unwrap().query_row(
+            "SELECT validity_issued_at,validity_expires_at,validity_policy_digest
+             FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))
+        ).unwrap();
+
         let snapshot:(String,String,String)=store.connection().unwrap().query_row(
             "SELECT d.native_authority_pin_set_id,d.native_authority_pin_set_digest,s.snapshot
              FROM authorization_dispatches d
@@ -2674,15 +2682,19 @@ mod tests {
         let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
         store.commit_bound_verified(&record,&evidence,&TestProviderVerifier).unwrap();
 
-        let terminal:(String,String)=store.connection().unwrap().query_row(
-            "SELECT native_authority_pin_set_id,native_authority_pin_set_digest
+        let terminal:(String,String,String,String,String)=store.connection().unwrap().query_row(
+            "SELECT native_authority_pin_set_id,native_authority_pin_set_digest,
+                    validity_issued_at,validity_expires_at,validity_policy_digest
              FROM authorization_terminal_evidence
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance,record.attempt_id],
-            |r| Ok((r.get(0)?,r.get(1)?))
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))
         ).unwrap();
         assert_eq!(terminal.0,snapshot.0);
         assert_eq!(terminal.1,snapshot.1);
+        assert_eq!(terminal.2,validity.0);
+        assert_eq!(terminal.3,validity.1);
+        assert_eq!(terminal.4,validity.2);
 
         let snapshot_bytes=hex::decode(&snapshot.2).unwrap();
         assert_eq!(
