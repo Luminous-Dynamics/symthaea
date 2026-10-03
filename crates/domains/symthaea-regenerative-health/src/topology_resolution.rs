@@ -13,6 +13,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+const BRANCH_SET_DOMAIN: &[u8] = b"symthaea:topology-branch-set:v1\n";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TopologyResolutionState {
     Resolved,
@@ -35,6 +37,7 @@ pub enum TopologyResolutionIssue {
     InconsistentObservedPredecessor,
     InconsistentResolutionPredecessor,
     ConfigurationMismatch,
+    BranchSetDigestMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -62,6 +65,8 @@ pub struct TopologyLifecycleResolution {
     /// selected branch. Keeping these references makes the resolution
     /// append-only rather than destructive.
     pub observed_successors: Vec<TopologyBranchReference>,
+    /// Digest of the canonicalized branch set considered by the authority.
+    pub observed_successors_digest: String,
     /// Stable authority-issued resolution statement identity.
     pub resolution_id: String,
     pub authority_id: String,
@@ -255,6 +260,10 @@ impl TopologyResolutionGate {
         let declared_preserved: BTreeSet<_> =
             resolution.observed_successors.iter().cloned().collect();
 
+        if resolution.observed_successors_digest != branch_set_digest(observed_successors) {
+            issues.push(TopologyResolutionIssue::BranchSetDigestMismatch);
+        }
+
         if declared_preserved.iter().any(|branch| {
             branch.predecessor_epoch != resolution.predecessor_epoch
                 || branch.predecessor_topology_digest != resolution.predecessor_topology_digest
@@ -319,6 +328,22 @@ mod tests {
         .unwrap()
     }
 
+    fn branch_set_digest(branches: &[TopologyBranchReference]) -> String {
+        let mut unique = BTreeSet::new();
+        unique.extend(branches.iter().cloned());
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(BRANCH_SET_DOMAIN);
+        for branch in unique {
+            bytes.extend_from_slice(&branch.predecessor_epoch.to_be_bytes());
+            bytes.extend_from_slice(&(branch.predecessor_topology_digest.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(branch.predecessor_topology_digest.as_bytes());
+            bytes.extend_from_slice(&branch.successor_epoch.to_be_bytes());
+            bytes.extend_from_slice(&(branch.successor_topology_digest.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(branch.successor_topology_digest.as_bytes());
+        }
+        blake3::hash(&bytes).to_hex().to_string()
+    }
+
     fn branch(digest: &str) -> TopologyBranchReference {
         TopologyBranchReference {
             predecessor_epoch: 1,
@@ -339,6 +364,7 @@ mod tests {
             selected_successor_topology_digest: selected.into(),
             resolution_epoch: 1,
             predecessor_resolution_digest: None,
+            observed_successors_digest: branch_set_digest(&observed),
             observed_successors: observed,
             resolution_id: "resolution-2".into(),
             authority_id: "mycelix-topology-authority".into(),
@@ -347,6 +373,27 @@ mod tests {
             resolved_at_ms: 2_000,
             configuration_digest: "cfg-1".into(),
         }
+    }
+
+    #[test]
+    fn branch_set_digest_mismatch_is_quarantined() {
+        let a = branch("topology-v2a");
+        let b = branch("topology-v2b");
+        let mut r = resolution("topology-v2a", vec![a.clone(), b.clone()]);
+        r.observed_successors_digest = "tampered-branch-set".into();
+        let d = gate().assess(Some(&r), &[a, b], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionIssue::BranchSetDigestMismatch));
+    }
+
+    #[test]
+    fn branch_set_digest_is_order_independent() {
+        let a = branch("topology-v2a");
+        let b = branch("topology-v2b");
+        assert_eq!(
+            branch_set_digest(&[a.clone(), b.clone()]),
+            branch_set_digest(&[b, a]),
+        );
     }
 
     #[test]
