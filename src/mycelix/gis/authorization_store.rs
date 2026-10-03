@@ -3144,8 +3144,9 @@ fn validate_native_authority_pin_set(
               validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,boundary_id,attempt_scope_digest,
                action_digest,provider_idempotency_key,target_identity,audience,adapter,
               adapter_revision,adapter_implementation_digest,outcome,evidence_id,
-              evidence_digest,attempt_binding_digest,verifier_id,verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32)",
+              evidence_digest,attempt_binding_digest,verifier_id,verifier_revision,verifier_implementation_id,
+              verifier_implementation_digest,verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity, row.1, row.2, row.3, row.4, row.5, row.6,
@@ -3158,6 +3159,9 @@ fn validate_native_authority_pin_set(
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 evidence.evidence_id, evidence.evidence_digest, record.attempt_binding_digest,
                 verified.configuration.verifier_id,
+                verified.configuration.verifier_revision,
+                verified.configuration.verifier_implementation_id,
+                verified.configuration.verifier_implementation_digest,
                 verified.configuration.verifier_config_digest, verified.configuration.trust_anchor_digest,
                 verified.configuration.evidence_profile_digest, verified.verification_digest,
             ],
@@ -3536,9 +3540,9 @@ fn validate_native_authority_pin_set(
               native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,boundary_id,attempt_scope_digest,
                action_digest,provider_idempotency_key,target_identity,audience,adapter,
               adapter_revision,adapter_implementation_digest,outcome,evidence_id,
-              evidence_digest,attempt_binding_digest,verifier_id,verifier_config_digest,trust_anchor_digest,
-              evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29)",
+              evidence_digest,attempt_binding_digest,verifier_id,verifier_revision,verifier_implementation_id,
+              verifier_implementation_digest,verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity, native_provenance.0, native_provenance.1, native_provenance.2, native_provenance.3,
@@ -3552,7 +3556,11 @@ fn validate_native_authority_pin_set(
                 if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 verified.evidence.evidence_id, verified.evidence.evidence_digest,
                 record.attempt_binding_digest,
-                verified.configuration.verifier_id, verified.configuration.verifier_config_digest,
+                verified.configuration.verifier_id,
+                verified.configuration.verifier_revision,
+                verified.configuration.verifier_implementation_id,
+                verified.configuration.verifier_implementation_digest,
+                verified.configuration.verifier_config_digest,
                 verified.configuration.trust_anchor_digest,
                 verified.configuration.evidence_profile_digest, verified.verification_digest,
             ],
