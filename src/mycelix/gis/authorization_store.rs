@@ -462,6 +462,68 @@ pub struct DurableDispatchRecord {
     pub attempt_binding_digest: String,
 }
 
+fn compute_attempt_scope_digest(
+    boundary_id: &str,
+    attempt_id: &str,
+) -> Result<String, AuthorizationStoreError> {
+    if boundary_id.is_empty() || attempt_id.is_empty() {
+        return Err(AuthorizationConsumptionError::InvalidBinding.into());
+    }
+    let mut material = Vec::with_capacity(128);
+    material.extend_from_slice(b"symthaea:gis:effect-boundary-attempt-scope:v1
+");
+    append_len_prefixed(&mut material, boundary_id.as_bytes());
+    append_len_prefixed(&mut material, attempt_id.as_bytes());
+    Ok(format!("sha256:{}", hex::encode(Sha256::digest(material))))
+}
+
+fn backfill_status_check_boundary_ownership(
+    connection: &mut Connection,
+) -> Result<(), AuthorizationStoreError> {
+    connection.execute(
+        "UPDATE authorization_status_checks
+         SET boundary_id=(
+             SELECT d.boundary_id
+             FROM authorization_dispatches d
+             WHERE d.authorization_instance=authorization_status_checks.authorization_instance
+               AND d.attempt_id=authorization_status_checks.attempt_id
+         )
+         WHERE (boundary_id IS NULL OR boundary_id='')
+           AND EXISTS(
+             SELECT 1 FROM authorization_dispatches d
+             WHERE d.authorization_instance=authorization_status_checks.authorization_instance
+               AND d.attempt_id=authorization_status_checks.attempt_id
+               AND d.boundary_id IS NOT NULL AND d.boundary_id <> ''
+           )",
+        [],
+    )?;
+
+    let rows: Vec<(String,String)> = {
+        let mut stmt = connection.prepare(
+            "SELECT attempt_id,boundary_id
+             FROM authorization_status_checks
+             WHERE attempt_id <> ''
+               AND boundary_id IS NOT NULL AND boundary_id <> ''
+               AND (attempt_scope_digest IS NULL OR attempt_scope_digest='')"
+        )?;
+        let mapped = stmt.query_map([], |row| {
+            Ok((row.get::<_,String>(0)?, row.get::<_,String>(1)?))
+        })?;
+        mapped.collect::<Result<Vec<_>, _>>()?
+    };
+    for (attempt_id,boundary_id) in rows {
+        let scope = compute_attempt_scope_digest(&boundary_id,&attempt_id)?;
+        connection.execute(
+            "UPDATE authorization_status_checks
+             SET attempt_scope_digest=?1
+             WHERE attempt_id=?2 AND boundary_id=?3
+               AND (attempt_scope_digest IS NULL OR attempt_scope_digest='')",
+            params![scope,attempt_id,boundary_id],
+        )?;
+    }
+    Ok(())
+}
+
 fn compute_attempt_binding_digest(
     authorization_instance: &str,
     attempt_id: &str,
@@ -744,6 +806,8 @@ impl SqliteAuthorizationStore {
                status_observed_at TEXT NOT NULL,
                status_valid_until TEXT NOT NULL,
                status_evidence_digest TEXT NOT NULL,
+               boundary_id TEXT,
+               attempt_scope_digest TEXT,
                PRIMARY KEY(authorization_instance,attempt_id,phase)
              );
              CREATE TABLE IF NOT EXISTS authorization_recovery_markers (
@@ -866,6 +930,9 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_terminal_evidence", "adapter_implementation_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "attempt_binding_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "evidence_profile_digest", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_status_checks", "boundary_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_status_checks", "attempt_scope_digest", "TEXT")?;
+        backfill_status_check_boundary_ownership(&mut connection)?;
         connection.execute_batch(
             "CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
                ON authorization_leases(attempt_id)
@@ -2521,8 +2588,9 @@ fn validate_native_authority_pin_set(
         tx.execute(
             "INSERT INTO authorization_status_checks
              (authorization_instance,attempt_id,phase,status_identifier,status_source_digest,
-              status_observed_at,status_valid_until,status_evidence_digest)
-             VALUES (?1,?2,'pre_entry',?3,?4,?5,?6,?7)",
+              status_observed_at,status_valid_until,status_evidence_digest,boundary_id,
+              attempt_scope_digest)
+             VALUES (?1,?2,'pre_entry',?3,?4,?5,?6,?7,?8,?9)",
             params![
                 record.authorization_instance.as_str(),
                 record.attempt_id.as_str(),
@@ -2531,6 +2599,8 @@ fn validate_native_authority_pin_set(
                 pre_entry_status.status_observed_at.as_str(),
                 pre_entry_status.status_valid_until.as_str(),
                 pre_entry_status.status_evidence_digest.as_str(),
+                record.boundary_id.as_str(),
+                compute_attempt_scope_digest(&record.boundary_id,&record.attempt_id)?,
             ],
         )?;
 
@@ -6796,6 +6866,18 @@ mod tests {
         let _=std::fs::remove_file(path);
     }
 
+
+    #[test]
+    fn attempt_scope_digest_is_stable_and_boundary_sensitive() {
+        let same_a = compute_attempt_scope_digest("boundary-A","attempt-1").unwrap();
+        let same_b = compute_attempt_scope_digest("boundary-A","attempt-1").unwrap();
+        let other_boundary = compute_attempt_scope_digest("boundary-B","attempt-1").unwrap();
+        let other_attempt = compute_attempt_scope_digest("boundary-A","attempt-2").unwrap();
+        assert_eq!(same_a, same_b);
+        assert_ne!(same_a, other_boundary);
+        assert_ne!(same_a, other_attempt);
+        assert!(same_a.starts_with("sha256:"));
+    }
 
     #[test]
     fn bound_attempt_id_cannot_be_reused_across_boundaries() {
