@@ -6,7 +6,7 @@
 //! Domain data only: no command conversion, executor handle, or authority.
 
 use blake3::Hasher;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use thiserror::Error;
 
 const SERVICE_OPERATION_DOMAIN_V1: &[u8] = b"nixward-service-operation-v1";
