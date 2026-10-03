@@ -702,6 +702,11 @@ impl SqliteAuthorizationStore {
                pin_set_digest TEXT PRIMARY KEY,
                snapshot TEXT NOT NULL
              );
+             CREATE TABLE IF NOT EXISTS authorization_provider_adapter_pins (
+               adapter_id TEXT PRIMARY KEY,
+               adapter_revision TEXT NOT NULL,
+               implementation_digest TEXT NOT NULL
+             );
              CREATE TABLE IF NOT EXISTS authorization_leases (
                authorization_instance TEXT PRIMARY KEY,
                action_id TEXT NOT NULL,
@@ -768,6 +773,8 @@ impl SqliteAuthorizationStore {
                target_identity TEXT NOT NULL,
                audience TEXT NOT NULL,
                adapter TEXT,
+               adapter_revision TEXT,
+               adapter_implementation_digest TEXT,
                outcome TEXT NOT NULL,
                evidence_id TEXT NOT NULL,
                evidence_digest TEXT NOT NULL,
@@ -804,6 +811,8 @@ impl SqliteAuthorizationStore {
                target_identity TEXT NOT NULL,
                audience TEXT NOT NULL,
                adapter TEXT NOT NULL,
+               adapter_revision TEXT NOT NULL,
+               adapter_implementation_digest TEXT NOT NULL,
                boundary_id TEXT NOT NULL,
                attempt_binding_digest TEXT NOT NULL,
                state TEXT NOT NULL,
@@ -832,6 +841,8 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_dispatches", "validity_expires_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "validity_policy_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "relying_party_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "adapter_revision", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_dispatches", "adapter_implementation_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_dispatches", "attempt_binding_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
@@ -851,6 +862,8 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_recovery_markers", "operation_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "trust_anchor_digest", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "adapter_revision", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "adapter_implementation_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "attempt_binding_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "evidence_profile_digest", "TEXT NOT NULL DEFAULT ''")?;
         connection.execute_batch(
@@ -1212,6 +1225,81 @@ impl SqliteAuthorizationStore {
                     AuthorizationConsumptionError::ProviderStatusVerificationRequired,
                 )
             })
+    }
+
+    /// Pin one adapter identity to an exact revision and implementation digest.
+    /// The tuple is selected by the relying party and is immutable once used.
+    pub fn pin_provider_adapter_configuration(
+        &self,
+        configuration: &ProviderAdapterConfiguration,
+    ) -> Result<(), AuthorizationStoreError> {
+        configuration.validate()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let existing: Option<(String, String)> = tx
+            .query_row(
+                "SELECT adapter_revision,implementation_digest
+                 FROM authorization_provider_adapter_pins
+                 WHERE adapter_id=?1",
+                params![configuration.adapter_id.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        match existing {
+            Some((revision, digest))
+                if revision == configuration.adapter_revision
+                    && digest == configuration.implementation_digest => {}
+            Some((revision, digest)) => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "adapter {} is already pinned as {revision}/{digest}",
+                    configuration.adapter_id
+                )));
+            }
+            None => {
+                tx.execute(
+                    "INSERT INTO authorization_provider_adapter_pins
+                     (adapter_id,adapter_revision,implementation_digest)
+                     VALUES (?1,?2,?3)",
+                    params![
+                        configuration.adapter_id.as_str(),
+                        configuration.adapter_revision.as_str(),
+                        configuration.implementation_digest.as_str(),
+                    ],
+                )?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn pinned_provider_adapter_configuration(
+        &self,
+        adapter_id: &str,
+    ) -> Result<ProviderAdapterConfiguration, AuthorizationStoreError> {
+        if adapter_id.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        let connection = self.connection()?;
+        let configuration = connection
+            .query_row(
+                "SELECT adapter_id,adapter_revision,implementation_digest
+                 FROM authorization_provider_adapter_pins
+                 WHERE adapter_id=?1",
+                params![adapter_id],
+                |row| {
+                    Ok(ProviderAdapterConfiguration {
+                        adapter_id: row.get(0)?,
+                        adapter_revision: row.get(1)?,
+                        implementation_digest: row.get(2)?,
+                    })
+                },
+            )
+            .optional()?
+            .ok_or_else(|| AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))?;
+        configuration.validate()?;
+        Ok(configuration)
     }
 
     /// Pin one issuer to one authority namespace for this relying-party domain.
