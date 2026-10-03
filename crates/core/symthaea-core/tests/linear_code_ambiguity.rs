@@ -208,7 +208,7 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     let dimensions = [500usize, 1000, 2000];
     let ranks = [3usize, 5, 7];
     let factor_counts = [3usize, 4, 5];
-    let repeats = 3usize;
+    let repeats = 10usize;
 
     let mut cases = 0usize;
     let mut exact_original = 0usize;
@@ -315,7 +315,7 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
         cases,
         dimensions.len() * ranks.len() * factor_counts.len() * repeats
     );
-    assert_eq!(cases, 81);
+    assert_eq!(cases, 270);
     assert_eq!(failures, 0);
     assert_eq!(valid_representative, cases);
     assert_eq!(jointly_dependent, 0);
