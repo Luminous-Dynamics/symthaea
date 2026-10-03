@@ -2202,8 +2202,9 @@ fn validate_native_authority_pin_set(
               native_authority_pin_set_id,native_authority_pin_set_digest,
               status_identifier,status_source_digest,status_observed_at,status_valid_until,status_evidence_digest,
               validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,
-              action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,attempt_binding_digest,state)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,'dispatch_pending')",
+              action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,
+              adapter_revision,adapter_implementation_digest,boundary_id,attempt_binding_digest,state)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,'dispatch_pending')",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity,
@@ -2223,8 +2224,9 @@ fn validate_native_authority_pin_set(
                 lease_validity.2.as_str(),
                 self.relying_party_id.as_str(),
                 record.action_id, record.action_digest, record.provider_idempotency_key,
-                record.target_identity, record.audience, record.adapter, record.boundary_id,
-                record.attempt_binding_digest],
+                record.target_identity, record.audience, record.adapter,
+                record.adapter_revision, record.adapter_implementation_digest,
+                record.boundary_id, record.attempt_binding_digest],
         )?;
         let changed = tx.execute(
             "UPDATE authorization_leases SET state='dispatch_pending', attempt_id=?2
@@ -2723,6 +2725,8 @@ fn validate_native_authority_pin_set(
             || evidence.target_identity != record.target_identity
             || evidence.audience != record.audience
             || evidence.adapter != record.adapter
+            || evidence.adapter_revision != record.adapter_revision
+            || evidence.adapter_implementation_digest != record.adapter_implementation_digest
             || evidence.boundary_id != record.boundary_id
             || evidence.attempt_binding_digest != record.attempt_binding_digest
         {
@@ -2743,50 +2747,54 @@ fn validate_native_authority_pin_set(
                     native_authorization_id,native_replay_derivation_digest,
                     native_authority_pin_set_id,native_authority_pin_set_digest,
                     relying_party_id,action_id,action_digest,provider_idempotency_key,
-                    target_identity,audience,adapter,boundary_id,attempt_binding_digest,
+                    target_identity,audience,adapter,adapter_revision,adapter_implementation_digest,
+                    boundary_id,attempt_binding_digest,
                     status_identifier,status_source_digest,status_observed_at,status_valid_until,
                     status_evidence_digest,validity_issued_at,validity_expires_at,validity_policy_digest,state
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
             params![record.authorization_instance, record.attempt_id, record.boundary_id],
             |r| Ok((
-                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
-                r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
-                r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
+                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,Option<String>>(2)?,
+                r.get::<_,Option<String>>(3)?, r.get::<_,Option<String>>(4)?, r.get::<_,Option<String>>(5)?,
+                r.get::<_,Option<String>>(6)?, r.get::<_,Option<String>>(7)?, r.get::<_,Option<String>>(8)?,
                 r.get::<_,String>(9)?, r.get::<_,String>(10)?, r.get::<_,String>(11)?,
                 r.get::<_,String>(12)?, r.get::<_,String>(13)?, r.get::<_,String>(14)?,
-                r.get::<_,String>(15)?, r.get::<_,String>(16)?, r.get::<_,Option<String>>(17)?,
-                r.get::<_,Option<String>>(18)?, r.get::<_,Option<String>>(19)?,
-                r.get::<_,Option<String>>(20)?, r.get::<_,Option<String>>(21)?,
-                r.get::<_,Option<String>>(22)?, r.get::<_,Option<String>>(23)?,
-                r.get::<_,Option<String>>(24)?, r.get::<_,String>(25)?,
+                r.get::<_,Option<String>>(15)?, r.get::<_,Option<String>>(16)?,
+                r.get::<_,String>(17)?, r.get::<_,String>(18)?,
+                r.get::<_,Option<String>>(19)?, r.get::<_,Option<String>>(20)?,
+                r.get::<_,Option<String>>(21)?, r.get::<_,Option<String>>(22)?,
+                r.get::<_,Option<String>>(23)?, r.get::<_,Option<String>>(24)?,
+                r.get::<_,String>(25)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
 
         let (
-            operation_id, native_replay_identity, native_issuer, native_authority_namespace,
-            native_authorization_id, native_replay_derivation_digest,
-            native_authority_pin_set_id, native_authority_pin_set_digest,
-            relying_party_id, action_id, action_digest, provider_idempotency_key,
-            target_identity, audience, adapter, boundary_id, attempt_binding_digest,
-            status_identifier, status_source_digest, status_observed_at, status_valid_until,
-            status_evidence_digest, validity_issued_at, validity_expires_at,
-            validity_policy_digest, state,
-        ) = row;
+            operation_id,native_replay_identity,native_issuer,native_authority_namespace,
+            native_authorization_id,native_replay_derivation_digest,
+            native_authority_pin_set_id,native_authority_pin_set_digest,
+            relying_party_id,action_id,action_digest,provider_idempotency_key,
+            target_identity,audience,adapter,adapter_revision,adapter_implementation_digest,
+            boundary_id,attempt_binding_digest,
+            status_identifier,status_source_digest,status_observed_at,status_valid_until,
+            status_evidence_digest,validity_issued_at,validity_expires_at,validity_policy_digest,state
+        )=row;
 
         if operation_id != record.operation_id
             || native_replay_identity != record.native_replay_identity
-            || native_issuer != record.native_issuer
-            || native_authority_namespace != record.native_authority_namespace
-            || native_authorization_id != record.native_authorization_id
-            || native_replay_derivation_digest != record.native_replay_derivation_digest
-            || relying_party_id != self.relying_party_id
+            || native_issuer.as_deref() != Some(record.native_issuer.as_str())
+            || native_authority_namespace.as_deref() != Some(record.native_authority_namespace.as_str())
+            || native_authorization_id.as_deref() != Some(record.native_authorization_id.as_str())
+            || native_replay_derivation_digest.as_deref() != Some(record.native_replay_derivation_digest.as_str())
+            || relying_party_id.as_deref() != Some(self.relying_party_id.as_str())
             || action_id != record.action_id
             || action_digest != record.action_digest
             || provider_idempotency_key != record.provider_idempotency_key
             || target_identity != record.target_identity
             || audience != record.audience
             || adapter != record.adapter
+            || adapter_revision.as_deref() != Some(record.adapter_revision.as_str())
+            || adapter_implementation_digest.as_deref() != Some(record.adapter_implementation_digest.as_str())
             || boundary_id != record.boundary_id
             || attempt_binding_digest != record.attempt_binding_digest
             || status_identifier.as_deref() != Some(record.status_identifier.as_str())
@@ -2798,40 +2806,32 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
 
+        let Some(adapter_revision) = adapter_revision.as_deref() else {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        };
+        let Some(adapter_implementation_digest) = adapter_implementation_digest.as_deref() else {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        };
+
         let expected = compute_attempt_binding_digest(
-            &record.authorization_instance,
-            &record.attempt_id,
-            &record.operation_id,
-            &record.native_replay_identity,
-            &record.native_issuer,
-            &record.native_authority_namespace,
-            &record.native_authorization_id,
-            &record.native_replay_derivation_digest,
-            &native_authority_pin_set_id,
-            &native_authority_pin_set_digest,
-            &self.relying_party_id,
-            &record.action_id,
-            &record.action_digest,
-            &record.provider_idempotency_key,
-            &record.target_identity,
-            &record.audience,
-            &record.adapter,
-            &record.status_identifier,
-            &record.status_source_digest,
-            &record.status_observed_at,
-            &record.status_valid_until,
-            &record.status_evidence_digest,
-            validity_issued_at.as_deref().unwrap_or(""),
-            validity_expires_at.as_deref(),
+            &record.authorization_instance,&record.attempt_id,&record.operation_id,
+            &record.native_replay_identity,&record.native_issuer,&record.native_authority_namespace,
+            &record.native_authorization_id,&record.native_replay_derivation_digest,
+            native_authority_pin_set_id.as_deref().unwrap_or(""),
+            native_authority_pin_set_digest.as_deref().unwrap_or(""),
+            &self.relying_party_id,&record.action_id,&record.action_digest,
+            &record.provider_idempotency_key,&record.target_identity,&record.audience,&record.adapter,
+            adapter_revision,adapter_implementation_digest,
+            &record.status_identifier,&record.status_source_digest,&record.status_observed_at,
+            &record.status_valid_until,&record.status_evidence_digest,
+            validity_issued_at.as_deref().unwrap_or(""),validity_expires_at.as_deref(),
             validity_policy_digest.as_deref().unwrap_or(""),
         );
-
         if attempt_binding_digest.is_empty() || expected != record.attempt_binding_digest
             || expected != attempt_binding_digest
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
-
         Ok(state)
     }
 
@@ -2931,15 +2931,17 @@ fn validate_native_authority_pin_set(
               native_issuer,native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
               native_authority_pin_set_id,native_authority_pin_set_digest,
               validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,boundary_id,
-              action_digest,provider_idempotency_key,target_identity,audience,adapter,outcome,evidence_id,
+              action_digest,provider_idempotency_key,target_identity,audience,adapter,
+              adapter_revision,adapter_implementation_digest,outcome,evidence_id,
               evidence_digest,attempt_binding_digest,verifier_id,verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity, row.1, row.2, row.3, row.4, row.5, row.6,
                 row.7, row.8, row.9,
                 self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
                 record.provider_idempotency_key, record.target_identity, record.audience, record.adapter,
+                record.adapter_revision, record.adapter_implementation_digest,
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 evidence.evidence_id, evidence.evidence_digest, record.attempt_binding_digest,
                 verified.configuration.verifier_id,
@@ -3310,7 +3312,8 @@ fn validate_native_authority_pin_set(
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
               native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,boundary_id,
-              action_digest,provider_idempotency_key,target_identity,audience,adapter,outcome,evidence_id,
+              action_digest,provider_idempotency_key,target_identity,audience,adapter,
+              adapter_revision,adapter_implementation_digest,outcome,evidence_id,
               evidence_digest,attempt_binding_digest,verifier_id,verifier_config_digest,trust_anchor_digest,
               evidence_profile_digest,verification_digest)
              VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28)",
@@ -3321,6 +3324,7 @@ fn validate_native_authority_pin_set(
                 native_provenance.6, native_provenance.7, native_provenance.8,
                 self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
                 record.provider_idempotency_key, record.target_identity, record.audience, verified.evidence.adapter,
+                record.adapter_revision, record.adapter_implementation_digest,
                 if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 verified.evidence.evidence_id, verified.evidence.evidence_digest,
                 record.attempt_binding_digest,
@@ -4046,6 +4050,8 @@ mod tests {
             target_identity: record.target_identity.clone(),
             audience: record.audience.clone(),
             adapter: record.adapter.clone(),
+            adapter_revision: record.adapter_revision.clone(),
+            adapter_implementation_digest: record.adapter_implementation_digest.clone(),
             boundary_id: record.boundary_id.clone(),
             attempt_binding_digest: record.attempt_binding_digest.clone(),
         }
