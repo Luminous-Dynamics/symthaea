@@ -218,6 +218,8 @@ pub enum AuthorizationConsumptionError {
     ActionAlreadyClosed,
     /// The authorization validity window is absent, malformed, stale, or expired.
     AuthorizationValidityWindowFailed,
+    /// Required provider/native status evidence could not be authenticated or was not fresh.
+    ProviderStatusVerificationRequired,
     InvalidNativeReplayProvenance,
     IndeterminateRequiresReconciliation,
     PreDispatchRecoveryNotAllowed,
