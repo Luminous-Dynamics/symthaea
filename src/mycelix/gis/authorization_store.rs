@@ -89,8 +89,16 @@ pub enum ProviderVerificationPurpose {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderVerifierConfiguration {
+    /// Stable relying-party control-domain identifier.
+    pub relying_party_id: String,
     /// Stable relying-party-selected verifier implementation/profile identifier.
     pub verifier_id: String,
+    /// Digest of the exact verifier configuration used for provider evidence.
+    pub verifier_config_digest: String,
+    /// Digest of the trust anchors/status inputs selected by the relying party.
+    pub trust_anchor_digest: String,
+    /// Digest of the evidence profile used to classify terminal provider evidence.
+    pub evidence_profile_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -782,6 +790,7 @@ impl SqliteAuthorizationStore {
     /// is revalidated immediately before the lease transition so the provider
     /// outcome cannot be attached to a different sink contract.
     fn validate_verified_terminal_outcome(
+        &self,
         record: &DurableDispatchRecord,
         verified: &VerifiedProviderOutcome,
     ) -> Result<(), AuthorizationStoreError> {
@@ -791,7 +800,8 @@ impl SqliteAuthorizationStore {
         {
             return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
         }
-        if verified.configuration.verifier_id.is_empty()
+        if verified.configuration.relying_party_id != self.relying_party_id
+            || verified.configuration.verifier_id.is_empty()
             || verified.configuration.verifier_config_digest.is_empty()
             || verified.configuration.trust_anchor_digest.is_empty()
             || verified.configuration.evidence_profile_digest.is_empty()
@@ -825,7 +835,7 @@ impl SqliteAuthorizationStore {
         let verified = verifier
             .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
-        Self::validate_verified_terminal_outcome(record, &verified)?;
+        self.validate_verified_terminal_outcome(record, &verified)?;
 
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -1793,6 +1803,7 @@ mod tests {
             Ok(VerifiedProviderOutcome {
                 evidence: evidence.clone(),
                 configuration: ProviderVerifierConfiguration {
+                    relying_party_id: "legacy-local".into(),
                     verifier_id: "test-verifier/v1".into(),
                     verifier_config_digest: "sha256:test-verifier-config".into(),
                     trust_anchor_digest: "sha256:test-trust-anchors".into(),
@@ -2052,6 +2063,61 @@ mod tests {
         assert_eq!(terminal.2,persisted.2);
         let _=std::fs::remove_file(path);
     }
+    #[test]
+    fn verifier_configuration_cannot_cross_relying_party_domain() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-verifier-rp-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-A").unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-verifier-rp","prod","adapter-A");
+        let action=EpistemicAction::new("verifier-rp","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"verifier-rp".into(), action_id:action.id.clone(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"support".into(), policy:"policy@1".into(),
+            decision:"execute".into(), issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "verifier-rp",action.id.clone(),digest,"support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-verifier-rp","boundary-A").unwrap();
+        let record=store.mark_dispatch_pending_bound(
+            "verifier-rp","attempt-verifier-rp",&action,&effect,"boundary-A",
+            "operation:verifier-rp","native:verifier-rp"
+        ).unwrap();
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        struct WrongRpVerifier;
+        impl ProviderEvidenceVerifier for WrongRpVerifier {
+            fn verify(
+                &self,
+                purpose: ProviderVerificationPurpose,
+                _record: &DurableDispatchRecord,
+                evidence: &ProviderTerminalEvidence,
+            ) -> Result<VerifiedProviderOutcome, ProviderVerificationError> {
+                if !matches!(purpose,ProviderVerificationPurpose::TerminalOutcome) {
+                    return Err(ProviderVerificationError::VerificationFailed);
+                }
+                Ok(VerifiedProviderOutcome {
+                    evidence:evidence.clone(),
+                    configuration:ProviderVerifierConfiguration {
+                        relying_party_id:"rp-B".into(),
+                        verifier_id:"test-verifier/v1".into(),
+                        verifier_config_digest:"sha256:test-verifier-config".into(),
+                        trust_anchor_digest:"sha256:test-trust-anchors".into(),
+                        evidence_profile_digest:"sha256:test-evidence-profile".into(),
+                    },
+                    verification_digest:"sha256:test-verification".into(),
+                })
+            }
+        }
+        assert!(matches!(
+            store.commit_bound_verified(&record,&evidence,&WrongRpVerifier),
+            Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
     #[test]
     fn operation_and_native_replay_identity_tampering_is_rejected() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-identity-fence-{}.db",std::process::id()));
