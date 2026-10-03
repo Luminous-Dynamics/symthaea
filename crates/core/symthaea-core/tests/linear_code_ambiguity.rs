@@ -6,7 +6,11 @@ use symthaea_core::hdc::linear_code::{
 #[test]
 fn canonical_fixture_fingerprint_is_emitted() {
     let code = RandomLinearCode::generate(96, 8, 0xC0DE);
-    let fingerprint = hex::encode(code.fingerprint());
+    let fingerprint = code
+        .fingerprint()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     println!("FIXTURE_FINGERPRINT={fingerprint}");
     assert_eq!(fingerprint.len(), 64);
 }
