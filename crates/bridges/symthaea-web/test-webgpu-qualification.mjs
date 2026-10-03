@@ -14,6 +14,9 @@
  *
  * Then:
  *   node ../symthaea-web/test-webgpu-qualification.mjs
+ *
+ * Optional hardware-backed qualification (requires a GPU-capable runner):
+ *   WEBGPU_MODES=webgpu-hardware,fallback node ../symthaea-web/test-webgpu-qualification.mjs
  */
 
 import { createHash } from 'crypto';
@@ -196,8 +199,9 @@ async function runMode(mode) {
 
   const failOnPageErrors = phase => {
     if (pageErrors.length > 0) {
-      throw new Error(
+      throw new QualificationError(
         `uncaught browser exception during ${phase}: ${JSON.stringify(pageErrors)}`,
+        'renderer',
       );
     }
   };
@@ -227,10 +231,16 @@ async function runMode(mode) {
       const blankMovieHash = await blankCanvasHash(page, 192, 192);
 
       if (firstSceneHash === blankSceneHash) {
-        throw new Error('WebGPU cognitive canvas is indistinguishable from a blank canvas');
+        throw new QualificationError(
+          'WebGPU cognitive canvas is indistinguishable from a blank canvas',
+          'renderer',
+        );
       }
       if (firstMovieHash === blankMovieHash) {
-        throw new Error('WebGPU movie canvas is indistinguishable from a blank canvas');
+        throw new QualificationError(
+          'WebGPU movie canvas is indistinguishable from a blank canvas',
+          'renderer',
+        );
       }
 
       await page.screenshot({
@@ -248,8 +258,9 @@ async function runMode(mode) {
       const repeatMovieHash = await canvasPngHash(page, '#webgpu-movie-canvas');
 
       if (repeatSceneHash !== firstSceneHash || repeatMovieHash !== firstMovieHash) {
-        throw new Error(
+        throw new QualificationError(
           `non-deterministic WebGPU capture: first=(${firstSceneHash},${firstMovieHash}) repeat=(${repeatSceneHash},${repeatMovieHash})`,
+          'renderer',
         );
       }
 
