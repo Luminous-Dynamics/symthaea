@@ -41,13 +41,15 @@ jobs:
 
       - name: Core boundary guard
         run: |
-          ! rg -n 'nixward|tokio|xenia|mycelix|std::process|Command::new|ssh' \
-            crates/core/sovereign-state-compiler
+          ! rg -n 'nixward|tokio|xenia|mycelix|std::process|Command::new|ssh|(^|[[:space:]])nix([[:space:]]|=)' \
+            crates/core/sovereign-state-compiler/Cargo.toml \
+            crates/core/sovereign-state-compiler/src
 
       - name: Adapter execution guard
         run: |
           ! rg -n 'std::process|Command::new|tokio|ssh|nix-env|nixos-rebuild' \
-            crates/core/sovereign-state-compiler-nix
+            crates/core/sovereign-state-compiler-nix/Cargo.toml \
+            crates/core/sovereign-state-compiler-nix/src
 
       - name: Build isolated SSC validation workspace
         run: |
