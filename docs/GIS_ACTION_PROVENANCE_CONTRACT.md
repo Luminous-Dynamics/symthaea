@@ -325,11 +325,3 @@ The recovery boundary is intentionally split in two. A Prepared attempt that has
 
 `RecoveryAuthorizationWitness` binds a recovery operation to the authorization instance, exact attempt, exact boundary, action digest, authority epoch, and issuance metadata. When the durable lease carries an explicit operation ID, the recovery witness must also carry the same non-empty operation ID; an empty or mismatched operation identity is rejected. The store enforces those bindings; the authority/authentication layer remains responsible for authenticating the issuer and policy. This keeps recovery authorization distinct from the execution receipt and prevents a recovery operation for one attempt from being applied to another.
 
-
-### Authorization validity provenance
-
-Effectful authorization is now time-bounded as a durable lifecycle property, not merely a field checked during initial witness admission. The exact issued_at/expires_at window is frozen onto the durable authorization lease together with the clock-source and clock-policy provenance. A missing, malformed, inverted, future, or expired window fails closed.
-
-The effectful lifecycle revalidates the frozen window before crossing DispatchPending and again immediately before provider entry. If the authorization has expired before entry, the boundary atomically closes the attempt as Expired, records an expired_not_entered marker, and prevents the old attempt from transitioning to provider entry. This preserves the AEB-07 distinction between a pre-entry stop and provider outcome evidence: elapsed time is not treated as proof of provider failure or non-entry unless the boundary's own atomic not-entered transition closes the attempt.
-
-The current implementation uses the relying-party system UTC wall clock as its explicit clock identity; the clock policy digest is persisted with the lease so later lifecycle code cannot silently reinterpret the historical validity provenance. A future deployment-specific trusted clock can replace this source without changing the durable validity contract.
