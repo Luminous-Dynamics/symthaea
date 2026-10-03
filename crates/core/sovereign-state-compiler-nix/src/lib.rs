@@ -341,11 +341,22 @@ impl TargetAdapter for NixOSTargetAdapter {
             require_attestation: false,
         };
 
-        let rollback_allowed = self
-            .snapshot
-            .profile
-            .capabilities
-            .contains(&Capability::Rollback);
+        let has_mutation = steps.iter().any(|step| {
+            matches!(
+                step.kind,
+                PlanStepKind::StageArtifacts
+                    | PlanStepKind::ApplyDesiredState
+                    | PlanStepKind::Reboot
+                    | PlanStepKind::Rollback
+            )
+        });
+
+        let rollback_allowed = has_mutation
+            && self
+                .snapshot
+                .profile
+                .capabilities
+                .contains(&Capability::Rollback);
 
         let plan = DeploymentPlan {
             schema_version: sovereign_state_compiler::SCHEMA_VERSION.into(),
