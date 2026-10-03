@@ -1201,7 +1201,8 @@ mod tests {
             finished_at_ms: 200,
             outcome: ExecutionOutcome::Succeeded,
             postcondition: PostconditionOutcome::Satisfied,
-            verification_digest: None,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+
             evidence: Vec::new(),
         };
 
@@ -1223,7 +1224,8 @@ mod tests {
             finished_at_ms: 160,
             outcome: ExecutionOutcome::Recovered,
             postcondition: PostconditionOutcome::Satisfied,
-            verification_digest: None,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+
             evidence: Vec::new(),
         };
 
@@ -1270,6 +1272,7 @@ mod tests {
             outcome: ExecutionOutcome::Succeeded,
             postcondition: PostconditionOutcome::Satisfied,
             verification_digest: None,
+
             evidence: Vec::new(),
         };
 
@@ -1318,7 +1321,8 @@ mod tests {
             finished_at_ms: 200,
             outcome: ExecutionOutcome::Succeeded,
             postcondition: PostconditionOutcome::Satisfied,
-            verification_digest: None,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+
             evidence: Vec::new(),
         };
 
@@ -1368,7 +1372,8 @@ mod tests {
             finished_at_ms: 150,
             outcome: ExecutionOutcome::Succeeded,
             postcondition: PostconditionOutcome::Satisfied,
-            verification_digest: None,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+
             evidence: Vec::new(),
         };
 
@@ -1393,7 +1398,8 @@ mod tests {
             finished_at_ms: 201,
             outcome: ExecutionOutcome::Succeeded,
             postcondition: PostconditionOutcome::Satisfied,
-            verification_digest: None,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+
             evidence: Vec::new(),
         };
 
@@ -1418,7 +1424,8 @@ mod tests {
             finished_at_ms: 199,
             outcome: ExecutionOutcome::Succeeded,
             postcondition: PostconditionOutcome::Satisfied,
-            verification_digest: None,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+
             evidence: Vec::new(),
         };
 
