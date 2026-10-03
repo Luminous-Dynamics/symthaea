@@ -280,6 +280,42 @@ impl EvaluationCheck {
         }
     }
 
+    /// Frozen failure-outcome semantics for the historical v1 procedure.
+    const fn legacy_allowed_failure_outcome_tags(self) -> &'static [u8] {
+        match self {
+            Self::EnvelopeStructuralValidation => &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidEnvelope)],
+            Self::ReceiptCommitment => &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch)],
+            Self::TemporalValidity => &[
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
+            ],
+            Self::CryptosuiteConformance => &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch)],
+            Self::VerificationMethodResolution => &[
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodMismatch),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable),
+            ],
+            Self::VerificationMethodLifecycle => &[
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodRevoked),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodExpired),
+            ],
+            Self::ProofPurposeAuthorization => &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized)],
+            Self::ProofPolicyConformance => &[
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::ProofPurposeMismatch),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::DomainMismatch),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::ChallengeMismatch),
+            ],
+            Self::CryptographicProof => &[
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::MissingProof),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidProofEncoding),
+                verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidSignature),
+            ],
+        }
+    }
+
+    fn allows_legacy_failure_outcome(self, outcome: ReceiptAttestationVerificationOutcome) -> bool {
+        self.legacy_allowed_failure_outcome_tags().contains(&verification_outcome_tag(outcome))
+    }
+
     fn allows_failure_outcome(
         self,
         outcome: ReceiptAttestationVerificationOutcome,
