@@ -291,6 +291,8 @@ impl SqliteAuthorizationStore {
                native_authority_namespace TEXT,
                native_authorization_id TEXT,
                native_replay_derivation_digest TEXT,
+               native_authority_pin_set_id TEXT,
+               native_authority_pin_set_digest TEXT,
                relying_party_id TEXT,
                boundary_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
@@ -315,6 +317,8 @@ impl SqliteAuthorizationStore {
                native_authority_namespace TEXT,
                native_authorization_id TEXT,
                native_replay_derivation_digest TEXT,
+               native_authority_pin_set_id TEXT,
+               native_authority_pin_set_digest TEXT,
                relying_party_id TEXT,
                action_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
@@ -335,12 +339,16 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_dispatches", "native_replay_derivation_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_namespace", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authorization_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_derivation_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "relying_party_id", "TEXT")?;
@@ -932,18 +940,26 @@ impl SqliteAuthorizationStore {
         if persisted_relying_party.as_deref() != Some(self.relying_party_id.as_str()) {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
-        let native_provenance: (Option<String>, Option<String>, Option<String>) = tx.query_row(
-            "SELECT native_authority_namespace,native_authorization_id,native_replay_derivation_digest
+        let native_provenance: (
+            Option<String>, Option<String>, Option<String>, Option<String>, Option<String>
+        ) = tx.query_row(
+            "SELECT native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+                    native_authority_pin_set_id,native_authority_pin_set_digest
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
         )?;
         Self::validate_persisted_native_replay_provenance(
             record,
             native_provenance.0.as_deref(),
             native_provenance.1.as_deref(),
             native_provenance.2.as_deref(),
+        )?;
+        Self::validate_native_authority_pin_set_snapshot(
+            &tx,
+            native_provenance.3.as_deref(),
+            native_provenance.4.as_deref(),
         )?;
         let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
@@ -1069,12 +1085,15 @@ impl SqliteAuthorizationStore {
 
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let row: (String, Option<String>, Option<String>, Option<String>) = tx.query_row(
-            "SELECT state,native_authority_namespace,native_authorization_id,native_replay_derivation_digest
+        let row: (
+            String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>
+        ) = tx.query_row(
+            "SELECT state,native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+                    native_authority_pin_set_id,native_authority_pin_set_digest
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
             params![record.authorization_instance, record.attempt_id, record.boundary_id],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
         let persisted_relying_party: Option<String> = tx.query_row(
             "SELECT relying_party_id FROM authorization_dispatches
@@ -1087,6 +1106,9 @@ impl SqliteAuthorizationStore {
         }
         Self::validate_persisted_native_replay_provenance(
             record, row.1.as_deref(), row.2.as_deref(), row.3.as_deref()
+        )?;
+        Self::validate_native_authority_pin_set_snapshot(
+            &tx, row.4.as_deref(), row.5.as_deref()
         )?;
         if !matches!(row.0.as_str(), "dispatch_pending" | "invoked" | "indeterminate") {
             if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
@@ -1127,13 +1149,15 @@ impl SqliteAuthorizationStore {
         tx.execute(
             "INSERT OR REPLACE INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
-              native_authority_namespace,native_authorization_id,native_replay_derivation_digest,relying_party_id,boundary_id,
+              native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+              native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,boundary_id,
               action_digest,provider_idempotency_key,target_identity,audience,outcome,evidence_id,
               evidence_digest,verifier_id,verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
-                record.native_replay_identity, row.1, row.2, row.3, self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
+                record.native_replay_identity, row.1, row.2, row.3, row.4, row.5,
+                self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
                 record.provider_idempotency_key, record.target_identity, record.audience,
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 evidence.evidence_id, evidence.evidence_digest, verified.configuration.verifier_id,
@@ -1479,11 +1503,12 @@ impl SqliteAuthorizationStore {
         tx.execute(
             "INSERT OR REPLACE INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
-              native_authority_namespace,native_authorization_id,native_replay_derivation_digest,relying_party_id,boundary_id,
+              native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+              native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,boundary_id,
               action_digest,provider_idempotency_key,target_identity,audience,outcome,evidence_id,
               evidence_digest,verifier_id,verifier_config_digest,trust_anchor_digest,
               evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity, native_provenance.0, native_provenance.1, native_provenance.2,
