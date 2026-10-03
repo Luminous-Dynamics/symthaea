@@ -157,6 +157,7 @@ jobs:
           dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
           unit_test_inventory=${{ steps.harness.outputs.unit_test_count }}
           integration_test_inventory=${{ steps.harness.outputs.integration_test_count }}
+          fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
