@@ -1427,6 +1427,16 @@ mod tests {
     }
 
     #[test]
+    fn effect_binding_rejects_empty_material_identities() {
+        assert!(!ActionEffectBinding::new("", "audience", "adapter").is_well_formed());
+        assert!(!ActionEffectBinding::new("target", "", "adapter").is_well_formed());
+        assert!(!ActionEffectBinding::new("target", "audience", "").is_well_formed());
+        assert!(ActionEffectBinding::new(
+            "target", "audience", "adapter"
+        ).is_well_formed());
+    }
+
+    #[test]
     fn effect_boundary_is_part_of_canonical_authorization_identity() {
         let effect = ActionEffectBinding::new("target:payments/ledger-7", "audience:ledger", "adapter:ledger-v2");
         let action = EpistemicAction::new("a-effect", "transfer", ActionRisk::Critical)
