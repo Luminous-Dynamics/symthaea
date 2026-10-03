@@ -186,6 +186,16 @@ jobs:
           test -n "$GEOMETRY_SWEEP"
           printf 'geometry_sweep=%s\n' "$GEOMETRY_SWEEP" >> "$GITHUB_OUTPUT"
 
+      - name: Capture published-grid search-space ledger
+        id: search_space
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity published_parameter_search_space_ledger_is_exact -- --nocapture 2>&1)"
+          SEARCH_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SEARCH_LEDGER=')"
+          test "$SEARCH_LEDGER_COUNT" -eq 1
+          SEARCH_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SEARCH_LEDGER=//p')"
+          test -n "$SEARCH_LEDGER"
+          printf 'search_ledger=%s\n' "$SEARCH_LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Capture published-parameter storage ledger
         id: storage
         run: |
@@ -300,6 +310,9 @@ jobs:
           storage_ledger_schema=linear-code-storage-v1
           storage_ledger_status=${{ steps.storage.outcome }}
           storage_ledger=${{ steps.storage.outputs.storage_ledger }}
+          search_ledger_schema=linear-code-search-v1
+          search_ledger_status=${{ steps.search_space.outcome }}
+          search_ledger=${{ steps.search_space.outputs.search_ledger }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
