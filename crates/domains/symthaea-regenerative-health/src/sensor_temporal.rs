@@ -441,6 +441,21 @@ mod tests {
     }
 
     #[test]
+    fn unexpected_verifier_identity_cannot_create_quorum() {
+        let mut a = pair("strain-a", 0.5, 1.5);
+        a.independence.topology_attestation.verification_result.verifier_id =
+            "unexpected-verifier".into();
+        let d = fusion_gate().assess(&[a, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::VerifierIdentityMismatch
+            )
+        )));
+    }
+
+    #[test]
     fn coherent_physical_change_remains_corroborated() {
         let d = fusion_gate().assess(&[
             pair("strain-a", 0.5, 1.5),
