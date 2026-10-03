@@ -2712,6 +2712,74 @@ mod tests {
     }
 
     #[test]
+    fn relying_party_scope_is_pinned_per_store() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-rp-scope-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-A").unwrap();
+        assert_eq!(store.relying_party_id(),"rp-A");
+        drop(store);
+
+        let same=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-A").unwrap();
+        assert_eq!(same.relying_party_id(),"rp-A");
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party(&path,"rp-B"),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party(&path,""),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn same_action_fence_is_scoped_to_pinned_relying_party_domain() {
+        let path_a=std::env::temp_dir().join(format!("symthaea-gis-auth-rp-a-{}.db",std::process::id()));
+        let path_b=std::env::temp_dir().join(format!("symthaea-gis-auth-rp-b-{}.db",std::process::id()));
+        let store_a=SqliteAuthorizationStore::open_with_relying_party(&path_a,"rp-A").unwrap();
+        let store_b=SqliteAuthorizationStore::open_with_relying_party(&path_b,"rp-B").unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-cross-rp","prod","adapter-A");
+        let action=EpistemicAction::new("rp-scoped-action","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+
+        for (store,instance,attempt,boundary,operation,native) in [
+            (&store_a,"rp-approval-a","attempt-rp-a","boundary-A","operation-rp-a","native-rp-a"),
+            (&store_b,"rp-approval-b","attempt-rp-b","boundary-B","operation-rp-b","native-rp-b"),
+        ] {
+            let witness=ActionAuthorizationWitness {
+                authorization_instance:instance.into(),
+                action_id:action.id.clone(),
+                action_digest:digest.clone(),
+                frame:"frame@1".into(),
+                support_digest:"support".into(),
+                policy:"policy@1".into(),
+                decision:"execute".into(),
+                issued_at:"2026-10-03T06:00:00Z".into(),
+                expires_at:None,
+                authority_epoch:1,
+            };
+            store.register_lease(&AuthorizationLease::new_with_instance(
+                instance,action.id.clone(),digest.clone(),"support","policy@1",1,1
+            )).unwrap();
+            store.prepare_for_execution_bound(&witness,&action,"frame@1",attempt,boundary).unwrap();
+            let record=store.mark_dispatch_pending_bound(
+                instance,attempt,&action,&effect,boundary,operation,native
+            ).unwrap();
+            assert_eq!(record.target_identity,"target-cross-rp");
+            let persisted_rp:String=store.connection().unwrap().query_row(
+                "SELECT relying_party_id FROM authorization_dispatches
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![instance,attempt],
+                |row| row.get(0)
+            ).unwrap();
+            assert_eq!(persisted_rp,store.relying_party_id());
+        }
+
+        let _=std::fs::remove_file(path_a);
+        let _=std::fs::remove_file(path_b);
+    }
+
+    #[test]
     fn current_instance_store_is_upgraded_with_boundary_columns_and_indexes() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-migrate-{}.db",std::process::id()));
         {
@@ -2753,6 +2821,18 @@ mod tests {
         ).unwrap();
         assert_eq!(lease_boundary,"boundary_id");
         assert_eq!(receipt_boundary,"boundary_id");
+
+        let rp_count:i64=lease.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('authorization_dispatches') WHERE name='relying_party_id'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(rp_count,1);
+
+        let metadata:String=lease.query_row(
+            "SELECT value FROM authorization_store_metadata WHERE key='relying_party_id'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(metadata,"legacy-local");
 
         for table in ["authorization_dispatches","authorization_terminal_evidence"] {
             for column in [
