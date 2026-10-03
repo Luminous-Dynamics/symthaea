@@ -1048,7 +1048,9 @@ impl VerificationContext {
     /// Supplemental evaluator/trust/authorization identities are deliberately
     /// excluded because they can be supplied by an external evaluation authority.
     pub fn matches_report(&self, report: &ReceiptAttestationVerificationReport) -> bool {
-        self.context_version == VERIFICATION_CONTEXT_VERSION
+        self.is_well_formed()
+            && report.is_well_formed()
+            && self.context_version == VERIFICATION_CONTEXT_VERSION
             && self.policy_fingerprint == report.policy_fingerprint
             && self.verifier_id == VERIFIER_IMPLEMENTATION_ID
             && self.verifier_version == report.verifier_version
@@ -3144,6 +3146,28 @@ mod tests {
             ..context.clone()
         }.fingerprint());
         assert!(!context.is_well_formed());
+    }
+
+    #[test]
+    fn verification_context_matches_report_rejects_malformed_report() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let context = VerificationContext::from_report(&report);
+
+        assert!(context.matches_report(&report));
+
+        let mut malformed_report = report;
+        malformed_report.structural_validation = VerificationStage::Failed(
+            ReceiptAttestationVerificationOutcome::InvalidEnvelope,
+        );
+
+        assert!(!malformed_report.is_well_formed());
+        assert!(!context.matches_report(&malformed_report));
     }
 
     #[test]
