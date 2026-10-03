@@ -238,6 +238,10 @@ pub struct DeploymentPlan {
     pub schema_version: String,
     pub intent: DeploymentIntent,
     pub target_snapshot: TargetSnapshot,
+    /// Maximum age permitted between target observation and authorization.
+    /// The executor should re-observe before execution when this window has
+    /// elapsed, especially for storage or boot-chain mutations.
+    pub max_target_snapshot_age_ms: Option<u64>,
     pub steps: Vec<PlanStep>,
     pub verification: VerificationPolicy,
     pub rollback: RollbackPolicy,
@@ -336,6 +340,16 @@ impl AuthorizationEvidence {
             return Err(PlanValidationError::AuthorizationIntentDigestMismatch);
         }
 
+        if let Some(max_age_ms) = plan.max_target_snapshot_age_ms {
+            let age_ms = now_ms.saturating_sub(plan.target_snapshot.observed_at_ms);
+            if age_ms > max_age_ms {
+                return Err(PlanValidationError::TargetSnapshotStale {
+                    age_ms,
+                    max_age_ms,
+                });
+            }
+        }
+
         let target_digest = plan
             .target_snapshot
             .profile
@@ -385,7 +399,7 @@ impl AuthorizationEvidence {
         for step in &plan.steps {
             validate_capabilities(
                 &step.required_capabilities,
-                &plan.target_profile.capabilities,
+                &plan.target_snapshot.profile.capabilities,
                 Some(&self.granted_capabilities),
             )?;
         }
@@ -462,6 +476,8 @@ pub enum PlanValidationError {
     AuthorizationPlanDigestMismatch,
     #[error("authorization target-snapshot digest does not match the observed target")]
     AuthorizationTargetSnapshotDigestMismatch,
+    #[error("target snapshot is stale: age {age_ms} ms exceeds maximum {max_age_ms} ms")]
+    TargetSnapshotStale { age_ms: u64, max_age_ms: u64 },
     #[error("authorization validity window is invalid")]
     AuthorizationWindowInvalid,
     #[error("authorization authority identifier is empty")]
@@ -509,6 +525,7 @@ mod tests {
                 observed_at_ms: 90,
                 observation_digest: ContentDigest::blake3(b"hardware-observation"),
             },
+            max_target_snapshot_age_ms: Some(200),
             steps: vec![
                 PlanStep {
                     sequence: 0,
@@ -594,6 +611,20 @@ mod tests {
         assert_eq!(
             plan.authorize(auth, 150),
             Err(PlanValidationError::AuthorizationTargetSnapshotDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_stale_target_snapshot() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+
+        assert_eq!(
+            plan.authorize(auth, 291),
+            Err(PlanValidationError::TargetSnapshotStale {
+                age_ms: 201,
+                max_age_ms: 200
+            })
         );
     }
 
