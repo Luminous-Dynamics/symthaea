@@ -442,8 +442,8 @@ fn overlapping_subspaces_without_shared_generators_still_recover_representativel
     assert_ne!(left.basis()[1], right.basis()[0]);
 
     let target = shared.clone();
-    let recovered =
-        recover_linear_bound(&target, &[&left, &right]).expect("target is in the union span");
+    let recovered = recover_linear_bound(&target, &[&left, &right])
+        .expect("target is in the union span");
 
     assert_eq!(recovered.len(), 2);
     assert!(left.contains(&recovered[0]));
