@@ -376,6 +376,72 @@ fn serde_rejects_duplicate_map_keys_before_canonicalization() {
 }
 
 #[test]
+fn public_raw_constructor_rejects_duplicate_named_maps() {
+    let toolchain = ExecutionLineageV1::from_raw_entries(
+        "luminous-dynamics/symthaea".into(),
+        "a".repeat(40),
+        "b".repeat(40),
+        "c".repeat(64),
+        vec![("Cargo.lock".into(), "sha256:0011223344556677".into())],
+        vec![
+            ("rustc".into(), "1.96.0".into()),
+            ("rustc".into(), "1.97.0".into()),
+        ],
+        "x86_64-unknown-linux-gnu".into(),
+        "x86_64-unknown-linux-gnu".into(),
+        Some("nix:fixture".into()),
+        vec!["default".into()],
+        "/workspace".into(),
+        vec!["cargo".into(), "test".into()],
+        vec![("RUST_BACKTRACE".into(), "0".into())],
+        vec![("fixture".into(), "blake3:8899aabbccddeeff".into())],
+    );
+    assert!(toolchain.unwrap_err().contains("duplicate name"));
+
+    let environment = ExecutionLineageV1::from_raw_entries(
+        "luminous-dynamics/symthaea".into(),
+        "a".repeat(40),
+        "b".repeat(40),
+        "c".repeat(64),
+        vec![("Cargo.lock".into(), "sha256:0011223344556677".into())],
+        vec![("rustc".into(), "1.96.0".into())],
+        "x86_64-unknown-linux-gnu".into(),
+        "x86_64-unknown-linux-gnu".into(),
+        Some("nix:fixture".into()),
+        vec!["default".into()],
+        "/workspace".into(),
+        vec!["cargo".into(), "test".into()],
+        vec![
+            ("RUST_BACKTRACE".into(), "0".into()),
+            ("RUST_BACKTRACE".into(), "1".into()),
+        ],
+        vec![("fixture".into(), "blake3:8899aabbccddeeff".into())],
+    );
+    assert!(environment.unwrap_err().contains("duplicate name"));
+
+    let immutable_inputs = ExecutionLineageV1::from_raw_entries(
+        "luminous-dynamics/symthaea".into(),
+        "a".repeat(40),
+        "b".repeat(40),
+        "c".repeat(64),
+        vec![("Cargo.lock".into(), "sha256:0011223344556677".into())],
+        vec![("rustc".into(), "1.96.0".into())],
+        "x86_64-unknown-linux-gnu".into(),
+        "x86_64-unknown-linux-gnu".into(),
+        Some("nix:fixture".into()),
+        vec!["default".into()],
+        "/workspace".into(),
+        vec!["cargo".into(), "test".into()],
+        vec![("RUST_BACKTRACE".into(), "0".into())],
+        vec![
+            ("fixture".into(), "blake3:8899aabbccddeeff".into()),
+            ("fixture".into(), "blake3:0011223344556677".into()),
+        ],
+    );
+    assert!(immutable_inputs.unwrap_err().contains("duplicate name"));
+}
+
+#[test]
 fn public_perturbation_classifier_reports_declared_and_collateral_drift() {
     let base = fixture();
     let mut environment = base.clone();
