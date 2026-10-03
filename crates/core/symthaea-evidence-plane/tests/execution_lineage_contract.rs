@@ -245,6 +245,29 @@ fn every_canonical_lineage_field_changes_identity_and_drift_report() {
 }
 
 #[test]
+fn invalid_current_lineage_cannot_advance_guard_phase() {
+    let base = fixture();
+    let mut invalid = base.clone();
+    invalid.source_revision = "not-a-git-object".into();
+
+    let mut guard = EvidenceLineageGuardV1::prepare(&base).unwrap();
+    let error = guard.commit_evidence(&invalid).unwrap_err();
+
+    assert!(matches!(
+        error,
+        symthaea_evidence_plane::execution_lineage::EvidenceLineageCommitError::InvalidCurrentLineage(_)
+    ));
+    assert_eq!(
+        guard.try_check(&base).unwrap(),
+        EvidenceLineageDecision::Stable
+    );
+    assert_eq!(
+        guard.try_check(&invalid).unwrap_err().to_string(),
+        "invalid or non-canonical Git object identity for source_revision: \"not-a-git-object\""
+    );
+}
+
+#[test]
 fn guard_refuses_cross_execution_evidence_after_commit() {
     let base = fixture();
     let mut changed = base.clone();
