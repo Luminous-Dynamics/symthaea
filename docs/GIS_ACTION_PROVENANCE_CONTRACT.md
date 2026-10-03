@@ -359,6 +359,8 @@ Commits `8af20f2f6618d17896b6d8b6513b3d99bf24aa10`, `002cc4385eb1545ca78372e9bde
 The boundary-scoped attempt namespace is now checked not only per durable row, but across the complete attempt lineage. For the same (authorization_instance, attempt_id), leases, receipts, status checks, recovery markers, terminal evidence, and dispatch records must agree on one non-empty boundary owner. Historical receipts or terminal evidence with a missing boundary may be backfilled only from the authoritative dispatch row; a conflicting non-empty boundary is never overwritten and causes startup or runtime validation to fail closed. This closes a cross-table splice in which every row could carry a locally valid (boundary_id, attempt_scope_digest) pair while the records described different execution boundaries. citeturn399269view0
 
 ### Bound receipts preserve the native provider replay key
+Commit `5c28726cfd10b043e3a33f6b6710f4996cd65554` extends this invariant to reads: any bound receipt must match the authoritative dispatch action identity, provider replay key, boundary, and derived attempt scope before it is returned. Adversarial coverage in `55af74534809f61d4204e56f16ec2930a8f08ad2` proves a forged bound receipt is rejected on read.
+
 
 Bound terminal receipts now persist the exact provider idempotency key used by the native-replay-derived dispatch. Re-reading or idempotently replaying a terminal receipt therefore returns that same key rather than reconstructing the legacy authorization-instance-derived key.
 
