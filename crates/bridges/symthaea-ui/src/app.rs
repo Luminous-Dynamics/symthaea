@@ -464,12 +464,14 @@ pub fn App() -> impl IntoView {
     });
 
     // Poll the movie renderer independently for the same device-loss handoff.
-    Effect::new(move |_| {
-        if !movie_webgpu_ready.get() {
-            return;
-        }
+    {
         let renderer = Rc::clone(&movie_webgpu_renderer);
-        spawn_local(async move {
+        Effect::new(move |_| {
+            if !movie_webgpu_ready.get() {
+                return;
+            }
+            let renderer = Rc::clone(&renderer);
+            spawn_local(async move {
             loop {
                 gloo_timers::future::TimeoutFuture::new(500).await;
                 let lost = renderer
@@ -481,8 +483,9 @@ pub fn App() -> impl IntoView {
                     break;
                 }
             }
+            });
         });
-    });
+    }
 
     // Poll GET-equivalent /v1/service status every 5s. This is baseline
     // liveness feedback independent of the telemetry WS above, which stays
