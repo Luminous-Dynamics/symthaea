@@ -2826,6 +2826,49 @@ mod tests {
         }
     }
 
+    struct TestProviderStatusVerifier;
+
+    impl ProviderStatusVerifier for TestProviderStatusVerifier {
+        fn verify_current_status(
+            &self,
+            purpose: ProviderStatusVerificationPurpose,
+            _issuer: &str,
+            _authority_namespace: &str,
+            _native_authorization_id: &str,
+            status_identifier: &str,
+            _action_digest: &str,
+            _target_identity: &str,
+            _audience: &str,
+            _adapter: &str,
+            expected_source_digest: Option<&str>,
+        ) -> Result<ProviderStatusEvidence, ProviderStatusVerificationError> {
+            if !matches!(
+                purpose,
+                ProviderStatusVerificationPurpose::Admission
+                    | ProviderStatusVerificationPurpose::PreEntry
+            ) || status_identifier.is_empty()
+            {
+                return Err(ProviderStatusVerificationError::InvalidBinding);
+            }
+
+            const SOURCE: &str = "sha256:test-status-source";
+            if expected_source_digest.is_some_and(|value| value != SOURCE) {
+                return Err(ProviderStatusVerificationError::InvalidBinding);
+            }
+
+            let observed = trusted_utc_now()
+                .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+            let valid_until = observed + Duration::seconds(30 * 60);
+            Ok(ProviderStatusEvidence {
+                status_identifier: status_identifier.to_owned(),
+                status_source_digest: SOURCE.to_owned(),
+                status_observed_at: observed.to_rfc3339_opts(SecondsFormat::Secs, true),
+                status_valid_until: valid_until.to_rfc3339_opts(SecondsFormat::Secs, true),
+                status_evidence_digest: "sha256:test-status-evidence".into(),
+            })
+        }
+    }
+
     fn verified_evidence(record: &DurableDispatchRecord, outcome: ExecutionOutcome) -> ProviderTerminalEvidence {
         ProviderTerminalEvidence {
             kind: ProviderEvidenceKind::TerminalOutcome,
@@ -2858,6 +2901,7 @@ mod tests {
         const ISSUER: &str = "test-issuer";
         const NAMESPACE: &str = "test-authority/v1";
         store.pin_native_authority_namespace(ISSUER, NAMESPACE)?;
+        let status_identifier = format!("status:{}", native_authorization_id.as_ref());
         store.mark_dispatch_pending_bound_from_pinned_native_authority(
             authorization_instance,
             attempt_id,
@@ -2867,6 +2911,8 @@ mod tests {
             operation_id.as_ref(),
             ISSUER,
             native_authorization_id.as_ref(),
+            &status_identifier,
+            &TestProviderStatusVerifier,
         )
     }
 
@@ -2883,6 +2929,7 @@ mod tests {
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         const ISSUER: &str = "test-explicit-issuer";
         store.pin_native_authority_namespace(ISSUER, authority_namespace)?;
+        let status_identifier = format!("status:{}", native_authorization_id);
         store.mark_dispatch_pending_bound_from_pinned_native_authority(
             authorization_instance,
             attempt_id,
@@ -2892,6 +2939,8 @@ mod tests {
             operation_id,
             ISSUER,
             native_authorization_id,
+            &status_identifier,
+            &TestProviderStatusVerifier,
         )
     }
 
@@ -3047,7 +3096,7 @@ mod tests {
             params![record.authorization_instance,record.attempt_id],
         ).unwrap();
         assert!(matches!(
-            store.mark_invoked_bound(&record),
+            store.mark_invoked_bound(&record, &TestProviderStatusVerifier),
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidNativeReplayProvenance
             ))
@@ -3596,7 +3645,7 @@ mod tests {
         ).unwrap();
 
         assert!(matches!(
-            store.mark_invoked_bound(&record),
+            store.mark_invoked_bound(&record, &TestProviderStatusVerifier),
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::AuthorizationValidityWindowFailed
             ))
@@ -3753,7 +3802,7 @@ mod tests {
             &witness.authorization_instance,"attempt-reconcile-key",&action,&effect,"boundary-A",
             "operation:reconcile-key","native-grant:reconcile"
         ).unwrap();
-        store.mark_invoked_bound(&record).unwrap();
+        store.mark_invoked_bound(&record, &TestProviderStatusVerifier).unwrap();
         store.recover_incomplete_attempt_for_boundary("boundary-A","attempt-reconcile-key").unwrap();
         let receipt=store.reconcile_indeterminate_bound_verified(
             &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier
@@ -3988,7 +4037,8 @@ mod tests {
                 "missing","attempt-missing",
                 &EpistemicAction::new("missing-action","intervention",super::super::ActionRisk::Critical),
                 &super::super::ActionEffectBinding::new("target-missing","prod","adapter"),
-                "boundary","operation","issuer.unpinned","native-auth"
+                "boundary","operation","issuer.unpinned","native-auth",
+                "status:missing","&TestProviderStatusVerifier"
             ),
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidNativeReplayProvenance
@@ -4028,7 +4078,8 @@ mod tests {
 
         let record=store.mark_dispatch_pending_bound_from_pinned_native_authority(
             "native-pin","attempt-native-pin",&action,&effect,"boundary-pin",
-            "operation:native-pin","issuer.example","native-auth-pin"
+            "operation:native-pin","issuer.example","native-auth-pin",
+            "status:native-auth-pin",&TestProviderStatusVerifier
         ).unwrap();
         let expected=super::super::NativeReplayDerivation::derive(
             "issuer.example/authority/v1","native-auth-pin"
@@ -4061,14 +4112,14 @@ mod tests {
         let mut wrong_operation=record.clone();
         wrong_operation.operation_id.push_str("-forged");
         assert!(matches!(
-            store.mark_invoked_bound(&wrong_operation),
+            store.mark_invoked_bound(&wrong_operation, &TestProviderStatusVerifier),
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
         ));
 
         let mut wrong_native=record.clone();
         wrong_native.native_replay_identity.push_str("-forged");
         assert!(matches!(
-            store.mark_invoked_bound(&wrong_native),
+            store.mark_invoked_bound(&wrong_native, &TestProviderStatusVerifier),
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
         ));
 
@@ -4189,9 +4240,9 @@ mod tests {
             format!("native-replay:{}", &witness.authorization_instance)).unwrap();
         assert_eq!(record.target_identity,"target-A");
         let mut tampered=record.clone(); tampered.adapter="adapter-B".into();
-        assert!(matches!(store.mark_invoked_bound(&tampered),Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))));
-        store.mark_invoked_bound(&record).unwrap();
-        assert!(store.mark_invoked_bound(&record).is_err());
+        assert!(matches!(store.mark_invoked_bound(&tampered, &TestProviderStatusVerifier),Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))));
+        store.mark_invoked_bound(&record, &TestProviderStatusVerifier).unwrap();
+        assert!(store.mark_invoked_bound(&record, &TestProviderStatusVerifier).is_err());
         let mut wrong_key=record.clone();
         wrong_key.provider_idempotency_key.push_str("-tampered");
         assert!(matches!(
@@ -4288,9 +4339,10 @@ mod tests {
         ).unwrap();
         let record_a=store.mark_dispatch_pending_bound_from_pinned_native_authority(
             "closed-a","attempt-closed-a",&action,&effect,"boundary-A",
-            "operation:closed-a","issuer.closed","native-closed-a"
+            "operation:closed-a","issuer.closed","native-closed-a",
+            "status:native-closed-a",&TestProviderStatusVerifier
         ).unwrap();
-        store.mark_invoked_bound(&record_a).unwrap();
+        store.mark_invoked_bound(&record_a, &TestProviderStatusVerifier).unwrap();
         store.commit_bound_verified(
             &record_a,
             &verified_evidence(&record_a,ExecutionOutcome::Succeeded),
@@ -4312,7 +4364,8 @@ mod tests {
         assert!(matches!(
             store.mark_dispatch_pending_bound_from_pinned_native_authority(
                 "closed-b","attempt-closed-b",&action,&effect,"boundary-B",
-                "operation:closed-b","issuer.closed","native-closed-b"
+                "operation:closed-b","issuer.closed","native-closed-b",
+                "status:native-closed-b",&TestProviderStatusVerifier
             ),
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::ActionAlreadyClosed
@@ -4399,7 +4452,7 @@ mod tests {
             store.mark_invoked("approval-legacy-fence","attempt-legacy-fence"),
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
         ));
-        store.mark_invoked_bound(&record).unwrap();
+        store.mark_invoked_bound(&record, &TestProviderStatusVerifier).unwrap();
         let _=std::fs::remove_file(path);
     }
 
