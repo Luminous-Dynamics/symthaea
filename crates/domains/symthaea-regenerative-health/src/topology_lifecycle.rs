@@ -293,6 +293,16 @@ mod tests {
         assert!(d.issues.contains(&TopologyLifecycleIssue::ConcurrentSuccessorFork));
     }
 
+
+    #[test]
+    fn stale_or_unrelated_predecessor_cannot_advance_the_admitted_lifecycle() {
+        let mut s = successor("topology-v2");
+        s.predecessor_topology_digest = "topology-old".into();
+        let d = gate().assess(&[s]);
+        assert_eq!(d.state, TopologyLifecycleState::Quarantined);
+        assert!(d.issues.contains(&TopologyLifecycleIssue::PredecessorDigestMismatch));
+    }
+
     #[test]
     fn epoch_skip_is_quarantined() {
         let mut s = successor("topology-v3");
