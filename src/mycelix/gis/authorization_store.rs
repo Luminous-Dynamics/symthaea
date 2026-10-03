@@ -1283,8 +1283,6 @@ impl SqliteAuthorizationStore {
         } else if existing.iter().zip(values.iter()).all(|(stored, expected)| {
             stored.as_deref() == Some(*expected)
         }) {
-            stored.as_deref() == Some(*expected)
-        }) {
             // Already pinned to exactly this configuration.
         } else {
             return Err(AuthorizationStoreError::InvalidState(
