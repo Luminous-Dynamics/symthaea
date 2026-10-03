@@ -4,6 +4,14 @@ use symthaea_core::hdc::linear_code::{
 };
 
 #[test]
+fn canonical_fixture_fingerprint_is_emitted() {
+    let code = RandomLinearCode::generate(96, 8, 0xC0DE);
+    let fingerprint = hex::encode(code.fingerprint());
+    println!("FIXTURE_FINGERPRINT={fingerprint}");
+    assert_eq!(fingerprint.len(), 64);
+}
+
+#[test]
 fn arbitrary_same_subspace_bound_is_not_uniquely_identifiable() {
     let code = RandomLinearCode::generate(96, 8, 0xD00D);
     let a = code.encode(&[true, false, true, false, false, true, false, true]);
