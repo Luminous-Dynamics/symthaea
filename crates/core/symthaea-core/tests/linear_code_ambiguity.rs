@@ -13,6 +13,16 @@ fn canonical_fixture_fingerprint_is_emitted() {
         .collect::<String>();
     println!("FIXTURE_FINGERPRINT={fingerprint}");
     assert_eq!(fingerprint.len(), 64);
+
+    // The fingerprint is intentionally sensitive to basis ordering: the
+    // ordered packed basis is part of fixture identity, not merely the span.
+    let mut reordered = code.clone();
+    reordered.basis.reverse();
+    assert_ne!(code.fingerprint(), reordered.fingerprint());
+
+    // Dimension is also part of the domain-separated identity.
+    let different_dimension = RandomLinearCode::generate(95, 8, 0xC0DE);
+    assert_ne!(code.fingerprint(), different_dimension.fingerprint());
 }
 
 #[test]
