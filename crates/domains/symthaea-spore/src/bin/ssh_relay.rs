@@ -139,7 +139,50 @@ fn parse_stage(output: &str) -> Option<NixosAnywhereStage> {
     }
 }
 
-/// Validate browser Origin values against domains we still control.let allowed = is_allowed_web_origin(origin_str);n///let ok = is_allowed_web_origin(o);n/// This intentionally uses an exact host/suffix check rather than substring matching.\n/// An attacker-controlled origin such as \`https://luminousdynamics.io.attacker.example\`\n/// must never inherit trust because it happens to contain our domain name.\nfn is_allowed_web_origin(origin: &str) -> bool {\n    let (scheme, authority) = if let Some(rest) = origin.strip_prefix("https://") {\n        ("https", rest)\n    } else if let Some(rest) = origin.strip_prefix("http://") {\n        ("http", rest)\n    } else {\n        return false;\n    };\n\n    // Origin is scheme + host + optional port. Paths, query strings, fragments,\n    // and userinfo are not valid trust-boundary material here.\n    if authority.is_empty()\n        || authority.chars().any(|c| matches!(c, '/' | '?' | '#' | '@'))\n    {\n        return false;\n    }\n\n    let host = if let Some((host, port)) = authority.rsplit_once(':') {\n        if host.is_empty() || port.is_empty() || !port.chars().all(|c| c.is_ascii_digit()) {\n            return false;\n        }\n        host.to_ascii_lowercase()\n    } else {\n        authority.to_ascii_lowercase()\n    };\n\n    match scheme {\n        "http" => host == "localhost" || host == "127.0.0.1",\n        "https" => {\n            host == "luminousdynamics.io"\n                || host.ends_with(".luminousdynamics.io")\n                || host == "nixforhumanity.org"\n                || host.ends_with(".nixforhumanity.org")\n        }\n        _ => false,\n    }\n}\n\n// Security validators imported from symthaea_spore::security (see use statement above).
+/// Validate browser Origin values against domains we still control.
+///
+/// This intentionally uses an exact host/suffix check rather than substring matching.
+/// An attacker-controlled origin such as `https://luminousdynamics.io.attacker.example`
+/// must never inherit trust because it happens to contain our domain name.
+fn is_allowed_web_origin(origin: &str) -> bool {
+    let (scheme, authority) = if let Some(rest) = origin.strip_prefix("https://") {
+        ("https", rest)
+    } else if let Some(rest) = origin.strip_prefix("http://") {
+        ("http", rest)
+    } else {
+        return false;
+    };
+
+    // Origin is scheme + host + optional port. Paths, query strings, fragments,
+    // and userinfo are not valid trust-boundary material here.
+    if authority.is_empty()
+        || authority.chars().any(|c| matches!(c, '/' | '?' | '#' | '@'))
+    {
+        return false;
+    }
+
+    let host = if let Some((host, port)) = authority.rsplit_once(':') {
+        if host.is_empty() || port.is_empty() || !port.chars().all(|c| c.is_ascii_digit()) {
+            return false;
+        }
+        host.to_ascii_lowercase()
+    } else {
+        authority.to_ascii_lowercase()
+    };
+
+    match scheme {
+        "http" => host == "localhost" || host == "127.0.0.1",
+        "https" => {
+            host == "luminousdynamics.io"
+                || host.ends_with(".luminousdynamics.io")
+                || host == "nixforhumanity.org"
+                || host.ends_with(".nixforhumanity.org")
+        }
+        _ => false,
+    }
+}
+
+// Security validators imported from symthaea_spore::security (see use statement above).
 // Local definitions removed — single source of truth for fuzzing and testing.
 
 // ── sanitize_heredoc also imported from security module ──
@@ -2364,14 +2407,7 @@ async fn handle_connection(
     > {
         if let Some(origin) = req.headers().get("origin") {
             let origin_str = origin.to_str().unwrap_or("");
-            let allowed = origin_str.starts_with("http://localhost")
-                || origin_str.starts_with("https://localhost")
-                || origin_str.starts_with("http://127.0.0.1")
-                || origin_str.starts_with("https://127.0.0.1")
-                || origin_str.contains("luminousdynamics.io")
-                || origin_str.contains("nixforhumanity.org")
-                || origin_str.contains("mycelix.net")
-                || origin_str.contains("relationalharmonics.org");
+            let allowed = is_allowed_web_origin(origin_str);
             if !allowed {
                 eprintln!(
                     "[{}] Rejected WebSocket: disallowed Origin '{}'",
@@ -5274,14 +5310,7 @@ async fn main() {
                         > {
                             if let Some(origin) = req.headers().get("origin") {
                                 let o = origin.to_str().unwrap_or("");
-                                let ok = o.starts_with("http://localhost")
-                                    || o.starts_with("https://localhost")
-                                    || o.starts_with("http://127.0.0.1")
-                                    || o.starts_with("https://127.0.0.1")
-                                    || o.contains("luminousdynamics.io")
-                                    || o.contains("nixforhumanity.org")
-                                    || o.contains("mycelix.net")
-                                    || o.contains("relationalharmonics.org");
+                                let ok = is_allowed_web_origin(o);
                                 if !ok {
                                     eprintln!(
                                         "[{}] Rejected TLS WebSocket: disallowed Origin '{}'",
@@ -5425,7 +5454,40 @@ mod tests {
         assert_eq!(validate_disk_path("  /dev/sda  ").unwrap(), "/dev/sda");
     }
 
-    // ── WebSocket Origin validation ──\n\n    #[test]\n    fn origin_accepts_owned_domains() {\n        assert!(is_allowed_web_origin("https://luminousdynamics.io"));\n        assert!(is_allowed_web_origin("https://pulse.luminousdynamics.io"));\n        assert!(is_allowed_web_origin("https://install.nixforhumanity.org:443"));\n    }\n\n    #[test]\n    fn origin_rejects_expired_or_unowned_domains() {\n        assert!(!is_allowed_web_origin("https://mycelix.net"));\n        assert!(!is_allowed_web_origin("https://relationalharmonics.org"));\n    }\n\n    #[test]\n    fn origin_rejects_suffix_confusion() {\n        assert!(!is_allowed_web_origin("https://luminousdynamics.io.attacker.example"));\n        assert!(!is_allowed_web_origin("https://notluminousdynamics.io"));\n    }\n\n    #[test]\n    fn origin_rejects_paths_and_userinfo() {\n        assert!(!is_allowed_web_origin("https://luminousdynamics.io/login"));\n        assert!(!is_allowed_web_origin("https://user@luminousdynamics.io"));\n    }\n\n    #[test]\n    fn origin_allows_local_development() {\n        assert!(is_allowed_web_origin("http://localhost:3000"));\n        assert!(is_allowed_web_origin("https://127.0.0.1:8443"));\n        assert!(!is_allowed_web_origin("https://localhost.attacker.example"));\n    }\n\n    // ── token_eq (constant-time comparison) ──
+    // ── WebSocket Origin validation ──
+
+    #[test]
+    fn origin_accepts_owned_domains() {
+        assert!(is_allowed_web_origin("https://luminousdynamics.io"));
+        assert!(is_allowed_web_origin("https://pulse.luminousdynamics.io"));
+        assert!(is_allowed_web_origin("https://install.nixforhumanity.org:443"));
+    }
+
+    #[test]
+    fn origin_rejects_expired_or_unowned_domains() {
+        assert!(!is_allowed_web_origin("https://mycelix.net"));
+        assert!(!is_allowed_web_origin("https://relationalharmonics.org"));
+    }
+
+    #[test]
+    fn origin_rejects_suffix_confusion() {
+        assert!(!is_allowed_web_origin("https://luminousdynamics.io.attacker.example"));
+        assert!(!is_allowed_web_origin("https://notluminousdynamics.io"));
+    }
+
+    #[test]
+    fn origin_rejects_paths_and_userinfo() {
+        assert!(!is_allowed_web_origin("https://luminousdynamics.io/login"));
+        assert!(!is_allowed_web_origin("https://user@luminousdynamics.io"));
+    }
+
+    #[test]
+    fn origin_allows_local_development() {
+        assert!(is_allowed_web_origin("http://localhost:3000"));
+        assert!(is_allowed_web_origin("https://127.0.0.1:8443"));
+        assert!(!is_allowed_web_origin("https://localhost.attacker.example"));
+    }
+    // ── token_eq (constant-time comparison) ──
 
     #[test]
     fn token_eq_same() {
