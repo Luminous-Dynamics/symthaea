@@ -1,6 +1,7 @@
 use symthaea_core::hdc::linear_code::{
-    BinaryCodeword, RandomLinearCode, basis_rank, recover_direct_sum_bound,
-    recover_independent_bound, recover_linear_bound, solve_linear_combination,
+    BinaryCodeword, LinearCodeWork, RandomLinearCode, basis_rank, recover_direct_sum_bound,
+    recover_independent_bound, recover_linear_bound, recover_linear_bound_with_work,
+    solve_linear_combination,
 };
 
 const CANONICAL_FIXTURE_DIMENSION: usize = 96;
@@ -34,6 +35,37 @@ fn canonical_fixture_fingerprint_is_emitted() {
     // Dimension is also part of the domain-separated identity.
     let different_dimension = RandomLinearCode::generate(95, 8, 0xC0DE);
     assert_ne!(code.fingerprint(), different_dimension.fingerprint());
+}
+
+#[test]
+fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
+    let (parent, left, right) =
+        RandomLinearCode::generate_direct_sum(96, 6, 6, 0x1111).expect("valid direct sum");
+    let target = left.basis()[0].bound(&right.basis()[0]);
+
+    let (first, first_work) =
+        recover_linear_bound_with_work(&target, &[&left, &right]);
+    let (second, second_work) =
+        recover_linear_bound_with_work(&target, &[&left, &right]);
+
+    assert_eq!(first, second);
+    assert_eq!(first_work, second_work);
+    assert_eq!(first_work.retained_generators, parent.rank());
+    assert_eq!(first_work.span_membership_checks, parent.rank());
+    assert!(first_work.basis_rank_pivots > 0);
+    assert!(first_work.solve_pivots > 0);
+    assert!(first_work.basis_rank_row_xor_words > 0);
+    assert!(first_work.solve_row_xor_words > 0);
+
+    println!(
+        "WORK_LEDGER=span_membership_checks={};basis_rank_pivots={};basis_rank_row_xor_words={};solve_pivots={};solve_row_xor_words={};retained_generators={}",
+        first_work.span_membership_checks,
+        first_work.basis_rank_pivots,
+        first_work.basis_rank_row_xor_words,
+        first_work.solve_pivots,
+        first_work.solve_row_xor_words,
+        first_work.retained_generators,
+    );
 }
 
 #[test]
