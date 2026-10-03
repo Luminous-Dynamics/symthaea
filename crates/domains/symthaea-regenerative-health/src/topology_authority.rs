@@ -14,6 +14,11 @@ use crate::topology_resolution::{
     TopologyBranchReference, TopologyLifecycleResolution, TopologyResolutionGate,
     TopologyResolutionIssue, TopologyResolutionPolicy, TopologyResolutionState,
 };
+use crate::topology_resolution_verification::{
+    TopologyResolutionVerificationDecision, TopologyResolutionVerificationGate,
+    TopologyResolutionVerificationIssue, TopologyResolutionVerificationPolicy,
+    TopologyResolutionVerificationResult, TopologyResolutionVerificationState,
+};
 use crate::topology_revocation::{
     TopologyLifecycleRevocation, TopologyRevocationGate, TopologyRevocationIssue,
     TopologyRevocationPolicy, TopologyRevocationState,
@@ -33,6 +38,7 @@ pub enum TopologyAuthorityState {
 pub enum TopologyAuthorityIssue {
     Resolution(TopologyResolutionIssue),
     Revocation(TopologyRevocationIssue),
+    Verification(TopologyResolutionVerificationIssue),
     RevocationWithoutResolvedAuthority,
     SuccessorNotYetEffective,
 }
@@ -43,6 +49,7 @@ pub struct TopologyAuthorityPolicy {
     pub policy_id: String,
     pub resolution_policy: TopologyResolutionPolicy,
     pub revocation_policy: TopologyRevocationPolicy,
+    pub resolution_verification_policy: TopologyResolutionVerificationPolicy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,6 +70,7 @@ pub struct TopologyAuthorityGate {
     policy: TopologyAuthorityPolicy,
     resolution_gate: TopologyResolutionGate,
     revocation_gate: TopologyRevocationGate,
+    resolution_verification_gate: TopologyResolutionVerificationGate,
 }
 
 impl TopologyAuthorityGate {
@@ -74,6 +82,9 @@ impl TopologyAuthorityGate {
         Ok(Self {
             resolution_gate: TopologyResolutionGate::new(policy.resolution_policy.clone())?,
             revocation_gate: TopologyRevocationGate::new(policy.revocation_policy.clone())?,
+            resolution_verification_gate: TopologyResolutionVerificationGate::new(
+                policy.resolution_verification_policy.clone(),
+            )?,
             policy,
         })
     }
@@ -81,6 +92,7 @@ impl TopologyAuthorityGate {
     pub fn assess(
         &self,
         resolution: Option<&TopologyLifecycleResolution>,
+        verification: Option<&TopologyResolutionVerificationResult>,
         revocation: Option<&TopologyLifecycleRevocation>,
         observed_successors: &[TopologyBranchReference],
         now_ms: u64,
@@ -142,6 +154,32 @@ impl TopologyAuthorityGate {
                         ..base
                     };
                 };
+
+                let verification_decision =
+                    self.resolution_verification_gate
+                        .assess(resolution, verification, now_ms);
+                issues.extend(
+                    verification_decision
+                        .issues
+                        .iter()
+                        .cloned()
+                        .map(TopologyAuthorityIssue::Verification),
+                );
+                if verification_decision.state
+                    != TopologyResolutionVerificationState::Verified
+                {
+                    return TopologyAuthorityDecision {
+                        state: if verification_decision.state
+                            == TopologyResolutionVerificationState::InsufficientEvidence
+                        {
+                            TopologyAuthorityState::Quarantined
+                        } else {
+                            TopologyAuthorityState::Quarantined
+                        },
+                        issues,
+                        ..base
+                    };
+                }
 
                 if let Some(revocation) = revocation {
                     let revocation_decision = self.revocation_gate.assess(revocation, now_ms);
@@ -229,6 +267,18 @@ mod tests {
         }
     }
 
+    fn verification() -> TopologyResolutionVerificationResult {
+        TopologyResolutionVerificationResult {
+            schema_version: "0.1".into(),
+            verifier_id: "mycelix-topology-verifier".into(),
+            resolution_id: "resolution-2".into(),
+            authority_statement_digest: "resolution-digest-2".into(),
+            verification_reference: "resolution-verify-2".into(),
+            verified_at_ms: 2_100,
+            valid_until_ms: 4_000,
+        }
+    }
+
     fn revocation() -> TopologyLifecycleRevocation {
         TopologyLifecycleRevocation {
             schema_version: "0.1".into(),
@@ -273,6 +323,11 @@ mod tests {
                 expected_current_resolution_id: "resolution-2".into(),
                 expected_current_authority_statement_digest: "resolution-digest-2".into(),
             },
+            resolution_verification_policy: TopologyResolutionVerificationPolicy {
+                schema_version: "0.1".into(),
+                policy_id: "topology-resolution-verification-v1".into(),
+                expected_verifier_id: "mycelix-topology-verifier".into(),
+            },
         })
         .unwrap()
     }
@@ -281,7 +336,7 @@ mod tests {
     fn resolved_without_revocation_is_current() {
         let a = branch("topology-v2a");
         let r = resolution("topology-v2a", vec![a.clone()]);
-        let d = gate().assess(Some(&r), None, &[a], 3_000);
+        let d = gate().assess(Some(&r), Some(&verification()), None, &[a], 3_000);
         assert_eq!(d.state, TopologyAuthorityState::Current);
     }
 
@@ -301,7 +356,7 @@ mod tests {
     fn valid_revocation_overrides_resolved_authority() {
         let a = branch("topology-v2a");
         let r = resolution("topology-v2a", vec![a.clone()]);
-        let d = gate().assess(Some(&r), Some(&revocation()), &[a], 3_001);
+        let d = gate().assess(Some(&r), Some(&verification()), Some(&revocation()), &[a], 3_001);
         assert_eq!(d.state, TopologyAuthorityState::Revoked);
         assert_eq!(d.revocation_id.as_deref(), Some("revocation-2"));
     }
@@ -311,7 +366,7 @@ mod tests {
         let a = branch("topology-v2a");
         let mut r = resolution("topology-v2a", vec![a.clone()]);
         r.selected_successor_effective_from_ms = 4_000;
-        let d = gate().assess(Some(&r), Some(&revocation()), &[a], 3_001);
+        let d = gate().assess(Some(&r), Some(&verification()), Some(&revocation()), &[a], 3_001);
         assert_eq!(d.state, TopologyAuthorityState::Revoked);
         assert!(!d
             .issues
@@ -333,7 +388,7 @@ mod tests {
         let r = resolution("topology-v2a", vec![a.clone()]);
         let mut revoke = revocation();
         revoke.target_resolution_id = "resolution-old".into();
-        let d = gate().assess(Some(&r), Some(&revoke), &[a], 3_001);
+        let d = gate().assess(Some(&r), Some(&verification()), Some(&revoke), &[a], 3_001);
         assert_eq!(d.state, TopologyAuthorityState::Quarantined);
         assert!(d.issues.iter().any(|issue| matches!(
             issue,
@@ -346,7 +401,7 @@ mod tests {
     #[test]
     fn revocation_without_resolved_authority_does_not_create_authority() {
         let a = branch("topology-v2a");
-        let d = gate().assess(None, Some(&revocation()), &[a], 3_001);
+        let d = gate().assess(None, None, Some(&revocation()), &[a], 3_001);
         assert_eq!(d.state, TopologyAuthorityState::InsufficientEvidence);
         assert!(d
             .issues
@@ -357,7 +412,7 @@ mod tests {
     fn unresolved_fork_remains_conflicted_even_with_a_revocation_claim() {
         let a = branch("topology-v2a");
         let b = branch("topology-v2b");
-        let d = gate().assess(None, Some(&revocation()), &[a, b], 3_001);
+        let d = gate().assess(None, None, Some(&revocation()), &[a, b], 3_001);
         assert_eq!(d.state, TopologyAuthorityState::Conflicted);
         assert!(d
             .issues
