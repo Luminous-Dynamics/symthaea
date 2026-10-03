@@ -139,6 +139,8 @@ The comparator now exposes a research-only `LinearCodeWork` ledger rather than r
 
 Repeated execution of the same deterministic fixture must produce both the same recovered result and the same ledger. These counters are algorithmic work units, not a universal hardware-independent runtime estimate, and must not be collapsed into a composite performance score.
 
+Each emitted work/scaling record is now self-identifying with its dimension, factor ranks, and seed; the receipt therefore carries fixture identity alongside algorithmic work units.
+
 This ledger is intended to test the structure of the recovery algorithm before timing or energy measurements are introduced. In particular, the measurement should preserve the distinction between the maximal-independent-subset construction and the final linear solve described by the paper.
 
 #### Small-fixture scaling qualification
