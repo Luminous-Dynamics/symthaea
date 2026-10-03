@@ -376,6 +376,27 @@ mod tests {
     }
 
     #[test]
+    fn branch_set_digest_mismatch_is_quarantined() {
+        let a = branch("topology-v2a");
+        let b = branch("topology-v2b");
+        let mut r = resolution("topology-v2a", vec![a.clone(), b.clone()]);
+        r.observed_successors_digest = "tampered-branch-set".into();
+        let d = gate().assess(Some(&r), &[a, b], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionIssue::BranchSetDigestMismatch));
+    }
+
+    #[test]
+    fn branch_set_digest_is_order_independent() {
+        let a = branch("topology-v2a");
+        let b = branch("topology-v2b");
+        assert_eq!(
+            branch_set_digest(&[a.clone(), b.clone()]),
+            branch_set_digest(&[b, a]),
+        );
+    }
+
+    #[test]
     fn authoritative_resolution_can_select_one_observed_branch() {
         let a = branch("topology-v2a");
         let b = branch("topology-v2b");
