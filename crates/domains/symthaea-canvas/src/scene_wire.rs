@@ -129,7 +129,7 @@ impl RemoteScene {
 
         // Serialization size is part of the protocol contract. Never emit a
         // partially serialized scene; replace it atomically with an inert root.
-        if remote.serialized_len() <= MAX_SCENE_BYTES {
+        if remote.is_supported() {
             remote
         } else {
             remote.root = WireNode {
@@ -736,6 +736,23 @@ mod tests {
             root,
         };
         assert!(!scene.is_supported());
+    }
+
+    #[test]
+    fn compiled_invalid_closed_polygon_falls_back_to_inert_root() {
+        let scene = SceneNode::polygon(
+            vec![
+                (20.0, 20.0),
+                (140.0, 140.0),
+                (20.0, 140.0),
+                (140.0, 20.0),
+            ],
+            true,
+        );
+        let wire = RemoteScene::from_scene(&scene);
+        assert!(matches!(wire.root.primitive, WirePrimitive::Group));
+        assert!(wire.root.children.is_empty());
+        assert!(wire.is_supported());
     }
 
     #[test]
