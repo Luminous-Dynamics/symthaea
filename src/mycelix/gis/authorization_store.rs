@@ -2139,6 +2139,7 @@ fn validate_native_authority_pin_set(
         authority_namespace: &str,
     ) -> Result<(), AuthorizationStoreError> {
         if action.effect_binding.as_ref() != Some(expected_effect)
+            || !expected_effect.is_well_formed()
             || authorization_instance.is_empty()
             || attempt_id.is_empty()
             || boundary_id.is_empty()
