@@ -46,6 +46,8 @@ IMPLICIT_SERVICE_RESTART_PATTERN='_[[:space:]]*=>[[:space:]]*NixOSCommand::Custo
 VALIDATED_OPERATION_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceOperationV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceOperationV1\b'
 OBSERVED_STATE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceObservedStateV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceObservedStateV1\b'
 OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceObservedStateV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
+ENABLEMENT_EVIDENCE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceEnablementEvidenceV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceEnablementEvidenceV1\b'
+ENABLEMENT_EVIDENCE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceEnablementEvidenceV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
 OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
 SYSTEMD_TRANSPORT_PUBLIC_API_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(observe_service_properties|observe_service_state_properties)[[:space:]]*\('
 
@@ -163,8 +165,18 @@ run_boundary_check() {
     echo "${matches}" >&2
     failed=1
   fi
+  if matches="$(rg -U -n --pcre2 "${ENABLEMENT_EVIDENCE_DESERIALIZATION_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
+    echo "ERROR: NixServiceEnablementEvidenceV1 must not deserialize around its observation boundary" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
   if matches="$(rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
     echo "ERROR: NixServiceObservedStateV1 constructor must not be public" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+  if matches="$(rg -U -n --pcre2 "${ENABLEMENT_EVIDENCE_PUBLIC_CONSTRUCTOR_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
+    echo "ERROR: NixServiceEnablementEvidenceV1 constructor must not be public" >&2
     echo "${matches}" >&2
     failed=1
   fi
@@ -305,6 +317,89 @@ run_self_test() {
     ) {}' > "${tmp}/observed-state-public-constructor.rs"
   if rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/observed-state-public-constructor.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect public observed-state constructor" >&2
+    return 1
+  fi
+
+  printf '%s\n'   printf '%s\n' 'pub fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-public-parser.rs"
+  if scan_public_observation_factory "${tmp}/observed-state-public-parser.rs"; then :; else
+    echo "ERROR: CROSS-023 self-test failed to detect public observed-state parser" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub fn from_observed_state(...) {}' > "${tmp}/observed-state-public-factory.rs"
+  if scan_public_observation_factory "${tmp}/observed-state-public-factory.rs"; then :; else
+    echo "ERROR: CROSS-023 self-test failed to detect public observed-state factory" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub(crate) fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-crate-parser.rs"
+  if scan_public_observation_factory "${tmp}/observed-state-crate-parser.rs"; then
+    echo "ERROR: CROSS-023 self-test falsely rejected crate-private observation parser" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub fn observe_service_properties(...) {}' > "${tmp}/systemd-transport-public.rs"
+  if scan_public_systemd_transport_api "${tmp}/systemd-transport-public.rs"; then :; else
+    echo "ERROR: CROSS-024 self-test failed to detect public systemd transport entry point" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub async fn observe_service_properties(...) {}' > "${tmp}/systemd-transport-public-async.rs"
+  if scan_public_systemd_transport_api "${tmp}/systemd-transport-public-async.rs"; then :; else
+    echo "ERROR: CROSS-024 self-test failed to detect public async systemd transport entry point" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub(crate) fn observe_service_properties(...) {}' > "${tmp}/systemd-transport-crate-private.rs"
+  if scan_public_systemd_transport_api "${tmp}/systemd-transport-crate-private.rs"; then
+    echo "ERROR: CROSS-024 self-test falsely rejected crate-private systemd transport entry point" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub mod systemd_transport;' > "${tmp}/systemd-transport-public-module.rs"
+  if rg -n '^pub[[:space:]]+mod[[:space:]]+systemd_transport;' "${tmp}/systemd-transport-public-module.rs"; then :; else
+    echo "ERROR: CROSS-024 self-test failed to detect public systemd transport module" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub(crate) mod systemd_transport;' > "${tmp}/systemd-transport-crate-private-module.rs"
+  if rg -n '^pub[[:space:]]+mod[[:space:]]+systemd_transport;' "${tmp}/systemd-transport-crate-private-module.rs"; then
+    echo "ERROR: CROSS-024 self-test falsely rejected crate-private systemd transport module" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub async fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-public-async-parser.rs"
+  if scan_public_observation_factory "${tmp}/observed-state-public-async-parser.rs"; then :; else
+    echo "ERROR: CROSS-023 self-test failed to detect public async observed-state parser" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'impl NixServiceObservedStateV1 {
+    pub async fn new(
+        unit: String,
+    ) {}' > "${tmp}/observed-state-public-async-constructor.rs"
+  if rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/observed-state-public-async-constructor.rs"; then :; else
+    echo "ERROR: CROSS-022 self-test failed to detect public async observed-state constructor" >&2
+    return 1
+  fi
+}
+
+
+run_self_test
+run_boundary_check
+echo "CROSS-015: Nixward governed observation boundary is clean."
+#[derive(\n    Deserialize,\n)]\npub struct NixServiceEnablementEvidenceV1;' > "${tmp}/enablement-evidence-deserialize.rs"
+  if rg -U -n --pcre2 "${ENABLEMENT_EVIDENCE_DESERIALIZATION_PATTERN}" "${tmp}/enablement-evidence-deserialize.rs"; then :; else
+    echo "ERROR: CROSS-025 self-test failed to detect multiline enablement-evidence deserialization" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'impl NixServiceEnablementEvidenceV1 {
+    pub fn new(
+        unit: String,
+    ) {}' > "${tmp}/enablement-evidence-public-constructor.rs"
+  if rg -U -n --pcre2 "${ENABLEMENT_EVIDENCE_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/enablement-evidence-public-constructor.rs"; then :; else
+    echo "ERROR: CROSS-025 self-test failed to detect public enablement-evidence constructor" >&2
     return 1
   fi
 
