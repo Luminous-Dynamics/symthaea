@@ -4409,6 +4409,9 @@ mod tests {
         fn configuration(&self) -> ProviderStatusVerifierConfiguration {
             ProviderStatusVerifierConfiguration::new(
                 "test-status-verifier/v1",
+                "test-status-verifier/rev1",
+                "test-status-verifier",
+                "sha256:test-status-verifier-implementation",
                 "sha256:test-status-verifier-config",
             )
         }
@@ -4493,6 +4496,9 @@ mod tests {
         store.pin_provider_status_verifier_configuration(
             &ProviderStatusVerifierConfiguration::new(
                 "test-status-verifier/v1",
+                "test-status-verifier/rev1",
+                "test-status-verifier",
+                "sha256:test-status-verifier-implementation",
                 "sha256:test-status-verifier-config",
             )
         )?;
@@ -6538,14 +6544,18 @@ mod tests {
         ));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
         let config=ProviderStatusVerifierConfiguration::new(
-            "status-verifier/v1","sha256:status-verifier-config"
+            "status-verifier/v1","status-verifier/rev1",
+            "status-verifier","sha256:status-verifier-implementation",
+            "sha256:status-verifier-config"
         );
         store.pin_provider_status_verifier_configuration(&config).unwrap();
         store.pin_provider_status_verifier_configuration(&config).unwrap();
         assert!(matches!(
             store.pin_provider_status_verifier_configuration(
                 &ProviderStatusVerifierConfiguration::new(
-                    "status-verifier/v2","sha256:other"
+                    "status-verifier/v2","status-verifier/rev2",
+                    "status-verifier","sha256:status-verifier-implementation",
+                    "sha256:other"
                 )
             ),
             Err(AuthorizationStoreError::InvalidState(_))
@@ -6631,8 +6641,15 @@ mod tests {
             "symthaea-gis-auth-status-admission-failure-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open_with_relying_party(
-        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
             &path,"rp-status-admission-failure"
+        ).unwrap();
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
+        store.pin_provider_status_verifier_configuration(
+            &ProviderStatusVerifierConfiguration::new(
+                "test-status-verifier/v1","test-status-verifier/rev1",
+                "test-status-verifier","sha256:test-status-verifier-implementation",
+                "sha256:test-status-verifier-config"
+            )
         ).unwrap();
         store.pin_native_authority_namespace(
             "issuer.status-admission","issuer.status-admission/authority/v1"
@@ -6710,7 +6727,10 @@ mod tests {
         ));
         let store=SqliteAuthorizationStore::open_with_relying_party(
         store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
-        store.pin_provider_status_verifier_configuration(&ProviderStatusVerifierConfiguration::new("test-status-verifier/v1","sha256:test-status-verifier-config")).unwrap();
+        store.pin_provider_status_verifier_configuration(&ProviderStatusVerifierConfiguration::new(
+            "test-status-verifier/v1","test-status-verifier/rev1",
+            "test-status-verifier","sha256:test-status-verifier-implementation",
+            "sha256:test-status-verifier-config")).unwrap();
             &path,"rp-status-failure"
         ).unwrap();
         store.pin_native_authority_namespace("issuer.status","issuer.status/authority/v1").unwrap();
@@ -6774,7 +6794,10 @@ mod tests {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-action-closed-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-closed").unwrap();
         store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
-        store.pin_provider_status_verifier_configuration(&ProviderStatusVerifierConfiguration::new("test-status-verifier/v1","sha256:test-status-verifier-config")).unwrap();
+        store.pin_provider_status_verifier_configuration(&ProviderStatusVerifierConfiguration::new(
+            "test-status-verifier/v1","test-status-verifier/rev1",
+            "test-status-verifier","sha256:test-status-verifier-implementation",
+            "sha256:test-status-verifier-config")).unwrap();
         store.pin_native_authority_namespace("issuer.closed","issuer.closed/authority/v1").unwrap();
 
         let effect=super::super::ActionEffectBinding::new("target-closed","prod","adapter-closed");
