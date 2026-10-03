@@ -275,7 +275,9 @@ impl EvaluationCheck {
                 verification_outcome_tag(
                     ReceiptAttestationVerificationOutcome::InvalidProofEncoding,
                 ),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidSignature),
+                verification_outcome_tag(
+                    ReceiptAttestationVerificationOutcome::InvalidSignature,
+                ),
             ],
         }
     }
@@ -283,13 +285,19 @@ impl EvaluationCheck {
     /// Frozen failure-outcome semantics for the historical v1 procedure.
     const fn legacy_allowed_failure_outcome_tags(self) -> &'static [u8] {
         match self {
-            Self::EnvelopeStructuralValidation => &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidEnvelope)],
-            Self::ReceiptCommitment => &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch)],
+            Self::EnvelopeStructuralValidation => &[verification_outcome_tag(
+                ReceiptAttestationVerificationOutcome::InvalidEnvelope,
+            )],
+            Self::ReceiptCommitment => &[verification_outcome_tag(
+                ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
+            )],
             Self::TemporalValidity => &[
                 verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
                 verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
             ],
-            Self::CryptosuiteConformance => &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch)],
+            Self::CryptosuiteConformance => &[verification_outcome_tag(
+                ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
+            )],
             Self::VerificationMethodResolution => &[
                 verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodMismatch),
                 verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable),
@@ -298,7 +306,9 @@ impl EvaluationCheck {
                 verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodRevoked),
                 verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodExpired),
             ],
-            Self::ProofPurposeAuthorization => &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized)],
+            Self::ProofPurposeAuthorization => &[verification_outcome_tag(
+                ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
+            )],
             Self::ProofPolicyConformance => &[
                 verification_outcome_tag(ReceiptAttestationVerificationOutcome::ProofPurposeMismatch),
                 verification_outcome_tag(ReceiptAttestationVerificationOutcome::DomainMismatch),
@@ -306,14 +316,20 @@ impl EvaluationCheck {
             ],
             Self::CryptographicProof => &[
                 verification_outcome_tag(ReceiptAttestationVerificationOutcome::MissingProof),
-                verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidProofEncoding),
+                verification_outcome_tag(
+                    ReceiptAttestationVerificationOutcome::InvalidProofEncoding,
+                ),
                 verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidSignature),
             ],
         }
     }
 
-    fn allows_legacy_failure_outcome(self, outcome: ReceiptAttestationVerificationOutcome) -> bool {
-        self.legacy_allowed_failure_outcome_tags().contains(&verification_outcome_tag(outcome))
+    fn allows_legacy_failure_outcome(
+        self,
+        outcome: ReceiptAttestationVerificationOutcome,
+    ) -> bool {
+        self.legacy_allowed_failure_outcome_tags()
+            .contains(&verification_outcome_tag(outcome))
     }
 
     fn allows_failure_outcome(
@@ -3384,8 +3400,12 @@ mod tests {
         let procedure = EvaluationProcedure::attestation_ed25519_v1();
         let trace = EvaluationTrace {
             procedure_fingerprint: procedure.fingerprint(),
-            results: procedure.checks.iter().copied().enumerate().map(|(index, check)| {
-                EvaluationCheckResult {
+            results: procedure
+                .checks
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, check)| EvaluationCheckResult {
                     sequence: index as u32,
                     check,
                     stage: if check == EvaluationCheck::CryptographicProof {
@@ -3395,8 +3415,8 @@ mod tests {
                     } else {
                         VerificationStage::Passed
                     },
-                }
-            }).collect(),
+                })
+                .collect(),
         };
 
         assert!(trace.is_well_formed());
