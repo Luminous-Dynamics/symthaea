@@ -309,6 +309,12 @@ pub struct ProviderVerifierConfiguration {
     pub relying_party_id: String,
     /// Stable relying-party-selected verifier implementation/profile identifier.
     pub verifier_id: String,
+    /// Exact revision of the relying-party-selected verifier implementation/profile.
+    pub verifier_revision: String,
+    /// Stable identifier for the exact verifier implementation.
+    pub verifier_implementation_id: String,
+    /// Digest of the exact verifier implementation.
+    pub verifier_implementation_digest: String,
     /// Digest of the exact verifier configuration used for provider evidence.
     pub verifier_config_digest: String,
     /// Digest of the trust anchors/status inputs selected by the relying party.
@@ -355,6 +361,9 @@ impl ProviderVerifierConfiguration {
     fn validate(&self) -> Result<(), AuthorizationStoreError> {
         if self.relying_party_id.is_empty()
             || self.verifier_id.is_empty()
+            || self.verifier_revision.is_empty()
+            || self.verifier_implementation_id.is_empty()
+            || self.verifier_implementation_digest.is_empty()
             || self.verifier_config_digest.is_empty()
             || self.trust_anchor_digest.is_empty()
             || self.evidence_profile_digest.is_empty()
@@ -903,6 +912,9 @@ impl SqliteAuthorizationStore {
                evidence_digest TEXT NOT NULL,
                attempt_binding_digest TEXT NOT NULL,
                verifier_id TEXT NOT NULL,
+               verifier_revision TEXT,
+               verifier_implementation_id TEXT,
+               verifier_implementation_digest TEXT,
                verifier_config_digest TEXT NOT NULL,
                trust_anchor_digest TEXT NOT NULL,
                evidence_profile_digest TEXT NOT NULL,
@@ -988,6 +1000,9 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_receipts", "attempt_scope_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_recovery_markers", "operation_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_recovery_markers", "attempt_scope_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_revision", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_implementation_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_implementation_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "trust_anchor_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "adapter_revision", "TEXT")?;
@@ -1227,6 +1242,9 @@ impl SqliteAuthorizationStore {
         let keys = [
             ("provider_evidence_verifier_relying_party_id", configuration.relying_party_id.as_str()),
             ("provider_evidence_verifier_id", configuration.verifier_id.as_str()),
+            ("provider_evidence_verifier_revision", configuration.verifier_revision.as_str()),
+            ("provider_evidence_verifier_implementation_id", configuration.verifier_implementation_id.as_str()),
+            ("provider_evidence_verifier_implementation_digest", configuration.verifier_implementation_digest.as_str()),
             ("provider_evidence_verifier_config_digest", configuration.verifier_config_digest.as_str()),
             ("provider_evidence_verifier_trust_anchor_digest", configuration.trust_anchor_digest.as_str()),
             ("provider_evidence_verifier_evidence_profile_digest", configuration.evidence_profile_digest.as_str()),
@@ -1234,6 +1252,9 @@ impl SqliteAuthorizationStore {
         let values = [
             configuration.relying_party_id.as_str(),
             configuration.verifier_id.as_str(),
+            configuration.verifier_revision.as_str(),
+            configuration.verifier_implementation_id.as_str(),
+            configuration.verifier_implementation_digest.as_str(),
             configuration.verifier_config_digest.as_str(),
             configuration.trust_anchor_digest.as_str(),
             configuration.evidence_profile_digest.as_str(),
@@ -1257,6 +1278,8 @@ impl SqliteAuthorizationStore {
                 )?;
             }
         } else if existing.iter().zip(values.iter()).all(|(stored, expected)| {
+            stored.as_deref() == Some(*expected)
+        }) {
             stored.as_deref() == Some(*expected)
         }) {
             // Already pinned to exactly this configuration.
@@ -1286,15 +1309,22 @@ impl SqliteAuthorizationStore {
         let configuration = match (
             read("provider_evidence_verifier_relying_party_id")?,
             read("provider_evidence_verifier_id")?,
+            read("provider_evidence_verifier_revision")?,
+            read("provider_evidence_verifier_implementation_id")?,
+            read("provider_evidence_verifier_implementation_digest")?,
             read("provider_evidence_verifier_config_digest")?,
             read("provider_evidence_verifier_trust_anchor_digest")?,
             read("provider_evidence_verifier_evidence_profile_digest")?,
         ) {
-            (Some(relying_party_id), Some(verifier_id), Some(verifier_config_digest),
-             Some(trust_anchor_digest), Some(evidence_profile_digest)) =>
+            (Some(relying_party_id), Some(verifier_id), Some(verifier_revision),
+             Some(verifier_implementation_id), Some(verifier_implementation_digest),
+             Some(verifier_config_digest), Some(trust_anchor_digest), Some(evidence_profile_digest)) =>
                 ProviderVerifierConfiguration {
                     relying_party_id,
                     verifier_id,
+                    verifier_revision,
+                    verifier_implementation_id,
+                    verifier_implementation_digest,
                     verifier_config_digest,
                     trust_anchor_digest,
                     evidence_profile_digest,
