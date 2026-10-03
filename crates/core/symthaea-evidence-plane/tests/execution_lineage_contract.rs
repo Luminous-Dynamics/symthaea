@@ -1,7 +1,6 @@
 use serde_json::json;
 use symthaea_evidence_plane::execution_lineage::{
-    EvidenceLineageDecision, EvidenceLineageGuardV1, ExecutionLineageV1,
-    RepositorySourceSnapshotId,
+    EvidenceLineageDecision, EvidenceLineageGuardV1, ExecutionLineageV1, RepositorySourceSnapshotId,
 };
 
 fn fixture() -> ExecutionLineageV1 {
