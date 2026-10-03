@@ -301,6 +301,62 @@ pub struct LinearCodeWork {
     pub retained_generators: usize,
     pub projection_word_xor_ops: usize,
 }
+/// Exact symbolic cardinality of the form 2^e.
+///
+/// The exponent representation is exact even when the expanded cardinality
+/// does not fit in a machine integer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ExactPowerOfTwo {
+    exponent: usize,
+}
+
+impl ExactPowerOfTwo {
+    pub const fn new(exponent: usize) -> Self {
+        Self { exponent }
+    }
+
+    pub const fn exponent(self) -> usize {
+        self.exponent
+    }
+
+    pub const fn is_one(self) -> bool {
+        self.exponent == 0
+    }
+}
+
+/// Exact algebraic geometry of the factor-to-bound map over GF(2).
+///
+/// Let Delta be the sum of factor dimensions and r be the rank of the
+/// concatenated factor generators. The kernel dimension is Delta-r, and
+/// every representable target therefore has exactly 2^(Delta-r) factorizations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LinearCodeAlgebra {
+    pub factor_dimension_sum: usize,
+    pub union_generator_rank: usize,
+    pub kernel_dimension: usize,
+    pub raw_factor_tuple_count: ExactPowerOfTwo,
+    pub reachable_target_count: ExactPowerOfTwo,
+    pub factorization_count_per_target: ExactPowerOfTwo,
+    pub unique_factorization: bool,
+    /// Minimum number of factor groups participating in a non-zero dependency.
+    /// None means the factor spaces are jointly independent.
+    pub dependency_order: Option<usize>,
+}
+
+impl LinearCodeAlgebra {
+    pub const fn raw_factor_tuple_exponent(self) -> usize {
+        self.raw_factor_tuple_count.exponent()
+    }
+
+    pub const fn reachable_target_exponent(self) -> usize {
+        self.reachable_target_count.exponent()
+    }
+
+    pub const fn factorization_exponent(self) -> usize {
+        self.factorization_count_per_target.exponent()
+    }
+}
+
 
 fn extends_span_with_work(
     basis: &[BinaryCodeword],
@@ -584,10 +640,165 @@ fn basis_rank_counted(
     rank
 }
 
+/// Compute exact rank/nullity and multiplicity structure for a factor tuple.
+///
+/// The factor coefficient spaces form a linear domain of dimension Delta = sum(k_i).
+/// Concatenating their generator bases defines the map into the ambient Boolean space.
+/// Its image has dimension r, so every non-empty fiber has cardinality 2^(Delta-r).
+pub fn factorization_algebra(factors: &[&RandomLinearCode]) -> Option<LinearCodeAlgebra> {
+    if factors.is_empty() {
+        return None;
+    }
+
+    let dimension = factors[0].dimension();
+    if factors.iter().any(|factor| factor.dimension() != dimension) {
+        return None;
+    }
+
+    let factor_dimension_sum = factors
+        .iter()
+        .try_fold(0usize, |sum, factor| sum.checked_add(factor.rank()))?;
+
+    let combined_basis = concatenate_factor_bases(factors, factor_dimension_sum);
+    let union_generator_rank = basis_rank(&combined_basis, dimension);
+    let kernel_dimension = factor_dimension_sum - union_generator_rank;
+
+    let dependency_order = if kernel_dimension == 0 {
+        None
+    } else {
+        minimum_dependent_factor_order(factors)
+    };
+
+    Some(LinearCodeAlgebra {
+        factor_dimension_sum,
+        union_generator_rank,
+        kernel_dimension,
+        raw_factor_tuple_count: ExactPowerOfTwo::new(factor_dimension_sum),
+        reachable_target_count: ExactPowerOfTwo::new(union_generator_rank),
+        factorization_count_per_target: ExactPowerOfTwo::new(kernel_dimension),
+        unique_factorization: kernel_dimension == 0,
+        dependency_order,
+    })
+}
+
+/// Return the exact fiber cardinality for a target in the factor-span.
+/// None means that the target is not representable by the supplied factors.
+pub fn factorization_count_for_target(
+    target: &BinaryCodeword,
+    factors: &[&RandomLinearCode],
+) -> Option<ExactPowerOfTwo> {
+    let algebra = factorization_algebra(factors)?;
+    if target.dimension() != factors[0].dimension() {
+        return None;
+    }
+
+    let combined_basis = concatenate_factor_bases(factors, algebra.factor_dimension_sum);
+    solve_linear_combination(target, &combined_basis)
+        .map(|_| algebra.factorization_count_per_target)
+}
+
+fn concatenate_factor_bases(
+    factors: &[&RandomLinearCode],
+    capacity: usize,
+) -> Vec<BinaryCodeword> {
+    let mut basis = Vec::with_capacity(capacity);
+    for factor in factors {
+        basis.extend(factor.basis().iter().cloned());
+    }
+    basis
+}
+
+fn minimum_dependent_factor_order(factors: &[&RandomLinearCode]) -> Option<usize> {
+    if factors.len() < 2 {
+        return None;
+    }
+
+    for subset_size in 2..=factors.len() {
+        let mut chosen = Vec::with_capacity(subset_size);
+        if has_dependent_factor_subset(factors, subset_size, 0, &mut chosen) {
+            return Some(subset_size);
+        }
+    }
+
+    None
+}
+
+fn has_dependent_factor_subset(
+    factors: &[&RandomLinearCode],
+    subset_size: usize,
+    start: usize,
+    chosen: &mut Vec<usize>,
+) -> bool {
+    if chosen.len() == subset_size {
+        let mut rank_sum = 0usize;
+        let mut basis = Vec::new();
+        for &index in chosen.iter() {
+            let factor = factors[index];
+            rank_sum += factor.rank();
+            basis.extend(factor.basis().iter().cloned());
+        }
+        return basis_rank(&basis, factors[0].dimension()) < rank_sum;
+    }
+
+    let remaining = factors.len() - start;
+    if remaining < subset_size - chosen.len() {
+        return false;
+    }
+
+    for index in start..factors.len() {
+        chosen.push(index);
+        if has_dependent_factor_subset(factors, subset_size, index + 1, chosen) {
+            return true;
+        }
+        chosen.pop();
+    }
+    false
+}
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
+    fn factorization_algebra_reports_unique_direct_sum() {
+        let (parent, left, right) =
+            RandomLinearCode::generate_direct_sum(64, 3, 4, 0xA11CE).expect("valid direct sum");
+        let factors: Vec<&RandomLinearCode> = vec![&left, &right];
+        let algebra = factorization_algebra(&factors).expect("valid factor algebra");
+
+        assert_eq!(algebra.factor_dimension_sum, parent.rank());
+        assert_eq!(algebra.union_generator_rank, parent.rank());
+        assert_eq!(algebra.kernel_dimension, 0);
+        assert!(algebra.unique_factorization);
+        assert_eq!(algebra.raw_factor_tuple_count.exponent(), parent.rank());
+        assert_eq!(algebra.reachable_target_count.exponent(), parent.rank());
+        assert_eq!(algebra.factorization_count_per_target.exponent(), 0);
+        assert_eq!(algebra.dependency_order, None);
+    }
+
+    #[test]
+    fn factorization_algebra_reports_overlap_and_higher_order_dependency() {
+        let c1 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b01])])
+            .expect("c1");
+        let c2 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b10])])
+            .expect("c2");
+        let c3 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b11])])
+            .expect("c3");
+
+        for pair in [[&c1, &c2], [&c1, &c3], [&c2, &c3]] {
+            let algebra = factorization_algebra(&pair).expect("pair algebra");
+            assert_eq!(algebra.kernel_dimension, 0);
+            assert!(algebra.unique_factorization);
+            assert_eq!(algebra.dependency_order, None);
+        }
+
+        let algebra = factorization_algebra(&[&c1, &c2, &c3]).expect("triple algebra");
+        assert_eq!(algebra.factor_dimension_sum, 3);
+        assert_eq!(algebra.union_generator_rank, 2);
+        assert_eq!(algebra.kernel_dimension, 1);
+        assert!(!algebra.unique_factorization);
+        assert_eq!(algebra.dependency_order, Some(3));
+        assert_eq!(algebra.factorization_count_per_target.exponent(), 1);
+    }
     #[test]
     fn direct_sum_subcodes_partition_a_parent_basis() {
         let (parent, left, right) =
