@@ -449,6 +449,11 @@ pub struct ExecutionReceipt {
     /// Mechanical execution result. This does not imply that the target
     /// postcondition was proven.
     pub outcome: ExecutionOutcome,
+    /// Transition disposition observed after execution.
+    ///
+    /// This must match the disposition authorized by the compiled plan; a
+    /// receipt cannot silently reinterpret an authorized transition.
+    pub observed_disposition: DeploymentDisposition,
     /// Independent status of the required postcondition verification.
     pub postcondition: PostconditionOutcome,
     pub verification_digest: Option<ContentDigest>,
@@ -476,6 +481,10 @@ impl ExecutionReceipt {
 
         if self.target_snapshot_digest != plan.authorization.target_snapshot_digest {
             return Err(ReceiptValidationError::TargetSnapshotDigestMismatch);
+        }
+
+        if self.observed_disposition != plan.plan.verification.disposition {
+            return Err(ReceiptValidationError::ObservedDispositionMismatch);
         }
 
         if !has_concrete_digest(Some(&self.final_target_snapshot_digest)) {
@@ -536,6 +545,8 @@ pub enum ReceiptValidationError {
     PlanDigestMismatch,
     #[error("execution receipt target snapshot digest does not match authorization")]
     TargetSnapshotDigestMismatch,
+    #[error("execution receipt observed disposition does not match the authorized plan")]
+    ObservedDispositionMismatch,
     #[error("execution receipt carries no concrete final target snapshot digest")]
     MissingFinalSnapshotEvidence,
     #[error("execution receipt timestamps are out of order")]
@@ -1251,6 +1262,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 200,
             outcome: ExecutionOutcome::Succeeded,
@@ -1274,6 +1286,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-recovery"),
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
             outcome: ExecutionOutcome::Recovered,
@@ -1298,6 +1311,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
             outcome: ExecutionOutcome::Succeeded,
@@ -1349,6 +1363,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
             outcome: ExecutionOutcome::Succeeded,
@@ -1375,6 +1390,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
             outcome: ExecutionOutcome::Succeeded,
@@ -1389,6 +1405,32 @@ mod tests {
 
 
     #[test]
+    fn rejects_receipt_with_wrong_observed_disposition() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: DeploymentDisposition::NotActivated,
+            started_at_ms: 151,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Unproven,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::ObservedDispositionMismatch)
+        );
+    }
+
+    #[test]
     fn rejects_receipt_for_tampered_plan() {
         let plan = sample_plan();
         let auth = authorization_for(&plan);
@@ -1399,6 +1441,7 @@ mod tests {
             plan_digest: ContentDigest::blake3(b"wrong-plan"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 200,
             outcome: ExecutionOutcome::Succeeded,
@@ -1425,6 +1468,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 200,
             finished_at_ms: 199,
             outcome: ExecutionOutcome::Failed,
@@ -1450,6 +1494,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 99,
             finished_at_ms: 150,
             outcome: ExecutionOutcome::Succeeded,
@@ -1476,6 +1521,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 201,
             outcome: ExecutionOutcome::Succeeded,
@@ -1502,6 +1548,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"changed-state"),
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 199,
             outcome: ExecutionOutcome::Succeeded,
