@@ -49,13 +49,19 @@ The in-memory resolver therefore exposes:
 
 Changing unrelated verification methods should not invalidate a scoped snapshot for a method whose resolution facts did not change.
 
-### 4. Missing snapshots are explicit
+### 4. Resolver failure and identity mismatch are explicit
+
+A resolver failure does not constitute successful resolution. The report may retain the requested method identifier for diagnostics, but a `resolved_verification_method: Some(...)` value MUST NOT be interpreted by itself as evidence that the resolver successfully returned that method.
+
+Likewise, if a resolver returns a method whose identifier does not match the requested identifier, verification MUST terminate rather than verify with the mismatched result. The paired snapshot, when supplied, remains provenance for the resolver result that was actually returned; it does not convert the rejected result into a successful resolution.
+
+### 5. Missing snapshots are explicit
 
 `None` means that the resolver did not provide a durable snapshot identifier.
 
 Consumers that require replayable/auditable resolution evidence SHOULD require an explicit snapshot identifier rather than silently treating `None` as proof that resolution was durable.
 
-### 5. Snapshot evidence does not establish truth
+### 6. Snapshot evidence does not establish truth
 
 A valid snapshot proves only that the verifier recorded a particular resolver state or durable state reference.
 
