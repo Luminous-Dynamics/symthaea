@@ -57,6 +57,8 @@ pub struct TopologyLifecyclePolicy {
     pub expected_asset_id: String,
     pub expected_component_id: String,
     pub expected_configuration_digest: String,
+    pub expected_predecessor_epoch: u64,
+    pub expected_predecessor_topology_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,6 +82,8 @@ impl TopologyLifecycleGate {
             || policy.expected_asset_id.trim().is_empty()
             || policy.expected_component_id.trim().is_empty()
             || policy.expected_configuration_digest.trim().is_empty()
+            || policy.expected_predecessor_epoch == 0
+            || policy.expected_predecessor_topology_digest.trim().is_empty()
         {
             return Err("invalid topology lifecycle policy");
         }
@@ -118,6 +122,14 @@ impl TopologyLifecycleGate {
 
             if statement.predecessor_epoch == 0 || statement.successor_epoch == 0 {
                 issues.push(TopologyLifecycleIssue::InvalidEpoch);
+                continue;
+            }
+
+            if statement.predecessor_epoch != self.policy.expected_predecessor_epoch
+                || statement.predecessor_topology_digest
+                    != self.policy.expected_predecessor_topology_digest
+            {
+                issues.push(TopologyLifecycleIssue::PredecessorDigestMismatch);
                 continue;
             }
 
@@ -237,6 +249,8 @@ mod tests {
             expected_asset_id: "vehicle-1".into(),
             expected_component_id: "wing-root".into(),
             expected_configuration_digest: "cfg-1".into(),
+            expected_predecessor_epoch: 1,
+            expected_predecessor_topology_digest: "topology-v1".into(),
         })
         .unwrap()
     }
