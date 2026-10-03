@@ -5020,6 +5020,77 @@ mod tests {
     }
 
     #[test]
+    fn reconciliation_verifier_is_not_called_for_unvalidated_dispatch_record() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-reconcile-verifier-order-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"legacy-local").unwrap();
+        store.pin_provider_evidence_verifier_configuration(&ProviderVerifierConfiguration {
+            relying_party_id:"legacy-local".into(),
+            verifier_id:"test-verifier/v1".into(),
+            verifier_revision:"test-verifier-rev/1".into(),
+            verifier_implementation_id:"test-verifier-impl".into(),
+            verifier_implementation_digest:"sha256:test-verifier-implementation".into(),
+            verifier_config_digest:"sha256:test-verifier-config".into(),
+            trust_anchor_digest:"sha256:test-trust-anchors".into(),
+            evidence_profile_digest:"sha256:test-evidence-profile".into(),
+        }).unwrap();
+
+        let effect=super::super::ActionEffectBinding::new("target-reconcile-order","prod","adapter-reconcile-order");
+        store.pin_provider_adapter_configuration(
+            &super::ProviderAdapterConfiguration::new(
+                "adapter-reconcile-order","test-adapter/v1","sha256:test-adapter-implementation"
+            )
+        ).unwrap();
+        let action=EpistemicAction::new(
+            "reconcile-verifier-order","effect",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"reconcile-verifier-order".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness,&action,"frame@1","attempt-reconcile-order",
+            "boundary-reconcile-order","operation-reconcile-order"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-reconcile-order",&action,&effect,
+            "boundary-reconcile-order","operation-reconcile-order","native-reconcile-order"
+        ).unwrap();
+        store.commit_bound(&record,ExecutionOutcome::Indeterminate).unwrap();
+
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let mut forged=record.clone();
+        forged.target_identity="attacker-reconcile-target".into();
+        let calls=Arc::new(AtomicUsize::new(0));
+        let err=store.reconcile_indeterminate_bound_verified(
+            &forged,
+            &evidence,
+            &CountingProviderVerifier { calls: calls.clone() }
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding)
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst),0);
+
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn terminal_commit_requires_relying_party_pinned_verifier_configuration() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-verifier-pin-{}.db",std::process::id()
