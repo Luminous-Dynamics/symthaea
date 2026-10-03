@@ -44,6 +44,11 @@ pub struct TemporalFusionPolicy {
     pub minimum_trusted_sensors: u16,
     pub minimum_independent_groups: u16,
     pub maximum_delta_disagreement_milli: u32,
+    pub expected_asset_id: String,
+    pub expected_component_id: String,
+    pub expected_topology_id: String,
+    pub expected_topology_version: String,
+    pub expected_topology_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,6 +97,11 @@ impl TemporalFusionGate {
             || policy.minimum_trusted_sensors == 0
             || policy.minimum_independent_groups == 0
             || policy.maximum_delta_disagreement_milli == 0
+            || policy.expected_asset_id.trim().is_empty()
+            || policy.expected_component_id.trim().is_empty()
+            || policy.expected_topology_id.trim().is_empty()
+            || policy.expected_topology_version.trim().is_empty()
+            || policy.expected_topology_digest.trim().is_empty()
         {
             return Err("invalid temporal fusion policy");
         }
@@ -139,9 +149,21 @@ impl TemporalFusionGate {
                 continue;
             }
 
+            if pair.independence.asset_id != self.policy.expected_asset_id
+                || pair.independence.component_id != self.policy.expected_component_id
+                || pair.independence.topology_attestation.topology_id != self.policy.expected_topology_id
+                || pair.independence.topology_attestation.topology_version != self.policy.expected_topology_version
+                || pair.independence.topology_attestation.topology_digest != self.policy.expected_topology_digest
+            {
+                issues.push(TemporalFusionIssue::TopologyAttestation(
+                    SensorTopologyAttestationIssue::TopologyIdentityMismatch,
+                ));
+                continue;
+            }
+
             if let Err(issue) = pair.independence.topology_attestation.validate(
-                &pair.independence.asset_id,
-                &pair.independence.component_id,
+                &self.policy.expected_asset_id,
+                &self.policy.expected_component_id,
                 &pair.current.configuration_digest,
                 pair.previous.timestamp_ms,
             ) {
@@ -316,6 +338,11 @@ mod tests {
             minimum_trusted_sensors: 2,
             minimum_independent_groups: 2,
             maximum_delta_disagreement_milli: 250,
+            expected_asset_id: "vehicle-1".into(),
+            expected_component_id: "wing-root".into(),
+            expected_topology_id: "topology-wing-root".into(),
+            expected_topology_version: "1".into(),
+            expected_topology_digest: "topology-v1".into(),
         })
         .unwrap()
     }
