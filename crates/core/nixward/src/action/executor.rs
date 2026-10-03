@@ -1087,7 +1087,7 @@ mod tests {
         );
 
         let record = executor.authorized_history().front().unwrap();
-        assert_eq!(record.command(), &command);
+        assert!(matches!(record.command(), NixOSCommand::Service { operation: NixServiceOperationKindV1::Restart, unit } if unit == "nginx.service"));
         assert_eq!(record.action_intent_digest(), "intent-123");
         assert_eq!(record.approval_request_id(), "request-123");
         assert_eq!(record.projection_digest(), "projection-123");
