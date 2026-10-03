@@ -163,6 +163,10 @@ pub struct KnowledgeSnapshotReceipt {
     pub receipt_digest_hex: String,
 }
 
+fn is_hex_digest(value: &str) -> bool {
+    value.len() == 64 && value.as_bytes().iter().all(u8::is_ascii_hexdigit)
+}
+
 impl KnowledgeSnapshotReceipt {
     fn canonical_receipt_digest_hex(&self) -> String {
         let mut hasher = blake3::Hasher::new();
@@ -2078,6 +2082,12 @@ fn verify_snapshot_receipts_in_tx(
                 expected_generation, receipt.generation
             ));
         }
+        if !is_hex_digest(&receipt.canonical_digest_hex) {
+            return Err(format!(
+                "Snapshot receipt canonical digest is not a 64-character hexadecimal digest: generation {}",
+                receipt.generation
+            ));
+        }
         if receipt.receipt_digest_hex != receipt.canonical_receipt_digest_hex() {
             return Err(format!(
                 "Snapshot receipt self-digest mismatch: generation {}",
@@ -3550,6 +3560,55 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+
+
+    #[test]
+    fn test_snapshot_receipt_rejects_malformed_canonical_digest_even_with_valid_self_digest() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_receipt_digest_format_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let fact = FactRecord {
+            memory_id: "digest-format".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x11; BinaryHV::BYTES],
+            source_text: "digest format".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+
+        {
+            let conn = p.open_connection().unwrap();
+            let tampered = KnowledgeSnapshotReceipt {
+                generation: 1,
+                canonical_digest_hex: "not-a-digest".into(),
+                receipt_digest_hex: String::new(),
+            };
+            let self_digest = tampered.canonical_receipt_digest_hex();
+            conn.execute(
+                "DROP TRIGGER trg_knowledge_snapshot_receipts_no_update;
+                 UPDATE knowledge_snapshot_receipts
+                 SET canonical_digest_hex = ?1, receipt_digest_hex = ?2
+                 WHERE generation = 1;",
+                rusqlite::params!["not-a-digest", self_digest],
+            )
+            .unwrap();
+        }
+
+        let err = p.verify_snapshot_receipts().unwrap_err();
+        assert!(err.contains("canonical digest is not a 64-character hexadecimal digest"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_schema_migration_rejects_legacy_foreign_key_violation() {
