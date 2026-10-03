@@ -3550,6 +3550,105 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+
+    #[test]
+    fn test_schema_migration_rejects_legacy_foreign_key_violation() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_fk_check_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                CREATE TABLE knowledge_causal_edges (
+                    cause TEXT NOT NULL,
+                    effect TEXT NOT NULL,
+                    strength REAL NOT NULL,
+                    is_inhibitory INTEGER NOT NULL DEFAULT 0,
+                    cycle INTEGER NOT NULL,
+                    PRIMARY KEY (cause, effect)
+                );
+                CREATE TABLE knowledge_ontology (
+                    name TEXT PRIMARY KEY,
+                    vector_blob BLOB NOT NULL,
+                    usage_count INTEGER NOT NULL,
+                    utility REAL NOT NULL,
+                    created_at_cycle INTEGER NOT NULL,
+                    last_used_cycle INTEGER NOT NULL,
+                    is_a_parent TEXT
+                );
+                CREATE TABLE knowledge_snapshot_receipts (
+                    generation INTEGER PRIMARY KEY AUTOINCREMENT,
+                    canonical_digest_hex TEXT NOT NULL
+                );
+                CREATE TABLE knowledge_snapshot_validation_receipts (
+                    validation_event TEXT PRIMARY KEY,
+                    generation INTEGER NOT NULL,
+                    snapshot_digest_hex TEXT NOT NULL,
+                    validator_ref TEXT NOT NULL,
+                    validator_version TEXT NOT NULL,
+                    validation_profile TEXT NOT NULL,
+                    conforms INTEGER NOT NULL,
+                    report_digest_hex TEXT,
+                    FOREIGN KEY (generation) REFERENCES knowledge_snapshot_receipts(generation)
+                );",
+            )
+            .unwrap();
+
+            // This orphan is deliberately inserted with FK enforcement disabled,
+            // simulating a legacy database written before the per-connection PRAGMA.
+            conn.execute(
+                "INSERT INTO knowledge_snapshot_validation_receipts
+                 (validation_event, generation, snapshot_digest_hex, validator_ref,
+                  validator_version, validation_profile, conforms)
+                 VALUES ('orphan', 99, ?1, 'legacy-validator', 'v1', 'legacy-profile', 1)",
+                ["d".repeat(64).as_str()],
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let err = {
+            let conn = p.open_connection().unwrap();
+            p.ensure_schema(&conn).unwrap_err()
+        };
+        assert!(err.contains("Schema foreign-key check failed"));
+        assert!(err.contains("1 violation"));
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let snapshot_receipt_columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(knowledge_snapshot_receipts)")
+            .unwrap()
+            .query_map([], |row| row.get(1))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert!(!snapshot_receipt_columns
+            .iter()
+            .any(|column| column == "receipt_digest_hex"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn test_load_provenance_relations_total_orders_equal_timestamps_by_kind() {
         let dir = std::env::temp_dir().join(format!(
