@@ -354,6 +354,8 @@ Settlement additionally re-reads the adapter pin and requires it to match the fr
 
 ### Cross-table attempt ownership fence
 
+Commits `8af20f2f6618d17896b6d8b6513b3d99bf24aa10`, `002cc4385eb1545ca78372e9bde138d7d6f7d6b7`, `a2e407a9de6a3ed862ebc24ff740c2f0e6fab786`, and `e4bddd6de7ec709c4b75cba99d6151203145f1a4` complete and adversarially exercise this fence at startup, provider-entry/settlement validation, and direct cross-table splice tests.
+
 The boundary-scoped attempt namespace is now checked not only per durable row, but across the complete attempt lineage. For the same (authorization_instance, attempt_id), leases, receipts, status checks, recovery markers, terminal evidence, and dispatch records must agree on one non-empty boundary owner. Historical receipts or terminal evidence with a missing boundary may be backfilled only from the authoritative dispatch row; a conflicting non-empty boundary is never overwritten and causes startup or runtime validation to fail closed. This closes a cross-table splice in which every row could carry a locally valid (boundary_id, attempt_scope_digest) pair while the records described different execution boundaries. citeturn399269view0
 
 ### Bound receipts preserve the native provider replay key
