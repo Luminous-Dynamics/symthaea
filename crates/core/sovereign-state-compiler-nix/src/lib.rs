@@ -378,6 +378,18 @@ impl TargetAdapter for NixOSTargetAdapter {
             (None, None) => None,
         };
 
+        match activation_mode {
+            Some(NixActivationMode::DryActivate)
+                if reboot || !install.is_empty() || !remove.is_empty() || home_manager =>
+            {
+                return Err(NixOSAdapterError::ConflictingTransitionSemantics);
+            }
+            Some(NixActivationMode::Test | NixActivationMode::Boot) if reboot => {
+                return Err(NixOSAdapterError::ConflictingTransitionSemantics);
+            }
+            _ => {}
+        }
+
         if let Some(NixActivationMode::Rollback { generation }) = activation_mode {
             let required_resource = nixos_generation_resource(generation);
             if !intent.required_resources.contains(&required_resource) {
@@ -561,6 +573,8 @@ pub enum NixOSAdapterError {
     UnboundRollbackGeneration(u64),
     #[error("NixOS activation modes cannot be combined in one intent")]
     ConflictingActivationModes,
+    #[error("requested NixOS transition has ambiguous post-state semantics")]
+    ConflictingTransitionSemantics,
     #[error("compiled plan violates neutral compiler invariants: {0}")]
     PlanValidation(PlanValidationError),
 }
@@ -931,6 +945,49 @@ mod tests {
         let plan = adapter().compile(&intent).expect("compile");
         assert!(!plan.rollback.allowed);
         assert_eq!(plan.rollback.max_attempts, 0);
+    }
+
+    #[test]
+    fn activation_modes_reject_ambiguous_compositions() {
+        let mut dry = DeploymentIntent::new("dry-install", "host-01");
+        dry.desired_state.properties.insert(
+            REBUILD_KEY.into(),
+            StateValue::String("dry-activate".into()),
+        );
+        dry.desired_state.properties.insert(
+            INSTALL_KEY.into(),
+            StateValue::List(vec![StateValue::String("ripgrep".into())]),
+        );
+        assert_eq!(
+            adapter().compile(&dry),
+            Err(NixOSAdapterError::ConflictingTransitionSemantics)
+        );
+
+        let mut test = DeploymentIntent::new("test-reboot", "host-01");
+        test.desired_state.properties.insert(
+            REBUILD_KEY.into(),
+            StateValue::String("test".into()),
+        );
+        test.desired_state
+            .properties
+            .insert(REBOOT_KEY.into(), StateValue::Bool(true));
+        assert_eq!(
+            adapter().compile(&test),
+            Err(NixOSAdapterError::ConflictingTransitionSemantics)
+        );
+
+        let mut boot = DeploymentIntent::new("boot-reboot", "host-01");
+        boot.desired_state.properties.insert(
+            REBUILD_KEY.into(),
+            StateValue::String("boot".into()),
+        );
+        boot.desired_state
+            .properties
+            .insert(REBOOT_KEY.into(), StateValue::Bool(true));
+        assert_eq!(
+            adapter().compile(&boot),
+            Err(NixOSAdapterError::ConflictingTransitionSemantics)
+        );
     }
 
     #[test]
