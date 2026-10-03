@@ -37,7 +37,7 @@ jobs:
         run: |
           find crates/core/sovereign-state-compiler crates/core/sovereign-state-compiler-nix \
             -type f -name '*.rs' -print0 |
-            xargs -0 -r rustfmt +1.96.0 --edition 2024 --check
+            xargs -0 -r -n1 rustup run 1.96.0 rustfmt --edition 2024 --check
 
       - name: Core boundary guard
         run: |
