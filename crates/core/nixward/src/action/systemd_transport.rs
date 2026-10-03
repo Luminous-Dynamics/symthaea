@@ -10,6 +10,7 @@
 
 use std::process::Command;
 
+const OBSERVED_STATE_PROPERTIES: &str = "Id,Names,LoadState,ActiveState,SubState,UnitFileState";
 const GOVERNED_PROPERTIES: &str = "Id,Names,LoadState,ActiveState,SubState,UnitFileState,CanStart,CanStop,CanReload";
 
 /// Read the exact governed systemd property projection for one canonical unit.
@@ -21,12 +22,24 @@ const GOVERNED_PROPERTIES: &str = "Id,Names,LoadState,ActiveState,SubState,UnitF
 /// The transport is observational only and may become stale immediately after
 /// the command returns; it is never execution authority.
 pub fn observe_service_properties(unit: &str) -> Result<String, std::io::Error> {
+    observe_projection(unit, GOVERNED_PROPERTIES)
+}
+
+/// Read only the identity and lifecycle/unit-file state projection.
+///
+/// Enablement evidence deliberately uses this narrower projection so it does
+/// not become dependent on unrelated CanStart/CanStop/CanReload fields.
+pub fn observe_service_state_properties(unit: &str) -> Result<String, std::io::Error> {
+    observe_projection(unit, OBSERVED_STATE_PROPERTIES)
+}
+
+fn observe_projection(unit: &str, properties: &str) -> Result<String, std::io::Error> {
     let output = Command::new("systemctl")
         .args([
             "show",
             unit,
             "--no-pager",
-            &format!("--property={GOVERNED_PROPERTIES}"),
+            &format!("--property={properties}"),
         ])
         .output()?;
 
@@ -53,7 +66,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn governed_property_projection_is_frozen() {
+    fn governed_property_projections_are_frozen() {
+        assert_eq!(
+            OBSERVED_STATE_PROPERTIES,
+            "Id,Names,LoadState,ActiveState,SubState,UnitFileState"
+        );
         assert_eq!(
             GOVERNED_PROPERTIES,
             "Id,Names,LoadState,ActiveState,SubState,UnitFileState,CanStart,CanStop,CanReload"
