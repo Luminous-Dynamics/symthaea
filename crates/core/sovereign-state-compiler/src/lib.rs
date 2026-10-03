@@ -321,6 +321,18 @@ impl DeploymentPlan {
             return Err(PlanValidationError::TargetMismatch);
         }
 
+        if self.steps.is_empty()
+            || !self
+                .steps
+                .iter()
+                .any(|step| step.kind == PlanStepKind::Verify)
+        {
+            return Err(PlanValidationError::MissingVerificationStep);
+        }
+        if self.steps.last().map(|step| &step.kind) != Some(&PlanStepKind::Verify) {
+            return Err(PlanValidationError::VerificationStepNotFinal);
+        }
+
         let mut expected_sequence = 0u32;
         for step in &self.steps {
             if step.sequence != expected_sequence {
@@ -753,6 +765,10 @@ pub enum PlanValidationError {
     MissingTargetResource(ResourceRef),
     #[error("plan step sequence is not contiguous from zero")]
     NonContiguousPlanSequence,
+    #[error("plan must contain a verification step")]
+    MissingVerificationStep,
+    #[error("verification step must be the final lifecycle step")]
+    VerificationStepNotFinal,
     #[error("plan step sequence overflowed")]
     SequenceOverflow,
     #[error("rollback attempts are configured without rollback permission")]
@@ -806,6 +822,7 @@ mod tests {
             identity: TargetId::from("host-01"),
             platform: "nixos".into(),
             capabilities: [
+                Capability::ObserveHardware,
                 Capability::ConfigureSystem,
                 Capability::InstallApplication,
                 Capability::Rollback,
@@ -852,6 +869,12 @@ mod tests {
                     required_capabilities: [Capability::Rollback].into_iter().collect(),
                     description: "rollback if verification fails".into(),
                 },
+                PlanStep {
+                    sequence: 2,
+                    kind: PlanStepKind::Verify,
+                    required_capabilities: [Capability::ObserveHardware].into_iter().collect(),
+                    description: "verify target state".into(),
+                },
             ],
             verification: VerificationPolicy::default(),
             rollback: RollbackPolicy {
@@ -873,6 +896,7 @@ mod tests {
             target_snapshot_digest: plan.target_snapshot.digest().expect("snapshot digest"),
             plan_digest: plan.digest().expect("plan digest"),
             granted_capabilities: [
+                Capability::ObserveHardware,
                 Capability::ConfigureSystem,
                 Capability::Rollback,
             ]
@@ -1139,6 +1163,30 @@ mod tests {
         assert_eq!(
             plan.authorize(auth, 150),
             Err(PlanValidationError::AuthorizationIntentDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_plan_without_verification_step() {
+        let mut plan = sample_plan();
+        plan.steps.retain(|step| step.kind != PlanStepKind::Verify);
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::MissingVerificationStep)
+        );
+    }
+
+    #[test]
+    fn rejects_non_final_verification_step() {
+        let mut plan = sample_plan();
+        let verify = plan.steps.pop().expect("verify step");
+        plan.steps.insert(0, verify);
+        for (sequence, step) in plan.steps.iter_mut().enumerate() {
+            step.sequence = sequence as u32;
+        }
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::VerificationStepNotFinal)
         );
     }
 
