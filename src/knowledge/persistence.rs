@@ -3098,6 +3098,18 @@ mod tests {
             .unwrap();
         assert!(trigger_sql.contains("UPDATE prohibited"));
 
+        let update_err = conn
+            .execute(
+                "UPDATE knowledge_snapshot_validation_receipts
+                 SET validator_ref = 'should-not-commit'
+                 WHERE validation_event = 'validation:legacy'",
+                [],
+            )
+            .unwrap_err();
+        assert!(update_err
+            .to_string()
+            .contains("knowledge_snapshot_validation_receipts is append-only"));
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
