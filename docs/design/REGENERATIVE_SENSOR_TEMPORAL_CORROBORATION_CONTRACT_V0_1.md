@@ -44,4 +44,23 @@ A valid reference is still not physical truth. It establishes an auditable trust
 
 Within one temporal corroboration decision, admitted sensor pairs must also resolve to the same authoritative topology attestation reference. This prevents multiple independently well-formed references from silently creating a quorum over different topology statements.
 
+## Verification-result boundary
+
+The authoritative reference is now paired with an explicit verification result. The result binds:
+
+- the verifier identity;
+- the exact attestation ID and statement digest evaluated;
+- the verification-result reference; and
+- a validity interval for the verification result.
+
+The local sensing contract checks these bindings and the result's temporal validity. It still does **not** perform cryptographic verification or establish the verifier's trust anchor. That remains the responsibility of the authoritative provenance layer.
+
+This distinction prevents a particularly dangerous failure mode: a sensor can no longer become locally admissible merely by naming an attestation reference; the temporal gate also requires a coherent, time-valid verification result for that exact reference.
+
+The intended trust progression is therefore:
+
+**attestation reference → authoritative verification result → local temporal validity → sensor independence quorum.**
+
+A verification result is evidence about the topology statement, not evidence that the physical asset itself is healthy.
+
 ## Adversarial boundary\n\nThis layer improves resilience against isolated stuck/drifting channels, but it cannot solve a coordinated majority attack by itself. If a quorum of sensors is compromised and reports a coherent false trajectory, temporal agreement alone cannot distinguish that trajectory from a genuine physical transition.\n\nThat case requires additional independent evidence such as physics/model residuals, heterogeneous sensing modalities, provenance and authorization controls, independent verification, or stronger Byzantine/fault assumptions.\n\n## Research basis\n\nRecent 2026 structural-health-monitoring research explicitly models sensor faults alongside evolving structural state and identifies bias, drift, gain variation, saturation, dropout, and stuck signals as distinct sensing degradations. It also emphasizes that structural degradation and sensor faults can otherwise produce ambiguous measurement anomalies. The present contract adopts that architectural distinction while keeping the core decision deterministic and platform-neutral.\n\n## Non-goals\n\nThis contract does not:\n\n- diagnose the physical failure mechanism;\n- declare a vehicle safe;\n- certify a repair;\n- replace regulated engineering authority;\n- infer physical recovery from sensor agreement;\n- assume that majority agreement is proof of truth.\n\nThe strongest invariant remains:\n\n**agreement is evidence quality, not physical truth.**
