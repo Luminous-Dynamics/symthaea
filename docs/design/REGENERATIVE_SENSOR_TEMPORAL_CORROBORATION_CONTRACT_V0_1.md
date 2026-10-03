@@ -86,3 +86,38 @@ The intended trust progression is now:
 
 The epoch remains evidence about topology lifecycle state. It does not establish physical health, safety, repair success, or recovery.
 
+
+
+## Distributed topology lifecycle convergence
+
+Epoch continuity prevents an individual observation from silently rolling back to an older topology statement, but distributed/offline operation creates a second problem: two actors can independently produce successors from the same admitted predecessor.
+
+The lifecycle boundary therefore treats topology transitions as append-only statements:
+
+**predecessor epoch + predecessor digest → lifecycle event → successor epoch + successor digest**
+
+The local convergence gate pins the predecessor that is currently admissible and requires the successor to advance exactly one epoch. A successor from an unrelated predecessor, an epoch skip, or an epoch rollback is quarantined.
+
+Most importantly, two distinct successor digests for the same predecessor are a **concurrent successor fork**. The gate reports Conflicted; it does not select the newer timestamp, larger epoch, first-arriving statement, or any other local winner.
+
+Duplicate copies of the same successor are not a fork. They may be recorded as a duplicate-evidence condition while retaining the same lifecycle interpretation.
+
+This distinction is important for offline-first assets. Network reconnection can produce multiple validly formed lifecycle statements that cannot safely be reconciled by timestamp alone. The safe local behavior is to preserve the competing branches and require an authoritative lifecycle resolution before one branch becomes current.
+
+The boundary therefore separates four questions:
+
+1. **Validity:** is this transition structurally well formed?
+2. **Continuity:** does it descend directly from the currently admitted predecessor?
+3. **Convergence:** do all observed statements agree on one successor?
+4. **Authority:** which lifecycle statement is authoritative when distributed actors disagree?
+
+Only the first three are addressed here. Authority remains outside the local sensing contract.
+
+This also aligns with the RATS freshness model: freshness is not the same thing as current lifecycle state, and distributed epoch mechanisms must account for propagation races and stale/frozen participants. Epoch Markers explicitly provide a shared freshness mechanism without requiring every participant to trust its local clock. citeturn0search0turn0search1
+
+### Security invariant
+
+**Never silently merge or choose between competing topology successors.**
+
+A fork is evidence of unresolved lifecycle divergence, not evidence that either branch is correct.
+
