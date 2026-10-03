@@ -64,3 +64,25 @@ The intended trust progression is therefore:
 A verification result is evidence about the topology statement, not evidence that the physical asset itself is healthy.
 
 ## Adversarial boundary\n\nThis layer improves resilience against isolated stuck/drifting channels, but it cannot solve a coordinated majority attack by itself. If a quorum of sensors is compromised and reports a coherent false trajectory, temporal agreement alone cannot distinguish that trajectory from a genuine physical transition.\n\nThat case requires additional independent evidence such as physics/model residuals, heterogeneous sensing modalities, provenance and authorization controls, independent verification, or stronger Byzantine/fault assumptions.\n\n## Research basis\n\nRecent 2026 structural-health-monitoring research explicitly models sensor faults alongside evolving structural state and identifies bias, drift, gain variation, saturation, dropout, and stuck signals as distinct sensing degradations. It also emphasizes that structural degradation and sensor faults can otherwise produce ambiguous measurement anomalies. The present contract adopts that architectural distinction while keeping the core decision deterministic and platform-neutral.\n\n## Non-goals\n\nThis contract does not:\n\n- diagnose the physical failure mechanism;\n- declare a vehicle safe;\n- certify a repair;\n- replace regulated engineering authority;\n- infer physical recovery from sensor agreement;\n- assume that majority agreement is proof of truth.\n\nThe strongest invariant remains:\n\n**agreement is evidence quality, not physical truth.**
+
+## Topology epoch continuity
+
+Topology identity is now also bound to an explicit lifecycle epoch. The epoch binding carries:
+
+- a monotonic epoch number;
+- the predecessor topology digest for epochs after the initial epoch;
+- the lifecycle time at which the epoch became effective; and
+- a stable lifecycle event identifier.
+
+The temporal policy pins the currently admissible topology epoch in addition to the topology ID, version, and digest. This makes a rollback to an older topology statement, a forked digest under the expected epoch, or an otherwise malformed epoch binding fail closed at the sensing boundary.
+
+This is deliberately a **lifecycle continuity boundary**, not a claim that the local policy itself is authoritative. A legitimate topology/configuration change should create a new authoritative topology statement and advance the policy/reference to that epoch. The local gate therefore avoids silently treating an old attestation as current merely because its timestamp has not yet expired.
+
+The distinction matters for offline and distributed systems: freshness alone does not establish that a statement is the *current* lifecycle state. RFC 9334 likewise treats freshness as a separate architectural concern and identifies replay, delay, reordering, and freezing participants on a past epoch as threats that must be handled by the attestation design. citeturn1search0
+
+The intended trust progression is now:
+
+**attestation reference → authoritative verification result → topology epoch continuity → local temporal validity → independence quorum.**
+
+The epoch remains evidence about topology lifecycle state. It does not establish physical health, safety, repair success, or recovery.
+
