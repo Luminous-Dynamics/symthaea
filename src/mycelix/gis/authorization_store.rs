@@ -353,6 +353,8 @@ pub struct ProviderTerminalEvidence {
     pub audience: String,
     pub adapter: String,
     pub boundary_id: String,
+    /// Commitment of the exact durable attempt whose effect is being evidenced.
+    pub attempt_binding_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -722,6 +724,7 @@ impl SqliteAuthorizationStore {
                outcome TEXT NOT NULL,
                evidence_id TEXT NOT NULL,
                evidence_digest TEXT NOT NULL,
+               attempt_binding_digest TEXT NOT NULL,
                verifier_id TEXT NOT NULL,
                verifier_config_digest TEXT NOT NULL,
                trust_anchor_digest TEXT NOT NULL,
@@ -801,6 +804,7 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_recovery_markers", "operation_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "trust_anchor_digest", "TEXT NOT NULL DEFAULT ''")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "attempt_binding_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "evidence_profile_digest", "TEXT NOT NULL DEFAULT ''")?;
         connection.execute_batch(
             "CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
@@ -2580,6 +2584,7 @@ fn validate_native_authority_pin_set(
             || evidence.audience != record.audience
             || evidence.adapter != record.adapter
             || evidence.boundary_id != record.boundary_id
+            || evidence.attempt_binding_digest != record.attempt_binding_digest
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
@@ -2787,8 +2792,8 @@ fn validate_native_authority_pin_set(
               native_authority_pin_set_id,native_authority_pin_set_digest,
               validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,boundary_id,
               action_digest,provider_idempotency_key,target_identity,audience,adapter,outcome,evidence_id,
-              evidence_digest,verifier_id,verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28)",
+              evidence_digest,attempt_binding_digest,verifier_id,verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity, row.1, row.2, row.3, row.4, row.5, row.6,
@@ -2796,7 +2801,8 @@ fn validate_native_authority_pin_set(
                 self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
                 record.provider_idempotency_key, record.target_identity, record.audience, record.adapter,
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
-                evidence.evidence_id, evidence.evidence_digest, verified.configuration.verifier_id,
+                evidence.evidence_id, evidence.evidence_digest, record.attempt_binding_digest,
+                verified.configuration.verifier_id,
                 verified.configuration.verifier_config_digest, verified.configuration.trust_anchor_digest,
                 verified.configuration.evidence_profile_digest, verified.verification_digest,
             ],
@@ -3165,9 +3171,9 @@ fn validate_native_authority_pin_set(
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
               native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,boundary_id,
               action_digest,provider_idempotency_key,target_identity,audience,adapter,outcome,evidence_id,
-              evidence_digest,verifier_id,verifier_config_digest,trust_anchor_digest,
+              evidence_digest,attempt_binding_digest,verifier_id,verifier_config_digest,trust_anchor_digest,
               evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity, native_provenance.0, native_provenance.1, native_provenance.2, native_provenance.3,
@@ -3177,6 +3183,7 @@ fn validate_native_authority_pin_set(
                 record.provider_idempotency_key, record.target_identity, record.audience, verified.evidence.adapter,
                 if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 verified.evidence.evidence_id, verified.evidence.evidence_digest,
+                record.attempt_binding_digest,
                 verified.configuration.verifier_id, verified.configuration.verifier_config_digest,
                 verified.configuration.trust_anchor_digest,
                 verified.configuration.evidence_profile_digest, verified.verification_digest,
@@ -3900,6 +3907,7 @@ mod tests {
             audience: record.audience.clone(),
             adapter: record.adapter.clone(),
             boundary_id: record.boundary_id.clone(),
+            attempt_binding_digest: record.attempt_binding_digest.clone(),
         }
     }
 
@@ -4248,6 +4256,13 @@ mod tests {
             ],
         ).unwrap_err();
         assert!(matches!(err, rusqlite::Error::SqliteFailure(_, _)));
+        let binding:String=store.connection().unwrap().query_row(
+            "SELECT attempt_binding_digest FROM authorization_terminal_evidence
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(binding,record.attempt_binding_digest);
         let adapter:String=store.connection().unwrap().query_row(
             "SELECT adapter FROM authorization_terminal_evidence
              WHERE authorization_instance=?1 AND attempt_id=?2",
