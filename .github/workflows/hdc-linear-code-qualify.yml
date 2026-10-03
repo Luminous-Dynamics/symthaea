@@ -101,9 +101,13 @@ jobs:
           cargo generate-lockfile --manifest-path "$HARNESS/Cargo.toml"
           LOCK_SHA256="$(sha256sum "$HARNESS/Cargo.lock" | cut -d" " -f1)"
           CARGO_VERSION="$(cargo --version)"
+          UNIT_TEST_COUNT="$(cargo test --locked --manifest-path "$HARNESS/Cargo.toml" --lib linear_code -- --list | grep -c ": test$")"
+          INTEGRATION_TEST_COUNT="$(cargo test --locked --manifest-path "$HARNESS/Cargo.toml" --test linear_code_ambiguity -- --list | grep -c ": test$")"
           echo "path=$HARNESS" >> "$GITHUB_OUTPUT"
           echo "lock_sha256=$LOCK_SHA256" >> "$GITHUB_OUTPUT"
           echo "cargo_version=$CARGO_VERSION" >> "$GITHUB_OUTPUT"
+          echo "unit_test_count=$UNIT_TEST_COUNT" >> "$GITHUB_OUTPUT"
+          echo "integration_test_count=$INTEGRATION_TEST_COUNT" >> "$GITHUB_OUTPUT"
 
       - name: Linear-code unit tests
         id: unit_tests
@@ -139,6 +143,8 @@ jobs:
           integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
           cargo_version=${{ steps.harness.outputs.cargo_version }}
           dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
+          unit_test_inventory=${{ steps.harness.outputs.unit_test_count }}
+          integration_test_inventory=${{ steps.harness.outputs.integration_test_count }}
           representation=gf2_random_linear_code
           bipolar_mapping=gf2_0_to_plus1_1_to_minus1
           binding_equivalence=hadamard_equals_gf2_xor
