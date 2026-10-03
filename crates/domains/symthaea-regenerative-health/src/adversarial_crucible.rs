@@ -81,6 +81,7 @@ fn temporal_gate() -> TemporalFusionGate {
         expected_topology_id: "topology-wing-root".into(),
         expected_topology_version: "1".into(),
         expected_topology_digest: "topology-v1".into(),
+        expected_attestation_issuer_id: "mycelix-topology-authority".into(),
     })
     .expect("valid temporal policy")
 }
@@ -130,6 +131,12 @@ fn run_pair(
                 issued_at_ms: 500,
                 valid_until_ms: 2_500,
                 evidence_id: format!("independence-{sensor_id}"),
+                authoritative_reference: crate::sensor_topology::AuthoritativeAttestationReference {
+                    attestation_id: "att-topology-1".into(),
+                    issuer_id: "mycelix-topology-authority".into(),
+                    attestation_digest: "att-digest-1".into(),
+                    verification_reference: "verify-1".into(),
+                },
             },
         },
     }
