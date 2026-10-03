@@ -335,3 +335,10 @@ The effectful lifecycle now treats the logical operation identifier as an attemp
 Terminal settlement and reconciliation now compare the caller-supplied durable dispatch record against the authoritative persisted dispatch row across the complete immutable identity surface: operation ID, native replay identity and derivation inputs, issuer/namespace/native authorization ID, relying-party domain, action identity/digest, provider idempotency key, target, audience, adapter, and boundary. A record that combines fields from different attempts is rejected before lease settlement.
 
 This closes a distinct class of provenance failure from operation-ID substitution: a valid attempt cannot be paired with a forged target, audience, adapter, or operation while retaining a valid action digest. The persisted row remains the source of truth; terminal provider evidence is accepted only after the record itself is proven to be the exact durable attempt.
+
+### Terminal verifier configuration is relying-party pinned
+
+Terminal provider evidence is now accepted only under a write-once relying-party pin for the complete verifier configuration: relying-party identity, verifier implementation/profile identifier, verifier configuration digest, trust-anchor digest, and evidence-profile digest. Missing pin metadata or a verifier result that differs from the pinned tuple is rejected before terminal settlement or authenticated reconciliation.
+
+The verifier's returned configuration is therefore evidence about what verifier claims it used, not a presenter-controlled trust root. The durable store selects the accepted configuration and requires an exact match before consuming the authorization. This follows the AEB-07 requirement that verifier revisions, trust anchors, and related validation inputs be relying-party-selected rather than introduced by presented data. citeturn102081search0turn102081search2
+
