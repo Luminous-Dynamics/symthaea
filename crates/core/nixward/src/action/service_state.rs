@@ -578,6 +578,7 @@ mod tests {
         let (state, capabilities) = NixServiceObservedStateV1::parse_systemd_observation(
             "nginx",
             "Id=nginx.service
+Names=nginx.service
 LoadState=loaded
 ActiveState=active
 SubState=running
@@ -712,11 +713,32 @@ CanReload=yes
     }
 
     #[test]
+    fn complete_observation_requires_resolved_name_membership() {
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_observation(
+                "nginx",
+                "Id=nginx.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::MissingNames
+        );
+    }
+
+    #[test]
     fn rejects_unknown_or_missing_operation_capability_values() {
         assert_eq!(
             NixServiceObservedStateV1::parse_systemd_observation(
                 "nginx",
                 "Id=nginx.service
+Names=nginx.service
 LoadState=loaded
 ActiveState=active
 SubState=running
@@ -733,6 +755,7 @@ CanReload=yes
             NixServiceObservedStateV1::parse_systemd_observation(
                 "nginx",
                 "Id=nginx.service
+Names=nginx.service
 LoadState=loaded
 ActiveState=active
 SubState=running
@@ -751,6 +774,7 @@ CanStop=yes
         let (value, capabilities) = NixServiceObservedStateV1::parse_systemd_observation(
             "nginx",
             "Id=nginx.service
+Names=nginx.service
 LoadState=loaded
 ActiveState=active
 SubState=running
