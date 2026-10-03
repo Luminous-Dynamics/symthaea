@@ -9,7 +9,7 @@ use symthaea_swarm::semantic_evidence_vds::{
     Rfc9942ProofKind, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload, Rfc9942SignatureWithReceipts,
     Rfc9162ConsistencyProof, Rfc9162InclusionProof, Rfc9942VdpError, Rfc9942Vdp,
     Rfc9942ReceiptCollection, Rfc9942VerifiedProof, Rfc9162Sha256Vds,
-    COSE_ES256_ALGORITHM_ID,
+    Rfc9942Es256CoseKey, COSE_ES256_ALGORITHM_ID,
 };
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
 use sha2::Digest;
@@ -459,6 +459,63 @@ fn rfc9942_consistency_state_binds_signature_to_detached_root() {
     );
 }
 
+
+
+#[test]
+fn rfc9942_es256_cose_key_inclusion_uses_detached_proof_derived_root() {
+    let candidate = b"candidate";
+    let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
+    let vds = Rfc9162Sha256Vds;
+    let proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
+    let head = vds.tree_head(&leaves);
+
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+    let cose_key_wire = {
+        let mut out = vec![0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20];
+        out.extend_from_slice(&RFC8392_PUBLIC_X);
+        out.extend_from_slice(&[0x22, 0x58, 0x20]);
+        out.extend_from_slice(&RFC8392_PUBLIC_Y);
+        out
+    };
+    let cose_key = Rfc9942Es256CoseKey::from_cbor(&cose_key_wire).unwrap();
+
+    let unsigned = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp.clone(),
+        Rfc9942ReceiptPayload::Detached,
+        vec![0u8; 64],
+    )
+    .unwrap();
+
+    let rng = SystemRandom::new();
+    let signer = EcdsaKeyPair::from_private_key_and_public_key(
+        &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+        &RFC8392_PRIVATE_D,
+        &rfc8392_public_key(),
+        &rng,
+    )
+    .unwrap();
+    let tbs = unsigned.signature1_tbs(&[], Some(head.root())).unwrap();
+    let signature = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Detached,
+        signature,
+    )
+    .unwrap();
+
+    // The detached payload need not be supplied by the caller for inclusion:
+    // the semantic verifier derives the root from the candidate + proof and
+    // then authenticates that exact derived root. The COSE_Key convenience
+    // helper must remain on that same path.
+    assert_eq!(
+        receipt.verify_es256_cose_key_inclusion(candidate, &cose_key, &[], None),
+        Ok(head)
+    );
+}
 
 #[test]
 fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
