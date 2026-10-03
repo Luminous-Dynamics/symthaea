@@ -1502,6 +1502,17 @@ fn validate_native_authority_pin_set(
 
         let lease = load_lease(&tx, authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
+        let persisted_operation_id: Option<String> = tx
+            .query_row(
+                "SELECT operation_id FROM authorization_leases
+                 WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+                params![authorization_instance, attempt_id, boundary_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if persisted_operation_id.as_deref() != Some(operation_id) {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
         if lease.action_id != action.id
             || lease.action_digest != action.canonical_action_digest()
             || !matches!(
@@ -6056,4 +6067,56 @@ mod tests {
         assert_ne!(r1.is_ok(),r2.is_ok());
         let _=std::fs::remove_file(path);
     }
+    #[test]
+    fn bound_dispatch_rejects_operation_identity_substitution() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-operation-binding-{}.db",
+            std::process::id()
+        ));
+        let (store, action, witness) = fixture(&path);
+        let effect = super::super::ActionEffectBinding::new(
+            "target-operation",
+            "prod",
+            "adapter-A",
+        );
+        let action = action.with_effect_binding(effect.clone());
+        let witness = ActionAuthorizationWitness {
+            action_id: action.id.clone(),
+            authorization_instance: witness.authorization_instance.clone(),
+            action_digest: action.canonical_action_digest(),
+            frame: witness.frame,
+            support_digest: witness.support_digest,
+            policy: witness.policy,
+            decision: witness.decision,
+            issued_at: witness.issued_at,
+            expires_at: witness.expires_at,
+            authority_epoch: witness.authority_epoch,
+        };
+        store.prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt-operation",
+            "boundary-A",
+            "operation-A",
+        ).unwrap();
+        assert!(matches!(
+            store.validate_bound_dispatch_preconditions(
+                &witness.authorization_instance,
+                "attempt-operation",
+                &action,
+                &effect,
+                "boundary-A",
+                "operation-B",
+                "https://issuer.example",
+                "native-auth-1",
+                "authority:issuer.example",
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+        let _ = std::fs::remove_file(path);
+    }
+
 }
