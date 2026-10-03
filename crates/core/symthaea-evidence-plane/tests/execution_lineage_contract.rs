@@ -1,8 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
-
 use serde_json::json;
 use symthaea_evidence_plane::execution_lineage::{
-    EvidenceLineageDecision, ExecutionLineageV1, RepositorySourceSnapshotId,
+    EvidenceLineageDecision, EvidenceLineageGuardV1, ExecutionLineageV1,
+    RepositorySourceSnapshotId,
 };
 
 fn fixture() -> ExecutionLineageV1 {
@@ -42,13 +41,20 @@ fn workload_identity_is_stable_across_environment_only_changes() {
     let environment = base.environment_digest().unwrap();
 
     let mut changed = base.clone();
-    changed.toolchain_versions.insert("cargo".into(), "1.96.0".into());
+    changed
+        .toolchain_versions
+        .insert("cargo".into(), "1.96.0".into());
     changed.host_triple = "aarch64-unknown-linux-gnu".into();
-    changed.allowed_env.insert("RUSTFLAGS".into(), "-Copt-level=3".into());
+    changed
+        .allowed_env
+        .insert("RUSTFLAGS".into(), "-Copt-level=3".into());
 
     assert_eq!(changed.workload_digest().unwrap(), workload);
     assert_ne!(changed.environment_digest().unwrap(), environment);
-    assert_ne!(changed.validated_digest().unwrap(), base.validated_digest().unwrap());
+    assert_ne!(
+        changed.validated_digest().unwrap(),
+        base.validated_digest().unwrap()
+    );
 }
 
 #[test]
@@ -57,8 +63,7 @@ fn guard_refuses_cross_execution_evidence_after_commit() {
     let mut changed = base.clone();
     changed.source_revision = "d".repeat(40);
 
-    let mut guard = symthaea_evidence_plane::execution_lineage::EvidenceLineageGuardV1::prepare(&base)
-        .unwrap();
+    let mut guard = EvidenceLineageGuardV1::prepare(&base).unwrap();
     guard.commit_evidence(&base).unwrap();
 
     assert_eq!(
@@ -74,7 +79,10 @@ fn serde_rejects_duplicate_map_keys_before_canonicalization() {
     let object = value.as_object_mut().unwrap();
     object.insert(
         "lock_digests".into(),
-        json!({"Cargo.lock": "sha256:0011223344556677", "other": "blake3:0011223344556677"}),
+        json!({
+            "Cargo.lock": "sha256:0011223344556677",
+            "other": "blake3:0011223344556677"
+        }),
     );
     let mut text = serde_json::to_string(&value).unwrap();
     text = text.replace(
@@ -88,10 +96,7 @@ fn serde_rejects_duplicate_map_keys_before_canonicalization() {
 fn serde_rejects_duplicate_feature_members_before_set_canonicalization() {
     let value = serde_json::to_value(fixture()).unwrap();
     let mut object = value.as_object().unwrap().clone();
-    object.insert(
-        "feature_flags".into(),
-        json!(["default", "default"]),
-    );
+    object.insert("feature_flags".into(), json!(["default", "default"]));
     let text = serde_json::to_string(&object).unwrap();
     assert!(serde_json::from_str::<ExecutionLineageV1>(&text).is_err());
 }
