@@ -718,16 +718,15 @@ impl ReceiptAttestationVerificationReport {
             .resolution_snapshot_fingerprint
             .as_deref()
             .is_none_or(|snapshot| !snapshot.is_empty());
+        let resolved_method_is_well_formed = self
+            .resolved_verification_method
+            .as_deref()
+            .is_none_or(|method| !method.is_empty());
+        let resolved_method_is_required = matches!(self.verification_method, VerificationStage::Passed);
 
         snapshot_is_well_formed
-            && match self.verification_method {
-                VerificationStage::Passed => self
-                    .resolved_verification_method
-                    .as_deref()
-                    .is_some_and(|method| !method.is_empty()),
-                VerificationStage::Failed(_)
-                | VerificationStage::NotEvaluated => true,
-            }
+            && resolved_method_is_well_formed
+            && (!resolved_method_is_required || self.resolved_verification_method.is_some())
     }
 
     /// Validate that this report is internally coherent without requiring
@@ -3210,6 +3209,29 @@ mod tests {
             .not_established
             .retain(|claim| *claim != EvaluationClaim::EvaluatorIndependence);
         assert!(!tampered.is_well_formed());
+    }
+
+    #[test]
+    fn verification_report_self_validation_rejects_empty_resolved_method() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let mut report = verifier.verify_report(&envelope, &receipt);
+
+        assert!(report.is_well_formed());
+        report.resolved_verification_method = Some(String::new());
+        assert!(!report.is_well_formed());
+
+        report.verification_method =
+            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable);
+        assert!(!report.is_well_formed());
+        report.resolved_verification_method = Some(
+            "did:example:attester-a#key-1".into(),
+        );
+        assert!(report.is_well_formed());
     }
 
     #[test]
