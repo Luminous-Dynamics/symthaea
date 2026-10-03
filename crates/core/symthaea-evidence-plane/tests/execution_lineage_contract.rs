@@ -81,6 +81,123 @@ fn workload_identity_is_stable_across_environment_only_changes() {
 }
 
 #[test]
+fn every_canonical_lineage_field_changes_identity_and_drift_report() {
+    let base = fixture();
+
+    let cases: Vec<(&str, ExecutionLineageV1, _)> = vec![
+        ({
+            let mut lineage = base.clone();
+            lineage.source_repository = "another-org/symthaea".into();
+            ("source_repository", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage.source_revision = "d".repeat(40);
+            ("source_revision", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage.source_tree = "e".repeat(40);
+            ("source_tree", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage.repository_source_snapshot_id =
+                RepositorySourceSnapshotId::parse(&"f".repeat(64)).unwrap();
+            ("repository_source_snapshot_id", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage
+                .lock_digests
+                .insert("Cargo.lock".into(), "sha256:1122334455667788".into());
+            ("lock_digests", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage
+                .toolchain_versions
+                .insert("cargo".into(), "1.96.0".into());
+            ("toolchain_versions", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage.host_triple = "aarch64-unknown-linux-gnu".into();
+            ("host_triple", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage.target_triple = "wasm32-unknown-unknown".into();
+            ("target_triple", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage.nix_identity = None;
+            ("nix_identity", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage.feature_flags.insert("research".into());
+            ("feature_flags", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage.cwd = "/workspace/changed".into();
+            ("working_directory", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage.argv.push("--nocapture".into());
+            ("command_argv", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage
+                .allowed_env
+                .insert("RUSTFLAGS".into(), "-Copt-level=3".into());
+            ("allowed_environment", lineage)
+        }),
+        ({
+            let mut lineage = base.clone();
+            lineage
+                .immutable_input_digests
+                .insert("dataset.bin".into(), "blake3:1122334455667788".into());
+            ("immutable_input_digests", lineage)
+        }),
+    ];
+
+    for (name, changed) in cases {
+        assert!(changed.validate().is_ok(), "{name} fixture must remain valid");
+        assert_ne!(
+            base.digest(),
+            changed.digest(),
+            "{name} must be identity-material"
+        );
+        let report = symthaea_evidence_plane::execution_lineage::ExecutionLineageDriftV1::between(
+            &base,
+            &changed,
+        )
+        .unwrap()
+        .expect("changed lineage must report drift");
+        assert_eq!(report.changed_fields.len(), 1, "{name} should have isolated drift");
+        assert_eq!(
+            format!("{:?}", report.changed_fields[0]),
+            name
+                .split('_')
+                .enumerate()
+                .map(|(index, part)| if index == 0 {
+                    let mut chars = part.chars();
+                    chars.next().unwrap().to_ascii_uppercase().to_string() + chars.as_str()
+                } else {
+                    let mut chars = part.chars();
+                    chars.next().unwrap().to_ascii_uppercase().to_string() + chars.as_str()
+                })
+                .collect::<String>()
+        );
+    }
+}
+
+#[test]
 fn guard_refuses_cross_execution_evidence_after_commit() {
     let base = fixture();
     let mut changed = base.clone();
