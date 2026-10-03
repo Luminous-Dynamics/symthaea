@@ -214,8 +214,13 @@ fn every_canonical_lineage_field_changes_identity_and_drift_report() {
             changed.digest(),
             "{name} must be identity-material"
         );
-        let report = ExecutionLineageDriftFieldV1::report(&base, &changed);
-        assert_eq!(report, vec![expected_field], "{name} drift must be isolated");
+        let report =
+            symthaea_evidence_plane::execution_lineage::ExecutionLineageDriftV1::between(
+                &base, &changed,
+            )
+            .unwrap()
+            .expect("changed lineage must report drift");
+        assert_eq!(report.changed_fields, vec![expected_field], "{name} drift must be isolated");
     }
 }
 
