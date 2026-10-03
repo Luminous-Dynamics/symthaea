@@ -231,6 +231,9 @@ pub enum DeploymentDisposition {
     NotActivated,
     /// No state transition was requested; existing target state should remain.
     Unchanged,
+    /// The target completed an explicit reboot transition without another
+    /// deployment disposition being primary.
+    Rebooted,
     /// An explicitly identified prior state was reached as the rollback target.
     RollbackTarget,
 }
@@ -1292,6 +1295,36 @@ mod tests {
         assert_eq!(
             plan.validate(),
             Err(PlanValidationError::RollbackAttemptsWithoutPermission)
+        );
+    }
+
+    #[test]
+    fn reboot_only_disposition_is_explicit() {
+        let mut plan = sample_plan();
+        plan.intent.required_capabilities.clear();
+        plan.intent.required_resources.clear();
+        plan.steps = vec![
+            PlanStep {
+                sequence: 0,
+                kind: PlanStepKind::Reboot,
+                required_capabilities: [Capability::Reboot].into_iter().collect(),
+                description: "reboot target".into(),
+            },
+            PlanStep {
+                sequence: 1,
+                kind: PlanStepKind::Verify,
+                required_capabilities: [Capability::ObserveHardware].into_iter().collect(),
+                description: "verify target state".into(),
+            },
+        ];
+        plan.target_snapshot.profile.capabilities.insert(Capability::Reboot);
+        plan.intent.required_capabilities.insert(Capability::Reboot);
+        plan.verification.disposition = DeploymentDisposition::Rebooted;
+
+        assert_eq!(plan.validate(), Ok(()));
+        assert_eq!(
+            plan.verification.disposition,
+            DeploymentDisposition::Rebooted
         );
     }
 
