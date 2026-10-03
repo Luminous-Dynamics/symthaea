@@ -458,13 +458,13 @@ The NixOS adapter MUST preserve the semantic distinction between:
 
 These are distinct state transitions even when they originate from the same desired configuration. The adapter therefore models them as a typed `NixActivationMode`, while the neutral SSC core remains unaware of Nix-specific vocabulary.
 
-Rollback requires stronger identity binding than a bare generation number. A rollback request MUST identify the target generation as an observed resource in the target snapshot:
+Rollback requires stronger identity binding than a bare generation number. A rollback request MUST identify both the requested generation ordinal and the exact observed system-profile/store realization. The adapter binds that pair into the observed resource identity:
 
-`required_resources ⊇ { nixos-generation(generation) }`
+`required_resources ⊇ { nixos-generation(generation, realization) }`
 
-The generation resource identity is content-addressed and is included in the authorized plan digest. This prevents a later executor from interpreting an otherwise identical authorization as permission to operate on a different generation identity.
+The realization identity is content-addressed and is included in the authorized plan digest. This prevents a later executor from interpreting an otherwise identical authorization as permission to operate on a different store realization even when the generation ordinal is reused or independently derived.
 
-A rollback request without the corresponding observed generation resource is rejected. Rollback is also mutually exclusive with rebuild, application installation/removal, and Home Manager mutation in the same intent. Reboot may be composed afterward because it is an explicit subsequent lifecycle step.
+A rollback request without the corresponding observed generation realization resource is rejected. Rollback is also mutually exclusive with rebuild, application installation/removal, and Home Manager mutation in the same intent. Reboot may be composed afterward because it is an explicit subsequent lifecycle step.
 
 The adapter also rejects ambiguous lifecycle compositions. In particular,
 `dry-activate` cannot be combined with another state mutation or reboot,
@@ -476,9 +476,9 @@ actually performs.
 This establishes the stronger invariant:
 
 `same host + same authority + same nominal generation number`
-does not constitute the same rollback authorization unless the observed generation resource is also the same.
+does not constitute the same rollback authorization unless the exact observed generation realization resource is also the same.
 
-The adapter remains plan-only. The existence, current/default/active status, and successful transition to that generation remain Nixward verification responsibilities.
+The adapter remains plan-only. The existence, exact realization, current/default/active status, and successful transition to that generation remain Nixward verification responsibilities.
 
 ## Resource binding
 
