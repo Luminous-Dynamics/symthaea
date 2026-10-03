@@ -296,6 +296,7 @@ impl NixServiceObservedStateV1 {
     ) -> Result<Self, NixServiceStateErrorV1> {
         let requested_unit = canonical_service_unit(requested_unit.into())?;
         let mut observed_id = None;
+        let mut observed_names = None;
         let mut load_state = None;
         let mut active_state = None;
         let mut sub_state = None;
@@ -310,11 +311,12 @@ impl NixServiceObservedStateV1 {
             }
             match key {
                 "Id" if observed_id.is_none() => observed_id = Some(value.to_string()),
+                "Names" if observed_names.is_none() => observed_names = Some(value.to_string()),
                 "LoadState" if load_state.is_none() => load_state = Some(ServiceLoadStateV1::parse(value)?),
                 "ActiveState" if active_state.is_none() => active_state = Some(ServiceActiveStateV1::parse(value)?),
                 "SubState" if sub_state.is_none() => sub_state = Some(value.to_string()),
                 "UnitFileState" if unit_file_state.is_none() => unit_file_state = Some(ServiceUnitFileStateV1::parse(value)?),
-                "Id" | "LoadState" | "ActiveState" | "SubState" | "UnitFileState" => {
+                "Id" | "Names" | "LoadState" | "ActiveState" | "SubState" | "UnitFileState" => {
                     return Err(NixServiceStateErrorV1::DuplicateProperty);
                 }
                 _ => return Err(NixServiceStateErrorV1::UnexpectedProperty),
@@ -332,7 +334,9 @@ impl NixServiceObservedStateV1 {
             active_state.ok_or(NixServiceStateErrorV1::MissingActiveState)?,
             unit_file_state.ok_or(NixServiceStateErrorV1::MissingUnitFileState)?,
             sub_state.ok_or(NixServiceStateErrorV1::MissingSubState)?,
-        )
+        )?;
+        state.resolved_id = observed_id;
+        Ok(state)
     }
 
     /// Parse the complete governed observation atomically. Capability facts are
