@@ -93,6 +93,15 @@ fn rfc9942_inclusion_and_consistency_preserve_required_verification_order() {
         ),
         Err(Rfc9942VdpError::InvalidEs256Signature)
     );
+    assert_eq!(
+        consistency.verify_es256_consistency_state(
+            symthaea_swarm::semantic_evidence_vds::VdsTreeHead::new(1, [0x55; 32]),
+            &public_key,
+            &[],
+            None,
+        ),
+        Err(Rfc9942VdpError::InvalidEs256Signature)
+    );
 }
 
 #[test]
