@@ -217,7 +217,8 @@ impl RandomLinearCode {
         left_rank: usize,
         right_rank: usize,
         seed: u64,
-    ) -> Option<(Self, Self, Self)> {        assert!(dimension > 0, "dimension must be positive");
+    ) -> Option<(Self, Self, Self)> {
+        assert!(dimension > 0, "dimension must be positive");
         assert!(left_rank > 0, "left rank must be positive");
         assert!(right_rank > 0, "right rank must be positive");
         let total_rank = left_rank.checked_add(right_rank)?;
