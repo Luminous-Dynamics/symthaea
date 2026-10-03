@@ -7,7 +7,6 @@ legacy_regex='mycelix\\.net|mycelix\\.com|mycelix\\.dev|relationalharmonics\\.or
 # Keep the scan narrow so historical/archive material can retain provenance.
 scan_paths=(
   .github
-  crates/domains/symthaea-spore
   nix/modules
   src/swarm
   crates/domains/symthaea-spore/src/bin
