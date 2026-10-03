@@ -157,7 +157,7 @@ function assertSemanticSceneSamples(samples) {
   }
 }
 
-function assertSemanticMovieSamples(samples, label = 'WebGPU') {
+function assertSemanticMovieSamples(samples, label = 'WebGPU', classification = 'renderer') {
   const byName = new Map(samples.map(sample => [sample.name, sample.rgba]));
   const left = byName.get('left');
   const right = byName.get('right');
@@ -167,19 +167,19 @@ function assertSemanticMovieSamples(samples, label = 'WebGPU') {
   if (!left || !right || !top || !bottom) {
     throw new QualificationError(
       `${label} semantic movie probes missing: ${JSON.stringify(samples)}`,
-      'renderer',
+      classification,
     );
   }
   if (!(left[0] + 20 < right[0])) {
     throw new QualificationError(
       `${label} movie horizontal gradient is not increasing red left-to-right: ${JSON.stringify(samples)}`,
-      'renderer',
+      classification,
     );
   }
   if (!(top[1] + 20 < bottom[1])) {
     throw new QualificationError(
       `${label} movie vertical gradient is not increasing green top-to-bottom: ${JSON.stringify(samples)}`,
-      'renderer',
+      classification,
     );
   }
 }
@@ -465,7 +465,7 @@ async function runMode(mode) {
         { name: 'bottom', x: 16, y: 22 },
       ],
     );
-    assertSemanticMovieSamples(semanticFallbackMovieSamples, 'Canvas2D fallback');
+    assertSemanticMovieSamples(semanticFallbackMovieSamples, 'Canvas2D fallback', 'fallback');
 
     const firstFallbackCanvasHash = await canvasPngHash(page, '#canvas2d-movie-fallback');
     const firstPortraitSource = await page.$eval(
