@@ -87,6 +87,7 @@ jobs:
           [dependencies]
           rand = "=0.8.6"
           rand_chacha = "=0.3.1"
+          blake3 = "=1.8.2"
           EOF
 
           cat > "$HARNESS/src/lib.rs" <<EOF
