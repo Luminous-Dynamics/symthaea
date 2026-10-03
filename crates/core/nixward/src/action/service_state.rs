@@ -461,7 +461,7 @@ impl NixServiceObservedStateV1 {
         hasher.update(SERVICE_STATE_DOMAIN_V1);
         write_len_prefixed(&mut hasher, self.unit.as_bytes());
         write_len_prefixed(&mut hasher, self.resolved_id.as_bytes());
-        write_len_prefixed(&mut hasher, &(self.observed_names.len() as u64).to_be_bytes());
+        hasher.update(&(self.observed_names.len() as u64).to_be_bytes());
         for name in &self.observed_names {
             write_len_prefixed(&mut hasher, name.as_bytes());
         }
@@ -740,6 +740,39 @@ CanReload=yes
         .0;
 
         assert_eq!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn narrow_and_complete_observation_share_name_set_digest_semantics() {
+        let narrow = NixServiceObservedStateV1::parse_systemd_properties(
+            "alias.service",
+            "Id=real.service
+Names=alias.service real.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=enabled
+",
+        )
+        .unwrap();
+
+        let (complete, _) = NixServiceObservedStateV1::parse_systemd_observation(
+            "alias.service",
+            "Id=real.service
+Names=real.service alias.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+        )
+        .unwrap();
+
+        assert_eq!(narrow.resolved_id(), complete.resolved_id());
+        assert_eq!(narrow.digest().unwrap(), complete.digest().unwrap());
     }
 
     #[test]
