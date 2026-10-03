@@ -2874,6 +2874,77 @@ mod tests {
     }
 
     #[test]
+    fn test_legacy_validation_migration_rejects_unrecognized_receipt_digest() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_legacy_validation_digest_drift_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_snapshot_receipts (
+                    generation INTEGER PRIMARY KEY AUTOINCREMENT,
+                    canonical_digest_hex TEXT NOT NULL,
+                    receipt_digest_hex TEXT NOT NULL
+                );
+                CREATE TABLE knowledge_snapshot_validation_receipts (
+                    validation_event TEXT PRIMARY KEY,
+                    generation INTEGER NOT NULL,
+                    snapshot_digest_hex TEXT NOT NULL,
+                    validator_ref TEXT NOT NULL,
+                    validator_version TEXT NOT NULL,
+                    validation_profile TEXT NOT NULL,
+                    conforms INTEGER NOT NULL,
+                    report_digest_hex TEXT,
+                    receipt_digest_hex TEXT
+                );
+                INSERT INTO knowledge_snapshot_receipts
+                    (generation, canonical_digest_hex, receipt_digest_hex)
+                VALUES (1, 'snapshot-digest', 'placeholder');
+                INSERT INTO knowledge_snapshot_validation_receipts
+                    (validation_event, generation, snapshot_digest_hex, validator_ref,
+                     validator_version, validation_profile, conforms, report_digest_hex,
+                     receipt_digest_hex)
+                VALUES (
+                    'validation:legacy',
+                    1,
+                    'snapshot-digest',
+                    'validator',
+                    'v1',
+                    'profile',
+                    1,
+                    NULL,
+                    'definitely-not-a-valid-epf-011-digest'
+                );",
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let conn = p.open_connection().unwrap();
+        let err = p.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains("Validation receipt self-digest is not a recognized EPF-011 integrity digest"));
+
+        // The migration is transactional: failure must not leave behind a partially
+        // upgraded validation ledger.
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(knowledge_snapshot_validation_receipts)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert!(!columns.iter().any(|column| column == "validation_sequence"));
+        assert!(!columns.iter().any(|column| column == "receipt_digest_hex"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_legacy_provenance_normalization_preserves_existing_snapshot_receipt() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_legacy_provenance_receipt_compatibility_test_{}",
