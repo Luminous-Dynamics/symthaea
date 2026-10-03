@@ -34,7 +34,7 @@ const SCREENSHOT_DIR = path.resolve(
   process.env.WEBGPU_SCREENSHOTS || path.join(ROOT, 'webgpu-qualification-screenshots'),
 );
 const CHROMIUM = process.env.CHROMIUM_PATH || execFileSync('which', ['chromium'], { encoding: 'utf8' }).trim();
-const MODES = (process.env.WEBGPU_MODES || 'webgpu,fallback')
+const MODES = (process.env.WEBGPU_MODES || 'webgpu-swiftshader,fallback')
   .split(',')
   .map(value => value.trim())
   .filter(Boolean);
@@ -143,7 +143,7 @@ async function waitForVisible(page, selector) {
 }
 
 async function runMode(mode) {
-  const gpuMode = mode === 'webgpu';
+  const gpuMode = mode === 'webgpu' || mode === 'webgpu-swiftshader';
   if (!gpuMode && mode !== 'fallback') {
     throw new Error(`unsupported qualification mode: ${mode}`);
   }
@@ -178,12 +178,21 @@ async function runMode(mode) {
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
+  const failOnPageErrors = phase => {
+    if (pageErrors.length > 0) {
+      throw new Error(
+        `uncaught browser exception during ${phase}: ${JSON.stringify(pageErrors)}`,
+      );
+    }
+  };
+
   try {
     await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
     const capability = await capabilityPreflight(page);
 
     if (gpuMode) {
+      failOnPageErrors('WebGPU capability preflight');
       if (!capability.navigator_gpu || !capability.adapter || !capability.device) {
         throw new Error(`WebGPU capability preflight failed: ${JSON.stringify(capability)}`);
       }
@@ -191,6 +200,7 @@ async function runMode(mode) {
       await waitForProjection(page, '#webgpu-cognitive-canvas', 'block');
       await waitForProjection(page, '#webgpu-movie-canvas', 'block');
       await sleep(250);
+      failOnPageErrors('WebGPU first render');
 
       const firstSceneHash = await canvasPngHash(page, '#webgpu-cognitive-canvas');
       const firstMovieHash = await canvasPngHash(page, '#webgpu-movie-canvas');
@@ -213,6 +223,7 @@ async function runMode(mode) {
       await waitForProjection(page, '#webgpu-cognitive-canvas', 'block');
       await waitForProjection(page, '#webgpu-movie-canvas', 'block');
       await sleep(250);
+      failOnPageErrors('WebGPU deterministic repeat render');
 
       const repeatSceneHash = await canvasPngHash(page, '#webgpu-cognitive-canvas');
       const repeatMovieHash = await canvasPngHash(page, '#webgpu-movie-canvas');
@@ -225,6 +236,7 @@ async function runMode(mode) {
 
       return {
         mode,
+        qualification_profile: gpuMode ? 'browser-webgpu-swiftshader' : 'forced-gpu-disabled',
         capability,
         scene_hash: firstSceneHash,
         movie_hash: firstMovieHash,
@@ -236,6 +248,7 @@ async function runMode(mode) {
     await waitForProjection(page, '#canvas2d-movie-fallback', 'block');
     await waitForVisible(page, 'img.portrait');
     await sleep(100);
+    failOnPageErrors('forced fallback render');
 
     const fallback = await page.evaluate(() => {
       const canvas = document.querySelector('#canvas2d-movie-fallback');
