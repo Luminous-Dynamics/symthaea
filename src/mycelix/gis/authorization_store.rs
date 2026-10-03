@@ -3959,13 +3959,19 @@ fn insert_receipt_with_boundary(
         ExecutionOutcome::Failed => "failed",
         ExecutionOutcome::Indeterminate => "indeterminate",
     };
+    let attempt_scope_digest = match boundary_id {
+        Some(boundary) => Some(compute_attempt_scope_digest(boundary, &r.attempt_id)?),
+        None => None,
+    };
     tx.execute(
         "INSERT INTO authorization_receipts
-         (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,provider_idempotency_key,boundary_id)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+         (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,
+          provider_idempotency_key,boundary_id,attempt_scope_digest)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
         params![
             r.authorization_instance, r.action_id, r.attempt_id, phase, outcome,
-            r.action_digest, r.authority_epoch as i64, r.provider_idempotency_key, boundary_id
+            r.action_digest, r.authority_epoch as i64, r.provider_idempotency_key, boundary_id,
+            attempt_scope_digest
         ],
     )?;
     Ok(())
@@ -3975,7 +3981,7 @@ fn load_receipt(
 ) -> Result<Option<ExecutionReceipt>, AuthorizationStoreError> {
     tx.query_row(
         "SELECT authorization_instance,action_id,attempt_id,outcome,action_digest,authority_epoch,
-                provider_idempotency_key
+                provider_idempotency_key,boundary_id,attempt_scope_digest
          FROM authorization_receipts
          WHERE authorization_instance=?1 AND attempt_id=?2 AND phase=?3",
         params![authorization_instance,attempt_id,phase],
@@ -3992,6 +3998,17 @@ fn load_receipt(
             let action_digest: String = r.get(4)?;
             let authority_epoch = r.get::<_,i64>(5)? as u64;
             let provider_idempotency_key: Option<String> = r.get(6)?;
+            let boundary_id: Option<String> = r.get(7)?;
+            let attempt_scope_digest: Option<String> = r.get(8)?;
+            if let Some(boundary) = boundary_id.as_deref() {
+                let expected_scope=compute_attempt_scope_digest(boundary,&attempt_id)
+                    .map_err(|_| rusqlite::Error::InvalidQuery)?;
+                if attempt_scope_digest.as_deref()!=Some(expected_scope.as_str()) {
+                    return Err(rusqlite::Error::InvalidQuery);
+                }
+            } else if attempt_scope_digest.as_ref().is_some_and(|scope| !scope.is_empty()) {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
             let fallback_lease = AuthorizationLease::new_with_instance(
                 authorization_instance.clone(),
                 action_id.clone(),
