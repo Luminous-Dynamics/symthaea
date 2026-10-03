@@ -4368,58 +4368,116 @@ fn insert_receipt_with_boundary(
 fn load_receipt(
     tx: &Transaction<'_>, authorization_instance: &str, attempt_id: &str, phase: &str,
 ) -> Result<Option<ExecutionReceipt>, AuthorizationStoreError> {
-    tx.query_row(
+    let row: Option<(
+        String, String, String, String, String, i64,
+        Option<String>, Option<String>, Option<String>,
+    )> = tx.query_row(
         "SELECT authorization_instance,action_id,attempt_id,outcome,action_digest,authority_epoch,
                 provider_idempotency_key,boundary_id,attempt_scope_digest
          FROM authorization_receipts
          WHERE authorization_instance=?1 AND attempt_id=?2 AND phase=?3",
         params![authorization_instance,attempt_id,phase],
-        |r| {
-            let outcome = match r.get::<_,String>(3)?.as_str() {
-                "succeeded" => ExecutionOutcome::Succeeded,
-                "failed" => ExecutionOutcome::Failed,
-                "indeterminate" => ExecutionOutcome::Indeterminate,
-                _ => return Err(rusqlite::Error::InvalidQuery),
-            };
-            let authorization_instance: String = r.get(0)?;
-            let action_id: String = r.get(1)?;
-            let attempt_id: String = r.get(2)?;
-            let action_digest: String = r.get(4)?;
-            let authority_epoch = r.get::<_,i64>(5)? as u64;
-            let provider_idempotency_key: Option<String> = r.get(6)?;
-            let boundary_id: Option<String> = r.get(7)?;
-            let attempt_scope_digest: Option<String> = r.get(8)?;
-            if let Some(boundary) = boundary_id.as_deref() {
-                let expected_scope=compute_attempt_scope_digest(boundary,&attempt_id)
-                    .map_err(|_| rusqlite::Error::InvalidQuery)?;
-                if attempt_scope_digest.as_deref()!=Some(expected_scope.as_str()) {
-                    return Err(rusqlite::Error::InvalidQuery);
-                }
-            } else if attempt_scope_digest.as_ref().is_some_and(|scope| !scope.is_empty()) {
-                return Err(rusqlite::Error::InvalidQuery);
-            }
-            let fallback_lease = AuthorizationLease::new_with_instance(
+        |r| Ok((
+            r.get(0)?,
+            r.get(1)?,
+            r.get(2)?,
+            r.get(3)?,
+            r.get(4)?,
+            r.get(5)?,
+            r.get(6)?,
+            r.get(7)?,
+            r.get(8)?,
+        )),
+    ).optional()?;
+
+    let Some((
+        authorization_instance,
+        action_id,
+        attempt_id,
+        outcome,
+        action_digest,
+        authority_epoch,
+        provider_idempotency_key,
+        boundary_id,
+        attempt_scope_digest,
+    )) = row else {
+        return Ok(None);
+    };
+
+    let outcome = match outcome.as_str() {
+        "succeeded" => ExecutionOutcome::Succeeded,
+        "failed" => ExecutionOutcome::Failed,
+        "indeterminate" => ExecutionOutcome::Indeterminate,
+        _ => return Err(AuthorizationStoreError::InvalidState(
+            "invalid persisted authorization receipt outcome".into()
+        )),
+    };
+
+    if let Some(boundary) = boundary_id.as_deref() {
+        let expected_scope=compute_attempt_scope_digest(boundary,&attempt_id)?;
+        if attempt_scope_digest.as_deref() != Some(expected_scope.as_str()) {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        let dispatch: Option<(String,String,String,String,Option<String>)> = tx.query_row(
+            "SELECT action_id,action_digest,provider_idempotency_key,boundary_id,attempt_scope_digest
+             FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![authorization_instance,attempt_id],
+            |r| Ok((
+                r.get(0)?,
+                r.get(1)?,
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+            )),
+        ).optional()?;
+
+        let Some((
+            dispatch_action_id,
+            dispatch_action_digest,
+            dispatch_provider_key,
+            dispatch_boundary,
+            dispatch_scope,
+        )) = dispatch else {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        };
+
+        if dispatch_action_id != action_id
+            || dispatch_action_digest != action_digest
+            || dispatch_provider_key != provider_idempotency_key.as_deref().unwrap_or("")
+            || dispatch_boundary != boundary
+            || dispatch_scope.as_deref() != Some(expected_scope.as_str())
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+    } else if attempt_scope_digest.as_ref().is_some_and(|scope| !scope.is_empty()) {
+        return Err(AuthorizationConsumptionError::InvalidBinding.into());
+    }
+
+    let provider_idempotency_key = provider_idempotency_key
+        .filter(|key| !key.is_empty())
+        .unwrap_or_else(|| {
+            AuthorizationLease::new_with_instance(
                 authorization_instance.clone(),
                 action_id.clone(),
                 action_digest.clone(),
                 String::new(),
                 String::new(),
-                authority_epoch,
+                authority_epoch as u64,
                 1,
-            );
-            Ok(ExecutionReceipt {
-                authorization_instance,
-                action_id,
-                attempt_id,
-                outcome,
-                action_digest,
-                provider_idempotency_key: provider_idempotency_key
-                    .filter(|key| !key.is_empty())
-                    .unwrap_or_else(|| fallback_lease.provider_idempotency_key()),
-                authority_epoch,
-            })
-        },
-    ).optional().map_err(Into::into)
+            ).provider_idempotency_key()
+        });
+
+    Ok(Some(ExecutionReceipt {
+        authorization_instance,
+        action_id,
+        attempt_id,
+        outcome,
+        action_digest,
+        provider_idempotency_key,
+        authority_epoch: authority_epoch as u64,
+    }))
 }
 
 #[cfg(test)]
