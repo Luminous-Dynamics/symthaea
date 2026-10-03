@@ -357,6 +357,49 @@ mod tests {
     }
 
     #[test]
+    fn epoch_one_cannot_claim_a_predecessor() {
+        let mut a = attestation();
+        a.epoch_binding.predecessor_topology_digest = Some("topology-v0".into());
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::InvalidEpochBinding)
+        );
+    }
+
+    #[test]
+    fn later_epoch_requires_predecessor_binding() {
+        let mut a = attestation();
+        a.epoch_binding.epoch = 2;
+        a.epoch_binding.predecessor_topology_digest = None;
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::MissingEpochPredecessor)
+        );
+    }
+
+    #[test]
+    fn epoch_cannot_become_effective_after_attestation_issue_time() {
+        let mut a = attestation();
+        a.epoch_binding.effective_from_ms = 501;
+        a.issued_at_ms = 500;
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::EpochEffectiveTimeMismatch)
+        );
+    }
+
+    #[test]
+    fn epoch_cannot_self_reference_its_own_topology_digest() {
+        let mut a = attestation();
+        a.epoch_binding.epoch = 2;
+        a.epoch_binding.predecessor_topology_digest = Some("topology-v1".into());
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::InvalidEpochBinding)
+        );
+    }
+
+    #[test]
     fn authoritative_reference_identity_is_exactly_comparable() {
         let a = attestation();
         let mut b = attestation();
