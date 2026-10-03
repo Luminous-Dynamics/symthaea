@@ -145,6 +145,13 @@ jobs:
           printf 'fingerprint=%s\\n' "$FINGERPRINT" >> "$GITHUB_OUTPUT"
           printf 'fixture_spec=%s\\n' "$FIXTURE_SPEC" >> "$GITHUB_OUTPUT"
 
+      - name: Capture deterministic work ledger
+        id: work
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_work_ledger_is_deterministic_and_semantically_linked -- --nocapture 2>&1)"
+          WORK_LEDGER="$(printf '%s\\n' "$OUTPUT" | awk -F= '/WORK_LEDGER=/ { print $2; exit }')"
+          test -n "$WORK_LEDGER"
+          printf 'work_ledger=%s\\n' "$WORK_LEDGER" >> "$GITHUB_OUTPUT"
       - name: Strict Clippy
         id: clippy
         run: |
@@ -173,6 +180,8 @@ jobs:
           fixture_spec=${{ steps.fingerprint.outputs.fixture_spec }}
           fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
           fixture_fingerprint_schema=blake3-256-symthaea-hdc-linear-code-v1
+          work_ledger_status=${{ steps.work.outcome }}
+          work_ledger=${{ steps.work.outputs.work_ledger }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
