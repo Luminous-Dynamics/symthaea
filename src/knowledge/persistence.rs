@@ -2421,7 +2421,191 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
         }
     }
 
+    verify_receipt_trigger_behavior(conn)?;
+
     Ok(())
+}
+
+fn verify_receipt_trigger_behavior(conn: &rusqlite::Connection) -> Result<(), String> {
+    conn.execute_batch("SAVEPOINT epf011_trigger_attestation;")
+        .map_err(|e| format!("Schema integrity trigger probe savepoint: {e}"))?;
+
+    let result = (|| {
+        let snapshot_generation: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(generation), 0) FROM knowledge_snapshot_receipts",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Schema integrity trigger probe generation: {e}"))?
+            .checked_add(1)
+            .ok_or("Schema integrity trigger probe generation exhausted SQLite INTEGER range")?;
+        let snapshot_digest = "0".repeat(64);
+        let snapshot = KnowledgeSnapshotReceipt {
+            generation: u64::try_from(snapshot_generation)
+                .map_err(|_| "Schema integrity trigger probe generation overflow")?,
+            canonical_digest_hex: snapshot_digest.clone(),
+            receipt_digest_hex: String::new(),
+        };
+
+        conn.execute(
+            "INSERT INTO knowledge_snapshot_receipts
+             (generation, canonical_digest_hex, receipt_digest_hex)
+             VALUES (?1, ?2, ?3)",
+            rusqlite::params![
+                snapshot_generation,
+                snapshot_digest,
+                snapshot.canonical_receipt_digest_hex(),
+            ],
+        )
+        .map_err(|e| format!("Schema integrity trigger probe snapshot insert: {e}"))?;
+
+        if conn
+            .execute(
+                "INSERT INTO knowledge_snapshot_receipts
+                 (generation, canonical_digest_hex, receipt_digest_hex)
+                 VALUES (?1, ?2, ?3)",
+                rusqlite::params![
+                    snapshot_generation + 1,
+                    "not-a-digest",
+                    "not-a-digest",
+                ],
+            )
+            .is_ok()
+        {
+            return Err(
+                "Schema integrity check failed: snapshot receipt trigger did not reject malformed insert"
+                    .into(),
+            );
+        }
+
+        let validation_sequence: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(validation_sequence), 0)
+                 FROM knowledge_snapshot_validation_receipts",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Schema integrity trigger probe sequence: {e}"))?
+            .checked_add(1)
+            .ok_or("Schema integrity trigger probe sequence exhausted SQLite INTEGER range")?;
+        let validation_event = format!("__epf011_trigger_probe_{snapshot_generation}");
+        let validation = KnowledgeSnapshotValidationReceipt {
+            validation_event: validation_event.clone(),
+            generation: u64::try_from(snapshot_generation)
+                .map_err(|_| "Schema integrity trigger probe generation overflow")?,
+            snapshot_digest_hex: "0".repeat(64),
+            validator_ref: "probe-validator".into(),
+            validator_version: "probe-v1".into(),
+            validation_profile: "probe".into(),
+            conforms: true,
+            report_digest_hex: None,
+        };
+
+        conn.execute(
+            "INSERT INTO knowledge_snapshot_validation_receipts
+             (validation_event, validation_sequence, generation, snapshot_digest_hex,
+              validator_ref, validator_version, validation_profile, conforms,
+              report_digest_hex, receipt_digest_hex)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            rusqlite::params![
+                validation.validation_event,
+                validation_sequence,
+                snapshot_generation,
+                validation.snapshot_digest_hex,
+                validation.validator_ref,
+                validation.validator_version,
+                validation.validation_profile,
+                validation.conforms,
+                validation.report_digest_hex,
+                validation.canonical_digest_hex_for_sequence(
+                    u64::try_from(validation_sequence)
+                        .map_err(|_| "Schema integrity trigger probe sequence overflow")?,
+                ),
+            ],
+        )
+        .map_err(|e| format!("Schema integrity trigger probe validation insert: {e}"))?;
+
+        if conn
+            .execute(
+                "INSERT INTO knowledge_snapshot_validation_receipts
+                 (validation_event, validation_sequence, generation, snapshot_digest_hex,
+                  validator_ref, validator_version, validation_profile, conforms,
+                  report_digest_hex, receipt_digest_hex)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, ?9)",
+                rusqlite::params![
+                    format!("{validation_event}-bad"),
+                    validation_sequence + 1,
+                    snapshot_generation,
+                    "not-a-digest",
+                    "",
+                    "probe-v1",
+                    "probe",
+                    2_i64,
+                    "not-a-digest",
+                ],
+            )
+            .is_ok()
+        {
+            return Err(
+                "Schema integrity check failed: validation receipt trigger did not reject malformed insert"
+                    .into(),
+            );
+        }
+
+        for (statement, label) in [
+            (
+                format!(
+                    "UPDATE knowledge_snapshot_receipts
+                     SET canonical_digest_hex = '1'
+                     WHERE generation = {snapshot_generation}"
+                ),
+                "snapshot receipt UPDATE",
+            ),
+            (
+                format!(
+                    "DELETE FROM knowledge_snapshot_receipts
+                     WHERE generation = {snapshot_generation}"
+                ),
+                "snapshot receipt DELETE",
+            ),
+            (
+                format!(
+                    "UPDATE knowledge_snapshot_validation_receipts
+                     SET validator_version = 'mutated'
+                     WHERE validation_event = '{validation_event}'"
+                ),
+                "validation receipt UPDATE",
+            ),
+            (
+                format!(
+                    "DELETE FROM knowledge_snapshot_validation_receipts
+                     WHERE validation_event = '{validation_event}'"
+                ),
+                "validation receipt DELETE",
+            ),
+        ] {
+            if conn.execute_batch(&statement).is_ok() {
+                return Err(format!(
+                    "Schema integrity check failed: {label} was not rejected"
+                ));
+            }
+        }
+
+        Ok(())
+    })();
+
+    let rollback = conn.execute_batch(
+        "ROLLBACK TO epf011_trigger_attestation;
+         RELEASE epf011_trigger_attestation;",
+    );
+    if let Err(e) = rollback {
+        return Err(format!(
+            "Schema integrity trigger probe rollback failed: {e}"
+        ));
+    }
+
+    result
 }
 
 
@@ -3453,6 +3637,58 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+
+    #[test]
+    fn test_schema_trigger_attestation_rejects_comment_only_receipt_guard() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_comment_trigger_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        p.save_facts(&[FactRecord {
+            memory_id: "comment-trigger".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x61; BinaryHV::BYTES],
+            source_text: "comment trigger".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "DROP TRIGGER trg_knowledge_snapshot_receipts_required_insert;
+                 CREATE TRIGGER trg_knowledge_snapshot_receipts_required_insert
+                 BEFORE INSERT ON knowledge_snapshot_receipts
+                 WHEN 1
+                 BEGIN
+                     /* before insert on knowledge_snapshot_receipts
+                        new.generation is null
+                        new.generation <= 0
+                        new.canonical_digest_hex is null
+                        length(new.canonical_digest_hex) <> 64
+                        new.receipt_digest_hex is null
+                        length(new.receipt_digest_hex) <> 64
+                        raise(abort, 'knowledge_snapshot_receipts requires positive generation and 64-character digests') */
+                     SELECT 1;
+                 END;",
+            )
+            .unwrap();
+        }
+
+        let conn = p.open_connection().unwrap();
+        let err = p.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains("snapshot receipt trigger"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_initialized_schema_rejects_weakened_receipt_insert_trigger() {
