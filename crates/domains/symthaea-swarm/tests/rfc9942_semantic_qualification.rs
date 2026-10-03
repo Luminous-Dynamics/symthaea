@@ -188,7 +188,7 @@ fn rfc9162_inclusion_and_consistency_path_bounds_are_tree_size_derived() {
 fn cose_extension_values_accept_well_formed_simple_items_and_round_trip_exactly() {
     for value in [&[0xe0][..], &[0xf3][..], &[0xf8, 0x20][..]] {
         let mut protected = Vec::new();
-        protected.extend_from_slice(&[0xa1, 0x07]);
+        protected.extend_from_slice(&[0xa1, 0x19, 0x03, 0xe7]);
         protected.extend_from_slice(value);
 
         let mut encoded = Vec::new();
