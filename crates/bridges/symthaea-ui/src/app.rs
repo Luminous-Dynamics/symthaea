@@ -335,14 +335,9 @@ pub fn App() -> impl IntoView {
                     portrait.set(Some(svg));
                 }
                 if let Some(scene_value) = payload.get("canvas_scene") {
-                    let within_wire_budget = serde_json::to_vec(scene_value)
-                        .map(|bytes| bytes.len() <= 128 * 1024)
-                        .unwrap_or(false);
-                    if within_wire_budget {
-                        if let Ok(scene) = serde_json::from_value::<RemoteScene>(scene_value.clone()) {
-                            if scene.is_supported() {
-                                gpu_scene.set(Some(scene));
-                            }
+                    if let Ok(scene) = serde_json::from_value::<RemoteScene>(scene_value.clone()) {
+                        if scene.is_supported() {
+                            gpu_scene.set(Some(scene));
                         }
                     }
                 }
