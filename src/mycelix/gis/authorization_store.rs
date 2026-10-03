@@ -417,6 +417,7 @@ impl SqliteAuthorizationStore {
                provider_idempotency_key TEXT NOT NULL,
                target_identity TEXT NOT NULL,
                audience TEXT NOT NULL,
+               adapter TEXT,
                outcome TEXT NOT NULL,
                evidence_id TEXT NOT NULL,
                evidence_digest TEXT NOT NULL,
@@ -477,6 +478,7 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_terminal_evidence", "validity_issued_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "validity_expires_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "validity_policy_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "adapter", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
@@ -1607,15 +1609,15 @@ fn validate_native_authority_pin_set(
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
               native_authority_pin_set_id,native_authority_pin_set_digest,
               validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,boundary_id,
-              action_digest,provider_idempotency_key,target_identity,audience,outcome,evidence_id,
+              action_digest,provider_idempotency_key,target_identity,audience,adapter,outcome,evidence_id,
               evidence_digest,verifier_id,verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity, row.1, row.2, row.3, row.4, row.5,
                 row.6, row.7, row.8,
                 self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
-                record.provider_idempotency_key, record.target_identity, record.audience,
+                record.provider_idempotency_key, record.target_identity, record.audience, record.adapter,
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 evidence.evidence_id, evidence.evidence_digest, verified.configuration.verifier_id,
                 verified.configuration.verifier_config_digest, verified.configuration.trust_anchor_digest,
@@ -1978,17 +1980,17 @@ fn validate_native_authority_pin_set(
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
               native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,boundary_id,
-              action_digest,provider_idempotency_key,target_identity,audience,outcome,evidence_id,
+              action_digest,provider_idempotency_key,target_identity,audience,adapter,outcome,evidence_id,
               evidence_digest,verifier_id,verifier_config_digest,trust_anchor_digest,
               evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity, native_provenance.0, native_provenance.1, native_provenance.2,
                 native_provenance.3, native_provenance.4,
                 native_provenance.5, native_provenance.6, native_provenance.7,
                 self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
-                record.provider_idempotency_key, record.target_identity, record.audience,
+                record.provider_idempotency_key, record.target_identity, record.audience, verified.evidence.adapter,
                 if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 verified.evidence.evidence_id, verified.evidence.evidence_digest,
                 verified.configuration.verifier_id, verified.configuration.verifier_config_digest,
@@ -2656,6 +2658,53 @@ mod tests {
                 AuthorizationConsumptionError::InvalidBinding
             ))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_evidence_persists_exact_adapter_identity() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-terminal-adapter-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-terminal-adapter","prod","adapter-terminal"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"terminal-adapter".into(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:30:00Z".into(),
+            expires_at:Some("2026-10-04T06:30:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-terminal-adapter","boundary-terminal"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-terminal-adapter",
+            &action,&effect,"boundary-terminal",
+            "operation:terminal-adapter","native-terminal-adapter"
+        ).unwrap();
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        store.commit_bound_verified(&record,&evidence,&TestProviderVerifier).unwrap();
+        let adapter:String=store.connection().unwrap().query_row(
+            "SELECT adapter FROM authorization_terminal_evidence
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(adapter,record.adapter);
         let _=std::fs::remove_file(path);
     }
 
