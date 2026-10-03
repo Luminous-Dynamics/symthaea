@@ -287,14 +287,12 @@ impl SqliteAuthorizationStore {
         )?;
         ensure_column(&mut connection, "authorization_leases", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
-        ensure_column(&mut connection, "authorization_dispatches", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?
-        ;
+        ensure_column(&mut connection, "authorization_dispatches", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_namespace", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authorization_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_replay_derivation_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
-        ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?
-        ;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_namespace", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authorization_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_derivation_digest", "TEXT")?;
@@ -1817,7 +1815,7 @@ mod tests {
         let witness=ActionAuthorizationWitness {
             authorization_instance:"reconcile-key".into(), action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(), support_digest:witness.support_digest,
-            current_frame:witness.current_frame, policy:witness.policy, authority_epoch:witness.authority_epoch,
+            frame:witness.frame, policy:witness.policy, authority_epoch:witness.authority_epoch,
         };
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-reconcile-key","boundary-A").unwrap();
         let record=store.mark_dispatch_pending_bound(
@@ -1852,7 +1850,7 @@ mod tests {
             action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(),
             support_digest:witness.support_digest,
-            current_frame:witness.current_frame,
+            frame:witness.frame,
             policy:witness.policy,
             authority_epoch:witness.authority_epoch,
         };
@@ -1887,7 +1885,7 @@ mod tests {
             action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(),
             support_digest:witness.support_digest,
-            current_frame:witness.current_frame,
+            frame:witness.frame,
             policy:witness.policy,
             authority_epoch:witness.authority_epoch,
         };
@@ -1971,7 +1969,7 @@ mod tests {
             action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(),
             support_digest:witness.support_digest,
-            current_frame:witness.current_frame,
+            frame:witness.frame,
             policy:witness.policy,
             authority_epoch:witness.authority_epoch,
         };
@@ -2149,12 +2147,12 @@ mod tests {
         let witness_a=ActionAuthorizationWitness {
             authorization_instance:"fence-a".into(), action_id:action.id.clone(),
             action_digest:digest.clone(), support_digest:"support-a".into(),
-            current_frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
+            frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
         };
         let witness_b=ActionAuthorizationWitness {
             authorization_instance:"fence-b".into(), action_id:action.id.clone(),
             action_digest:digest, support_digest:"support-b".into(),
-            current_frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
+            frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             witness_a.authorization_instance.clone(), witness_a.action_id.clone(),
@@ -2199,12 +2197,12 @@ mod tests {
         let witness_a=ActionAuthorizationWitness {
             authorization_instance:"native-a".into(), action_id:action_a.id.clone(),
             action_digest:action_a.canonical_action_digest(), support_digest:"support-a".into(),
-            current_frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
+            frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
         };
         let witness_b=ActionAuthorizationWitness {
             authorization_instance:"native-b".into(), action_id:action_b.id.clone(),
             action_digest:action_b.canonical_action_digest(), support_digest:"support-b".into(),
-            current_frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
+            frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             witness_a.authorization_instance.clone(), witness_a.action_id.clone(),
