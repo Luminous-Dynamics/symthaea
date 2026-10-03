@@ -30,6 +30,14 @@ jobs:
       - name: Format check
         run: cargo +1.96.0 fmt --all -- --check
 
+      - name: Core boundary guard
+        run: |
+          ! rg -n 'nixward|tokio|xenia|mycelix|std::process|Command::new|ssh'             crates/core/sovereign-state-compiler
+
+      - name: Adapter execution guard
+        run: |
+          ! rg -n 'std::process|Command::new|tokio|ssh|nix-env|nixos-rebuild'             crates/core/sovereign-state-compiler-nix
+
       - name: Check crate
         run: cargo +1.96.0 check -p sovereign-state-compiler
 
