@@ -763,6 +763,16 @@ impl AuthorizationEvidence {
 
 fn validate_artifacts(artifacts: &[ArtifactRef]) -> Result<(), PlanValidationError> {
     for artifact in artifacts {
+        if artifact.id.0.is_empty() {
+            return Err(PlanValidationError::InvalidArtifactIdentity(
+                artifact.id.clone(),
+            ));
+        }
+        if artifact.version.as_deref().is_some_and(str::is_empty) {
+            return Err(PlanValidationError::InvalidArtifactVersion(
+                artifact.id.clone(),
+            ));
+        }
         if artifact.digest.algorithm.is_empty() || artifact.digest.value.is_empty() {
             return Err(PlanValidationError::InvalidArtifactDigest(
                 artifact.id.clone(),
@@ -884,6 +894,10 @@ pub enum PlanValidationError {
     SequenceOverflow,
     #[error("rollback attempts are configured without rollback permission")]
     RollbackAttemptsWithoutPermission,
+    #[error("artifact has an empty identity")]
+    InvalidArtifactIdentity(ArtifactId),
+    #[error("artifact has an empty version string")]
+    InvalidArtifactVersion(ArtifactId),
     #[error("artifact has an empty or incomplete content digest")]
     InvalidArtifactDigest(ArtifactId),
     #[error("artifact attestation reference is incomplete")]
@@ -1169,6 +1183,42 @@ mod tests {
                     .next()
                     .expect("required resource")
                     .clone()
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_artifact_without_identity() {
+        let mut plan = sample_plan();
+        plan.intent.artifacts.push(ArtifactRef {
+            id: ArtifactId::from(""),
+            version: Some("1.0.0".into()),
+            digest: ContentDigest::blake3(b"artifact"),
+            provenance: Vec::new(),
+        });
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::InvalidArtifactIdentity(
+                ArtifactId::from("")
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_artifact_with_empty_version() {
+        let mut plan = sample_plan();
+        plan.intent.artifacts.push(ArtifactRef {
+            id: ArtifactId::from("empty-version"),
+            version: Some(String::new()),
+            digest: ContentDigest::blake3(b"artifact"),
+            provenance: Vec::new(),
+        });
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::InvalidArtifactVersion(
+                ArtifactId::from("empty-version")
             ))
         );
     }
