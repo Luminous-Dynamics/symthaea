@@ -280,14 +280,11 @@ fn published_parameter_search_space_ledger_is_exact() {
                 let linear_variables = factor_count * rank;
                 let exhaustive_candidates = 1u128 << linear_variables;
                 let coefficient_words = linear_variables.div_ceil(64) as u128;
-                let solver_matrix_word_cells =
-                    dimension as u128 * (coefficient_words + 1);
+                let solver_matrix_word_cells = dimension as u128 * (coefficient_words + 1);
 
                 assert_eq!(
                     exhaustive_candidates,
-                    (0..factor_count)
-                        .map(|_| 1u128 << rank)
-                        .product::<u128>()
+                    (0..factor_count).map(|_| 1u128 << rank).product::<u128>()
                 );
                 assert_eq!(
                     solver_matrix_word_cells,
