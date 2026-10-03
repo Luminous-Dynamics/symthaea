@@ -1537,7 +1537,7 @@ impl ObservationGraph {
             }
         }
         visiting.remove(id);
-        visited.insert(id);
+        visited.insert(id.to_string());
         false
     }
 }
