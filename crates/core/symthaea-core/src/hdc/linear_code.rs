@@ -437,7 +437,8 @@ pub fn recover_linear_bound(
     target: &BinaryCodeword,
     factors: &[&RandomLinearCode],
 ) -> Option<Vec<BinaryCodeword>> {
-    recover_linear_bound_with_work(target, factors).0}
+    recover_linear_bound_with_work(target, factors).0
+}
 
 /// Recover a clean bound and return deterministic work counters for the
 /// maximal-independent-subset construction and GF(2) solve.
@@ -696,7 +697,8 @@ mod tests {
     }
 
     #[test]
-    fn bipolar_mapping_matches_raviv_boolean_convention() {        let mut word = BinaryCodeword::zero(3);
+    fn bipolar_mapping_matches_raviv_boolean_convention() {
+        let mut word = BinaryCodeword::zero(3);
         assert_eq!(word.to_bipolar(), vec![1, 1, 1]);
 
         word.set_bit(0, true);
