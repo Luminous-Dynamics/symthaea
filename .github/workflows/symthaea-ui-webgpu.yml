@@ -39,10 +39,10 @@ jobs:
         working-directory: crates/bridges/symthaea-web
         run: npm ci
 
-      - name: Install Chromium
+      - name: Install Chromium + Xvfb
         run: |
           sudo apt-get update
-          sudo apt-get install -y chromium
+          sudo apt-get install -y chromium xvfb xauth
 
       - name: Validate qualification harness syntax
         working-directory: crates/bridges/symthaea-web
@@ -58,7 +58,7 @@ jobs:
           CHROMIUM_PATH: /usr/bin/chromium
           WEBGPU_ARTIFACT: webgpu-qualification.json
           WEBGPU_SCREENSHOTS: webgpu-qualification-screenshots
-        run: node ../symthaea-web/test-webgpu-qualification.mjs
+        run: xvfb-run -a node ../symthaea-web/test-webgpu-qualification.mjs
 
       - name: Upload qualification evidence
         if: always()
