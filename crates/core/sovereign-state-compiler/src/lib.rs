@@ -466,6 +466,10 @@ impl ExecutionReceipt {
             return Err(ReceiptValidationError::TargetSnapshotDigestMismatch);
         }
 
+        if !has_concrete_digest(Some(&self.final_target_snapshot_digest)) {
+            return Err(ReceiptValidationError::MissingFinalSnapshotEvidence);
+        }
+
         if self.finished_at_ms < self.started_at_ms {
             return Err(ReceiptValidationError::TimestampOrderInvalid);
         }
@@ -520,6 +524,8 @@ pub enum ReceiptValidationError {
     PlanDigestMismatch,
     #[error("execution receipt target snapshot digest does not match authorization")]
     TargetSnapshotDigestMismatch,
+    #[error("execution receipt carries no concrete final target snapshot digest")]
+    MissingFinalSnapshotEvidence,
     #[error("execution receipt timestamps are out of order")]
     TimestampOrderInvalid,
     #[error("execution started before authorization became valid")]
@@ -1254,6 +1260,34 @@ mod tests {
 
         assert!(receipt.validate_for(&authorized).is_ok());
         assert!(!receipt.is_verified_success());
+    }
+
+    #[test]
+    fn rejects_receipt_without_final_snapshot_evidence() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest {
+                algorithm: String::new(),
+                value: String::new(),
+            },
+            started_at_ms: 151,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Unproven,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::MissingFinalSnapshotEvidence)
+        );
     }
 
     #[test]
