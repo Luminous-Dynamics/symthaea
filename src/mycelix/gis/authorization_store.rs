@@ -2325,8 +2325,9 @@ fn validate_native_authority_pin_set(
               status_identifier,status_source_digest,status_observed_at,status_valid_until,status_evidence_digest,
               validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,
               action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,
-              adapter_revision,adapter_implementation_digest,boundary_id,attempt_binding_digest,state)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,'dispatch_pending')",
+              adapter_revision,adapter_implementation_digest,boundary_id,attempt_scope_digest,
+              attempt_binding_digest,state)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,'dispatch_pending')",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity,
@@ -2348,7 +2349,9 @@ fn validate_native_authority_pin_set(
                 record.action_id, record.action_digest, record.provider_idempotency_key,
                 record.target_identity, record.audience, record.adapter,
                 record.adapter_revision, record.adapter_implementation_digest,
-                record.boundary_id, record.attempt_binding_digest],
+                record.boundary_id,
+                compute_attempt_scope_digest(&record.boundary_id,&record.attempt_id)?,
+                record.attempt_binding_digest],
         )?;
         let changed = tx.execute(
             "UPDATE authorization_leases SET state='dispatch_pending', attempt_id=?2
@@ -2897,7 +2900,7 @@ fn validate_native_authority_pin_set(
                     native_authority_pin_set_id,native_authority_pin_set_digest,
                     relying_party_id,action_id,action_digest,provider_idempotency_key,
                     target_identity,audience,adapter,adapter_revision,adapter_implementation_digest,
-                    boundary_id,attempt_binding_digest,
+                    boundary_id,attempt_scope_digest,attempt_binding_digest,
                     status_identifier,status_source_digest,status_observed_at,status_valid_until,
                     status_evidence_digest,validity_issued_at,validity_expires_at,validity_policy_digest,state
              FROM authorization_dispatches
@@ -2910,10 +2913,10 @@ fn validate_native_authority_pin_set(
                 r.get::<_,String>(9)?, r.get::<_,String>(10)?, r.get::<_,String>(11)?,
                 r.get::<_,String>(12)?, r.get::<_,String>(13)?, r.get::<_,String>(14)?,
                 r.get::<_,Option<String>>(15)?, r.get::<_,Option<String>>(16)?,
-                r.get::<_,String>(17)?, r.get::<_,String>(18)?,
-                r.get::<_,Option<String>>(19)?, r.get::<_,Option<String>>(20)?,
-                r.get::<_,Option<String>>(21)?, r.get::<_,Option<String>>(22)?,
-                r.get::<_,Option<String>>(23)?, r.get::<_,Option<String>>(24)?,
+                r.get::<_,String>(17)?, r.get::<_,Option<String>>(18)?, r.get::<_,String>(19)?,
+                r.get::<_,Option<String>>(20)?, r.get::<_,Option<String>>(21)?,
+                r.get::<_,Option<String>>(22)?, r.get::<_,Option<String>>(23)?,
+                r.get::<_,Option<String>>(24)?, r.get::<_,Option<String>>(25)?,
                 r.get::<_,String>(25)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
@@ -2924,7 +2927,7 @@ fn validate_native_authority_pin_set(
             native_authority_pin_set_id,native_authority_pin_set_digest,
             relying_party_id,action_id,action_digest,provider_idempotency_key,
             target_identity,audience,adapter,adapter_revision,adapter_implementation_digest,
-            boundary_id,attempt_binding_digest,
+            boundary_id,attempt_scope_digest,attempt_binding_digest,
             status_identifier,status_source_digest,status_observed_at,status_valid_until,
             status_evidence_digest,validity_issued_at,validity_expires_at,validity_policy_digest,state
         )=row;
@@ -2945,6 +2948,9 @@ fn validate_native_authority_pin_set(
             || adapter_revision.as_deref() != Some(record.adapter_revision.as_str())
             || adapter_implementation_digest.as_deref() != Some(record.adapter_implementation_digest.as_str())
             || boundary_id != record.boundary_id
+            || attempt_scope_digest.as_deref() != Some(
+                compute_attempt_scope_digest(&record.boundary_id,&record.attempt_id)?.as_str()
+            )
             || attempt_binding_digest != record.attempt_binding_digest
             || status_identifier.as_deref() != Some(record.status_identifier.as_str())
             || status_source_digest.as_deref() != Some(record.status_source_digest.as_str())
