@@ -652,6 +652,15 @@ mod tests {
     }
 
     #[test]
+    fn default_capabilities_do_not_overclaim_recovery() {
+        assert!(!default_nixos_capabilities().contains(
+            &Capability::CreateRecoveryEnvironment
+        ));
+        assert!(default_nixos_capabilities().contains(&Capability::ObserveState));
+        assert!(default_nixos_capabilities().contains(&Capability::Rollback));
+    }
+
+    #[test]
     fn compiles_a_nixos_switch_without_native_commands() {
         let adapter = adapter();
         let mut intent = DeploymentIntent::new("switch-1", "host-01");
