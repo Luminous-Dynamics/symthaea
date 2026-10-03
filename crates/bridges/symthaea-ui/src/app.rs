@@ -439,6 +439,9 @@ pub fn App() -> impl IntoView {
     // Poll WebGPU device health so a static cognitive projection can
     // demote to its compatibility renderer even when no new scene arrives.
     Effect::new(move |_| {
+        if !webgpu_ready.get() {
+            return;
+        }
         let renderer = Rc::clone(&webgpu_renderer);
         spawn_local(async move {
             loop {
@@ -457,6 +460,9 @@ pub fn App() -> impl IntoView {
 
     // Poll the movie renderer independently for the same device-loss handoff.
     Effect::new(move |_| {
+        if !movie_webgpu_ready.get() {
+            return;
+        }
         let renderer = Rc::clone(&movie_webgpu_renderer);
         spawn_local(async move {
             loop {
