@@ -354,6 +354,14 @@ mod tests {
                         attestation_digest: "att-digest-1".into(),
                         verification_reference: "verify-1".into(),
                     },
+                    verification_result: crate::sensor_topology::AttestationVerificationResult {
+                        verifier_id: "mycelix-topology-verifier".into(),
+                        attestation_id: "att-topology-1".into(),
+                        attestation_digest: "att-digest-1".into(),
+                        verification_reference: "verify-1".into(),
+                        verified_at_ms: 500,
+                        valid_until_ms: 2_500,
+                    },
                 },
             },
         }
