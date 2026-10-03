@@ -584,10 +584,8 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
     );
     let mut candidate_digest = Vec::new();
     candidate_digest.extend_from_slice(b"candidate");
-    assert_eq!(
-        state.outer_payload_sha256(),
-        sha2::Sha256::digest(&candidate_digest).into()
-    );
+    let expected_payload_sha256: [u8; 32] = sha2::Sha256::digest(&candidate_digest).into();
+    assert_eq!(state.outer_payload_sha256(), expected_payload_sha256);
 
     // Sign the outer object over different payload bytes while retaining the
     // same valid inner Receipt. The outer signature is valid, but the Receipt
