@@ -1152,6 +1152,53 @@ fn validate_native_authority_pin_set(
     /// Canonical native-authorization entry point. The issuer is only a
     /// lookup key; the relying-party-pinned authority namespace is resolved
     /// inside the boundary before replay identity derivation.
+    fn validate_bound_dispatch_preconditions(
+        &self,
+        authorization_instance: &str,
+        attempt_id: &str,
+        action: &EpistemicAction,
+        expected_effect: &super::ActionEffectBinding,
+        boundary_id: &str,
+        operation_id: &str,
+        issuer: &str,
+        native_authorization_id: &str,
+        authority_namespace: &str,
+    ) -> Result<(), AuthorizationStoreError> {
+        if action.effect_binding.as_ref() != Some(expected_effect)
+            || authorization_instance.is_empty()
+            || attempt_id.is_empty()
+            || boundary_id.is_empty()
+            || operation_id.is_empty()
+            || issuer.is_empty()
+            || native_authorization_id.is_empty()
+            || authority_namespace.is_empty()
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let current_boundary = load_lease_boundary(&tx, authorization_instance)?;
+        if current_boundary.as_deref() != Some(boundary_id) {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        let lease = load_lease(&tx, authorization_instance)?
+            .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
+        if lease.action_id != action.id
+            || lease.action_digest != action.canonical_action_digest()
+            || !matches!(
+                lease.state,
+                AuthorizationLeaseState::Prepared { ref attempt_id: id }
+                    if id == attempt_id
+            )
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        Ok(())
+    }
+
     pub fn mark_dispatch_pending_bound_from_pinned_native_authority<V: ProviderStatusVerifier>(
         &self,
         authorization_instance: &str,
@@ -1166,6 +1213,17 @@ fn validate_native_authority_pin_set(
         status_verifier: &V,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         let authority_namespace = self.pinned_native_authority_namespace(issuer)?;
+        self.validate_bound_dispatch_preconditions(
+            authorization_instance,
+            attempt_id,
+            action,
+            expected_effect,
+            boundary_id,
+            operation_id,
+            issuer,
+            native_authorization_id,
+            &authority_namespace,
+        )?;
         let replay = super::NativeReplayDerivation::derive(
             authority_namespace,
             native_authorization_id,
@@ -4446,6 +4504,78 @@ mod tests {
                 AuthorizationConsumptionError::ActionAlreadyInFlight
             ))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn status_lookup_is_not_attempted_before_structural_dispatch_validation() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-ordering-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-status-ordering"
+        ).unwrap();
+        store.pin_native_authority_namespace(
+            "issuer.ordering","issuer.ordering/authority/v1"
+        ).unwrap();
+
+        let effect=super::super::ActionEffectBinding::new(
+            "target-status-ordering","prod","adapter"
+        );
+        let action=EpistemicAction::new(
+            "status-ordering","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"status-ordering".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "status-ordering",action.id.clone(),digest,
+            "support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-status-ordering","boundary-status"
+        ).unwrap();
+
+        let wrong_effect=super::super::ActionEffectBinding::new(
+            "target-different","prod","adapter"
+        );
+        assert!(matches!(
+            store.mark_dispatch_pending_bound_from_pinned_native_authority(
+                "status-ordering","attempt-status-ordering",
+                &action,&wrong_effect,"boundary-status","operation:status-ordering",
+                "issuer.ordering","native-status-ordering",
+                "status:native-status-ordering",&AdmissionStatusFailsVerifier
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_leases
+             WHERE authorization_instance=?1",
+            params![witness.authorization_instance],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"prepared");
+
+        let dispatches:i64=store.connection().unwrap().query_row(
+            "SELECT COUNT(*) FROM authorization_dispatches
+             WHERE authorization_instance=?1",
+            params![witness.authorization_instance],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(dispatches,0);
         let _=std::fs::remove_file(path);
     }
 
