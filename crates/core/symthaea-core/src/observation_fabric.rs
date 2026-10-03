@@ -384,13 +384,17 @@ fn write_canonical_string(hasher: &mut blake3::Hasher, value: &str) {
 fn write_canonical_string_option(hasher: &mut blake3::Hasher, value: Option<&str>) {
     match value {
         Some(value) => { hasher.update(&[1]); write_canonical_string(hasher, value); }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        }
     }
 }
 fn write_canonical_i128_option(hasher: &mut blake3::Hasher, value: Option<i128>) {
     match value {
         Some(value) => { hasher.update(&[1]); hasher.update(&value.to_be_bytes()); }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        }
     }
 }
 fn write_canonical_string_vec(hasher: &mut blake3::Hasher, values: &[String]) {
@@ -452,7 +456,9 @@ fn write_canonical_independence_basis(hasher: &mut blake3::Hasher, value: &Indep
             hasher.update(&[5]);
             write_canonical_provenance_coverage(hasher, coverage);
         }
-        IndependenceBasis::NoSharedProvenance => hasher.update(&[6]),
+        IndependenceBasis::NoSharedProvenance => {
+            hasher.update(&[6]);
+        }
     }
 }
 
@@ -542,7 +548,11 @@ impl Observation {
             return Err(ObservationValidationError::InvalidParentObservation);
         }
         let mut parent_ids = HashSet::with_capacity(self.provenance.parent_observation_ids.len());
-        if self.provenance.parent_observation_ids.iter().any(|parent| !parent_ids.insert(parent)) {
+        if self
+            .provenance
+            .parent_observation_ids
+            .iter()
+            .any(|parent| !parent_ids.insert(parent.as_str())) {
             return Err(ObservationValidationError::DuplicateParentObservation);
         }
         if let Some(activity) = &self.provenance.processing_activity {
@@ -581,7 +591,6 @@ pub enum ObservationRelationKind {
 ///
 /// This keeps an independence classification auditable instead of collapsing
 /// every non-independent result into an opaque SharedUpstream label.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// Predicate evaluated by the bounded provenance-independence verifier.
 ///
 /// The verifier is intentionally narrow: these predicates describe provenance
@@ -1390,8 +1399,10 @@ impl ObservationGraph {
 
         let mut visiting = HashSet::new();
         let mut visited = HashSet::new();
-        for id in by_id.keys() {
-            if !visited.contains(id) && Self::visit_lineage(id, &lineage_children, &mut visiting, &mut visited) {
+        for &id in by_id.keys() {
+            if !visited.contains(id)
+                && Self::visit_lineage(id, &lineage_children, &mut visiting, &mut visited)
+            {
                 return Err(ObservationValidationError::LineageCycle);
             }
         }
@@ -1580,6 +1591,7 @@ pub enum ObservationValidationError {
     MissingExecutionFingerprint,
     #[error("processing activity output does not identify the activity as its producer: {0}")]
     ActivityOutputMissingProducer(String),
+    #[error("processing activity state is inconsistent: {0}")]
     InconsistentProcessingActivity(String),
     #[error("processing activity input is not represented in the output observation's parent lineage: {0}")]
     ActivityInputMissingParent(String),
