@@ -1,5 +1,6 @@
 use symthaea_evidence_plane::execution_lineage::{
-    EvidenceLineageDecision, EvidenceLineageGuardV1, ExecutionLineageV1, RepositorySourceSnapshotId,
+    qualify_lineage_perturbation, EvidenceLineageDecision, EvidenceLineageGuardV1,
+    ExecutionLineageV1, LineagePerturbationResult, RepositorySourceSnapshotId,
 };
 
 fn fixture() -> ExecutionLineageV1 {
@@ -91,6 +92,51 @@ fn serde_rejects_duplicate_map_keys_before_canonicalization() {
         "argv":["cargo","test"],
         "allowed_env":{"RUST_BACKTRACE":"0"},
         "immutable_input_digests":{"fixture":"blake3:8899aabbccddeeff"}
+    }"#;
+
+    assert!(serde_json::from_str::<ExecutionLineageV1>(text).is_err());
+}
+
+#[test]
+fn public_perturbation_classifier_reports_declared_and_collateral_drift() {
+    let base = fixture();
+    let mut environment = base.clone();
+    environment.host_triple = "aarch64-unknown-linux-gnu".into();
+    let mut workload = base.clone();
+    workload.source_revision = "d".repeat(40);
+
+    assert_eq!(
+        qualify_lineage_perturbation(&base, &base, false),
+        LineagePerturbationResult::InvariantPreserved
+    );
+    assert_eq!(
+        qualify_lineage_perturbation(&base, &workload, true),
+        LineagePerturbationResult::ExpectedDependencyChanged
+    );
+    assert_eq!(
+        qualify_lineage_perturbation(&base, &environment, false),
+        LineagePerturbationResult::UnexpectedCollateralChange
+    );
+}
+
+#[test]
+fn serde_rejects_unknown_wire_fields() {
+    let text = r#"{
+        "source_repository":"luminous-dynamics/symthaea",
+        "source_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "repository_source_snapshot_id":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "lock_digests":{"Cargo.lock":"sha256:0011223344556677"},
+        "toolchain_versions":{"rustc":"1.96.0"},
+        "host_triple":"x86_64-unknown-linux-gnu",
+        "target_triple":"x86_64-unknown-linux-gnu",
+        "nix_identity":"nix:fixture",
+        "feature_flags":["default"],
+        "cwd":"/workspace",
+        "argv":["cargo","test"],
+        "allowed_env":{"RUST_BACKTRACE":"0"},
+        "immutable_input_digests":{"fixture":"blake3:8899aabbccddeeff"},
+        "unsupported_field":"must-fail"
     }"#;
 
     assert!(serde_json::from_str::<ExecutionLineageV1>(text).is_err());
