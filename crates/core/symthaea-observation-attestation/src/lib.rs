@@ -2527,7 +2527,8 @@ mod tests {
             envelope.attester_id.clone(),
             signing_key.verifying_key(),
             150,
-        );
+        )
+        .with_resolution_snapshot_fingerprint("verifier-later-state");
 
         let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
 
