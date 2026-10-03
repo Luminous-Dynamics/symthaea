@@ -1,8 +1,8 @@
 use blake3::Hasher;
 use symthaea_core::hdc::linear_code::{
-    BinaryCodeword, LinearCodeWork, RandomLinearCode, basis_rank, recover_direct_sum_bound,
-    recover_independent_bound, recover_linear_bound, recover_linear_bound_with_work,
-    solve_linear_combination,
+    BinaryCodeword, LinearCodeWork, RandomLinearCode, basis_rank, factorization_algebra,
+    factorization_count_for_target, recover_direct_sum_bound, recover_independent_bound,
+    recover_linear_bound, recover_linear_bound_with_work, solve_linear_combination,
 };
 
 const CANONICAL_FIXTURE_DIMENSION: usize = 96;
@@ -312,6 +312,162 @@ fn published_parameter_search_space_ledger_is_exact() {
 }
 
 #[test]
+fn algebraic_multiplicity_ledger_is_exhaustively_self_consistent() {
+    let shared = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b001])])
+        .expect("shared code");
+    let orthogonal = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b010])])
+        .expect("orthogonal code");
+
+    let pair = vec![&shared, &shared];
+    let pair_algebra = factorization_algebra(&pair).expect("pair algebra");
+    assert_eq!(pair_algebra.factor_dimension_sum, 2);
+    assert_eq!(pair_algebra.union_generator_rank, 1);
+    assert_eq!(pair_algebra.kernel_dimension, 1);
+    assert_eq!(pair_algebra.raw_factor_tuple_count.exponent(), 2);
+    assert_eq!(pair_algebra.reachable_target_count.exponent(), 1);
+    assert_eq!(pair_algebra.factorization_count_per_target.exponent(), 1);
+    assert!(!pair_algebra.unique_factorization);
+    assert_eq!(pair_algebra.dependency_order, Some(2));
+
+    let pair_targets = [
+        shared.encode(&[false]),
+        shared.encode(&[true]),
+    ];
+    for target in pair_targets {
+        assert_eq!(
+            factorization_count_for_target(&target, &pair)
+                .expect("pair target is representable")
+                .exponent(),
+            1,
+        );
+    }
+    let mut pair_fibers: Vec<(BinaryCodeword, usize)> = Vec::new();
+    for left in shared.enumerate() {
+        for right in shared.enumerate() {
+            let target = left.bound(&right);
+            if let Some((_, count)) = pair_fibers.iter_mut().find(|(candidate, _)| *candidate == target) {
+                *count += 1;
+            } else {
+                pair_fibers.push((target, 1));
+            }
+        }
+    }
+    assert_eq!(pair_fibers.len(), 2);
+    assert!(pair_fibers.iter().all(|(_, count)| *count == 2));
+
+    // Three one-dimensional subcodes: every pair intersects trivially, but
+    // e1 + e2 + (e1 + e2) = 0 creates a genuine 3-way dependency.
+    let c1 = shared.clone();
+    let c2 = orthogonal.clone();
+    let c3 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b011])])
+        .expect("third code");
+
+    for factors in [[&c1, &c2], [&c1, &c3], [&c2, &c3]] {
+        let algebra = factorization_algebra(&factors).expect("pairwise algebra");
+        assert_eq!(algebra.kernel_dimension, 0);
+        assert!(algebra.unique_factorization);
+        assert_eq!(algebra.dependency_order, None);
+    }
+
+    let triple = vec![&c1, &c2, &c3];
+    let triple_algebra = factorization_algebra(&triple).expect("triple algebra");
+    assert_eq!(triple_algebra.factor_dimension_sum, 3);
+    assert_eq!(triple_algebra.union_generator_rank, 2);
+    assert_eq!(triple_algebra.kernel_dimension, 1);
+    assert_eq!(triple_algebra.raw_factor_tuple_count.exponent(), 3);
+    assert_eq!(triple_algebra.reachable_target_count.exponent(), 2);
+    assert_eq!(triple_algebra.factorization_count_per_target.exponent(), 1);
+    assert!(!triple_algebra.unique_factorization);
+    assert_eq!(triple_algebra.dependency_order, Some(3));
+
+    let mut triple_fibers: Vec<(BinaryCodeword, usize)> = Vec::new();
+    for a in c1.enumerate() {
+        for b in c2.enumerate() {
+            for d in c3.enumerate() {
+                let target = a.bound(&b).bound(&d);
+                if let Some((_, count)) = triple_fibers.iter_mut().find(|(candidate, _)| *candidate == target) {
+                    *count += 1;
+                } else {
+                    triple_fibers.push((target, 1));
+                }
+            }
+        }
+    }
+    assert_eq!(triple_fibers.len(), 4);
+    assert!(triple_fibers.iter().all(|(_, count)| *count == 2));
+    for (target, count) in &triple_fibers {
+        assert_eq!(
+            factorization_count_for_target(target, &triple)
+                .expect("triple target is representable")
+                .exponent(),
+            1,
+        );
+        assert_eq!(*count, 1usize << triple_algebra.kernel_dimension);
+    }
+
+    let outsider = BinaryCodeword::from_words(3, vec![0b100]);
+    assert!(factorization_count_for_target(&outsider, &triple).is_none());
+
+    println!(
+        "ALGEBRAIC_LEDGER=pair_delta={};pair_rank={};pair_kernel={};pair_raw=2^{};pair_reachable=2^{};pair_fiber=2^{};pair_unique={};pair_dependency_order={:?};triple_delta={};triple_rank={};triple_kernel={};triple_raw=2^{};triple_reachable=2^{};triple_fiber=2^{};triple_unique={};triple_dependency_order={:?};pair_distinct_targets={};triple_distinct_targets={};pair_fibers_exact=true;triple_fibers_exact=true",
+        pair_algebra.factor_dimension_sum,
+        pair_algebra.union_generator_rank,
+        pair_algebra.kernel_dimension,
+        pair_algebra.raw_factor_tuple_count.exponent(),
+        pair_algebra.reachable_target_count.exponent(),
+        pair_algebra.factorization_count_per_target.exponent(),
+        pair_algebra.unique_factorization,
+        pair_algebra.dependency_order,
+        triple_algebra.factor_dimension_sum,
+        triple_algebra.union_generator_rank,
+        triple_algebra.kernel_dimension,
+        triple_algebra.raw_factor_tuple_count.exponent(),
+        triple_algebra.reachable_target_count.exponent(),
+        triple_algebra.factorization_count_per_target.exponent(),
+        triple_algebra.unique_factorization,
+        triple_algebra.dependency_order,
+        pair_fibers.len(),
+        triple_fibers.len(),
+    );
+}
+
+#[test]
+fn higher_order_dependency_stress_has_pairwise_trivial_cases() {
+    let dimension = 8usize;
+    let rank = 3usize;
+    let realizations = 20_000usize;
+    let mut pairwise_trivial = 0usize;
+    let mut three_way_dependencies = 0usize;
+
+    for realization in 0..realizations {
+        let seed = 0x8A00_0000u64 + realization as u64;
+        let c1 = RandomLinearCode::generate(dimension, rank, seed);
+        let c2 = RandomLinearCode::generate(dimension, rank, seed.wrapping_add(1));
+        let c3 = RandomLinearCode::generate(dimension, rank, seed.wrapping_add(2));
+        let pairwise = [[&c1, &c2], [&c1, &c3], [&c2, &c3]];
+        let pairwise_trivial_here = pairwise.iter().all(|pair| {
+            factorization_algebra(pair)
+                .expect("pair algebra")
+                .kernel_dimension
+                == 0
+        });
+
+        if pairwise_trivial_here {
+            pairwise_trivial += 1;
+            let triple = factorization_algebra(&[&c1, &c2, &c3]).expect("triple algebra");
+            assert!(triple.kernel_dimension > 0);
+            assert_eq!(triple.dependency_order, Some(3));
+            three_way_dependencies += 1;
+        }
+    }
+
+    assert!(pairwise_trivial > 0);
+    assert_eq!(three_way_dependencies, pairwise_trivial);
+    println!(
+        "HIGHER_ORDER_SWEEP=dimension={dimension};rank={rank};realizations={realizations};pairwise_trivial={pairwise_trivial};three_way_dependencies={three_way_dependencies}",
+    );
+}
+#[test]
 fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     let dimensions = [500usize, 1000, 2000];
     let ranks = [3usize, 5, 7];
@@ -325,7 +481,12 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     let mut failures = 0usize;
     let mut total_work = LinearCodeWork::default();
     let mut result_digest = Hasher::new();
-    result_digest.update(b"symthaea-hdc-paper-matrix-v1\\0");
+    result_digest.update(b"symthaea-hdc-paper-matrix-v2\\0");
+    let mut unique_cases = 0usize;
+    let mut non_unique_valid = 0usize;
+    let mut nonexistent_targets = 0usize;
+    let mut max_kernel_dimension = 0usize;
+    let mut max_dependency_order = 0usize;
 
     for &dimension in &dimensions {
         for &rank in &ranks {
@@ -385,8 +546,48 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                     for factor in &factors {
                         combined_basis.extend(factor.basis().iter().cloned());
                     }
-                    let jointly_independent =
-                        basis_rank(&combined_basis, dimension) == rank * factor_count;
+
+                    let algebra = factorization_algebra(&factors).expect("valid paper fixture");
+                    assert_eq!(algebra.factor_dimension_sum, rank * factor_count);
+                    assert_eq!(algebra.union_generator_rank, basis_rank(&combined_basis, dimension));
+                    assert_eq!(
+                        algebra.factor_dimension_sum,
+                        algebra.union_generator_rank + algebra.kernel_dimension
+                    );
+                    assert_eq!(
+                        algebra.factorization_count_per_target.exponent(),
+                        algebra.kernel_dimension
+                    );
+                    assert_eq!(
+                        algebra.unique_factorization,
+                        algebra.kernel_dimension == 0
+                    );
+                    max_kernel_dimension = max_kernel_dimension.max(algebra.kernel_dimension);
+                    if let Some(order) = algebra.dependency_order {
+                        max_dependency_order = max_dependency_order.max(order);
+                    }
+
+                    result_digest.update(&(algebra.factor_dimension_sum as u64).to_le_bytes());
+                    result_digest.update(&(algebra.union_generator_rank as u64).to_le_bytes());
+                    result_digest.update(&(algebra.kernel_dimension as u64).to_le_bytes());
+                    result_digest.update(&(algebra.raw_factor_tuple_count.exponent() as u64).to_le_bytes());
+                    result_digest.update(&(algebra.reachable_target_count.exponent() as u64).to_le_bytes());
+                    result_digest.update(
+                        &(algebra.factorization_count_per_target.exponent() as u64).to_le_bytes(),
+                    );
+                    result_digest.update(&[algebra.unique_factorization as u8]);
+                    result_digest.update(&(algebra.dependency_order.unwrap_or(0) as u64).to_le_bytes());
+
+                    let target_multiplicity =
+                        factorization_count_for_target(&target, &factors)
+                            .expect("generated target must be representable");
+                    assert_eq!(
+                        target_multiplicity.exponent(),
+                        algebra.kernel_dimension,
+                        "every representable target must have the algebraic fiber cardinality"
+                    );
+
+                    let jointly_independent = algebra.unique_factorization;
                     if !jointly_independent {
                         jointly_dependent += 1;
                     }
@@ -440,6 +641,9 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                             "independent paper-style factors have unique exact recovery"
                         );
                         exact_original += 1;
+                        unique_cases += 1;
+                    } else {
+                        non_unique_valid += 1;
                     }
                 }
             }
@@ -453,6 +657,9 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     assert_eq!(cases, 270);
     assert_eq!(failures, 0);
     assert_eq!(valid_representative, cases);
+    assert_eq!(unique_cases + non_unique_valid, cases);
+    assert_eq!(nonexistent_targets, 0);
+    assert!(max_kernel_dimension >= 0);
 
     let result_digest = result_digest.finalize();
     let result_digest = result_digest
@@ -461,7 +668,7 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
     println!(
-        "PAPER_MATRIX=dimensions=500,1000,2000;ranks=3,5,7;factors=3,4,5;repeats={repeats};cases={cases};exact_original={exact_original};valid_representative={valid_representative};jointly_dependent={jointly_dependent};failures={failures};result_digest={result_digest};total_span_membership_checks={};total_basis_rank_pivots={};total_solve_pivots={};total_solve_row_xor_words={}",
+        "PAPER_MATRIX=dimensions=500,1000,2000;ranks=3,5,7;factors=3,4,5;repeats={repeats};cases={cases};exact_original={exact_original};unique_cases={unique_cases};non_unique_valid={non_unique_valid};valid_representative={valid_representative};jointly_dependent={jointly_dependent};nonexistent_targets={nonexistent_targets};max_kernel_dimension={max_kernel_dimension};max_dependency_order={max_dependency_order};failures={failures};result_digest={result_digest};total_span_membership_checks={};total_basis_rank_pivots={};total_solve_pivots={};total_solve_row_xor_words={}",
         total_work.span_membership_checks,
         total_work.basis_rank_pivots,
         total_work.solve_pivots,
