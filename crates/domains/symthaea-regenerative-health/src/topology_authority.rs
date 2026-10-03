@@ -210,7 +210,7 @@ mod tests {
             resolution_epoch: 1,
             predecessor_resolution_digest: None,
             observed_successors: observed.clone(),
-            observed_successors_digest: super::crate::topology_resolution::branch_set_digest(&observed),
+            observed_successors_digest: crate::topology_resolution::branch_set_digest(&observed),
             resolution_id: "resolution-2".into(),
             authority_id: "mycelix-topology-authority".into(),
             authority_statement_digest: "resolution-digest-2".into(),
