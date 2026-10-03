@@ -45,6 +45,22 @@ pub struct VerificationPolicyInputs {
 }
 
 impl VerificationPolicyInputs {
+    /// Validate the semantic policy identity before trusting its fingerprint.
+    ///
+    /// A self-consistent fingerprint is not sufficient because callers may
+    /// deserialize and mutate public fields before recomputing that fingerprint.
+    pub fn is_well_formed(&self) -> bool {
+        let optional_nonempty = |value: &Option<String>| {
+            value.as_deref().is_none_or(|value| !value.is_empty())
+        };
+
+        self.policy_version == POLICY_VERSION
+            && self.cryptosuite == CRYPTOSUITE
+            && optional_nonempty(&self.expected_proof_purpose)
+            && optional_nonempty(&self.expected_domain)
+            && optional_nonempty(&self.expected_challenge_fingerprint)
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         fn write_string(bytes: &mut Vec<u8>, value: &str) {
@@ -95,6 +111,17 @@ impl VerifierEnvironmentIdentity {
     pub fn with_runtime_profile(mut self, profile: impl Into<String>) -> Self {
         self.runtime_profile = Some(profile.into());
         self
+    }
+
+    /// Validate the semantic environment identity before trusting its fingerprint.
+    pub fn is_well_formed(&self) -> bool {
+        !self.build_fingerprint.is_empty()
+            && self.identity_version == ENVIRONMENT_IDENTITY_VERSION
+            && self.implementation_id == VERIFIER_IMPLEMENTATION_ID
+            && self
+                .runtime_profile
+                .as_deref()
+                .is_none_or(|profile| !profile.is_empty())
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -703,6 +730,8 @@ impl ReceiptAttestationVerificationReport {
         };
 
         supported_version
+            && self.policy_inputs.is_well_formed()
+            && self.environment_identity.is_well_formed()
             && self.policy_fingerprint == self.policy_inputs.fingerprint()
             && self.environment_fingerprint == self.environment_identity.fingerprint()
             && self.procedure_fingerprint == expected_procedure_fingerprint
@@ -2460,6 +2489,40 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn verification_policy_self_validation_rejects_semantic_rebinding() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        assert!(report.policy_inputs.is_well_formed());
+        report.policy_inputs.cryptosuite = "attacker-cryptosuite";
+        report.policy_fingerprint = report.policy_inputs.fingerprint();
+        assert!(!report.policy_inputs.is_well_formed());
+        assert!(!report.has_consistent_identity_bindings());
+    }
+
+    #[test]
+    fn verifier_environment_self_validation_rejects_semantic_rebinding() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        assert!(report.environment_identity.is_well_formed());
+        report.environment_identity.implementation_id = "attacker-verifier";
+        report.environment_fingerprint = report.environment_identity.fingerprint();
+        assert!(!report.environment_identity.is_well_formed());
+        assert!(!report.has_consistent_identity_bindings());
+    }
 
     #[test]
     fn verification_report_binds_policy_environment_and_evaluation_time() {
