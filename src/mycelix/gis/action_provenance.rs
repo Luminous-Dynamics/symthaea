@@ -580,6 +580,15 @@ impl ActionEffectBinding {
         }
     }
 
+    /// Effect-bound actions require concrete target, audience, and adapter
+    /// identities. Empty material fields would otherwise create a formally
+    /// bound digest whose provider meaning is left to downstream defaults.
+    pub fn is_well_formed(&self) -> bool {
+        !self.target_identity.is_empty()
+            && !self.audience.is_empty()
+            && !self.adapter.is_empty()
+    }
+
     pub fn canonical_digest(&self) -> String {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"SYMTHEA-GIS-EFFECT-V1");
