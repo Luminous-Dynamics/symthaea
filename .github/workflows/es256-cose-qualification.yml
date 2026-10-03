@@ -2,6 +2,7 @@ name: ES256 COSE Qualification
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-swarm/src/semantic_evidence_vds.rs"
       - "crates/domains/symthaea-swarm/src/semantic_evidence_anchor.rs"
