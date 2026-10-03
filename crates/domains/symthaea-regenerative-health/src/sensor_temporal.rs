@@ -192,6 +192,16 @@ impl TemporalFusionGate {
         }
 
         let required = self.policy.minimum_trusted_sensors as usize;
+        let authoritative_references: std::collections::BTreeSet<_> = trusted
+            .iter()
+            .map(|pair| &pair.independence.topology_attestation.authoritative_reference)
+            .collect();
+        if authoritative_references.len() > 1 {
+            issues.push(TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::AttestationReferenceMismatch,
+            ));
+        }
+
         let independent_groups: std::collections::BTreeSet<_> = trusted
             .iter()
             .map(|pair| pair.independence.independence_group.as_str())
@@ -505,6 +515,21 @@ mod tests {
             issue,
             TemporalFusionIssue::TopologyAttestation(
                 SensorTopologyAttestationIssue::EmptyAttestationReference
+            )
+        )));
+    }
+
+    #[test]
+    fn mixed_attestation_references_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.authoritative_reference.attestation_digest =
+            "att-digest-other".into();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::AttestationReferenceMismatch
             )
         )));
     }
