@@ -1902,6 +1902,15 @@ impl KnowledgePersistence {
              BEGIN
                  SELECT RAISE(ABORT, 'knowledge_facts memory_id must be non-empty');
              END;
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_validation_receipts_required_insert
+             BEFORE INSERT ON knowledge_snapshot_validation_receipts
+             WHEN NEW.validation_event IS NULL
+                  OR trim(NEW.validation_event) = ''
+                  OR NEW.validation_sequence IS NULL
+                  OR NEW.validation_sequence <= 0
+             BEGIN
+                 SELECT RAISE(ABORT, 'knowledge_snapshot_validation_receipts requires a valid event and positive sequence');
+             END;
              CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_receipts_no_update
              BEFORE UPDATE ON knowledge_snapshot_receipts
              BEGIN
@@ -5140,6 +5149,48 @@ mod tests {
             "Snapshot validation digest does not match committed receipt"
         ));
         assert!(p.latest_snapshot_validation_receipts().unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_validation_receipt_insert_requires_event_and_positive_sequence() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_validation_receipt_insert_guard_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let conn = p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+
+        let err = conn
+            .execute(
+                "INSERT INTO knowledge_snapshot_validation_receipts
+                 (validation_event, validation_sequence, generation, snapshot_digest_hex,
+                  validator_ref, validator_version, validation_profile, conforms)
+                 VALUES ('', 1, 999, ?1, 'validator', 'v1', 'profile', 1)",
+                ["digest"],
+            )
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("requires a valid event and positive sequence"));
+
+        let err = conn
+            .execute(
+                "INSERT INTO knowledge_snapshot_validation_receipts
+                 (validation_event, validation_sequence, generation, snapshot_digest_hex,
+                  validator_ref, validator_version, validation_profile, conforms)
+                 VALUES ('validation:bad-seq', 0, 999, ?1, 'validator', 'v1', 'profile', 1)",
+                ["digest"],
+            )
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("requires a valid event and positive sequence"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
