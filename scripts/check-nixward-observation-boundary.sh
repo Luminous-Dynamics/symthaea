@@ -159,7 +159,6 @@ run_boundary_check() {
   fi
   if matches="$(rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
     echo "ERROR: NixServiceObservedStateV1 constructor must not be public" >&2
-    echo "ERROR: NixServiceObservedStateV1 constructor must not be public" >&2
     echo "${matches}" >&2
     failed=1
   fi
