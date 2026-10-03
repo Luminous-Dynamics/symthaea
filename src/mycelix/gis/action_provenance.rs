@@ -5,6 +5,7 @@
 //! without rewriting the historical record of an action that already happened.
 
 use super::ignorance_types::{ConclusionDependencyGraph, EpistemicFrameImpact, EpistemicFrameRevision};
+use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 
 fn append_len_prefixed<H: Digest>(hasher: &mut H, value: &[u8]) {
@@ -226,6 +227,10 @@ pub enum AuthorizationConsumptionError {
     InvalidNativeReplayProvenance,
     IndeterminateRequiresReconciliation,
     PreDispatchRecoveryNotAllowed,
+    AuthorizationValidityMissing,
+    AuthorizationNotYetValid,
+    AuthorizationExpired,
+    AuthorizationValidityInvalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -240,7 +245,7 @@ pub struct AuthorizationLease {
     pub policy: String,
     pub authority_epoch: u64,
     pub remaining_executions: u32,
-    pub state: AuthorizationLeaseState,
+    pub state: AuthorizationLeaseState,    /// Frozen validity provenance captured at authorization admission.\n    pub issued_at: String,\n    pub expires_at: Option<String>,\n    pub clock_source_id: String,\n    pub clock_policy_digest: String,\n
 }
 
 impl AuthorizationLease {
@@ -322,6 +327,10 @@ impl AuthorizationLease {
             support_digest: support_digest.into(),
             policy: policy.into(),
             authority_epoch,
+            issued_at: String::new(),
+            expires_at: None,
+            clock_source_id: String::new(),
+            clock_policy_digest: String::new(),
             remaining_executions: execution_budget,
             state: if execution_budget == 0 {
                 AuthorizationLeaseState::Exhausted
@@ -331,7 +340,7 @@ impl AuthorizationLease {
         }
     }
 
-    pub fn prepare_for_execution(
+    /// Freeze the exact authorization validity window on the lease.\n    pub fn freeze_validity(&mut self, witness: &ActionAuthorizationWitness) -> Result<(), AuthorizationConsumptionError> {\n        let expires_at = witness.expires_at.as_deref().ok_or(AuthorizationConsumptionError::AuthorizationValidityMissing)?;\n        let issued = DateTime::parse_from_rfc3339(&witness.issued_at).map_err(|_| AuthorizationConsumptionError::AuthorizationValidityInvalid)?.with_timezone(&Utc);\n        let expires = DateTime::parse_from_rfc3339(expires_at).map_err(|_| AuthorizationConsumptionError::AuthorizationValidityInvalid)?.with_timezone(&Utc);\n        if issued > expires { return Err(AuthorizationConsumptionError::AuthorizationValidityInvalid); }\n        if !self.issued_at.is_empty() && (self.issued_at != witness.issued_at || self.expires_at.as_deref() != witness.expires_at.as_deref()) { return Err(AuthorizationConsumptionError::InvalidBinding); }\n        self.issued_at = witness.issued_at.clone();\n        self.expires_at = witness.expires_at.clone();\n        self.clock_source_id = "system-utc-wall-clock".into();\n        self.clock_policy_digest = "sha256:symthaea-gis-authorization-clock-v1".into();\n        Ok(())\n    }\n\n    pub fn validate_validity_now(&self) -> Result<(), AuthorizationConsumptionError> {\n        if self.issued_at.is_empty() || self.expires_at.is_none() { return Err(AuthorizationConsumptionError::AuthorizationValidityMissing); }\n        let issued = DateTime::parse_from_rfc3339(&self.issued_at).map_err(|_| AuthorizationConsumptionError::AuthorizationValidityInvalid)?.with_timezone(&Utc);\n        let expires = DateTime::parse_from_rfc3339(self.expires_at.as_deref().unwrap()).map_err(|_| AuthorizationConsumptionError::AuthorizationValidityInvalid)?.with_timezone(&Utc);\n        let now = Utc::now();\n        if now < issued { return Err(AuthorizationConsumptionError::AuthorizationNotYetValid); }\n        if now > expires { return Err(AuthorizationConsumptionError::AuthorizationExpired); }\n        Ok(())\n    }\n\n    pub fn prepare_for_execution(
         &mut self,
         witness: &ActionAuthorizationWitness,
         action: &EpistemicAction,
