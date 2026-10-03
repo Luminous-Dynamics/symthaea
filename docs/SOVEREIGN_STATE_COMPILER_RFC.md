@@ -357,3 +357,20 @@ authority over an arbitrary storage device.
 For destructive operations, the executor should re-observe resource identity
 immediately before mutation and compare that observation to the authorized
 snapshot, rather than trusting a UI-selected device path.
+
+
+## Authorization lifetime
+
+An intent expiry is an upper bound on authorization. Authorization MUST NOT
+extend beyond the intent's expiry, and an executor MUST reject an intent that
+has already expired.
+
+This makes the authority window monotone:
+
+`execution_now <= authorization_expiry <= intent_expiry`
+
+when both expiries are present.
+
+Short-lived authorization is preferred for privileged operations; persistent
+management should be implemented as repeated, freshly authorized reconciliation
+rather than an indefinitely valid mutation grant.
