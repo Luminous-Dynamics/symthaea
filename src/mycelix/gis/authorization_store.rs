@@ -194,16 +194,35 @@ impl DurableDispatchRecord {
     }
 }
 
-pub struct SqliteAuthorizationStore { path: PathBuf }
+pub struct SqliteAuthorizationStore {
+    path: PathBuf,
+    relying_party_id: String,
+}
 
 impl SqliteAuthorizationStore {
+    const LEGACY_RELYING_PARTY_ID: &'static str = "legacy-local";
+
     pub fn open(path: impl AsRef<Path>) -> Result<Self, AuthorizationStoreError> {
+        Self::open_with_relying_party(path, Self::LEGACY_RELYING_PARTY_ID)
+    }
+
+    /// Open a durable authorization-consumption domain pinned to one relying party.
+    pub fn open_with_relying_party(
+        path: impl AsRef<Path>,
+        relying_party_id: impl Into<String>,
+    ) -> Result<Self, AuthorizationStoreError> {
         let path = path.as_ref().to_path_buf();
+        let relying_party_id = relying_party_id.into();
+        if relying_party_id.is_empty() {
+            return Err(AuthorizationStoreError::InvalidState(
+                "relying party id must not be empty".into(),
+            ));
+        }
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| AuthorizationStoreError::InvalidState(e.to_string()))?;
         }
-        let store = Self { path };
+        let store = Self { path, relying_party_id };
         let mut connection = store.connection()?;
         connection.execute_batch(
             "PRAGMA journal_mode=WAL;
@@ -211,7 +230,11 @@ impl SqliteAuthorizationStore {
         )?;
         migrate_legacy_schema(&mut connection)?;
         connection.execute_batch(
-            "CREATE TABLE IF NOT EXISTS authorization_leases (
+            "CREATE TABLE IF NOT EXISTS authorization_store_metadata (
+               key TEXT PRIMARY KEY,
+               value TEXT NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS authorization_leases (
                authorization_instance TEXT PRIMARY KEY,
                action_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
@@ -251,6 +274,7 @@ impl SqliteAuthorizationStore {
                native_authority_namespace TEXT,
                native_authorization_id TEXT,
                native_replay_derivation_digest TEXT,
+               relying_party_id TEXT,
                boundary_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
                provider_idempotency_key TEXT NOT NULL,
@@ -274,6 +298,7 @@ impl SqliteAuthorizationStore {
                native_authority_namespace TEXT,
                native_authorization_id TEXT,
                native_replay_derivation_digest TEXT,
+               relying_party_id TEXT,
                action_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
                provider_idempotency_key TEXT NOT NULL,
@@ -291,11 +316,13 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_namespace", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authorization_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_replay_derivation_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_namespace", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authorization_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_derivation_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "trust_anchor_digest", "TEXT NOT NULL DEFAULT ''")?;
@@ -313,14 +340,55 @@ impl SqliteAuthorizationStore {
              CREATE UNIQUE INDEX IF NOT EXISTS authorization_dispatch_operation_uq
                ON authorization_dispatches(operation_id)
                WHERE operation_id <> '';
-             CREATE INDEX IF NOT EXISTS authorization_dispatch_action_fence_idx
-               ON authorization_dispatches(target_identity, action_digest, state);",
+             DROP INDEX IF EXISTS authorization_dispatch_action_fence_idx;
+             CREATE INDEX authorization_dispatch_action_fence_idx
+               ON authorization_dispatches(relying_party_id, target_identity, action_digest, state);",
         )?;
+
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let configured: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata WHERE key='relying_party_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match configured {
+            Some(existing) if existing != store.relying_party_id => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "relying party mismatch: store is pinned to {existing}"
+                )));
+            }
+            Some(_) => {}
+            None => {
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value) VALUES('relying_party_id',?1)",
+                    params![store.relying_party_id.as_str()],
+                )?;
+                tx.execute(
+                    "UPDATE authorization_dispatches
+                     SET relying_party_id=?1
+                     WHERE relying_party_id IS NULL OR relying_party_id=''",
+                    params![store.relying_party_id.as_str()],
+                )?;
+                tx.execute(
+                    "UPDATE authorization_terminal_evidence
+                     SET relying_party_id=?1
+                     WHERE relying_party_id IS NULL OR relying_party_id=''",
+                    params![store.relying_party_id.as_str()],
+                )?;
+            }
+        }
+        tx.commit()?;
         Ok(store)
     }
 
     fn connection(&self) -> Result<Connection, AuthorizationStoreError> {
         Ok(Connection::open(&self.path)?)
+    }
+
+    pub fn relying_party_id(&self) -> &str {
+        &self.relying_party_id
     }
 
     pub fn register_lease(&self, lease: &AuthorizationLease) -> Result<(), AuthorizationStoreError> {
