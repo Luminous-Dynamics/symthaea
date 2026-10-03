@@ -146,7 +146,8 @@ jobs:
       - name: Emit qualification receipt
         if: always()
         run: |
-          cat > hdc-linear-code-qualification.txt <<EOF
+          mkdir -p hdc-linear-code-evidence
+          cat > hdc-linear-code-evidence/hdc-linear-code-qualification.txt <<EOF
           HDC Linear-Code Recovery Qualification
           ======================================
           exact_head=${{ steps.head.outputs.sha }}
@@ -157,6 +158,8 @@ jobs:
           dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
           unit_test_inventory=${{ steps.harness.outputs.unit_test_count }}
           integration_test_inventory=${{ steps.harness.outputs.integration_test_count }}
+          fixture_fingerprint_status=${{ steps.fingerprint.outcome == 'success' && 'captured' || 'not-captured' }}
+          fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
           fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
@@ -177,10 +180,14 @@ jobs:
           strict_clippy=${{ steps.clippy.outcome }}
           receipt_semantics=descriptive-only
           EOF
+          if [ "${{ steps.harness.outcome }}" = "success" ] && [ -f "${{ steps.harness.outputs.path }}/Cargo.lock" ]; then
+            cp "${{ steps.harness.outputs.path }}/Cargo.lock" hdc-linear-code-evidence/Cargo.lock
+          fi
 
       - name: Upload qualification receipt
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hdc-linear-code-qualification-${{ steps.head.outputs.sha }}
-          path: hdc-linear-code-qualification.txt
+          path: hdc-linear-code-evidence
+          if-no-files-found: error
