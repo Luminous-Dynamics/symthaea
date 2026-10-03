@@ -134,8 +134,11 @@ jobs:
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_ambiguity canonical_fixture_fingerprint_is_emitted -- --nocapture 2>&1)"
           FINGERPRINT="$(printf '%s\\n' "$OUTPUT" | awk -F= '/FIXTURE_FINGERPRINT=/ { print $2; exit }')"
+          FIXTURE_SPEC="$(printf '%s\\n' "$OUTPUT" | awk -F= '/FIXTURE_SPEC=/ { print $2; exit }')"
+          test -n "$FIXTURE_SPEC"
           test "$(printf '%s' "$FINGERPRINT" | wc -c)" -eq 64
           printf 'fingerprint=%s\\n' "$FINGERPRINT" >> "$GITHUB_OUTPUT"
+          printf 'fixture_spec=%s\\n' "$FIXTURE_SPEC" >> "$GITHUB_OUTPUT"
 
       - name: Strict Clippy
         id: clippy
@@ -162,11 +165,9 @@ jobs:
           unit_test_inventory=${{ steps.harness.outputs.unit_test_count }}
           integration_test_inventory=${{ steps.harness.outputs.integration_test_count }}
           fixture_fingerprint_status=${{ steps.fingerprint.outcome == 'success' && 'captured' || 'not-captured' }}
+          fixture_spec=${{ steps.fingerprint.outputs.fixture_spec }}
           fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
           fixture_fingerprint_schema=blake3-256-symthaea-hdc-linear-code-v1
-          fixture_seed=0xC0DE
-          fixture_dimension=96
-          fixture_rank=8
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
