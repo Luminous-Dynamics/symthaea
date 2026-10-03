@@ -478,6 +478,16 @@ impl ExecutionReceipt {
             return Err(ReceiptValidationError::FinishedAfterAuthorizationExpiry);
         }
 
+        if matches!(
+            self.postcondition,
+            PostconditionOutcome::Satisfied
+                | PostconditionOutcome::Violated
+                | PostconditionOutcome::Unproven
+        ) && !has_concrete_digest(self.verification_digest.as_ref())
+        {
+            return Err(ReceiptValidationError::MissingVerificationEvidence);
+        }
+
         Ok(())
     }
 
@@ -518,6 +528,8 @@ pub enum ReceiptValidationError {
     StartedBeforeAuthorization,
     #[error("execution finished after authorization expired")]
     FinishedAfterAuthorizationExpiry,
+    #[error("postcondition claims evaluation but carries no concrete verification evidence digest")]
+    MissingVerificationEvidence,
     #[error("canonical serialization failed: {0}")]
     Serialization(serde_json::Error),
 }
@@ -705,6 +717,10 @@ fn canonical_digest<T: Serialize>(
         algorithm: "blake3".into(),
         value: hasher.finalize().to_hex().to_string(),
     })
+}
+
+fn has_concrete_digest(digest: Option<&ContentDigest>) -> bool {
+    digest.is_some_and(|value| !value.algorithm.is_empty() && !value.value.is_empty())
 }
 
 /// The minimal adapter contract for target-specific lowering.
@@ -1238,6 +1254,31 @@ mod tests {
 
         assert!(receipt.validate_for(&authorized).is_ok());
         assert!(!receipt.is_verified_success());
+    }
+
+    #[test]
+    fn rejects_evaluated_postcondition_without_evidence_digest() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            started_at_ms: 151,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Satisfied,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::MissingVerificationEvidence)
+        );
     }
 
     #[test]
