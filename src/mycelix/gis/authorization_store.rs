@@ -3866,6 +3866,31 @@ mod tests {
                 AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
             )
         ));
+
+        assert_eq!(
+            store.recover_incomplete_attempt_for_boundary(
+                "boundary-verifier-config",
+                "attempt-verifier-config"
+            ).unwrap(),
+            1
+        );
+        let reconcile_err=store.reconcile_indeterminate_bound_verified(
+            &record,
+            &verified_evidence(&record,ExecutionOutcome::Succeeded),
+            &WrongConfigVerifier
+        ).unwrap_err();
+        assert!(matches!(
+            reconcile_err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
+            )
+        ));
+        store.reconcile_indeterminate_bound_verified(
+            &record,
+            &verified_evidence(&record,ExecutionOutcome::Succeeded),
+            &TestProviderVerifier
+        ).unwrap();
+
         let _=std::fs::remove_file(path);
     }
 
