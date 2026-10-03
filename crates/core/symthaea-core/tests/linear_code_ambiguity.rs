@@ -244,10 +244,16 @@ fn published_parameter_storage_ledger_is_exact_and_packed_consistent() {
         }
     }
 
+    let expected_target_bytes = dimensions
+        .iter()
+        .map(|&dimension| BinaryCodeword::zero(dimension).words().len() as u128 * 8)
+        .sum::<u128>()
+        * ranks.len() as u128
+        * factor_counts.len() as u128;
     assert_eq!(cases, 27);
     assert!(total_theoretical_generator_bits < total_theoretical_codebook_bits);
     assert!(total_packed_generator_bytes > 0);
-    assert_eq!(total_packed_target_bytes, 27 * 8 * 32);
+    assert_eq!(total_packed_target_bytes, expected_target_bytes);
 
     println!(
         "STORAGE_LEDGER=dimensions=500,1000,2000;ranks=3,5,7;factors=3,4,5;cases={cases};theoretical_codebook_bits={total_theoretical_codebook_bits};theoretical_generator_matrix_bits={total_theoretical_generator_bits};packed_generator_bytes={total_packed_generator_bytes};packed_target_bytes={total_packed_target_bytes}"
