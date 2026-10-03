@@ -276,6 +276,13 @@ The fixture also pins the minimum-distance ambiguity boundary. A corruption equa
 
 The recent Deng–Raviv noisy-VSA construction is a separate comparator family: it changes the code construction to a Reed–Solomon/Hadamard concatenation and uses histogram recovery/list-decoding machinery to obtain formal noise resilience. It should remain separate from the current random-linear-code exact-recovery implementation unless that representation is intentionally adopted.
 
+### Current coding-theory literature boundary (September–October 2026)
+
+Recent work reinforces the need to keep finite-fixture geometry and noisy decoding explicit. Doron et al. (2026) prove broad discrepancy results for random linear codes and show that, in the relevant asymptotic regime, random linear codes can behave like unstructured random codes for list-decoding above capacity. Kumar and Mon (2026) give improved near-capacity list-decoding bounds for random linear codes over finite fields. Neither result is a guarantee for a particular finite HDC fixture, so this comparator records actual code geometry instead of inferring robustness from the random-linear-code label.
+
+References: https://arxiv.org/abs/2606.24471 ; https://eccc.weizmann.ac.il/report/2026/181/
+
+
 A September 2026 result by Silas further sharpens the random-linear-code decoding boundary: at rates approaching Hamming list-decoding capacity, the worst-case list size is asymptotically determined for every finite field, with the binary case recovering the previously tight constant-order behavior. This is useful context for future Stage-E experiments, but it is a coding-theoretic asymptotic/list-decoding statement, not a claim about the small deterministic fixtures used here.
 
 ### Acceptance gates
