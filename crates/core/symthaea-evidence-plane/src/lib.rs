@@ -1706,7 +1706,7 @@ mod tests {
     }
 
     #[test]
-    fn execution_lineage_guard_rejects_invalid_preparation() {
+    fn execution_lineage_guard_try_prepare_rejects_invalid_preparation() {
         let mut lineage = lineage_fixture();
         lineage
             .immutable_input_digests
