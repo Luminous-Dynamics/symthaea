@@ -156,10 +156,6 @@ jobs:
           test -n "$FIXTURE_SPEC"
           test "${#FINGERPRINT}" -eq 64
           case "$FINGERPRINT" in
-          FIXTURE_SPEC="$(printf '%s\\n' "$OUTPUT" | awk -F= '/FIXTURE_SPEC=/ { print $2; exit }')"
-          test -n "$FIXTURE_SPEC"
-          test "${#FINGERPRINT}" -eq 64
-          case "$FINGERPRINT" in
             (*[!0-9a-f]*) exit 1 ;;
           esac
           printf 'fingerprint=%s\\n' "$FINGERPRINT" >> "$GITHUB_OUTPUT"
@@ -173,8 +169,8 @@ jobs:
           test "$WORK_LEDGER_COUNT" -eq 1
           WORK_LEDGER="$(printf '%s\\n' "$OUTPUT" | sed -n 's/^WORK_LEDGER=//p')"
           test -n "$WORK_LEDGER"
-          test -n "$WORK_LEDGER"
           printf 'work_ledger=%s\\n' "$WORK_LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Capture small-fixture scaling ledger
         id: scaling
         run: |
@@ -182,7 +178,6 @@ jobs:
           SCALING_LEDGER_COUNT="$(printf '%s\\n' "$OUTPUT" | grep -c '^SCALING_LEDGER=')"
           test "$SCALING_LEDGER_COUNT" -eq 3
           SCALING_LEDGER="$(printf '%s\\n' "$OUTPUT" | sed -n 's/^SCALING_LEDGER=//p' | paste -sd '|' -)"
-          test -n "$SCALING_LEDGER"
           test -n "$SCALING_LEDGER"
           printf 'scaling_ledger=%s\\n' "$SCALING_LEDGER" >> "$GITHUB_OUTPUT"
 
@@ -193,7 +188,6 @@ jobs:
           PACKING_BOUNDARY_COUNT="$(printf '%s\\n' "$OUTPUT" | grep -c '^PACKING_BOUNDARY=')"
           test "$PACKING_BOUNDARY_COUNT" -eq 3
           PACKING_BOUNDARY="$(printf '%s\\n' "$OUTPUT" | sed -n 's/^PACKING_BOUNDARY=//p' | paste -sd '|' -)"
-          test -n "$PACKING_BOUNDARY"
           test -n "$PACKING_BOUNDARY"
           printf 'packing_boundary=%s\\n' "$PACKING_BOUNDARY" >> "$GITHUB_OUTPUT"
 
