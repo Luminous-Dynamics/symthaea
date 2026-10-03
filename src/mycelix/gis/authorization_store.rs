@@ -2660,6 +2660,21 @@ mod tests {
         assert_eq!(lease_boundary,"boundary_id");
         assert_eq!(receipt_boundary,"boundary_id");
 
+        for table in ["authorization_dispatches","authorization_terminal_evidence"] {
+            for column in [
+                "native_authority_namespace",
+                "native_authorization_id",
+                "native_replay_derivation_digest",
+            ] {
+                let count:i64=lease.query_row(
+                    &format!("SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name=?1"),
+                    params![column],
+                    |row| row.get(0),
+                ).unwrap();
+                assert_eq!(count,1,"{table}.{column} missing after migration");
+            }
+        }
+
         let index_count:i64=lease.query_row(
             "SELECT COUNT(*) FROM sqlite_master
              WHERE type='index' AND name IN
