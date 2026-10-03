@@ -739,7 +739,11 @@ fn validate_native_authority_pin_set(
         }
 
         let pin_set_id = self.native_authority_pin_set_id();
-        let pin_set_digest = format!("sha256:{}", hex::encode(Sha256::digest(&canonical)));
+        let mut digest_material = Vec::with_capacity(canonical.len() + pin_set_id.len() + 64);
+        digest_material.extend_from_slice(b"symthaea:gis:native-pin-set-digest:v2\n");
+        append_len_prefixed(&mut digest_material, pin_set_id.as_bytes());
+        append_len_prefixed(&mut digest_material, &canonical);
+        let pin_set_digest = format!("sha256:v2:{}", hex::encode(Sha256::digest(&digest_material)));
         let snapshot = hex::encode(&canonical);
 
         tx.execute(
@@ -819,8 +823,20 @@ fn validate_native_authority_pin_set(
             .map_err(|_| AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidNativeReplayProvenance
             ))?;
-        let derived = format!("sha256:{}", hex::encode(Sha256::digest(&canonical)));
-        if derived != pin_set_digest {
+        let valid = if let Some(hex_digest) = pin_set_digest.strip_prefix("sha256:v2:") {
+            let mut digest_material = Vec::with_capacity(canonical.len() + pin_set_id.len() + 64);
+            digest_material.extend_from_slice(b"symthaea:gis:native-pin-set-digest:v2\n");
+            append_len_prefixed(&mut digest_material, pin_set_id.as_bytes());
+            append_len_prefixed(&mut digest_material, &canonical);
+            hex::encode(Sha256::digest(&digest_material)) == hex_digest
+        } else if let Some(hex_digest) = pin_set_digest.strip_prefix("sha256:") {
+            // Historical v1 snapshots were content-only; retain validation for
+            // durable evidence created before relying-party-scoped v2 digests.
+            hex::encode(Sha256::digest(&canonical)) == hex_digest
+        } else {
+            false
+        };
+        if !valid {
             return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
         }
         Ok(())
@@ -2889,6 +2905,38 @@ mod tests {
     }
 
     #[test]
+    fn identical_pin_contents_have_distinct_relying_party_scoped_digests() {
+        let path_a=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-pin-digest-rp-a-{}.db",std::process::id()
+        ));
+        let path_b=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-pin-digest-rp-b-{}.db",std::process::id()
+        ));
+        let store_a=SqliteAuthorizationStore::open_with_relying_party(
+            &path_a,"rp-digest-a"
+        ).unwrap();
+        let store_b=SqliteAuthorizationStore::open_with_relying_party(
+            &path_b,"rp-digest-b"
+        ).unwrap();
+        store_a.pin_native_authority_namespace("issuer","authority/v1").unwrap();
+        store_b.pin_native_authority_namespace("issuer","authority/v1").unwrap();
+
+        let read_digest=|store:&SqliteAuthorizationStore| -> String {
+            let mut connection=store.connection().unwrap();
+            let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+            let (_,digest)=store.persist_native_authority_pin_set_snapshot(&tx).unwrap();
+            tx.commit().unwrap();
+            digest
+        };
+        let digest_a=read_digest(&store_a);
+        let digest_b=read_digest(&store_b);
+        assert_ne!(digest_a,digest_b);
+
+        let _=std::fs::remove_file(path_a);
+        let _=std::fs::remove_file(path_b);
+    }
+
+    #[test]
     fn reopening_rejects_preexisting_normalized_issuer_conflict() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-issuer-reopen-conflict-{}.db",std::process::id()
@@ -3067,8 +3115,12 @@ mod tests {
         assert_eq!(terminal.4,validity.2);
 
         let snapshot_bytes=hex::decode(&snapshot.2).unwrap();
+        let mut digest_material=Vec::new();
+        digest_material.extend_from_slice(b"symthaea:gis:native-pin-set-digest:v2\n");
+        append_len_prefixed(&mut digest_material,snapshot.0.as_bytes());
+        append_len_prefixed(&mut digest_material,&snapshot_bytes);
         assert_eq!(
-            format!("sha256:{}",hex::encode(Sha256::digest(snapshot_bytes))),
+            format!("sha256:v2:{}",hex::encode(Sha256::digest(digest_material))),
             snapshot.1
         );
         let _=std::fs::remove_file(path);
