@@ -298,12 +298,11 @@ async function runMode(mode) {
       '--disable-dev-shm-usage',
       '--enable-features=Vulkan',
       '--use-angle=vulkan',
-      '--use-vulkan=swiftshader',
-      '--use-webgpu-adapter=swiftshader',
       '--disable-vulkan-surface',
     );
     if (swiftShaderMode) {
       args.push(
+        '--use-vulkan=swiftshader',
         '--use-webgpu-adapter=swiftshader',
         '--enable-dawn-features=allow_unsafe_apis',
         '--disable-dawn-features=use_dxc',
