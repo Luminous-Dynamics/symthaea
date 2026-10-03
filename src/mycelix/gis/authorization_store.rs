@@ -628,7 +628,7 @@ impl SqliteAuthorizationStore {
             boundary_id,
             operation_id,
             &replay.native_replay_identity,
-            Some(&replay),
+            &replay,
         )
     }
 
@@ -670,14 +670,28 @@ impl SqliteAuthorizationStore {
         boundary_id: &str,
         operation_id: &str,
         native_replay_identity: &str,
-        native_replay_provenance: Option<&super::NativeReplayDerivation>,
+        native_replay_provenance: &super::NativeReplayDerivation,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         if action.effect_binding.as_ref() != Some(expected_effect)
             || boundary_id.is_empty()
             || operation_id.is_empty()
             || native_replay_identity.is_empty()
+            || native_replay_provenance.authority_namespace.is_empty()
+            || native_replay_provenance.native_authorization_id.is_empty()
+            || native_replay_provenance.derivation_digest.is_empty()
+            || native_replay_provenance.native_replay_identity != native_replay_identity
         {
-            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+        }
+        let derived = super::NativeReplayDerivation::derive(
+            &native_replay_provenance.authority_namespace,
+            &native_replay_provenance.native_authorization_id,
+        )
+        .map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
+        if derived.native_replay_identity != native_replay_identity
+            || derived.derivation_digest != native_replay_provenance.derivation_digest
+        {
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
         }
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -764,9 +778,9 @@ impl SqliteAuthorizationStore {
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity,
-                native_replay_provenance.map(|p| p.authority_namespace.as_str()),
-                native_replay_provenance.map(|p| p.native_authorization_id.as_str()),
-                native_replay_provenance.map(|p| p.derivation_digest.as_str()),
+                native_replay_provenance.authority_namespace.as_str(),
+                native_replay_provenance.native_authorization_id.as_str(),
+                native_replay_provenance.derivation_digest.as_str(),
                 self.relying_party_id.as_str(),
                 record.action_id, record.action_digest, record.provider_idempotency_key,
                 record.target_identity, record.audience, record.adapter, record.boundary_id],
