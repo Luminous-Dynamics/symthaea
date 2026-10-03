@@ -2023,8 +2023,10 @@ impl KnowledgePersistence {
                   OR NEW.generation <= 0
                   OR NEW.canonical_digest_hex IS NULL
                   OR length(NEW.canonical_digest_hex) <> 64
+                  OR NEW.canonical_digest_hex GLOB '*[^0-9A-Fa-f]*'
                   OR NEW.receipt_digest_hex IS NULL
                   OR length(NEW.receipt_digest_hex) <> 64
+                  OR NEW.receipt_digest_hex GLOB '*[^0-9A-Fa-f]*'
                   OR trim(NEW.canonical_digest_hex) = ''
                   OR trim(NEW.receipt_digest_hex) = ''
              BEGIN
@@ -2038,6 +2040,7 @@ impl KnowledgePersistence {
                   OR NEW.validation_sequence <= 0
                   OR NEW.snapshot_digest_hex IS NULL
                   OR length(NEW.snapshot_digest_hex) <> 64
+                  OR NEW.snapshot_digest_hex GLOB '*[^0-9A-Fa-f]*'
                   OR trim(NEW.snapshot_digest_hex) = ''
                   OR NEW.validator_ref IS NULL
                   OR trim(NEW.validator_ref) = ''
@@ -2048,6 +2051,7 @@ impl KnowledgePersistence {
                   OR NEW.conforms NOT IN (0, 1)
                   OR NEW.receipt_digest_hex IS NULL
                   OR length(NEW.receipt_digest_hex) <> 64
+                  OR NEW.receipt_digest_hex GLOB '*[^0-9A-Fa-f]*'
                   OR trim(NEW.receipt_digest_hex) = ''
              BEGIN
                  SELECT RAISE(ABORT, 'knowledge_snapshot_validation_receipts requires valid identity, digest, validator, outcome, and positive sequence');
@@ -3512,7 +3516,7 @@ mod tests {
             .execute(
                 "INSERT INTO knowledge_snapshot_receipts
                  (generation, canonical_digest_hex, receipt_digest_hex)
-                 VALUES (999, 'short', 'short')",
+                 VALUES (999, 'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', '0000000000000000000000000000000000000000000000000000000000000000')",
                 [],
             )
             .unwrap_err();
@@ -3527,7 +3531,9 @@ mod tests {
                   validator_ref, validator_version, validation_profile, conforms,
                   report_digest_hex, receipt_digest_hex)
                  VALUES ('bad', 999, 1,
-                         'short', 'validator', 'v1', 'profile', 2, NULL, 'short')",
+                         'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg',
+                         'validator', 'v1', 'profile', 1, NULL,
+                         '0000000000000000000000000000000000000000000000000000000000000000')",
                 [],
             )
             .unwrap_err();
