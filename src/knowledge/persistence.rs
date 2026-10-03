@@ -820,15 +820,6 @@ impl KnowledgePersistence {
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
-        // Preserve the established legacy migration behavior before any complete
-        // snapshot verification attempts to decode memory identities.
-        conn.execute(
-            "UPDATE knowledge_facts
-             SET memory_id = 'legacy-fact:' || id
-             WHERE memory_id IS NULL",
-            [],
-        )
-        .map_err(|e| e.to_string())?;
         let tx = conn
             .unchecked_transaction()
             .map_err(|e| format!("Begin latest snapshot receipt verification: {e}"))?;
@@ -877,15 +868,6 @@ impl KnowledgePersistence {
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
-        // Materialize deterministic identities for pre-EPF-011 rows before
-        // beginning the read transaction.
-        conn.execute(
-            "UPDATE knowledge_facts
-             SET memory_id = 'legacy-fact:' || id
-             WHERE memory_id IS NULL",
-            [],
-        )
-        .map_err(|e| e.to_string())?;
 
         let tx = conn
             .unchecked_transaction()
@@ -960,15 +942,6 @@ impl KnowledgePersistence {
         let mut conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
-        // Validation now verifies the complete live snapshot, so legacy rows must
-        // receive their deterministic EPF-011 identities before opening the transaction.
-        conn.execute(
-            "UPDATE knowledge_facts
-             SET memory_id = 'legacy-fact:' || id
-             WHERE memory_id IS NULL",
-            [],
-        )
-        .map_err(|e| e.to_string())?;
 
         // This transaction both observes the snapshot and appends the validation receipt.
         // Starting it as IMMEDIATE avoids the deferred read→write upgrade race that can
@@ -1107,15 +1080,6 @@ impl KnowledgePersistence {
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
-        // The live-state binding below reads the complete snapshot; preserve
-        // compatibility with pre-EPF-011 facts exactly as the snapshot loader does.
-        conn.execute(
-            "UPDATE knowledge_facts
-             SET memory_id = 'legacy-fact:' || id
-             WHERE memory_id IS NULL",
-            [],
-        )
-        .map_err(|e| e.to_string())?;
         // Keep verification and retrieval in the same transaction snapshot.
         // A second transaction after verification would re-open a TOCTOU window in
         // which another writer could mutate validation history between the integrity
@@ -1181,15 +1145,6 @@ impl KnowledgePersistence {
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
-        // Materialize deterministic identities for pre-EPF-011 rows before
-        // beginning the read transaction.
-        conn.execute(
-            "UPDATE knowledge_facts
-             SET memory_id = 'legacy-fact:' || id
-             WHERE memory_id IS NULL",
-            [],
-        )
-        .map_err(|e| e.to_string())?;
 
         let tx = conn
             .unchecked_transaction()
@@ -1219,15 +1174,6 @@ impl KnowledgePersistence {
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
-        // Materialize deterministic identities for pre-EPF-011 rows so a subsequent
-        // save updates the same row rather than creating a second representation.
-        conn.execute(
-            "UPDATE knowledge_facts
-             SET memory_id = 'legacy-fact:' || id
-             WHERE memory_id IS NULL",
-            [],
-        )
-        .map_err(|e| e.to_string())?;
 
         let mut stmt = conn
             .prepare(
@@ -1630,6 +1576,34 @@ impl KnowledgePersistence {
                 tx.execute(&format!("ALTER TABLE knowledge_facts ADD COLUMN {name} {ty}"), [])
                     .map_err(|e| format!("Schema migration {name}: {e}"))?;
             }
+        }
+
+        // Materialize deterministic identities as part of the atomic migration rather
+        // than performing an autocommit write from individual read APIs. This makes
+        // legacy identity normalization happen exactly once, behind the same migration
+        // boundary as the uniqueness constraint.
+        tx.execute(
+            "UPDATE knowledge_facts
+             SET memory_id = 'legacy-fact:' || id
+             WHERE memory_id IS NULL",
+            [],
+        )
+        .map_err(|e| format!("Schema legacy memory identity backfill: {e}"))?;
+
+        let blank_memory_id_count: i64 = tx
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM knowledge_facts
+                 WHERE memory_id IS NOT NULL AND trim(memory_id) = ''",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Schema legacy memory identity validation: {e}"))?;
+        if blank_memory_id_count > 0 {
+            return Err(format!(
+                "Schema legacy memory identity validation failed: {} blank memory_id value(s)",
+                blank_memory_id_count
+            ));
         }
 
         // Add snapshot-receipt self-digest support to databases created by the
@@ -3316,7 +3290,62 @@ mod tests {
 
 
     #[test]
-    fn test_legacy_receipt_ledgers_migrate_and_backfill_integrity_fields() {
+    fn test_schema_migration_backfills_legacy_memory_identity_atomically() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_legacy_memory_identity_migration_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );",
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO knowledge_facts
+                 (vector_blob, source_text, confidence, cycle, is_causal)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params![vec![0x42u8; BinaryHV::BYTES], "legacy", 0.5f32, 7i64, false],
+            )
+            .unwrap();
+        }
+
+        let mut p=KnowledgePersistence::new(&db_path);
+        let conn=p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+
+        let memory_id:String=conn
+            .query_row(
+                "SELECT memory_id FROM knowledge_facts WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(memory_id, "legacy-fact:1");
+
+        // A subsequent read does not need a compatibility write; the migration
+        // has already materialized the stable identity.
+        let before_changes=conn.changes();
+        let facts=p.load_facts().unwrap();
+        assert_eq!(facts[0].memory_id, "legacy-fact:1");
+        assert_eq!(conn.changes(), before_changes);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_schema_migration_rejects_blank_legacy_memory_identity() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_legacy_receipt_migration_test_{}",
             std::process::id()
@@ -3855,6 +3884,57 @@ mod tests {
         assert!(blocked.to_string().contains("UPDATE prohibited"));
 
         p.verify_snapshot_validation_receipts().unwrap();
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_schema_migration_rejects_blank_legacy_memory_identity() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_blank_legacy_memory_identity_migration_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id TEXT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );",
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO knowledge_facts
+                 (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+                 VALUES ('   ', ?1, 'blank identity', 0.5, 1, 0)",
+                [vec![0x55u8; BinaryHV::BYTES]],
+            )
+            .unwrap();
+        }
+
+        let mut p=KnowledgePersistence::new(&db_path);
+        let conn=p.open_connection().unwrap();
+        let err=p.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains("blank memory_id"));
+
+        // The transaction rollback must leave the original legacy row untouched.
+        let preserved:String=conn
+            .query_row(
+                "SELECT memory_id FROM knowledge_facts WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(preserved, "   ");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
