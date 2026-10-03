@@ -250,7 +250,7 @@ jobs:
           fixture_spec=${{ steps.fingerprint.outputs.fixture_spec }}
           fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
           fixture_fingerprint_schema=blake3-256-symthaea-hdc-linear-code-v1
-          fixture_geometry_schema=linear-code-geometry-v1
+          fixture_geometry_schema=linear-code-geometry-v2
           fixture_geometry=${{ steps.fingerprint.outputs.fixture_geometry }}
           work_ledger_schema=linear-code-work-v1
           scaling_ledger_schema=linear-code-scaling-v1
