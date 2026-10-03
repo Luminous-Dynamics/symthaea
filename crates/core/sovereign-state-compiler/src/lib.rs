@@ -383,6 +383,11 @@ pub struct ExecutionReceipt {
     pub schema_version: String,
     pub plan_digest: ContentDigest,
     pub target_snapshot_digest: ContentDigest,
+    /// Digest of the target observation captured after execution.
+    ///
+    /// This may legitimately differ from the pre-execution snapshot digest
+    /// because the deployment is expected to change state.
+    pub final_target_snapshot_digest: ContentDigest,
     pub started_at_ms: u64,
     pub finished_at_ms: u64,
     pub outcome: ExecutionOutcome,
@@ -416,6 +421,14 @@ impl ExecutionReceipt {
         if self.finished_at_ms < self.started_at_ms {
             return Err(ReceiptValidationError::TimestampOrderInvalid);
         }
+        if self.started_at_ms < plan.authorization.valid_from_ms.unwrap_or(self.started_at_ms) {
+            return Err(ReceiptValidationError::StartedBeforeAuthorization);
+        }
+        if let Some(valid_until_ms) = plan.authorization.valid_until_ms
+            && self.finished_at_ms > valid_until_ms
+        {
+            return Err(ReceiptValidationError::FinishedAfterAuthorizationExpiry);
+        }
 
         Ok(())
     }
@@ -446,6 +459,10 @@ pub enum ReceiptValidationError {
     TargetSnapshotDigestMismatch,
     #[error("execution receipt timestamps are out of order")]
     TimestampOrderInvalid,
+    #[error("execution started before authorization became valid")]
+    StartedBeforeAuthorization,
+    #[error("execution finished after authorization expired")]
+    FinishedAfterAuthorizationExpiry,
     #[error("canonical serialization failed: {0}")]
     Serialization(serde_json::Error),
 }
@@ -1099,6 +1116,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             started_at_ms: 151,
             finished_at_ms: 200,
             outcome: ExecutionOutcome::Succeeded,
@@ -1119,6 +1137,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: ContentDigest::blake3(b"wrong-plan"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             started_at_ms: 151,
             finished_at_ms: 200,
             outcome: ExecutionOutcome::Succeeded,
@@ -1142,6 +1161,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             started_at_ms: 200,
             finished_at_ms: 199,
             outcome: ExecutionOutcome::Failed,
@@ -1153,6 +1173,75 @@ mod tests {
             receipt.validate_for(&authorized),
             Err(ReceiptValidationError::TimestampOrderInvalid)
         );
+    }
+
+    #[test]
+    fn rejects_receipt_started_before_authorization_window() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            started_at_ms: 99,
+            finished_at_ms: 150,
+            outcome: ExecutionOutcome::Succeeded,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::StartedBeforeAuthorization)
+        );
+    }
+
+    #[test]
+    fn rejects_receipt_finished_after_authorization_expiry() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            started_at_ms: 151,
+            finished_at_ms: 201,
+            outcome: ExecutionOutcome::Succeeded,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::FinishedAfterAuthorizationExpiry)
+        );
+    }
+
+    #[test]
+    fn receipt_accepts_distinct_post_execution_snapshot() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"changed-state"),
+            started_at_ms: 151,
+            finished_at_ms: 199,
+            outcome: ExecutionOutcome::Succeeded,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert!(receipt.validate_for(&authorized).is_ok());
     }
 
     #[test]
