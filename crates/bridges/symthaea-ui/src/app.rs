@@ -18,7 +18,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use symthaea_canvas::{GpuScene, RemoteScene, WebGpuMovieRenderer, WebGpuRenderer};
 #[cfg(feature = "browser-qualification")]
-use symthaea_canvas::{Color, SceneNode, Style, Transform};
+use symthaea_canvas::{Color, SceneNode};
+#[cfg(feature = "browser-qualification")]
+use symthaea_canvas::scene_graph::{Style, Transform};
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
@@ -152,7 +154,7 @@ fn browser_qualification_scene() -> RemoteScene {
 #[cfg(feature = "browser-qualification")]
 fn browser_qualification_portrait() -> String {
     use base64::Engine as _;
-    const SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#0a0f1a"/><circle cx="256" cy="256" r="150" fill="#2eb8ea" fill-opacity=".22" stroke="#f2ead0" stroke-width="4"/><path d="M156 290 C196 210 232 210 256 270 C280 210 316 210 356 290" fill="none" stroke="#f2ead0" stroke-width="6"/><circle cx="210" cy="255" r="12" fill="#f2ead0"/><circle cx="302" cy="255" r="12" fill="#f2ead0"/></svg>"#;
+    const SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#0a0f1a"/><circle cx="256" cy="256" r="150" fill="#2eb8ea" fill-opacity=".22" stroke="#f2ead0" stroke-width="4"/><path d="M156 290 C196 210 232 210 256 270 C280 210 316 210 356 290" fill="none" stroke="#f2ead0" stroke-width="6"/><circle cx="210" cy="255" r="12" fill="#f2ead0"/><circle cx="302" cy="255" r="12" fill="#f2ead0"/></svg>"##;
     format!(
         "data:image/svg+xml;base64,{}",
         base64::engine::general_purpose::STANDARD.encode(SVG.as_bytes())
