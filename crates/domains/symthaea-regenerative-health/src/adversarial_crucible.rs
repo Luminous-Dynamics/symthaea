@@ -76,6 +76,11 @@ fn temporal_gate() -> TemporalFusionGate {
         minimum_trusted_sensors: 2,
         minimum_independent_groups: 2,
         maximum_delta_disagreement_milli: 250,
+        expected_asset_id: "vehicle-1".into(),
+        expected_component_id: "wing-root".into(),
+        expected_topology_id: "topology-wing-root".into(),
+        expected_topology_version: "1".into(),
+        expected_topology_digest: "topology-v1".into(),
     })
     .expect("valid temporal policy")
 }
@@ -88,7 +93,7 @@ fn observation(sensor_id: &str, timestamp_ms: u64, residual: f64) -> SensorObser
         normalized_residual: residual.max(0.0),
         uncertainty: 1.0,
         evidence_id: format!("e-{sensor_id}-{timestamp_ms}"),
-        configuration_digest: format!("cfg-{sensor_id}"),
+        configuration_digest: "cfg-1".into(),
     }
 }
 
@@ -112,10 +117,20 @@ fn run_pair(
             schema_version: "0.1".into(),
             sensor_id: sensor_id.into(),
             component_id: "wing-root".into(),
+            asset_id: "vehicle-1".into(),
             independence_group: format!("group-{sensor_id}"),
-            topology_digest: "topology-v1".into(),
-            configuration_digest: "cfg-1".into(),
-            evidence_id: format!("independence-{sensor_id}"),
+            topology_attestation: crate::sensor_topology::SensorTopologyAttestation {
+                schema_version: "0.1".into(),
+                asset_id: "vehicle-1".into(),
+                component_id: "wing-root".into(),
+                topology_id: "topology-wing-root".into(),
+                topology_version: "1".into(),
+                topology_digest: "topology-v1".into(),
+                configuration_digest: "cfg-1".into(),
+                issued_at_ms: 500,
+                valid_until_ms: 2_500,
+                evidence_id: format!("independence-{sensor_id}"),
+            },
         },
     }
 }

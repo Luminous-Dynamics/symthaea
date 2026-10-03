@@ -15,7 +15,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::sensor_health::{SensorHealthDecision, SensorHealthState, SensorObservation};
+use crate::{sensor_health::{SensorHealthDecision, SensorHealthState, SensorObservation}, sensor_topology::{SensorTopologyAttestation, SensorTopologyAttestationIssue}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TemporalFusionState {
@@ -31,6 +31,7 @@ pub enum TemporalFusionIssue {
     InsufficientIndependentGroups,
     InvalidIndependenceProvenance,
     IndependenceConfigurationMismatch,
+    TopologyAttestation(SensorTopologyAttestationIssue),
     DuplicateSensor,
     NonMonotonicTime,
     TemporalDisagreement,
@@ -43,6 +44,11 @@ pub struct TemporalFusionPolicy {
     pub minimum_trusted_sensors: u16,
     pub minimum_independent_groups: u16,
     pub maximum_delta_disagreement_milli: u32,
+    pub expected_asset_id: String,
+    pub expected_component_id: String,
+    pub expected_topology_id: String,
+    pub expected_topology_version: String,
+    pub expected_topology_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,14 +56,11 @@ pub struct SensorIndependenceBinding {
     pub schema_version: String,
     pub sensor_id: String,
     pub component_id: String,
+    pub asset_id: String,
     /// Stable physical/common-mode dependency domain.
     pub independence_group: String,
-    /// Digest of the qualified topology/dependency declaration.
-    pub topology_digest: String,
-    /// Configuration under which the topology binding was qualified.
-    pub configuration_digest: String,
-    /// Provenance identity for the topology binding.
-    pub evidence_id: String,
+    /// Qualified topology/dependency declaration governing this binding.
+    pub topology_attestation: SensorTopologyAttestation,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -94,6 +97,11 @@ impl TemporalFusionGate {
             || policy.minimum_trusted_sensors == 0
             || policy.minimum_independent_groups == 0
             || policy.maximum_delta_disagreement_milli == 0
+            || policy.expected_asset_id.trim().is_empty()
+            || policy.expected_component_id.trim().is_empty()
+            || policy.expected_topology_id.trim().is_empty()
+            || policy.expected_topology_version.trim().is_empty()
+            || policy.expected_topology_digest.trim().is_empty()
         {
             return Err("invalid temporal fusion policy");
         }
@@ -128,18 +136,47 @@ impl TemporalFusionGate {
             if pair.independence.schema_version.trim().is_empty()
                 || pair.independence.sensor_id != pair.current.sensor_id
                 || pair.independence.component_id.trim().is_empty()
+                || pair.independence.asset_id.trim().is_empty()
                 || pair.independence.independence_group.trim().is_empty()
-                || pair.independence.topology_digest.trim().is_empty()
-                || pair.independence.evidence_id.trim().is_empty()
             {
                 issues.push(TemporalFusionIssue::InvalidIndependenceProvenance);
                 continue;
             }
             if pair.previous.configuration_digest != pair.current.configuration_digest
                 || pair.current.configuration_digest.trim().is_empty()
-                || pair.independence.configuration_digest != pair.current.configuration_digest
             {
                 issues.push(TemporalFusionIssue::IndependenceConfigurationMismatch);
+                continue;
+            }
+
+            if pair.independence.asset_id != self.policy.expected_asset_id
+                || pair.independence.component_id != self.policy.expected_component_id
+                || pair.independence.topology_attestation.topology_id != self.policy.expected_topology_id
+                || pair.independence.topology_attestation.topology_version != self.policy.expected_topology_version
+                || pair.independence.topology_attestation.topology_digest != self.policy.expected_topology_digest
+            {
+                issues.push(TemporalFusionIssue::TopologyAttestation(
+                    SensorTopologyAttestationIssue::TopologyIdentityMismatch,
+                ));
+                continue;
+            }
+
+            if let Err(issue) = pair.independence.topology_attestation.validate(
+                &self.policy.expected_asset_id,
+                &self.policy.expected_component_id,
+                &pair.current.configuration_digest,
+                pair.previous.timestamp_ms,
+            ) {
+                issues.push(TemporalFusionIssue::TopologyAttestation(issue));
+                continue;
+            }
+            if let Err(issue) = pair.independence.topology_attestation.validate(
+                &pair.independence.asset_id,
+                &pair.independence.component_id,
+                &pair.current.configuration_digest,
+                pair.current.timestamp_ms,
+            ) {
+                issues.push(TemporalFusionIssue::TopologyAttestation(issue));
                 continue;
             }
 
@@ -204,6 +241,7 @@ impl TemporalFusionGate {
                 TemporalFusionIssue::DuplicateSensor
                     | TemporalFusionIssue::InvalidIndependenceProvenance
                     | TemporalFusionIssue::IndependenceConfigurationMismatch
+                    | TemporalFusionIssue::TopologyAttestation(_)
                     | TemporalFusionIssue::NonMonotonicTime
                     | TemporalFusionIssue::TemporalDisagreement
             )
@@ -275,10 +313,20 @@ mod tests {
                 schema_version: "0.1".into(),
                 sensor_id: sensor_id.into(),
                 component_id: "wing-root".into(),
+                asset_id: "vehicle-1".into(),
                 independence_group: format!("group-{sensor_id}"),
-                topology_digest: "topology-v1".into(),
-                configuration_digest: "cfg-1".into(),
-                evidence_id: format!("independence-{sensor_id}"),
+                topology_attestation: SensorTopologyAttestation {
+                    schema_version: "0.1".into(),
+                    asset_id: "vehicle-1".into(),
+                    component_id: "wing-root".into(),
+                    topology_id: "topology-wing-root".into(),
+                    topology_version: "1".into(),
+                    topology_digest: "topology-v1".into(),
+                    configuration_digest: "cfg-1".into(),
+                    issued_at_ms: 500,
+                    valid_until_ms: 2_500,
+                    evidence_id: format!("independence-{sensor_id}"),
+                },
             },
         }
     }
@@ -290,6 +338,11 @@ mod tests {
             minimum_trusted_sensors: 2,
             minimum_independent_groups: 2,
             maximum_delta_disagreement_milli: 250,
+            expected_asset_id: "vehicle-1".into(),
+            expected_component_id: "wing-root".into(),
+            expected_topology_id: "topology-wing-root".into(),
+            expected_topology_version: "1".into(),
+            expected_topology_digest: "topology-v1".into(),
         })
         .unwrap()
     }
@@ -342,16 +395,21 @@ mod tests {
     #[test]
     fn malformed_independence_binding_cannot_enter_quorum() {
         let mut p = pair("strain-a", 0.5, 1.5);
-        p.independence.topology_digest.clear();
+        p.independence.topology_attestation.topology_digest.clear();
         let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
         assert_eq!(d.state, TemporalFusionState::Conflicted);
-        assert!(d.issues.contains(&TemporalFusionIssue::InvalidIndependenceProvenance));
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::TopologyIdentityMismatch
+            )
+        )));
     }
 
     #[test]
     fn independence_binding_configuration_must_match_observation() {
         let mut p = pair("strain-a", 0.5, 1.5);
-        p.independence.configuration_digest = "cfg-attacker".into();
+        p.independence.topology_attestation.configuration_digest = "cfg-attacker".into();
         let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
         assert_eq!(d.state, TemporalFusionState::Conflicted);
         assert!(d.issues.contains(&TemporalFusionIssue::IndependenceConfigurationMismatch));
@@ -368,6 +426,57 @@ mod tests {
             d.independent_group_ids,
             vec!["group-strain-a", "group-strain-b"]
         );
+    }
+
+    #[test]
+    fn stale_topology_attestation_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.valid_until_ms = 1_999;
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::StaleAttestation
+            )
+        )));
+    }
+
+    #[test]
+    fn future_topology_attestation_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.issued_at_ms = 1_001;
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::FutureAttestation
+            )
+        )));
+    }
+
+    #[test]
+    fn topology_substitution_cannot_enter_independence_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.component_id = "tail-root".into();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::TopologyIdentityMismatch
+            )
+        )));
+    }
+
+    #[test]
+    fn configuration_rotation_requires_new_topology_attestation() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.current.configuration_digest = "cfg-2".into();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.contains(&TemporalFusionIssue::IndependenceConfigurationMismatch));
     }
 
     #[test]
