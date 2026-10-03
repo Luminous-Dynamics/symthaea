@@ -1150,6 +1150,12 @@ impl KnowledgePersistence {
             .unchecked_transaction()
             .map_err(|e| format!("Begin persistence snapshot read: {e}"))?;
 
+        // Preserve the legacy API shape, but fail closed when a committed snapshot
+        // receipt exists and the live projection no longer matches it. Databases that
+        // have never used save_snapshot remain readable without inventing a receipt.
+        verify_snapshot_receipts_in_tx(&tx)?;
+        verify_current_snapshot_matches_latest_receipt_in_tx(&tx)?;
+
         let snapshot = read_snapshot_from_transaction(&tx)?;
 
         tx.commit()
@@ -5458,6 +5464,47 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&dir);
     }
+    #[test]
+    fn test_load_snapshot_fails_closed_when_receipted_projection_drifts() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_load_snapshot_receipt_drift_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "load-drift".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x7Eu8; BinaryHV::BYTES],
+            source_text: "original".into(),
+            confidence: 0.7,
+            domain: Some("test".into()),
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+
+        {
+            let conn = p.open_connection().unwrap();
+            conn.execute(
+                "UPDATE knowledge_facts
+                 SET source_text = 'drifted'
+                 WHERE memory_id = 'load-drift'",
+                [],
+            )
+            .unwrap();
+        }
+
+        let err = p.load_snapshot().unwrap_err();
+        assert!(err.starts_with("Snapshot receipt digest mismatch: generation 1"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn test_load_snapshot_returns_all_domains_from_one_read() {
         let dir = std::env::temp_dir().join(format!(
