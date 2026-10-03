@@ -219,7 +219,8 @@ fn disjoint_factor_subspaces_have_unique_exhaustive_decomposition() {
         })
         .collect();
 
-    assert_eq!(matches.len(), 1);    assert_eq!(matches[0], (a, b));
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0], (a, b));
 
     // A corrupted query is classified explicitly. Choose a one-bit flip that
     // leaves the jointly generated factor span; this must not be silently
