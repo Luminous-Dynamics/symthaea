@@ -91,7 +91,8 @@ The primary portability boundary must be capability negotiation, not an OS enum.
 
 Example capabilities:
 
-- ObserveHardware
+- ObserveState — observe the target's realized state for lifecycle planning and verification.
+- ObserveHardware — observe physical hardware/inventory when a workflow specifically needs those facts.
 - InstallApplication
 - RemoveApplication
 - ConfigureSystem
@@ -107,6 +108,8 @@ Example capabilities:
 - AttestState
 
 A target advertises the capabilities it actually exposes. The compiler may only produce plans within that capability envelope.
+
+"ObserveState" is the generic semantic capability used by neutral Observe/Verify lifecycle steps. "ObserveHardware" remains distinct so a virtual, managed, or non-hardware target does not need to claim physical hardware access merely to prove deployed state.
 
 This allows:
 
@@ -392,6 +395,9 @@ Authorization validation now requires:
 - execution receipts bind the exact authorized plan, pre-execution snapshot, and
   post-execution observation;
 - receipt timestamps must remain within the authorization validity window.
+- pre-execution target observations must not be future-dated relative to authorization;
+- receipt execution must not begin before the target snapshot it claims to execute against;
+- neutral Observe/Verify lifecycle steps must explicitly require ObserveState.
 
 This deliberately separates the four sets that matter:
 
