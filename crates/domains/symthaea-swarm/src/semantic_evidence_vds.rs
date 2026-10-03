@@ -3626,4 +3626,151 @@ mod tests {
         assert_ne!(ConsistencyStatus::Unsupported, ConsistencyStatus::Invalid);
         assert_ne!(ConsistencyStatus::Unsupported, ConsistencyStatus::Valid);
     }
+    #[test]
+    fn rfc9942_semantic_adversarial_wire_matrix() {
+        // Keep this matrix at the wire boundary: every mutation is applied to
+        // an otherwise valid RFC 9942 Receipt so a passing parser cannot rely
+        // on constructor invariants alone.
+        let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, 2);
+        cbor_int(&mut protected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected, RFC9162_VDS_ID);
+
+        let mut valid = Vec::new();
+        cbor_tag(&mut valid, COSE_SIGN1_TAG);
+        cbor_array_len(&mut valid, 4);
+        cbor_bytes(&mut valid, &protected);
+        cbor_map_len(&mut valid, 1);
+        cbor_int(&mut valid, RFC9942_VDP_HEADER_LABEL);
+        valid.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut valid, &[0x22; 32]);
+        cbor_bytes(&mut valid, &[0xAA; 64]);
+
+        let decoded = Rfc9942ReceiptEnvelope::from_cbor(&valid).unwrap();
+        assert_eq!(decoded.algorithm_id(), COSE_ES256_ALGORITHM_ID);
+        assert_eq!(decoded.vds_id(), RFC9162_VDS_ID);
+
+        // alg moved to the unprotected bucket: RFC 9942 requires it in
+        // protected, and the implementation must not silently apply
+        // unprotected precedence.
+        let mut alg_unprotected = Vec::new();
+        cbor_tag(&mut alg_unprotected, COSE_SIGN1_TAG);
+        cbor_array_len(&mut alg_unprotected, 4);
+        let mut protected_without_alg = Vec::new();
+        cbor_map_len(&mut protected_without_alg, 1);
+        cbor_int(&mut protected_without_alg, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected_without_alg, RFC9162_VDS_ID);
+        cbor_bytes(&mut alg_unprotected, &protected_without_alg);
+        cbor_map_len(&mut alg_unprotected, 2);
+        cbor_int(&mut alg_unprotected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut alg_unprotected, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut alg_unprotected, RFC9942_VDP_HEADER_LABEL);
+        alg_unprotected.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut alg_unprotected, &[0x22; 32]);
+        cbor_bytes(&mut alg_unprotected, &[0xAA; 64]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&alg_unprotected),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        // vds moved to the unprotected bucket must not become an implicit
+        // semantic binding for the proof.
+        let mut vds_unprotected = Vec::new();
+        cbor_tag(&mut vds_unprotected, COSE_SIGN1_TAG);
+        cbor_array_len(&mut vds_unprotected, 4);
+        let mut protected_without_vds = Vec::new();
+        cbor_map_len(&mut protected_without_vds, 1);
+        cbor_int(&mut protected_without_vds, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected_without_vds, COSE_ES256_ALGORITHM_ID);
+        cbor_bytes(&mut vds_unprotected, &protected_without_vds);
+        cbor_map_len(&mut vds_unprotected, 2);
+        cbor_int(&mut vds_unprotected, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut vds_unprotected, RFC9162_VDS_ID);
+        cbor_int(&mut vds_unprotected, RFC9942_VDP_HEADER_LABEL);
+        vds_unprotected.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut vds_unprotected, &[0x22; 32]);
+        cbor_bytes(&mut vds_unprotected, &[0xAA; 64]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&vds_unprotected),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        // vdp is a COSE unprotected parameter; moving it into protected must
+        // not create an alternate parsing path.
+        let mut vdp_protected = Vec::new();
+        cbor_tag(&mut vdp_protected, COSE_SIGN1_TAG);
+        cbor_array_len(&mut vdp_protected, 4);
+        let mut protected_with_vdp = Vec::new();
+        cbor_map_len(&mut protected_with_vdp, 3);
+        cbor_int(&mut protected_with_vdp, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected_with_vdp, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected_with_vdp, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected_with_vdp, RFC9162_VDS_ID);
+        cbor_int(&mut protected_with_vdp, RFC9942_VDP_HEADER_LABEL);
+        protected_with_vdp.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut vdp_protected, &protected_with_vdp);
+        cbor_map_len(&mut vdp_protected, 0);
+        cbor_bytes(&mut vdp_protected, &[0x22; 32]);
+        cbor_bytes(&mut vdp_protected, &[0xAA; 64]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&vdp_protected),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        // A proof of the wrong registered type must not be accepted as the
+        // requested inclusion proof.
+        let consistency = Rfc9942Vdp::new(
+            Rfc9942ProofKind::Consistency,
+            vec![Rfc9162ConsistencyProof::new(1, 2, vec![[0x33; 32]]).to_cbor()],
+        )
+        .unwrap();
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::new(
+                COSE_ES256_ALGORITHM_ID,
+                consistency,
+                Rfc9942ReceiptPayload::Attached([0x22; 32]),
+                vec![0xAA; 64],
+            )
+            .unwrap()
+            .verify_inclusion(b"candidate"),
+            Err(Rfc9942VdpError::WrongProofKind)
+        );
+
+        // Attached payload is part of the proof binding; a valid-looking
+        // 32-byte root with different bytes must fail.
+        let proof_receipt = Rfc9942ReceiptEnvelope::from_cbor(&valid).unwrap();
+        assert_eq!(
+            proof_receipt.verify_inclusion(b"candidate"),
+            Err(Rfc9942VdpError::NoMatchingProof)
+        );
+
+        // Receipt arrays are priority ordered, not sets: reversing them must
+        // survive a wire round trip without normalization.
+        let first = Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp.clone(),
+            Rfc9942ReceiptPayload::Attached([0x22; 32]),
+            vec![0x01; 64],
+        ).unwrap();
+        let second = Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,
+            vdp,
+            Rfc9942ReceiptPayload::Detached,
+            vec![0x02; 64],
+        ).unwrap();
+        let forward = Rfc9942ReceiptCollection::new(vec![first.clone(), second.clone()]).unwrap();
+        let reverse = Rfc9942ReceiptCollection::new(vec![second.clone(), first.clone()]).unwrap();
+        assert_ne!(forward.to_cbor(), reverse.to_cbor());
+        assert_eq!(
+            Rfc9942ReceiptCollection::from_cbor(&reverse.to_cbor()).unwrap().receipts(),
+            &[second, first]
+        );
+    }
+
+
 }
