@@ -811,21 +811,6 @@ impl Rfc9942SignatureWithReceipts {
         self.unprotected_receipts.as_ref()
     }
 
-    fn receipt_at(&self, index: usize) -> Result<(&Rfc9942ReceiptEnvelope, Rfc9942ReceiptPlacement), Rfc9942VdpError> {
-        if let Some(receipts) = self.protected_receipts.as_ref() {
-            return receipts
-                .receipts()
-                .get(index)
-                .map(|receipt| (receipt, Rfc9942ReceiptPlacement::Protected))
-                .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds);
-        }
-        self.unprotected_receipts
-            .as_ref()
-            .and_then(|receipts| receipts.receipts().get(index))
-            .map(|receipt| (receipt, Rfc9942ReceiptPlacement::Unprotected))
-            .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)
-    }
-
     pub fn payload(&self) -> &Rfc9942SignaturePayload {
         &self.payload
     }
@@ -1509,7 +1494,6 @@ impl Rfc9942Vdp {
         }
         let mut root = [0u8; 32];
         root.copy_from_slice(payload);
-        let vds = Rfc9162Sha256Vds;
         for proof_bytes in &self.proofs {
             let proof = Rfc9162InclusionProof::from_cbor(proof_bytes)?;
             let head = VdsTreeHead::new(proof.tree_size, root);
