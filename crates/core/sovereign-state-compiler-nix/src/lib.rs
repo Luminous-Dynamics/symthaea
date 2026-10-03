@@ -427,6 +427,78 @@ mod tests {
             .collect()
         );
         assert!(plan.validate().is_ok());
+        assert_eq!(
+            plan.verification.expected_state,
+            intent.desired_state
+        );
+    }
+
+    #[test]
+    fn deterministic_nixos_rebuild_plan_vectors() {
+        let vectors = [
+            (
+                "switch",
+                vec![
+                    (PlanStepKind::Observe, vec![Capability::ObserveHardware]),
+                    (
+                        PlanStepKind::ApplyDesiredState,
+                        vec![
+                            Capability::ConfigureSystem,
+                            Capability::UpdateSystem,
+                            Capability::ModifyBootChain,
+                        ],
+                    ),
+                    (PlanStepKind::Verify, vec![Capability::ObserveHardware]),
+                ],
+            ),
+            (
+                "test",
+                vec![
+                    (PlanStepKind::Observe, vec![Capability::ObserveHardware]),
+                    (
+                        PlanStepKind::ApplyDesiredState,
+                        vec![
+                            Capability::ConfigureSystem,
+                            Capability::ObserveHardware,
+                            Capability::UpdateSystem,
+                        ],
+                    ),
+                    (PlanStepKind::Verify, vec![Capability::ObserveHardware]),
+                ],
+            ),
+            (
+                "boot",
+                vec![
+                    (PlanStepKind::Observe, vec![Capability::ObserveHardware]),
+                    (
+                        PlanStepKind::ApplyDesiredState,
+                        vec![
+                            Capability::ConfigureSystem,
+                            Capability::UpdateSystem,
+                            Capability::ModifyBootChain,
+                        ],
+                    ),
+                    (PlanStepKind::Verify, vec![Capability::ObserveHardware]),
+                ],
+            ),
+        ];
+
+        for (mode, expected) in vectors {
+            let mut intent = DeploymentIntent::new("vector-1", "host-01");
+            intent.desired_state.properties.insert(
+                REBUILD_KEY.into(),
+                StateValue::String(mode.into()),
+            );
+
+            let plan = adapter().compile(&intent).expect("compile");
+            let actual = plan
+                .steps
+                .iter()
+                .map(|step| (step.kind.clone(), step.required_capabilities.iter().copied().collect()))
+                .collect::<Vec<_>>();
+
+            assert_eq!(actual, expected, "plan vector mismatch for {mode}");
+        }
     }
 
     #[test]
