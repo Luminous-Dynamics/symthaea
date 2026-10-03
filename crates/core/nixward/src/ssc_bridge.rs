@@ -11,11 +11,8 @@ use serde::{Deserialize, Serialize};
 use sovereign_state_compiler::{
     ContentDigest, ResourceRef, TargetId, TargetProfile, TargetSnapshot,
 };
-use sovereign_state_compiler_nix::{
-    default_nixos_capabilities, nixos_generation_resource,
-};
+use sovereign_state_compiler_nix::{default_nixos_capabilities, nixos_generation_resource};
 use thiserror::Error;
-
 
 pub const NIXOS_SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
 pub const NIXOS_CURRENT_SYSTEM: &str = "/run/current-system";
@@ -145,9 +142,7 @@ impl NixSystemObservation {
             .iter()
             .map(|entry| {
                 nixos_generation_resource(entry.number, &entry.realization)
-                    .map_err(|error| {
-                        SscObservationError::Io(error.to_string())
-                    })
+                    .map_err(|error| SscObservationError::Io(error.to_string()))
             })
             .collect::<Result<_, _>>()?;
 
@@ -222,9 +217,7 @@ fn parse_generation_link_name(name: &str) -> Result<Option<u64>, SscObservationE
 }
 
 fn generation_link(generation: u64) -> PathBuf {
-    PathBuf::from(format!(
-        "/nix/var/nix/profiles/system-{generation}-link"
-    ))
+    PathBuf::from(format!("/nix/var/nix/profiles/system-{generation}-link"))
 }
 
 fn read_profile_generation(link: &Path) -> Result<u64, SscObservationError> {
@@ -267,8 +260,7 @@ mod tests {
             42
         );
         assert_eq!(
-            parse_generation_link_name("system-current-link")
-                .expect_err("non-generation"),
+            parse_generation_link_name("system-current-link").expect_err("non-generation"),
             SscObservationError::Io("invalid digit found in string".into())
         );
         assert_eq!(
@@ -280,8 +272,7 @@ mod tests {
     #[test]
     fn profile_generation_parser_rejects_zero() {
         assert_eq!(
-            parse_generation_link_name("system-0-link")
-                .expect_err("generation zero"),
+            parse_generation_link_name("system-0-link").expect_err("generation zero"),
             SscObservationError::MissingSystemProfileGeneration
         );
     }
@@ -438,19 +429,26 @@ mod tests {
             .expect("snapshot");
         assert_eq!(snapshot.profile.identity, TargetId::from("host-01"));
         assert_eq!(snapshot.profile.platform, "nixos");
-        assert!(snapshot.profile.capabilities.contains(
-            &sovereign_state_compiler::Capability::ObserveState
-        ));
+        assert!(
+            snapshot
+                .profile
+                .capabilities
+                .contains(&sovereign_state_compiler::Capability::ObserveState)
+        );
         assert_eq!(snapshot.observed_at_ms, 123);
         assert_eq!(snapshot.resources.len(), 2);
-        assert!(snapshot.resources.contains(
-            &nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
-                .expect("generation resource")
-        ));
-        assert!(snapshot.resources.contains(
-            &nixos_generation_resource(43, "/nix/store/bbb-nixos-system-host")
-                .expect("generation resource")
-        ));
+        assert!(
+            snapshot.resources.contains(
+                &nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                    .expect("generation resource")
+            )
+        );
+        assert!(
+            snapshot.resources.contains(
+                &nixos_generation_resource(43, "/nix/store/bbb-nixos-system-host")
+                    .expect("generation resource")
+            )
+        );
     }
 
     #[test]
@@ -476,15 +474,20 @@ mod tests {
 
         assert_eq!(
             observation.generation_resource(42).expect("resource"),
-            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
-                .expect("resource")
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("resource")
         );
         assert_eq!(
-            observation.system_profile_generation().expect("profile generation").number,
+            observation
+                .system_profile_generation()
+                .expect("profile generation")
+                .number,
             43
         );
         assert_eq!(
-            observation.current_generation().expect("current generation").number,
+            observation
+                .current_generation()
+                .expect("current generation")
+                .number,
             42
         );
         assert_ne!(
