@@ -198,13 +198,19 @@ const fn verification_outcome_tag(outcome: ReceiptAttestationVerificationOutcome
     }
 }
 
-const CURRENT_ENVELOPE_STRUCTURAL_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidEnvelope)];
-const CURRENT_RECEIPT_COMMITMENT_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch)];
+const CURRENT_ENVELOPE_STRUCTURAL_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidEnvelope),
+];
+const CURRENT_RECEIPT_COMMITMENT_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch),
+];
 const CURRENT_TEMPORAL_FAILURE_TAGS: &[u8] = &[
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
 ];
-const CURRENT_CRYPTOSUITE_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch)];
+const CURRENT_CRYPTOSUITE_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch),
+];
 const CURRENT_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS: &[u8] = &[
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodMismatch),
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable),
@@ -227,13 +233,19 @@ const CURRENT_CRYPTOGRAPHIC_PROOF_FAILURE_TAGS: &[u8] = &[
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidSignature),
 ];
 
-const LEGACY_ENVELOPE_STRUCTURAL_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidEnvelope)];
-const LEGACY_RECEIPT_COMMITMENT_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch)];
+const LEGACY_ENVELOPE_STRUCTURAL_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidEnvelope),
+];
+const LEGACY_RECEIPT_COMMITMENT_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch),
+];
 const LEGACY_TEMPORAL_FAILURE_TAGS: &[u8] = &[
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
 ];
-const LEGACY_CRYPTOSUITE_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch)];
+const LEGACY_CRYPTOSUITE_FAILURE_TAGS: &[u8] = &[
+    verification_outcome_tag(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch),
+];
 const LEGACY_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS: &[u8] = &[
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodMismatch),
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable),
@@ -751,7 +763,8 @@ impl ReceiptAttestationVerificationReport {
             .resolved_verification_method
             .as_deref()
             .is_none_or(|method| !method.is_empty());
-        let resolved_method_is_required = matches!(self.verification_method, VerificationStage::Passed);
+        let resolved_method_is_required =
+            matches!(self.verification_method, VerificationStage::Passed);
 
         snapshot_is_well_formed
             && resolved_method_is_well_formed
@@ -3315,8 +3328,9 @@ mod tests {
         report.resolved_verification_method = Some(String::new());
         assert!(!report.is_well_formed());
 
-        report.verification_method =
-            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable);
+        report.verification_method = VerificationStage::Failed(
+            ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+        );
         assert!(!report.is_well_formed());
         report.resolved_verification_method = Some(
             "did:example:attester-a#key-1".into(),
