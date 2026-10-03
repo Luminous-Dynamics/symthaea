@@ -281,7 +281,7 @@ impl NixServiceObservedStateV1 {
         })
     }
 
-    /// Parse the exact five properties used for the governed pre-state.
+    /// Parse the exact identity/state properties used for the governed pre-state.
     /// Capability facts are parsed only by the complete-observation parser.
     pub fn parse_systemd_properties(
         requested_unit: impl Into<String>,
@@ -617,6 +617,25 @@ CanReload=no
         let b = NixServiceOperationCapabilitiesV1::from_observed_state(&failed, true, true, true).unwrap();
         assert_ne!(a.pre_state_digest(), b.pre_state_digest());
         assert_ne!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn narrow_state_parser_accepts_observation_without_capability_fields() {
+        let value = NixServiceObservedStateV1::parse_systemd_properties(
+            "nginx",
+            "Id=nginx.service
+Names=nginx.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=disabled
+",
+        )
+        .unwrap();
+
+        assert_eq!(value.unit(), "nginx.service");
+        assert_eq!(value.resolved_id(), "nginx.service");
+        assert_eq!(value.unit_file_state(), ServiceUnitFileStateV1::Disabled);
     }
 
     #[test]
