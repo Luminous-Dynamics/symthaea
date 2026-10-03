@@ -33,6 +33,7 @@ pub enum TopologyResolutionIssue {
     MissingPreservedBranch,
     DuplicateObservedBranch,
     InconsistentObservedPredecessor,
+    InconsistentResolutionPredecessor,
     ConfigurationMismatch,
 }
 
@@ -253,6 +254,14 @@ impl TopologyResolutionGate {
 
         let declared_preserved: BTreeSet<_> =
             resolution.observed_successors.iter().cloned().collect();
+
+        if declared_preserved.iter().any(|branch| {
+            branch.predecessor_epoch != resolution.predecessor_epoch
+                || branch.predecessor_topology_digest != resolution.predecessor_topology_digest
+                || branch.successor_epoch != resolution.selected_successor_epoch
+        }) {
+            issues.push(TopologyResolutionIssue::InconsistentResolutionPredecessor);
+        }
         if !declared_preserved.contains(&selected) {
             issues.push(TopologyResolutionIssue::MissingPreservedBranch);
         }
@@ -448,6 +457,18 @@ mod tests {
         let d = g.assess(Some(&r), &[a], 3_000);
         assert_eq!(d.state, TopologyResolutionState::Quarantined);
         assert!(d.issues.contains(&TopologyResolutionIssue::SuccessorEpochMismatch));
+    }
+
+    #[test]
+    fn resolution_cannot_preserve_a_branch_from_another_predecessor() {
+        let a = branch("topology-v2a");
+        let mut foreign = branch("topology-v2b");
+        foreign.predecessor_epoch = 2;
+        foreign.predecessor_topology_digest = "topology-v2".into();
+        let r = resolution("topology-v2a", vec![a.clone(), foreign]);
+        let d = gate().assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionIssue::InconsistentResolutionPredecessor));
     }
 
     #[test]
