@@ -25,15 +25,23 @@ const REBOOT_KEY: &str = "system.reboot";
 const ROLLBACK_KEY: &str = "nixos.rollback";
 const ROLLBACK_GENERATION_KEY: &str = "nixos.rollback-generation";
 pub const NIXOS_GENERATION_RESOURCE_KIND: &str = "nixos-generation";
+const NIXOS_GENERATION_DIGEST_DOMAIN: &[u8] =
+    b"LUMINOUS-DYNAMICS/SSC/NIXOS-GENERATION/v1\\0";
 
 /// Construct the resource identity used to bind a rollback to a specific
 /// observed NixOS generation.
+///
+/// The digest uses a protocol-specific domain separator plus a fixed-width
+/// big-endian generation number, avoiding ambiguity with other SSC resource
+/// identities that may use the same hash function.
 pub fn nixos_generation_resource(generation: u64) -> sovereign_state_compiler::ResourceRef {
+    let mut bytes = Vec::with_capacity(NIXOS_GENERATION_DIGEST_DOMAIN.len() + 8);
+    bytes.extend_from_slice(NIXOS_GENERATION_DIGEST_DOMAIN);
+    bytes.extend_from_slice(&generation.to_be_bytes());
+
     sovereign_state_compiler::ResourceRef {
         kind: NIXOS_GENERATION_RESOURCE_KIND.into(),
-        identity: sovereign_state_compiler::ContentDigest::blake3(
-            generation.to_string().as_bytes(),
-        ),
+        identity: sovereign_state_compiler::ContentDigest::blake3(&bytes),
     }
 }
 
