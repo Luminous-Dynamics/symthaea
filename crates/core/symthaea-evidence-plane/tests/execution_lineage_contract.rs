@@ -463,6 +463,19 @@ fn public_perturbation_classifier_reports_declared_and_collateral_drift() {
     );
 }
 
+
+#[test]
+fn public_serde_serialization_rejects_invalid_mutated_lineage() {
+    let mut lineage = fixture();
+    lineage.source_revision = "not-a-git-object".into();
+
+    let error = serde_json::to_string(&lineage).unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "invalid or non-canonical Git object identity for source_revision: \"not-a-git-object\""
+    );
+}
+
 #[test]
 fn serde_rejects_unknown_wire_fields() {
     let text = r#"{
