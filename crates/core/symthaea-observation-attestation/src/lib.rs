@@ -611,8 +611,17 @@ pub struct ReceiptAttestationVerificationReport {
     /// current verifier-produced reports always contain the populated trace.
     #[serde(default)]
     pub execution_trace: EvaluationTrace,
-    /// Fingerprint of the resolver's durable view, when resolution was performed.
+    /// Fingerprint of the resolver's durable view, when resolution returned a paired result.
+    ///
+    /// A resolver error does not fabricate this field from a later verifier-side
+    /// observation. A paired None is likewise authoritative and means that the
+    /// resolver did not provide a durable snapshot identifier for that result.
     pub resolution_snapshot_fingerprint: Option<String>,
+    /// Method identifier supplied to the resolver and, when available, confirmed by it.
+    ///
+    /// On resolver failure this may still contain the requested identifier for
+    /// diagnostics; consumers must not interpret Some here as proof that resolution
+    /// succeeded. Resolver success is established by the execution trace and outcome.
     pub resolved_verification_method: Option<String>,
     pub structural_validation: VerificationStage,
     pub receipt_commitment: VerificationStage,
