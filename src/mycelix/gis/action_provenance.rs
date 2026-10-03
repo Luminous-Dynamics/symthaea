@@ -105,6 +105,9 @@ pub struct ActionAuthorizationWitness {
     /// Stable authorization instance identity. Fresh presentation identifiers
     /// must not silently create a fresh spendable authority for the same action.
     pub authorization_instance: String,
+    /// Logical operation frozen when this lease enters a boundary-owned attempt.
+    /// This is separate from attempt identity and provider replay identity.
+    pub operation_id: Option<String>,
     pub action_digest: String,
     pub frame: String,
     pub support_digest: String,
@@ -314,6 +317,7 @@ impl AuthorizationLease {
         Self {
             action_id: action_id.into(),
             authorization_instance: authorization_instance.into(),
+            operation_id: None,
             action_digest: action_digest.into(),
             support_digest: support_digest.into(),
             policy: policy.into(),
