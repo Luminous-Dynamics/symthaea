@@ -964,12 +964,21 @@ impl Rfc9942SignatureWithReceipts {
         outer_external_aad: &[u8],
         detached_outer_payload: Option<&[u8]>,
     ) -> Result<Rfc9942VerifiedSignatureWithReceipt, Rfc9942VdpError> {
-        let (receipt, placement) = self.receipt_at(receipt_index)
-            .map_err(|error| match error {
-                Rfc9942VdpError::ReceiptIndexOutOfBounds if self.receipts().is_none() =>
-                    Rfc9942VdpError::ReceiptsMissing,
-                other => other,
-            })?;
+        let (receipt, placement) = if let Some(receipts) = self.protected_receipts.as_ref() {
+            let receipt = receipts
+                .receipts()
+                .get(receipt_index)
+                .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
+            (receipt, Rfc9942ReceiptPlacement::Protected)
+        } else if let Some(receipts) = self.unprotected_receipts.as_ref() {
+            let receipt = receipts
+                .receipts()
+                .get(receipt_index)
+                .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
+            (receipt, Rfc9942ReceiptPlacement::Unprotected)
+        } else {
+            return Err(Rfc9942VdpError::ReceiptsMissing);
+        };
 
         let payload = match (&self.payload, detached_outer_payload) {
             (Rfc9942SignaturePayload::Attached(bytes), None) => bytes.as_slice(),
