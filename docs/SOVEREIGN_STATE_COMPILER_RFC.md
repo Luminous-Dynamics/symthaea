@@ -288,8 +288,9 @@ SSC distinguishes four evidence moments rather than collapsing them into one
 The receipt records mechanical `ExecutionOutcome` separately from a typed
 `PostconditionOutcome`. A mechanically successful execution may therefore be
 `Unproven` until fresh observation establishes the requested postcondition.
-A verified-success interpretation requires both an execution outcome of
-`Succeeded`/`Recovered` and `PostconditionOutcome::Satisfied`.
+A verified-success interpretation requires an execution outcome of
+`Succeeded` and `PostconditionOutcome::Satisfied`; `Recovered` remains a distinct
+recovery disposition rather than forward deployment success.
 
 The post-state digest is allowed to differ from the pre-state digest because a
 successful deployment is expected to change state. Verification semantics
