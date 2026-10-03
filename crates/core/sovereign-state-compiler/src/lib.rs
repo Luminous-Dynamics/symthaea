@@ -1033,10 +1033,21 @@ mod tests {
 
     #[test]
     fn rejects_observe_or_verify_steps_without_observe_state() {
-        let mut plan = sample_plan();
-        plan.steps[2].required_capabilities.clear();
+        let mut observe_plan = sample_plan();
+        observe_plan.steps[0].kind = PlanStepKind::Observe;
+        observe_plan.steps[0].required_capabilities.clear();
         assert_eq!(
-            plan.validate(),
+            observe_plan.validate(),
+            Err(PlanValidationError::StepMissingSemanticCapability {
+                kind: PlanStepKind::Observe,
+                capability: Capability::ObserveState,
+            })
+        );
+
+        let mut verify_plan = sample_plan();
+        verify_plan.steps[2].required_capabilities.clear();
+        assert_eq!(
+            verify_plan.validate(),
             Err(PlanValidationError::StepMissingSemanticCapability {
                 kind: PlanStepKind::Verify,
                 capability: Capability::ObserveState,
@@ -1685,6 +1696,32 @@ mod tests {
         assert_eq!(
             receipt.validate_for(&authorized),
             Err(ReceiptValidationError::StartedBeforeAuthorization)
+        );
+    }
+
+    #[test]
+    fn rejects_receipt_started_before_target_snapshot() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
+            started_at_ms: 89,
+            finished_at_ms: 150,
+            outcome: ExecutionOutcome::Failed,
+            postcondition: PostconditionOutcome::NotEvaluated,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::StartedBeforeTargetSnapshot)
         );
     }
 
