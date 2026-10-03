@@ -141,8 +141,22 @@ impl TopologyResolutionGate {
                 policy_id: self.policy.policy_id.clone(),
                 state: if observed_successors.is_empty() {
                     TopologyResolutionState::InsufficientEvidence
-                } else {
+                } else if unique_observed
+                    .iter()
+                    .map(|branch| {
+                        (
+                            branch.predecessor_epoch,
+                            branch.predecessor_topology_digest.as_str(),
+                            branch.successor_topology_digest.as_str(),
+                        )
+                    })
+                    .collect::<BTreeSet<_>>()
+                    .len()
+                    > 1
+                {
                     TopologyResolutionState::Conflicted
+                } else {
+                    TopologyResolutionState::InsufficientEvidence
                 },
                 selected_successor: None,
                 preserved_branches: unique_observed.into_iter().collect(),
@@ -308,6 +322,13 @@ mod tests {
         let d = gate().assess(None, &[a, b], 3_000);
         assert_eq!(d.state, TopologyResolutionState::Conflicted);
         assert!(d.resolution_id.is_none());
+    }
+
+    #[test]
+    fn unresolved_single_successor_is_insufficient_evidence() {
+        let a = branch("topology-v2a");
+        let d = gate().assess(None, &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::InsufficientEvidence);
     }
 
     #[test]
