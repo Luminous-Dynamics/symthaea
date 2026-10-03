@@ -325,3 +325,7 @@ The recovery boundary is intentionally split in two. A Prepared attempt that has
 
 `RecoveryAuthorizationWitness` binds a recovery operation to the authorization instance, exact attempt, exact boundary, action digest, authority epoch, and issuance metadata. When the durable lease carries an explicit operation ID, the recovery witness must also carry the same non-empty operation ID; an empty or mismatched operation identity is rejected. The store enforces those bindings; the authority/authentication layer remains responsible for authenticating the issuer and policy. This keeps recovery authorization distinct from the execution receipt and prevents a recovery operation for one attempt from being applied to another.
 
+
+### Operation identity is frozen at preparation
+
+The effectful lifecycle now treats the logical operation identifier as an attempt-bound authorization input, not caller metadata that can be replaced at the `DispatchPending` transition. `prepare_for_execution_bound_with_operation` persists the operation identity before dispatch; both the precondition check and the authoritative `DispatchPending` transaction require the exact persisted value. A caller cannot prepare operation A and enter the provider as operation B while retaining the same action, native replay, target, and status evidence.
