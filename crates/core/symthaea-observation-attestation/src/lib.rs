@@ -56,6 +56,7 @@ impl VerificationPolicyInputs {
 
         !self.policy_version.is_empty()
             && self.cryptosuite == CRYPTOSUITE
+            && self.require_active_verification_method
             && optional_nonempty(&self.expected_proof_purpose)
             && optional_nonempty(&self.expected_domain)
             && optional_nonempty(&self.expected_challenge_fingerprint)
@@ -2503,6 +2504,22 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn policy_self_validation_rejects_unsupported_lifecycle_mode() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let mut policy = report.policy_inputs;
+
+        assert!(policy.is_well_formed());
+        policy.require_active_verification_method = false;
+        assert!(!policy.is_well_formed());
+    }
 
     #[test]
     fn custom_policy_version_remains_a_valid_policy_identity() {
