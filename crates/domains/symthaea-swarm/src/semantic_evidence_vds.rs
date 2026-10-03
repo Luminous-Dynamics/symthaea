@@ -480,12 +480,16 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        let head=match detached_payload {
-            Some(payload)=>self.verify_inclusion_with_detached_payload(candidate_entry,payload)?,
-            None=>self.verify_inclusion(candidate_entry)?,
-        };
-        self.verify_es256_cose_key(key,external_aad,detached_payload)?;
-        Ok(head)
+        let state = self.verify_es256_inclusion_state(
+            candidate_entry,
+            &key.public_key_sec1(),
+            external_aad,
+            detached_payload,
+        )?;
+        state
+            .proof()
+            .inclusion_head()
+            .ok_or(Rfc9942VdpError::WrongProofKind)
     }
 
     /// Verify RFC9942 consistency using a validated ES256 COSE_Key.
@@ -497,11 +501,17 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        self.verify_es256_cose_key(key,external_aad,detached_payload)?;
-        match detached_payload {
-            Some(payload)=>self.verify_consistency_with_detached_payload(older,payload),
-            None=>self.verify_consistency(older),
-        }
+        let state = self.verify_es256_consistency_state(
+            older,
+            &key.public_key_sec1(),
+            external_aad,
+            detached_payload,
+        )?;
+        state
+            .proof()
+            .consistency_heads()
+            .map(|(_, newer)| newer)
+            .ok_or(Rfc9942VdpError::WrongProofKind)
     }
 
     /// Verify an RFC9942 inclusion Receipt with Ed25519: proof first, then
