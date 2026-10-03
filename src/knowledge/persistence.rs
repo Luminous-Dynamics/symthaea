@@ -2089,7 +2089,7 @@ fn verify_table_column_contract(
                 format!("Schema integrity check failed: missing column {column} on {table}")
             })?;
 
-        if actual_type.to_ascii_uppercase() != *expected_type {
+        if !actual_type.eq_ignore_ascii_case(expected_type) {
             return Err(format!(
                 "Schema integrity check failed: column {column} on {table} has declared type {actual_type}, expected {expected_type}"
             ));
