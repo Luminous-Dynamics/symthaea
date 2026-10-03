@@ -90,7 +90,7 @@ pub struct TargetProfile {
 
 impl TargetProfile {
     pub fn digest(&self) -> Result<ContentDigest, serde_json::Error> {
-        canonical_digest(self, b"LUMINOUS-DYNAMICS/SSC/TARGET-PROFILE/v1\\0")
+        canonical_digest(self, TARGET_PROFILE_DIGEST_DOMAIN)
     }
 }
 
@@ -108,7 +108,7 @@ pub struct TargetSnapshot {
 
 impl TargetSnapshot {
     pub fn digest(&self) -> Result<ContentDigest, serde_json::Error> {
-        canonical_digest(self, b"LUMINOUS-DYNAMICS/SSC/TARGET-SNAPSHOT/v1\\0")
+        canonical_digest(self, TARGET_SNAPSHOT_DIGEST_DOMAIN)
     }
 }
 
@@ -179,7 +179,7 @@ impl DeploymentIntent {
     }
 
     pub fn digest(&self) -> Result<ContentDigest, serde_json::Error> {
-        canonical_digest(self, PLAN_DIGEST_DOMAIN)
+        canonical_digest(self, INTENT_DIGEST_DOMAIN)
     }
 }
 
@@ -258,7 +258,7 @@ impl DeploymentPlan {
     /// The authorization object is intentionally excluded, avoiding a
     /// circular digest dependency.
     pub fn digest(&self) -> Result<ContentDigest, serde_json::Error> {
-        canonical_digest(self, INTENT_DIGEST_DOMAIN)
+        canonical_digest(self, PLAN_DIGEST_DOMAIN)
     }
 
     /// Validate OS-independent structural, identity, and capability invariants.
