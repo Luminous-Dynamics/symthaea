@@ -261,6 +261,60 @@ fn published_parameter_storage_ledger_is_exact_and_packed_consistent() {
 }
 
 #[test]
+fn published_parameter_search_space_ledger_is_exact() {
+    let dimensions = [500usize, 1000, 2000];
+    let ranks = [3usize, 5, 7];
+    let factor_counts = [3usize, 4, 5];
+
+    let mut cases = 0usize;
+    let mut total_exhaustive_candidates = 0u128;
+    let mut max_exhaustive_candidates = 0u128;
+    let mut total_factor_slots = 0usize;
+    let mut total_linear_variables = 0usize;
+    let mut total_solver_matrix_word_cells = 0u128;
+
+    for &dimension in &dimensions {
+        for &rank in &ranks {
+            for &factor_count in &factor_counts {
+                let factor_slots = factor_count;
+                let linear_variables = factor_count * rank;
+                let exhaustive_candidates = 1u128 << linear_variables;
+                let coefficient_words = linear_variables.div_ceil(64) as u128;
+                let solver_matrix_word_cells =
+                    dimension as u128 * (coefficient_words + 1);
+
+                assert_eq!(
+                    exhaustive_candidates,
+                    (0..factor_count)
+                        .map(|_| 1u128 << rank)
+                        .product::<u128>()
+                );
+                assert_eq!(
+                    solver_matrix_word_cells,
+                    dimension as u128 * (linear_variables.div_ceil(64) as u128 + 1)
+                );
+
+                total_exhaustive_candidates += exhaustive_candidates;
+                max_exhaustive_candidates = max_exhaustive_candidates.max(exhaustive_candidates);
+                total_factor_slots += factor_slots;
+                total_linear_variables += linear_variables;
+                total_solver_matrix_word_cells += solver_matrix_word_cells;
+                cases += 1;
+            }
+        }
+    }
+
+    assert_eq!(cases, 27);
+    assert_eq!(total_factor_slots, 108);
+    assert!(max_exhaustive_candidates >= (1u128 << 35));
+    assert!(total_exhaustive_candidates > total_solver_matrix_word_cells);
+
+    println!(
+        "SEARCH_LEDGER=dimensions=500,1000,2000;ranks=3,5,7;factors=3,4,5;cases={cases};total_exhaustive_candidates={total_exhaustive_candidates};max_exhaustive_candidates={max_exhaustive_candidates};total_factor_slots={total_factor_slots};total_linear_variables={total_linear_variables};total_solver_matrix_word_cells={total_solver_matrix_word_cells}"
+    );
+}
+
+#[test]
 fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     let dimensions = [500usize, 1000, 2000];
     let ranks = [3usize, 5, 7];
