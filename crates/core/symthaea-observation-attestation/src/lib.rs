@@ -716,6 +716,29 @@ impl ReceiptAttestationVerificationReport {
             && self.procedure_fingerprint == expected_procedure_fingerprint
     }
 
+    /// Validate that this report is internally coherent without requiring
+    /// construction of an EvidenceEvaluation.
+    ///
+    /// Legacy v3 reports are validated against their historical stage projection
+    /// because first-class execution traces were not part of the v3 evidence identity.
+    /// Current v4 reports must validate their captured execution trace directly.
+    pub fn is_well_formed(&self) -> bool {
+        if !self.has_consistent_identity_bindings() {
+            return false;
+        }
+
+        if self.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
+            let legacy_trace = EvaluationTrace::from_report_legacy(self);
+            legacy_trace.is_well_formed()
+                && legacy_trace.terminal_outcome() == Some(self.outcome)
+                && legacy_trace.matches_report(self)
+        } else {
+            self.execution_trace.is_well_formed()
+                && self.execution_trace.terminal_outcome() == Some(self.outcome)
+                && self.execution_trace.matches_report(self)
+        }
+    }
+
     fn failed(
         outcome: ReceiptAttestationVerificationOutcome,
         failed_check: EvaluationCheck,
@@ -3469,6 +3492,22 @@ mod tests {
     }
 
     #[test]
+    fn verification_report_self_validation_rejects_stage_mutation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        assert!(report.is_well_formed());
+        report.cryptographic_proof =
+            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::InvalidSignature);
+        assert!(!report.is_well_formed());
+    }
+
+    #[test]
     fn current_report_does_not_repair_malformed_execution_trace() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let mut report = Ed25519ReceiptVerifier::new(
@@ -3519,6 +3558,26 @@ mod tests {
         assert_ne!(evaluation.execution_trace, report.execution_trace);
         assert!(evaluation.execution_trace.is_well_formed());
         assert!(evaluation.is_consistent_with_report(&report));
+    }
+
+    #[test]
+    fn legacy_v3_report_self_validation_uses_historical_projection() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        report.verifier_version = "symthaea-observation-attestation-report-v3";
+        report.procedure_fingerprint =
+            EvaluationProcedure::attestation_ed25519_v1().fingerprint();
+        report.execution_trace = EvaluationTrace::default();
+
+        assert!(report.is_well_formed());
+
+        report.outcome = ReceiptAttestationVerificationOutcome::InvalidSignature;
+        assert!(!report.is_well_formed());
     }
 
     #[test]
