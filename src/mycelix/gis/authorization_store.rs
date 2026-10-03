@@ -242,6 +242,10 @@ impl SqliteAuthorizationStore {
                key TEXT PRIMARY KEY,
                value TEXT NOT NULL
              );
+             CREATE TABLE IF NOT EXISTS authorization_native_authority_pins (
+               issuer TEXT PRIMARY KEY,
+               authority_namespace TEXT NOT NULL
+             );
              CREATE TABLE IF NOT EXISTS authorization_leases (
                authorization_instance TEXT PRIMARY KEY,
                action_id TEXT NOT NULL,
