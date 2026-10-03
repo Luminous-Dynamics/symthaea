@@ -339,16 +339,12 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_dispatches", "native_replay_derivation_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_digest", "TEXT")?;
-        ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_id", "TEXT")?;
-        ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_namespace", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authorization_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_derivation_digest", "TEXT")?;
-        ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_id", "TEXT")?;
-        ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "relying_party_id", "TEXT")?;
@@ -961,6 +957,11 @@ impl SqliteAuthorizationStore {
             native_provenance.3.as_deref(),
             native_provenance.4.as_deref(),
         )?;
+        Self::validate_native_authority_pin_set_snapshot(
+            &tx,
+            native_provenance.3.as_deref(),
+            native_provenance.4.as_deref(),
+        )?;
         let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
         if current_boundary != record.boundary_id {
@@ -1443,12 +1444,15 @@ impl SqliteAuthorizationStore {
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
-        let native_provenance: (Option<String>, Option<String>, Option<String>) = tx.query_row(
-            "SELECT native_authority_namespace,native_authorization_id,native_replay_derivation_digest
+        let native_provenance: (
+            Option<String>, Option<String>, Option<String>, Option<String>, Option<String>
+        ) = tx.query_row(
+            "SELECT native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+                    native_authority_pin_set_id,native_authority_pin_set_digest
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
         )?;
         Self::validate_persisted_native_replay_provenance(
             record,
@@ -1512,6 +1516,7 @@ impl SqliteAuthorizationStore {
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity, native_provenance.0, native_provenance.1, native_provenance.2,
+                native_provenance.3, native_provenance.4,
                 self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
                 record.provider_idempotency_key, record.target_identity, record.audience,
                 if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
@@ -2181,6 +2186,85 @@ mod tests {
                 AuthorizationConsumptionError::InvalidBinding
             ))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn pin_set_snapshot_is_frozen_per_attempt_and_reused_for_terminal_evidence() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-pin-snapshot-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-pin-snapshot").unwrap();
+        store.pin_native_authority_namespace("issuer-a","authority/v1").unwrap();
+
+        let effect=super::super::ActionEffectBinding::new("target-pin-snapshot","prod","adapter");
+        let action=EpistemicAction::new(
+            "pin-snapshot-action","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"pin-snapshot-1".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T09:00:00Z".into(),
+            expires_at:None,
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            "support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-pin-snapshot","boundary-pin"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,"pin-snapshot-1","attempt-pin-snapshot",&action,&effect,
+            "boundary-pin","operation:pin-snapshot","native-pin-snapshot"
+        ).unwrap();
+
+        let snapshot:(String,String,String)=store.connection().unwrap().query_row(
+            "SELECT d.native_authority_pin_set_id,d.native_authority_pin_set_digest,s.snapshot
+             FROM authorization_dispatches d
+             JOIN authorization_native_authority_pin_sets s
+               ON s.pin_set_id=d.native_authority_pin_set_id
+              AND s.pin_set_digest=d.native_authority_pin_set_digest
+             WHERE d.authorization_instance=?1 AND d.attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))
+        ).unwrap();
+
+        store.pin_native_authority_namespace("issuer-b","authority/v1").unwrap();
+
+        let later_digest:String=store.connection().unwrap().query_row(
+            "SELECT native_authority_pin_set_digest FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(later_digest,snapshot.1);
+
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        store.commit_bound_verified(&record,&evidence,&TestProviderVerifier).unwrap();
+
+        let terminal:(String,String)=store.connection().unwrap().query_row(
+            "SELECT native_authority_pin_set_id,native_authority_pin_set_digest
+             FROM authorization_terminal_evidence
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| Ok((r.get(0)?,r.get(1)?))
+        ).unwrap();
+        assert_eq!(terminal.0,snapshot.0);
+        assert_eq!(terminal.1,snapshot.1);
+
+        let snapshot_bytes=hex::decode(&snapshot.2).unwrap();
+        assert_eq!(
+            format!("sha256:{}",hex::encode(Sha256::digest(snapshot_bytes))),
+            snapshot.1
+        );
         let _=std::fs::remove_file(path);
     }
 
