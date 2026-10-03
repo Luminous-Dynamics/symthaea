@@ -676,6 +676,8 @@ use web_sys::HtmlCanvasElement;
 /// SVG as a graceful fallback when initialization fails.
 #[cfg(target_arch = "wasm32")]
 pub struct WebGpuRenderer {
+    instance: wgpu::Instance,
+    canvas: HtmlCanvasElement,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -825,6 +827,8 @@ impl WebGpuRenderer {
         });
 
         Ok(Self {
+            instance,
+            canvas,
             surface,
             device,
             queue,
@@ -838,6 +842,9 @@ impl WebGpuRenderer {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
+        if self.is_device_lost() {
+            return;
+        }
         self.config.width = width.max(1);
         self.config.height = height.max(1);
         self.surface.configure(&self.device, &self.config);
@@ -906,11 +913,26 @@ impl WebGpuRenderer {
     fn acquire_surface_frame(&mut self) -> Result<wgpu::SurfaceTexture, String> {
         match self.surface.get_current_texture() {
             Ok(frame) => Ok(frame),
-            Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
+            Err(wgpu::SurfaceError::Outdated) => {
                 self.surface.configure(&self.device, &self.config);
                 self.surface
                     .get_current_texture()
                     .map_err(|error| format!("failed to reacquire WebGPU surface texture: {error}"))
+            }
+            Err(wgpu::SurfaceError::Lost) => {
+                if self.is_device_lost() {
+                    return Err("WebGPU cognitive device was lost".to_string());
+                }
+                self.surface = self
+                    .instance
+                    .create_surface(wgpu::SurfaceTarget::Canvas(self.canvas.clone()))
+                    .map_err(|error| {
+                        format!("failed to recreate WebGPU canvas surface: {error}")
+                    })?;
+                self.surface.configure(&self.device, &self.config);
+                self.surface
+                    .get_current_texture()
+                    .map_err(|error| format!("failed to reacquire recreated WebGPU surface texture: {error}"))
             }
             Err(wgpu::SurfaceError::Timeout) => {
                 Err("WebGPU surface acquisition timed out".to_string())
@@ -937,6 +959,8 @@ const MAX_MOVIE_RGBA_BYTES: usize = 32 * 1024 * 1024;
 /// WebGPU renderer for decoded RGBA cognitive movie frames.
 #[cfg(target_arch = "wasm32")]
 pub struct WebGpuMovieRenderer {
+    instance: wgpu::Instance,
+    canvas: HtmlCanvasElement,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -1093,6 +1117,8 @@ impl WebGpuMovieRenderer {
         });
 
         Ok(Self {
+            instance,
+            canvas,
             surface,
             device,
             queue,
@@ -1198,11 +1224,26 @@ impl WebGpuMovieRenderer {
 
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
-            Err(wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost) => {
+            Err(wgpu::SurfaceError::Outdated) => {
                 self.surface.configure(&self.device, &self.config);
                 self.surface
                     .get_current_texture()
                     .map_err(|error| format!("failed to reacquire WebGPU movie surface: {error}"))?
+            }
+            Err(wgpu::SurfaceError::Lost) => {
+                if self.is_device_lost() {
+                    return Err("WebGPU movie device was lost".to_string());
+                }
+                self.surface = self
+                    .instance
+                    .create_surface(wgpu::SurfaceTarget::Canvas(self.canvas.clone()))
+                    .map_err(|error| format!("failed to recreate WebGPU movie surface: {error}"))?;
+                self.surface.configure(&self.device, &self.config);
+                self.surface
+                    .get_current_texture()
+                    .map_err(|error| {
+                        format!("failed to reacquire recreated WebGPU movie surface: {error}")
+                    })?
             }
             Err(wgpu::SurfaceError::Timeout) => {
                 return Err("WebGPU movie surface acquisition timed out".to_string());
