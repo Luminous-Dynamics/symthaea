@@ -98,8 +98,14 @@ fn environment_identity_is_stable_across_workload_only_changes() {
         .insert("dataset.bin".into(), "blake3:1122334455667788".into());
 
     assert_eq!(changed.environment_digest().unwrap(), environment);
-    assert_ne!(changed.workload_digest().unwrap(), base.workload_digest().unwrap());
-    assert_ne!(changed.validated_digest().unwrap(), base.validated_digest().unwrap());
+    assert_ne!(
+        changed.workload_digest().unwrap(),
+        base.workload_digest().unwrap()
+    );
+    assert_ne!(
+        changed.validated_digest().unwrap(),
+        base.validated_digest().unwrap()
+    );
 }
 
 #[test]
