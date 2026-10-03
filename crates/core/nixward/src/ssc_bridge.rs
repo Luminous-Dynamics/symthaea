@@ -54,6 +54,8 @@ pub enum SscObservationError {
     CurrentGenerationRealizationMismatch,
     #[error("NixOS system profile does not identify an exact generation")]
     MissingSystemProfileGeneration,
+    #[error("NixOS system profile contains no generation links")]
+    NoSystemGenerations,
     #[error("NixOS system profile generation does not match its exact realization")]
     SystemProfileRealizationMismatch,
 }
@@ -72,11 +74,8 @@ impl From<serde_json::Error> for SscObservationError {
 
 impl NixSystemObservation {
     pub fn observe() -> Result<Self, SscObservationError> {
-        let mut generations = GenerationObserver::list_generations()?
-            .into_iter()
-            .map(Self::generation)
-            .collect::<Result<Vec<_>, _>>()?;
-        generations.sort_by_key(|entry| entry.number);
+        let current_system_realization = read_realization(Path::new(NIXOS_CURRENT_SYSTEM))?;
+        let generations = observe_generations(&current_system_realization)?;
 
         let observation = Self {
             generations,
@@ -87,20 +86,6 @@ impl NixSystemObservation {
         };
         observation.validate()?;
         Ok(observation)
-    }
-
-    fn generation(info: GenerationInfo) -> Result<NixGenerationObservation, SscObservationError> {
-        let link = generation_link(info.number);
-        let realization = read_realization(&link)?;
-        if realization.is_empty() {
-            return Err(SscObservationError::MissingRealization);
-        }
-
-        Ok(NixGenerationObservation {
-            number: info.number,
-            realization,
-            current: info.current,
-        })
     }
 
     pub fn validate(&self) -> Result<(), SscObservationError> {
@@ -190,6 +175,53 @@ impl NixSystemObservation {
     }
 }
 
+fn observe_generations(
+    current_system_realization: &str,
+) -> Result<Vec<NixGenerationObservation>, SscObservationError> {
+    let mut generations = Vec::new();
+
+    for entry in std::fs::read_dir(Path::new("/nix/var/nix/profiles"))? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        let Some(number) = parse_generation_link_name(name)? else {
+            continue;
+        };
+
+        let realization = read_realization(&entry.path())?;
+        generations.push(NixGenerationObservation {
+            number,
+            current: realization == current_system_realization,
+            realization,
+        });
+    }
+
+    generations.sort_by_key(|entry| entry.number);
+    if generations.is_empty() {
+        return Err(SscObservationError::NoSystemGenerations);
+    }
+    Ok(generations)
+}
+
+fn parse_generation_link_name(name: &str) -> Result<Option<u64>, SscObservationError> {
+    let Some(number) = name
+        .strip_prefix("system-")
+        .and_then(|value| value.strip_suffix("-link"))
+    else {
+        return Ok(None);
+    };
+
+    let number = number
+        .parse::<u64>()
+        .map_err(|error| SscObservationError::Io(error.to_string()))?;
+    if number == 0 {
+        return Err(SscObservationError::MissingSystemProfileGeneration);
+    }
+    Ok(Some(number))
+}
+
 fn generation_link(generation: u64) -> PathBuf {
     PathBuf::from(format!(
         "/nix/var/nix/profiles/system-{generation}-link"
@@ -204,24 +236,8 @@ fn read_profile_generation(link: &Path) -> Result<u64, SscObservationError> {
         .ok_or_else(|| {
             SscObservationError::Io("NixOS system profile link has no UTF-8 filename".into())
         })?;
-    parse_profile_generation_name(name)
-}
 
-fn parse_profile_generation_name(name: &str) -> Result<u64, SscObservationError> {
-    let Some(number) = name
-        .strip_prefix("system-")
-        .and_then(|value| value.strip_suffix("-link"))
-    else {
-        return Err(SscObservationError::MissingSystemProfileGeneration);
-    };
-
-    let number = number
-        .parse::<u64>()
-        .map_err(|error| SscObservationError::Io(error.to_string()))?;
-    if number == 0 {
-        return Err(SscObservationError::MissingSystemProfileGeneration);
-    }
-    Ok(number)
+    parse_generation_link_name(name)?.ok_or(SscObservationError::MissingSystemProfileGeneration)
 }
 
 fn read_realization(link: &Path) -> Result<String, SscObservationError> {
@@ -238,29 +254,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn profile_generation_parser_is_exact() {
+    fn generation_link_parser_is_exact() {
         assert_eq!(
-            parse_profile_generation_name("system-42-link").expect("generation"),
+            parse_generation_link_name("system-42-link")
+                .expect("generation")
+                .expect("link"),
             42
         );
         assert_eq!(
-            parse_profile_generation_name("system-0042-link").expect("generation"),
+            parse_generation_link_name("system-0042-link")
+                .expect("generation")
+                .expect("link"),
             42
         );
         assert_eq!(
-            parse_profile_generation_name("system-current-link").expect_err("non-generation"),
-            SscObservationError::MissingSystemProfileGeneration
+            parse_generation_link_name("system-current-link")
+                .expect_err("non-generation"),
+            SscObservationError::Io("invalid digit found in string".into())
         );
         assert_eq!(
-            parse_profile_generation_name("system-42").expect_err("non-generation"),
-            SscObservationError::MissingSystemProfileGeneration
+            parse_generation_link_name("system-42").expect("non-generation"),
+            None
         );
     }
 
     #[test]
     fn profile_generation_parser_rejects_zero() {
         assert_eq!(
-            parse_profile_generation_name("system-0-link")
+            parse_generation_link_name("system-0-link")
                 .expect_err("generation zero"),
             SscObservationError::MissingSystemProfileGeneration
         );
