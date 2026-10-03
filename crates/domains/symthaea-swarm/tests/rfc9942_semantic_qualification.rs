@@ -8,8 +8,10 @@
 use symthaea_swarm::semantic_evidence_vds::{
     Rfc9942ProofKind, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload, Rfc9942SignatureWithReceipts,
     Rfc9162ConsistencyProof, Rfc9162InclusionProof, Rfc9942VdpError, Rfc9942Vdp,
-    Rfc9942ReceiptCollection, COSE_ES256_ALGORITHM_ID,
+    Rfc9942ReceiptCollection, Rfc9942VerifiedProof, Rfc9162Sha256Vds,
+    COSE_ES256_ALGORITHM_ID,
 };
+use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
 
 #[test]
 fn rfc9942_inclusion_and_consistency_preserve_required_verification_order() {
@@ -285,4 +287,100 @@ fn cose_extension_accepts_full_range_integer_values() {
             .expect("full-range generic integer value must be accepted");
         assert_eq!(decoded.to_cbor(), encoded);
     }
+}
+
+#[test]
+fn rfc9942_semantic_state_cannot_confuse_valid_signature_with_wrong_entry() {
+    const PRIVATE_D: [u8; 32] = [
+        0x6c, 0x13, 0x82, 0x76, 0x5a, 0xec, 0x53, 0x58,
+        0xf1, 0x17, 0x73, 0x3d, 0x28, 0x1c, 0x1c, 0x7b,
+        0xdc, 0x39, 0x88, 0x4d, 0x04, 0xa4, 0x5a, 0x1e,
+        0x6c, 0x67, 0xc8, 0x58, 0xbc, 0x20, 0x6c, 0x19,
+    ];
+    const PUBLIC_X: [u8; 32] = [
+        0x14, 0x33, 0x29, 0xcc, 0xe7, 0x86, 0x8e, 0x41,
+        0x69, 0x27, 0x59, 0x9c, 0xf6, 0x5a, 0x34, 0xf3,
+        0xce, 0x2f, 0xfd, 0xa5, 0x5a, 0x7a, 0xec, 0xa6,
+        0x9e, 0xd8, 0x91, 0x9a, 0x39, 0x4d, 0x42, 0xf0,
+    ];
+    const PUBLIC_Y: [u8; 32] = [
+        0x60, 0xf7, 0xf1, 0xa7, 0x80, 0xd8, 0xa7, 0x83,
+        0xbf, 0xb7, 0xa2, 0xdd, 0x6b, 0x27, 0x96, 0xe8,
+        0x12, 0x8d, 0xbc, 0xef, 0x9d, 0x3d, 0x16, 0x8d,
+        0xb9, 0x52, 0x99, 0x71, 0xa3, 0x6e, 0x7b, 0x09,
+    ];
+
+    fn public_key() -> [u8; 65] {
+        let mut key = [0u8; 65];
+        key[0] = 0x04;
+        key[1..33].copy_from_slice(&PUBLIC_X);
+        key[33..65].copy_from_slice(&PUBLIC_Y);
+        key
+    }
+
+    fn signed_receipt(candidate: &[u8]) -> Rfc9942ReceiptEnvelope {
+        let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
+        let vds = Rfc9162Sha256Vds;
+        let head = vds.tree_head(&leaves);
+        let proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+        let unsigned = Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp.clone(),
+            Rfc9942ReceiptPayload::Attached(head.root()),
+            vec![0u8; 64],
+        )
+        .unwrap();
+
+        let rng = SystemRandom::new();
+        let signing_key = EcdsaKeyPair::from_private_key_and_public_key(
+            &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+            &PRIVATE_D,
+            &public_key(),
+            &rng,
+        )
+        .unwrap();
+        let tbs = unsigned.signature1_tbs(&[], None).unwrap();
+        let signature = signing_key.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+
+        Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp,
+            Rfc9942ReceiptPayload::Attached(head.root()),
+            signature,
+        )
+        .unwrap()
+    }
+
+    let receipt = signed_receipt(b"candidate");
+    let key = public_key();
+
+    // Signature verification alone proves only that the protected headers and
+    // selected payload were signed by the key.
+    receipt.verify_es256(&key, &[], None).unwrap();
+
+    let state = receipt
+        .verify_es256_inclusion_state(b"candidate", &key, &[], None)
+        .unwrap();
+    assert_eq!(state.algorithm_id(), COSE_ES256_ALGORITHM_ID);
+    assert_eq!(state.vds_id(), 1);
+    match state.proof() {
+        Rfc9942VerifiedProof::Inclusion { head, candidate_leaf } => {
+            assert_eq!(head.tree_size(), 2);
+            let mut leaf_input = Vec::with_capacity(1 + b"candidate".len());
+            leaf_input.push(0x00);
+            leaf_input.extend_from_slice(b"candidate");
+            let expected_leaf: [u8; 32] = sha2::Sha256::digest(&leaf_input).into();
+            assert_eq!(candidate_leaf, expected_leaf);
+        }
+        Rfc9942VerifiedProof::Consistency { .. } => panic!("expected inclusion state"),
+    }
+
+    // The same validly signed Receipt must not be composable with a different
+    // candidate entry. This closes the signature-success/semantic-proof gap.
+    assert_eq!(
+        receipt.verify_es256_inclusion_state(b"different", &key, &[], None),
+        Err(Rfc9942VdpError::NoMatchingProof)
+    );
 }
