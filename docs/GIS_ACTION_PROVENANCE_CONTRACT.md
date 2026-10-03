@@ -355,7 +355,7 @@ This is an implementation-level provenance commitment rather than a new AEB stan
 
 Strict effectful admission now requires the adapter identifier named by the frozen effect to resolve to a relying-party-pinned adapter revision and implementation digest. The pin is durable and write-once. The dispatch record and terminal evidence carry the exact selected revision and implementation digest, and the attempt provenance commitment covers both values.
 
-Settlement additionally re-reads the adapter pin and requires it to match the frozen record. A later adapter replacement, database-side pin mutation, or presenter-selected revision therefore cannot silently reinterpret an already-authorized attempt. This aligns with AEB-07's requirement that the relying party pin every adapter revision and, in the native compilation contract, the verifier/adapter implementation identity and digest. citeturn281056view0
+Settlement additionally re-reads the adapter pin and requires it to match the frozen record. The same persisted-pin check runs before provider entry, before the boundary performs the pre-entry status verification. A later adapter replacement, database-side pin mutation, or presenter-selected revision therefore cannot silently reinterpret an already-authorized attempt. This aligns with AEB-07's requirement that the relying party pin every adapter revision and, in the native compilation contract, the verifier/adapter implementation identity and digest. citeturn281056view0
 
 ### Bound receipts preserve the native provider replay key
 
