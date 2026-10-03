@@ -375,7 +375,6 @@ fn serde_rejects_duplicate_map_keys_before_canonicalization() {
     assert!(serde_json::from_str::<ExecutionLineageV1>(text).is_err());
 }
 
-
 #[test]
 fn serde_rejects_duplicate_keys_in_every_named_map_family() {
     let cases = [
