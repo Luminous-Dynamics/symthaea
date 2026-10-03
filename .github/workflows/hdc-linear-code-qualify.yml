@@ -161,6 +161,16 @@ jobs:
           printf 'fingerprint=%s\n' "$FINGERPRINT" >> "$GITHUB_OUTPUT"
           printf 'fixture_spec=%s\n' "$FIXTURE_SPEC" >> "$GITHUB_OUTPUT"
 
+      - name: Capture deterministic code geometry ledger
+        id: geometry
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity small_code_geometry_ledger_is_exhaustively_self_consistent -- --nocapture 2>&1)"
+          GEOMETRY_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^GEOMETRY_LEDGER=')"
+          test "$GEOMETRY_LEDGER_COUNT" -eq 1
+          GEOMETRY_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^GEOMETRY_LEDGER=//p')"
+          test -n "$GEOMETRY_LEDGER"
+          printf 'geometry_ledger=%s\n' "$GEOMETRY_LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Capture deterministic work ledger
         id: work
         run: |
@@ -234,6 +244,9 @@ jobs:
           packing_boundary=${{ steps.packing.outputs.packing_boundary }}
           work_ledger_status=${{ steps.work.outcome }}
           work_ledger=${{ steps.work.outputs.work_ledger }}
+          geometry_ledger_schema=linear-code-geometry-v1
+          geometry_ledger_status=${{ steps.geometry.outcome }}
+          geometry_ledger=${{ steps.geometry.outputs.geometry_ledger }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
