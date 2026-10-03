@@ -216,6 +216,7 @@ mod tests {
             selected_successor_topology_digest: selected.into(),
             selected_successor_effective_from_ms: 1_500,
             resolution_epoch: 1,
+            predecessor_resolution_id: None,
             predecessor_resolution_digest: None,
             observed_successors: observed.clone(),
             observed_successors_digest: crate::topology_resolution::branch_set_digest(&observed),
@@ -258,6 +259,7 @@ mod tests {
                 expected_configuration_digest: "cfg-1".into(),
                 expected_authority_id: "mycelix-topology-authority".into(),
                 expected_resolution_epoch: 1,
+                expected_predecessor_resolution_id: None,
                 expected_predecessor_resolution_digest: None,
             },
             revocation_policy: TopologyRevocationPolicy {
