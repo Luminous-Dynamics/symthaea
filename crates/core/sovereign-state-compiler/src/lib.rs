@@ -1338,6 +1338,7 @@ mod tests {
                 algorithm: String::new(),
                 value: String::new(),
             },
+            observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
             outcome: ExecutionOutcome::Succeeded,
