@@ -1341,7 +1341,7 @@ fn validate_native_authority_pin_set(
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?)),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?)),
         )?;
         Self::validate_persisted_native_replay_provenance(
             record,
@@ -1585,9 +1585,9 @@ fn validate_native_authority_pin_set(
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let row: (
             String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>,
-            Option<String>, Option<String>, Option<String>
+            Option<String>, Option<String>, Option<String>, Option<String>
         ) = tx.query_row(
-            "SELECT state,native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+            "SELECT state,native_issuer,native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
                     native_authority_pin_set_id,native_authority_pin_set_digest,
                     validity_issued_at,validity_expires_at,validity_policy_digest
              FROM authorization_dispatches
@@ -1605,10 +1605,13 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
         Self::validate_persisted_native_replay_provenance(
-            record, row.1.as_deref(), row.2.as_deref(), row.3.as_deref()
+            record, row.2.as_deref(), row.3.as_deref(), row.4.as_deref()
+        )?;
+        self.validate_native_authority_pin_binding(
+            &tx, row.1.as_deref(), row.2.as_deref()
         )?;
         self.validate_native_authority_pin_set_snapshot(
-            &tx, row.4.as_deref(), row.5.as_deref()
+            &tx, row.5.as_deref(), row.6.as_deref()
         )?;
         if !matches!(row.0.as_str(), "dispatch_pending" | "invoked" | "indeterminate") {
             if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
@@ -1649,16 +1652,16 @@ fn validate_native_authority_pin_set(
         tx.execute(
             "INSERT INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
-              native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+              native_issuer,native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
               native_authority_pin_set_id,native_authority_pin_set_digest,
               validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,boundary_id,
               action_digest,provider_idempotency_key,target_identity,audience,adapter,outcome,evidence_id,
               evidence_digest,verifier_id,verifier_config_digest,trust_anchor_digest,evidence_profile_digest,verification_digest)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
-                record.native_replay_identity, row.1, row.2, row.3, row.4, row.5,
-                row.6, row.7, row.8,
+                record.native_replay_identity, row.1, row.2, row.3, row.4, row.5, row.6,
+                row.7, row.8, row.9,
                 self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
                 record.provider_idempotency_key, record.target_identity, record.audience, record.adapter,
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
@@ -1947,26 +1950,31 @@ fn validate_native_authority_pin_set(
         }
         let native_provenance: (
             Option<String>, Option<String>, Option<String>, Option<String>, Option<String>,
-            Option<String>, Option<String>, Option<String>
+            Option<String>, Option<String>, Option<String>, Option<String>
         ) = tx.query_row(
-            "SELECT native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
+            "SELECT native_issuer,native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
                     native_authority_pin_set_id,native_authority_pin_set_digest,
                     validity_issued_at,validity_expires_at,validity_policy_digest
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?)),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?)),
         )?;
         Self::validate_persisted_native_replay_provenance(
             record,
-            native_provenance.0.as_deref(),
             native_provenance.1.as_deref(),
             native_provenance.2.as_deref(),
+            native_provenance.3.as_deref(),
+        )?;
+        self.validate_native_authority_pin_binding(
+            &tx,
+            native_provenance.0.as_deref(),
+            native_provenance.1.as_deref(),
         )?;
         self.validate_native_authority_pin_set_snapshot(
             &tx,
-            native_provenance.3.as_deref(),
             native_provenance.4.as_deref(),
+            native_provenance.5.as_deref(),
         )?;
         self.validate_persisted_authorization_validity(
             native_provenance.5.as_deref(),
@@ -2029,9 +2037,9 @@ fn validate_native_authority_pin_set(
              VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27)",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
-                record.native_replay_identity, native_provenance.0, native_provenance.1, native_provenance.2,
-                native_provenance.3, native_provenance.4,
-                native_provenance.5, native_provenance.6, native_provenance.7,
+                record.native_replay_identity, native_provenance.0, native_provenance.1, native_provenance.2, native_provenance.3,
+                native_provenance.4, native_provenance.5,
+                native_provenance.6, native_provenance.7, native_provenance.8,
                 self.relying_party_id.as_str(), record.boundary_id, record.action_digest,
                 record.provider_idempotency_key, record.target_identity, record.audience, verified.evidence.adapter,
                 if matches!(outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
