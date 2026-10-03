@@ -274,19 +274,33 @@ async function runMode(mode) {
 }
 
 const results = {};
+const failures = {};
 try {
   for (const mode of MODES) {
-    results[mode] = await runMode(mode);
+    try {
+      results[mode] = await runMode(mode);
+    } catch (error) {
+      failures[mode] = {
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 
   const artifact = {
     schema: 'symthaea-ui-webgpu-qualification-v1',
     url: URL,
     chromium: CHROMIUM,
+    git_sha: process.env.GITHUB_SHA || null,
+    run_id: process.env.GITHUB_RUN_ID || null,
+    ok: Object.keys(failures).length === 0,
     results,
+    failures,
   };
   writeFileSync(ARTIFACT, JSON.stringify(artifact, null, 2) + '\n');
   console.log(JSON.stringify(artifact, null, 2));
+  if (Object.keys(failures).length > 0) {
+    process.exitCode = 1;
+  }
 } finally {
   if (server?.pid) {
     try {
