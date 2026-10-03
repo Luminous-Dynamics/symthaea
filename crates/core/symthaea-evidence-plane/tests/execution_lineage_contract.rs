@@ -393,13 +393,19 @@ fn serde_rejects_duplicate_keys_in_every_named_map_family() {
     ];
 
     for (field, entries) in cases {
+        let immutable_inputs = if field == "immutable_input_digests" {
+            ""
+        } else {
+            r#","immutable_input_digests":{"fixture":"blake3:8899aabbccddeeff"}"#
+        };
         let text = format!(
-            r#"{{"source_repository":"luminous-dynamics/symthaea","source_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","repository_source_snapshot_id":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","lock_digests":{{"Cargo.lock":"sha256:0011223344556677"}},"{field}":{{{entries}}},"host_triple":"x86_64-unknown-linux-gnu","target_triple":"x86_64-unknown-linux-gnu","nix_identity":"nix:fixture","feature_flags":["default"],"cwd":"/workspace","argv":["cargo","test"],"allowed_env":{{"RUST_BACKTRACE":"0"}},"immutable_input_digests":{{"fixture":"blake3:8899aabbccddeeff"}}}}"#
+            r#"{{"source_repository":"luminous-dynamics/symthaea","source_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","repository_source_snapshot_id":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","lock_digests":{{"Cargo.lock":"sha256:0011223344556677"}},"{field}":{{{entries}}},"host_triple":"x86_64-unknown-linux-gnu","target_triple":"x86_64-unknown-linux-gnu","nix_identity":"nix:fixture","feature_flags":["default"],"cwd":"/workspace","argv":["cargo","test"],"allowed_env":{{"RUST_BACKTRACE":"0"}}{immutable_inputs}}}"#
         );
 
+        let error = serde_json::from_str::<ExecutionLineageV1>(&text).unwrap_err();
         assert!(
-            serde_json::from_str::<ExecutionLineageV1>(&text).is_err(),
-            "duplicate {field} entries must fail closed"
+            error.to_string().contains("duplicate map key"),
+            "duplicate {field} entries must fail in the inner map visitor: {error}"
         );
     }
 }
