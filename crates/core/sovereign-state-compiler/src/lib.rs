@@ -320,6 +320,18 @@ impl DeploymentPlan {
             }
         }
 
+        if self.verification.require_attestation
+            && !self
+                .target_snapshot
+                .profile
+                .capabilities
+                .contains(&Capability::AttestState)
+        {
+            return Err(PlanValidationError::MissingTargetCapability(
+                Capability::AttestState,
+            ));
+        }
+
         if !self.rollback.allowed && self.rollback.max_attempts != 0 {
             return Err(PlanValidationError::RollbackAttemptsWithoutPermission);
         }
@@ -548,6 +560,23 @@ impl AuthorizationEvidence {
             )?;
         }
 
+        let mut required_authority = plan.intent.required_capabilities.clone();
+        for step in &plan.steps {
+            required_authority.extend(step.required_capabilities.iter().copied());
+        }
+        if plan.rollback.allowed {
+            required_authority.insert(Capability::Rollback);
+        }
+        if plan.verification.require_attestation {
+            required_authority.insert(Capability::AttestState);
+        }
+
+        for capability in &self.granted_capabilities {
+            if !required_authority.contains(capability) {
+                return Err(PlanValidationError::UnneededGrantedCapability(*capability));
+            }
+        }
+
         Ok(())
     }
 }
@@ -662,6 +691,8 @@ pub enum PlanValidationError {
     EmptyNonce,
     #[error("authorization grants a capability unsupported by target")]
     GrantedCapabilityNotSupported(Capability),
+    #[error("authorization grants a capability not required by the compiled plan")]
+    UnneededGrantedCapability(Capability),
     #[error("authorization is not yet valid")]
     AuthorizationNotYetValid,
     #[error("authorization has expired")]
@@ -963,6 +994,21 @@ mod tests {
             plan.authorize(auth, 150),
             Err(PlanValidationError::GrantedCapabilityNotSupported(
                 Capability::Reboot
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_unneeded_granted_capability() {
+        let plan = sample_plan();
+        let mut auth = authorization_for(&plan);
+        auth.granted_capabilities
+            .insert(Capability::InstallApplication);
+
+        assert_eq!(
+            plan.authorize(auth, 150),
+            Err(PlanValidationError::UnneededGrantedCapability(
+                Capability::InstallApplication
             ))
         );
     }
