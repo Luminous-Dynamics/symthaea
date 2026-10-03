@@ -141,6 +141,11 @@ Repeated execution of the same deterministic fixture must produce both the same 
 
 Each emitted work/scaling record is now self-identifying with its dimension, factor ranks, and seed; the receipt therefore carries fixture identity alongside algorithmic work units.
 
+
+### Deterministic code-geometry ledger
+
+The comparator now records minimum Hamming distance and the corresponding maximum bipolar inner product for a bounded exhaustive fixture. For a linear code, the minimum distance equals the minimum weight of a nonzero codeword, and every pairwise difference is again a codeword; therefore the exhaustive pairwise check cross-validates the geometry calculation. This is a representation property, not a quality score and not a substitute for the paper's asymptotic/random-code guarantees.
+
 This ledger is intended to test the structure of the recovery algorithm before timing or energy measurements are introduced. In particular, the measurement should preserve the distinction between the maximal-independent-subset construction and the final linear solve described by the paper.
 
 #### Small-fixture scaling qualification
@@ -186,7 +191,8 @@ The branch is ready for an evidence-producing benchmark only when:
 - intentionally corrupted queries produce classified outcomes rather than silent false positives;
 - the resonator control uses the same ground-truth factor set and independently verified fixture;
 - the evidence schema records the representation family explicitly;
-- deterministic work ledgers are reproducible on repeated qualification fixtures and distinguish construction work from solve work.
+- deterministic work ledgers are reproducible on repeated qualification fixtures and distinguish construction work from solve work;
+- bounded code-geometry ledgers cross-check minimum distance against exhaustive pairwise Hamming distance and bipolar inner product.
 
 ## Why this is the next step
 
