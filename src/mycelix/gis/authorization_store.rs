@@ -762,16 +762,31 @@ fn normalize_native_issuer(issuer: &str) -> String {
         if issuer.is_empty() {
             return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
         }
+        let normalized = normalize_native_issuer(issuer);
         let connection = self.connection()?;
-        connection
-            .query_row(
-                "SELECT authority_namespace
-                 FROM authorization_native_authority_pins
-                 WHERE issuer=?1",
-                params![issuer],
-                |row| row.get(0),
-            )
-            .optional()?
+        let mut stmt = connection.prepare(
+            "SELECT issuer,authority_namespace
+             FROM authorization_native_authority_pins",
+        )?;
+        let mut rows = stmt.query([])?;
+        let mut matched_namespace: Option<String> = None;
+        while let Some(row) = rows.next()? {
+            let pinned_issuer: String = row.get(0)?;
+            if normalize_native_issuer(&pinned_issuer) != normalized {
+                continue;
+            }
+            let namespace: String = row.get(1)?;
+            match matched_namespace.as_deref() {
+                None => matched_namespace = Some(namespace),
+                Some(existing) if existing == namespace => {}
+                Some(_) => {
+                    return Err(
+                        AuthorizationConsumptionError::InvalidNativeReplayProvenance.into()
+                    );
+                }
+            }
+        }
+        matched_namespace
             .ok_or_else(|| AuthorizationConsumptionError::InvalidNativeReplayProvenance.into())
     }
 
@@ -876,17 +891,42 @@ fn normalize_native_issuer(issuer: &str) -> String {
             .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
         lease.prepare_for_execution(witness, action, current_frame, attempt_id)?;
 
-        tx.execute(
-            "UPDATE authorization_leases
-             SET validity_issued_at=?2,validity_expires_at=?3,validity_policy_digest=?4
-             WHERE authorization_instance=?1",
-            params![
-                witness.authorization_instance.as_str(),
-                validity_issued_at.as_str(),
-                validity_expires_at.as_deref(),
-                validity_policy_digest.as_str(),
-            ],
-        )?;
+        let persisted_validity: Option<(String, Option<String>, String)> = tx
+            .query_row(
+                "SELECT validity_issued_at,validity_expires_at,validity_policy_digest
+                 FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+            )
+            .optional()?;
+        match persisted_validity {
+            Some((issued, expires, policy))
+                if !issued.is_empty() || expires.is_some() || !policy.is_empty() =>
+            {
+                if issued != validity_issued_at
+                    || expires.as_deref() != validity_expires_at.as_deref()
+                    || policy != validity_policy_digest
+                {
+                    return Err(
+                        AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into()
+                    );
+                }
+            }
+            _ => {
+                tx.execute(
+                    "UPDATE authorization_leases
+                     SET validity_issued_at=?2,validity_expires_at=?3,validity_policy_digest=?4
+                     WHERE authorization_instance=?1",
+                    params![
+                        witness.authorization_instance.as_str(),
+                        validity_issued_at.as_str(),
+                        validity_expires_at.as_deref(),
+                        validity_policy_digest.as_str(),
+                    ],
+                )?;
+            }
+        }
 
         let changed = tx.execute(
             "UPDATE authorization_leases
@@ -2590,6 +2630,24 @@ mod tests {
     }
 
     #[test]
+    fn normalized_issuer_alias_resolves_to_one_pinned_namespace() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-issuer-alias-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-issuer-alias"
+        ).unwrap();
+        store.pin_native_authority_namespace(
+            "HTTPS://Issuer.Example.:443/","authority/v1"
+        ).unwrap();
+        assert_eq!(
+            store.pinned_native_authority_namespace("https:issuer.example").unwrap(),
+            "authority/v1"
+        );
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn issuer_normalization_collisions_cannot_split_authority_namespace() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-issuer-normalization-{}.db",std::process::id()
@@ -2772,6 +2830,75 @@ mod tests {
             Err(AuthorizationStoreError::InvalidState(_))
         ));
         drop(store);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn authorization_validity_window_cannot_be_extended_by_reusing_instance() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-validity-immutable-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-validity-immutable"
+        ).unwrap();
+        let effect=super::super::ActionEffectBinding::new(
+            "target-validity-immutable","prod","adapter"
+        );
+        let action=EpistemicAction::new(
+            "validity-immutable","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"validity-immutable".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-04T06:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            "support","policy@1",1,2
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-validity-immutable-1","boundary-validity"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,
+            "attempt-validity-immutable-1",&action,&effect,"boundary-validity",
+            "operation:validity-immutable-1","native-validity-immutable-1"
+        ).unwrap();
+        store.commit_bound_verified(
+            &record,&verified_evidence(&record,ExecutionOutcome::Failed),&TestProviderVerifier
+        ).unwrap();
+
+        let extended=ActionAuthorizationWitness {
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-05T06:00:00Z".into()),
+            ..witness.clone()
+        };
+        assert!(matches!(
+            store.prepare_for_execution_bound(
+                &extended,&action,"frame@1",
+                "attempt-validity-immutable-2","boundary-validity"
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::AuthorizationValidityWindowFailed
+            ))
+        ));
+        let persisted:(String,Option<String>,String)=store.connection().unwrap().query_row(
+            "SELECT validity_issued_at,validity_expires_at,validity_policy_digest
+             FROM authorization_leases WHERE authorization_instance=?1",
+            params![witness.authorization_instance.as_str()],
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))
+        ).unwrap();
+        assert_eq!(persisted.0,witness.issued_at);
+        assert_eq!(persisted.1,witness.expires_at);
+        assert_eq!(persisted.2,store.clock_policy.digest());
         let _=std::fs::remove_file(path);
     }
 
