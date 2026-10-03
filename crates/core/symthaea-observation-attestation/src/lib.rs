@@ -499,12 +499,6 @@ pub struct EvaluationTrace {
 }
 
 impl EvaluationTrace {
-    /// The representation produced when a legacy report was serialized without
-    /// the first-class execution-trace field.
-    fn is_legacy_absent_placeholder(&self) -> bool {
-        self.procedure_fingerprint.is_empty() && self.results.is_empty()
-    }
-
     /// Reconstruct an execution trace from compatibility report stages.
     ///
     /// Current reports capture the trace directly. This method exists for
