@@ -2015,14 +2015,40 @@ impl KnowledgePersistence {
              BEGIN
                  SELECT RAISE(ABORT, 'knowledge_provenance_relations requires valid identities, timestamp, and stable kind');
              END;
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_receipts_required_insert
+             BEFORE INSERT ON knowledge_snapshot_receipts
+             WHEN NEW.generation IS NULL
+                  OR NEW.generation <= 0
+                  OR NEW.canonical_digest_hex IS NULL
+                  OR length(NEW.canonical_digest_hex) <> 64
+                  OR NEW.receipt_digest_hex IS NULL
+                  OR length(NEW.receipt_digest_hex) <> 64
+                  OR trim(NEW.canonical_digest_hex) = ''
+                  OR trim(NEW.receipt_digest_hex) = ''
+             BEGIN
+                 SELECT RAISE(ABORT, 'knowledge_snapshot_receipts requires positive generation and 64-character digests');
+             END;
              CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_validation_receipts_required_insert
              BEFORE INSERT ON knowledge_snapshot_validation_receipts
              WHEN NEW.validation_event IS NULL
                   OR trim(NEW.validation_event) = ''
                   OR NEW.validation_sequence IS NULL
                   OR NEW.validation_sequence <= 0
+                  OR NEW.snapshot_digest_hex IS NULL
+                  OR length(NEW.snapshot_digest_hex) <> 64
+                  OR trim(NEW.snapshot_digest_hex) = ''
+                  OR NEW.validator_ref IS NULL
+                  OR trim(NEW.validator_ref) = ''
+                  OR NEW.validator_version IS NULL
+                  OR trim(NEW.validator_version) = ''
+                  OR NEW.validation_profile IS NULL
+                  OR trim(NEW.validation_profile) = ''
+                  OR NEW.conforms NOT IN (0, 1)
+                  OR NEW.receipt_digest_hex IS NULL
+                  OR length(NEW.receipt_digest_hex) <> 64
+                  OR trim(NEW.receipt_digest_hex) = ''
              BEGIN
-                 SELECT RAISE(ABORT, 'knowledge_snapshot_validation_receipts requires a valid event and positive sequence');
+                 SELECT RAISE(ABORT, 'knowledge_snapshot_validation_receipts requires valid identity, digest, validator, outcome, and positive sequence');
              END;
              CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_receipts_no_update
              BEFORE UPDATE ON knowledge_snapshot_receipts
@@ -2118,6 +2144,7 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
         "trg_knowledge_facts_memory_id_required_update",
         "trg_knowledge_provenance_relation_required_insert",
         "trg_knowledge_provenance_relation_required_update",
+        "trg_knowledge_snapshot_receipts_required_insert",
         "trg_knowledge_snapshot_validation_receipts_required_insert",
         "trg_knowledge_snapshot_receipts_no_update",
         "trg_knowledge_snapshot_receipts_no_delete",
@@ -2219,12 +2246,30 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
                 "new.kind not in (",
                 "raise(abort, 'knowledge_provenance_relations requires valid identities, timestamp, and stable kind')",
             ],
+            "trg_knowledge_snapshot_receipts_required_insert" => &[
+                "before insert on knowledge_snapshot_receipts",
+                "new.generation is null",
+                "new.generation <= 0",
+                "new.canonical_digest_hex is null",
+                "length(new.canonical_digest_hex) <> 64",
+                "new.receipt_digest_hex is null",
+                "length(new.receipt_digest_hex) <> 64",
+                "raise(abort, 'knowledge_snapshot_receipts requires positive generation and 64-character digests')",
+            ],
             "trg_knowledge_snapshot_validation_receipts_required_insert" => &[
                 "before insert on knowledge_snapshot_validation_receipts",
                 "new.validation_event is null",
                 "new.validation_sequence is null",
                 "new.validation_sequence <= 0",
-                "raise(abort, 'knowledge_snapshot_validation_receipts requires a valid event and positive sequence')",
+                "new.snapshot_digest_hex is null",
+                "length(new.snapshot_digest_hex) <> 64",
+                "new.validator_ref is null",
+                "new.validator_version is null",
+                "new.validation_profile is null",
+                "new.conforms not in (0, 1)",
+                "new.receipt_digest_hex is null",
+                "length(new.receipt_digest_hex) <> 64",
+                "raise(abort, 'knowledge_snapshot_validation_receipts requires valid identity, digest, validator, outcome, and positive sequence')",
             ],
             "trg_knowledge_snapshot_receipts_no_update" => &[
                 "before update on knowledge_snapshot_receipts",
@@ -3402,6 +3447,49 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+
+    #[test]
+    fn test_receipt_insert_boundary_rejects_malformed_digests_and_outcomes() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_receipt_insert_boundary_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let conn = p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+
+        let snapshot_err = conn
+            .execute(
+                "INSERT INTO knowledge_snapshot_receipts
+                 (generation, canonical_digest_hex, receipt_digest_hex)
+                 VALUES (999, 'short', 'short')",
+                [],
+            )
+            .unwrap_err();
+        assert!(snapshot_err
+            .to_string()
+            .contains("knowledge_snapshot_receipts requires positive generation and 64-character digests"));
+
+        let validation_err = conn
+            .execute(
+                "INSERT INTO knowledge_snapshot_validation_receipts
+                 (validation_event, validation_sequence, generation, snapshot_digest_hex,
+                  validator_ref, validator_version, validation_profile, conforms,
+                  report_digest_hex, receipt_digest_hex)
+                 VALUES ('bad', 999, 1,
+                         'short', 'validator', 'v1', 'profile', 2, NULL, 'short')",
+                [],
+            )
+            .unwrap_err();
+        assert!(validation_err.to_string().contains(
+            "knowledge_snapshot_validation_receipts requires valid identity, digest, validator, outcome, and positive sequence"
+        ));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_initialized_schema_rejects_disabled_foreign_key_enforcement() {
