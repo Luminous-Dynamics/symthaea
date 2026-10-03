@@ -104,6 +104,39 @@ fn recovery_work_scales_over_small_structural_fixtures() {
 }
 
 #[test]
+fn recovery_crosses_u64_packing_boundaries() {
+    for &(dimension, seed) in &[(63usize, 0x6301u64), (64, 0x6401), (65, 0x6501)] {
+        let (parent, left, right) =
+            RandomLinearCode::generate_direct_sum(dimension, 2, 2, seed)
+                .expect("valid direct sum");
+        let left_message = [true, false];
+        let right_message = [false, true];
+        let left_word = left.encode(&left_message);
+        let right_word = right.encode(&right_message);
+        let target = left_word.bound(&right_word);
+
+        let (recovered, work) =
+            recover_linear_bound_with_work(&target, &[&left, &right]);
+        let recovered = recovered.expect("packing-boundary fixture must recover");
+        assert_eq!(recovered, vec![left_word, right_word]);
+        assert_eq!(work.retained_generators, parent.rank());
+        assert_eq!(work.basis_rank_pivots, parent.rank() * parent.rank());
+
+        let bipolar = target.to_bipolar();
+        assert_eq!(
+            BinaryCodeword::from_bipolar(&bipolar),
+            Some(target.clone())
+        );
+        println!(
+            "PACKING_BOUNDARY=dimension={dimension};rank={};seed=0x{seed:X};retained_generators={};basis_rank_pivots={}",
+            parent.rank(),
+            work.retained_generators,
+            work.basis_rank_pivots,
+        );
+    }
+}
+
+#[test]
 fn arbitrary_same_subspace_bound_is_not_uniquely_identifiable() {
     let code = RandomLinearCode::generate(96, 8, 0xD00D);
     let a = code.encode(&[true, false, true, false, false, true, false, true]);
