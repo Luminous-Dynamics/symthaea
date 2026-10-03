@@ -49,6 +49,7 @@ pub struct TemporalFusionPolicy {
     pub expected_topology_id: String,
     pub expected_topology_version: String,
     pub expected_topology_digest: String,
+    pub expected_attestation_issuer_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -102,6 +103,7 @@ impl TemporalFusionGate {
             || policy.expected_topology_id.trim().is_empty()
             || policy.expected_topology_version.trim().is_empty()
             || policy.expected_topology_digest.trim().is_empty()
+            || policy.expected_attestation_issuer_id.trim().is_empty()
         {
             return Err("invalid temporal fusion policy");
         }
@@ -165,6 +167,7 @@ impl TemporalFusionGate {
                 &self.policy.expected_asset_id,
                 &self.policy.expected_component_id,
                 &pair.current.configuration_digest,
+                &self.policy.expected_attestation_issuer_id,
                 pair.previous.timestamp_ms,
             ) {
                 issues.push(TemporalFusionIssue::TopologyAttestation(issue));
@@ -174,6 +177,7 @@ impl TemporalFusionGate {
                 &pair.independence.asset_id,
                 &pair.independence.component_id,
                 &pair.current.configuration_digest,
+                &self.policy.expected_attestation_issuer_id,
                 pair.current.timestamp_ms,
             ) {
                 issues.push(TemporalFusionIssue::TopologyAttestation(issue));
@@ -326,6 +330,12 @@ mod tests {
                     issued_at_ms: 500,
                     valid_until_ms: 2_500,
                     evidence_id: format!("independence-{sensor_id}"),
+                    authoritative_reference: crate::sensor_topology::AuthoritativeAttestationReference {
+                        attestation_id: "att-topology-1".into(),
+                        issuer_id: "mycelix-topology-authority".into(),
+                        attestation_digest: "att-digest-1".into(),
+                        verification_reference: "verify-1".into(),
+                    },
                 },
             },
         }
@@ -343,6 +353,7 @@ mod tests {
             expected_topology_id: "topology-wing-root".into(),
             expected_topology_version: "1".into(),
             expected_topology_digest: "topology-v1".into(),
+            expected_attestation_issuer_id: "mycelix-topology-authority".into(),
         })
         .unwrap()
     }
@@ -466,6 +477,34 @@ mod tests {
             issue,
             TemporalFusionIssue::TopologyAttestation(
                 SensorTopologyAttestationIssue::TopologyIdentityMismatch
+            )
+        )));
+    }
+
+    #[test]
+    fn wrong_attestation_issuer_cannot_enter_independence_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.authoritative_reference.issuer_id = "attacker".into();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::AttestationIssuerMismatch
+            )
+        )));
+    }
+
+    #[test]
+    fn missing_attestation_reference_cannot_enter_independence_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.authoritative_reference.attestation_id.clear();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::EmptyAttestationReference
             )
         )));
     }
