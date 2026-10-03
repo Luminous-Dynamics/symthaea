@@ -331,3 +331,29 @@ References:
 - Microsoft Desired State Configuration.
 - Apple Device Management declarations/status.
 - Android Management API policies.
+
+
+## Resource binding
+
+Capabilities alone are insufficient for operations that mutate a concrete
+resource. An intent therefore carries required resource identities, and the
+fresh target snapshot advertises the resources actually observed.
+
+Examples include:
+
+- a specific block device selected for OS replacement or encryption;
+- a specific firmware slot;
+- a specific VM or hypervisor resource;
+- a specific managed application/package identity.
+
+The compiler validates:
+
+`required_resources ⊆ observed_resources`
+
+and the compiled plan digest binds the complete resource set. This prevents a
+generic capability such as `EncryptStorage` from silently widening into
+authority over an arbitrary storage device.
+
+For destructive operations, the executor should re-observe resource identity
+immediately before mutation and compare that observation to the authorized
+snapshot, rather than trusting a UI-selected device path.
