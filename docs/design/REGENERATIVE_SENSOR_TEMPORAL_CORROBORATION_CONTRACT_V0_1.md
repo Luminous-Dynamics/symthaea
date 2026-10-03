@@ -21,4 +21,25 @@ The resulting separation is:
 
 The local contract therefore remains deterministic and dependency-light while leaving room for a later Mycelix-backed authoritative topology attestation.
 
+## Authoritative attestation-reference boundary
+
+The topology attestation now carries a structured reference into the authoritative provenance layer:
+
+- attestation identity;
+- issuer identity;
+- attestation statement digest; and
+- verification-result/evidence reference.
+
+The local contract validates reference completeness and expected issuer identity, but does **not** perform or claim cryptographic verification. This is an intentional boundary: Symthaea consumes an attestation reference and enforces its local consistency, while Mycelix (or another configured authority) remains responsible for authoritative provenance and verification.
+
+The reference is also time-bounded through the enclosing topology attestation. Future-dated and expired attestations cannot qualify a temporal pair. Configuration or topology changes therefore require a compatible attestation reference rather than silently reusing an unrelated declaration.
+
+This follows the broader RATS separation between attesters, verifiers, and attestation results: the sensing domain should consume the result/reference rather than impersonate the authoritative verifier.
+
+The resulting evidence chain is:
+
+**sensor observation → sensor qualification → topology declaration → authoritative attestation reference → local validity → independence quorum → temporal corroboration → physics/model evidence.**
+
+A valid reference is still not physical truth. It establishes an auditable trust-layer dependency, not a self-issued claim of correctness.
+
 ## Adversarial boundary\n\nThis layer improves resilience against isolated stuck/drifting channels, but it cannot solve a coordinated majority attack by itself. If a quorum of sensors is compromised and reports a coherent false trajectory, temporal agreement alone cannot distinguish that trajectory from a genuine physical transition.\n\nThat case requires additional independent evidence such as physics/model residuals, heterogeneous sensing modalities, provenance and authorization controls, independent verification, or stronger Byzantine/fault assumptions.\n\n## Research basis\n\nRecent 2026 structural-health-monitoring research explicitly models sensor faults alongside evolving structural state and identifies bias, drift, gain variation, saturation, dropout, and stuck signals as distinct sensing degradations. It also emphasizes that structural degradation and sensor faults can otherwise produce ambiguous measurement anomalies. The present contract adopts that architectural distinction while keeping the core decision deterministic and platform-neutral.\n\n## Non-goals\n\nThis contract does not:\n\n- diagnose the physical failure mechanism;\n- declare a vehicle safe;\n- certify a repair;\n- replace regulated engineering authority;\n- infer physical recovery from sensor agreement;\n- assume that majority agreement is proof of truth.\n\nThe strongest invariant remains:\n\n**agreement is evidence quality, not physical truth.**
