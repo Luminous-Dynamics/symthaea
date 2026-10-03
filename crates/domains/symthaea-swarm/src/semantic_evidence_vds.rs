@@ -110,6 +110,29 @@ impl Rfc9942VerifiedReceipt {
     pub const fn proof(&self) -> Rfc9942VerifiedProof { self.proof }
 }
 
+impl Rfc9942VerifiedProof {
+    pub const fn inclusion_head(&self) -> Option<VdsTreeHead> {
+        match self {
+            Self::Inclusion { head, .. } => Some(*head),
+            Self::Consistency { .. } => None,
+        }
+    }
+
+    pub const fn inclusion_candidate_leaf(&self) -> Option<[u8; 32]> {
+        match self {
+            Self::Inclusion { candidate_leaf, .. } => Some(*candidate_leaf),
+            Self::Consistency { .. } => None,
+        }
+    }
+
+    pub const fn consistency_heads(&self) -> Option<(VdsTreeHead, VdsTreeHead)> {
+        match self {
+            Self::Inclusion { .. } => None,
+            Self::Consistency { older, newer } => Some((*older, *newer)),
+        }
+    }
+}
+
 /// Structurally validated COSE_Key for ES256 verification.
 ///
 /// This adapter implements the EC2/P-256 public-key subset needed by ES256.
@@ -543,12 +566,15 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<Rfc9942VerifiedReceipt, Rfc9942VdpError> {
-        if !matches!(self.payload, Rfc9942ReceiptPayload::Detached) {
-            return Err(Rfc9942VdpError::InvalidStructure);
-        }
-        let payload = detached_payload.ok_or(Rfc9942VdpError::DetachedPayloadRequired)?;
-        self.verify_es256(public_key, external_aad, Some(payload))?;
-        let newer = self.verify_consistency_with_detached_payload(older, payload)?;
+        // The signature covers the exact attached payload or the explicitly
+        // supplied detached bytes. Consistency verification consumes that same
+        // payload root, preserving the signature/proof binding without making
+        // detached transport mandatory at this API layer.
+        self.verify_es256(public_key, external_aad, detached_payload)?;
+        let newer = match detached_payload {
+            Some(payload) => self.verify_consistency_with_detached_payload(older, payload)?,
+            None => self.verify_consistency(older)?,
+        };
         Ok(self.verified_state(Rfc9942VerifiedProof::Consistency { older, newer }))
     }
 
