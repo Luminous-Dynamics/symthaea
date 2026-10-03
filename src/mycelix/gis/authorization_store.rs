@@ -2917,6 +2917,36 @@ fn validate_native_authority_pin_set(
         Ok(())
     }
 
+    fn validate_persisted_provider_verifier_configuration(
+        &self,
+        tx: &Transaction<'_>,
+        expected: &ProviderVerifierConfiguration,
+    ) -> Result<(), AuthorizationStoreError> {
+        let values = [
+            ("provider_evidence_verifier_relying_party_id", expected.relying_party_id.as_str()),
+            ("provider_evidence_verifier_id", expected.verifier_id.as_str()),
+            ("provider_evidence_verifier_revision", expected.verifier_revision.as_str()),
+            ("provider_evidence_verifier_implementation_id", expected.verifier_implementation_id.as_str()),
+            ("provider_evidence_verifier_implementation_digest", expected.verifier_implementation_digest.as_str()),
+            ("provider_evidence_verifier_config_digest", expected.verifier_config_digest.as_str()),
+            ("provider_evidence_verifier_trust_anchor_digest", expected.trust_anchor_digest.as_str()),
+            ("provider_evidence_verifier_evidence_profile_digest", expected.evidence_profile_digest.as_str()),
+        ];
+        for (key, expected_value) in values {
+            let stored: Option<String> = tx
+                .query_row(
+                    "SELECT value FROM authorization_store_metadata WHERE key=?1",
+                    params![key],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if stored.as_deref() != Some(expected_value) {
+                return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
+            }
+        }
+        Ok(())
+    }
+
     /// Compare every immutable identity field of a caller-supplied dispatch
     /// record against the durable dispatch row before terminal settlement.
     fn validate_persisted_adapter_configuration(
@@ -3067,6 +3097,8 @@ fn validate_native_authority_pin_set(
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
+        self.validate_persisted_provider_verifier_configuration(&tx, &verified.configuration)?;
+        self.validate_persisted_provider_verifier_configuration(&tx, &verified.configuration)?;
         let row: (
             String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>,
             Option<String>, Option<String>, Option<String>, Option<String>
@@ -4697,6 +4729,79 @@ mod tests {
         assert!(matches!(
             store.pin_provider_evidence_verifier_configuration(&changed),
             Err(AuthorizationStoreError::InvalidState(_))
+        ));
+
+        let changed_revision=ProviderVerifierConfiguration {
+            verifier_revision:"test-verifier/rev2".into(),
+            ..pinned.clone()
+        };
+        assert!(matches!(
+            store.pin_provider_evidence_verifier_configuration(&changed_revision),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+
+        let changed_implementation=ProviderVerifierConfiguration {
+            verifier_implementation_digest:"sha256:changed-implementation".into(),
+            ..pinned.clone()
+        };
+        assert!(matches!(
+            store.pin_provider_evidence_verifier_configuration(&changed_implementation),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_verifier_implementation_pin_drift_is_rejected() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-verifier-implementation-drift-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-verifier-implementation-drift","prod","adapter-verifier-drift"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"verifier-implementation-drift".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:40:00Z".into(),
+            expires_at:Some("2026-10-04T06:40:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-verifier-drift","boundary-verifier-drift"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-verifier-drift",
+            &action,&effect,"boundary-verifier-drift",
+            "operation:verifier-drift","native-verifier-drift"
+        ).unwrap();
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_store_metadata
+             SET value='sha256:tampered-verifier-implementation'
+             WHERE key='provider_evidence_verifier_implementation_digest'",
+            [],
+        ).unwrap();
+
+        let err=store.commit_bound_verified(
+            &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
+            )
         ));
         let _=std::fs::remove_file(path);
     }
