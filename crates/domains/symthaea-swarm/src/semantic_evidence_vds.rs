@@ -110,6 +110,38 @@ impl Rfc9942VerifiedReceipt {
     pub const fn proof(&self) -> Rfc9942VerifiedProof { self.proof }
 }
 
+/// Where RFC 9942 header parameter 394 was carried on the outer
+/// Signature_With_Receipt object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rfc9942ReceiptPlacement {
+    Protected,
+    Unprotected,
+}
+
+/// Semantic state for an outer Signature_With_Receipt carrying an inclusion
+/// Receipt. Its construction proves that:
+/// - the outer COSE_Sign1 signature verified;
+/// - the selected inner Receipt verified its inclusion proof and signature;
+/// - the exact outer payload bytes were the candidate entry supplied to the
+///   inclusion proof;
+/// - the inner Receipt was bound to VDS 1 and its signed Merkle root.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rfc9942VerifiedSignatureWithReceipt {
+    outer_algorithm_id: i64,
+    outer_payload_sha256: [u8; 32],
+    receipt_index: usize,
+    receipt_placement: Rfc9942ReceiptPlacement,
+    receipt: Rfc9942VerifiedReceipt,
+}
+
+impl Rfc9942VerifiedSignatureWithReceipt {
+    pub const fn outer_algorithm_id(&self) -> i64 { self.outer_algorithm_id }
+    pub const fn outer_payload_sha256(&self) -> [u8; 32] { self.outer_payload_sha256 }
+    pub const fn receipt_index(&self) -> usize { self.receipt_index }
+    pub const fn receipt_placement(&self) -> Rfc9942ReceiptPlacement { self.receipt_placement }
+    pub const fn receipt(&self) -> Rfc9942VerifiedReceipt { self.receipt }
+}
+
 impl Rfc9942VerifiedProof {
     pub const fn inclusion_head(&self) -> Option<VdsTreeHead> {
         match self {
@@ -759,6 +791,21 @@ impl Rfc9942SignatureWithReceipts {
         self.unprotected_receipts.as_ref()
     }
 
+    fn receipt_at(&self, index: usize) -> Result<(&Rfc9942ReceiptEnvelope, Rfc9942ReceiptPlacement), Rfc9942VdpError> {
+        if let Some(receipts) = self.protected_receipts.as_ref() {
+            return receipts
+                .receipts()
+                .get(index)
+                .map(|receipt| (receipt, Rfc9942ReceiptPlacement::Protected))
+                .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds);
+        }
+        self.unprotected_receipts
+            .as_ref()
+            .and_then(|receipts| receipts.receipts().get(index))
+            .map(|receipt| (receipt, Rfc9942ReceiptPlacement::Unprotected))
+            .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)
+    }
+
     pub fn payload(&self) -> &Rfc9942SignaturePayload {
         &self.payload
     }
@@ -879,6 +926,59 @@ impl Rfc9942SignatureWithReceipts {
         detached_payload: Option<&[u8]>,
     ) -> Result<(), Rfc9942VdpError> {
         self.verify_es256(&key.public_key_sec1(),external_aad,detached_payload)
+    }
+
+    /// Verify an outer Signature_With_Receipt and one selected inclusion
+    /// Receipt as one semantic operation.
+    ///
+    /// The outer payload is used verbatim as the inclusion candidate, closing
+    /// the composition gap where a valid inner Receipt could otherwise be
+    /// verified for a different caller-supplied entry.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256_inclusion_receipt_state(
+        &self,
+        receipt_index: usize,
+        receipt_public_key: &[u8],
+        outer_public_key: &[u8],
+        receipt_external_aad: &[u8],
+        outer_external_aad: &[u8],
+        detached_outer_payload: Option<&[u8]>,
+    ) -> Result<Rfc9942VerifiedSignatureWithReceipt, Rfc9942VdpError> {
+        let (receipt, placement) = self.receipt_at(receipt_index)
+            .map_err(|error| match error {
+                Rfc9942VdpError::ReceiptIndexOutOfBounds if self.receipts().is_none() =>
+                    Rfc9942VdpError::ReceiptsMissing,
+                other => other,
+            })?;
+
+        let payload = match (&self.payload, detached_outer_payload) {
+            (Rfc9942SignaturePayload::Attached(bytes), None) => bytes.as_slice(),
+            (Rfc9942SignaturePayload::Attached(_), Some(_)) =>
+                return Err(Rfc9942VdpError::InvalidStructure),
+            (Rfc9942SignaturePayload::Detached, Some(bytes)) => bytes,
+            (Rfc9942SignaturePayload::Detached, None) =>
+                return Err(Rfc9942VdpError::DetachedPayloadRequired),
+        };
+
+        // Inner inclusion verification consumes the exact outer payload bytes.
+        // Its API verifies the proof before the inner Receipt signature.
+        let verified_receipt = receipt.verify_es256_inclusion_state(
+            payload,
+            receipt_public_key,
+            receipt_external_aad,
+            None,
+        )?;
+
+        // The outer signature authenticates those exact candidate bytes.
+        self.verify_es256(outer_public_key, outer_external_aad, detached_outer_payload)?;
+
+        Ok(Rfc9942VerifiedSignatureWithReceipt {
+            outer_algorithm_id: self.protected_algorithm_id()?,
+            outer_payload_sha256: sha256(payload),
+            receipt_index,
+            receipt_placement: placement,
+            receipt: verified_receipt,
+        })
     }
 
     pub fn signature(&self) -> &[u8] {
@@ -1243,6 +1343,10 @@ pub enum Rfc9942VdpError {
     EmptyReceiptCollection,
     #[error("RFC 9942 receipts collection exceeds its defensive resource bound")]
     ReceiptCollectionResourceLimitExceeded,
+    #[error("requested RFC 9942 receipt index is outside the receipt collection")]
+    ReceiptIndexOutOfBounds,
+    #[error("outer RFC 9942 Signature_With_Receipt does not carry receipts")]
+    ReceiptsMissing,
     #[error("outer RFC 9942 COSE_Sign1 payload exceeds its defensive resource bound")]
     SignaturePayloadResourceLimitExceeded,
     #[error("COSE signature algorithm {0} is not supported by this verifier")]
