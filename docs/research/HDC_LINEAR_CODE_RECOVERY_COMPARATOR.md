@@ -193,6 +193,9 @@ The branch is ready for an evidence-producing benchmark only when:
 - the evidence schema records the representation family explicitly;
 - deterministic work ledgers are reproducible on repeated qualification fixtures and distinguish construction work from solve work;
 - bounded code-geometry ledgers cross-check minimum distance against exhaustive pairwise Hamming distance and bipolar inner product.
+- rank/nullity identities are emitted and mechanically checked on clean fixtures, including the exact 2^d fiber cardinality;
+- explicit two-way overlap and three-way dependency fixtures distinguish pairwise independence from global uniqueness;
+- the paper-scale result digest commits to the algebraic geometry fields and representative-selection boundary.
 
 ## Why this is the next step
 
@@ -210,6 +213,40 @@ The qualification harness now covers the paper's published \(n\in\{500,1000,2000
 
 For bound recovery with factor ranks \(k_1,\ldots,k_F\), exhaustive factor enumeration contains exactly \(2^{\sum_i k_i}\) candidate tuples. The algebraic method instead solves for \(\sum_i k_i\) Boolean coefficients over the retained independent basis. The qualification harness records both quantities across the same published parameter grid. This is a structural search-space comparison only; it is not a measured runtime ratio, and it does not assume that an exhaustive implementation and the solver have identical constant factors.
 
+### Exact rank/nullity and fiber-multiplicity ledger
+
+The comparator now treats identifiability as an algebraic property of the factor-to-bound map rather than an absence-of-counterexample result from sampling.
+
+For factor code dimensions k_1, ..., k_F, define Delta = sum_i k_i and concatenate independent generator bases into one GF(2) matrix. Let r be the rank of that concatenated basis and d = Delta - r. The factor coefficient domain has 2^Delta tuples, the image contains exactly 2^r reachable targets, and every representable target has exactly 2^d preimages. This follows because every non-empty fiber of a linear map is a coset of its kernel.
+
+The research API records these quantities as first-class fields:
+
+- factor_dimension_sum = Delta;
+- union_generator_rank = r;
+- kernel_dimension = d;
+- raw_factor_tuple_count = 2^Delta;
+- reachable_target_count = 2^r;
+- factorization_count_per_target = 2^d;
+- unique_factorization = (d = 0);
+- dependency_order = the minimum number of factor groups supporting a non-zero dependency, or absent when the factors are jointly independent.
+
+Cardinalities are stored symbolically as exact powers of two, so large search spaces are never truncated by machine integer overflow. The target-specific multiplicity API returns the same fiber cardinality for every representable target and returns no factorization for a target outside the union span.
+
+### Adversarial dependency qualification
+
+Pairwise subcode-intersection checks are not sufficient when three or more factors participate. The qualification suite therefore includes both a two-factor overlap fixture and a three-factor fixture
+
+    C1 = span(e1), C2 = span(e2), C3 = span(e1 + e2),
+
+where every pair is independent but the triple has Delta = 3, r = 2, d = 1 and therefore exactly two valid factorizations for every reachable target.
+
+A deterministic n = 8, k = 3, F = 3 stress sweep over 20,000 realizations additionally searches for pairwise-trivial but globally dependent cases. This is an adversarial structural check, not a statistical claim about the paper-scale random ensemble.
+
+### Digest and representative boundary
+
+The paper-scale BLAKE3 result digest now commits to the algebraic geometry fields in addition to the fixture parameters, targets, original factors, and selected recovered representatives. Thus a change that preserves aggregate recovery counts but changes uniqueness or multiplicity is detectable.
+
+The evidence boundary remains explicit: algebraic rank/nullity establishes existence, uniqueness, and multiplicity; the general recovery API may choose one deterministic representative under the declared ownership policy; representative choice is not promoted to a uniqueness claim for overlapping subcodes.
 ### Published-grid storage ledger
 
 Raviv's Remark 6 distinguishes representation size from recovery work: an arbitrary codebook supplied explicitly requires \(|C_i|n\) bits per factor, while a linear code can be represented by its generator matrix using \(k_i n\) bits. The qualification harness now records those theoretical payload sizes separately from the actual packed-`u64` generator storage used by this implementation, along with target storage. These are raw representation quantities, not a composite efficiency score; struct/allocator overhead is intentionally excluded.
