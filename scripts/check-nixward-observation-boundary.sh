@@ -271,13 +271,7 @@ run_self_test() {
     return 1
   fi
 
-  printf '%s\n' 
-}
-
-run_self_test
-run_boundary_check
-echo "CROSS-015: Nixward governed observation boundary is clean."
-impl NixServiceObservedStateV1 {
+  printf '%s\n' 'impl NixServiceObservedStateV1 {
     pub fn new(
         unit: String,
     ) {}' > "${tmp}/observed-state-public-constructor.rs"
