@@ -305,15 +305,28 @@ Authorization validation now requires:
 - exact compiled-plan digest equality;
 - a valid time window;
 - every granted capability to be supported by the target;
-- every required/step capability to be both supported and granted.
+- every required/step capability to be both supported and granted;
+- no granted capability may be unrelated to the compiled authority requirements;
+- artifact and external attestation references must carry concrete digests and
+  non-empty reference metadata;
+- verification carries exact expected state values rather than property names alone;
+- execution receipts bind the exact plan and target snapshot and enforce timestamp ordering.
 
 This deliberately separates the four sets that matter:
 
 `required ∩ granted ∩ supported`
 
-with the additional invariant:
+with the additional invariants:
 
-`granted ⊆ supported`.
+`granted ⊆ supported`
+
+and
+
+`granted ⊆ required_authority`
+
+where `required_authority` is the union of intent/step capabilities plus
+capabilities needed for enabled rollback or attestation verification. This
+prevents both under-authorized execution and unnecessary privilege grants.
 
 The first relationship prevents privilege escalation through an unsupported or
 unapproved requested operation. The second prevents an authorization object
