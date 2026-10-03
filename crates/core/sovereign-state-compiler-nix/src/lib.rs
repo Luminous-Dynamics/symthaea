@@ -83,8 +83,8 @@ pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
 /// * `applications.install`: list of logical artifact/package identifiers
 /// * `applications.remove`: list of logical package identifiers
 /// * `system.reboot`: boolean
-/// * `nixos.rollback`: boolean; `true` requires `nixos.rollback-generation`
-* `nixos.rollback-generation`: non-negative generation number
+/// /// * `nixos.rollback`: boolean; `true` requires `nixos.rollback-generation`
+/// * `nixos.rollback-generation`: non-negative generation number
 ///
 /// Unknown properties are rejected rather than silently ignored.
 #[derive(Debug, Clone)]
@@ -276,10 +276,6 @@ impl TargetAdapter for NixOSTargetAdapter {
         }
 
         let rebuild = Self::property_string(intent, REBUILD_KEY)?;
-        let activation_mode = rebuild
-            .as_deref()
-            .map(NixActivationMode::parse_rebuild)
-            .transpose()?;
         let home_manager = Self::property_bool(intent, HOME_MANAGER_KEY)?.unwrap_or(false);
         let install = Self::property_string_list(intent, INSTALL_KEY)?;
         let remove = Self::property_string_list(intent, REMOVE_KEY)?;
@@ -291,7 +287,16 @@ impl TargetAdapter for NixOSTargetAdapter {
             return Err(NixOSAdapterError::RollbackGenerationRequired);
         }
 
-        if matches!(activation_mode, Some(NixActivationMode::DryActivate)) && rollback_requested {
+        let activation_mode = match (rebuild.as_deref(), rollback_generation) {
+            (Some(_), Some(_)) => return Err(NixOSAdapterError::ConflictingActivationModes),
+            (Some(mode), None) => Some(NixActivationMode::parse_rebuild(mode)?),
+            (None, Some(generation)) => Some(NixActivationMode::Rollback { generation }),
+            (None, None) => None,
+        };
+
+        if matches!(activation_mode, Some(NixActivationMode::Rollback { .. }))
+            && (!install.is_empty() || !remove.is_empty() || home_manager)
+        {
             return Err(NixOSAdapterError::ConflictingActivationModes);
         }
 
