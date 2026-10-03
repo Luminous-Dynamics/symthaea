@@ -793,4 +793,34 @@ mod tests {
     fn movie_parser_rejects_excessive_frame_count() {
         assert!(Movie::from_json(&movie_json(2, 2, 1, MAX_MOVIE_FRAMES + 1)).is_none());
     }
+
+    #[test]
+    fn movie_parser_rejects_total_rgba_budget_before_decode() {
+        let oversized = serde_json::json!({
+            "mental_movie": {
+                "width": 2048,
+                "height": 2048,
+                "channels": 1,
+                "frames_b64": ["", "", ""],
+            }
+        });
+        assert!(Movie::from_json(&oversized).is_none());
+    }
+
+    #[test]
+    fn movie_parser_rejects_oversized_base64_before_decode() {
+        let width = 64_u32;
+        let height = 64_u32;
+        let expected_raw_bytes = (width * height) as usize;
+        let max_encoded_len = expected_raw_bytes.div_ceil(3) * 4;
+        let oversized = serde_json::json!({
+            "mental_movie": {
+                "width": width,
+                "height": height,
+                "channels": 1,
+                "frames_b64": ["A".repeat(max_encoded_len + 1)],
+            }
+        });
+        assert!(Movie::from_json(&oversized).is_none());
+    }
 }
