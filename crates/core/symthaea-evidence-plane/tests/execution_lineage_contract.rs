@@ -375,6 +375,36 @@ fn serde_rejects_duplicate_map_keys_before_canonicalization() {
     assert!(serde_json::from_str::<ExecutionLineageV1>(text).is_err());
 }
 
+
+#[test]
+fn serde_rejects_duplicate_keys_in_every_named_map_family() {
+    let cases = [
+        (
+            "toolchain_versions",
+            "\"rustc\":\"1.96.0\",\"rustc\":\"1.97.0\"",
+        ),
+        (
+            "allowed_env",
+            "\"RUST_BACKTRACE\":\"0\",\"RUST_BACKTRACE\":\"1\"",
+        ),
+        (
+            "immutable_input_digests",
+            "\"fixture\":\"blake3:8899aabbccddeeff\",\"fixture\":\"blake3:0011223344556677\"",
+        ),
+    ];
+
+    for (field, entries) in cases {
+        let text = format!(
+            r#"{{"source_repository":"luminous-dynamics/symthaea","source_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","repository_source_snapshot_id":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","lock_digests":{{"Cargo.lock":"sha256:0011223344556677"}},"{field}":{{{entries}}},"host_triple":"x86_64-unknown-linux-gnu","target_triple":"x86_64-unknown-linux-gnu","nix_identity":"nix:fixture","feature_flags":["default"],"cwd":"/workspace","argv":["cargo","test"],"allowed_env":{{"RUST_BACKTRACE":"0"}},"immutable_input_digests":{{"fixture":"blake3:8899aabbccddeeff"}}}}"#
+        );
+
+        assert!(
+            serde_json::from_str::<ExecutionLineageV1>(&text).is_err(),
+            "duplicate {field} entries must fail closed"
+        );
+    }
+}
+
 #[test]
 fn public_raw_constructor_rejects_duplicate_named_maps() {
     let toolchain = ExecutionLineageV1::from_raw_entries(
