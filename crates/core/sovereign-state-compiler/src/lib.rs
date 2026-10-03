@@ -680,7 +680,7 @@ impl AuthorizationEvidence {
             return Err(PlanValidationError::AuthorizationExpired);
         }
         if self.valid_from_ms.is_some_and(|from| now_ms < from) {
-            return Err(PlanValidationError::AuthorizationExpired);
+            return Err(PlanValidationError::AuthorizationNotYetValid);
         }
 
         for capability in &self.granted_capabilities {
@@ -1255,6 +1255,17 @@ mod tests {
             Err(PlanValidationError::UnsupportedSchemaVersion(
                 "ssc/v999".into()
             ))
+        );
+    }
+
+    #[test]
+    fn rejects_authorization_before_valid_from() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+
+        assert_eq!(
+            plan.authorize(auth, 99),
+            Err(PlanValidationError::AuthorizationNotYetValid)
         );
     }
 
