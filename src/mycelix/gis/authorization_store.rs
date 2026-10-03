@@ -706,7 +706,7 @@ impl SqliteAuthorizationStore {
              FROM authorization_dispatches WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
             |r| Ok((
-                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,Option<String>>(2)?,
+                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
                 r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
                 r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
                 r.get::<_,String>(9)?,
