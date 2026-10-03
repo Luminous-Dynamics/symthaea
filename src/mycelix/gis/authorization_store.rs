@@ -470,8 +470,7 @@ fn compute_attempt_scope_digest(
         return Err(AuthorizationConsumptionError::InvalidBinding.into());
     }
     let mut material = Vec::with_capacity(128);
-    material.extend_from_slice(b"symthaea:gis:effect-boundary-attempt-scope:v1
-");
+    material.extend_from_slice(b"symthaea:gis:effect-boundary-attempt-scope:v1\n");
     append_len_prefixed(&mut material, boundary_id.as_bytes());
     append_len_prefixed(&mut material, attempt_id.as_bytes());
     Ok(format!("sha256:{}", hex::encode(Sha256::digest(material))))
