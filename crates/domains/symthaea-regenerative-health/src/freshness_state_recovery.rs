@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Authenticated recovery of receiver-local freshness state.
+//! Crash-consistent receiver freshness-state recovery.
 //!
-//! The recovery record is separate from the evidence envelope. Its hash
-//! provides integrity; deployment supplies authentication and a rollback-
-//! resistant anchor (for example protected NVRAM, a TPM-backed counter, or a
-//! trusted higher-level service). A hash alone is not authentication.
+//! The recovery record is rollbackable storage. The anchor is deliberately a
+//! separate deployment boundary and must be backed by a rollback-resistant
+//! monotonic mechanism or trusted authority. A content hash detects mutation;
+//! it does not by itself prevent rollback.
 
 use serde::{Deserialize, Serialize};
 
 use crate::freshness_reconciliation::{FreshnessAcceptancePolicy, FreshnessAcceptanceState};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FreshnessStateRecoveryRecord {
+pub struct FreshnessRecoveryRecord {
     pub schema_version: String,
     pub receiver_id: String,
     pub policy_fingerprint: String,
@@ -28,7 +28,7 @@ pub struct FreshnessStateRecoveryRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FreshnessStateRecoveryAnchor {
+pub struct FreshnessRecoveryAnchor {
     pub schema_version: String,
     pub receiver_id: String,
     pub policy_fingerprint: String,
@@ -36,38 +36,50 @@ pub struct FreshnessStateRecoveryAnchor {
     pub state_fingerprint: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FreshnessStateRecoveryOutcome {
-    Restored,
-    RestoredConflicted,
-    Quarantined,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FreshnessStateRecoveryIssue {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FreshnessRecoveryIssue {
     InvalidRecord,
     ReceiverMismatch,
     PolicyMismatch,
     StateFingerprintMismatch,
     AnchorMismatch,
+    GenerationNotMonotonic,
+    PreviousStateMismatch,
     AuthenticationFailure,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FreshnessRecoveryOutcome {
+    Restored,
+    RestoredConflicted,
+    Quarantined,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FreshnessStateRecoveryDecision {
-    pub outcome: FreshnessStateRecoveryOutcome,
+pub struct FreshnessRecoveryDecision {
+    pub outcome: FreshnessRecoveryOutcome,
     pub state: Option<FreshnessAcceptanceState>,
-    pub issues: Vec<FreshnessStateRecoveryIssue>,
+    pub issues: Vec<FreshnessRecoveryIssue>,
 }
 
-/// Authentication is a deployment boundary: TPM, signature, MAC, or remote
-/// authority implementations can be supplied without changing freshness
-/// semantics.
-pub trait FreshnessStateRecoveryAuthenticator {
-    fn authenticate(&self, record: &FreshnessStateRecoveryRecord) -> bool;
+/// Authentication is intentionally abstract. Deployments may bind this to a
+/// signature, MAC, TPM-backed key, remote authority, or another trust anchor.
+pub trait FreshnessRecoveryAuthenticator {
+    fn authenticate(&self, record: &FreshnessRecoveryRecord) -> bool;
 }
 
-impl FreshnessStateRecoveryRecord {
+/// The external anchor is intentionally abstract. Its implementation must
+/// provide an atomic compare-and-swap operation over the complete anchor.
+pub trait FreshnessRecoveryAnchorStore {
+    fn load(&self) -> Option<FreshnessRecoveryAnchor>;
+    fn compare_and_swap(
+        &self,
+        expected: Option<&FreshnessRecoveryAnchor>,
+        next: &FreshnessRecoveryAnchor,
+    ) -> bool;
+}
+
+impl FreshnessRecoveryRecord {
     pub fn new(
         receiver_id: impl Into<String>,
         policy: &FreshnessAcceptancePolicy,
@@ -83,6 +95,7 @@ impl FreshnessStateRecoveryRecord {
         let authority_reference = authority_reference.into();
         let authority_statement_digest = authority_statement_digest.into();
         let authentication_binding = authentication_binding.into();
+
         if receiver_id.trim().is_empty()
             || authority_reference.trim().is_empty()
             || authority_statement_digest.trim().is_empty()
@@ -90,18 +103,17 @@ impl FreshnessStateRecoveryRecord {
         {
             return Err("incomplete recovery identity or authority binding");
         }
-        let policy_fingerprint = policy.fingerprint();
-        if state.policy_fingerprint != policy_fingerprint {
+        if state.policy_fingerprint != policy.fingerprint() {
             return Err("state policy fingerprint mismatch");
         }
-        let state_fingerprint = state.fingerprint();
+
         Ok(Self {
             schema_version: "0.1".into(),
             receiver_id,
-            policy_fingerprint,
+            policy_fingerprint: policy.fingerprint(),
             generation,
+            state_fingerprint: state.fingerprint(),
             state,
-            state_fingerprint,
             previous_state_fingerprint,
             authority_reference,
             authority_statement_digest,
@@ -109,8 +121,8 @@ impl FreshnessStateRecoveryRecord {
         })
     }
 
-    pub fn anchor(&self) -> FreshnessStateRecoveryAnchor {
-        FreshnessStateRecoveryAnchor {
+    pub fn anchor(&self) -> FreshnessRecoveryAnchor {
+        FreshnessRecoveryAnchor {
             schema_version: self.schema_version.clone(),
             receiver_id: self.receiver_id.clone(),
             policy_fingerprint: self.policy_fingerprint.clone(),
@@ -119,56 +131,58 @@ impl FreshnessStateRecoveryRecord {
         }
     }
 
-    pub fn recover<A: FreshnessStateRecoveryAuthenticator>(
+    pub fn recover<A: FreshnessRecoveryAuthenticator>(
         &self,
         policy: &FreshnessAcceptancePolicy,
-        anchor: &FreshnessStateRecoveryAnchor,
+        anchor: &FreshnessRecoveryAnchor,
         authenticator: &A,
-    ) -> FreshnessStateRecoveryDecision {
+    ) -> FreshnessRecoveryDecision {
         let mut issues = Vec::new();
         let policy_fingerprint = policy.fingerprint();
+
         if self.schema_version != "0.1"
             || self.receiver_id.trim().is_empty()
             || self.authority_reference.trim().is_empty()
             || self.authority_statement_digest.trim().is_empty()
             || self.authentication_binding.trim().is_empty()
         {
-            issues.push(FreshnessStateRecoveryIssue::InvalidRecord);
+            issues.push(FreshnessRecoveryIssue::InvalidRecord);
         }
         if self.receiver_id != anchor.receiver_id {
-            issues.push(FreshnessStateRecoveryIssue::ReceiverMismatch);
+            issues.push(FreshnessRecoveryIssue::ReceiverMismatch);
         }
         if self.policy_fingerprint != policy_fingerprint
             || anchor.policy_fingerprint != policy_fingerprint
+            || self.state.policy_fingerprint != policy_fingerprint
         {
-            issues.push(FreshnessStateRecoveryIssue::PolicyMismatch);
+            issues.push(FreshnessRecoveryIssue::PolicyMismatch);
         }
-        if self.state.policy_fingerprint != policy_fingerprint
-            || self.state.fingerprint() != self.state_fingerprint
-        {
-            issues.push(FreshnessStateRecoveryIssue::StateFingerprintMismatch);
+        if self.state.fingerprint() != self.state_fingerprint {
+            issues.push(FreshnessRecoveryIssue::StateFingerprintMismatch);
         }
         if self.schema_version != anchor.schema_version
             || self.generation != anchor.generation
             || self.state_fingerprint != anchor.state_fingerprint
         {
-            issues.push(FreshnessStateRecoveryIssue::AnchorMismatch);
+            issues.push(FreshnessRecoveryIssue::AnchorMismatch);
         }
         if !authenticator.authenticate(self) {
-            issues.push(FreshnessStateRecoveryIssue::AuthenticationFailure);
+            issues.push(FreshnessRecoveryIssue::AuthenticationFailure);
         }
+
         if !issues.is_empty() {
-            return FreshnessStateRecoveryDecision {
-                outcome: FreshnessStateRecoveryOutcome::Quarantined,
+            return FreshnessRecoveryDecision {
+                outcome: FreshnessRecoveryOutcome::Quarantined,
                 state: None,
                 issues,
             };
         }
-        FreshnessStateRecoveryDecision {
+
+        FreshnessRecoveryDecision {
             outcome: if self.state.status_conflicted() {
-                FreshnessStateRecoveryOutcome::RestoredConflicted
+                FreshnessRecoveryOutcome::RestoredConflicted
             } else {
-                FreshnessStateRecoveryOutcome::Restored
+                FreshnessRecoveryOutcome::Restored
             },
             state: Some(self.state.clone()),
             issues,
@@ -176,20 +190,67 @@ impl FreshnessStateRecoveryRecord {
     }
 }
 
+pub fn prepare_record(
+    receiver_id: impl Into<String>,
+    policy: &FreshnessAcceptancePolicy,
+    generation: u64,
+    state: FreshnessAcceptanceState,
+    previous_state_fingerprint: Option<String>,
+    authority_reference: impl Into<String>,
+    authority_statement_digest: impl Into<String>,
+    authentication_binding: impl Into<String>,
+) -> Result<FreshnessRecoveryRecord, &'static str> {
+    FreshnessRecoveryRecord::new(
+        receiver_id,
+        policy,
+        generation,
+        state,
+        previous_state_fingerprint,
+        authority_reference,
+        authority_statement_digest,
+        authentication_binding,
+    )
+}
+
+pub fn commit_anchor<S: FreshnessRecoveryAnchorStore>(
+    store: &S,
+    expected: Option<&FreshnessRecoveryAnchor>,
+    record: &FreshnessRecoveryRecord,
+) -> Result<(), &'static str> {
+    if let Some(expected) = expected {
+        if record.generation <= expected.generation {
+            return Err("recovery generation is not strictly monotonic");
+        }
+        if record.previous_state_fingerprint.as_deref()
+            != Some(expected.state_fingerprint.as_str())
+        {
+            return Err("recovery predecessor fingerprint mismatch");
+        }
+    } else if record.generation != 0 {
+        return Err("initial recovery generation must be zero");
+    }
+
+    let next = record.anchor();
+    if store.compare_and_swap(expected, &next) {
+        Ok(())
+    } else {
+        Err("recovery anchor compare-and-swap failed")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::freshness_reconciliation::{
-        FreshnessAcceptancePolicy, FreshnessMarker,
-    };
+    use crate::freshness_reconciliation::FreshnessMarker;
 
-    struct AcceptAll;
-    impl FreshnessStateRecoveryAuthenticator for AcceptAll {
-        fn authenticate(&self, _: &FreshnessStateRecoveryRecord) -> bool { true }
+    struct Accept;
+    impl FreshnessRecoveryAuthenticator for Accept {
+        fn authenticate(&self, _: &FreshnessRecoveryRecord) -> bool { true }
     }
+
     struct Reject;
-    impl FreshnessStateRecoveryAuthenticator for Reject {
-        fn authenticate(&self, _: &FreshnessStateRecoveryRecord) -> bool { false }
+    impl FreshnessRecoveryAuthenticator for Reject {
+        fn authenticate(&self, _: &FreshnessRecoveryRecord) -> bool { false }
     }
 
     fn policy() -> FreshnessAcceptancePolicy {
@@ -203,53 +264,58 @@ mod tests {
         }
     }
 
-    fn record() -> FreshnessStateRecoveryRecord {
+    fn state() -> FreshnessAcceptanceState {
+        FreshnessAcceptanceState::new(&policy()).unwrap()
+    }
+
+    fn record(generation: u64, state: FreshnessAcceptanceState, previous: Option<String>) -> FreshnessRecoveryRecord {
         let p = policy();
-        FreshnessStateRecoveryRecord::new(
-            "receiver-1", &p, 4, FreshnessAcceptanceState::new(&p).unwrap(),
-            None, "authority-1", "statement-1", "binding-1",
+        FreshnessRecoveryRecord::new(
+            "receiver-1", &p, generation, state, previous,
+            "authority-1", "statement-1", "binding-1",
         ).unwrap()
     }
 
     #[test]
     fn exact_anchor_restores() {
-        let r = record();
-        let d = r.recover(&policy(), &r.anchor(), &AcceptAll);
-        assert_eq!(d.outcome, FreshnessStateRecoveryOutcome::Restored);
+        let r = record(0, state(), None);
+        let d = r.recover(&policy(), &r.anchor(), &Accept);
+        assert_eq!(d.outcome, FreshnessRecoveryOutcome::Restored);
         assert_eq!(d.state, Some(r.state));
     }
 
     #[test]
     fn modified_state_is_rejected() {
-        let mut r = record();
-        r.state.highest_accepted_epoch = Some(99);
-        let d = r.recover(&policy(), &r.anchor(), &AcceptAll);
-        assert_eq!(d.outcome, FreshnessStateRecoveryOutcome::Quarantined);
-        assert!(d.issues.contains(&FreshnessStateRecoveryIssue::StateFingerprintMismatch));
+        let r = record(0, state(), None);
+        let mut modified = r.clone();
+        modified.state.highest_accepted_epoch = Some(99);
+        let d = modified.recover(&policy(), &r.anchor(), &Accept);
+        assert_eq!(d.outcome, FreshnessRecoveryOutcome::Quarantined);
+        assert!(d.issues.contains(&FreshnessRecoveryIssue::StateFingerprintMismatch));
     }
 
     #[test]
-    fn older_anchor_is_rejected() {
-        let r = record();
-        let mut a = r.anchor();
-        a.generation -= 1;
-        let d = r.recover(&policy(), &a, &AcceptAll);
-        assert_eq!(d.outcome, FreshnessStateRecoveryOutcome::Quarantined);
-        assert!(d.issues.contains(&FreshnessStateRecoveryIssue::AnchorMismatch));
+    fn old_anchor_is_rejected() {
+        let r = record(3, state(), Some("previous".into()));
+        let mut anchor = r.anchor();
+        anchor.generation = 2;
+        let d = r.recover(&policy(), &anchor, &Accept);
+        assert_eq!(d.outcome, FreshnessRecoveryOutcome::Quarantined);
+        assert!(d.issues.contains(&FreshnessRecoveryIssue::AnchorMismatch));
     }
 
     #[test]
     fn unauthenticated_record_is_rejected() {
-        let r = record();
+        let r = record(0, state(), None);
         let d = r.recover(&policy(), &r.anchor(), &Reject);
-        assert_eq!(d.outcome, FreshnessStateRecoveryOutcome::Quarantined);
-        assert!(d.issues.contains(&FreshnessStateRecoveryIssue::AuthenticationFailure));
+        assert_eq!(d.outcome, FreshnessRecoveryOutcome::Quarantined);
+        assert!(d.issues.contains(&FreshnessRecoveryIssue::AuthenticationFailure));
     }
 
     #[test]
     fn conflict_survives_recovery() {
         let p = policy();
-        let s = FreshnessAcceptanceState::new(&p).unwrap();
+        let s = state();
         let a = FreshnessMarker {
             scheme: p.expected_scheme.clone(),
             source_id: p.expected_source_id.clone(),
@@ -258,11 +324,29 @@ mod tests {
         };
         let b = FreshnessMarker { marker_digest: "b".into(), ..a.clone() };
         let s = s.apply(&p, &a).state.apply(&p, &b).state;
-        let r = FreshnessStateRecoveryRecord::new(
-            "receiver-1", &p, 5, s, None, "authority-1", "statement-1", "binding-1",
-        ).unwrap();
-        let d = r.recover(&p, &r.anchor(), &AcceptAll);
-        assert_eq!(d.outcome, FreshnessStateRecoveryOutcome::RestoredConflicted);
+        let r = record(0, s, None);
+        let d = r.recover(&p, &r.anchor(), &Accept);
+        assert_eq!(d.outcome, FreshnessRecoveryOutcome::RestoredConflicted);
         assert!(d.state.unwrap().status_conflicted());
+    }
+
+    #[test]
+    fn non_monotonic_generation_is_rejected() {
+        let p = policy();
+        let base = record(4, state(), None);
+        let next = record(4, state(), Some(base.state_fingerprint.clone()));
+        struct Store;
+        impl FreshnessRecoveryAnchorStore for Store {
+            fn load(&self) -> Option<FreshnessRecoveryAnchor> { None }
+            fn compare_and_swap(
+                &self,
+                _: Option<&FreshnessRecoveryAnchor>,
+                _: &FreshnessRecoveryAnchor,
+            ) -> bool { true }
+        }
+        assert_eq!(
+            commit_anchor(&Store, Some(&base.anchor()), &next),
+            Err("recovery generation is not strictly monotonic")
+        );
     }
 }
