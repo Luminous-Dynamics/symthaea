@@ -367,3 +367,15 @@ Commit `5c28726cfd10b043e3a33f6b6710f4996cd65554` extends this invariant to read
 Bound terminal receipts now persist the exact provider idempotency key used by the native-replay-derived dispatch. Re-reading or idempotently replaying a terminal receipt therefore returns that same key rather than reconstructing the legacy authorization-instance-derived key.
 
 Historical unbound receipts may retain the legacy reconstruction fallback for compatibility. Strict effect-bound receipts do not: their persisted provider key is part of the durable attempt lineage and is preserved across terminal retries and recovery paths. This prevents a read-after-settlement operation from silently presenting a different replay identity than the one used at provider entry. citeturn366187view0
+
+
+### Verifier input validation order
+
+Terminal provider verification is now downstream of the authoritative durable-attempt check. commit_bound_verified acquires the immediate SQLite transaction, validates the supplied dispatch record against the persisted operation, replay, action, effect, boundary, scope, status, validity, adapter, and commitment fields, and only then invokes the provider-evidence verifier. Authenticated reconciliation follows the same ordering while holding the transaction through the verifier result and terminal settlement.
+
+This ordering is intentionally stronger than merely rejecting a forged record after verification: an untrusted caller cannot cause the provider verifier to evaluate a caller-controlled dispatch record that has already failed the durable provenance boundary. Deterministic adversarial tests cover both terminal settlement and reconciliation; a forged target causes InvalidBinding and the verifier call count remains zero. This aligns with AEB-07's closed verifier-input model, where relying-party-selected inputs and the exact validated native/result binding precede accepted evidence handling. citeturn227865search1
+
+### Repository integrity repairs
+
+Two concrete implementation defects found during this hardening pass were repaired without weakening any safety gate: authorization_store.rs now contains its own canonical length-prefix helper required by the boundary provenance commitments, and the startup index migration no longer contains the stray duplicate ON authorization_dispatches(operation_id) SQL fragment.
+
