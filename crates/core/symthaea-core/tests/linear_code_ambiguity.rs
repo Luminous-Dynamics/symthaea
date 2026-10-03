@@ -43,10 +43,8 @@ fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
         RandomLinearCode::generate_direct_sum(96, 6, 6, 0x1111).expect("valid direct sum");
     let target = left.basis()[0].bound(&right.basis()[0]);
 
-    let (first, first_work) =
-        recover_linear_bound_with_work(&target, &[&left, &right]);
-    let (second, second_work) =
-        recover_linear_bound_with_work(&target, &[&left, &right]);
+    let (first, first_work) = recover_linear_bound_with_work(&target, &[&left, &right]);
+    let (second, second_work) = recover_linear_bound_with_work(&target, &[&left, &right]);
 
     assert_eq!(first, second);
     assert_eq!(first_work, second_work);
