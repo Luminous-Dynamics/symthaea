@@ -1268,6 +1268,19 @@ mod tests {
     }
 
     #[test]
+    fn rejects_previous_schema_version_after_v0_3_change() {
+        let mut plan = sample_plan();
+        plan.schema_version = "ssc/v0.2".into();
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::UnsupportedSchemaVersion(
+                "ssc/v0.2".into()
+            ))
+        );
+    }
+
+    #[test]
     fn rejects_unsupported_plan_schema_version() {
         let mut plan = sample_plan();
         plan.schema_version = "ssc/v999".into();
