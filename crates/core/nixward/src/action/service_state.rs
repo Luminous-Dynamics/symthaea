@@ -527,7 +527,10 @@ fn normalize_observed_names_from_vec(
         return Err(NixServiceStateErrorV1::MissingNames);
     }
 
-    let mut canonical = names.to_vec();
+    let mut canonical = names
+        .iter()
+        .map(|name| canonical_observed_service_unit(name.clone()))
+        .collect::<Result<Vec<_>, _>>()?;
     canonical.sort();
     if canonical.windows(2).any(|pair| pair[0] == pair[1]) {
         return Err(NixServiceStateErrorV1::DuplicateObservedName);
@@ -902,6 +905,17 @@ CanReload=yes
 ",
             )
             .unwrap_err(),
+            NixServiceStateErrorV1::InvalidObservedUnitIdentity
+        );
+    }
+
+    #[test]
+    fn validate_shape_rejects_noncanonical_internal_observed_name() {
+        let mut value = state("active", "enabled", "running");
+        value.observed_names.push("nginx".to_string());
+
+        assert_eq!(
+            value.validate_shape().unwrap_err(),
             NixServiceStateErrorV1::InvalidObservedUnitIdentity
         );
     }
