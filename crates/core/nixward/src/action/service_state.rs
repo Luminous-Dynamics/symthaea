@@ -624,7 +624,7 @@ CanStop=yes
 
     #[test]
     fn parses_complete_systemd_observation() {
-        let value = NixServiceObservedStateV1::parse_systemd_properties(
+        let (value, capabilities) = NixServiceObservedStateV1::parse_systemd_observation(
             "nginx",
             "Id=nginx.service
 LoadState=loaded
@@ -632,7 +632,7 @@ ActiveState=active
 SubState=running
 UnitFileState=enabled
 CanStart=yes
-CanStop=yes
+CanStop=no
 CanReload=yes
 ",
         )
@@ -642,6 +642,10 @@ CanReload=yes
         assert_eq!(value.active_state(), ServiceActiveStateV1::Active);
         assert_eq!(value.unit_file_state(), ServiceUnitFileStateV1::Enabled);
         assert_eq!(value.sub_state(), "running");
+        assert!(capabilities.can_start());
+        assert!(!capabilities.can_stop());
+        assert!(capabilities.can_reload());
+        assert_eq!(capabilities.pre_state_digest(), value.digest().unwrap());
     }
 
     #[test]
