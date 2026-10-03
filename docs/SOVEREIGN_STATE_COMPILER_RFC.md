@@ -285,6 +285,12 @@ SSC distinguishes four evidence moments rather than collapsing them into one
 4. **Observed post-state** — a fresh target observation whose digest is carried
    by the receipt.
 
+The receipt records mechanical `ExecutionOutcome` separately from a typed
+`PostconditionOutcome`. A mechanically successful execution may therefore be
+`Unproven` until fresh observation establishes the requested postcondition.
+A verified-success interpretation requires both an execution outcome of
+`Succeeded`/`Recovered` and `PostconditionOutcome::Satisfied`.
+
 The post-state digest is allowed to differ from the pre-state digest because a
 successful deployment is expected to change state. Verification semantics
 determine whether that change matches the exact expected desired state **and
@@ -367,6 +373,8 @@ Authorization validation now requires:
   non-empty reference metadata;
 - verification carries exact expected state values and a typed transition disposition rather than property names alone;
 - the transition disposition is included in the compiled plan digest and therefore in authorization;
+- execution receipts separate mechanical execution outcome from typed postcondition outcome;
+- a mechanical `Succeeded` receipt is not treated as verified success unless the postcondition is `Satisfied`;
 - execution receipts bind the exact authorized plan, pre-execution snapshot, and
   post-execution observation;
 - receipt timestamps must remain within the authorization validity window.
