@@ -661,7 +661,7 @@ impl SqliteAuthorizationStore {
         )
     }
 
-    #[deprecated(note = "use mark_dispatch_pending_bound_from_native_authority")]
+    #[deprecated(note = "use mark_dispatch_pending_bound_from_pinned_native_authority")]
     pub fn mark_dispatch_pending_bound(
         &self,
         authorization_instance: &str,
