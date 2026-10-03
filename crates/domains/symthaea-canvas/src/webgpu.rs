@@ -553,12 +553,19 @@ fn point_on_segment(
     a: [f32; 2],
     b: [f32; 2],
     point: [f32; 2],
-    epsilon: f32,
+    epsilon: f64,
 ) -> bool {
-    point[0] >= a[0].min(b[0]) - epsilon
-        && point[0] <= a[0].max(b[0]) + epsilon
-        && point[1] >= a[1].min(b[1]) - epsilon
-        && point[1] <= a[1].max(b[1]) + epsilon
+    let px = f64::from(point[0]);
+    let py = f64::from(point[1]);
+    let ax = f64::from(a[0]);
+    let ay = f64::from(a[1]);
+    let bx = f64::from(b[0]);
+    let by = f64::from(b[1]);
+
+    px >= ax.min(bx) - epsilon
+        && px <= ax.max(bx) + epsilon
+        && py >= ay.min(by) - epsilon
+        && py <= ay.max(by) + epsilon
 }
 
 fn point_in_triangle(
@@ -571,7 +578,7 @@ fn point_in_triangle(
     let ab = cross(a, b, point);
     let bc = cross(b, c, point);
     let ca = cross(c, a, point);
-    let epsilon = 1e-6;
+    let epsilon: f64 = 1e-6;
     if ccw {
         ab >= -epsilon && bc >= -epsilon && ca >= -epsilon
     } else {
