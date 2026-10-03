@@ -4606,6 +4606,63 @@ mod tests {
     }
 
     #[test]
+    fn malformed_effect_binding_is_rejected_before_status_lookup() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-malformed-effect-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=super::super::ActionEffectBinding::new("","prod","adapter-A");
+        let action=EpistemicAction::new(
+            "malformed-effect","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"malformed-effect".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T07:00:00Z".into(),
+            expires_at:Some("2026-10-04T07:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-malformed-effect","boundary-malformed"
+        ).unwrap();
+
+        let err=store.mark_dispatch_pending_bound_from_pinned_native_authority(
+            &witness.authorization_instance,
+            "attempt-malformed-effect",
+            &action,
+            &effect,
+            "boundary-malformed",
+            "operation-malformed-effect",
+            "untrusted-issuer",
+            "native-malformed",
+            "status:native-malformed",
+            &AdmissionStatusFailsVerifier,
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+        assert!(store.connection().unwrap().query_row::<i64,_,_>(
+            "SELECT COUNT(*) FROM authorization_dispatches",
+            [],
+            |row| row.get(0)
+        ).unwrap() == 0);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn unbound_prepare_rejects_effect_bound_actions() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-effect-prepare-{}.db",std::process::id()
