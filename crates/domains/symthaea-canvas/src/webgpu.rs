@@ -663,6 +663,11 @@ fn finite(value: f32, fallback: f32) -> f32 {
 
 #[cfg(target_arch = "wasm32")]
 use std::borrow::Cow;
+#[cfg(target_arch = "wasm32")]
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 #[cfg(target_arch = "wasm32")]
 use web_sys::HtmlCanvasElement;
@@ -681,6 +686,9 @@ pub struct WebGpuRenderer {
     /// Reusable CPU-side staging bytes for scene uploads; avoids a fresh
     /// allocation on every cognitive-frame render.
     upload_bytes: Vec<u8>,
+    /// Latched when the underlying WebGPU device is lost. The next render
+    /// returns an error so the caller can activate its compatibility path.
+    device_lost: Arc<AtomicBool>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -716,6 +724,18 @@ impl WebGpuRenderer {
             })
             .await
             .map_err(|error| format!("failed to create WebGPU device: {error}"))?;
+
+        let device_lost = Arc::new(AtomicBool::new(false));
+        {
+            let device_lost = Arc::clone(&device_lost);
+            device.set_device_lost_callback(move |reason, message| {
+                device_lost.store(true, Ordering::Release);
+                web_sys::console::warn_2(
+                    &format!("Symthaea WebGPU cognitive device lost ({reason:?})").into(),
+                    &message.into(),
+                );
+            });
+        }
 
         let width = canvas.width().max(1);
         let height = canvas.height().max(1);
@@ -813,6 +833,7 @@ impl WebGpuRenderer {
             vertex_buffer_bytes,
             config,
             upload_bytes: Vec::new(),
+            device_lost,
         })
     }
 
@@ -823,6 +844,9 @@ impl WebGpuRenderer {
     }
 
     pub fn render(&mut self, scene: &GpuScene) -> Result<(), String> {
+        if self.device_lost.load(Ordering::Acquire) {
+            return Err("WebGPU cognitive device was lost".to_string());
+        }
         scene_to_bytes(&scene.vertices, &mut self.upload_bytes);
         if self.upload_bytes.len() > self.vertex_buffer_bytes {
             return Err(format!(
@@ -919,6 +943,9 @@ pub struct WebGpuMovieRenderer {
     config: wgpu::SurfaceConfiguration,
     frame_width: u32,
     frame_height: u32,
+    /// Latched when the underlying WebGPU device is lost. The next render
+    /// returns an error so the caller can activate its compatibility path.
+    device_lost: Arc<AtomicBool>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -950,6 +977,18 @@ impl WebGpuMovieRenderer {
             })
             .await
             .map_err(|error| format!("failed to create WebGPU movie device: {error}"))?;
+
+        let device_lost = Arc::new(AtomicBool::new(false));
+        {
+            let device_lost = Arc::clone(&device_lost);
+            device.set_device_lost_callback(move |reason, message| {
+                device_lost.store(true, Ordering::Release);
+                web_sys::console::warn_2(
+                    &format!("Symthaea WebGPU movie device lost ({reason:?})").into(),
+                    &message.into(),
+                );
+            });
+        }
 
         let width = canvas.width().max(1);
         let height = canvas.height().max(1);
@@ -1060,11 +1099,15 @@ impl WebGpuMovieRenderer {
             config,
             frame_width: 0,
             frame_height: 0,
+            device_lost,
         })
     }
 
     /// Upload one bounded RGBA frame and present it with nearest-neighbour sampling.
     pub fn render(&mut self, width: u32, height: u32, rgba: &[u8]) -> Result<(), String> {
+        if self.device_lost.load(Ordering::Acquire) {
+            return Err("WebGPU movie device was lost".to_string());
+        }
         if width == 0
             || height == 0
             || width > MAX_MOVIE_WIDTH
