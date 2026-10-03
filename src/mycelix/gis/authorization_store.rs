@@ -317,6 +317,22 @@ pub struct ProviderVerifierConfiguration {
     pub evidence_profile_digest: String,
 }
 
+impl ProviderVerifierConfiguration {
+    fn validate(&self) -> Result<(), AuthorizationStoreError> {
+        if self.relying_party_id.is_empty()
+            || self.verifier_id.is_empty()
+            || self.verifier_config_digest.is_empty()
+            || self.trust_anchor_digest.is_empty()
+            || self.evidence_profile_digest.is_empty()
+        {
+            return Err(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into()
+            );
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderTerminalEvidence {
     pub kind: ProviderEvidenceKind,
@@ -877,6 +893,107 @@ impl SqliteAuthorizationStore {
         }
         tx.commit()?;
         Ok(())
+    }
+
+    /// Pin the relying-party-selected terminal provider evidence verifier configuration.
+    ///
+    /// This is write-once configuration for the durable effect boundary. Presented
+    /// verifier metadata cannot silently become a trust anchor for a terminal outcome.
+    pub fn pin_provider_evidence_verifier_configuration(
+        &self,
+        configuration: &ProviderVerifierConfiguration,
+    ) -> Result<(), AuthorizationStoreError> {
+        configuration.validate()?;
+        if configuration.relying_party_id != self.relying_party_id {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let keys = [
+            ("provider_evidence_verifier_relying_party_id", configuration.relying_party_id.as_str()),
+            ("provider_evidence_verifier_id", configuration.verifier_id.as_str()),
+            ("provider_evidence_verifier_config_digest", configuration.verifier_config_digest.as_str()),
+            ("provider_evidence_verifier_trust_anchor_digest", configuration.trust_anchor_digest.as_str()),
+            ("provider_evidence_verifier_evidence_profile_digest", configuration.evidence_profile_digest.as_str()),
+        ];
+        let values = [
+            configuration.relying_party_id.as_str(),
+            configuration.verifier_id.as_str(),
+            configuration.verifier_config_digest.as_str(),
+            configuration.trust_anchor_digest.as_str(),
+            configuration.evidence_profile_digest.as_str(),
+        ];
+        let mut existing = Vec::with_capacity(keys.len());
+        for (key, _) in keys {
+            existing.push(
+                tx.query_row(
+                    "SELECT value FROM authorization_store_metadata WHERE key=?1",
+                    params![key],
+                    |row| row.get::<_, String>(0),
+                ).optional()?
+            );
+        }
+
+        if existing.iter().all(Option::is_none) {
+            for ((key, _), value) in keys.iter().zip(values.iter()) {
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value) VALUES(?1,?2)",
+                    params![key, value],
+                )?;
+            }
+        } else if existing.iter().zip(values.iter()).all(|(stored, expected)| {
+            stored.as_deref() == Some(*expected)
+        }) {
+            // Already pinned to exactly this configuration.
+        } else {
+            return Err(AuthorizationStoreError::InvalidState(
+                "provider evidence verifier configuration is already pinned differently".into()
+            ));
+        }
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn pinned_provider_evidence_verifier_configuration(
+        &self,
+    ) -> Result<ProviderVerifierConfiguration, AuthorizationStoreError> {
+        let connection = self.connection()?;
+        let read = |key: &str| -> Result<Option<String>, AuthorizationStoreError> {
+            Ok(connection
+                .query_row(
+                    "SELECT value FROM authorization_store_metadata WHERE key=?1",
+                    params![key],
+                    |row| row.get(0),
+                )
+                .optional()?)
+        };
+        let configuration = match (
+            read("provider_evidence_verifier_relying_party_id")?,
+            read("provider_evidence_verifier_id")?,
+            read("provider_evidence_verifier_config_digest")?,
+            read("provider_evidence_verifier_trust_anchor_digest")?,
+            read("provider_evidence_verifier_evidence_profile_digest")?,
+        ) {
+            (Some(relying_party_id), Some(verifier_id), Some(verifier_config_digest),
+             Some(trust_anchor_digest), Some(evidence_profile_digest)) =>
+                ProviderVerifierConfiguration {
+                    relying_party_id,
+                    verifier_id,
+                    verifier_config_digest,
+                    trust_anchor_digest,
+                    evidence_profile_digest,
+                },
+            _ => return Err(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into()
+            ),
+        };
+        configuration.validate()?;
+        if configuration.relying_party_id != self.relying_party_id {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        Ok(configuration)
     }
 
     fn pinned_provider_status_verifier_configuration(
@@ -2394,6 +2511,10 @@ fn validate_native_authority_pin_set(
             .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
         self.validate_verified_terminal_outcome(record, &verified)?;
+        let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
+        if verified.configuration != pinned_verifier {
+            return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
+        }
 
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -2894,6 +3015,10 @@ fn validate_native_authority_pin_set(
             .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
         Self::validate_verified_terminal_outcome(record, &verified)?;
+        let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
+        if verified.configuration != pinned_verifier {
+            return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
+        }
         if !matches!(verified.evidence.outcome, ExecutionOutcome::Succeeded | ExecutionOutcome::Failed) {
             return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
         }
