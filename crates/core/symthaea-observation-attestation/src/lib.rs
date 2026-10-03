@@ -3696,6 +3696,72 @@ mod tests {
         assert!(!evaluation.is_consistent_with_report(&report));
     }
 
+
+    #[test]
+    fn resolver_identity_mismatch_cannot_fall_through_to_crypto_verification() {
+        struct MismatchedKeyResolver {
+            returned_method: String,
+            verifying_key: VerifyingKey,
+        }
+
+        impl VerificationMethodResolver for MismatchedKeyResolver {
+            fn resolve(
+                &self,
+                _verification_method: &str,
+            ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
+                Ok(ResolvedVerificationMethod {
+                    verification_method: self.returned_method.clone(),
+                    verifying_key: self.verifying_key,
+                    status: VerificationMethodStatus::Active,
+                    allowed_proof_purposes: vec!["observation-independence".into()],
+                })
+            }
+
+            fn resolve_with_snapshot(
+                &self,
+                verification_method: &str,
+            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+                Ok(ResolvedVerificationMethodSnapshot {
+                    resolved: self.resolve(verification_method)?,
+                    snapshot_fingerprint: Some("identity-mismatch-snapshot".into()),
+                })
+            }
+        }
+
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let resolver = MismatchedKeyResolver {
+            returned_method: "did:example:unexpected#key-9".into(),
+            verifying_key: signing_key.verifying_key(),
+        };
+
+        let report = Ed25519ReceiptVerifier::new(
+            envelope.attester_id.clone(),
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_with_resolver_report(&envelope, &receipt, &resolver);
+
+        // The returned key is intentionally valid for the envelope. Only the
+        // resolver's method identity mismatch should prevent verification.
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable
+        );
+        assert_ne!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::Verified
+        );
+        assert_eq!(
+            report.execution_trace.results.last().map(|result| result.check),
+            Some(EvaluationCheck::VerificationMethodResolution)
+        );
+        assert_eq!(
+            report.resolution_snapshot_fingerprint.as_deref(),
+            Some("identity-mismatch-snapshot")
+        );
+        assert!(report.execution_trace.is_well_formed());
+    }
+
     #[test]
     fn resolver_snapshot_is_retained_when_resolver_returns_mismatched_method() {
         struct MismatchedResolver {
