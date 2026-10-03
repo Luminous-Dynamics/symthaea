@@ -1171,20 +1171,28 @@ fn validate_native_authority_pin_set(
             native_authorization_id,
         )
         .map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
-        let status = status_verifier
-            .verify_current_status(
-                ProviderStatusVerificationPurpose::Admission,
-                issuer,
-                &authority_namespace,
-                native_authorization_id,
-                status_identifier,
-                &action.canonical_action_digest(),
-                &expected_effect.target_identity,
-                &expected_effect.audience,
-                &expected_effect.adapter,
-                None,
-            )
-            .map_err(|_| AuthorizationConsumptionError::ProviderStatusVerificationRequired)?;
+        let status = match status_verifier.verify_current_status(
+            ProviderStatusVerificationPurpose::Admission,
+            issuer,
+            &authority_namespace,
+            native_authorization_id,
+            status_identifier,
+            &action.canonical_action_digest(),
+            &expected_effect.target_identity,
+            &expected_effect.audience,
+            &expected_effect.adapter,
+            None,
+        ) {
+            Ok(status) => status,
+            Err(_) => {
+                self.close_pre_dispatch_status_failure(
+                    authorization_instance,
+                    attempt_id,
+                    boundary_id,
+                )?;
+                return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+            }
+        };
         self.validate_provider_status_evidence(&status, None, true)?;
         self.mark_dispatch_pending_bound_with_provenance(
             authorization_instance,
@@ -1434,6 +1442,44 @@ fn validate_native_authority_pin_set(
     /// Cross the provider-entry boundary only for the exact immutable record
     /// created before dispatch. All identity/effect fields are checked again,
     /// preventing a stale executor from substituting a different sink or key.
+    fn close_pre_dispatch_status_failure(
+        &self,
+        authorization_instance: &str,
+        attempt_id: &str,
+        boundary_id: &str,
+    ) -> Result<(), AuthorizationStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        let changed = tx.execute(
+            "UPDATE authorization_leases
+             SET state='ready',attempt_id=NULL,boundary_id=NULL
+             WHERE authorization_instance=?1 AND state='prepared'
+               AND attempt_id=?2 AND boundary_id=?3",
+            params![authorization_instance, attempt_id, boundary_id],
+        )?;
+        if changed != 1 {
+            return Err(AuthorizationConsumptionError::PreDispatchRecoveryNotAllowed.into());
+        }
+
+        let (action_digest, authority_epoch): (String, i64) = tx.query_row(
+            "SELECT action_digest,authority_epoch
+             FROM authorization_leases
+             WHERE authorization_instance=?1",
+            params![authorization_instance],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+
+        tx.execute(
+            "INSERT OR IGNORE INTO authorization_recovery_markers
+             (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
+             VALUES (?1,?2,?3,?4,?5,'not_entered_status')",
+            params![authorization_instance, attempt_id, boundary_id, action_digest, authority_epoch],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
     fn close_pre_entry_status_failure(
         &self,
         record: &DurableDispatchRecord,
@@ -2885,6 +2931,30 @@ mod tests {
                 },
                 verification_digest: "sha256:test-verification".into(),
             })
+        }
+    }
+
+    struct AdmissionStatusFailsVerifier;
+
+    impl ProviderStatusVerifier for AdmissionStatusFailsVerifier {
+        fn verify_current_status(
+            &self,
+            purpose: ProviderStatusVerificationPurpose,
+            _issuer: &str,
+            _authority_namespace: &str,
+            _native_authorization_id: &str,
+            _status_identifier: &str,
+            _action_digest: &str,
+            _target_identity: &str,
+            _audience: &str,
+            _adapter: &str,
+            _expected_source_digest: Option<&str>,
+        ) -> Result<ProviderStatusEvidence, ProviderStatusVerificationError> {
+            if matches!(purpose, ProviderStatusVerificationPurpose::Admission) {
+                Err(ProviderStatusVerificationError::Unavailable)
+            } else {
+                Err(ProviderStatusVerificationError::VerificationFailed)
+            }
         }
     }
 
@@ -4376,6 +4446,83 @@ mod tests {
                 AuthorizationConsumptionError::ActionAlreadyInFlight
             ))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn admission_status_failure_releases_prepared_reservation_without_dispatch() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-admission-failure-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-status-admission-failure"
+        ).unwrap();
+        store.pin_native_authority_namespace(
+            "issuer.status-admission","issuer.status-admission/authority/v1"
+        ).unwrap();
+
+        let effect=super::super::ActionEffectBinding::new(
+            "target-status-admission-failure","prod","adapter"
+        );
+        let action=EpistemicAction::new(
+            "status-admission-failure","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"status-admission-failure".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "status-admission-failure",action.id.clone(),digest,
+            "support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-status-admission-failure","boundary-status"
+        ).unwrap();
+
+        assert!(matches!(
+            store.mark_dispatch_pending_bound_from_pinned_native_authority(
+                "status-admission-failure","attempt-status-admission-failure",
+                &action,&effect,"boundary-status","operation:status-admission-failure",
+                "issuer.status-admission","native-status-admission-failure",
+                "status:native-status-admission-failure",&AdmissionStatusFailsVerifier
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderStatusVerificationRequired
+            ))
+        ));
+
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_leases
+             WHERE authorization_instance=?1",
+            params![witness.authorization_instance],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"ready");
+
+        let dispatches:i64=store.connection().unwrap().query_row(
+            "SELECT COUNT(*) FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![witness.authorization_instance,"attempt-status-admission-failure"],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(dispatches,0);
+
+        let marker:String=store.connection().unwrap().query_row(
+            "SELECT marker FROM authorization_recovery_markers
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![witness.authorization_instance,"attempt-status-admission-failure"],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(marker,"not_entered_status");
         let _=std::fs::remove_file(path);
     }
 
