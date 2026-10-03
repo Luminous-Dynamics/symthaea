@@ -82,6 +82,7 @@ pub struct TopologyLifecycleResolution {
     /// Monotonic authority-resolution sequence. Later resolutions link to
     /// the digest of the prior resolution rather than mutating it.
     pub resolution_epoch: u64,
+    pub predecessor_resolution_id: Option<String>,
     pub predecessor_resolution_digest: Option<String>,
     /// Every competing successor considered by the authority, including the
     /// selected branch. Keeping these references makes the resolution
@@ -107,6 +108,7 @@ pub struct TopologyResolutionPolicy {
     pub expected_configuration_digest: String,
     pub expected_authority_id: String,
     pub expected_resolution_epoch: u64,
+    pub expected_predecessor_resolution_id: Option<String>,
     pub expected_predecessor_resolution_digest: Option<String>,
 }
 
@@ -253,13 +255,16 @@ impl TopologyResolutionGate {
 
         match (
             resolution.resolution_epoch,
+            resolution.predecessor_resolution_id.as_deref(),
+            self.policy.expected_predecessor_resolution_id.as_deref(),
             resolution.predecessor_resolution_digest.as_deref(),
             self.policy.expected_predecessor_resolution_digest.as_deref(),
         ) {
-            (1, None, None) => {}
-            (1, _, _) => issues.push(TopologyResolutionIssue::PredecessorMismatch),
-            (_, Some(actual), Some(expected)) if actual == expected => {}
-            (_, _, _) => issues.push(TopologyResolutionIssue::PredecessorMismatch),
+            (1, None, None, None, None) => {}
+            (1, _, _, _, _) => issues.push(TopologyResolutionIssue::PredecessorMismatch),
+            (_, Some(actual_id), Some(expected_id), Some(actual_digest), Some(expected_digest))
+                if actual_id == expected_id && actual_digest == expected_digest => {}
+            (_, _, _, _, _) => issues.push(TopologyResolutionIssue::PredecessorMismatch),
         }
 
         for branch in &unique_observed {
@@ -354,6 +359,7 @@ mod tests {
             expected_configuration_digest: "cfg-1".into(),
             expected_authority_id: "mycelix-topology-authority".into(),
             expected_resolution_epoch: 1,
+            expected_predecessor_resolution_id: None,
             expected_predecessor_resolution_digest: None,
         })
         .unwrap()
@@ -382,6 +388,7 @@ mod tests {
             selected_successor_topology_digest: selected.into(),
             selected_successor_effective_from_ms: 1_500,
             resolution_epoch: 1,
+            predecessor_resolution_id: None,
             predecessor_resolution_digest: None,
             observed_successors_digest: branch_set_digest(&observed),
             observed_successors: observed,
@@ -517,6 +524,7 @@ mod tests {
         let b = branch("topology-v2b");
         let mut r = resolution("topology-v2a", vec![a.clone(), b]);
         r.resolution_epoch = 2;
+        r.predecessor_resolution_id = None;
         r.predecessor_resolution_digest = None;
         let mut g = gate();
         g.policy.expected_resolution_epoch = 2;
@@ -531,12 +539,30 @@ mod tests {
         let b = branch("topology-v2b");
         let mut r = resolution("topology-v2a", vec![a.clone(), b]);
         r.resolution_epoch = 2;
+        r.predecessor_resolution_id = Some("resolution-1".into());
         r.predecessor_resolution_digest = Some("resolution-digest-1".into());
         let mut g = gate();
         g.policy.expected_resolution_epoch = 2;
+        g.policy.expected_predecessor_resolution_id = Some("resolution-1".into());
         g.policy.expected_predecessor_resolution_digest = Some("resolution-digest-1".into());
         let d = g.assess(Some(&r), &[a], 3_000);
         assert_eq!(d.state, TopologyResolutionState::Resolved);
+    }
+
+    #[test]
+    fn later_resolution_requires_exact_predecessor_resolution_identity() {
+        let a = branch("topology-v2a");
+        let mut r = resolution("topology-v2a", vec![a.clone()]);
+        r.resolution_epoch = 2;
+        r.predecessor_resolution_id = Some("resolution-wrong".into());
+        r.predecessor_resolution_digest = Some("resolution-digest-1".into());
+        let mut g = gate();
+        g.policy.expected_resolution_epoch = 2;
+        g.policy.expected_predecessor_resolution_id = Some("resolution-1".into());
+        g.policy.expected_predecessor_resolution_digest = Some("resolution-digest-1".into());
+        let d = g.assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionIssue::PredecessorMismatch));
     }
 
     #[test]
@@ -546,6 +572,7 @@ mod tests {
         r.resolution_epoch = 1;
         let mut g = gate();
         g.policy.expected_resolution_epoch = 2;
+        g.policy.expected_predecessor_resolution_id = Some("resolution-1".into());
         g.policy.expected_predecessor_resolution_digest = Some("resolution-digest-1".into());
         let d = g.assess(Some(&r), &[a], 3_000);
         assert_eq!(d.state, TopologyResolutionState::Quarantined);
