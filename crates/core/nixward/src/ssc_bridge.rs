@@ -111,7 +111,11 @@ impl NixSystemObservation {
         }
 
         if let Some(generation) = self.system_profile_generation {
-            let Some(entry) = self.generations.iter().find(|entry| entry.number == generation) else {
+            let Some(entry) = self
+                .generations
+                .iter()
+                .find(|entry| entry.number == generation)
+            else {
                 return Err(SscObservationError::SystemProfileRealizationMismatch);
             };
             if entry.realization != self.system_profile_realization {
