@@ -2059,6 +2059,22 @@ fn validate_native_authority_pin_set(
         Ok(())
     }
 
+    fn validate_recovery_authorization_issued_at(
+        &self,
+        issued_at: &str,
+    ) -> Result<(), AuthorizationStoreError> {
+        let issued = DateTime::parse_from_rfc3339(issued_at)
+            .map_err(|_| AuthorizationConsumptionError::AuthorizationValidityWindowFailed)?
+            .with_timezone(&Utc);
+        let now = self.trusted_utc_now()?;
+        let skew = Duration::seconds(self.clock_policy.allowed_skew_seconds as i64);
+        let max_age = Duration::seconds(self.clock_policy.max_age_seconds as i64);
+        if issued > now + skew || now > issued + max_age + skew {
+            return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+        }
+        Ok(())
+    }
+
     fn validate_persisted_authorization_validity(
         &self,
         issued_at: Option<&str>,
@@ -2430,6 +2446,7 @@ fn validate_native_authority_pin_set(
         if witness.boundary_id.is_empty() || witness.attempt_id.is_empty() {
             return Err(AuthorizationConsumptionError::PreDispatchRecoveryNotAllowed.into());
         }
+        self.validate_recovery_authorization_issued_at(&witness.issued_at)?;
 
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -5166,6 +5183,61 @@ mod tests {
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
         ));
         store.mark_invoked_bound(&record, &TestProviderStatusVerifier).unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn stale_recovery_authorization_is_rejected_before_state_change() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-recovery-validity-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new(
+            "recovery-validity","intervention",super::super::ActionRisk::Critical
+        );
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"recovery-validity".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T10:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "recovery-validity",action.id.clone(),digest.clone(),"support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-recovery-validity","boundary-A"
+        ).unwrap();
+
+        let stale=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt-recovery-validity".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2020-01-01T00:00:00Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&stale),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::AuthorizationValidityWindowFailed
+            ))
+        ));
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+            params![witness.authorization_instance],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"prepared");
+
         let _=std::fs::remove_file(path);
     }
 
