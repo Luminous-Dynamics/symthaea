@@ -182,6 +182,7 @@ The branch is ready for an evidence-producing benchmark only when:
 - every generated code is full-rank according to its declared rank;
 - every fixture is reproducible byte-for-byte from its seed, pinned RNG algorithm, dependency lock, and revision;
 - the clean fixture's identifiability conditions are explicit and the recovery result matches exhaustive truth (including ambiguity) on all validation fixtures;
+- the packed GF(2) solver is exhaustively cross-checked against code-subspace membership on a bounded Boolean space;
 - intentionally corrupted queries produce classified outcomes rather than silent false positives;
 - the resonator control uses the same ground-truth factor set and independently verified fixture;
 - the evidence schema records the representation family explicitly;
