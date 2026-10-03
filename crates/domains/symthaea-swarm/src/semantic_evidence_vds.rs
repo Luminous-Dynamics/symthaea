@@ -555,7 +555,7 @@ impl Rfc9942ReceiptEnvelope {
             let entry_start=reader.offset;
             let label_key=reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !unprotected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
-            let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Text(_)=>None };
+            let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_)=>None };
             if label==Some(COSE_CRIT_HEADER_LABEL){return Err(Rfc9942VdpError::CriticalHeaderNotProtected);}
             if label==Some(RFC9942_VDP_HEADER_LABEL){
                 if vdp.is_some(){return Err(Rfc9942VdpError::InvalidStructure);}
@@ -1721,7 +1721,7 @@ impl<'a> CborReader<'a> {
     fn read_cose_label(&mut self) -> Result<Option<i64>, Rfc9162ProofDecodeError> {
         match self.read_cose_label_key()? {
             CborLabelKey::Integer(value) => Ok(Some(value)),
-            CborLabelKey::Unsigned(_) | CborLabelKey::Text(_) => Ok(None),
+            CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_) => Ok(None),
         }
     }
 
