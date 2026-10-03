@@ -633,6 +633,34 @@ mod tests {
     }
 
     #[test]
+    fn parses_complete_current_unit_file_state_vocabulary() {
+        for value in [
+            "enabled",
+            "enabled-runtime",
+            "linked",
+            "linked-runtime",
+            "alias",
+            "masked",
+            "masked-runtime",
+            "static",
+            "disabled",
+            "indirect",
+            "generated",
+            "transient",
+            "bad",
+        ] {
+            assert!(
+                ServiceUnitFileStateV1::parse(value).is_ok(),
+                "current systemd UnitFileState value must parse: {value}"
+            );
+        }
+        assert_eq!(
+            ServiceUnitFileStateV1::parse("not-found").unwrap_err(),
+            NixServiceStateErrorV1::UnknownUnitFileState
+        );
+    }
+
+    #[test]
     fn parses_operation_capability_facts_and_binds_pre_state() {
         let (state, capabilities) = NixServiceObservedStateV1::parse_systemd_observation(
             "nginx",
