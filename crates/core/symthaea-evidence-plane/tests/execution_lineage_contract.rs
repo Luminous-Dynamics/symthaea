@@ -463,7 +463,6 @@ fn public_perturbation_classifier_reports_declared_and_collateral_drift() {
     );
 }
 
-
 #[test]
 fn public_serde_serialization_rejects_invalid_mutated_lineage() {
     let mut lineage = fixture();
