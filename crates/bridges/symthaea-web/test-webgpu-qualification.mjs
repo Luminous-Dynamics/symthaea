@@ -117,32 +117,46 @@ async function capabilityPreflight(page) {
   });
 }
 
-async function waitForProjection(page, selector, display) {
-  await page.waitForFunction(
-    ({ selector, display }) => {
-      const element = document.querySelector(selector);
-      return element && getComputedStyle(element).display === display;
-    },
-    { timeout: 30_000 },
-    { selector, display },
-  );
+async function waitForProjection(page, selector, display, classification = 'renderer') {
+  try {
+    await page.waitForFunction(
+      ({ selector, display }) => {
+        const element = document.querySelector(selector);
+        return element && getComputedStyle(element).display === display;
+      },
+      { timeout: 30_000 },
+      { selector, display },
+    );
+  } catch (error) {
+    throw new QualificationError(
+      `projection ${selector} did not reach display=${display}: ${error instanceof Error ? error.message : String(error)}`,
+      classification,
+    );
+  }
 }
 
-async function waitForVisible(page, selector) {
-  await page.waitForFunction(
-    selector => {
-      const element = document.querySelector(selector);
-      if (!element) return false;
-      const style = getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      return style.display !== 'none'
-        && style.visibility !== 'hidden'
-        && rect.width > 0
-        && rect.height > 0;
-    },
-    { timeout: 30_000 },
-    selector,
-  );
+async function waitForVisible(page, selector, classification = 'fallback') {
+  try {
+    await page.waitForFunction(
+      selector => {
+        const element = document.querySelector(selector);
+        if (!element) return false;
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== 'none'
+          && style.visibility !== 'hidden'
+          && rect.width > 0
+          && rect.height > 0;
+      },
+      { timeout: 30_000 },
+      selector,
+    );
+  } catch (error) {
+    throw new QualificationError(
+      `required fallback element ${selector} did not become visible: ${error instanceof Error ? error.message : String(error)}`,
+      classification,
+    );
+  }
 }
 
 class QualificationError extends Error {
