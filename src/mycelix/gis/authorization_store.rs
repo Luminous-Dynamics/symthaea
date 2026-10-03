@@ -403,6 +403,66 @@ impl SqliteAuthorizationStore {
         &self.relying_party_id
     }
 
+    /// Pin one issuer to one authority namespace for this relying-party domain.
+    /// The mapping is write-once; attempting to change an established pin fails closed.
+    pub fn pin_native_authority_namespace(
+        &self,
+        issuer: &str,
+        authority_namespace: &str,
+    ) -> Result<(), AuthorizationStoreError> {
+        if issuer.is_empty() || authority_namespace.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+        }
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let existing: Option<String> = tx
+            .query_row(
+                "SELECT authority_namespace
+                 FROM authorization_native_authority_pins
+                 WHERE issuer=?1",
+                params![issuer],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match existing {
+            Some(namespace) if namespace != authority_namespace => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "authority namespace pin for {issuer} is already established as {namespace}"
+                )));
+            }
+            Some(_) => {}
+            None => {
+                tx.execute(
+                    "INSERT INTO authorization_native_authority_pins(issuer,authority_namespace)
+                     VALUES (?1,?2)",
+                    params![issuer, authority_namespace],
+                )?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn pinned_native_authority_namespace(
+        &self,
+        issuer: &str,
+    ) -> Result<String, AuthorizationStoreError> {
+        if issuer.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+        }
+        let connection = self.connection()?;
+        connection
+            .query_row(
+                "SELECT authority_namespace
+                 FROM authorization_native_authority_pins
+                 WHERE issuer=?1",
+                params![issuer],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or_else(|| AuthorizationConsumptionError::InvalidNativeReplayProvenance.into())
+    }
+
     pub fn register_lease(&self, lease: &AuthorizationLease) -> Result<(), AuthorizationStoreError> {
         let connection = self.connection()?;
         connection.execute(
