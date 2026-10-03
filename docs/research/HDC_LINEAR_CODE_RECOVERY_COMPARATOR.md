@@ -204,7 +204,7 @@ The literature supports treating this as a distinct recovery family. Raviv repor
 
 ### Paper-scale binding-recovery smoke matrix
 
-The qualification harness now covers the paper's published \(n\in\{500,1000,2000\}\), \(k\in\{3,5,7\}\), and \(F\in\{3,4,5\}\) binding-recovery parameter grid, using ten deterministic repeats per setting, matching the published experiment's repeat count. The smoke matrix deliberately records validity and joint-basis independence rather than timing or superiority. When the sampled factor bases are jointly independent, the unique GF(2) representation makes exact original-factor recovery testable; when dependence occurs, the fixture is classified instead of being silently treated as uniquely identifiable.
+The qualification harness now covers the paper's published \(n\in\{500,1000,2000\}\), \(k\in\{3,5,7\}\), and \(F\in\{3,4,5\}\) binding-recovery parameter grid, using ten deterministic repeats per setting, matching the published experiment's repeat count. The matrix deliberately records validity and joint-basis independence rather than timing or superiority. It also emits a deterministic BLAKE3 result digest over the case parameters, targets, original factors, and recovered factors, so a change that preserves aggregate success counts is still detectable. When the sampled factor bases are jointly independent, the unique GF(2) representation makes exact original-factor recovery testable; when dependence occurs, the fixture is classified instead of being silently treated as uniquely identifiable.
 
 
 ## Non-goals
