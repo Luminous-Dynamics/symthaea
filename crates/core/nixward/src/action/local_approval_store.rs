@@ -172,9 +172,12 @@ impl LocalApprovalRequestStoreV1 {
             .pending
             .lock()
             .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?;
-        let record = pending
-            .get(&submission.request_id)
-            .ok_or(LocalApprovalRequestStoreErrorV1::RequestNotPending)?;
+        let (request, projection_digest) = {
+            let record = pending
+                .get(&submission.request_id)
+                .ok_or(LocalApprovalRequestStoreErrorV1::RequestNotPending)?;
+            (record.request.clone(), record.projection_digest.clone())
+        };
         let v2 = LocalApprovalSubmissionV2 {
             request_id: submission.request_id.clone(),
             daemon_incarnation_id: submission.daemon_incarnation_id.clone(),
@@ -185,16 +188,16 @@ impl LocalApprovalRequestStoreV1 {
         };
         let decision = admit_verified_local_submission_v2(
             &v2,
-            &record.request,
+            &request,
             &"00".repeat(32),
             verified_peer,
             evaluation,
         )?;
         pending.remove(&submission.request_id);
         ConsumedLocalApprovalDecisionV1::from_admitted_parts(
-            &record.request,
+            &request,
             decision,
-            record.projection_digest.clone(),
+            projection_digest,
             verified_peer,
             evaluation,
         )
