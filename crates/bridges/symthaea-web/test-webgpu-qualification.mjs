@@ -142,10 +142,20 @@ async function waitForVisible(page, selector) {
   );
 }
 
+class QualificationError extends Error {
+  constructor(message, classification) {
+    super(message);
+    this.name = 'QualificationError';
+    this.classification = classification;
+  }
+}
+
 async function runMode(mode) {
-  const gpuMode = mode === 'webgpu' || mode === 'webgpu-swiftshader';
+  const swiftShaderMode = mode === 'webgpu-swiftshader';
+  const hardwareMode = mode === 'webgpu-hardware';
+  const gpuMode = swiftShaderMode || hardwareMode;
   if (!gpuMode && mode !== 'fallback') {
-    throw new Error(`unsupported qualification mode: ${mode}`);
+    throw new QualificationError(`unsupported qualification mode: ${mode}`, 'harness');
   }
 
   const args = [
@@ -155,13 +165,19 @@ async function runMode(mode) {
   if (gpuMode) {
     args.push(
       '--enable-unsafe-webgpu',
-      '--use-webgpu-adapter=swiftshader',
-      '--enable-dawn-features=allow_unsafe_apis',
-      '--disable-dawn-features=use_dxc',
-      '--enable-webgpu-developer-features',
       '--use-gpu-in-tests',
       '--enable-accelerated-2d-canvas',
     );
+    if (swiftShaderMode) {
+      args.push(
+        '--use-webgpu-adapter=swiftshader',
+        '--enable-dawn-features=allow_unsafe_apis',
+        '--disable-dawn-features=use_dxc',
+        '--enable-webgpu-developer-features',
+      );
+    } else {
+      args.push('--enable-gpu');
+    }
   } else {
     args.push('--disable-gpu');
   }
@@ -194,7 +210,10 @@ async function runMode(mode) {
     if (gpuMode) {
       failOnPageErrors('WebGPU capability preflight');
       if (!capability.navigator_gpu || !capability.adapter || !capability.device) {
-        throw new Error(`WebGPU capability preflight failed: ${JSON.stringify(capability)}`);
+        throw new QualificationError(
+          `WebGPU capability preflight failed: ${JSON.stringify(capability)}`,
+          'capability',
+        );
       }
 
       await waitForProjection(page, '#webgpu-cognitive-canvas', 'block');
@@ -236,7 +255,11 @@ async function runMode(mode) {
 
       return {
         mode,
-        qualification_profile: gpuMode ? 'browser-webgpu-swiftshader' : 'forced-gpu-disabled',
+        qualification_profile: swiftShaderMode
+          ? 'browser-webgpu-swiftshader'
+          : hardwareMode
+            ? 'browser-webgpu-hardware'
+            : 'forced-gpu-disabled',
         capability,
         scene_hash: firstSceneHash,
         movie_hash: firstMovieHash,
@@ -267,10 +290,16 @@ async function runMode(mode) {
     });
 
     if (!fallback.canvas || JSON.stringify(fallback.pixels) !== JSON.stringify([255, 255, 255, 255])) {
-      throw new Error(`Canvas2D fallback fixture was not rendered as expected: ${JSON.stringify(fallback)}`);
+      throw new QualificationError(
+        `Canvas2D fallback fixture was not rendered as expected: ${JSON.stringify(fallback)}`,
+        'fallback',
+      );
     }
     if (!fallback.portrait || !fallback.gpu_canvas_hidden) {
-      throw new Error(`SVG fallback state was not preserved: ${JSON.stringify(fallback)}`);
+      throw new QualificationError(
+        `SVG fallback state was not preserved: ${JSON.stringify(fallback)}`,
+        'fallback',
+      );
     }
 
     await page.screenshot({
@@ -299,6 +328,7 @@ try {
       results[mode] = await runMode(mode);
     } catch (error) {
       failures[mode] = {
+        classification: error instanceof QualificationError ? error.classification : 'harness',
         error: error instanceof Error ? error.message : String(error),
       };
     }
