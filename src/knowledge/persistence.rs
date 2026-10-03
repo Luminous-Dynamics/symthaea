@@ -3604,7 +3604,7 @@ mod tests {
             .unwrap();
         }
 
-        let err = p.verify_snapshot_receipts().unwrap_err();
+        let err = p.latest_snapshot_receipt().unwrap_err();
         assert!(err.contains("canonical digest is not a 64-character hexadecimal digest"));
 
         let _ = std::fs::remove_dir_all(&dir);
