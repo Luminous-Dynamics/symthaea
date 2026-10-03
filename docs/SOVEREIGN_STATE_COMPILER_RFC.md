@@ -183,6 +183,12 @@ This covers:
 
 ## Immediate extraction from current code
 
+The first NixOS adapter proof is now separated from the neutral compiler as
+`sovereign-state-compiler-nix`. It lowers an explicit NixOS state vocabulary
+into abstract lifecycle steps and rejects unknown state properties rather than
+silently discarding them. It intentionally has no Nixward, shell, transport, or
+privileged-execution dependency.
+
 The existing Spore/Nixward code suggests the following ownership transfer:
 
 ### Move toward Sovereign State Compiler
@@ -238,7 +244,13 @@ The compiler should be able to say:
 
 > "This target can realize these requested state transitions, using these native mechanisms, under this authority, with this verification and recovery contract."
 
-It should not need to understand the application semantically beyond the artifact and declared requirements.
+It should not need to understand the application semantically beyond the artifact
+and declared requirements.
+
+The NixOS adapter is the first proof of this principle: the same neutral intent,
+artifact, capability, authorization, and verification contract can describe a
+system rebuild and an unrelated application installation. The adapter chooses
+the NixOS lowering semantics while the core remains oblivious to Nix.
 
 ## Naming recommendation
 
