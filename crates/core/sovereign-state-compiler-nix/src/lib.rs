@@ -1297,7 +1297,10 @@ mod tests {
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(42),
         );
-        a.required_resources.insert(nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"));
+        a.required_resources.insert(
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource"),
+        );
 
         let mut b = a.clone();
         b.desired_state.properties.insert(
