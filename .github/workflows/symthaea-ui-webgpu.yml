@@ -42,7 +42,7 @@ jobs:
       - name: Install Chromium + Xvfb
         run: |
           sudo apt-get update
-          sudo apt-get install -y chromium xvfb xauth
+          sudo apt-get install -y chromium xvfb xauth libvulkan1 mesa-vulkan-drivers
 
       - name: Validate qualification harness syntax
         working-directory: crates/bridges/symthaea-web
@@ -56,6 +56,7 @@ jobs:
         working-directory: crates/bridges/symthaea-ui
         env:
           CHROMIUM_PATH: /usr/bin/chromium
+          WEBGPU_HEADLESS: "false"
           WEBGPU_ARTIFACT: webgpu-qualification.json
           WEBGPU_SCREENSHOTS: webgpu-qualification-screenshots
         run: xvfb-run -a node ../symthaea-web/test-webgpu-qualification.mjs
