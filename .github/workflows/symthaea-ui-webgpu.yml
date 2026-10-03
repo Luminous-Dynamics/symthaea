@@ -48,7 +48,7 @@ jobs:
         working-directory: crates/bridges/symthaea-ui
         run: trunk build --release --features browser-qualification --dist dist
 
-      - name: Run WebGPU + fallback qualification
+      - name: Run SwiftShader WebGPU + fallback qualification
         working-directory: crates/bridges/symthaea-ui
         env:
           CHROMIUM_PATH: /usr/bin/chromium
