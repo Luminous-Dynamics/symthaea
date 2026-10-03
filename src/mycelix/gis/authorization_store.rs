@@ -74,10 +74,12 @@ impl RecoveryAuthorizationWitness {
             && !self.policy.is_empty()
             && !self.issued_at.is_empty()
             && self.authorization_instance == lease.authorization_instance
-            && lease.operation_id
-                .as_deref()
-                .map(|operation_id| self.operation_id == operation_id)
-                .unwrap_or(true)
+            && match lease.operation_id.as_deref() {
+                Some(operation_id) => {
+                    !self.operation_id.is_empty() && self.operation_id == operation_id
+                }
+                None => self.operation_id.is_empty(),
+            }
             && self.action_digest == lease.action_digest
             && self.policy == lease.policy
             && self.authority_epoch == lease.authority_epoch
@@ -5079,6 +5081,75 @@ mod tests {
     }
 
     #[test]
+    fn operation_bound_recovery_requires_matching_operation_identity() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-operation-recovery-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new(
+            "operation-recovery","intervention",super::super::ActionRisk::Critical
+        );
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"operation-recovery".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T10:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "operation-recovery",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness,&action,"frame@1","attempt-operation-recovery","boundary-A","operation-A"
+        ).unwrap();
+
+        let missing_operation=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:"attempt-operation-recovery".into(),
+            operation_id:"".into(),
+            boundary_id:"boundary-A".into(),
+            action_digest:digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:1,
+            issued_at:"2026-10-03T10:00:01Z".into(),
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&missing_operation),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let wrong_operation=RecoveryAuthorizationWitness {
+            operation_id:"operation-B".into(),
+            ..missing_operation.clone()
+        };
+        assert!(matches!(
+            store.recover_pre_dispatch_attempt(&wrong_operation),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let correct=RecoveryAuthorizationWitness {
+            operation_id:"operation-A".into(),
+            ..missing_operation
+        };
+        assert!(store.recover_pre_dispatch_attempt(&correct).unwrap());
+
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn pre_dispatch_recovery_releases_prepared_attempt_and_records_marker() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-pre-recovery-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
@@ -5101,6 +5172,7 @@ mod tests {
         let recovery=RecoveryAuthorizationWitness {
             authorization_instance:witness.authorization_instance.clone(),
             attempt_id:"attempt-pre".into(),
+            operation_id:"".into(),
             boundary_id:"boundary-A".into(),
             action_digest:digest,
             policy:"recovery-policy-v1".into(),
@@ -5150,6 +5222,7 @@ mod tests {
         let wrong_boundary=RecoveryAuthorizationWitness {
             authorization_instance:"approval-pre-fence".into(),
             attempt_id:"attempt-pre-fence".into(),
+            operation_id:"".into(),
             boundary_id:"boundary-B".into(),
             action_digest:digest.clone(),
             policy:"recovery-policy-v1".into(),
@@ -5164,6 +5237,7 @@ mod tests {
         let wrong_policy=RecoveryAuthorizationWitness {
             authorization_instance:"approval-pre-fence".into(),
             attempt_id:"attempt-pre-fence".into(),
+            operation_id:"".into(),
             boundary_id:"boundary-A".into(),
             action_digest:"sha256:action".into(),
             policy:"forged-recovery-policy".into(),
@@ -5178,6 +5252,7 @@ mod tests {
         let wrong_digest=RecoveryAuthorizationWitness {
             authorization_instance:"approval-pre-fence".into(),
             attempt_id:"attempt-pre-fence".into(),
+            operation_id:"".into(),
             boundary_id:"boundary-A".into(),
             action_digest:"sha256:forged".into(),
             policy:"recovery-policy-v1".into(),
@@ -5192,6 +5267,7 @@ mod tests {
         let correct=RecoveryAuthorizationWitness {
             authorization_instance:"approval-pre-fence".into(),
             attempt_id:"attempt-pre-fence".into(),
+            operation_id:"".into(),
             boundary_id:"boundary-A".into(),
             action_digest:digest,
             policy:"recovery-policy-v1".into(),
@@ -5232,6 +5308,7 @@ mod tests {
         let recovery=RecoveryAuthorizationWitness {
             authorization_instance:"approval-after-dispatch".into(),
             attempt_id:"attempt-after-dispatch".into(),
+            operation_id:"".into(),
             boundary_id:"boundary-A".into(),
             action_digest:digest,
             policy:"recovery-policy-v1".into(),
@@ -5338,6 +5415,7 @@ mod tests {
         let recovery=RecoveryAuthorizationWitness {
             authorization_instance:witness.authorization_instance.clone(),
             attempt_id:"attempt-prepared".into(),
+            operation_id:"".into(),
             boundary_id:"boundary-A".into(),
             action_digest:digest,
             policy:"recovery-policy-v1".into(),
