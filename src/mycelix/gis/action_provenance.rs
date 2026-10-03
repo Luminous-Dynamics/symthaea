@@ -516,6 +516,23 @@ impl AuthorizationLease {
         }
     }
 
+    /// Close a prepared or DispatchPending attempt as not-entered after a
+    /// pre-entry validity failure. This is distinct from ordinary revocation
+    /// and cannot be used once provider entry has begun.
+    pub fn expire_before_entry(&mut self, attempt_id: &str) -> Result<(), AuthorizationConsumptionError> {
+        if matches!(
+            &self.state,
+            AuthorizationLeaseState::Prepared { attempt_id: id }
+                | AuthorizationLeaseState::DispatchPending { attempt_id: id }
+                if id == attempt_id
+        ) {
+            self.state = AuthorizationLeaseState::Expired;
+            Ok(())
+        } else {
+            Err(AuthorizationConsumptionError::PreDispatchRecoveryNotAllowed)
+        }
+    }
+
 pub fn reconcile_indeterminate(
         &mut self,
         attempt_id: &str,
