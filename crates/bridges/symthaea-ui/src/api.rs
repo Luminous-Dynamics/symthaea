@@ -29,6 +29,19 @@ use wasm_bindgen_futures::JsFuture;
 /// before a second full JSON object is materialized in the WASM heap.
 const MAX_TELEMETRY_TEXT_BYTES: usize = 40 * 1024 * 1024;
 
+/// Bound one /v1/service HTTP response before JSON parsing.
+const MAX_SERVICE_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
+
+fn validate_service_response_len(byte_len: usize) -> Result<(), String> {
+    if byte_len > MAX_SERVICE_RESPONSE_BYTES {
+        return Err(format!(
+            "service response exceeds {} byte bound",
+            MAX_SERVICE_RESPONSE_BYTES
+        ));
+    }
+    Ok(())
+}
+
 fn validate_telemetry_text_len(byte_len: usize) -> Result<(), String> {
     if byte_len > MAX_TELEMETRY_TEXT_BYTES {
         return Err(format!(
@@ -183,6 +196,14 @@ mod tests {
     fn telemetry_text_budget_accepts_boundary() {
         assert!(validate_telemetry_text_len(MAX_TELEMETRY_TEXT_BYTES).is_ok());
         assert!(parse_telemetry_text("{}").is_ok());
+    }
+
+    #[test]
+    fn service_response_budget_enforces_boundary() {
+        assert!(validate_service_response_len(MAX_SERVICE_RESPONSE_BYTES).is_ok());
+        let error = validate_service_response_len(MAX_SERVICE_RESPONSE_BYTES + 1)
+            .expect_err("oversized service response must be rejected");
+        assert!(error.contains("exceeds"));
     }
 
     #[test]
