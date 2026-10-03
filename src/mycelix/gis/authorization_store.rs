@@ -7040,6 +7040,55 @@ mod tests {
     }
 
     #[test]
+    fn persisted_attempt_scope_tampering_is_rejected() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-attempt-scope-tamper-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-scope").unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-scope","prod","adapter-scope");
+        let action=EpistemicAction::new("attempt-scope-action","effect",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(), authorization_instance:"approval-scope".into(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "approval-scope",action.id.clone(),digest.clone(),"sha256:support","policy-v1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness,&action,"frame@1","attempt-scope","boundary-scope","operation-scope"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,"approval-scope","attempt-scope",&action,&effect,"boundary-scope",
+            "operation-scope","native-scope"
+        ).unwrap();
+
+        let mut connection=store.connection().unwrap();
+        let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        tx.execute(
+            "UPDATE authorization_dispatches
+             SET attempt_scope_digest='sha256:tampered-scope'
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+            params![
+                record.authorization_instance,
+                record.attempt_id,
+                record.boundary_id,
+            ],
+        ).unwrap();
+        let err=store.validate_persisted_dispatch_record(&tx,&record).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding)
+        ));
+        tx.rollback().unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn bound_attempt_id_cannot_be_reused_across_boundaries() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-attempt-scope-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
