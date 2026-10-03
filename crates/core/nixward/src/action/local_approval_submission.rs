@@ -264,7 +264,7 @@ fn admit_verified_local_submission_v1_test_adapter(
     submission: &LocalApprovalSubmissionV1,
     request: &PendingNixApprovalRequestV1,
     verified_peer: &VerifiedLocalUnixPeerCredentialV1,
-    evaluation: UnixMillisV1,
+    evaluation: AuthoritativeEvaluationV1,
 ) -> Result<LocalNixApprovalDecisionV1, LocalApprovalAdmissionErrorV1> {
     // Legacy unit coverage remains isolated from production admission. CROSS-002
     // production callers must use V2 and a runtime-owned projection digest.
@@ -282,7 +282,7 @@ fn admit_verified_local_submission_v1_test_adapter(
         request,
         &projection_digest,
         verified_peer,
-        AuthoritativeEvaluationV1::from_unix_millis_for_test(evaluation),
+        evaluation,
     )
 }
 
@@ -618,7 +618,7 @@ mod tests {
         request.authority_profile_ref = "unknown-profile-v99".to_string();
         assert_eq!(
             request.validate_shape().unwrap_err(),
-            LocalApprovalErrorV1::UnknownAuthorityProfile
+            LocalApprovalErrorV1::InvalidIdentifier("authority profile ref")
         );
     }
 
