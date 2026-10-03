@@ -336,12 +336,13 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
                 && valid_coordinate(*x2)
                 && valid_coordinate(*y2)
         }
-        WirePrimitive::Polygon { points, .. } => {
+        WirePrimitive::Polygon { points, closed } => {
             points.len() >= 2
                 && points.len() <= MAX_POLYGON_POINTS
                 && points
                     .iter()
                     .all(|point| valid_coordinate(point[0]) && valid_coordinate(point[1]))
+                && (!*closed || is_valid_closed_polygon(points))
         }
         WirePrimitive::Rect { x, y, w, h, rx } => {
             valid_coordinate(*x)
@@ -381,6 +382,101 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
     node.children
         .iter()
         .all(|child| validate_node(child, depth + 1, count))
+}
+
+fn is_valid_closed_polygon(points: &[[f32; 2]]) -> bool {
+    let mut normalized = Vec::with_capacity(points.len());
+    for (index, point) in points.iter().enumerate() {
+        if normalized
+            .last()
+            .is_none_or(|&last: &usize| points[last] != *point)
+        {
+            normalized.push(index);
+        }
+    }
+    if normalized.len() > 1 && points[*normalized.first().unwrap()] == points[*normalized.last().unwrap()] {
+        normalized.pop();
+    }
+    if normalized.len() < 3 {
+        return true;
+    }
+    let area2 = normalized
+        .iter()
+        .enumerate()
+        .map(|(index, &a)| {
+            let b = normalized[(index + 1) % normalized.len()];
+            points[a][0] * points[b][1] - points[a][1] * points[b][0]
+        })
+        .sum::<f32>();
+    area2.is_finite()
+        && area2.abs() > 1e-6
+        && is_simple_polygon(points, &normalized)
+}
+
+fn is_simple_polygon(points: &[[f32; 2]], polygon: &[usize]) -> bool {
+    let n = polygon.len();
+    if n < 4 {
+        return true;
+    }
+
+    for i in 0..n {
+        let a = points[polygon[i]];
+        let b = points[polygon[(i + 1) % n]];
+        for j in (i + 1)..n {
+            if j == i + 1 || (i == 0 && j == n - 1) {
+                continue;
+            }
+            let c = points[polygon[j]];
+            let d = points[polygon[(j + 1) % n]];
+            if segments_intersect_or_touch(a, b, c, d) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn segments_intersect_or_touch(
+    a: [f32; 2],
+    b: [f32; 2],
+    c: [f32; 2],
+    d: [f32; 2],
+) -> bool {
+    const EPSILON: f32 = 1e-6;
+    let ab_c = cross(a, b, c);
+    let ab_d = cross(a, b, d);
+    let cd_a = cross(c, d, a);
+    let cd_b = cross(c, d, b);
+    if !ab_c.is_finite() || !ab_d.is_finite() || !cd_a.is_finite() || !cd_b.is_finite() {
+        return false;
+    }
+    let proper = ((ab_c > EPSILON && ab_d < -EPSILON)
+        || (ab_c < -EPSILON && ab_d > EPSILON))
+        && ((cd_a > EPSILON && cd_b < -EPSILON)
+            || (cd_a < -EPSILON && cd_b > EPSILON));
+    if proper {
+        return true;
+    }
+    (ab_c.abs() <= EPSILON && point_on_segment(a, b, c, EPSILON))
+        || (ab_d.abs() <= EPSILON && point_on_segment(a, b, d, EPSILON))
+        || (cd_a.abs() <= EPSILON && point_on_segment(c, d, a, EPSILON))
+        || (cd_b.abs() <= EPSILON && point_on_segment(c, d, b, EPSILON))
+}
+
+fn cross(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
+    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+}
+
+fn point_on_segment(
+    a: [f32; 2],
+    b: [f32; 2],
+    point: [f32; 2],
+    epsilon: f32,
+) -> bool {
+    point[0] >= a[0].min(b[0]) - epsilon
+        && point[0] <= a[0].max(b[0]) + epsilon
+        && point[1] >= a[1].min(b[1]) - epsilon
+        && point[1] <= a[1].max(b[1]) + epsilon
 }
 
 fn collect_first_gradient_colors(root: &SceneNode) -> std::collections::HashMap<&str, Color> {
@@ -640,6 +736,43 @@ mod tests {
             root,
         };
         assert!(!scene.is_supported());
+    }
+
+    #[test]
+    fn externally_constructed_scene_rejects_invalid_closed_polygon_topology() {
+        for points in [
+            vec![
+                [20.0, 20.0],
+                [140.0, 140.0],
+                [20.0, 140.0],
+                [140.0, 20.0],
+            ],
+            vec![
+                [20.0, 20.0],
+                [140.0, 20.0],
+                [140.0, 140.0],
+                [20.0, 140.0],
+                [80.0, 20.0],
+            ],
+            vec![
+                [20.0, 20.0],
+                [140.0, 20.0],
+                [140.0, 140.0],
+                [20.0, 20.0],
+                [20.0, 140.0],
+            ],
+        ] {
+            let scene = RemoteScene {
+                version: RemoteScene::VERSION,
+                root: WireNode {
+                    primitive: WirePrimitive::Polygon { points, closed: true },
+                    transform: WireTransform::default(),
+                    style: WireStyle::default(),
+                    children: vec![],
+                },
+            };
+            assert!(!scene.is_supported());
+        }
     }
 
     #[test]
