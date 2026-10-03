@@ -2737,6 +2737,30 @@ fn validate_native_authority_pin_set(
 
     /// Compare every immutable identity field of a caller-supplied dispatch
     /// record against the durable dispatch row before terminal settlement.
+    fn validate_persisted_adapter_configuration(
+        tx: &Transaction<'_>,
+        record: &DurableDispatchRecord,
+    ) -> Result<(), AuthorizationStoreError> {
+        let configuration = tx
+            .query_row(
+                "SELECT adapter_revision,implementation_digest
+                 FROM authorization_provider_adapter_pins
+                 WHERE adapter_id=?1",
+                params![record.adapter.as_str()],
+                |row| Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?)),
+            )
+            .optional()?
+            .ok_or_else(|| AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))?;
+        if configuration.0 != record.adapter_revision
+            || configuration.1 != record.adapter_implementation_digest
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        Ok(())
+    }
+
     fn validate_persisted_dispatch_record(
         &self,
         tx: &Transaction<'_>,
@@ -2812,6 +2836,7 @@ fn validate_native_authority_pin_set(
         let Some(adapter_implementation_digest) = adapter_implementation_digest.as_deref() else {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         };
+        Self::validate_persisted_adapter_configuration(tx, record)?;
 
         let expected = compute_attempt_binding_digest(
             &record.authorization_instance,&record.attempt_id,&record.operation_id,
@@ -4282,6 +4307,61 @@ mod tests {
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidBinding
             ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn adapter_pin_tampering_is_rejected_before_terminal_settlement() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-adapter-tamper-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-adapter-tamper","prod","adapter-adapter-tamper"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"adapter-tamper".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T07:30:00Z".into(),
+            expires_at:Some("2026-10-04T07:30:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-adapter-tamper","boundary-adapter-tamper"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-adapter-tamper",
+            &action,&effect,"boundary-adapter-tamper",
+            "operation:adapter-tamper","native-adapter-tamper"
+        ).unwrap();
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_provider_adapter_pins
+             SET implementation_digest='sha256:tampered-adapter'
+             WHERE adapter_id=?1",
+            params![record.adapter.as_str()],
+        ).unwrap();
+
+        let err=store.commit_bound_verified(
+            &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
         ));
         let _=std::fs::remove_file(path);
     }
