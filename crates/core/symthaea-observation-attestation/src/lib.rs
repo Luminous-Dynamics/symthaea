@@ -564,15 +564,16 @@ impl EvaluationTrace {
 
     /// Validate the structural invariants of the durable execution trace.
     pub fn is_well_formed(&self) -> bool {
-        let procedure = EvaluationProcedure::attestation_ed25519();
+        let current_procedure = EvaluationProcedure::attestation_ed25519();
         let legacy_procedure = EvaluationProcedure::attestation_ed25519_v1();
-        let procedure = if self.procedure_fingerprint == procedure.fingerprint() {
-            procedure
-        } else if self.procedure_fingerprint == legacy_procedure.fingerprint() {
-            legacy_procedure
-        } else {
-            return false;
-        };
+        let (procedure, legacy_semantics) =
+            if self.procedure_fingerprint == current_procedure.fingerprint() {
+                (current_procedure, false)
+            } else if self.procedure_fingerprint == legacy_procedure.fingerprint() {
+                (legacy_procedure, true)
+            } else {
+                return false;
+            };
 
         !self.results.is_empty()
             && self.results.iter().enumerate().all(|(index, result)| {
@@ -581,7 +582,11 @@ impl EvaluationTrace {
                     && match result.stage {
                         VerificationStage::Passed => true,
                         VerificationStage::Failed(outcome) => {
-                            result.check.allows_failure_outcome(outcome)
+                            if legacy_semantics {
+                                result.check.allows_legacy_failure_outcome(outcome)
+                            } else {
+                                result.check.allows_failure_outcome(outcome)
+                            }
                         }
                         VerificationStage::NotEvaluated => false,
                     }
@@ -3371,6 +3376,33 @@ mod tests {
         assert_ne!(
             procedure.fingerprint(),
             EvaluationProcedure::attestation_ed25519().fingerprint()
+        );
+    }
+
+    #[test]
+    fn legacy_v1_execution_trace_preserves_historical_failure_semantics() {
+        let procedure = EvaluationProcedure::attestation_ed25519_v1();
+        let trace = EvaluationTrace {
+            procedure_fingerprint: procedure.fingerprint(),
+            results: procedure.checks.iter().copied().enumerate().map(|(index, check)| {
+                EvaluationCheckResult {
+                    sequence: index as u32,
+                    check,
+                    stage: if check == EvaluationCheck::CryptographicProof {
+                        VerificationStage::Failed(
+                            ReceiptAttestationVerificationOutcome::InvalidSignature,
+                        )
+                    } else {
+                        VerificationStage::Passed
+                    },
+                }
+            }).collect(),
+        };
+
+        assert!(trace.is_well_formed());
+        assert_eq!(
+            trace.terminal_outcome(),
+            Some(ReceiptAttestationVerificationOutcome::InvalidSignature)
         );
     }
 
