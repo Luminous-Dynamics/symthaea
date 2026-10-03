@@ -36,6 +36,7 @@ jobs:
       - name: Format SSC crates
         run: |
           find crates/core/sovereign-state-compiler crates/core/sovereign-state-compiler-nix \
+            crates/core/nixward/src/ssc_bridge.rs \
             -type f -name '*.rs' -print0 |
             xargs -0 -r -n1 rustup run 1.96.0 rustfmt --edition 2024 --check
 
@@ -50,6 +51,11 @@ jobs:
           ! rg -n 'std::process|Command::new|tokio|ssh|nix-env|nixos-rebuild' \
             crates/core/sovereign-state-compiler-nix/Cargo.toml \
             crates/core/sovereign-state-compiler-nix/src
+
+      - name: Nixward SSC bridge execution guard
+        run: |
+          ! rg -n 'std::process|Command::new|tokio|ssh|nix-env|nixos-rebuild' \
+            crates/core/nixward/src/ssc_bridge.rs
 
       - name: Build isolated SSC validation workspace
         run: |
