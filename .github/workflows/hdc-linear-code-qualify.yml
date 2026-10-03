@@ -186,6 +186,16 @@ jobs:
           test -n "$GEOMETRY_SWEEP"
           printf 'geometry_sweep=%s\n' "$GEOMETRY_SWEEP" >> "$GITHUB_OUTPUT"
 
+      - name: Capture published-parameter storage ledger
+        id: storage
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity published_parameter_storage_ledger_is_exact_and_packed_consistent -- --nocapture 2>&1)"
+          STORAGE_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^STORAGE_LEDGER=')"
+          test "$STORAGE_LEDGER_COUNT" -eq 1
+          STORAGE_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^STORAGE_LEDGER=//p')"
+          test -n "$STORAGE_LEDGER"
+          printf 'storage_ledger=%s\n' "$STORAGE_LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Capture paper-scale binding recovery matrix
         id: paper_matrix
         run: |
@@ -287,6 +297,9 @@ jobs:
           paper_matrix_status=${{ steps.paper_matrix.outcome }}
           paper_matrix=${{ steps.paper_matrix.outputs.paper_matrix }}
           paper_matrix_result_digest=${{ steps.paper_matrix.outputs.paper_matrix_result_digest }}
+          storage_ledger_schema=linear-code-storage-v1
+          storage_ledger_status=${{ steps.storage.outcome }}
+          storage_ledger=${{ steps.storage.outputs.storage_ledger }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
