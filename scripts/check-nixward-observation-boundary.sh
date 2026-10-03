@@ -308,10 +308,9 @@ run_self_test() {
     echo "ERROR: CROSS-023 self-test falsely rejected crate-private observation parser" >&2
     return 1
   fi
-}
 
-  printf '%s\n' 'pub async fn parse_systemd_properties(...) {}' > "$tmp/observed-state-public-async-parser.rs"
-  if scan_public_observation_factory "$tmp/observed-state-public-async-parser.rs"; then :; else
+  printf '%s\n' 'pub async fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-public-async-parser.rs"
+  if scan_public_observation_factory "${tmp}/observed-state-public-async-parser.rs"; then :; else
     echo "ERROR: CROSS-023 self-test failed to detect public async observed-state parser" >&2
     return 1
   fi
@@ -319,11 +318,13 @@ run_self_test() {
   printf '%s\n' 'impl NixServiceObservedStateV1 {
     pub async fn new(
         unit: String,
-    ) {}' > "$tmp/observed-state-public-async-constructor.rs"
-  if rg -U -n --pcre2 "$OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN" "$tmp/observed-state-public-async-constructor.rs"; then :; else
+    ) {}' > "${tmp}/observed-state-public-async-constructor.rs"
+  if rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/observed-state-public-async-constructor.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect public async observed-state constructor" >&2
     return 1
   fi
+}
+
 
 run_self_test
 run_boundary_check
