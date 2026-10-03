@@ -1591,6 +1591,8 @@ fn validate_cose_crit(
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum CborLabelKey {
     Integer(i64),
+    /// Positive CBOR labels above i64::MAX remain distinguishable from signed labels.
+    Unsigned(u64),
     Text(Vec<u8>),
 }
 
@@ -1694,7 +1696,14 @@ impl<'a> CborReader<'a> {
 
     fn read_cose_label_key(&mut self) -> Result<CborLabelKey, Rfc9162ProofDecodeError> {
         match self.peek_major_type()? {
-            0 | 1 => self.read_i64().map(CborLabelKey::Integer),
+            0 => {
+                let value = self.read_u64()?;
+                match i64::try_from(value) {
+                    Ok(value) => Ok(CborLabelKey::Integer(value)),
+                    Err(_) => Ok(CborLabelKey::Unsigned(value)),
+                }
+            }
+            1 => self.read_i64().map(CborLabelKey::Integer),
             3 => self.read_text_bounded(256).map(CborLabelKey::Text),
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
@@ -1703,7 +1712,7 @@ impl<'a> CborReader<'a> {
     fn read_cose_label(&mut self) -> Result<Option<i64>, Rfc9162ProofDecodeError> {
         match self.read_cose_label_key()? {
             CborLabelKey::Integer(value) => Ok(Some(value)),
-            CborLabelKey::Text(_) => Ok(None),
+            CborLabelKey::Unsigned(_) | CborLabelKey::Text(_) => Ok(None),
         }
     }
 
