@@ -207,9 +207,9 @@ The execution identities remain deliberately non-interchangeable:
 
 - **Authorization instance** identifies the durable grant of authority.
 - **Attempt ID** identifies one executor attempt and may change across recovery/replacement.
-- **Provider idempotency key** identifies the downstream replay unit for the same authorized action. It is derived deterministically from the authorization instance and canonical action digest, and intentionally excludes the attempt ID.
+- **Provider idempotency key** identifies the downstream replay-control value for the same native grant and effect target. It is derived deterministically from the native replay identity + target identity + canonical action digest, under a versioned domain separator, and intentionally excludes the operation ID and attempt ID.
 
-Consequently, a crash or executor replacement must not manufacture a new provider idempotency key merely because it has a new attempt ID. A freshly issued authorization instance receives a distinct provider identity. The provider key is a downstream replay-control identity, not a substitute for authorization and not evidence that the effect occurred.
+Consequently, a crash or executor replacement must not manufacture a new provider idempotency key merely because it has a new attempt ID. A fresh native grant receives a distinct replay identity and therefore a distinct provider key. The provider key is a downstream replay-control identity, not a substitute for authorization and not evidence that the effect occurred.
 
 ### Frozen durable dispatch record
 
@@ -233,7 +233,7 @@ For an effectful attempt, the preferred lifecycle is:
 
     prepare_for_execution_bound
       ↓
-    mark_dispatch_pending_bound
+    mark_dispatch_pending_bound_from_pinned_native_authority
       ↓
     mark_invoked_bound
       ↓
@@ -300,11 +300,11 @@ For an effectful attempt, the store also enforces a transactional same-action in
 
 This layer deliberately does **not** claim that the native replay identity has been derived correctly merely because a caller supplied a string. The native authorization adapter remains responsible for authenticating the native authority and deriving its replay identity from the pinned authority namespace and native authorization identifier. The store's role is to require, freeze, bind, and durably fence that value once it crosses the execution boundary.
 
-The effect boundary now exposes a canonical native-authorization entry point that derives the native replay identity from the pinned authority namespace and native authorization identifier before constructing the durable dispatch record. That derivation witness—authority namespace, native authorization identifier, and derivation digest—is persisted with the dispatch record and propagated into terminal provider evidence in the same durable lifecycle. The legacy free-form replay-identity entry point remains only for staged compatibility and is deprecated.
+The effect boundary now exposes a canonical native-authorization entry point that derives the native replay identity from the pinned authority namespace and native authorization identifier before constructing the durable dispatch record. That derivation witness—authority namespace, native authorization identifier, and derivation digest—is persisted with the dispatch record and propagated into terminal provider evidence in the same durable lifecycle. The former free-form replay-identity entry points remain only as deprecated hard-fail shims: they cannot create an effectful dispatch record without durable native derivation provenance.
 
 The durable SQLite authorization store is also pinned to one relying-party control domain. Production callers can open it with an explicit relying-party identifier; the compatibility open path uses the legacy-local domain. The same-action in-flight fence is therefore evaluated as relying party + effecting target identity + action digest, while the relying-party binding itself remains outside the canonical action digest. A store cannot later be reopened under a different relying party, preventing accidental cross-domain fence reuse. The native authority pin set is likewise durable and write-once: an accepted issuer is resolved to one authority namespace inside the effect boundary before native replay identity derivation. Unpinned issuers and attempts to change an established mapping fail closed. The same-action fence is independent of native replay identity: fresh native authority cannot bypass an occupied action key. An EXECUTED/SUCCEEDED result keeps that action key closed; a FAILED result releases it for a later attempt only when fresh native authority and a new operation lifecycle are provided.
 
-Provider idempotency derivation is now native-replay based. The effectful path derives the provider key from the native replay identity plus the exact effecting target and canonical action digest under a versioned domain separator. The operation identifier, authorization presentation identifier, attempt identifier, wrapper/handoff digest, session, task, trace, challenge, and provider-supplied identifier are excluded. This means executor retries and operation-label changes cannot manufacture a fresh downstream effect identity. A legacy authorization-instance derivation remains only as an explicitly deprecated compatibility API and is not used by the bound effectful dispatch path.
+Provider idempotency derivation is now native-replay based. The effectful path derives the provider key from the native replay identity plus the exact effecting target and canonical action digest under a versioned domain separator. The operation identifier, authorization presentation identifier, attempt identifier, wrapper/handoff digest, session, task, trace, challenge, and provider-supplied identifier are excluded. This means executor retries and operation-label changes cannot manufacture a fresh downstream effect identity. The former authorization-instance derivation API is deprecated and hard-fenced; it is not a usable effectful compatibility path.
 
 ### Pre-entry recovery versus Indeterminate reconciliation
 
