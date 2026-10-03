@@ -308,6 +308,8 @@ pub struct DurableDispatchRecord {
     pub native_issuer: String,
     /// Frozen authority namespace resolved from the issuer pin.
     pub native_authority_namespace: String,
+    /// Stable native authorization identifier from which native replay identity was derived.
+    pub native_authorization_id: String,
     pub status_identifier: String,
     pub status_source_digest: String,
     pub status_observed_at: String,
@@ -333,6 +335,7 @@ impl DurableDispatchRecord {
         native_replay_identity: impl Into<String>,
         native_issuer: impl Into<String>,
         native_authority_namespace: impl Into<String>,
+        native_authorization_id: impl Into<String>,
         action_id: impl Into<String>,
         action_digest: impl Into<String>,
         provider_idempotency_key: impl Into<String>,
@@ -347,6 +350,7 @@ impl DurableDispatchRecord {
             native_replay_identity: native_replay_identity.into(),
             native_issuer: native_issuer.into(),
             native_authority_namespace: native_authority_namespace.into(),
+            native_authorization_id: native_authorization_id.into(),
             status_identifier: status.status_identifier.clone(),
             status_source_digest: status.status_source_digest.clone(),
             status_observed_at: status.status_observed_at.clone(),
@@ -1363,6 +1367,7 @@ fn validate_native_authority_pin_set(
             native_replay_identity,
             native_issuer,
             &native_replay_provenance.authority_namespace,
+            &native_replay_provenance.native_authorization_id,
             &action.id,
             &expected_digest,
             &lease
@@ -1499,7 +1504,7 @@ fn validate_native_authority_pin_set(
             ProviderStatusVerificationPurpose::PreEntry,
             &record.native_issuer,
             &record.native_authority_namespace,
-            &record.native_replay_identity,
+            &record.native_authorization_id,
             &record.status_identifier,
             &record.action_digest,
             &record.target_identity,
@@ -2891,7 +2896,7 @@ mod tests {
             purpose: ProviderStatusVerificationPurpose,
             _issuer: &str,
             _authority_namespace: &str,
-            _native_authorization_id: &str,
+            native_authorization_id: &str,
             status_identifier: &str,
             _action_digest: &str,
             _target_identity: &str,
@@ -2899,11 +2904,14 @@ mod tests {
             _adapter: &str,
             expected_source_digest: Option<&str>,
         ) -> Result<ProviderStatusEvidence, ProviderStatusVerificationError> {
+            let expected_native_authorization_id =
+                status_identifier.strip_prefix("status:");
             if !matches!(
                 purpose,
                 ProviderStatusVerificationPurpose::Admission
                     | ProviderStatusVerificationPurpose::PreEntry
             ) || status_identifier.is_empty()
+                || expected_native_authorization_id != Some(native_authorization_id)
             {
                 return Err(ProviderStatusVerificationError::InvalidBinding);
             }
