@@ -1825,6 +1825,13 @@ impl KnowledgePersistence {
             ));
         }
 
+        // Before committing the migrated schema, require the historical ledgers to satisfy
+        // the same invariants used by runtime verification. This prevents malformed legacy
+        // metadata from being converted into a merely self-consistent but structurally invalid
+        // provenance history.
+        verify_snapshot_receipts_in_tx(&tx)?;
+        verify_snapshot_validation_receipts_in_tx(&tx)?;
+
         // Enforce append-only receipt history at the SQLite boundary. Migration backfills
         // above intentionally happen before these triggers are created.
         tx.execute_batch(
