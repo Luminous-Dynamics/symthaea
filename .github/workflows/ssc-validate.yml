@@ -1,5 +1,6 @@
 name: Sovereign State Compiler Validation
-# Boundary contract: validate the neutral core and plan-only target adapters on every relevant branch push/PR.
+# Boundary contract: validate the neutral core and plan-only NixOS adapter without
+# inheriting unrelated workspace-member failures.
 
 on:
   push:
@@ -32,19 +33,55 @@ jobs:
           rustup component add rustfmt --toolchain 1.96.0
           rustup default 1.96.0
 
-      - name: Format check
-        run: cargo +1.96.0 fmt --all -- --check
+      - name: Format SSC crates
+        run: |
+          find crates/core/sovereign-state-compiler crates/core/sovereign-state-compiler-nix \
+            -type f -name '*.rs' -print0 |
+            xargs -0 -r rustfmt +stable --edition 2024 --check
 
       - name: Core boundary guard
         run: |
-          ! rg -n 'nixward|tokio|xenia|mycelix|std::process|Command::new|ssh'             crates/core/sovereign-state-compiler
+          ! rg -n 'nixward|tokio|xenia|mycelix|std::process|Command::new|ssh' \
+            crates/core/sovereign-state-compiler
 
       - name: Adapter execution guard
         run: |
-          ! rg -n 'std::process|Command::new|tokio|ssh|nix-env|nixos-rebuild'             crates/core/sovereign-state-compiler-nix
+          ! rg -n 'std::process|Command::new|tokio|ssh|nix-env|nixos-rebuild' \
+            crates/core/sovereign-state-compiler-nix
 
-      - name: Check crate
-        run: cargo +1.96.0 check -p sovereign-state-compiler
+      - name: Build isolated SSC validation workspace
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
 
-      - name: Test crate
-        run: cargo +1.96.0 test -p sovereign-state-compiler
+          mkdir -p "$tmp/sovereign-state-compiler/src"
+          mkdir -p "$tmp/sovereign-state-compiler-nix/src"
+          cp crates/core/sovereign-state-compiler/Cargo.toml "$tmp/sovereign-state-compiler/"
+          cp crates/core/sovereign-state-compiler/src/lib.rs "$tmp/sovereign-state-compiler/src/"
+          cp crates/core/sovereign-state-compiler-nix/Cargo.toml "$tmp/sovereign-state-compiler-nix/"
+          cp crates/core/sovereign-state-compiler-nix/src/lib.rs "$tmp/sovereign-state-compiler-nix/src/"
+
+          cat > "$tmp/Cargo.toml" <<'EOF'
+          [workspace]
+          resolver = "2"
+          members = [
+              "sovereign-state-compiler",
+              "sovereign-state-compiler-nix",
+          ]
+
+          [workspace.dependencies]
+          blake3 = "1.5"
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          thiserror = "1.0"
+          EOF
+
+          cargo +1.96.0 metadata --manifest-path "$tmp/Cargo.toml" --no-deps
+          cargo +1.96.0 check --manifest-path "$tmp/Cargo.toml" --workspace
+          cargo +1.96.0 test --manifest-path "$tmp/Cargo.toml" --workspace
+
+      - name: Verify source boundary remains workspace-portable
+        run: |
+          test -f crates/core/sovereign-state-compiler/Cargo.toml
+          test -f crates/core/sovereign-state-compiler-nix/Cargo.toml
