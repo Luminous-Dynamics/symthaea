@@ -1654,7 +1654,7 @@ impl KnowledgePersistence {
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| format!("Provenance kind normalization row: {e}"))?
         };
-        for (rowid, legacy_kind) in legacy_kind_rows.drain(..) {
+        for (rowid, legacy_kind) in legacy_kind_rows {
             let kind = provenance_kind_from_persisted(&legacy_kind)
                 .ok_or_else(|| format!("Unknown persisted provenance kind: {legacy_kind}"))?;
             tx.execute(
