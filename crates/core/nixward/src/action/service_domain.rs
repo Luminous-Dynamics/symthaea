@@ -164,6 +164,16 @@ mod tests {
     }
 
     #[test]
+    fn canonicalizer_rejects_path_like_input_before_suffix_classification() {
+        for unit in ["../nginx", "/nginx", "foo\\bar"] {
+            assert_eq!(
+                NixServiceOperationV1::new(unit, NixServiceOperationKindV1::Start).unwrap_err(),
+                NixServiceOperationErrorV1::PathLikeUnit
+            );
+        }
+    }
+
+    #[test]
     fn accepts_and_rejects_exact_service_unit_length_boundary() {
         let max_name = format!("{}.service", "a".repeat(247));
         assert_eq!(max_name.len(), 255);
