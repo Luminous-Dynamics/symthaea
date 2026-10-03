@@ -484,10 +484,8 @@ impl ExecutionReceipt {
     /// Whether the receipt represents both mechanical success/recovery and
     /// satisfied postconditions.
     pub fn is_verified_success(&self) -> bool {
-        matches!(
-            self.outcome,
-            ExecutionOutcome::Succeeded | ExecutionOutcome::Recovered
-        ) && self.postcondition == PostconditionOutcome::Satisfied
+        self.outcome == ExecutionOutcome::Succeeded
+            && self.postcondition == PostconditionOutcome::Satisfied
     }
 }
 
@@ -1194,6 +1192,29 @@ mod tests {
         };
 
         assert!(receipt.validate_for(&authorized).is_ok());
+    }
+
+    #[test]
+    fn recovery_is_not_forward_verified_success() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-recovery"),
+            started_at_ms: 151,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Recovered,
+            postcondition: PostconditionOutcome::Satisfied,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert!(receipt.validate_for(&authorized).is_ok());
+        assert!(!receipt.is_verified_success());
     }
 
     #[test]
