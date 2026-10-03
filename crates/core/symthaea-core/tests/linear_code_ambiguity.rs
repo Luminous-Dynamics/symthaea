@@ -302,6 +302,15 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                         continue;
                     };
 
+                    result_digest.update(b"recovered");
+                    result_digest.update(&(recovered.len() as u64).to_le_bytes());
+                    for word in &recovered {
+                        result_digest.update(&(word.words().len() as u64).to_le_bytes());
+                        for packed_word in word.words() {
+                            result_digest.update(&packed_word.to_le_bytes());
+                        }
+                    }
+
                     let valid = recovered.len() == factor_count
                         && recovered
                             .iter()
