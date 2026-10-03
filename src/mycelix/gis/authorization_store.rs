@@ -1907,7 +1907,8 @@ fn validate_native_authority_pin_set(
 
         let changed = tx.execute(
             "UPDATE authorization_leases
-             SET state='prepared', attempt_id=?2, operation_id=?3, boundary_id=?4
+             SET state='prepared', attempt_id=?2, operation_id=?3, boundary_id=?4,
+                 attempt_scope_digest=?5
              WHERE authorization_instance=?1 AND state='ready'
                AND remaining_executions>0 AND boundary_id IS NULL",
             params![
@@ -1915,6 +1916,7 @@ fn validate_native_authority_pin_set(
                 attempt_id,
                 operation_id,
                 boundary_id,
+                compute_attempt_scope_digest(boundary_id, attempt_id)?,
             ],
         )?;
         if changed != 1 {
@@ -3307,7 +3309,7 @@ fn validate_native_authority_pin_set(
 
         let changed = tx.execute(
             "UPDATE authorization_leases
-             SET state='ready', attempt_id=NULL, boundary_id=NULL
+             SET state='ready', attempt_id=NULL, boundary_id=NULL, attempt_scope_digest=NULL
              WHERE authorization_instance=?1 AND state='prepared'
                AND attempt_id=?2 AND boundary_id=?3",
             params![
@@ -3902,9 +3904,14 @@ fn update_lease_with_boundary(
         | AuthorizationLeaseState::Expired => None,
         _ => boundary_id,
     };
+    let attempt_scope_digest = match (current_boundary, state_attempt(&lease.state)) {
+        (Some(boundary), Some(attempt)) => Some(compute_attempt_scope_digest(boundary, attempt)?),
+        _ => None,
+    };
     let changed = tx.execute(
         "UPDATE authorization_leases
-         SET state=?2,attempt_id=?3,operation_id=?4,remaining_executions=?5,boundary_id=?6
+         SET state=?2,attempt_id=?3,operation_id=?4,remaining_executions=?5,boundary_id=?6,
+             attempt_scope_digest=?7
          WHERE authorization_instance=?1",
         params![
             lease.authorization_instance,
@@ -3912,7 +3919,8 @@ fn update_lease_with_boundary(
             state_attempt(&lease.state),
             if current_boundary.is_some() { lease.operation_id.as_deref() } else { None },
             lease.remaining_executions as i64,
-            current_boundary
+            current_boundary,
+            attempt_scope_digest
         ],
     )?;
     if changed != 1 {
