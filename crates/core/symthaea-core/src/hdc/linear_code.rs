@@ -622,6 +622,27 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_small_space_hadamard_xor_equivalence() {
+        let dimension = 6;
+        let words: Vec<_> = (0..(1usize << dimension))
+            .map(|mask| BinaryCodeword::from_words(dimension, vec![mask as u64]))
+            .collect();
+
+        for left in &words {
+            for right in &words {
+                let boolean_bound = left.bound(right);
+                let hadamard: Vec<i8> = left
+                    .to_bipolar()
+                    .iter()
+                    .zip(right.to_bipolar())
+                    .map(|(left, right)| left * right)
+                    .collect();
+                assert_eq!(BinaryCodeword::from_bipolar(&hadamard), Some(boolean_bound));
+            }
+        }
+    }
+
+    #[test]
     fn malformed_bipolar_observation_is_rejected() {
         assert_eq!(BinaryCodeword::from_bipolar(&[-1, 0, 1]), None);
     }
