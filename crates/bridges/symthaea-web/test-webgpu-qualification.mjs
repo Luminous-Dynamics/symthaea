@@ -393,7 +393,7 @@ try {
   }
 
   const artifact = {
-    schema: 'symthaea-ui-webgpu-qualification-v1',
+    schema: 'symthaea-ui-webgpu-qualification-v2',
     url: URL,
     chromium: CHROMIUM,
     git_sha: process.env.GITHUB_SHA || null,
