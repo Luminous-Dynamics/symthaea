@@ -1347,6 +1347,21 @@ impl EvidenceEvaluation {
         evaluation
     }
 
+    /// Validate the internal integrity of this evaluation without requiring
+    /// access to the source verification report.
+    ///
+    /// This is intentionally weaker than report consistency: it proves that the
+    /// evaluation is internally coherent, not that it still matches the exact
+    /// report from which it was materialized.
+    pub fn is_well_formed(&self) -> bool {
+        self.evaluation_version == EVIDENCE_EVALUATION_VERSION
+            && self.evaluation_type == ATTESTATION_VERIFICATION_EVALUATION_TYPE
+            && self.context_fingerprint == self.context.fingerprint()
+            && self.execution_trace.is_well_formed()
+            && self.execution_trace.terminal_outcome() == Some(self.outcome)
+            && self.boundary.is_well_formed()
+    }
+
     /// Validate that this evaluation remains consistent with the report that
     /// materialized it. This catches post-hoc mutation of outcome, subject,
     /// context identity, execution evidence, or epistemic boundary.
@@ -1358,7 +1373,7 @@ impl EvidenceEvaluation {
         // evidence no longer satisfies the report contract. This keeps the
         // report-level invariant as the single integrity gate for consumers.
         report.is_well_formed()
-            && self.evaluation_version == EVIDENCE_EVALUATION_VERSION
+            && self.is_well_formed()
             && self.subject_fingerprint == report.receipt_fingerprint
             && self.verification_report_fingerprint == report.fingerprint()
             && self.context_fingerprint == self.context.fingerprint()
@@ -3037,6 +3052,28 @@ mod tests {
         };
         assert_eq!(trace.terminal_outcome(), None);
         assert!(!trace.is_well_formed());
+    }
+
+    #[test]
+    fn evidence_evaluation_self_validation_rejects_internal_mutation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+
+        assert!(evaluation.is_well_formed());
+
+        let mut changed_context = evaluation.clone();
+        changed_context.context_fingerprint = "tampered-context".into();
+        assert!(!changed_context.is_well_formed());
+
+        let mut changed_trace = evaluation;
+        changed_trace.execution_trace = EvaluationTrace::default();
+        assert!(!changed_trace.is_well_formed());
     }
 
     #[test]
