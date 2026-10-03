@@ -205,6 +205,60 @@ fn small_code_geometry_seed_sweep_is_exhaustively_self_consistent() {
 }
 
 #[test]
+fn published_parameter_storage_ledger_is_exact_and_packed_consistent() {
+    let dimensions = [500usize, 1000, 2000];
+    let ranks = [3usize, 5, 7];
+    let factor_counts = [3usize, 4, 5];
+
+    let mut cases = 0usize;
+    let mut total_theoretical_codebook_bits = 0u128;
+    let mut total_theoretical_generator_bits = 0u128;
+    let mut total_packed_generator_bytes = 0u128;
+    let mut total_packed_target_bytes = 0u128;
+
+    for &dimension in &dimensions {
+        let packed_words = BinaryCodeword::zero(dimension).words().len() as u128;
+        let packed_target_bytes = packed_words * 8;
+
+        for &rank in &ranks {
+            let codeword_count = 1u128 << rank;
+
+            for &factor_count in &factor_counts {
+                let arbitrary_codebook_bits =
+                    (factor_count as u128 * codeword_count + 1) * dimension as u128;
+                let generator_matrix_bits =
+                    (factor_count * rank + 1) as u128 * dimension as u128;
+                let packed_generator_bytes =
+                    (factor_count * rank) as u128 * packed_words * 8;
+
+                total_theoretical_codebook_bits += arbitrary_codebook_bits;
+                total_theoretical_generator_bits += generator_matrix_bits;
+                total_packed_generator_bytes += packed_generator_bytes;
+                total_packed_target_bytes += packed_target_bytes;
+                cases += 1;
+
+                assert_eq!(
+                    packed_generator_bytes * 8,
+                    (factor_count * rank) as u128
+                        * packed_words
+                        * 64
+                );
+                assert!(generator_matrix_bits <= arbitrary_codebook_bits);
+            }
+        }
+    }
+
+    assert_eq!(cases, 27);
+    assert!(total_theoretical_generator_bits < total_theoretical_codebook_bits);
+    assert!(total_packed_generator_bytes > 0);
+    assert_eq!(total_packed_target_bytes, 27 * 8 * 32);
+
+    println!(
+        "STORAGE_LEDGER=dimensions=500,1000,2000;ranks=3,5,7;factors=3,4,5;cases={cases};theoretical_codebook_bits={total_theoretical_codebook_bits};theoretical_generator_matrix_bits={total_theoretical_generator_bits};packed_generator_bytes={total_packed_generator_bytes};packed_target_bytes={total_packed_target_bytes}"
+    );
+}
+
+#[test]
 fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     let dimensions = [500usize, 1000, 2000];
     let ranks = [3usize, 5, 7];
