@@ -1298,16 +1298,16 @@ impl SqliteAuthorizationStore {
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         let row = tx.query_row(
-            "SELECT operation_id,native_replay_identity,action_id,action_digest,provider_idempotency_key,
-                    target_identity,audience,adapter,boundary_id,state
+            "SELECT operation_id,native_replay_identity,relying_party_id,action_id,action_digest,
+                    provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance.as_str(), record.attempt_id.as_str()],
             |r| Ok((
-                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
+                r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,Option<String>>(2)?,
                 r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
                 r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
-                r.get::<_,String>(9)?,
+                r.get::<_,String>(9)?, r.get::<_,String>(10)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
 
