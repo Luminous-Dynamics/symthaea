@@ -194,7 +194,15 @@ impl TemporalFusionGate {
         let required = self.policy.minimum_trusted_sensors as usize;
         let authoritative_references: std::collections::BTreeSet<_> = trusted
             .iter()
-            .map(|pair| &pair.independence.topology_attestation.authoritative_reference)
+            .map(|pair| {
+                let reference = &pair.independence.topology_attestation.authoritative_reference;
+                (
+                    reference.attestation_id.as_str(),
+                    reference.issuer_id.as_str(),
+                    reference.attestation_digest.as_str(),
+                    reference.verification_reference.as_str(),
+                )
+            })
             .collect();
         if authoritative_references.len() > 1 {
             issues.push(TemporalFusionIssue::TopologyAttestation(
