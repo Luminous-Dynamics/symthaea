@@ -83,7 +83,7 @@ impl NixActivationMode {
             Self::Test => [
                 Capability::ConfigureSystem,
                 Capability::UpdateSystem,
-                Capability::ObserveHardware,
+                Capability::ObserveState,
             ]
             .into_iter()
             .collect(),
@@ -140,6 +140,7 @@ impl NixActivationMode {
 /// compiler crate.
 pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
     [
+        Capability::ObserveState,
         Capability::ObserveHardware,
         Capability::InstallApplication,
         Capability::RemoveApplication,
@@ -417,7 +418,7 @@ impl TargetAdapter for NixOSTargetAdapter {
         Self::push_step(
             &mut steps,
             PlanStepKind::Observe,
-            [Capability::ObserveHardware],
+            [Capability::ObserveState],
             "observe target before applying state",
         );
 
@@ -500,7 +501,7 @@ impl TargetAdapter for NixOSTargetAdapter {
         Self::push_step(
             &mut steps,
             PlanStepKind::Verify,
-            [Capability::ObserveHardware],
+            [Capability::ObserveState],
             "verify declared target state after execution",
         );
 
@@ -655,7 +656,7 @@ mod tests {
             (
                 "switch",
                 vec![
-                    (PlanStepKind::Observe, set(&[Capability::ObserveHardware])),
+                    (PlanStepKind::Observe, set(&[Capability::ObserveState])),
                     (
                         PlanStepKind::ApplyDesiredState,
                         set(&[
@@ -664,13 +665,13 @@ mod tests {
                             Capability::ModifyBootChain,
                         ]),
                     ),
-                    (PlanStepKind::Verify, set(&[Capability::ObserveHardware])),
+                    (PlanStepKind::Verify, set(&[Capability::ObserveState])),
                 ],
             ),
             (
                 "test",
                 vec![
-                    (PlanStepKind::Observe, set(&[Capability::ObserveHardware])),
+                    (PlanStepKind::Observe, set(&[Capability::ObserveState])),
                     (
                         PlanStepKind::ApplyDesiredState,
                         set(&[
@@ -679,13 +680,13 @@ mod tests {
                             Capability::UpdateSystem,
                         ]),
                     ),
-                    (PlanStepKind::Verify, set(&[Capability::ObserveHardware])),
+                    (PlanStepKind::Verify, set(&[Capability::ObserveState])),
                 ],
             ),
             (
                 "boot",
                 vec![
-                    (PlanStepKind::Observe, set(&[Capability::ObserveHardware])),
+                    (PlanStepKind::Observe, set(&[Capability::ObserveState])),
                     (
                         PlanStepKind::ApplyDesiredState,
                         set(&[
@@ -694,13 +695,13 @@ mod tests {
                             Capability::ModifyBootChain,
                         ]),
                     ),
-                    (PlanStepKind::Verify, set(&[Capability::ObserveHardware])),
+                    (PlanStepKind::Verify, set(&[Capability::ObserveState])),
                 ],
             ),
             (
                 "dry-activate",
                 vec![
-                    (PlanStepKind::Observe, set(&[Capability::ObserveHardware])),
+                    (PlanStepKind::Observe, set(&[Capability::ObserveState])),
                     (
                         PlanStepKind::ApplyDesiredState,
                         set(&[
@@ -708,7 +709,7 @@ mod tests {
                             Capability::UpdateSystem,
                         ]),
                     ),
-                    (PlanStepKind::Verify, set(&[Capability::ObserveHardware])),
+                    (PlanStepKind::Verify, set(&[Capability::ObserveState])),
                 ],
             ),
         ];
