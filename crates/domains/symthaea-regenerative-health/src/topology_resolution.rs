@@ -33,6 +33,7 @@ pub enum TopologyResolutionIssue {
     MissingPreservedBranch,
     DuplicateObservedBranch,
     InconsistentObservedPredecessor,
+    InconsistentResolutionPredecessor,
     ConfigurationMismatch,
 }
 
@@ -53,6 +54,10 @@ pub struct TopologyLifecycleResolution {
     pub predecessor_topology_digest: String,
     pub selected_successor_epoch: u64,
     pub selected_successor_topology_digest: String,
+    /// Monotonic authority-resolution sequence. Later resolutions link to
+    /// the digest of the prior resolution rather than mutating it.
+    pub resolution_epoch: u64,
+    pub predecessor_resolution_digest: Option<String>,
     /// Every competing successor considered by the authority, including the
     /// selected branch. Keeping these references makes the resolution
     /// append-only rather than destructive.
@@ -74,6 +79,8 @@ pub struct TopologyResolutionPolicy {
     pub expected_component_id: String,
     pub expected_configuration_digest: String,
     pub expected_authority_id: String,
+    pub expected_resolution_epoch: u64,
+    pub expected_predecessor_resolution_digest: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,6 +93,8 @@ pub struct TopologyResolutionDecision {
     /// lifecycle does not erase competing statements.
     pub preserved_branches: Vec<TopologyBranchReference>,
     pub resolution_id: Option<String>,
+    pub resolution_epoch: Option<u64>,
+    pub authority_statement_digest: Option<String>,
     pub issues: Vec<TopologyResolutionIssue>,
 }
 
@@ -102,6 +111,7 @@ impl TopologyResolutionGate {
             || policy.expected_component_id.trim().is_empty()
             || policy.expected_configuration_digest.trim().is_empty()
             || policy.expected_authority_id.trim().is_empty()
+            || policy.expected_resolution_epoch == 0
         {
             return Err("invalid topology resolution policy");
         }
@@ -161,6 +171,8 @@ impl TopologyResolutionGate {
                 selected_successor: None,
                 preserved_branches: unique_observed.into_iter().collect(),
                 resolution_id: None,
+                resolution_epoch: None,
+                authority_statement_digest: None,
                 issues,
             };
         };
@@ -202,6 +214,23 @@ impl TopologyResolutionGate {
             issues.push(TopologyResolutionIssue::SuccessorEpochMismatch);
         }
 
+        if resolution.resolution_epoch == 0 {
+            issues.push(TopologyResolutionIssue::SuccessorEpochMismatch);
+        } else if resolution.resolution_epoch != self.policy.expected_resolution_epoch {
+            issues.push(TopologyResolutionIssue::SuccessorEpochMismatch);
+        }
+
+        match (
+            resolution.resolution_epoch,
+            resolution.predecessor_resolution_digest.as_deref(),
+            self.policy.expected_predecessor_resolution_digest.as_deref(),
+        ) {
+            (1, None, None) => {}
+            (1, _, _) => issues.push(TopologyResolutionIssue::PredecessorMismatch),
+            (_, Some(actual), Some(expected)) if actual == expected => {}
+            (_, _, _) => issues.push(TopologyResolutionIssue::PredecessorMismatch),
+        }
+
         for branch in &unique_observed {
             if branch.predecessor_epoch == resolution.predecessor_epoch
                 && branch.predecessor_topology_digest == resolution.predecessor_topology_digest
@@ -225,6 +254,14 @@ impl TopologyResolutionGate {
 
         let declared_preserved: BTreeSet<_> =
             resolution.observed_successors.iter().cloned().collect();
+
+        if declared_preserved.iter().any(|branch| {
+            branch.predecessor_epoch != resolution.predecessor_epoch
+                || branch.predecessor_topology_digest != resolution.predecessor_topology_digest
+                || branch.successor_epoch != resolution.selected_successor_epoch
+        }) {
+            issues.push(TopologyResolutionIssue::InconsistentResolutionPredecessor);
+        }
         if !declared_preserved.contains(&selected) {
             issues.push(TopologyResolutionIssue::MissingPreservedBranch);
         }
@@ -244,6 +281,8 @@ impl TopologyResolutionGate {
                 selected_successor: Some(selected),
                 preserved_branches: unique_observed.into_iter().collect(),
                 resolution_id: Some(resolution.resolution_id.clone()),
+                resolution_epoch: Some(resolution.resolution_epoch),
+                authority_statement_digest: Some(resolution.authority_statement_digest.clone()),
                 issues,
             }
         } else {
@@ -254,6 +293,8 @@ impl TopologyResolutionGate {
                 selected_successor: None,
                 preserved_branches: unique_observed.into_iter().collect(),
                 resolution_id: Some(resolution.resolution_id.clone()),
+                resolution_epoch: Some(resolution.resolution_epoch),
+                authority_statement_digest: Some(resolution.authority_statement_digest.clone()),
                 issues,
             }
         }
@@ -272,6 +313,8 @@ mod tests {
             expected_component_id: "wing-root".into(),
             expected_configuration_digest: "cfg-1".into(),
             expected_authority_id: "mycelix-topology-authority".into(),
+            expected_resolution_epoch: 1,
+            expected_predecessor_resolution_digest: None,
         })
         .unwrap()
     }
@@ -294,6 +337,8 @@ mod tests {
             predecessor_topology_digest: "topology-v1".into(),
             selected_successor_epoch: 2,
             selected_successor_topology_digest: selected.into(),
+            resolution_epoch: 1,
+            predecessor_resolution_digest: None,
             observed_successors: observed,
             resolution_id: "resolution-2".into(),
             authority_id: "mycelix-topology-authority".into(),
@@ -352,6 +397,17 @@ mod tests {
     }
 
     #[test]
+    fn resolved_decision_exposes_authority_chain_identity() {
+        let a = branch("topology-v2a");
+        let r = resolution("topology-v2a", vec![a.clone()]);
+        let d = gate().assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Resolved);
+        assert_eq!(d.resolution_id.as_deref(), Some("resolution-2"));
+        assert_eq!(d.resolution_epoch, Some(1));
+        assert_eq!(d.authority_statement_digest.as_deref(), Some("resolution-digest-2"));
+    }
+
+    #[test]
     fn wrong_authority_cannot_resolve_a_fork() {
         let a = branch("topology-v2a");
         let b = branch("topology-v2b");
@@ -360,6 +416,59 @@ mod tests {
         let d = gate().assess(Some(&r), &[a], 3_000);
         assert_eq!(d.state, TopologyResolutionState::Quarantined);
         assert!(d.issues.contains(&TopologyResolutionIssue::WrongAuthority));
+    }
+
+    #[test]
+    fn later_resolution_requires_predecessor_resolution_digest() {
+        let a = branch("topology-v2a");
+        let b = branch("topology-v2b");
+        let mut r = resolution("topology-v2a", vec![a.clone(), b]);
+        r.resolution_epoch = 2;
+        r.predecessor_resolution_digest = None;
+        let mut g = gate();
+        g.policy.expected_resolution_epoch = 2;
+        let d = g.assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionIssue::PredecessorMismatch));
+    }
+
+    #[test]
+    fn later_resolution_must_link_to_the_expected_previous_resolution() {
+        let a = branch("topology-v2a");
+        let b = branch("topology-v2b");
+        let mut r = resolution("topology-v2a", vec![a.clone(), b]);
+        r.resolution_epoch = 2;
+        r.predecessor_resolution_digest = Some("resolution-digest-1".into());
+        let mut g = gate();
+        g.policy.expected_resolution_epoch = 2;
+        g.policy.expected_predecessor_resolution_digest = Some("resolution-digest-1".into());
+        let d = g.assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Resolved);
+    }
+
+    #[test]
+    fn old_resolution_epoch_cannot_be_replayed_as_current() {
+        let a = branch("topology-v2a");
+        let mut r = resolution("topology-v2a", vec![a.clone()]);
+        r.resolution_epoch = 1;
+        let mut g = gate();
+        g.policy.expected_resolution_epoch = 2;
+        g.policy.expected_predecessor_resolution_digest = Some("resolution-digest-1".into());
+        let d = g.assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionIssue::SuccessorEpochMismatch));
+    }
+
+    #[test]
+    fn resolution_cannot_preserve_a_branch_from_another_predecessor() {
+        let a = branch("topology-v2a");
+        let mut foreign = branch("topology-v2b");
+        foreign.predecessor_epoch = 2;
+        foreign.predecessor_topology_digest = "topology-v2".into();
+        let r = resolution("topology-v2a", vec![a.clone(), foreign]);
+        let d = gate().assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionIssue::InconsistentResolutionPredecessor));
     }
 
     #[test]

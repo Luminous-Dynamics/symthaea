@@ -106,3 +106,56 @@ This contract does not:
 - automatically reconcile incompatible physical histories.
 
 Those remain separate authority, physics, and recovery boundaries.
+
+
+## Resolution continuity
+
+The authority layer now has its own monotonic resolution epoch.
+
+A later authority decision does not overwrite an earlier decision. Instead:
+
+**resolution epoch N + resolution digest → authority event → resolution epoch N+1 + new resolution digest**
+
+For the initial resolution, no predecessor resolution digest is permitted. For later resolutions, the expected predecessor digest must match policy.
+
+This closes the replay seam in which an older, still-validly formatted authority decision could be presented again as though it were the current resolution.
+
+The resulting lifecycle has two linked histories:
+
+**physical topology history**
+predecessor topology digest → successor topology digest
+
+**authority decision history**
+previous resolution digest → new resolution digest
+
+These histories are intentionally separate. A new authority resolution may change which topology branch is considered current without rewriting the underlying physical/topology statements.
+
+The architecture therefore preserves:
+
+- the original topology statements;
+- all competing successor branches;
+- the authority decision that resolved a fork;
+- later authority decisions that supersede or correct earlier decisions.
+
+A future Mycelix implementation can bind these records to signed lifecycle events and an append-only transparency mechanism. SCITT's published architecture provides a useful external analogy: signed statements can be recorded in an append-only verifiable structure and accompanied by receipts, while the content semantics remain application-specific.
+
+### Security invariant
+
+**An older authority decision must never regain current authority merely because its signature or validity interval remains acceptable.**
+
+Currentness is a lifecycle property, not merely a validity-window property.
+
+
+## Downstream audit identity
+
+A resolved decision exposes three stable identifiers for downstream evidence chaining:
+
+- the resolution ID;
+- the monotonic resolution epoch; and
+- the authority statement digest.
+
+These are deliberately distinct. The resolution ID names the lifecycle decision, the epoch establishes its position in the authority-decision history, and the statement digest identifies the exact authority statement.
+
+A downstream evidence envelope can therefore reference the decision without copying or reinterpreting the authority statement itself.
+
+The contract still does not calculate or cryptographically verify that digest. It treats the digest as an authoritative-layer identity claim and leaves verification to the trust/provenance system.
