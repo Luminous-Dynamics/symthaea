@@ -100,3 +100,14 @@ The independence domain is now treated as qualified metadata rather than an arbi
 Malformed independence metadata is not silently ignored. The temporal gate excludes it from the trusted cohort and records an explicit evidence-quality issue. The resulting decision also exposes the independent group IDs and count so downstream audit logic cannot confuse raw sensor count with independent evidence count.
 
 This is deliberately still a local deterministic contract. The topology digest and evidence identity are placeholders for a later provenance-backed asset topology record; they do not by themselves prove physical independence. Current SHM literature likewise treats redundancy and sensor placement as reliability mechanisms while recognizing that sensor faults and structural changes can be difficult to disentangle. citeturn0search0turn0search2
+
+
+## Independence binding contract
+
+The temporal layer now models independence as a structured binding rather than three unrelated strings. A binding identifies the sensor and component, the stable physical/common-mode independence group, the topology/dependency declaration digest, the configuration under which that declaration was qualified, and the provenance evidence identity.
+
+The temporal gate requires the binding to agree with the observation configuration and rejects incomplete bindings before they can contribute to quorum. This keeps the contract deterministic while making the eventual transition to a Mycelix-backed topology attestation explicit.
+
+Importantly, independence remains a property of the evidence-generation path, not a guarantee against coordinated compromise. A future adversarial crucible should therefore include attacks spanning multiple declared groups. Independence reduces common-mode correlation risk; it does not establish truth by itself.
+
+Recent 2026 SHM research reinforces this distinction: causal/deconfounding approaches explicitly model environmental and structural causes rather than relying on correlation alone, while sensor-placement research treats information independence as a design property. citeturn0search0turn0search1
