@@ -1354,7 +1354,10 @@ impl EvidenceEvaluation {
         &self,
         report: &ReceiptAttestationVerificationReport,
     ) -> bool {
-        report.has_consistent_identity_bindings()
+        // Refuse to materialize consistency from a report whose own execution
+        // evidence no longer satisfies the report contract. This keeps the
+        // report-level invariant as the single integrity gate for consumers.
+        report.is_well_formed()
             && self.evaluation_version == EVIDENCE_EVALUATION_VERSION
             && self.subject_fingerprint == report.receipt_fingerprint
             && self.verification_report_fingerprint == report.fingerprint()
