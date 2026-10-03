@@ -3388,18 +3388,18 @@ fn validate_native_authority_pin_set(
         evidence: &ProviderTerminalEvidence,
         verifier: &V,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
+        let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
+
         let verified = verifier
             .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
         self.validate_verified_terminal_outcome(record, &verified)?;
-        let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
         if verified.configuration != pinned_verifier {
             return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
         }
-
-        let mut connection = self.connection()?;
-        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
         self.validate_persisted_provider_verifier_configuration(&tx, &verified.configuration)?;
         let row: (
             String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>,
@@ -3761,6 +3761,7 @@ fn validate_native_authority_pin_set(
     /// before this operation can consume the authorization budget.
     fn reconcile_indeterminate_bound_verified_inner(
         &self,
+        tx: &Transaction<'_>,
         record: &DurableDispatchRecord,
         outcome: ExecutionOutcome,
         verified: &VerifiedProviderOutcome,
@@ -3768,11 +3769,9 @@ fn validate_native_authority_pin_set(
         if matches!(outcome, ExecutionOutcome::Indeterminate) {
             return Err(AuthorizationConsumptionError::AttemptMismatch.into());
         }
-        let mut connection = self.connection()?;
-        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
-        let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
-        self.validate_persisted_provider_verifier_configuration(&tx, &verified.configuration)?;
+        let persisted_state = self.validate_persisted_dispatch_record(tx, record)?;
+        self.validate_persisted_provider_verifier_configuration(tx, &verified.configuration)?;
 
         let row = tx.query_row(
             "SELECT operation_id,native_replay_identity,relying_party_id,action_id,action_digest,
@@ -3907,7 +3906,6 @@ fn validate_native_authority_pin_set(
                 verified.configuration.evidence_profile_digest, verified.verification_digest,
             ],
         )?;
-        tx.commit()?;
         Ok(receipt)
     }
 
@@ -3928,18 +3926,28 @@ fn validate_native_authority_pin_set(
         evidence: &ProviderTerminalEvidence,
         verifier: &V,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
+        let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        self.validate_persisted_dispatch_record(&tx, record)?;
+
         let verified = verifier
             .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
         Self::validate_verified_terminal_outcome(record, &verified)?;
-        let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
         if verified.configuration != pinned_verifier {
             return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
         }
+        self.validate_persisted_provider_verifier_configuration(&tx, &verified.configuration)?;
         if !matches!(verified.evidence.outcome, ExecutionOutcome::Succeeded | ExecutionOutcome::Failed) {
             return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
         }
-        self.reconcile_indeterminate_bound_verified_inner(record, verified.evidence.outcome, &verified)
+
+        let receipt = self.reconcile_indeterminate_bound_verified_inner(
+            &tx, record, verified.evidence.outcome, &verified
+        )?;
+        tx.commit()?;
+        Ok(receipt)
     }
 
     /// Crash recovery is deliberately conservative: a process may have reached
@@ -4507,7 +4515,13 @@ fn load_receipt(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{sync::Arc, thread};
+    use std::{
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+        thread,
+    };
 
     fn fixture(path: &Path) -> (SqliteAuthorizationStore, EpistemicAction, ActionAuthorizationWitness) {
         let store = SqliteAuthorizationStore::open(path).unwrap();
@@ -4576,6 +4590,35 @@ mod tests {
                     evidence_profile_digest: "sha256:test-evidence-profile".into(),
                 },
                 verification_digest: "sha256:test-verification".into(),
+            })
+        }
+    }
+
+    struct CountingProviderVerifier {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl ProviderEvidenceVerifier for CountingProviderVerifier {
+        fn verify(
+            &self,
+            _purpose: ProviderVerificationPurpose,
+            record: &DurableDispatchRecord,
+            evidence: &ProviderTerminalEvidence,
+        ) -> Result<VerifiedProviderOutcome, ProviderVerificationError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(VerifiedProviderOutcome {
+                evidence: evidence.clone(),
+                configuration: ProviderVerifierConfiguration {
+                    relying_party_id: "legacy-local".into(),
+                    verifier_id: "test-verifier/v1".into(),
+                    verifier_revision: "test-verifier-rev/1".into(),
+                    verifier_implementation_id: "test-verifier-impl".into(),
+                    verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
+                    verifier_config_digest: "sha256:test-verifier-config".into(),
+                    trust_anchor_digest: "sha256:test-trust-anchors".into(),
+                    evidence_profile_digest: "sha256:test-evidence-profile".into(),
+                },
+                verification_digest: format!("sha256:counted:{}", record.attempt_id),
             })
         }
     }
@@ -4907,6 +4950,72 @@ mod tests {
                 AuthorizationConsumptionError::InvalidBinding
             ))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_verifier_is_not_called_for_unvalidated_dispatch_record() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-verifier-order-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"legacy-local").unwrap();
+        store.pin_provider_evidence_verifier_configuration(&ProviderVerifierConfiguration {
+            relying_party_id:"legacy-local".into(),
+            verifier_id:"test-verifier/v1".into(),
+            verifier_revision:"test-verifier-rev/1".into(),
+            verifier_implementation_id:"test-verifier-impl".into(),
+            verifier_implementation_digest:"sha256:test-verifier-implementation".into(),
+            verifier_config_digest:"sha256:test-verifier-config".into(),
+            trust_anchor_digest:"sha256:test-trust-anchors".into(),
+            evidence_profile_digest:"sha256:test-evidence-profile".into(),
+        }).unwrap();
+
+        let effect=super::super::ActionEffectBinding::new("target-order","prod","adapter-order");
+        store.pin_provider_adapter_configuration(
+            &super::ProviderAdapterConfiguration::new(
+                "adapter-order","test-adapter/v1","sha256:test-adapter-implementation"
+            )
+        ).unwrap();
+        let action=EpistemicAction::new(
+            "verifier-order","effect",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"verifier-order".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound_with_operation(
+            &witness,&action,"frame@1","attempt-order","boundary-order","operation-order"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-order",&action,&effect,
+            "boundary-order","operation-order","native-order"
+        ).unwrap();
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let mut forged=record.clone();
+        forged.target_identity="attacker-target".into();
+        let calls=Arc::new(AtomicUsize::new(0));
+        let err=store.commit_bound_verified(
+            &forged,&evidence,&CountingProviderVerifier { calls: calls.clone() }
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding)
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst),0);
+
         let _=std::fs::remove_file(path);
     }
 
