@@ -347,6 +347,7 @@ fn solve_linear_combination_counted(
 
     let coefficient_words = basis.len().div_ceil(64);
     let augmented_word = coefficient_words;
+    work.solve_matrix_word_cells += dimension * (coefficient_words + 1);
     let augmented_mask = 1u64;
     let mut rows: Vec<Vec<u64>> = (0..dimension)
         .map(|row| {
