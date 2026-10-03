@@ -1,5 +1,5 @@
 use symthaea_core::hdc::linear_code::{
-    BinaryCodeword, RandomLinearCode, basis_rank, recover_direct_sum_bound,
+    BinaryCodeword, LinearCodeWork, RandomLinearCode, basis_rank, recover_direct_sum_bound,
     recover_independent_bound, recover_linear_bound, recover_linear_bound_with_work,
     solve_linear_combination,
 };
