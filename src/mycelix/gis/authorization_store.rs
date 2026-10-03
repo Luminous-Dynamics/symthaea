@@ -3870,6 +3870,79 @@ mod tests {
     }
 
     #[test]
+    fn terminal_verifier_configuration_mismatch_is_rejected() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-verifier-config-mismatch-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-verifier-config","prod","adapter-verifier-config"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"verifier-config-mismatch".into(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:45:00Z".into(),
+            expires_at:Some("2026-10-04T06:45:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-verifier-config","boundary-verifier-config"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-verifier-config",
+            &action,&effect,"boundary-verifier-config",
+            "operation:verifier-config","native-verifier-config"
+        ).unwrap();
+
+        struct WrongConfigVerifier;
+        impl ProviderEvidenceVerifier for WrongConfigVerifier {
+            fn verify(
+                &self,
+                purpose: ProviderVerificationPurpose,
+                record: &DurableDispatchRecord,
+                evidence: &ProviderTerminalEvidence,
+            ) -> Result<VerifiedProviderOutcome, ProviderVerificationError> {
+                if !matches!(purpose,ProviderVerificationPurpose::TerminalOutcome) {
+                    return Err(ProviderVerificationError::VerificationFailed);
+                }
+                Ok(VerifiedProviderOutcome {
+                    evidence:evidence.clone(),
+                    configuration:ProviderVerifierConfiguration {
+                        relying_party_id:"legacy-local".into(),
+                        verifier_id:"test-verifier/v2".into(),
+                        verifier_config_digest:"sha256:tampered-config".into(),
+                        trust_anchor_digest:"sha256:test-trust-anchors".into(),
+                        evidence_profile_digest:"sha256:test-evidence-profile".into(),
+                    },
+                    verification_digest:format!("sha256:verification:{}",record.attempt_id),
+                })
+            }
+        }
+
+        let err=store.commit_bound_verified(
+            &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&WrongConfigVerifier
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
+            )
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn terminal_evidence_storage_is_insert_only_for_attempt() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-terminal-insert-only-{}.db",std::process::id()
