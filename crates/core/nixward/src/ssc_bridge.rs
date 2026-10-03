@@ -143,6 +143,7 @@ impl NixSystemObservation {
         target: impl Into<TargetId>,
         observed_at_ms: u64,
     ) -> Result<TargetSnapshot, SscObservationError> {
+        self.validate()?;
         let observation_digest = self.observation_digest()?;
         let resources = self
             .generations
@@ -172,8 +173,9 @@ impl NixSystemObservation {
     }
 
     pub fn system_profile_generation(&self) -> Option<&NixGenerationObservation> {
-        let generation = self.system_profile_generation?;
-        self.generations.iter().find(|entry| entry.number == generation)
+        self.generations
+            .iter()
+            .find(|entry| entry.number == self.system_profile_generation)
     }
 }
 
@@ -224,19 +226,19 @@ mod tests {
     fn profile_generation_parser_is_exact() {
         assert_eq!(
             parse_profile_generation_name("system-42-link").expect("generation"),
-            Some(42)
+            42
         );
         assert_eq!(
             parse_profile_generation_name("system-0042-link").expect("generation"),
-            Some(42)
+            42
         );
         assert_eq!(
-            parse_profile_generation_name("system-current-link").expect("non-generation"),
-            None
+            parse_profile_generation_name("system-current-link").expect_err("non-generation"),
+            SscObservationError::MissingSystemProfileGeneration
         );
         assert_eq!(
-            parse_profile_generation_name("system-42").expect("non-generation"),
-            None
+            parse_profile_generation_name("system-42").expect_err("non-generation"),
+            SscObservationError::MissingSystemProfileGeneration
         );
     }
 
