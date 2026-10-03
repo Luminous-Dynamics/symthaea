@@ -62,6 +62,9 @@ pub struct TopologyAuthorityDecision {
     pub selected_successor_effective_from_ms: Option<u64>,
     pub preserved_branches: Vec<TopologyBranchReference>,
     pub revocation_id: Option<String>,
+    pub verification_report_digest: Option<String>,
+    pub policy_fingerprint: Option<String>,
+    pub environment_fingerprint: Option<String>,
     pub issues: Vec<TopologyAuthorityIssue>,
 }
 
@@ -118,6 +121,9 @@ impl TopologyAuthorityGate {
                 .map(|item| item.selected_successor_effective_from_ms),
             preserved_branches: resolution_decision.preserved_branches.clone(),
             revocation_id: revocation.map(|item| item.revocation_id.clone()),
+            verification_report_digest: None,
+            policy_fingerprint: None,
+            environment_fingerprint: None,
             issues: Vec::new(),
         };
 
@@ -165,6 +171,11 @@ impl TopologyAuthorityGate {
                         .cloned()
                         .map(TopologyAuthorityIssue::Verification),
                 );
+                let verification_report_digest =
+                    verification_decision.verification_report_digest.clone();
+                let policy_fingerprint = verification_decision.policy_fingerprint.clone();
+                let environment_fingerprint =
+                    verification_decision.environment_fingerprint.clone();
                 if verification_decision.state
                     != TopologyResolutionVerificationState::Verified
                 {
@@ -176,6 +187,9 @@ impl TopologyAuthorityGate {
                         } else {
                             TopologyAuthorityState::Quarantined
                         },
+                        verification_report_digest,
+                        policy_fingerprint,
+                        environment_fingerprint,
                         issues,
                         ..base
                     };
@@ -195,6 +209,9 @@ impl TopologyAuthorityGate {
                         TopologyRevocationState::Revoked => {
                             return TopologyAuthorityDecision {
                                 state: TopologyAuthorityState::Revoked,
+                                verification_report_digest: verification_report_digest.clone(),
+                                policy_fingerprint: policy_fingerprint.clone(),
+                                environment_fingerprint: environment_fingerprint.clone(),
                                 issues,
                                 ..base
                             };
@@ -202,6 +219,9 @@ impl TopologyAuthorityGate {
                         TopologyRevocationState::Quarantined => {
                             return TopologyAuthorityDecision {
                                 state: TopologyAuthorityState::Quarantined,
+                                verification_report_digest: verification_report_digest.clone(),
+                                policy_fingerprint: policy_fingerprint.clone(),
+                                environment_fingerprint: environment_fingerprint.clone(),
                                 issues,
                                 ..base
                             };
@@ -213,6 +233,9 @@ impl TopologyAuthorityGate {
                     issues.push(TopologyAuthorityIssue::SuccessorNotYetEffective);
                     return TopologyAuthorityDecision {
                         state: TopologyAuthorityState::PendingActivation,
+                        verification_report_digest: verification_report_digest.clone(),
+                        policy_fingerprint: policy_fingerprint.clone(),
+                        environment_fingerprint: environment_fingerprint.clone(),
                         issues,
                         ..base
                     };
@@ -220,6 +243,9 @@ impl TopologyAuthorityGate {
 
                 TopologyAuthorityDecision {
                     state: TopologyAuthorityState::Current,
+                    verification_report_digest,
+                    policy_fingerprint,
+                    environment_fingerprint,
                     issues,
                     ..base
                 }
@@ -274,6 +300,9 @@ mod tests {
             resolution_id: "resolution-2".into(),
             authority_statement_digest: "resolution-digest-2".into(),
             verification_reference: "resolution-verify-2".into(),
+            verification_report_digest: "report-digest-2".into(),
+            policy_fingerprint: "policy-fingerprint-2".into(),
+            environment_fingerprint: "environment-fingerprint-2".into(),
             verified_at_ms: 2_100,
             valid_until_ms: 4_000,
         }
@@ -350,6 +379,17 @@ mod tests {
         assert!(d
             .issues
             .contains(&TopologyAuthorityIssue::SuccessorNotYetEffective));
+    }
+
+    #[test]
+    fn authority_decision_preserves_verifier_provenance() {
+        let a = branch("topology-v2a");
+        let r = resolution("topology-v2a", vec![a.clone()]);
+        let d = gate().assess(Some(&r), Some(&verification()), None, &[a], 3_000);
+        assert_eq!(d.state, TopologyAuthorityState::Current);
+        assert_eq!(d.verification_report_digest.as_deref(), Some("report-digest-2"));
+        assert_eq!(d.policy_fingerprint.as_deref(), Some("policy-fingerprint-2"));
+        assert_eq!(d.environment_fingerprint.as_deref(), Some("environment-fingerprint-2"));
     }
 
     #[test]
