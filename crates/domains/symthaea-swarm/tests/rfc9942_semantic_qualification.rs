@@ -529,6 +529,46 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
     let receipt = signed_receipt(b"candidate");
     let key = rfc8392_public_key();
 
+    let detached_receipt = {
+        let candidate = b"candidate";
+        let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
+        let vds = Rfc9162Sha256Vds;
+        let head = vds.tree_head(&leaves);
+        let proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+        let unsigned = Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp.clone(),
+            Rfc9942ReceiptPayload::Detached,
+            vec![0u8; 64],
+        ).unwrap();
+        let rng = SystemRandom::new();
+        let signer = EcdsaKeyPair::from_private_key_and_public_key(
+            &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+            &RFC8392_PRIVATE_D,
+            &key,
+            &rng,
+        ).unwrap();
+        let root = head.root();
+        let tbs = unsigned.signature1_tbs(&[], Some(&root)).unwrap();
+        let signature = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+        Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp,
+            Rfc9942ReceiptPayload::Detached,
+            signature,
+        ).unwrap()
+    };
+
+    let detached_outer = signed_outer(&detached_receipt, b"candidate");
+    let detached_state = detached_outer
+        .verify_es256_inclusion_receipt_state(0, &key, &key, &[], &[], None)
+        .unwrap();
+    assert_eq!(
+        detached_state.receipt().proof().inclusion_head().unwrap().tree_size(),
+        2
+    );
+
     let valid_outer = signed_outer(&receipt, b"candidate");
     let state = valid_outer
         .verify_es256_inclusion_receipt_state(
