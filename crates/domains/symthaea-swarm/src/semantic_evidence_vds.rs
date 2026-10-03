@@ -83,8 +83,9 @@ impl Rfc9942ReceiptPayload {
 /// protected VDS binding, payload binding, and the requested VDP proof have
 /// all succeeded through one semantic verification path.
 ///
-/// The fields are private so callers cannot manufacture this capability from
-/// an isolated successful verify_es256() result.
+/// The verified receipt wrapper keeps its capability-bearing fields private,
+/// so callers cannot manufacture this verification state from an isolated
+/// successful verify_es256() result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rfc9942VerifiedProof {
     Inclusion {
