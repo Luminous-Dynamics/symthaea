@@ -1246,6 +1246,12 @@ fn normalize_native_issuer(issuer: &str) -> String {
             if changed != 1 {
                 return Err(AuthorizationConsumptionError::AttemptMismatch.into());
             }
+            let authority_epoch: i64 = tx.query_row(
+                "SELECT authority_epoch FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![record.authorization_instance.as_str()],
+                |row| row.get(0),
+            )?;
             tx.execute(
                 "INSERT OR IGNORE INTO authorization_recovery_markers
                  (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
@@ -1255,7 +1261,7 @@ fn normalize_native_issuer(issuer: &str) -> String {
                     record.attempt_id.as_str(),
                     record.boundary_id.as_str(),
                     record.action_digest.as_str(),
-                    0i64,
+                    authority_epoch,
                 ],
             )?;
             tx.commit()?;
@@ -2384,7 +2390,7 @@ mod tests {
             action_id:action.id.clone(), authorization_instance:action.id.clone(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
-            issued_at:"2026-10-02T20:00:00Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-02T20:00:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new(action.id.clone(),digest,"sha256:support","policy-v1",1,1)).unwrap();
         (store,action,witness)
@@ -2518,7 +2524,7 @@ mod tests {
             policy:"policy-v1".into(),
             decision:"execute".into(),
             issued_at:"2026-10-03T06:50:00Z".into(),
-            expires_at:None,
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
             authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
@@ -2588,7 +2594,7 @@ mod tests {
             policy:"policy@1".into(),
             decision:"execute".into(),
             issued_at:"2026-10-03T09:00:00Z".into(),
-            expires_at:None,
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
             authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
@@ -2666,6 +2672,107 @@ mod tests {
     }
 
     #[test]
+    fn effectful_validity_window_is_rejected_at_admission() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-validity-admission-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-validity").unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-validity","prod","adapter");
+        let action=EpistemicAction::new(
+            "validity-admission","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect);
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"validity-admission".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-02T19:00:00Z".into(),
+            expires_at:Some("2026-10-02T19:30:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            "support","policy@1",1,1
+        )).unwrap();
+
+        assert!(matches!(
+            store.prepare_for_execution_bound(
+                &witness,&action,"frame@1","attempt-validity-admission","boundary-validity"
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::AuthorizationValidityWindowFailed
+            ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn expired_after_dispatch_is_closed_as_not_entered() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-validity-preentry-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-validity-preentry").unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-validity-preentry","prod","adapter");
+        let action=EpistemicAction::new(
+            "validity-preentry","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"validity-preentry".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-03T12:00:00Z".into()),
+            authority_epoch:7,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            "support","policy@1",7,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-validity-preentry","boundary-validity"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,"validity-preentry","attempt-validity-preentry",&action,&effect,
+            "boundary-validity","operation:validity-preentry","native-validity-preentry"
+        ).unwrap();
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_dispatches
+             SET validity_expires_at='2026-10-03T05:59:59Z'
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+
+        assert!(matches!(
+            store.mark_invoked_bound(&record),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::AuthorizationValidityWindowFailed
+            ))
+        ));
+
+        let states:(String,String)=store.connection().unwrap().query_row(
+            "SELECT d.state,l.state FROM authorization_dispatches d
+             JOIN authorization_leases l ON l.authorization_instance=d.authorization_instance
+             WHERE d.authorization_instance=?1 AND d.attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| Ok((r.get(0)?,r.get(1)?))
+        ).unwrap();
+        assert_eq!(states.0,"not_entered");
+        assert_eq!(states.1,"ready");
+
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     #[allow(deprecated)]
     fn legacy_provenance_less_bound_apis_fail_closed() {
         let path=std::env::temp_dir().join(format!(
@@ -2724,7 +2831,7 @@ mod tests {
             policy:"policy-v1".into(),
             decision:"execute".into(),
             issued_at:"2026-10-02T20:30:00Z".into(),
-            expires_at:None,
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
             authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
@@ -2763,7 +2870,7 @@ mod tests {
             policy:"policy-v1".into(),
             decision:"execute".into(),
             issued_at:"2026-10-02T20:31:00Z".into(),
-            expires_at:None,
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
             authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
@@ -2986,7 +3093,7 @@ mod tests {
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"support".into(), policy:"policy@1".into(),
             decision:"execute".into(), issued_at:"2026-10-03T06:00:00Z".into(),
-            expires_at:None, authority_epoch:1,
+            expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             "verifier-rp",action.id.clone(),digest,"support","policy@1",1,1
@@ -3067,7 +3174,7 @@ mod tests {
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"support".into(), policy:"policy@1".into(),
             decision:"execute".into(), issued_at:"2026-10-03T06:00:00Z".into(),
-            expires_at:None, authority_epoch:1,
+            expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             "native-pin",action.id.clone(),digest,"support","policy@1",1,1
@@ -3230,7 +3337,7 @@ mod tests {
             action_id:action.id.clone(), authorization_instance:action.id.clone(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
-            issued_at:"2026-10-02T20:00:00Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-02T20:00:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new(action.id.clone(),digest,"sha256:support","policy-v1",1,1)).unwrap();
         store.prepare_for_execution(&witness,&action,"frame@1","attempt-bound").unwrap();
@@ -3328,7 +3435,7 @@ mod tests {
             authorization_instance:"closed-a".into(), action_id:action.id.clone(),
             action_digest:digest.clone(), support_digest:"support-a".into(),
             frame:"frame@1".into(), policy:"policy@1".into(), decision:"execute".into(),
-            issued_at:"2026-10-03T06:30:00Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-03T06:30:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             "closed-a",action.id.clone(),digest.clone(),"support-a","policy@1",1,1
@@ -3351,7 +3458,7 @@ mod tests {
             authorization_instance:"closed-b".into(), action_id:action.id.clone(),
             action_digest:record_a.action_digest.clone(), support_digest:"support-b".into(),
             frame:"frame@1".into(), policy:"policy@1".into(), decision:"execute".into(),
-            issued_at:"2026-10-03T06:30:01Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-03T06:30:01Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             "closed-b",action.id.clone(),record_a.action_digest.clone(),"support-b","policy@1",1,1
@@ -3427,7 +3534,7 @@ mod tests {
             action_id:action.id.clone(), authorization_instance:"approval-legacy-fence".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
-            issued_at:"2026-10-02T20:09:00Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-02T20:09:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             "approval-legacy-fence",action.id.clone(),digest,"sha256:support","policy-v1",1,1
@@ -3463,7 +3570,7 @@ mod tests {
             action_id:action.id.clone(), authorization_instance:"approval-pre-recovery".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
-            issued_at:"2026-10-02T20:13:00Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-02T20:13:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             "approval-pre-recovery",action.id.clone(),digest.clone(),
@@ -3512,7 +3619,7 @@ mod tests {
             action_id:action.id.clone(), authorization_instance:"approval-pre-fence".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
-            issued_at:"2026-10-02T20:15:00Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-02T20:15:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             "approval-pre-fence",action.id.clone(),digest.clone(),
@@ -3589,7 +3696,7 @@ mod tests {
             action_id:action.id.clone(), authorization_instance:"approval-after-dispatch".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
-            issued_at:"2026-10-02T20:17:00Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-02T20:17:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             "approval-after-dispatch",action.id.clone(),digest.clone(),
@@ -3635,7 +3742,7 @@ mod tests {
             action_id:action.id.clone(), authorization_instance:"approval-boundary".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
-            issued_at:"2026-10-02T20:10:00Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-02T20:10:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             witness.authorization_instance.clone(),action.id.clone(),digest,
@@ -3690,7 +3797,7 @@ mod tests {
             action_id:action.id.clone(), authorization_instance:"approval-prepared".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
-            issued_at:"2026-10-02T20:12:00Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-02T20:12:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             "approval-prepared",action.id.clone(),digest.clone(),
@@ -3746,13 +3853,13 @@ mod tests {
             action_id:action_a.id.clone(), authorization_instance:"scope-approval-a".into(),
             action_digest:digest_a.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
-            issued_at:"2026-10-02T20:11:00Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-02T20:11:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         let witness_b=ActionAuthorizationWitness {
             action_id:action_b.id.clone(), authorization_instance:"scope-approval-b".into(),
             action_digest:digest_b.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
-            issued_at:"2026-10-02T20:11:01Z".into(), expires_at:None, authority_epoch:1,
+            issued_at:"2026-10-02T20:11:01Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         store.register_lease(&AuthorizationLease::new_with_instance(
             "scope-approval-a",action_a.id.clone(),digest_a,"sha256:support","policy-v1",1,1
@@ -3848,7 +3955,7 @@ mod tests {
                 policy:"policy@1".into(),
                 decision:"execute".into(),
                 issued_at:"2026-10-03T06:00:00Z".into(),
-                expires_at:None,
+                expires_at:Some("2026-10-04T12:00:00Z".into()),
                 authority_epoch:1,
             };
             store.register_lease(&AuthorizationLease::new_with_instance(
