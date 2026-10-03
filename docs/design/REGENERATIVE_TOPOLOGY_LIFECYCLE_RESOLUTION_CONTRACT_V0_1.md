@@ -174,3 +174,40 @@ That distinction matters in distributed systems:
 **evidence-set integrity ≠ global knowledge**
 
 A future Mycelix transparency layer can strengthen this with durable statement receipts and synchronization evidence without changing the local semantics.
+
+
+## Explicit revocation
+
+Supersession and revocation are different lifecycle operations.
+
+A later resolution can supersede an earlier authority decision by advancing the resolution epoch and linking to the prior resolution digest.
+
+A revocation instead invalidates the current authority decision **without inventing a replacement topology**.
+
+The revocation record targets the exact current resolution identity:
+
+**resolution epoch + resolution ID + authority statement digest → revocation**
+
+The local gate requires the configured authority, exact target identity, configuration continuity, and a non-future revocation time.
+
+This produces an explicit state:
+
+**Resolved → Revoked**
+
+rather than forcing the system to manufacture a replacement topology merely to express that the previous decision is no longer trusted.
+
+The revoked resolution and all topology branches remain historical evidence.
+
+A later authoritative resolution can subsequently establish a new current branch, but that is a separate event and a separate resolution record.
+
+### Why this distinction matters
+
+Without explicit revocation, an operator could be forced to choose between two unsafe representations:
+
+- leave a known-bad authority decision looking current; or
+- fabricate a replacement topology just to remove current status.
+
+Neither is necessary.
+
+**Revocation removes current authority; it does not rewrite physical history.**
+
