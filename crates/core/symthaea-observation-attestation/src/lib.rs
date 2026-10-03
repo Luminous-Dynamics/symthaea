@@ -698,6 +698,29 @@ impl ReceiptAttestationVerificationReport {
         report
     }
 
+    fn failed_with_resolution_snapshot(
+        outcome: ReceiptAttestationVerificationOutcome,
+        failed_check: EvaluationCheck,
+        receipt_fingerprint: String,
+        resolved_verification_method: Option<String>,
+        resolution_snapshot_fingerprint: Option<String>,
+        evaluated_at_unix_ns: i128,
+        policy_inputs: VerificationPolicyInputs,
+        environment_identity: VerifierEnvironmentIdentity,
+    ) -> Self {
+        let mut report = Self::failed(
+            outcome,
+            failed_check,
+            receipt_fingerprint,
+            resolved_verification_method,
+            evaluated_at_unix_ns,
+            policy_inputs,
+            environment_identity,
+        );
+        report.resolution_snapshot_fingerprint = resolution_snapshot_fingerprint;
+        report
+    }
+
     fn passed(
         receipt_fingerprint: String,
         resolved_verification_method: Option<String>,
@@ -1675,61 +1698,66 @@ impl Ed25519ReceiptVerifier {
         };
         let resolved = resolved_snapshot.resolved;
         if resolved.verification_method != method {
-            return ReceiptAttestationVerificationReport::failed(
+            return ReceiptAttestationVerificationReport::failed_with_resolution_snapshot(
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
                 EvaluationCheck::VerificationMethodResolution,
                 receipt.fingerprint(),
                 Some(method.to_string()),
-                    self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                resolved_snapshot.snapshot_fingerprint.clone(),
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         }
         match resolved.status {
             VerificationMethodStatus::Active => {}
             VerificationMethodStatus::Revoked => {
-                return ReceiptAttestationVerificationReport::failed(
-                    ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
-                    EvaluationCheck::VerificationMethodLifecycle,
-                    receipt.fingerprint(),
-                    Some(method.to_string()),
-                    self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
-                );
+                return ReceiptAttestationVerificationReport::failed_with_resolution_snapshot(
+                ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
+                EvaluationCheck::VerificationMethodLifecycle,
+                receipt.fingerprint(),
+                Some(method.to_string()),
+                resolved_snapshot.snapshot_fingerprint.clone(),
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
+            );
             }
             VerificationMethodStatus::Expired => {
-                return ReceiptAttestationVerificationReport::failed(
-                    ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
-                    EvaluationCheck::VerificationMethodLifecycle,
-                    receipt.fingerprint(),
-                    Some(method.to_string()),
-                    self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
-                );
+                return ReceiptAttestationVerificationReport::failed_with_resolution_snapshot(
+                ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
+                EvaluationCheck::VerificationMethodLifecycle,
+                receipt.fingerprint(),
+                Some(method.to_string()),
+                resolved_snapshot.snapshot_fingerprint.clone(),
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
+            );
             }
             VerificationMethodStatus::Unknown => {
-                return ReceiptAttestationVerificationReport::failed(
-                    ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
-                    EvaluationCheck::VerificationMethodResolution,
-                    receipt.fingerprint(),
-                    Some(method.to_string()),
-                    self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
-                );
+                return ReceiptAttestationVerificationReport::failed_with_resolution_snapshot(
+                ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+                EvaluationCheck::VerificationMethodResolution,
+                receipt.fingerprint(),
+                Some(method.to_string()),
+                resolved_snapshot.snapshot_fingerprint.clone(),
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
+            );
             }
         }
         if !resolved.is_authorized_for(&envelope.proof_purpose) {
-            return ReceiptAttestationVerificationReport::failed(
+            return ReceiptAttestationVerificationReport::failed_with_resolution_snapshot(
                 ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized,
                 EvaluationCheck::ProofPurposeAuthorization,
                 receipt.fingerprint(),
                 Some(method.to_string()),
-                    self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                resolved_snapshot.snapshot_fingerprint.clone(),
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         }
         let mut report =
