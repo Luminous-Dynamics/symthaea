@@ -46,6 +46,7 @@ IMPLICIT_SERVICE_RESTART_PATTERN='_[[:space:]]*=>[[:space:]]*NixOSCommand::Custo
 VALIDATED_OPERATION_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceOperationV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceOperationV1\b'
 OBSERVED_STATE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceObservedStateV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceObservedStateV1\b'
 OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceObservedStateV1[[:space:]]*\{.*?pub[[:space:]]+fn[[:space:]]+new[[:space:]]*\('
+OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
 
 scan_diagnostic_boundary() {
   local file="$1"
@@ -65,6 +66,11 @@ scan_legacy_custom_command() {
 scan_legacy_service_constructor() {
   local file="$1"
   rg -n --pcre2 "${LEGACY_SERVICE_CONSTRUCTOR_PATTERN}" "$file"
+}
+
+scan_public_observation_factory() {
+  local file="$1"
+  rg -n --pcre2 "${OBSERVATION_PUBLIC_FACTORY_PATTERN}" "$file"
 }
 
 scan_legacy_service_renderer() {
@@ -153,6 +159,12 @@ run_boundary_check() {
   fi
   if matches="$(rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
     echo "ERROR: NixServiceObservedStateV1 constructor must not be public" >&2
+    echo "ERROR: NixServiceObservedStateV1 constructor must not be public" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+  if matches="$(scan_public_observation_factory "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
+    echo "ERROR: observed-state parsers/factories must not be public" >&2
     echo "${matches}" >&2
     failed=1
   fi
@@ -277,6 +289,24 @@ run_self_test() {
     ) {}' > "${tmp}/observed-state-public-constructor.rs"
   if rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/observed-state-public-constructor.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect public observed-state constructor" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-public-parser.rs"
+  if scan_public_observation_factory "${tmp}/observed-state-public-parser.rs"; then :; else
+    echo "ERROR: CROSS-023 self-test failed to detect public observed-state parser" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub fn from_observed_state(...) {}' > "${tmp}/observed-state-public-factory.rs"
+  if scan_public_observation_factory "${tmp}/observed-state-public-factory.rs"; then :; else
+    echo "ERROR: CROSS-023 self-test failed to detect public observed-state factory" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub(crate) fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-crate-parser.rs"
+  if scan_public_observation_factory "${tmp}/observed-state-crate-parser.rs"; then
+    echo "ERROR: CROSS-023 self-test falsely rejected crate-private observation parser" >&2
     return 1
   fi
 }
