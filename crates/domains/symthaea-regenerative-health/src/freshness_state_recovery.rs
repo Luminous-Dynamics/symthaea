@@ -393,10 +393,12 @@ mod tests {
             err,
             FreshnessAnchorAssuranceError::InsufficientCapabilities {
                 missing: vec![
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::IntegrityProtection,
                     crate::freshness_anchor_assurance::FreshnessAnchorCapability::Authentication,
                     crate::freshness_anchor_assurance::FreshnessAnchorCapability::Monotonicity,
                     crate::freshness_anchor_assurance::FreshnessAnchorCapability::RollbackResistance,
                     crate::freshness_anchor_assurance::FreshnessAnchorCapability::AtomicUpdate,
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::CrashPersistence,
                 ],
             }
         );
