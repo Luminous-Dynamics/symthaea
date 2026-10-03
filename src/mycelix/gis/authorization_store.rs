@@ -530,14 +530,6 @@ impl SqliteAuthorizationStore {
         if boundary_id.is_empty() || attempt_id.is_empty() {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
-        if native_replay_provenance.is_some_and(|p| {
-            p.native_replay_identity != native_replay_identity
-                || p.authority_namespace.is_empty()
-                || p.native_authorization_id.is_empty()
-                || p.derivation_digest.is_empty()
-        }) {
-            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
-        }
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
@@ -643,39 +635,30 @@ impl SqliteAuthorizationStore {
     #[deprecated(note = "use mark_dispatch_pending_bound_from_pinned_native_authority")]
     pub fn mark_dispatch_pending_bound_from_native_authority(
         &self,
-        authorization_instance: &str,
-        attempt_id: &str,
-        action: &EpistemicAction,
-        expected_effect: &super::ActionEffectBinding,
-        boundary_id: &str,
-        operation_id: &str,
-        authority_namespace: &str,
-        native_authorization_id: &str,
+        _authorization_instance: &str,
+        _attempt_id: &str,
+        _action: &EpistemicAction,
+        _expected_effect: &super::ActionEffectBinding,
+        _boundary_id: &str,
+        _operation_id: &str,
+        _authority_namespace: &str,
+        _native_authorization_id: &str,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
-        let replay=super::NativeReplayDerivation::derive(
-            authority_namespace,native_authorization_id,
-        ).map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
-        self.mark_dispatch_pending_bound_with_provenance(
-            authorization_instance,attempt_id,action,expected_effect,boundary_id,
-            operation_id,&replay.native_replay_identity,Some(&replay),
-        )
+        Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into())
     }
 
     #[deprecated(note = "use mark_dispatch_pending_bound_from_pinned_native_authority")]
     pub fn mark_dispatch_pending_bound(
         &self,
-        authorization_instance: &str,
-        attempt_id: &str,
-        action: &EpistemicAction,
-        expected_effect: &super::ActionEffectBinding,
-        boundary_id: &str,
-        operation_id: &str,
-        native_replay_identity: &str,
+        _authorization_instance: &str,
+        _attempt_id: &str,
+        _action: &EpistemicAction,
+        _expected_effect: &super::ActionEffectBinding,
+        _boundary_id: &str,
+        _operation_id: &str,
+        _native_replay_identity: &str,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
-        self.mark_dispatch_pending_bound_with_provenance(
-            authorization_instance,attempt_id,action,expected_effect,boundary_id,
-            operation_id,native_replay_identity,None,
-        )
+        Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into())
     }
 
     fn mark_dispatch_pending_bound_with_provenance(
@@ -1073,14 +1056,15 @@ impl SqliteAuthorizationStore {
                 r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?,
                 r.get::<_,String>(3)?, r.get::<_,String>(4)?, r.get::<_,String>(5)?,
                 r.get::<_,String>(6)?, r.get::<_,String>(7)?, r.get::<_,String>(8)?,
-                r.get::<_,String>(9)?,
+                r.get::<_,String>(9)?, r.get::<_,String>(10)?,
             )),
         ).optional()?.ok_or_else(|| AuthorizationStoreError::NotFound(record.attempt_id.clone()))?;
         if row.0 != record.operation_id || row.1 != record.native_replay_identity
-            || row.2 != record.action_id || row.3 != record.action_digest
-            || row.4 != record.provider_idempotency_key || row.5 != record.target_identity
-            || row.6 != record.audience || row.7 != record.adapter || row.8 != record.boundary_id
-            || !matches!(row.9.as_str(), "dispatch_pending" | "invoked" | "indeterminate" | "succeeded" | "failed")
+            || row.2 != self.relying_party_id
+            || row.3 != record.action_id || row.4 != record.action_digest
+            || row.5 != record.provider_idempotency_key || row.6 != record.target_identity
+            || row.7 != record.audience || row.8 != record.adapter || row.9 != record.boundary_id
+            || !matches!(row.10.as_str(), "dispatch_pending" | "invoked" | "indeterminate" | "succeeded" | "failed")
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
@@ -1977,6 +1961,99 @@ mod tests {
         }
     }
 
+    fn mark_dispatch_pending_bound_for_test(
+        store: &SqliteAuthorizationStore,
+        authorization_instance: &str,
+        attempt_id: &str,
+        action: &EpistemicAction,
+        expected_effect: &super::super::ActionEffectBinding,
+        boundary_id: &str,
+        operation_id: impl AsRef<str>,
+        native_authorization_id: impl AsRef<str>,
+    ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
+        const ISSUER: &str = "test-issuer";
+        const NAMESPACE: &str = "test-authority/v1";
+        store.pin_native_authority_namespace(ISSUER, NAMESPACE)?;
+        store.mark_dispatch_pending_bound_from_pinned_native_authority(
+            authorization_instance,
+            attempt_id,
+            action,
+            expected_effect,
+            boundary_id,
+            operation_id.as_ref(),
+            ISSUER,
+            native_authorization_id.as_ref(),
+        )
+    }
+
+    fn mark_dispatch_pending_bound_from_native_authority_for_test(
+        store: &SqliteAuthorizationStore,
+        authorization_instance: &str,
+        attempt_id: &str,
+        action: &EpistemicAction,
+        expected_effect: &super::super::ActionEffectBinding,
+        boundary_id: &str,
+        operation_id: &str,
+        authority_namespace: &str,
+        native_authorization_id: &str,
+    ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
+        const ISSUER: &str = "test-explicit-issuer";
+        store.pin_native_authority_namespace(ISSUER, authority_namespace)?;
+        store.mark_dispatch_pending_bound_from_pinned_native_authority(
+            authorization_instance,
+            attempt_id,
+            action,
+            expected_effect,
+            boundary_id,
+            operation_id,
+            ISSUER,
+            native_authorization_id,
+        )
+    }
+
+    #[test]
+    fn legacy_provenance_less_bound_apis_fail_closed() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-legacy-fence-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=action.with_effect_binding(effect.clone());
+
+        assert!(matches!(
+            SqliteAuthorizationStore::mark_dispatch_pending_bound(
+                &store,
+                &witness.authorization_instance,
+                "attempt-legacy-api",
+                &action,
+                &effect,
+                "boundary-A",
+                "operation:legacy-api",
+                "native-replay:legacy-api",
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidNativeReplayProvenance
+            ))
+        ));
+        assert!(matches!(
+            SqliteAuthorizationStore::mark_dispatch_pending_bound_from_native_authority(
+                &store,
+                &witness.authorization_instance,
+                "attempt-legacy-authority-api",
+                &action,
+                &effect,
+                "boundary-A",
+                "operation:legacy-authority-api",
+                "authority",
+                "native-auth",
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidNativeReplayProvenance
+            ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
     #[test]
     fn pre_entry_lookup_cannot_be_used_as_terminal_outcome() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-verifier-kind-{}.db",std::process::id()));
@@ -2000,7 +2077,7 @@ mod tests {
             "sha256:support","policy-v1",1,1
         )).unwrap();
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-kind","boundary-A").unwrap();
-        let record=store.mark_dispatch_pending_bound(
+        let record=mark_dispatch_pending_bound_for_test(&store,
             &witness.authorization_instance,"attempt-kind",&action,&effect,"boundary-A"
         ,
             format!("operation:{}", "attempt-kind"),
@@ -2039,7 +2116,7 @@ mod tests {
             "sha256:support","policy-v1",1,1
         )).unwrap();
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-exact","boundary-A").unwrap();
-        let record=store.mark_dispatch_pending_bound(
+        let record=mark_dispatch_pending_bound_for_test(&store,
             &witness.authorization_instance,"attempt-exact",&action,&effect,"boundary-A"
         ,
             format!("operation:{}", "attempt-exact"),
@@ -2067,7 +2144,7 @@ mod tests {
             frame:witness.frame, policy:witness.policy, authority_epoch:witness.authority_epoch,
         };
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-reconcile-key","boundary-A").unwrap();
-        let record=store.mark_dispatch_pending_bound(
+        let record=mark_dispatch_pending_bound_for_test(&store,
             &witness.authorization_instance,"attempt-reconcile-key",&action,&effect,"boundary-A",
             "operation:reconcile-key","native-grant:reconcile"
         ).unwrap();
@@ -2104,7 +2181,7 @@ mod tests {
             authority_epoch:witness.authority_epoch,
         };
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-provider-key","boundary-A").unwrap();
-        let record=store.mark_dispatch_pending_bound(
+        let record=mark_dispatch_pending_bound_for_test(&store,
             &witness.authorization_instance,"attempt-provider-key",&action,&effect,"boundary-A",
             "operation:provider-key","native-grant:one"
         ).unwrap();
@@ -2139,7 +2216,7 @@ mod tests {
             authority_epoch:witness.authority_epoch,
         };
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-provider-key","boundary-A").unwrap();
-        let record=store.mark_dispatch_pending_bound(
+        let record=mark_dispatch_pending_bound_for_test(&store,
             &witness.authorization_instance,"attempt-provider-key",&action,&effect,"boundary-A",
             "operation:provider-key","native-grant:one"
         ).unwrap();
@@ -2173,7 +2250,7 @@ mod tests {
             policy:witness.policy,authority_epoch:witness.authority_epoch,
         };
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-native-derived","boundary-A").unwrap();
-        let record=store.mark_dispatch_pending_bound_from_native_authority(
+        let record=mark_dispatch_pending_bound_from_native_authority_for_test(&store,
             &witness.authorization_instance,"attempt-native-derived",&action,&effect,"boundary-A",
             "operation:native-derived","issuer.example","native-auth-1"
         ).unwrap();
@@ -2246,7 +2323,7 @@ mod tests {
             "verifier-rp",action.id.clone(),digest,"support","policy@1",1,1
         )).unwrap();
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-verifier-rp","boundary-A").unwrap();
-        let record=store.mark_dispatch_pending_bound(
+        let record=mark_dispatch_pending_bound_for_test(&store,
             "verifier-rp","attempt-verifier-rp",&action,&effect,"boundary-A",
             "operation:verifier-rp","native:verifier-rp"
         ).unwrap();
@@ -2357,7 +2434,7 @@ mod tests {
             authority_epoch:witness.authority_epoch,
         };
         store.prepare_for_execution_bound(&witness,&action,"frame@1","attempt-identity","boundary-A").unwrap();
-        let record=store.mark_dispatch_pending_bound(
+        let record=mark_dispatch_pending_bound_for_test(&store,
             &witness.authorization_instance,"attempt-identity",&action,&effect,"boundary-A",
             "operation:identity-fence","native-replay:identity-fence"
         ).unwrap();
@@ -2488,7 +2565,7 @@ mod tests {
         };
         store.register_lease(&AuthorizationLease::new(action.id.clone(),digest,"sha256:support","policy-v1",1,1)).unwrap();
         store.prepare_for_execution(&witness,&action,"frame@1","attempt-bound").unwrap();
-        let record=store.mark_dispatch_pending_bound(&witness.authorization_instance,"attempt-bound",&action,&effect,"boundary-A",
+        let record=mark_dispatch_pending_bound_for_test(&store,&witness.authorization_instance,"attempt-bound",&action,&effect,"boundary-A",
             format!("operation:{}", "attempt-bound"),
             format!("native-replay:{}", &witness.authorization_instance)).unwrap();
         assert_eq!(record.target_identity,"target-A");
@@ -2549,14 +2626,14 @@ mod tests {
         )).unwrap();
 
         store.prepare_for_execution_bound(&witness_a,&action,"frame@1","attempt-fence-a","boundary-A").unwrap();
-        store.mark_dispatch_pending_bound(
+        mark_dispatch_pending_bound_for_test(&store,
             &witness_a.authorization_instance,"attempt-fence-a",&action,&effect,"boundary-A",
             "operation:fence-a","native-grant:fence-a"
         ).unwrap();
 
         store.prepare_for_execution_bound(&witness_b,&action,"frame@1","attempt-fence-b","boundary-A").unwrap();
         assert!(matches!(
-            store.mark_dispatch_pending_bound(
+            mark_dispatch_pending_bound_for_test(&store,
                 &witness_b.authorization_instance,"attempt-fence-b",&action,&effect,"boundary-A",
                 "operation:fence-b","native-grant:fence-b"
             ),
@@ -2657,11 +2734,11 @@ mod tests {
         )).unwrap();
         store.prepare_for_execution_bound(&witness_a,&action_a,"frame@1","attempt-native-a","boundary-A").unwrap();
         store.prepare_for_execution_bound(&witness_b,&action_b,"frame@1","attempt-native-b","boundary-A").unwrap();
-        store.mark_dispatch_pending_bound(
+        mark_dispatch_pending_bound_for_test(&store,
             &witness_a.authorization_instance,"attempt-native-a",&action_a,&effect,"boundary-A",
             "operation:native-a","native-replay:shared"
         ).unwrap();
-        let duplicate=store.mark_dispatch_pending_bound(
+        let duplicate=mark_dispatch_pending_bound_for_test(&store,
             &witness_b.authorization_instance,"attempt-native-b",&action_b,&effect,"boundary-A",
             "operation:native-b","native-replay:shared"
         );
@@ -2694,7 +2771,7 @@ mod tests {
             Err(AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding))
         ));
 
-        let record=store.mark_dispatch_pending_bound(
+        let record=mark_dispatch_pending_bound_for_test(&store,
             "approval-legacy-fence","attempt-legacy-fence",&action,&effect,"boundary-A"
         ,
             format!("operation:{}", "attempt-legacy-fence"),
@@ -2741,7 +2818,7 @@ mod tests {
         assert_eq!(store.recover_incomplete_attempts().unwrap(),0);
         assert_eq!(store.recover_incomplete_attempts_for_boundary("boundary-A").unwrap(),0);
 
-        let old_attempt=store.mark_dispatch_pending_bound(
+        let old_attempt=mark_dispatch_pending_bound_for_test(&store,
             &witness.authorization_instance,"attempt-pre",&action,
             &super::super::ActionEffectBinding::new("target-A","prod","adapter-A"),
             "boundary-A"
@@ -2852,7 +2929,7 @@ mod tests {
         store.prepare_for_execution_bound(
             &witness,&action,"frame@1","attempt-after-dispatch","boundary-A"
         ).unwrap();
-        let record=store.mark_dispatch_pending_bound(
+        let record=mark_dispatch_pending_bound_for_test(&store,
             "approval-after-dispatch","attempt-after-dispatch",&action,&effect,"boundary-A"
         ,
             format!("operation:{}", "attempt-after-dispatch"),
@@ -2898,7 +2975,7 @@ mod tests {
         store.prepare_for_execution_bound(
             &witness,&action,"frame@1","attempt-boundary","boundary-A"
         ).unwrap();
-        let record=store.mark_dispatch_pending_bound(
+        let record=mark_dispatch_pending_bound_for_test(&store,
             &witness.authorization_instance,"attempt-boundary",&action,&effect,"boundary-A"
         ,
             format!("operation:{}", "attempt-boundary"),
@@ -2975,7 +3052,7 @@ mod tests {
         };
         assert!(reopened.recover_pre_dispatch_attempt(&recovery).unwrap());
         assert!(matches!(
-            reopened.mark_dispatch_pending_bound(
+            mark_dispatch_pending_bound_for_test(&reopened,
                 &witness.authorization_instance,"attempt-prepared",&action,
                 &super::super::ActionEffectBinding::new("target-A","prod","adapter-A"),
                 "boundary-A"
@@ -3109,7 +3186,7 @@ mod tests {
                 instance,action.id.clone(),digest.clone(),"support","policy@1",1,1
             )).unwrap();
             store.prepare_for_execution_bound(&witness,&action,"frame@1",attempt,boundary).unwrap();
-            let record=store.mark_dispatch_pending_bound(
+            let record=mark_dispatch_pending_bound_for_test(&store,
                 instance,attempt,&action,&effect,boundary,operation,native
             ).unwrap();
             assert_eq!(record.target_identity,"target-cross-rp");
