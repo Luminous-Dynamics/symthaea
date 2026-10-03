@@ -206,6 +206,10 @@ The literature supports treating this as a distinct recovery family. Raviv repor
 
 The qualification harness now covers the paper's published \(n\in\{500,1000,2000\}\), \(k\in\{3,5,7\}\), and \(F\in\{3,4,5\}\) binding-recovery parameter grid, using ten deterministic repeats per setting, matching the published experiment's repeat count. The matrix deliberately records validity and joint-basis independence rather than timing or superiority. It also emits a deterministic BLAKE3 result digest over the case parameters, targets, original factors, and recovered factors, so a change that preserves aggregate success counts is still detectable.
 
+### Published-grid search-space ledger
+
+For bound recovery with factor ranks \(k_1,\ldots,k_F\), exhaustive factor enumeration contains exactly \(2^{\sum_i k_i}\) candidate tuples. The algebraic method instead solves for \(\sum_i k_i\) Boolean coefficients over the retained independent basis. The qualification harness records both quantities across the same published parameter grid. This is a structural search-space comparison only; it is not a measured runtime ratio, and it does not assume that an exhaustive implementation and the solver have identical constant factors.
+
 ### Published-grid storage ledger
 
 Raviv's Remark 6 distinguishes representation size from recovery work: an arbitrary codebook supplied explicitly requires \(|C_i|n\) bits per factor, while a linear code can be represented by its generator matrix using \(k_i n\) bits. The qualification harness now records those theoretical payload sizes separately from the actual packed-`u64` generator storage used by this implementation, along with target storage. These are raw representation quantities, not a composite efficiency score; struct/allocator overhead is intentionally excluded.
