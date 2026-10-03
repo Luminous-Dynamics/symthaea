@@ -293,9 +293,13 @@ pub struct LinearCodeWork {
     pub span_membership_checks: usize,
     pub basis_rank_pivots: usize,
     pub basis_rank_row_xor_words: usize,
+    pub basis_rank_input_word_copies: usize,
+    pub solve_basis_bit_probes: usize,
+    pub solve_matrix_word_cells: usize,
     pub solve_pivots: usize,
     pub solve_row_xor_words: usize,
     pub retained_generators: usize,
+    pub projection_word_xor_ops: usize,
 }
 
 fn extends_span_with_work(
@@ -348,6 +352,7 @@ fn solve_linear_combination_counted(
         .map(|row| {
             let mut equation = vec![0u64; coefficient_words + 1];
             for (index, vector) in basis.iter().enumerate() {
+                work.solve_basis_bit_probes += 1;
                 if vector.bit(row) {
                     equation[index / 64] |= 1u64 << (index % 64);
                 }
@@ -479,6 +484,7 @@ pub fn recover_linear_bound_with_work(
         coefficients.iter().zip(&independent_basis).zip(&owners)
     {
         if *coefficient {
+            work.projection_word_xor_ops += generator.words.len();
             recovered[owner].xor_assign(generator);
         }
     }
@@ -540,11 +546,13 @@ fn basis_rank_counted(
     dimension: usize,
     work: &mut LinearCodeWork,
 ) -> usize {
-    let mut rows: Vec<BinaryCodeword> = vectors
-        .iter()
-        .filter(|vector| vector.dimension == dimension)
-        .cloned()
-        .collect();
+    let mut rows = Vec::with_capacity(vectors.len());
+    for vector in vectors {
+        if vector.dimension == dimension {
+            work.basis_rank_input_word_copies += vector.words.len();
+            rows.push(vector.clone());
+        }
+    }
 
     let mut rank = 0usize;
     for column in (0..dimension).rev() {
