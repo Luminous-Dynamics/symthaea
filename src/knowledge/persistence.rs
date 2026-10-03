@@ -196,7 +196,29 @@ pub struct KnowledgeSnapshotValidationReceipt {
 }
 
 impl KnowledgeSnapshotValidationReceipt {
-    fn canonical_digest_hex(&self) -> String {
+    /// Self-digest used by the current validation ledger schema.
+    ///
+    /// Version 2 binds the internal append sequence as well as the public receipt
+    /// fields, so direct sequence mutation cannot remain self-consistent.
+    fn canonical_digest_hex_for_sequence(&self, validation_sequence: u64) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.epf-011.snapshot-validation-receipt.v2");
+        digest_u64(&mut hasher, validation_sequence);
+        digest_str(&mut hasher, &self.validation_event);
+        digest_u64(&mut hasher, self.generation);
+        digest_str(&mut hasher, &self.snapshot_digest_hex);
+        digest_str(&mut hasher, &self.validator_ref);
+        digest_str(&mut hasher, &self.validator_version);
+        digest_str(&mut hasher, &self.validation_profile);
+        digest_bool(&mut hasher, self.conforms);
+        digest_opt_str(&mut hasher, self.report_digest_hex.as_deref());
+        hasher.finalize().to_hex().to_string()
+    }
+
+    /// Digest format used by the immediately preceding EPF-011 validation-receipt
+    /// tranche. Migration accepts only an exact legacy self-digest and rewrites it
+    /// deterministically to the sequence-bound v2 form.
+    fn legacy_canonical_digest_hex(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea.epf-011.snapshot-validation-receipt.v1");
         digest_str(&mut hasher, &self.validation_event);
@@ -1037,7 +1059,10 @@ impl KnowledgePersistence {
                 validation.validation_profile,
                 validation.conforms,
                 validation.report_digest_hex,
-                validation.canonical_digest_hex(),
+                validation.canonical_digest_hex_for_sequence(
+                    u64::try_from(next_validation_sequence)
+                        .expect("validation sequence preflighted for SQLite INTEGER range"),
+                ),
             ],
         )
         .map_err(|e| format!("Persist snapshot validation receipt: {e}"))?;
@@ -1746,51 +1771,87 @@ impl KnowledgePersistence {
             .map_err(|e| format!("Validation schema migration receipt_digest_hex: {e}"))?;
         }
 
-        let legacy_validation_rows = {
+        // Normalize every persisted validation receipt to the current sequence-bound
+        // v2 self-digest. Rows from the immediately preceding tranche use v1; rows
+        // without a digest are deterministically initialized from their existing fields.
+        // Any present digest that matches neither exact representation fails the migration
+        // closed instead of silently repairing potentially corrupted history.
+        let validation_receipt_rows = {
             let mut stmt = tx
                 .prepare(
-                    "SELECT rowid, validation_event, generation, snapshot_digest_hex,
-                            validator_ref, validator_version, validation_profile,
-                            conforms, report_digest_hex
+                    "SELECT rowid, validation_sequence, validation_event, generation,
+                            snapshot_digest_hex, validator_ref, validator_version,
+                            validation_profile, conforms, report_digest_hex,
+                            receipt_digest_hex
                      FROM knowledge_snapshot_validation_receipts
-                     WHERE receipt_digest_hex IS NULL
                      ORDER BY rowid ASC",
                 )
-                .map_err(|e| format!("Validation receipt backfill prepare: {e}"))?;
+                .map_err(|e| format!("Validation receipt integrity normalization prepare: {e}"))?;
             stmt.query_map([], |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
+                    u64::try_from(row.get::<_, i64>(1)?).map_err(|_| {
+                        rusqlite::Error::InvalidColumnType(
+                            1,
+                            "validation_sequence".into(),
+                            rusqlite::types::Type::Integer,
+                        )
+                    })?,
                     KnowledgeSnapshotValidationReceipt {
-                        validation_event: row.get(1)?,
-                        generation: u64::try_from(row.get::<_, i64>(2)?).map_err(|_| {
+                        validation_event: row.get(2)?,
+                        generation: u64::try_from(row.get::<_, i64>(3)?).map_err(|_| {
                             rusqlite::Error::InvalidColumnType(
-                                2,
+                                3,
                                 "generation".into(),
                                 rusqlite::types::Type::Integer,
                             )
                         })?,
-                        snapshot_digest_hex: row.get(3)?,
-                        validator_ref: row.get(4)?,
-                        validator_version: row.get(5)?,
-                        validation_profile: row.get(6)?,
-                        conforms: row.get(7)?,
-                        report_digest_hex: row.get(8)?,
+                        snapshot_digest_hex: row.get(4)?,
+                        validator_ref: row.get(5)?,
+                        validator_version: row.get(6)?,
+                        validation_profile: row.get(7)?,
+                        conforms: row.get(8)?,
+                        report_digest_hex: row.get(9)?,
                     },
+                    row.get::<_, Option<String>>(10)?,
                 ))
             })
-            .map_err(|e| format!("Validation receipt backfill query: {e}"))?
+            .map_err(|e| format!("Validation receipt integrity normalization query: {e}"))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Validation receipt backfill row: {e}"))?
+            .map_err(|e| format!("Validation receipt integrity normalization row: {e}"))?
         };
 
-        for (rowid, receipt) in legacy_validation_rows {
-            tx.execute(
-                "UPDATE knowledge_snapshot_validation_receipts
-                 SET receipt_digest_hex = ?1
-                 WHERE rowid = ?2",
-                rusqlite::params![receipt.canonical_digest_hex(), rowid],
-            )
-            .map_err(|e| format!("Validation receipt backfill update: {e}"))?;
+        for (rowid, validation_sequence, receipt, stored_digest) in validation_receipt_rows {
+            receipt
+                .validate_input()
+                .map_err(|e| format!("Invalid persisted snapshot validation receipt: {e}"))?;
+
+            if validation_sequence == 0 {
+                return Err("Validation receipt sequence must be positive".into());
+            }
+
+            let v2_digest = receipt.canonical_digest_hex_for_sequence(validation_sequence);
+            let needs_v2_backfill = match stored_digest.as_deref() {
+                None => true,
+                Some(digest) if digest == v2_digest => false,
+                Some(digest) if digest == receipt.legacy_canonical_digest_hex() => true,
+                Some(_) => {
+                    return Err(format!(
+                        "Validation receipt self-digest is not a recognized EPF-011 integrity digest: {}",
+                        receipt.validation_event
+                    ));
+                }
+            };
+
+            if needs_v2_backfill {
+                tx.execute(
+                    "UPDATE knowledge_snapshot_validation_receipts
+                     SET receipt_digest_hex = ?1
+                     WHERE rowid = ?2",
+                    rusqlite::params![v2_digest, rowid],
+                )
+                .map_err(|e| format!("Validation receipt integrity normalization update: {e}"))?;
+            }
         }
 
         // Create the identity index only after the additive columns exist on legacy databases.
@@ -2165,16 +2226,6 @@ fn verify_snapshot_validation_receipts_in_tx(
             .validate_input()
             .map_err(|e| format!("Invalid persisted snapshot validation receipt: {e}"))?;
 
-        if validation_sequence != expected_sequence {
-            return Err(format!(
-                "Snapshot validation receipt sequence discontinuity: expected {}, observed {}",
-                expected_sequence, validation_sequence
-            ));
-        }
-        expected_sequence = expected_sequence
-            .checked_add(1)
-            .ok_or("Snapshot validation sequence exhausted validation range")?;
-
         let Some(linked_snapshot_digest) = linked_snapshot_digest else {
             return Err(format!(
                 "Snapshot validation receipt references missing snapshot generation: {}",
@@ -2194,13 +2245,23 @@ fn verify_snapshot_validation_receipts_in_tx(
                 receipt.validation_event
             ));
         };
-        let expected = receipt.canonical_digest_hex();
+        let expected = receipt.canonical_digest_hex_for_sequence(validation_sequence);
         if stored_digest != expected {
             return Err(format!(
                 "Snapshot validation receipt self-digest mismatch: {}",
                 receipt.validation_event
             ));
         }
+
+        if validation_sequence != expected_sequence {
+            return Err(format!(
+                "Snapshot validation receipt sequence discontinuity: expected {}, observed {}",
+                expected_sequence, validation_sequence
+            ));
+        }
+        expected_sequence = expected_sequence
+            .checked_add(1)
+            .ok_or("Snapshot validation sequence exhausted validation range")?;
     }
     Ok(())
 }
@@ -3374,7 +3435,7 @@ mod tests {
                     conforms: true,
                     report_digest_hex: report_digest.clone(),
                 }
-                .canonical_digest_hex();
+                .canonical_digest_hex_for_sequence(1);
             assert_eq!(validation_row.1, expected_validation_receipt);
 
             let snapshot_receipt_schema: Vec<String> = conn
@@ -4509,7 +4570,7 @@ mod tests {
             "UPDATE knowledge_snapshot_validation_receipts
              SET receipt_digest_hex = ?1
              WHERE validation_event = 'validation:digest'",
-            rusqlite::params![tampered.canonical_digest_hex()],
+            rusqlite::params![tampered.canonical_digest_hex_for_sequence(1)],
         )
         .unwrap();
 
@@ -4541,6 +4602,61 @@ mod tests {
         assert_eq!(
             err,
             "Snapshot validation receipt snapshot digest mismatch: validation:digest"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_validation_receipt_self_digest_binds_internal_sequence() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_validation_sequence_digest_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "validation-sequence-digest".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0xA4; BinaryHV::BYTES],
+            source_text: "sequence digest".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        let committed = p.latest_snapshot_receipt().unwrap().unwrap();
+
+        p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:sequence-bound".into(),
+            generation: committed.generation,
+            snapshot_digest_hex: committed.canonical_digest_hex,
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        })
+        .unwrap();
+
+        let conn = p.open_connection().unwrap();
+        conn.execute_batch(
+            "DROP TRIGGER trg_knowledge_snapshot_validation_receipts_no_update;
+             UPDATE knowledge_snapshot_validation_receipts
+             SET validation_sequence = 2
+             WHERE validation_event = 'validation:sequence-bound';",
+        )
+        .unwrap();
+
+        let err = p.verify_snapshot_validation_receipts().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot validation receipt self-digest mismatch: validation:sequence-bound"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
