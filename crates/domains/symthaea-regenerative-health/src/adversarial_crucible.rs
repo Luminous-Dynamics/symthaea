@@ -76,6 +76,11 @@ fn temporal_gate() -> TemporalFusionGate {
         minimum_trusted_sensors: 2,
         minimum_independent_groups: 2,
         maximum_delta_disagreement_milli: 250,
+        expected_asset_id: "vehicle-1".into(),
+        expected_component_id: "wing-root".into(),
+        expected_topology_id: "topology-wing-root".into(),
+        expected_topology_version: "1".into(),
+        expected_topology_digest: "topology-v1".into(),
     })
     .expect("valid temporal policy")
 }
