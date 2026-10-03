@@ -273,6 +273,27 @@ Possible protocol namespace:
 "Sovereign Deploy" can remain an informal descriptive phrase during migration, but the architecture should avoid freezing the shorter name into public APIs if a more exact name is accepted.
 
 
+## Relationship to existing world-interface contracts
+
+The repository family already contains higher-level world-interface concepts such
+as action intents, authority contexts, observations, capabilities, evidence
+references, and execution receipts. Those contracts are useful integration
+surfaces for world/simulation bridges, but they are not the right dependency for
+the minimal deployment protocol core.
+
+SSC therefore remains self-contained at the protocol layer. Integrators may map
+between the two contract families:
+
+- world-interface action intent -> SSC DeploymentIntent;
+- world-interface authority context/decision -> SSC AuthorizationEvidence;
+- world-interface observation envelope -> SSC TargetSnapshot;
+- world-interface execution receipt/evidence references -> SSC ExecutionReceipt.
+
+The mapping must preserve exact target identity, artifact/configuration identity,
+capability grants, validity windows, and evidence digests. No adapter may weaken
+SSC validation merely because a higher-level bridge has already authorized an
+action.
+
 ## Interoperability and canonicalization
 
 The v0.1 Rust crate uses deterministic serde/JSON serialization for its internal
