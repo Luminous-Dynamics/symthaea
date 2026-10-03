@@ -1130,6 +1130,29 @@ pub enum EvaluationClaim {
     EnvelopeStructuralValidity,
 }
 
+impl EvaluationClaim {
+    /// Complete claim universe for the Evidence Fabric boundary.
+    ///
+    /// A well-formed boundary must classify every known claim exactly once.
+    pub const ALL: &'static [Self] = &[
+        Self::ReceiptIntegrity,
+        Self::AttestationAuthenticity,
+        Self::TemporalValidity,
+        Self::CryptosuiteConformance,
+        Self::VerificationMethodResolution,
+        Self::VerificationMethodLifecycle,
+        Self::ProofPurposeAuthorization,
+        Self::ProofPolicyConformance,
+        Self::CryptographicProofValidity,
+        Self::UnderlyingObservationTruth,
+        Self::SemanticValidity,
+        Self::ExternalWorldCorrespondence,
+        Self::AttesterIntent,
+        Self::EvaluatorIndependence,
+        Self::EnvelopeStructuralValidity,
+    ];
+}
+
 fn evaluation_claim_tag(claim: EvaluationClaim) -> u8 {
     match claim {
         EvaluationClaim::ReceiptIntegrity => 0,
@@ -1279,7 +1302,7 @@ impl EvaluationBoundary {
         }
     }
 
-    /// Validate the epistemic partition: a claim may occupy exactly one bucket.
+    /// Validate the epistemic partition: every known claim occupies exactly one bucket.
     pub fn is_well_formed(&self) -> bool {
         let established: std::collections::BTreeSet<_> =
             self.established.iter().copied().collect();
@@ -1287,6 +1310,12 @@ impl EvaluationBoundary {
             self.not_established.iter().copied().collect();
         let indeterminate: std::collections::BTreeSet<_> =
             self.indeterminate.iter().copied().collect();
+        let all_claims: std::collections::BTreeSet<_> =
+            EvaluationClaim::ALL.iter().copied().collect();
+
+        let mut present = established.clone();
+        present.extend(not_established.iter().copied());
+        present.extend(indeterminate.iter().copied());
 
         established.len() == self.established.len()
             && not_established.len() == self.not_established.len()
@@ -1294,6 +1323,7 @@ impl EvaluationBoundary {
             && established.is_disjoint(&not_established)
             && established.is_disjoint(&indeterminate)
             && not_established.is_disjoint(&indeterminate)
+            && present == all_claims
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -3160,6 +3190,26 @@ mod tests {
             ..context.clone()
         }.fingerprint());
         assert!(!context.is_well_formed());
+    }
+
+    #[test]
+    fn evaluation_boundary_self_validation_rejects_omitted_claim() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let boundary = EvaluationBoundary::from_report(&report);
+
+        assert!(boundary.is_well_formed());
+
+        let mut tampered = boundary.clone();
+        tampered
+            .not_established
+            .retain(|claim| *claim != EvaluationClaim::EvaluatorIndependence);
+        assert!(!tampered.is_well_formed());
     }
 
     #[test]
