@@ -602,7 +602,11 @@ mod tests {
         current.verification_result.verified_at_ms = 1_500;
         p.independence.previous_topology_attestation = Some(previous);
         p.independence.topology_attestation = current;
-        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        let mut gate = fusion_gate();
+        gate.policy.expected_topology_version = "2".into();
+        gate.policy.expected_topology_digest = "topology-v2".into();
+        gate.policy.expected_topology_epoch = 2;
+        let d = gate.assess(&[p, pair("strain-b", 0.6, 1.6)]);
         assert_eq!(d.state, TemporalFusionState::Corroborated);
     }
 
