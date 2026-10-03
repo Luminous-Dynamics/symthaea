@@ -2206,6 +2206,28 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
         );
     }
 
+    let foreign_key_violations = {
+        let mut stmt = conn
+            .prepare("PRAGMA foreign_key_check(knowledge_snapshot_validation_receipts)")
+            .map_err(|e| format!("Schema integrity foreign-key check prepare: {e}"))?;
+        stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })
+        .map_err(|e| format!("Schema integrity foreign-key check query: {e}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Schema integrity foreign-key check row: {e}"))?
+    };
+    if let Some((table, rowid, parent, constraint)) = foreign_key_violations.first() {
+        return Err(format!(
+            "Schema integrity check failed: foreign-key violation in {table} row {rowid} referencing {parent} (constraint {constraint})"
+        ));
+    }
+
     // These two indexes enforce identity uniqueness rather than merely improving
     // query performance, so verify both uniqueness and the exact key-column contract.
     for (table, index, expected_columns) in [
@@ -3219,6 +3241,38 @@ mod tests {
             err,
             "Schema integrity check failed: foreign-key enforcement is disabled on this connection"
         );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_initialized_schema_rejects_existing_foreign_key_violation() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_fk_violation_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let conn = p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+
+        conn.execute_batch("PRAGMA foreign_keys = OFF;").unwrap();
+        conn.execute(
+            "INSERT INTO knowledge_snapshot_validation_receipts
+             (validation_event, validation_sequence, generation, snapshot_digest_hex,
+              validator_ref, validator_version, validation_profile, conforms, receipt_digest_hex)
+             VALUES ('orphan', 1, 999, 'snapshot', 'validator', 'v1', 'profile', 1,
+                     '0000000000000000000000000000000000000000000000000000000000000000')",
+            [],
+        )
+        .unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+
+        let err = verify_initialized_schema_integrity(&conn).unwrap_err();
+        assert!(err.contains("foreign-key violation in knowledge_snapshot_validation_receipts"));
+        assert!(err.contains("referencing knowledge_snapshot_receipts"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
