@@ -217,8 +217,7 @@ impl RandomLinearCode {
         left_rank: usize,
         right_rank: usize,
         seed: u64,
-    ) -> Option<(Self, Self, Self)> {
-        assert!(dimension > 0, "dimension must be positive");
+    ) -> Option<(Self, Self, Self)> {        assert!(dimension > 0, "dimension must be positive");
         assert!(left_rank > 0, "left rank must be positive");
         assert!(right_rank > 0, "right rank must be positive");
         let total_rank = left_rank.checked_add(right_rank)?;
@@ -437,8 +436,7 @@ pub fn recover_linear_bound(
     target: &BinaryCodeword,
     factors: &[&RandomLinearCode],
 ) -> Option<Vec<BinaryCodeword>> {
-    recover_linear_bound_with_work(target, factors).0
-}
+    recover_linear_bound_with_work(target, factors).0}
 
 /// Recover a clean bound and return deterministic work counters for the
 /// maximal-independent-subset construction and GF(2) solve.
@@ -470,11 +468,11 @@ pub fn recover_linear_bound_with_work(
         }
     }
 
-    let coefficients =
-        match solve_linear_combination_counted(target, &independent_basis, &mut work) {
-            Some(coefficients) => coefficients,
-            None => return (None, work),
-        };
+    let coefficients = match solve_linear_combination_counted(target, &independent_basis, &mut work)
+    {
+        Some(coefficients) => coefficients,
+        None => return (None, work),
+    };
 
     let mut recovered = factors
         .iter()
@@ -697,8 +695,7 @@ mod tests {
     }
 
     #[test]
-    fn bipolar_mapping_matches_raviv_boolean_convention() {
-        let mut word = BinaryCodeword::zero(3);
+    fn bipolar_mapping_matches_raviv_boolean_convention() {        let mut word = BinaryCodeword::zero(3);
         assert_eq!(word.to_bipolar(), vec![1, 1, 1]);
 
         word.set_bit(0, true);
