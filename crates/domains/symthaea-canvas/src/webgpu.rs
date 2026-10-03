@@ -843,6 +843,11 @@ impl WebGpuRenderer {
         self.surface.configure(&self.device, &self.config);
     }
 
+    /// Returns whether the device-lost callback has fired.
+    pub fn is_device_lost(&self) -> bool {
+        self.device_lost.load(Ordering::Acquire)
+    }
+
     pub fn render(&mut self, scene: &GpuScene) -> Result<(), String> {
         if self.device_lost.load(Ordering::Acquire) {
             return Err("WebGPU cognitive device was lost".to_string());
@@ -1101,6 +1106,11 @@ impl WebGpuMovieRenderer {
             frame_height: 0,
             device_lost,
         })
+    }
+
+    /// Returns whether the device-lost callback has fired.
+    pub fn is_device_lost(&self) -> bool {
+        self.device_lost.load(Ordering::Acquire)
     }
 
     /// Upload one bounded RGBA frame and present it with nearest-neighbour sampling.
