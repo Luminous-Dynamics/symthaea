@@ -84,6 +84,25 @@ fn workload_identity_is_stable_across_environment_only_changes() {
 }
 
 #[test]
+fn environment_identity_is_stable_across_workload_only_changes() {
+    let base = fixture();
+    let environment = base.environment_digest().unwrap();
+
+    let mut changed = base.clone();
+    changed.source_revision = "d".repeat(40);
+    changed.repository_source_snapshot_id =
+        RepositorySourceSnapshotId::parse(&"f".repeat(64)).unwrap();
+    changed.argv.push("--nocapture".into());
+    changed
+        .immutable_input_digests
+        .insert("dataset.bin".into(), "blake3:1122334455667788".into());
+
+    assert_eq!(changed.environment_digest().unwrap(), environment);
+    assert_ne!(changed.workload_digest().unwrap(), base.workload_digest().unwrap());
+    assert_ne!(changed.validated_digest().unwrap(), base.validated_digest().unwrap());
+}
+
+#[test]
 fn every_canonical_lineage_field_changes_identity_and_drift_report() {
     let base = fixture();
 
