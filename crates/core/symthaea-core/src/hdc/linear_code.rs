@@ -344,6 +344,25 @@ pub struct LinearCodeAlgebra {
 }
 
 impl LinearCodeAlgebra {
+    /// Check the exact cardinality conservation law
+    ///
+    ///     Delta = rank(union) + kernel_dimension
+    ///
+    /// and its exponent form
+    ///
+    ///     raw_tuple = reachable_targets * fiber_size.
+    ///
+    /// Both identities are exact because the factor-to-bound map is linear over GF(2).
+    pub const fn satisfies_conservation_law(self) -> bool {
+        self.factor_dimension_sum
+            == self.union_generator_rank + self.kernel_dimension
+            && self.raw_factor_tuple_count.exponent()
+                == self.reachable_target_count.exponent()
+                    + self.factorization_count_per_target.exponent()
+            && self.unique_factorization == self.kernel_dimension == 0
+            && self.factorization_count_per_target.is_one() == self.unique_factorization
+    }
+
     pub const fn raw_factor_tuple_exponent(self) -> usize {
         self.raw_factor_tuple_count.exponent()
     }
