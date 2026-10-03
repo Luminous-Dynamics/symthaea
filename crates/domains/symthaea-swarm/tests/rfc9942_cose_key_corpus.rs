@@ -26,8 +26,11 @@ const Y: [u8; 32] = [
 ];
 
 fn bstr(bytes: &[u8]) -> Vec<u8> {
-    assert!(bytes.len() < 24);
-    let mut out = vec![0x40 + bytes.len() as u8];
+    let mut out = match bytes.len() {
+        0..=23 => vec![0x40 + bytes.len() as u8],
+        24..=255 => vec![0x58, bytes.len() as u8],
+        _ => panic!("fixture bstr too large"),
+    };
     out.extend_from_slice(bytes);
     out
 }
