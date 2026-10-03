@@ -39,6 +39,49 @@ fn canonical_fixture_fingerprint_is_emitted() {
 }
 
 #[test]
+fn small_code_geometry_ledger_is_exhaustively_self_consistent() {
+    let dimension = 16;
+    let code = RandomLinearCode::generate(dimension, 5, 0x6E01);
+    let codewords = code.enumerate();
+
+    let min_distance = codewords
+        .iter()
+        .filter(|word| word.weight() > 0)
+        .map(BinaryCodeword::weight)
+        .min()
+        .expect("non-zero codeword must exist");
+
+    let mut pairwise_min_distance = usize::MAX;
+    let mut max_inner_product = isize::MIN;
+    for left in &codewords {
+        for right in &codewords {
+            if left == right {
+                continue;
+            }
+            let distance = left
+                .words()
+                .iter()
+                .zip(right.words())
+                .map(|(a, b)| (a ^ b).count_ones() as usize)
+                .sum::<usize>();
+            pairwise_min_distance = pairwise_min_distance.min(distance);
+
+            let inner_product = dimension as isize - 2 * distance as isize;
+            max_inner_product = max_inner_product.max(inner_product);
+        }
+    }
+
+    assert_eq!(pairwise_min_distance, min_distance);
+    assert_eq!(max_inner_product, dimension as isize - 2 * min_distance as isize);
+
+    println!(
+        "GEOMETRY_LEDGER=dimension={dimension};rank={};seed=0x6E01;codewords={};min_distance={min_distance};max_bipolar_inner_product={max_inner_product}",
+        code.rank(),
+        codewords.len(),
+    );
+}
+
+#[test]
 fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
     let (parent, left, right) =
         RandomLinearCode::generate_direct_sum(96, 6, 6, 0x1111).expect("valid direct sum");
