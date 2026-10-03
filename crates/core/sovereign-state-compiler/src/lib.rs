@@ -64,6 +64,12 @@ impl From<&str> for ArtifactId {
 /// operations that the concrete target can actually authorize and perform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Capability {
+    /// Observe the target's realized state for lifecycle planning or verification.
+    /// This is intentionally broader than physical-hardware observation so the
+    /// neutral protocol can cover virtual, managed, and non-OS targets.
+    ObserveState,
+    /// Observe physical target hardware/inventory when a capability specifically
+    /// requires hardware facts.
     ObserveHardware,
     InstallApplication,
     RemoveApplication,
@@ -365,6 +371,7 @@ impl DeploymentPlan {
                 &self.target_snapshot.profile.capabilities,
                 None,
             )?;
+            validate_step_capability_semantics(step)?;
         }
 
         validate_capabilities(
@@ -513,6 +520,9 @@ impl ExecutionReceipt {
         if self.finished_at_ms < self.started_at_ms {
             return Err(ReceiptValidationError::TimestampOrderInvalid);
         }
+        if self.started_at_ms < plan.plan.target_snapshot.observed_at_ms {
+            return Err(ReceiptValidationError::StartedBeforeTargetSnapshot);
+        }
         if self.started_at_ms < plan.authorization.valid_from_ms.unwrap_or(self.started_at_ms) {
             return Err(ReceiptValidationError::StartedBeforeAuthorization);
         }
@@ -570,6 +580,8 @@ pub enum ReceiptValidationError {
     MissingFinalSnapshotEvidence,
     #[error("execution receipt timestamps are out of order")]
     TimestampOrderInvalid,
+    #[error("execution started before the authorized target snapshot was observed")]
+    StartedBeforeTargetSnapshot,
     #[error("execution started before authorization became valid")]
     StartedBeforeAuthorization,
     #[error("execution finished after authorization expired")]
@@ -608,8 +620,15 @@ impl AuthorizationEvidence {
             return Err(PlanValidationError::AuthorizationIntentDigestMismatch);
         }
 
+        if plan.target_snapshot.observed_at_ms > now_ms {
+            return Err(PlanValidationError::TargetSnapshotFutureDated {
+                observed_at_ms: plan.target_snapshot.observed_at_ms,
+                now_ms,
+            });
+        }
+
         if let Some(max_age_ms) = plan.max_target_snapshot_age_ms {
-            let age_ms = now_ms.saturating_sub(plan.target_snapshot.observed_at_ms);
+            let age_ms = now_ms - plan.target_snapshot.observed_at_ms;
             if age_ms > max_age_ms {
                 return Err(PlanValidationError::TargetSnapshotStale {
                     age_ms,
@@ -733,6 +752,24 @@ fn validate_artifacts(artifacts: &[ArtifactRef]) -> Result<(), PlanValidationErr
     Ok(())
 }
 
+fn validate_step_capability_semantics(step: &PlanStep) -> Result<(), PlanValidationError> {
+    let required = match step.kind {
+        PlanStepKind::Observe | PlanStepKind::Verify => Capability::ObserveState,
+        PlanStepKind::Reboot => Capability::Reboot,
+        PlanStepKind::Rollback => Capability::Rollback,
+        PlanStepKind::StageArtifacts | PlanStepKind::ApplyDesiredState => return Ok(()),
+    };
+
+    if !step.required_capabilities.contains(&required) {
+        return Err(PlanValidationError::StepMissingSemanticCapability {
+            kind: step.kind.clone(),
+            capability: required,
+        });
+    }
+
+    Ok(())
+}
+
 fn validate_capabilities(
     required: &BTreeSet<Capability>,
     supported: &BTreeSet<Capability>,
@@ -807,6 +844,11 @@ pub enum PlanValidationError {
     MissingVerificationStep,
     #[error("verification step must be the final lifecycle step")]
     VerificationStepNotFinal,
+    #[error("plan step {kind:?} must explicitly require semantic capability {capability:?}")]
+    StepMissingSemanticCapability {
+        kind: PlanStepKind,
+        capability: Capability,
+    },
     #[error("plan step sequence overflowed")]
     SequenceOverflow,
     #[error("rollback attempts are configured without rollback permission")]
@@ -823,6 +865,8 @@ pub enum PlanValidationError {
     AuthorizationPlanDigestMismatch,
     #[error("authorization target-snapshot digest does not match the observed target")]
     AuthorizationTargetSnapshotDigestMismatch,
+    #[error("target snapshot is future-dated: observed at {observed_at_ms} ms but authorization time is {now_ms} ms")]
+    TargetSnapshotFutureDated { observed_at_ms: u64, now_ms: u64 },
     #[error("target snapshot is stale: age {age_ms} ms exceeds maximum {max_age_ms} ms")]
     TargetSnapshotStale { age_ms: u64, max_age_ms: u64 },
     #[error("authorization validity window is invalid")]
@@ -860,6 +904,8 @@ mod tests {
             identity: TargetId::from("host-01"),
             platform: "nixos".into(),
             capabilities: [
+                Capability::ObserveState,
+                Capability::ObserveState,
                 Capability::ObserveHardware,
                 Capability::ConfigureSystem,
                 Capability::InstallApplication,
@@ -910,7 +956,7 @@ mod tests {
                 PlanStep {
                     sequence: 2,
                     kind: PlanStepKind::Verify,
-                    required_capabilities: [Capability::ObserveHardware].into_iter().collect(),
+                    required_capabilities: [Capability::ObserveState].into_iter().collect(),
                     description: "verify target state".into(),
                 },
             ],
@@ -934,6 +980,7 @@ mod tests {
             target_snapshot_digest: plan.target_snapshot.digest().expect("snapshot digest"),
             plan_digest: plan.digest().expect("plan digest"),
             granted_capabilities: [
+                Capability::ObserveState,
                 Capability::ObserveHardware,
                 Capability::ConfigureSystem,
                 Capability::Rollback,
@@ -966,6 +1013,34 @@ mod tests {
         assert_eq!(
             plan.validate(),
             Err(PlanValidationError::InvalidObservationDigest)
+        );
+    }
+
+    #[test]
+    fn rejects_future_dated_target_snapshot() {
+        let mut plan = sample_plan();
+        plan.target_snapshot.observed_at_ms = 151;
+        let auth = authorization_for(&plan);
+
+        assert_eq!(
+            plan.authorize(auth, 150),
+            Err(PlanValidationError::TargetSnapshotFutureDated {
+                observed_at_ms: 151,
+                now_ms: 150,
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_observe_or_verify_steps_without_observe_state() {
+        let mut plan = sample_plan();
+        plan.steps[2].required_capabilities.clear();
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::StepMissingSemanticCapability {
+                kind: PlanStepKind::Verify,
+                capability: Capability::ObserveState,
+            })
         );
     }
 
@@ -1313,7 +1388,7 @@ mod tests {
             PlanStep {
                 sequence: 1,
                 kind: PlanStepKind::Verify,
-                required_capabilities: [Capability::ObserveHardware].into_iter().collect(),
+                required_capabilities: [Capability::ObserveState].into_iter().collect(),
                 description: "verify target state".into(),
             },
         ];
