@@ -327,6 +327,36 @@ async function runMode(mode) {
       );
     }
 
+    const firstFallbackCanvasHash = await canvasPngHash(page, '#canvas2d-movie-fallback');
+    const firstPortraitSource = await page.$eval(
+      'img.portrait',
+      image => image.getAttribute('src') || '',
+    );
+    if (!firstPortraitSource.startsWith('data:image/svg+xml;base64,')) {
+      throw new QualificationError('SVG fallback source is not a data URL', 'fallback');
+    }
+
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await waitForProjection(page, '#canvas2d-movie-fallback', 'block');
+    await waitForVisible(page, 'img.portrait');
+    await sleep(100);
+    failOnPageErrors('forced fallback deterministic repeat render');
+
+    const repeatFallbackCanvasHash = await canvasPngHash(page, '#canvas2d-movie-fallback');
+    const repeatPortraitSource = await page.$eval(
+      'img.portrait',
+      image => image.getAttribute('src') || '',
+    );
+    const firstPortraitHash = createHash('sha256').update(firstPortraitSource).digest('hex');
+    const repeatPortraitHash = createHash('sha256').update(repeatPortraitSource).digest('hex');
+    if (repeatFallbackCanvasHash !== firstFallbackCanvasHash
+      || repeatPortraitHash !== firstPortraitHash) {
+      throw new QualificationError(
+        `non-deterministic fallback capture: canvas=${firstFallbackCanvasHash}/${repeatFallbackCanvasHash} portrait=${firstPortraitHash}/${repeatPortraitHash}`,
+        'fallback',
+      );
+    }
+
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, 'fallback.png'),
       fullPage: false,
@@ -337,7 +367,10 @@ async function runMode(mode) {
       qualification_profile: 'forced-gpu-disabled',
       capability,
       fallback,
+      canvas_hash: firstFallbackCanvasHash,
+      portrait_hash: firstPortraitHash,
       deterministic_fixture: true,
+      deterministic_repeat: true,
       page_errors: pageErrors,
     };
   } finally {
