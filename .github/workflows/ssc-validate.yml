@@ -1,0 +1,37 @@
+name: Sovereign State Compiler Validation
+
+on:
+  push:
+    branches:
+      - rfc/sovereign-state-compiler
+  pull_request:
+    paths:
+      - "crates/core/sovereign-state-compiler/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/ssc-validate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ssc:
+    name: format, check, test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust 1.96
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+
+      - name: Format check
+        run: cargo +1.96.0 fmt --all -- --check
+
+      - name: Check crate
+        run: cargo +1.96.0 check -p sovereign-state-compiler
+
+      - name: Test crate
+        run: cargo +1.96.0 test -p sovereign-state-compiler
