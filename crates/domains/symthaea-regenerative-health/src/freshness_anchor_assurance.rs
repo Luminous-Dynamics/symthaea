@@ -220,11 +220,7 @@ impl VerifiedFreshnessAnchor {
         receipt: FreshnessAnchorVerificationReceipt,
         verifier: &V,
     ) -> Result<Self, FreshnessAnchorAssuranceError> {
-        profile
-            .require_authoritative()
-            .map_err(|_| FreshnessAnchorAssuranceError::InsufficientCapabilities {
-                missing: profile.capabilities.missing_authoritative_capabilities(),
-            })?;
+        profile.require_authoritative()?;
         if receipt.schema_version != "0.1"
             || receipt.verifier_reference.trim().is_empty()
             || receipt.evidence_reference.trim().is_empty()
