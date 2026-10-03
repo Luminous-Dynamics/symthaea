@@ -85,7 +85,25 @@ pub struct TargetProfile {
 
 impl TargetProfile {
     pub fn digest(&self) -> Result<ContentDigest, serde_json::Error> {
-        canonical_digest(self, DIGEST_DOMAIN)
+        canonical_digest(self, b"LUMINOUS-DYNAMICS/SSC/TARGET-PROFILE/v1\\0")
+    }
+}
+
+/// Fresh observation of a concrete target.
+///
+/// The observation digest is deliberately separate from the platform label:
+/// a disk, boot chain, management enrollment, architecture, or other
+/// target-specific fact can change while the platform name remains the same.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TargetSnapshot {
+    pub profile: TargetProfile,
+    pub observed_at_ms: u64,
+    pub observation_digest: ContentDigest,
+}
+
+impl TargetSnapshot {
+    pub fn digest(&self) -> Result<ContentDigest, serde_json::Error> {
+        canonical_digest(self, b"LUMINOUS-DYNAMICS/SSC/TARGET-SNAPSHOT/v1\\0")
     }
 }
 
@@ -93,7 +111,19 @@ impl TargetProfile {
 /// command. Higher-level domain crates may add richer typed state later.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct DesiredState {
-    pub properties: BTreeMap<String, String>,
+    pub properties: BTreeMap<String, StateValue>,
+}
+
+/// Typed desired-state values prevent the universal protocol from becoming
+/// stringly-typed while remaining extensible enough for heterogeneous targets.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StateValue {
+    Null,
+    Bool(bool),
+    Integer(i64),
+    String(String),
+    List(Vec<StateValue>),
+    Object(BTreeMap<String, StateValue>),
 }
 
 /// Reference to an immutable artifact or artifact set.
@@ -193,6 +223,7 @@ pub struct AuthorizationEvidence {
     pub authority_id: String,
     pub intent_digest: ContentDigest,
     pub target_profile_digest: ContentDigest,
+    pub target_snapshot_digest: ContentDigest,
     pub plan_digest: ContentDigest,
     pub granted_capabilities: BTreeSet<Capability>,
     pub nonce: String,
@@ -206,7 +237,7 @@ pub struct AuthorizationEvidence {
 pub struct DeploymentPlan {
     pub schema_version: String,
     pub intent: DeploymentIntent,
-    pub target_profile: TargetProfile,
+    pub target_snapshot: TargetSnapshot,
     pub steps: Vec<PlanStep>,
     pub verification: VerificationPolicy,
     pub rollback: RollbackPolicy,
@@ -223,7 +254,7 @@ impl DeploymentPlan {
 
     /// Validate OS-independent structural, identity, and capability invariants.
     pub fn validate(&self) -> Result<(), PlanValidationError> {
-        if self.intent.target != self.target_profile.identity {
+        if self.intent.target != self.target_snapshot.profile.identity {
             return Err(PlanValidationError::TargetMismatch);
         }
 
@@ -237,14 +268,14 @@ impl DeploymentPlan {
                 .ok_or(PlanValidationError::SequenceOverflow)?;
             validate_capabilities(
                 &step.required_capabilities,
-                &self.target_profile.capabilities,
+                &self.target_snapshot.profile.capabilities,
                 None,
             )?;
         }
 
         validate_capabilities(
             &self.intent.required_capabilities,
-            &self.target_profile.capabilities,
+            &self.target_snapshot.profile.capabilities,
             None,
         )?;
 
@@ -306,11 +337,20 @@ impl AuthorizationEvidence {
         }
 
         let target_digest = plan
-            .target_profile
+            .target_snapshot
+            .profile
             .digest()
             .map_err(PlanValidationError::Serialization)?;
         if self.target_profile_digest != target_digest {
             return Err(PlanValidationError::AuthorizationTargetDigestMismatch);
+        }
+
+        let snapshot_digest = plan
+            .target_snapshot
+            .digest()
+            .map_err(PlanValidationError::Serialization)?;
+        if self.target_snapshot_digest != snapshot_digest {
+            return Err(PlanValidationError::AuthorizationTargetSnapshotDigestMismatch);
         }
 
         let plan_digest = plan.digest().map_err(PlanValidationError::Serialization)?;
@@ -331,14 +371,14 @@ impl AuthorizationEvidence {
         }
 
         for capability in &self.granted_capabilities {
-            if !plan.target_profile.capabilities.contains(capability) {
+            if !plan.target_snapshot.profile.capabilities.contains(capability) {
                 return Err(PlanValidationError::GrantedCapabilityNotSupported(*capability));
             }
         }
 
         validate_capabilities(
             &plan.intent.required_capabilities,
-            &plan.target_profile.capabilities,
+            &plan.target_snapshot.profile.capabilities,
             Some(&self.granted_capabilities),
         )?;
 
@@ -420,6 +460,8 @@ pub enum PlanValidationError {
     AuthorizationTargetDigestMismatch,
     #[error("authorization plan digest does not match the compiled plan")]
     AuthorizationPlanDigestMismatch,
+    #[error("authorization target-snapshot digest does not match the observed target")]
+    AuthorizationTargetSnapshotDigestMismatch,
     #[error("authorization validity window is invalid")]
     AuthorizationWindowInvalid,
     #[error("authorization authority identifier is empty")]
@@ -462,7 +504,11 @@ mod tests {
         DeploymentPlan {
             schema_version: SCHEMA_VERSION.into(),
             intent,
-            target_profile: sample_profile(),
+            target_snapshot: TargetSnapshot {
+                profile: sample_profile(),
+                observed_at_ms: 90,
+                observation_digest: ContentDigest::blake3(b"hardware-observation"),
+            },
             steps: vec![
                 PlanStep {
                     sequence: 0,
@@ -489,7 +535,12 @@ mod tests {
         AuthorizationEvidence {
             authority_id: "owner".into(),
             intent_digest: plan.intent.digest().expect("intent digest"),
-            target_profile_digest: plan.target_profile.digest().expect("target digest"),
+            target_profile_digest: plan
+                .target_snapshot
+                .profile
+                .digest()
+                .expect("target digest"),
+            target_snapshot_digest: plan.target_snapshot.digest().expect("snapshot digest"),
             plan_digest: plan.digest().expect("plan digest"),
             granted_capabilities: [
                 Capability::ConfigureSystem,
@@ -542,7 +593,7 @@ mod tests {
 
         assert_eq!(
             plan.authorize(auth, 150),
-            Err(PlanValidationError::AuthorizationTargetDigestMismatch)
+            Err(PlanValidationError::AuthorizationTargetSnapshotDigestMismatch)
         );
     }
 
@@ -641,7 +692,7 @@ mod tests {
         let mut changed = plan;
         changed.intent.desired_state.properties.insert(
             "hostname".into(),
-            "new-name".into(),
+            StateValue::String("new-name".into()),
         );
 
         assert_ne!(before, changed.digest().expect("digest"));
@@ -653,11 +704,11 @@ mod tests {
         intent
             .desired_state
             .properties
-            .insert("z".into(), "last".into());
+            .insert("z".into(), StateValue::String("last".into()));
         intent
             .desired_state
             .properties
-            .insert("a".into(), "first".into());
+            .insert("a".into(), StateValue::String("first".into()));
 
         let bytes = serde_json::to_vec(&intent).expect("serialize");
         let text = String::from_utf8(bytes).expect("utf8");
