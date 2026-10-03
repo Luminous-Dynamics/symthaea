@@ -80,13 +80,16 @@ async fn parse_service_response(resp: gloo_net::http::Response) -> Result<Value,
             let done = web_sys::js_sys::Reflect::get(&result, &JsValue::from_str("done"))
                 .map_err(|error| format!("failed to inspect response chunk: {error:?}"))?
                 .as_bool()
-                .unwrap_or(false);
+                .ok_or_else(|| "response stream returned a non-boolean done flag".to_string())?;
             if done {
                 break;
             }
 
             let value = web_sys::js_sys::Reflect::get(&result, &JsValue::from_str("value"))
                 .map_err(|error| format!("failed to inspect response chunk value: {error:?}"))?;
+            if value.is_null() || value.is_undefined() {
+                return Err("response stream returned a missing chunk value".to_string());
+            }
             let chunk = web_sys::js_sys::Uint8Array::new(&value);
             let chunk_len = chunk.length() as usize;
             let next_len = bytes
