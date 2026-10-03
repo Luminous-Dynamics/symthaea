@@ -1173,7 +1173,7 @@ mod tests {
             authority_epoch: 7,
         };
         let mut lease = AuthorizationLease::new("a-lease", action_digest.clone(), "sha256:support", "policy-v1", 7, 1);
-        lease.&witness, &action, "f1", "attempt-1").unwrap();
+        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
 
         lease.mark_dispatch_pending("attempt-1").unwrap();
         let receipt = lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap();
@@ -1197,7 +1197,7 @@ mod tests {
             issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 1,
         };
         let mut lease = AuthorizationLease::new("a-concurrent", action_digest.clone(), "sha256:support", "policy-v1", 1, 1);
-        lease.&witness, &action, "f1", "attempt-1").unwrap();
+        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
 
         lease.mark_dispatch_pending("attempt-1").unwrap();
         assert_eq!(
@@ -1217,7 +1217,7 @@ mod tests {
             issued_at: "2026-10-02T20:00:00Z".into(), expires_at: None, authority_epoch: 3,
         };
         let mut lease = AuthorizationLease::new("a-crash", action_digest.clone(), "sha256:support", "policy-v1", 3, 1);
-        lease.&witness, &action, "f1", "attempt-1").unwrap();
+        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
 
         lease.mark_dispatch_pending("attempt-1").unwrap();
         let receipt = lease.commit("attempt-1", ExecutionOutcome::Indeterminate).unwrap();
@@ -1251,7 +1251,7 @@ mod tests {
             "approval-2026-10-02-001", action.id.clone(), digest,
             "sha256:support", "policy-v1", 1, 1,
         );
-        lease.&witness, &action, "f1", "attempt-1").unwrap();
+        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
 
         lease.mark_dispatch_pending("attempt-1").unwrap();
         lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap();
@@ -1382,7 +1382,7 @@ mod tests {
             1,
             1,
         );
-        lease.&witness, &action, "f1", "attempt-1").unwrap();
+        lease.prepare_for_execution(&witness, &action, "f1", "attempt-1").unwrap();
 
         lease.mark_dispatch_pending("attempt-1").unwrap();
 
@@ -1434,7 +1434,7 @@ mod tests {
             "approval-effect-1", action.id.clone(), digest,
             "sha256:support", "policy-v1", 1, 1,
         );
-        lease.&witness, &action, &effect, "f1", "attempt-1").unwrap();
+        lease.prepare_for_effect_execution(&witness, &action, &effect, "f1", "attempt-1").unwrap();
 
         lease.mark_dispatch_pending("attempt-1").unwrap();
 
