@@ -1839,7 +1839,9 @@ impl KnowledgePersistence {
         // migration transaction so a legacy v1 self-digest can be upgraded; if any later
         // migration step fails, the transaction rollback restores the trigger unchanged.
         tx.execute_batch(
-            "DROP TRIGGER IF EXISTS trg_knowledge_snapshot_validation_receipts_no_update;",
+            "DROP TRIGGER IF EXISTS trg_knowledge_snapshot_receipts_required_insert;
+             DROP TRIGGER IF EXISTS trg_knowledge_snapshot_validation_receipts_required_insert;
+             DROP TRIGGER IF EXISTS trg_knowledge_snapshot_validation_receipts_no_update;",
         )
         .map_err(|e| format!("Schema validation receipt migration guard: {e}"))?;
 
@@ -3447,6 +3449,51 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+
+    #[test]
+    fn test_initialized_schema_rejects_weakened_receipt_insert_trigger() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_receipt_trigger_contract_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        p.save_facts(&[FactRecord {
+            memory_id: "receipt-trigger".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x51; BinaryHV::BYTES],
+            source_text: "receipt trigger".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "DROP TRIGGER trg_knowledge_snapshot_receipts_required_insert;
+                 CREATE TRIGGER trg_knowledge_snapshot_receipts_required_insert
+                 BEFORE INSERT ON knowledge_snapshot_receipts
+                 WHEN NEW.generation IS NULL
+                 BEGIN
+                     SELECT RAISE(ABORT, 'weakened receipt guard');
+                 END;",
+            )
+            .unwrap();
+        }
+
+        let conn = p.open_connection().unwrap();
+        let err = p.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains("trg_knowledge_snapshot_receipts_required_insert"));
+        assert!(err.contains("missing required contract fragment"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_receipt_insert_boundary_rejects_malformed_digests_and_outcomes() {
