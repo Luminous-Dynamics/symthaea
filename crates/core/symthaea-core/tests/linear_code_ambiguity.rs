@@ -1,3 +1,4 @@
+use blake3::Hasher;
 use symthaea_core::hdc::linear_code::{
     BinaryCodeword, LinearCodeWork, RandomLinearCode, basis_rank, recover_direct_sum_bound,
     recover_independent_bound, recover_linear_bound, recover_linear_bound_with_work,
@@ -216,6 +217,8 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     let mut jointly_dependent = 0usize;
     let mut failures = 0usize;
     let mut total_work = LinearCodeWork::default();
+    let mut result_digest = Hasher::new();
+    result_digest.update(b"symthaea-hdc-paper-matrix-v1\\0");
 
     for &dimension in &dimensions {
         for &rank in &ranks {
@@ -254,6 +257,22 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                         .cloned()
                         .reduce(|left, right| left.bound(&right))
                         .expect("at least one factor");
+
+                    result_digest.update(&(dimension as u64).to_le_bytes());
+                    result_digest.update(&(rank as u64).to_le_bytes());
+                    result_digest.update(&(factor_count as u64).to_le_bytes());
+                    result_digest.update(&(repeat as u64).to_le_bytes());
+                    result_digest.update(&seed_base.to_le_bytes());
+                    result_digest.update(&(target.words().len() as u64).to_le_bytes());
+                    for word in target.words() {
+                        result_digest.update(&word.to_le_bytes());
+                    }
+                    for word in &words {
+                        result_digest.update(&(word.words().len() as u64).to_le_bytes());
+                        for packed_word in word.words() {
+                            result_digest.update(&packed_word.to_le_bytes());
+                        }
+                    }
 
                     let mut combined_basis = Vec::with_capacity(rank * factor_count);
                     for factor in &factors {
@@ -320,8 +339,14 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     assert_eq!(valid_representative, cases);
     assert_eq!(jointly_dependent, 0);
 
+    let result_digest = result_digest.finalize();
+    let result_digest = result_digest
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     println!(
-        "PAPER_MATRIX=dimensions=500,1000,2000;ranks=3,5,7;factors=3,4,5;repeats={repeats};cases={cases};exact_original={exact_original};valid_representative={valid_representative};jointly_dependent={jointly_dependent};failures={failures};total_span_membership_checks={};total_basis_rank_pivots={};total_solve_pivots={};total_solve_row_xor_words={}",
+        "PAPER_MATRIX=dimensions=500,1000,2000;ranks=3,5,7;factors=3,4,5;repeats={repeats};cases={cases};exact_original={exact_original};valid_representative={valid_representative};jointly_dependent={jointly_dependent};failures={failures};result_digest={result_digest};total_span_membership_checks={};total_basis_rank_pivots={};total_solve_pivots={};total_solve_row_xor_words={}",
         total_work.span_membership_checks,
         total_work.basis_rank_pivots,
         total_work.solve_pivots,
