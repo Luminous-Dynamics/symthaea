@@ -79,7 +79,7 @@ async function canvasPixelSamples(page, selector, points) {
     selector,
     async (canvas, points) => {
       if (!(canvas instanceof HTMLCanvasElement)) {
-        throw new Error(`${selector} is not a canvas`);
+        throw new Error(`selected element is not a canvas`);
       }
       const dataUrl = canvas.toDataURL('image/png');
       const image = new Image();
