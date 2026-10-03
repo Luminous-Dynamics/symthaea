@@ -385,6 +385,7 @@ mod tests {
                 schema_version: "0.1".into(),
                 policy_id: "topology-resolution-verification-v1".into(),
                 expected_verifier_id: "mycelix-topology-verifier".into(),
+                required_freshness_scheme: Some("epoch-marker-v1".into()),
                 required_freshness_source_id: Some("topology-epoch-bell".into()),
                 minimum_freshness_epoch: Some(7),
             },
