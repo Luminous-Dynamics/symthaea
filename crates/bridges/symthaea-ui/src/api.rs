@@ -17,6 +17,24 @@ use gloo_net::websocket::Message;
 use gloo_net::websocket::futures::WebSocket;
 use serde_json::Value;
 
+/// Bound one inbound telemetry text frame before handing it to serde_json.
+///
+/// The live mental-movie representation is already bounded to at most 32 MiB
+/// of decoded RGBA storage; 40 MiB leaves room for its base64 encoding and
+/// surrounding JSON while ensuring an oversized websocket frame is rejected
+/// before a second full JSON object is materialized in the WASM heap.
+const MAX_TELEMETRY_TEXT_BYTES: usize = 40 * 1024 * 1024;
+
+fn parse_telemetry_text(text: &str) -> Result<Value, String> {
+    if text.len() > MAX_TELEMETRY_TEXT_BYTES {
+        return Err(format!(
+            "telemetry websocket frame exceeds {} byte bound",
+            MAX_TELEMETRY_TEXT_BYTES
+        ));
+    }
+    serde_json::from_str::<Value>(text).map_err(|error| format!("telemetry payload was not JSON: {error}"))
+}
+
 /// Send one `{"type":"query","content":...}` request to `POST /v1/service`
 /// and return the parsed JSON response (a `Response::QueryResponse` or
 /// `Response::Error` per the wire protocol).
@@ -73,9 +91,9 @@ pub async fn stream_telemetry(gateway: &str, mut on_message: impl FnMut(Value)) 
     let (_write, mut read) = ws.split();
     while let Some(msg) = read.next().await {
         match msg {
-            Ok(Message::Text(text)) => match serde_json::from_str::<Value>(&text) {
+            Ok(Message::Text(text)) => match parse_telemetry_text(&text) {
                 Ok(v) => on_message(v),
-                Err(e) => leptos::logging::warn!("telemetry payload was not JSON: {e}"),
+                Err(e) => leptos::logging::warn!("{e}"),
             },
             Ok(Message::Bytes(_)) => {}
             Err(e) => {
@@ -83,5 +101,30 @@ pub async fn stream_telemetry(gateway: &str, mut on_message: impl FnMut(Value)) 
                 break;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn telemetry_text_budget_accepts_boundary() {
+        assert!(MAX_TELEMETRY_TEXT_BYTES > 32 * 1024 * 1024);
+        assert!(parse_telemetry_text("{}").is_ok());
+    }
+
+    #[test]
+    fn telemetry_text_budget_rejects_oversize_without_parsing() {
+        let mut text = String::with_capacity(MAX_TELEMETRY_TEXT_BYTES + 1);
+        text.extend(std::iter::repeat_n('{', MAX_TELEMETRY_TEXT_BYTES + 1));
+        let error = parse_telemetry_text(&text).expect_err("oversized telemetry must be rejected");
+        assert!(error.contains("exceeds"));
+    }
+
+    #[test]
+    fn telemetry_text_parser_reports_invalid_json() {
+        let error = parse_telemetry_text("not-json").expect_err("invalid JSON must be rejected");
+        assert!(error.contains("not JSON"));
     }
 }
