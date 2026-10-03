@@ -8,8 +8,12 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use sovereign_state_compiler::{Capability, ContentDigest, ResourceRef, TargetId, TargetProfile, TargetSnapshot};
-use sovereign_state_compiler_nix::{default_nixos_capabilities, nixos_generation_resource, NIXOS_GENERATION_RESOURCE_KIND};
+use sovereign_state_compiler::{
+    ContentDigest, ResourceRef, TargetId, TargetProfile, TargetSnapshot,
+};
+use sovereign_state_compiler_nix::{
+    default_nixos_capabilities, nixos_generation_resource,
+};
 use thiserror::Error;
 
 use crate::observe::generations::{GenerationInfo, GenerationObserver};
@@ -105,10 +109,13 @@ impl NixSystemObservation {
         let resources = self
             .generations
             .iter()
-            .filter_map(|entry| {
-                nixos_generation_resource(entry.number, &entry.realization).ok()
+            .map(|entry| {
+                nixos_generation_resource(entry.number, &entry.realization)
+                    .map_err(|error| {
+                        SscObservationError::Io(error.to_string())
+                    })
             })
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         Ok(TargetSnapshot {
             profile: TargetProfile {
@@ -161,6 +168,26 @@ mod tests {
     }
 
     #[test]
+    fn observation_digest_changes_when_realization_changes() {
+        let mut observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        let before = observation.observation_digest().expect("digest");
+        observation.generations[0].realization = "/nix/store/bbb-nixos-system-host".into();
+        let after = observation.observation_digest().expect("digest");
+
+        assert_ne!(before, after);
+    }
+
+    #[test]
     fn generation_resource_tracks_exact_observed_realization() {
         let observation = NixSystemObservation {
             generations: vec![
@@ -197,9 +224,6 @@ mod tests {
             observation.current_system_realization,
             observation.system_profile_realization
         );
-        assert_eq!(
-            NIXOS_GENERATION_RESOURCE_KIND,
-            "nixos-generation"
-        );
+        assert_eq!(super::NIXOS_GENERATION_RESOURCE_KIND, "nixos-generation");
     }
 }
