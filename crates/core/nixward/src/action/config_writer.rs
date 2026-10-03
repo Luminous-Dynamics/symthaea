@@ -598,10 +598,8 @@ mod tests {
         assert!(
             matches!(
                 error.kind(),
-                std::io::ErrorKind::InvalidInput
-                    | std::io::ErrorKind::PermissionDenied
-                    | std::io::ErrorKind::NotFound
-            ),
+                std::io::ErrorKind::InvalidInput | std::io::ErrorKind::PermissionDenied
+            ) || matches!(error.raw_os_error(), Some(code) if code == libc::ELOOP),
             "expected symlink-safe open rejection, got {error:?}"
         );
     }
