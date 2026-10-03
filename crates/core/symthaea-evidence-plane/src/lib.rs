@@ -373,7 +373,10 @@ impl ExecutionLineageV1 {
         validate_git_object_id("source_revision", &self.source_revision)?;
         validate_git_object_id("source_tree", &self.source_tree)?;
         if self.repository_source_snapshot_id.as_str()
-            != self.repository_source_snapshot_id.as_str().to_ascii_lowercase()
+            != self
+                .repository_source_snapshot_id
+                .as_str()
+                .to_ascii_lowercase()
         {
             return Err("repository_source_snapshot_id must be canonical lowercase hex".into());
         }
