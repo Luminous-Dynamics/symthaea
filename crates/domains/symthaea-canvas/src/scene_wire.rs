@@ -129,10 +129,7 @@ impl RemoteScene {
 
         // Serialization size is part of the protocol contract. Never emit a
         // partially serialized scene; replace it atomically with an inert root.
-        if serde_json::to_vec(&remote)
-            .map(|bytes| bytes.len() <= MAX_SCENE_BYTES)
-            .unwrap_or(false)
-        {
+        if remote.serialized_len() <= MAX_SCENE_BYTES {
             remote
         } else {
             remote.root = WireNode {
