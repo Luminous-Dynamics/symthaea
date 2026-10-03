@@ -248,6 +248,14 @@ The legacy attempt-only transition APIs are also fenced from boundary-owned atte
 
 Boundary identity remains a recovery/ownership field, not an action-identity field. It is persisted on attempt-bearing durable records so recovery operations can be scoped to one execution boundary, while the canonical action digest and downstream provider idempotency identity remain common across boundaries for the same authorized action. This follows the current Action Evidence Boundary Internet-Draft's distinction between shared action identity and boundary-scoped attempt ownership, including its requirement that recovery of one attempt cannot close or release records belonging to another.
 
+#### Attempt-scoped status provenance
+
+The pre-entry provider-status ledger is itself attempt-keyed evidence, so it now persists the owning boundary and a deterministic `attempt_scope_digest` derived from `(boundary_id, attempt_id)` under a dedicated domain separator. This keeps status observations attributable to the same boundary namespace as the dispatch attempt rather than leaving an audit record keyed only by a free-form attempt identifier.
+
+For historical databases, migration backfills the status row's boundary only from the authoritative dispatch record for the same `(authorization_instance, attempt_id)` pair, then derives the scope digest from that persisted boundary. The migration never accepts a caller-supplied boundary as repair input. The production pre-entry status write records both values directly.
+
+This is an implementation hardening of the AEB-07 boundary-scoping model, not a claim that the draft specifies this exact hash construction. AEB-07 requires attempt identity to remain unique across boundaries sharing durable state and requires the boundary identifier to enter the derivation of every record keyed by attempt. citeturn728301search1turn728301search2
+
 
 ### Provider-verifier boundary
 
