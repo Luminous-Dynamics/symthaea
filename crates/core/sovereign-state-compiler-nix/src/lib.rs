@@ -342,7 +342,9 @@ impl TargetAdapter for NixOSTargetAdapter {
                             Capability::ConfigureSystem,
                             Capability::UpdateSystem,
                             Capability::ModifyBootChain,
-                        ],
+                        ]
+                        .into_iter()
+                        .collect::<BTreeSet<_>>(),
                         "activate the NixOS configuration and make its generation current",
                     ),
                     Some(NixActivationMode::Test) => (
@@ -350,7 +352,9 @@ impl TargetAdapter for NixOSTargetAdapter {
                             Capability::ConfigureSystem,
                             Capability::UpdateSystem,
                             Capability::ObserveHardware,
-                        ],
+                        ]
+                        .into_iter()
+                        .collect::<BTreeSet<_>>(),
                         "temporarily activate the NixOS configuration without changing the boot default",
                     ),
                     Some(NixActivationMode::Boot) => (
@@ -358,11 +362,15 @@ impl TargetAdapter for NixOSTargetAdapter {
                             Capability::ConfigureSystem,
                             Capability::UpdateSystem,
                             Capability::ModifyBootChain,
-                        ],
+                        ]
+                        .into_iter()
+                        .collect::<BTreeSet<_>>(),
                         "build the NixOS configuration and select it for the next boot without activating now",
                     ),
                     Some(NixActivationMode::DryActivate) => (
-                        [Capability::ConfigureSystem, Capability::UpdateSystem],
+                        [Capability::ConfigureSystem, Capability::UpdateSystem]
+                            .into_iter()
+                            .collect::<BTreeSet<_>>(),
                         "evaluate NixOS activation changes without activating the configuration",
                     ),
                     Some(NixActivationMode::Rollback { .. }) | None => {
