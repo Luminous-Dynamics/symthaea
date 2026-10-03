@@ -1088,12 +1088,36 @@ fn normalize_native_issuer(issuer: &str) -> String {
             params![authorization_instance],
             |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
         )?;
-        self.clock_policy.validate(
+        if self.clock_policy.validate(
             &lease_validity.0,
             lease_validity.1.as_deref(),
             trusted_utc_now()?,
-        )?;
-        if lease_validity.2 != self.clock_policy.digest() {
+        ).is_err()
+            || lease_validity.2 != self.clock_policy.digest()
+        {
+            let authority_epoch = lease.authority_epoch;
+            let changed = tx.execute(
+                "UPDATE authorization_leases
+                 SET state='expired',attempt_id=NULL,boundary_id=NULL
+                 WHERE authorization_instance=?1 AND state='prepared' AND attempt_id=?2",
+                params![authorization_instance, attempt_id],
+            )?;
+            if changed != 1 {
+                return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+            }
+            tx.execute(
+                "INSERT OR IGNORE INTO authorization_recovery_markers
+                 (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
+                 VALUES (?1,?2,?3,?4,?5,'not_entered_validity')",
+                params![
+                    authorization_instance,
+                    attempt_id,
+                    boundary_id,
+                    action.canonical_action_digest(),
+                    authority_epoch as i64,
+                ],
+            )?;
+            tx.commit()?;
             return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
         }
 
@@ -1244,7 +1268,7 @@ fn normalize_native_issuer(issuer: &str) -> String {
             }
             let changed = tx.execute(
                 "UPDATE authorization_leases
-                 SET state='ready',attempt_id=NULL,boundary_id=NULL
+                 SET state='expired',attempt_id=NULL,boundary_id=NULL
                  WHERE authorization_instance=?1 AND state='dispatch_pending'
                    AND attempt_id=?2 AND boundary_id=?3",
                 params![
@@ -2744,6 +2768,84 @@ mod tests {
             Err(AuthorizationStoreError::InvalidState(_))
         ));
         drop(store);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn expired_before_dispatch_closes_authorization_instance() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-validity-dispatch-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-validity-dispatch"
+        ).unwrap();
+        let effect=super::super::ActionEffectBinding::new(
+            "target-validity-dispatch","prod","adapter"
+        );
+        let action=EpistemicAction::new(
+            "validity-dispatch","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"validity-dispatch".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-03T12:00:00Z".into()),
+            authority_epoch:3,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            "support","policy@1",3,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1",
+            "attempt-validity-dispatch","boundary-validity"
+        ).unwrap();
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_leases
+             SET validity_expires_at='2026-10-03T05:59:59Z'
+             WHERE authorization_instance=?1",
+            params![witness.authorization_instance.as_str()],
+        ).unwrap();
+
+        let result=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,
+            "attempt-validity-dispatch",&action,&effect,"boundary-validity",
+            "operation:validity-dispatch","native-validity-dispatch"
+        );
+        assert!(matches!(
+            result,
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::AuthorizationValidityWindowFailed
+            ))
+        ));
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+            params![witness.authorization_instance.as_str()],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"expired");
+
+        let renewed=ActionAuthorizationWitness {
+            issued_at:"2026-10-03T08:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            ..witness.clone()
+        };
+        assert!(matches!(
+            store.prepare_for_execution_bound(
+                &renewed,&action,"frame@1",
+                "attempt-validity-dispatch-renewed","boundary-validity"
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::NotReady
+            ))
+        ));
         let _=std::fs::remove_file(path);
     }
 
