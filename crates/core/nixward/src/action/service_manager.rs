@@ -208,7 +208,7 @@ impl ServiceManager {
     /// collapses UnitFileState to a boolean or accepts partial observations.
     /// It is evidence only; it does not authorize or execute an effect.
     pub fn observed_state(service: &str) -> Result<NixServiceObservedStateV1, std::io::Error> {
-        let unit = Self::normalize_name(service);
+        let unit = Self::validated_governed_unit(service)?;
 
         let properties = observe_service_properties(&unit)?;
         let (state, _capabilities) =
@@ -243,7 +243,7 @@ impl ServiceManager {
     pub fn observed_state_with_capabilities(
         service: &str,
     ) -> Result<(NixServiceObservedStateV1, NixServiceOperationCapabilitiesV1), std::io::Error> {
-        let unit = Self::normalize_name(service);
+        let unit = Self::validated_governed_unit(service)?;
         let properties = observe_service_properties(&unit)?;
         NixServiceObservedStateV1::parse_systemd_observation(&unit, &properties)
             .map_err(|error| std::io::Error::other(format!(
@@ -263,6 +263,25 @@ impl ServiceManager {
             observed.active_state(),
             super::service_state::ServiceActiveStateV1::Active
         ))
+    }
+
+    /// Validate and canonicalize a unit before any governed host observation.
+    ///
+    /// This preserves the observation boundary's ordering: untrusted caller
+    /// input must cross the typed service-domain validator before it reaches
+    /// the systemd transport.
+    fn validated_governed_unit(service: &str) -> Result<String, std::io::Error> {
+        super::service_domain::NixServiceOperationV1::new(
+            service,
+            super::service_domain::NixServiceOperationKindV1::Start,
+        )
+        .map(|operation| operation.unit().to_string())
+        .map_err(|error| {
+            std::io::Error::other(format!(
+                "invalid governed service unit '{}': {error}",
+                service
+            ))
+        })
     }
 
     /// Ensure service name ends with ".service" if no suffix given.
@@ -387,6 +406,16 @@ mod tests {
         let (bin, args) = cmd.to_command();
         assert_eq!(bin, "systemctl");
         assert_eq!(args, vec!["restart", "nginx.service"]);
+    }
+
+    #[test]
+    fn governed_observation_validates_before_host_transport() {
+        let unit = ServiceManager::validated_governed_unit("nginx").unwrap();
+        assert_eq!(unit, "nginx.service");
+
+        let error = ServiceManager::validated_governed_unit("../nginx").unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::Other);
+        assert!(error.to_string().contains("path-like"));
     }
 
     #[test]
