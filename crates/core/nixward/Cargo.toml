@@ -26,6 +26,8 @@ path = "src/bin/nixward_daemon.rs"
 required-features = ["daemon"]
 
 [dependencies]
+sovereign-state-compiler = { path = "../sovereign-state-compiler" }
+sovereign-state-compiler-nix = { path = "../sovereign-state-compiler-nix" }
 symthaea-core = { path = "../symthaea-core" }
 # Native-only (C FFI, async)
 tree-sitter = { workspace = true, optional = true }
