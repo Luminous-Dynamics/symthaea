@@ -9,8 +9,8 @@ scan_paths=(
   .github
   crates/domains/symthaea-spore
   nix/modules
-  scripts
   src/swarm
+  crates/domains/symthaea-spore/src/bin
 )
 
 matches="$(git grep -nE "$legacy_regex" -- "${scan_paths[@]}"
