@@ -4797,6 +4797,21 @@ mod tests {
     }
 
     #[test]
+    fn provider_status_source_pin_is_write_once() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-source-pin-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        store.pin_provider_status_source_digest("sha256:status-source-a").unwrap();
+        store.pin_provider_status_source_digest("sha256:status-source-a").unwrap();
+        assert!(matches!(
+            store.pin_provider_status_source_digest("sha256:status-source-b"),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn status_lookup_is_not_attempted_before_structural_dispatch_validation() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-status-ordering-{}.db",std::process::id()
@@ -4874,6 +4889,7 @@ mod tests {
             "symthaea-gis-auth-status-admission-failure-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open_with_relying_party(
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
             &path,"rp-status-admission-failure"
         ).unwrap();
         store.pin_native_authority_namespace(
@@ -4951,6 +4967,7 @@ mod tests {
             "symthaea-gis-auth-status-failure-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open_with_relying_party(
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
             &path,"rp-status-failure"
         ).unwrap();
         store.pin_native_authority_namespace("issuer.status","issuer.status/authority/v1").unwrap();
@@ -5013,6 +5030,7 @@ mod tests {
     fn executed_action_instance_remains_closed_to_fresh_authority() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-action-closed-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-closed").unwrap();
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
         store.pin_native_authority_namespace("issuer.closed","issuer.closed/authority/v1").unwrap();
 
         let effect=super::super::ActionEffectBinding::new("target-closed","prod","adapter-closed");
