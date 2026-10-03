@@ -2548,7 +2548,7 @@ fn validate_native_authority_pin_set(
 
         let changed = tx.execute(
             "UPDATE authorization_leases
-             SET state='ready',attempt_id=NULL,boundary_id=NULL
+             SET state='ready',attempt_id=NULL,boundary_id=NULL,attempt_scope_digest=NULL
              WHERE authorization_instance=?1 AND state='prepared'
                AND attempt_id=?2 AND boundary_id=?3",
             params![authorization_instance, attempt_id, boundary_id],
@@ -2608,7 +2608,7 @@ fn validate_native_authority_pin_set(
 
         let changed = tx.execute(
             "UPDATE authorization_leases
-             SET state='ready',attempt_id=NULL,boundary_id=NULL
+             SET state='ready',attempt_id=NULL,boundary_id=NULL,attempt_scope_digest=NULL
              WHERE authorization_instance=?1 AND state='dispatch_pending'
                AND attempt_id=?2 AND boundary_id=?3",
             params![
