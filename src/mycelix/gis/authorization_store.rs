@@ -4312,6 +4312,66 @@ mod tests {
     }
 
     #[test]
+    fn adapter_pin_tampering_is_rejected_before_provider_entry() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-adapter-preentry-tamper-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-adapter-preentry","prod","adapter-adapter-preentry"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"adapter-preentry-tamper".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T07:35:00Z".into(),
+            expires_at:Some("2026-10-04T07:35:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-adapter-preentry","boundary-adapter-preentry"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-adapter-preentry",
+            &action,&effect,"boundary-adapter-preentry",
+            "operation:adapter-preentry","native-adapter-preentry"
+        ).unwrap();
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_provider_adapter_pins
+             SET adapter_revision='tampered-revision'
+             WHERE adapter_id=?1",
+            params![record.adapter.as_str()],
+        ).unwrap();
+
+        let err=store.mark_invoked_bound(&record,&TestProviderStatusVerifier).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"dispatch_pending");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn adapter_pin_tampering_is_rejected_before_terminal_settlement() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-adapter-tamper-{}.db",std::process::id()
