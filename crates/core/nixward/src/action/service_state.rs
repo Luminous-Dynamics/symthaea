@@ -260,7 +260,7 @@ pub struct NixServiceObservedStateV1 {
 }
 
 impl NixServiceObservedStateV1 {
-    pub fn new(
+    fn new(
         unit: impl Into<String>,
         load_state: ServiceLoadStateV1,
         active_state: ServiceActiveStateV1,
