@@ -3493,4 +3493,35 @@ mod tests {
             VerificationStage::Failed(ReceiptAttestationVerificationOutcome::InvalidEnvelope);
         assert!(!report.execution_trace.matches_report(&report));
     }
+
+    #[test]
+    fn verification_report_fingerprint_binds_resolution_identity_fields() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        assert!(report.resolved_verification_method.is_none());
+        assert!(report.resolution_snapshot_fingerprint.is_none());
+
+        let mut resolved_method = report.clone();
+        resolved_method.resolved_verification_method =
+            Some("did:example:attester-a#key-2".into());
+        assert_ne!(report.fingerprint(), resolved_method.fingerprint());
+
+        let mut snapshot = report.clone();
+        snapshot.resolution_snapshot_fingerprint = Some("opaque-snapshot-1".into());
+        assert_ne!(report.fingerprint(), snapshot.fingerprint());
+
+        let mut paired = report.clone();
+        paired.resolved_verification_method =
+            Some("did:example:attester-a#key-2".into());
+        paired.resolution_snapshot_fingerprint = Some("opaque-snapshot-1".into());
+        assert_ne!(resolved_method.fingerprint(), paired.fingerprint());
+        assert_ne!(snapshot.fingerprint(), paired.fingerprint());
+    }
+
 }
