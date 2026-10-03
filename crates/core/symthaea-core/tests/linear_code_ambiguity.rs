@@ -27,14 +27,23 @@ fn canonical_fixture_fingerprint_is_emitted() {
     assert_eq!(fingerprint.len(), 64);
 
     let codewords = code.enumerate();
-    let min_distance = codewords
+    let nonzero_weights: Vec<_> = codewords
         .iter()
         .filter(|word| word.weight() > 0)
         .map(BinaryCodeword::weight)
+        .collect();
+    let min_weight = *nonzero_weights
+        .iter()
         .min()
         .expect("non-zero codeword must exist");
+    let max_weight = *nonzero_weights
+        .iter()
+        .max()
+        .expect("non-zero codeword must exist");
     let mut pairwise_min_distance = usize::MAX;
+    let mut pairwise_max_distance = 0usize;
     let mut max_inner_product = isize::MIN;
+    let mut min_inner_product = isize::MAX;
     for left in &codewords {
         for right in &codewords {
             if left == right {
@@ -47,18 +56,28 @@ fn canonical_fixture_fingerprint_is_emitted() {
                 .map(|(a, b)| (a ^ b).count_ones() as usize)
                 .sum::<usize>();
             pairwise_min_distance = pairwise_min_distance.min(distance);
-            max_inner_product =
-                max_inner_product.max(CANONICAL_FIXTURE_DIMENSION as isize - 2 * distance as isize);
+            pairwise_max_distance = pairwise_max_distance.max(distance);
+            let inner_product =
+                CANONICAL_FIXTURE_DIMENSION as isize - 2 * distance as isize;
+            max_inner_product = max_inner_product.max(inner_product);
+            min_inner_product = min_inner_product.min(inner_product);
         }
     }
-    assert_eq!(pairwise_min_distance, min_distance);
+    let max_abs_inner_product = max_inner_product
+        .unsigned_abs()
+        .max(min_inner_product.unsigned_abs());
+    assert_eq!(pairwise_min_distance, min_weight);
+    assert_eq!(pairwise_max_distance, max_weight);
     assert_eq!(
-        max_inner_product,
-        CANONICAL_FIXTURE_DIMENSION as isize - 2 * min_distance as isize
+        max_abs_inner_product,
+        (CANONICAL_FIXTURE_DIMENSION as isize - 2 * min_weight as isize)
+            .unsigned_abs()
+            .max((CANONICAL_FIXTURE_DIMENSION as isize - 2 * max_weight as isize).unsigned_abs())
     );
     println!(
-        "FIXTURE_GEOMETRY=dimension={CANONICAL_FIXTURE_DIMENSION};rank={CANONICAL_FIXTURE_RANK};seed=0x{CANONICAL_FIXTURE_SEED:X};codewords={};min_distance={min_distance};max_bipolar_inner_product={max_inner_product}",
+        "FIXTURE_GEOMETRY=dimension={CANONICAL_FIXTURE_DIMENSION};rank={CANONICAL_FIXTURE_RANK};seed=0x{CANONICAL_FIXTURE_SEED:X};codewords={};min_distance={pairwise_min_distance};max_distance={pairwise_max_distance};max_bipolar_inner_product={max_inner_product};min_bipolar_inner_product={min_inner_product};max_abs_bipolar_inner_product={max_abs_inner_product};balanced_epsilon_num={max_abs_inner_product};balanced_epsilon_den={}",
         codewords.len(),
+        2 * CANONICAL_FIXTURE_DIMENSION,
     );
 
     // The fingerprint is intentionally sensitive to basis ordering: the
@@ -128,15 +147,24 @@ fn small_code_geometry_seed_sweep_is_exhaustively_self_consistent() {
     for seed in seeds {
         let code = RandomLinearCode::generate(dimension, rank, seed);
         let codewords = code.enumerate();
-        let min_distance = codewords
+        let nonzero_weights: Vec<_> = codewords
             .iter()
             .filter(|word| word.weight() > 0)
             .map(BinaryCodeword::weight)
+            .collect();
+        let min_weight = *nonzero_weights
+            .iter()
             .min()
+            .expect("non-zero codeword must exist");
+        let max_weight = *nonzero_weights
+            .iter()
+            .max()
             .expect("non-zero codeword must exist");
 
         let mut pairwise_min_distance = usize::MAX;
+        let mut pairwise_max_distance = 0usize;
         let mut max_inner_product = isize::MIN;
+        let mut min_inner_product = isize::MAX;
         for left in &codewords {
             for right in &codewords {
                 if left == right {
@@ -149,20 +177,29 @@ fn small_code_geometry_seed_sweep_is_exhaustively_self_consistent() {
                     .map(|(a, b)| (a ^ b).count_ones() as usize)
                     .sum::<usize>();
                 pairwise_min_distance = pairwise_min_distance.min(distance);
-                max_inner_product =
-                    max_inner_product.max(dimension as isize - 2 * distance as isize);
+                pairwise_max_distance = pairwise_max_distance.max(distance);
+                let inner_product = dimension as isize - 2 * distance as isize;
+                max_inner_product = max_inner_product.max(inner_product);
+                min_inner_product = min_inner_product.min(inner_product);
             }
         }
 
-        assert_eq!(pairwise_min_distance, min_distance);
+        let max_abs_inner_product = max_inner_product
+            .unsigned_abs()
+            .max(min_inner_product.unsigned_abs());
+        assert_eq!(pairwise_min_distance, min_weight);
+        assert_eq!(pairwise_max_distance, max_weight);
         assert_eq!(
-            max_inner_product,
-            dimension as isize - 2 * min_distance as isize
+            max_abs_inner_product,
+            (dimension as isize - 2 * min_weight as isize)
+                .unsigned_abs()
+                .max((dimension as isize - 2 * max_weight as isize).unsigned_abs())
         );
 
         println!(
-            "GEOMETRY_SWEEP=dimension={dimension};rank={rank};seed=0x{seed:X};codewords={};min_distance={min_distance};max_bipolar_inner_product={max_inner_product}",
+            "GEOMETRY_SWEEP=dimension={dimension};rank={rank};seed=0x{seed:X};codewords={};min_distance={pairwise_min_distance};max_distance={pairwise_max_distance};max_bipolar_inner_product={max_inner_product};min_bipolar_inner_product={min_inner_product};max_abs_bipolar_inner_product={max_abs_inner_product};balanced_epsilon_num={max_abs_inner_product};balanced_epsilon_den={}",
             codewords.len(),
+            2 * dimension,
         );
     }
 }
