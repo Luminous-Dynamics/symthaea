@@ -3897,7 +3897,7 @@ mod tests {
     }
 
     #[test]
-    fn test_schema_migration_rejects_blank_legacy_memory_identity() {
+    fn test_schema_migration_rejects_blank_or_whitespace_legacy_memory_identity() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_blank_legacy_memory_identity_migration_test_{}",
             std::process::id()
