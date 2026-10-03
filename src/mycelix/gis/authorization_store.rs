@@ -92,6 +92,47 @@ pub enum ProviderVerificationPurpose {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderStatusVerificationPurpose {
+    Admission,
+    PreEntry,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderStatusEvidence {
+    pub status_identifier: String,
+    pub status_source_digest: String,
+    pub status_observed_at: String,
+    pub status_valid_until: String,
+    pub status_evidence_digest: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderStatusVerificationError {
+    Revoked,
+    Stale,
+    Unavailable,
+    Unauthenticated,
+    InvalidBinding,
+    VerificationFailed,
+}
+
+pub trait ProviderStatusVerifier {
+    fn verify_current_status(
+        &self,
+        purpose: ProviderStatusVerificationPurpose,
+        issuer: &str,
+        authority_namespace: &str,
+        native_authorization_id: &str,
+        status_identifier: &str,
+        action_digest: &str,
+        target_identity: &str,
+        audience: &str,
+        adapter: &str,
+        expected_source_digest: Option<&str>,
+    ) -> Result<ProviderStatusEvidence, ProviderStatusVerificationError>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AuthorizationClockPolicy {
     pub max_age_seconds: u64,
     pub allowed_skew_seconds: u64,
@@ -263,6 +304,11 @@ pub struct DurableDispatchRecord {
     pub operation_id: String,
     /// Native replay identity derived by the native authorization path.
     pub native_replay_identity: String,
+    pub status_identifier: String,
+    pub status_source_digest: String,
+    pub status_observed_at: String,
+    pub status_valid_until: String,
+    pub status_evidence_digest: String,
     pub action_id: String,
     pub action_digest: String,
     pub provider_idempotency_key: String,
@@ -286,12 +332,18 @@ impl DurableDispatchRecord {
         provider_idempotency_key: impl Into<String>,
         effect: &super::ActionEffectBinding,
         boundary_id: impl Into<String>,
+        status: &ProviderStatusEvidence,
     ) -> Self {
         Self {
             authorization_instance: authorization_instance.into(),
             attempt_id: attempt_id.into(),
             operation_id: operation_id.into(),
             native_replay_identity: native_replay_identity.into(),
+            status_identifier: status.status_identifier.clone(),
+            status_source_digest: status.status_source_digest.clone(),
+            status_observed_at: status.status_observed_at.clone(),
+            status_valid_until: status.status_valid_until.clone(),
+            status_evidence_digest: status.status_evidence_digest.clone(),
             action_id: action_id.into(),
             action_digest: action_digest.into(),
             provider_idempotency_key: provider_idempotency_key.into(),
@@ -392,6 +444,17 @@ impl SqliteAuthorizationStore {
                boundary_id TEXT,
                PRIMARY KEY(authorization_instance, attempt_id, phase)
              );
+             CREATE TABLE IF NOT EXISTS authorization_status_checks (
+               authorization_instance TEXT NOT NULL,
+               attempt_id TEXT NOT NULL,
+               phase TEXT NOT NULL,
+               status_identifier TEXT NOT NULL,
+               status_source_digest TEXT NOT NULL,
+               status_observed_at TEXT NOT NULL,
+               status_valid_until TEXT NOT NULL,
+               status_evidence_digest TEXT NOT NULL,
+               PRIMARY KEY(authorization_instance,attempt_id,phase)
+             );
              CREATE TABLE IF NOT EXISTS authorization_recovery_markers (
                authorization_instance TEXT NOT NULL,
                attempt_id TEXT NOT NULL,
@@ -438,6 +501,11 @@ impl SqliteAuthorizationStore {
                native_replay_derivation_digest TEXT,
                native_authority_pin_set_id TEXT,
                native_authority_pin_set_digest TEXT,
+               status_identifier TEXT,
+               status_source_digest TEXT,
+               status_observed_at TEXT,
+               status_valid_until TEXT,
+               status_evidence_digest TEXT,
                validity_issued_at TEXT,
                validity_expires_at TEXT,
                validity_policy_digest TEXT,
@@ -465,6 +533,11 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_dispatches", "native_replay_derivation_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "status_identifier", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "status_source_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "status_observed_at", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "status_valid_until", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "status_evidence_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "validity_issued_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "validity_expires_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "validity_policy_digest", "TEXT")?;
@@ -1042,6 +1115,18 @@ fn validate_native_authority_pin_set(
         let mut lease = load_lease(&tx, authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
         lease.mark_dispatch_pending(attempt_id)?;
+        tx.execute(
+            "INSERT INTO authorization_status_checks
+             (authorization_instance,attempt_id,phase,status_identifier,status_source_digest,
+              status_observed_at,status_valid_until,status_evidence_digest)
+             VALUES (?1,?2,'admission',?3,?4,?5,?6,?7)",
+            params![
+                authorization_instance, attempt_id,
+                status.status_identifier.as_str(), status.status_source_digest.as_str(),
+                status.status_observed_at.as_str(), status.status_valid_until.as_str(),
+                status.status_evidence_digest.as_str(),
+            ],
+        )?;
         let changed = tx.execute(
             "UPDATE authorization_leases SET state='dispatch_pending', attempt_id=?2
              WHERE authorization_instance=?1 AND state='prepared' AND attempt_id=?2",
@@ -1067,7 +1152,7 @@ fn validate_native_authority_pin_set(
     /// Canonical native-authorization entry point. The issuer is only a
     /// lookup key; the relying-party-pinned authority namespace is resolved
     /// inside the boundary before replay identity derivation.
-    pub fn mark_dispatch_pending_bound_from_pinned_native_authority(
+    pub fn mark_dispatch_pending_bound_from_pinned_native_authority<V: ProviderStatusVerifier>(
         &self,
         authorization_instance: &str,
         attempt_id: &str,
@@ -1077,6 +1162,8 @@ fn validate_native_authority_pin_set(
         operation_id: &str,
         issuer: &str,
         native_authorization_id: &str,
+        status_identifier: &str,
+        status_verifier: &V,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         let authority_namespace = self.pinned_native_authority_namespace(issuer)?;
         let replay = super::NativeReplayDerivation::derive(
@@ -1084,6 +1171,21 @@ fn validate_native_authority_pin_set(
             native_authorization_id,
         )
         .map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
+        let status = status_verifier
+            .verify_current_status(
+                ProviderStatusVerificationPurpose::Admission,
+                issuer,
+                &authority_namespace,
+                native_authorization_id,
+                status_identifier,
+                &action.canonical_action_digest(),
+                &expected_effect.target_identity,
+                &expected_effect.audience,
+                &expected_effect.adapter,
+                None,
+            )
+            .map_err(|_| AuthorizationConsumptionError::ProviderStatusVerificationRequired)?;
+        self.validate_provider_status_evidence(&status, None, true)?;
         self.mark_dispatch_pending_bound_with_provenance(
             authorization_instance,
             attempt_id,
@@ -1094,6 +1196,7 @@ fn validate_native_authority_pin_set(
             &replay.native_replay_identity,
             issuer,
             &replay,
+            &status,
         )
     }
 
@@ -1137,6 +1240,7 @@ fn validate_native_authority_pin_set(
         native_replay_identity: &str,
         native_issuer: &str,
         native_replay_provenance: &super::NativeReplayDerivation,
+        status: &ProviderStatusEvidence,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         if action.effect_binding.as_ref() != Some(expected_effect)
             || boundary_id.is_empty()
@@ -1160,6 +1264,7 @@ fn validate_native_authority_pin_set(
         {
             return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
         }
+        self.validate_provider_status_evidence(status, None, true)?;
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
@@ -1270,6 +1375,7 @@ fn validate_native_authority_pin_set(
                 .map_err(|_| AuthorizationConsumptionError::InvalidBinding)?,
             expected_effect,
             boundary_id,
+            status,
         );
         if current_boundary.is_none() {
             tx.execute(
@@ -1284,9 +1390,10 @@ fn validate_native_authority_pin_set(
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
               native_issuer,native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
               native_authority_pin_set_id,native_authority_pin_set_digest,
+              status_identifier,status_source_digest,status_observed_at,status_valid_until,status_evidence_digest,
               validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,
               action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,'dispatch_pending')",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,'dispatch_pending')",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity,
@@ -1296,6 +1403,11 @@ fn validate_native_authority_pin_set(
                 native_replay_provenance.derivation_digest.as_str(),
                 native_authority_pin_set_id.as_str(),
                 native_authority_pin_set_digest.as_str(),
+                status.status_identifier.as_str(),
+                status.status_source_digest.as_str(),
+                status.status_observed_at.as_str(),
+                status.status_valid_until.as_str(),
+                status.status_evidence_digest.as_str(),
                 lease_validity.0.as_str(),
                 lease_validity.1.as_deref(),
                 lease_validity.2.as_str(),
@@ -1319,9 +1431,31 @@ fn validate_native_authority_pin_set(
     /// Cross the provider-entry boundary only for the exact immutable record
     /// created before dispatch. All identity/effect fields are checked again,
     /// preventing a stale executor from substituting a different sink or key.
-    pub fn mark_invoked_bound(
-        &self, record: &DurableDispatchRecord,
+    pub fn mark_invoked_bound<V: ProviderStatusVerifier>(
+        &self,
+        record: &DurableDispatchRecord,
+        status_verifier: &V,
     ) -> Result<(), AuthorizationStoreError> {
+        let pre_entry_status = status_verifier
+            .verify_current_status(
+                ProviderStatusVerificationPurpose::PreEntry,
+                "",
+                "",
+                &record.native_replay_identity,
+                &record.status_identifier,
+                &record.action_digest,
+                &record.target_identity,
+                &record.audience,
+                &record.adapter,
+                Some(&record.status_source_digest),
+            )
+            .map_err(|_| AuthorizationConsumptionError::ProviderStatusVerificationRequired)?;
+        self.validate_provider_status_evidence(
+            &pre_entry_status,
+            Some(&record.status_source_digest),
+            true,
+        )?;
+
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let row = tx.query_row(
@@ -1441,6 +1575,22 @@ fn validate_native_authority_pin_set(
             tx.commit()?;
             return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
         }
+        tx.execute(
+            "INSERT INTO authorization_status_checks
+             (authorization_instance,attempt_id,phase,status_identifier,status_source_digest,
+              status_observed_at,status_valid_until,status_evidence_digest)
+             VALUES (?1,?2,'pre_entry',?3,?4,?5,?6,?7)",
+            params![
+                record.authorization_instance.as_str(),
+                record.attempt_id.as_str(),
+                pre_entry_status.status_identifier.as_str(),
+                pre_entry_status.status_source_digest.as_str(),
+                pre_entry_status.status_observed_at.as_str(),
+                pre_entry_status.status_valid_until.as_str(),
+                pre_entry_status.status_evidence_digest.as_str(),
+            ],
+        )?;
+
         let current_boundary = load_lease_boundary(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
         if current_boundary != record.boundary_id {
@@ -1487,6 +1637,41 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::AttemptMismatch.into());
         }
         tx.commit()?;
+        Ok(())
+    }
+
+    fn validate_provider_status_evidence(
+        &self,
+        status: &ProviderStatusEvidence,
+        expected_source_digest: Option<&str>,
+        enforce_now: bool,
+    ) -> Result<(), AuthorizationStoreError> {
+        if status.status_identifier.is_empty()
+            || status.status_source_digest.is_empty()
+            || status.status_observed_at.is_empty()
+            || status.status_valid_until.is_empty()
+            || status.status_evidence_digest.is_empty()
+            || expected_source_digest.is_some_and(|expected| expected != status.status_source_digest)
+        {
+            return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+        }
+
+        let observed = DateTime::parse_from_rfc3339(&status.status_observed_at)
+            .map_err(|_| AuthorizationConsumptionError::ProviderStatusVerificationRequired)?
+            .with_timezone(&Utc);
+        let valid_until = DateTime::parse_from_rfc3339(&status.status_valid_until)
+            .map_err(|_| AuthorizationConsumptionError::ProviderStatusVerificationRequired)?
+            .with_timezone(&Utc);
+        if valid_until <= observed {
+            return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+        }
+        if enforce_now {
+            let now = trusted_utc_now()?;
+            let skew = Duration::seconds(self.clock_policy.allowed_skew_seconds as i64);
+            if observed > now + skew || now > valid_until + skew {
+                return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+            }
+        }
         Ok(())
     }
 
