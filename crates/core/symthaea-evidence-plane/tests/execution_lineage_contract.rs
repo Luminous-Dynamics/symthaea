@@ -1,8 +1,7 @@
 use symthaea_evidence_plane::execution_lineage::{
-    qualify_lineage_perturbation, EvidenceLineageCommitError, EvidenceLineageDecision,
-    EvidenceLineageGuardV1, ExecutionLineageDriftFieldV1, ExecutionLineageV1,
-    LineagePerturbationResult,
-    RepositorySourceSnapshotId,
+    EvidenceLineageCommitError, EvidenceLineageDecision, EvidenceLineageGuardV1,
+    ExecutionLineageDriftFieldV1, ExecutionLineageV1, LineagePerturbationResult,
+    RepositorySourceSnapshotId, qualify_lineage_perturbation,
 };
 
 fn fixture() -> ExecutionLineageV1 {
@@ -225,7 +224,10 @@ fn every_canonical_lineage_field_changes_identity_and_drift_report() {
     ];
 
     for (name, changed, expected_field) in cases {
-        assert!(changed.validate().is_ok(), "{name} fixture must remain valid");
+        assert!(
+            changed.validate().is_ok(),
+            "{name} fixture must remain valid"
+        );
         assert_ne!(
             base.digest(),
             changed.digest(),
