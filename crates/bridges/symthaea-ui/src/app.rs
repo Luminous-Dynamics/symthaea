@@ -472,17 +472,17 @@ pub fn App() -> impl IntoView {
             }
             let renderer = Rc::clone(&renderer);
             spawn_local(async move {
-            loop {
-                gloo_timers::future::TimeoutFuture::new(500).await;
-                let lost = renderer
-                    .borrow()
-                    .as_ref()
-                    .is_some_and(WebGpuMovieRenderer::is_device_lost);
-                if lost {
-                    movie_webgpu_ready.set(false);
-                    break;
+                loop {
+                    gloo_timers::future::TimeoutFuture::new(500).await;
+                    let lost = renderer
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(WebGpuMovieRenderer::is_device_lost);
+                    if lost {
+                        movie_webgpu_ready.set(false);
+                        break;
+                    }
                 }
-            }
             });
         });
     }
