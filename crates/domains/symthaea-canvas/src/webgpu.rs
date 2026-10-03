@@ -524,7 +524,7 @@ fn segments_intersect_or_touch(
     c: [f32; 2],
     d: [f32; 2],
 ) -> bool {
-    const EPSILON: f32 = 1e-6;
+    const EPSILON: f64 = 1e-6;
 
     let ab_c = cross(a, b, c);
     let ab_d = cross(a, b, d);
