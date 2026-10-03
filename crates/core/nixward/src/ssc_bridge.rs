@@ -46,6 +46,8 @@ pub enum SscObservationError {
     MultipleCurrentGenerations,
     #[error("NixOS generation observation contains a zero generation ordinal")]
     InvalidGenerationNumber,
+    #[error("NixOS realization is not rooted in /nix/store")]
+    InvalidRealizationPath,
     #[error("NixOS generation observation contains a duplicate generation ordinal")]
     DuplicateGenerationNumber,
     #[error("NixOS generation marked current does not match /run/current-system")]
@@ -250,12 +252,21 @@ fn read_profile_generation(link: &Path) -> Result<u64, SscObservationError> {
     parse_generation_link_name(name)?.ok_or(SscObservationError::MissingSystemProfileGeneration)
 }
 
+fn validate_realization_path(value: &str) -> Result<(), SscObservationError> {
+    if value.starts_with("/nix/store/") && value != "/nix/store/" {
+        Ok(())
+    } else {
+        Err(SscObservationError::InvalidRealizationPath)
+    }
+}
+
 fn read_realization(link: &Path) -> Result<String, SscObservationError> {
     let resolved = std::fs::canonicalize(link)?;
     let value = resolved.to_string_lossy().into_owned();
     if value.is_empty() {
         return Err(SscObservationError::MissingRealization);
     }
+    validate_realization_path(&value)?;
     Ok(value)
 }
 
@@ -312,6 +323,18 @@ mod tests {
         assert_eq!(
             observation.validate().expect_err("missing realization"),
             SscObservationError::MissingRealization
+        );
+    }
+
+    #[test]
+    fn realization_path_validation_rejects_non_store_paths() {
+        assert_eq!(
+            validate_realization_path("/etc/nixos"),
+            Err(SscObservationError::InvalidRealizationPath)
+        );
+        assert_eq!(
+            validate_realization_path("/nix/store/example-system"),
+            Ok(())
         );
     }
 
