@@ -32,6 +32,10 @@ Deng and Raviv, *Efficient Vector Symbolic Architectures from Histogram Recovery
 
 This is a useful boundary for this comparator: the exact GF(2) span solver here establishes clean binding recovery and representation semantics; it is not evidence for noisy recovery. Any future noise experiment must name the decoder and code construction explicitly rather than interpreting out-of-span detection as correction.
 
+## Reproducibility contract
+
+Fixture generation uses the explicitly named `rand_chacha` `ChaCha12Rng` algorithm with a recorded `u64` seed, rather than `StdRng`, whose algorithm is intentionally non-portable. The qualification harness pins `rand_chacha` to `0.3.1`, records the resolved `Cargo.lock` hash, and records the exact source/test hashes and PR head. This makes fixture identity explicit as **seed + RNG algorithm + dependency lock + source/test revision**, rather than treating a seed alone as a permanent byte-level identity.
+
 ## Research boundary
 
 Do not implement a "linear-code-inspired" approximation by reusing the existing random bipolar codebook and calling a different search routine. That would not test the claimed representation-level distinction.
