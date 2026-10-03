@@ -631,6 +631,10 @@ impl SqliteAuthorizationStore {
         )?;
         ensure_column(&mut connection, "authorization_leases", "operation_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "boundary_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_leases", "issued_at", "TEXT")?;
+        ensure_column(&mut connection, "authorization_leases", "expires_at", "TEXT")?;
+        ensure_column(&mut connection, "authorization_leases", "clock_source_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_leases", "clock_policy_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "validity_issued_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "validity_expires_at", "TEXT")?;
         ensure_column(&mut connection, "authorization_leases", "validity_policy_digest", "TEXT")?;
@@ -1275,6 +1279,8 @@ fn validate_native_authority_pin_set(
         }
         let mut lease = load_lease(&tx, &witness.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
+        lease.freeze_validity(witness)?;
+        lease.validate_validity_now()?;
         lease.prepare_for_execution(witness, action, current_frame, attempt_id)?;
         tx.execute(
             "UPDATE authorization_leases SET state='prepared', attempt_id=?2
@@ -1713,6 +1719,18 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::ActionAlreadyInFlight.into());
         }
 
+        if let Err(error) = lease.validate_validity_now() {
+            if matches!(error, AuthorizationConsumptionError::AuthorizationExpired) {
+                lease.expire()?;
+                update_lease_with_boundary(&tx, &lease, Some(boundary_id))?;
+                tx.execute(
+                    "INSERT OR IGNORE INTO authorization_recovery_markers (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker) VALUES (?1,?2,?3,?4,?5,'expired_not_entered')",
+                    params![authorization_instance,attempt_id,boundary_id,lease.action_digest,lease.authority_epoch as i64],
+                )?;
+                tx.commit()?;
+            }
+            return Err(error.into());
+        }
         lease.mark_dispatch_pending(attempt_id)?;
         let (native_authority_pin_set_id, native_authority_pin_set_digest) =
             self.persist_native_authority_pin_set_snapshot(&tx)?;
@@ -2118,6 +2136,22 @@ fn validate_native_authority_pin_set(
         }
         let mut lease = load_lease(&tx, &record.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(record.authorization_instance.clone()))?;
+        if let Err(error) = lease.validate_validity_now() {
+            if matches!(error, AuthorizationConsumptionError::AuthorizationExpired) {
+                lease.expire()?;
+                update_lease_with_boundary(&tx, &lease, Some(&record.boundary_id))?;
+                tx.execute(
+                    "UPDATE authorization_dispatches SET state='expired' WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3 AND state='dispatch_pending'",
+                    params![record.authorization_instance,record.attempt_id,record.boundary_id],
+                )?;
+                tx.execute(
+                    "INSERT OR IGNORE INTO authorization_recovery_markers (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker) VALUES (?1,?2,?3,?4,?5,'expired_not_entered')",
+                    params![record.authorization_instance,record.attempt_id,record.boundary_id,record.action_digest,lease.authority_epoch as i64],
+                )?;
+                tx.commit()?;
+            }
+            return Err(error.into());
+        }
         lease.mark_invoked(&record.attempt_id)?;
         let changed = tx.execute(
             "UPDATE authorization_leases SET state='invoked', attempt_id=?2
@@ -3110,6 +3144,10 @@ fn load_lease(tx: &Transaction<'_>, id: &str) -> Result<Option<AuthorizationLeas
         |r| {
             let state: String = r.get(7)?;
             let attempt: Option<String> = r.get(8)?;
+            let issued_at: Option<String> = r.get(9)?;
+            let expires_at: Option<String> = r.get(10)?;
+            let clock_source_id: Option<String> = r.get(11)?;
+            let clock_policy_digest: Option<String> = r.get(12)?;
             let operation_id: Option<String> = r.get(9)?;
             let decoded = match state.as_str() {
                 "ready" => AuthorizationLeaseState::Ready,
@@ -3140,6 +3178,10 @@ fn load_lease(tx: &Transaction<'_>, id: &str) -> Result<Option<AuthorizationLeas
                 authority_epoch: r.get::<_,i64>(5)? as u64,
                 remaining_executions: r.get::<_,i64>(6)? as u32,
                 state: decoded,
+                issued_at: issued_at.unwrap_or_default(),
+                expires_at,
+                clock_source_id: clock_source_id.unwrap_or_default(),
+                clock_policy_digest: clock_policy_digest.unwrap_or_default(),
             })
         },
     ).optional()
@@ -3219,7 +3261,11 @@ fn update_lease_with_boundary(
             state_attempt(&lease.state),
             if current_boundary.is_some() { lease.operation_id.as_deref() } else { None },
             lease.remaining_executions as i64,
-            current_boundary
+            current_boundary,
+            if lease.issued_at.is_empty() { None } else { Some(lease.issued_at.as_str()) },
+            lease.expires_at.as_deref(),
+            if lease.clock_source_id.is_empty() { None } else { Some(lease.clock_source_id.as_str()) },
+            if lease.clock_policy_digest.is_empty() { None } else { Some(lease.clock_policy_digest.as_str()) },
         ],
     )?;
     if changed != 1 {
