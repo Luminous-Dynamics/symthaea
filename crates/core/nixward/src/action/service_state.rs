@@ -1486,6 +1486,42 @@ CanReload=yes
     }
 
     #[test]
+    fn alias_enablement_evidence_commits_to_resolved_identity() {
+        let a = NixServiceObservedStateV1::parse_systemd_properties(
+            "service-alias",
+            "Id=service-a.service
+Names=service-a.service service-alias.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=alias
+",
+        )
+        .unwrap();
+
+        let b = NixServiceObservedStateV1::parse_systemd_properties(
+            "service-alias",
+            "Id=service-b.service
+Names=service-b.service service-alias.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=alias
+",
+        )
+        .unwrap();
+
+        let evidence_a = NixServiceEnablementEvidenceV1::from_observed_state(&a).unwrap();
+        let evidence_b = NixServiceEnablementEvidenceV1::from_observed_state(&b).unwrap();
+
+        assert_eq!(evidence_a.unit(), evidence_b.unit());
+        assert_eq!(evidence_a.unit_file_state(), evidence_b.unit_file_state());
+        assert_ne!(a.resolved_id(), b.resolved_id());
+        assert_ne!(evidence_a.pre_state_digest(), evidence_b.pre_state_digest());
+        assert_ne!(evidence_a.digest().unwrap(), evidence_b.digest().unwrap());
+    }
+
+    #[test]
     fn enablement_state_changes_digest() {
         let disabled = state("inactive", "disabled", "dead");
         let enabled = state("inactive", "enabled", "dead");
