@@ -144,7 +144,7 @@ Each emitted work/scaling record is now self-identifying with its dimension, fac
 
 ### Deterministic code-geometry ledger
 
-The comparator now records minimum Hamming distance and the corresponding maximum bipolar inner product for a bounded exhaustive fixture. For a linear code, the minimum distance equals the minimum weight of a nonzero codeword, and every pairwise difference is again a codeword; therefore the exhaustive pairwise check cross-validates the geometry calculation. This is a representation property, not a quality score and not a substitute for the paper's asymptotic/random-code guarantees.
+The comparator now records minimum Hamming distance and the corresponding maximum bipolar inner product for a bounded exhaustive fixture. A four-seed sweep at the same \(n=16,k=5\) scale also records each realization separately, reducing the chance that a single deterministic seed becomes an accidental geometry proxy. For a linear code, the minimum distance equals the minimum weight of a nonzero codeword, and every pairwise difference is again a codeword; therefore the exhaustive pairwise check cross-validates the geometry calculation. This is a representation property, not a quality score and not a substitute for the paper's asymptotic/random-code guarantees.
 
 This ledger is intended to test the structure of the recovery algorithm before timing or energy measurements are introduced. In particular, the measurement should preserve the distinction between the maximal-independent-subset construction and the final linear solve described by the paper.
 
