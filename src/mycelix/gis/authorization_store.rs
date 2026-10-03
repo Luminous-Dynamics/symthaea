@@ -9,6 +9,7 @@
 //! Indeterminate and requires explicit reconciliation.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::{Duration, DateTime, SecondsFormat, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
@@ -162,9 +163,13 @@ impl AuthorizationClockPolicy {
     }
 
     fn digest(&self) -> String {
+        self.digest_for_clock(Self::CLOCK_SOURCE_ID)
+    }
+
+    fn digest_for_clock(&self, clock_source_id: &str) -> String {
         let mut hasher = Sha256::new();
         hasher.update(b"symthaea:gis:authorization-clock-policy:v1\n");
-        hasher.update(Self::CLOCK_SOURCE_ID.as_bytes());
+        hasher.update(clock_source_id.as_bytes());
         hasher.update(self.max_age_seconds.to_be_bytes());
         hasher.update(self.allowed_skew_seconds.to_be_bytes());
         hasher.update([self.require_expiry as u8]);
@@ -213,6 +218,32 @@ impl AuthorizationClockPolicy {
             value.to_rfc3339_opts(SecondsFormat::Secs, true)
         };
         Ok((normalize(issued), expiry.map(normalize)))
+    }
+}
+
+pub trait TrustedAuthorizationClock: Send + Sync {
+    fn source_id(&self) -> &str;
+    fn now_utc(&self) -> Result<DateTime<Utc>, AuthorizationStoreError>;
+}
+
+#[derive(Debug, Default)]
+pub struct SystemUtcClock;
+
+impl TrustedAuthorizationClock for SystemUtcClock {
+    fn source_id(&self) -> &str {
+        "system-utc-wall-clock-v1"
+    }
+
+    fn now_utc(&self) -> Result<DateTime<Utc>, AuthorizationStoreError> {
+        let duration = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| AuthorizationStoreError::InvalidState(
+                "system clock is before UNIX epoch".into(),
+            ))?;
+        DateTime::<Utc>::from_timestamp(duration.as_secs() as i64, duration.subsec_nanos())
+            .ok_or_else(|| AuthorizationStoreError::InvalidState(
+                "system clock timestamp is out of range".into(),
+            ))
     }
 }
 
@@ -371,6 +402,7 @@ pub struct SqliteAuthorizationStore {
     path: PathBuf,
     relying_party_id: String,
     clock_policy: AuthorizationClockPolicy,
+    clock: Arc<dyn TrustedAuthorizationClock>,
 }
 
 impl SqliteAuthorizationStore {
@@ -397,7 +429,26 @@ impl SqliteAuthorizationStore {
         relying_party_id: impl Into<String>,
         clock_policy: AuthorizationClockPolicy,
     ) -> Result<Self, AuthorizationStoreError> {
+        Self::open_with_relying_party_clock_and_policy(
+            path,
+            relying_party_id,
+            Arc::new(SystemUtcClock),
+            clock_policy,
+        )
+    }
+
+    pub fn open_with_relying_party_clock_and_policy(
+        path: impl AsRef<Path>,
+        relying_party_id: impl Into<String>,
+        clock: Arc<dyn TrustedAuthorizationClock>,
+        clock_policy: AuthorizationClockPolicy,
+    ) -> Result<Self, AuthorizationStoreError> {
         clock_policy.validate_configuration()?;
+        if clock.source_id().is_empty() {
+            return Err(AuthorizationStoreError::InvalidState(
+                "trusted clock source id must not be empty".into(),
+            ));
+        }
         let path = path.as_ref().to_path_buf();
         let relying_party_id = relying_party_id.into();
         if relying_party_id.is_empty() {
@@ -409,7 +460,7 @@ impl SqliteAuthorizationStore {
             std::fs::create_dir_all(parent)
                 .map_err(|e| AuthorizationStoreError::InvalidState(e.to_string()))?;
         }
-        let store = Self { path, relying_party_id, clock_policy };
+        let store = Self { path, relying_party_id, clock_policy, clock };
         let mut connection = store.connection()?;
         connection.execute_batch(
             "PRAGMA journal_mode=WAL;
@@ -591,7 +642,29 @@ impl SqliteAuthorizationStore {
 
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         validate_native_authority_pin_set(&tx)?;
-        let clock_policy_digest = store.clock_policy.digest();
+        let clock_policy_digest = store.clock_policy.digest_for_clock(store.clock.source_id());
+        let configured_clock_source: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='authorization_clock_source_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match configured_clock_source {
+            Some(existing) if existing != store.clock.source_id() => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "authorization clock source mismatch: store is pinned to {existing}"
+                )));
+            }
+            Some(_) => {}
+            None => {
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value) VALUES('authorization_clock_source_id',?1)",
+                    params![store.clock.source_id()],
+                )?;
+            }
+        }
         let configured_policy: Option<String> = tx
             .query_row(
                 "SELECT value FROM authorization_store_metadata WHERE key='authorization_clock_policy_digest'",
@@ -649,6 +722,10 @@ impl SqliteAuthorizationStore {
         }
         tx.commit()?;
         Ok(store)
+    }
+
+    fn trusted_utc_now(&self) -> Result<DateTime<Utc>, AuthorizationStoreError> {
+        self.clock.now_utc()
     }
 
     fn connection(&self) -> Result<Connection, AuthorizationStoreError> {
@@ -1038,9 +1115,9 @@ fn validate_native_authority_pin_set(
         let (validity_issued_at, validity_expires_at) = self.clock_policy.validate(
             &witness.issued_at,
             witness.expires_at.as_deref(),
-            trusted_utc_now()?,
+            self.trusted_utc_now()?,
         )?;
-        let validity_policy_digest = self.clock_policy.digest();
+        let validity_policy_digest = self.clock_policy.digest_for_clock(self.clock.source_id());
 
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -1396,9 +1473,9 @@ fn validate_native_authority_pin_set(
         if self.clock_policy.validate(
             &lease_validity.0,
             lease_validity.1.as_deref(),
-            trusted_utc_now()?,
+            self.trusted_utc_now()?,
         ).is_err()
-            || lease_validity.2 != self.clock_policy.digest()
+            || lease_validity.2 != self.clock_policy.digest_for_clock(self.clock.source_id())
         {
             let authority_epoch = lease.authority_epoch;
             let changed = tx.execute(
@@ -1845,7 +1922,7 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
         }
         if enforce_now {
-            let now = trusted_utc_now()?;
+            let now = self.trusted_utc_now()?;
             let skew = Duration::seconds(self.clock_policy.allowed_skew_seconds as i64);
             if observed > now + skew || now > valid_until + skew {
                 return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
@@ -1861,7 +1938,7 @@ fn validate_native_authority_pin_set(
         policy_digest: Option<&str>,
         enforce_now: bool,
     ) -> Result<(), AuthorizationStoreError> {
-        if policy_digest != Some(self.clock_policy.digest().as_str()) {
+        if policy_digest != Some(self.clock_policy.digest_for_clock(self.clock.source_id()).as_str()) {
             return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
         }
         let issued_at = issued_at
@@ -1888,7 +1965,7 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
         }
         if enforce_now {
-            self.clock_policy.validate(issued_at, expires_at, trusted_utc_now()?)?;
+            self.clock_policy.validate(issued_at, expires_at, self.trusted_utc_now()?)?;
         }
         Ok(())
     }
