@@ -3286,17 +3286,25 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
 
-        if let Some((boundary_id, action_digest)) = tx
+        if let Some((boundary_id, action_digest, stored_scope)) = tx
             .query_row(
-                "SELECT boundary_id,action_digest
+                "SELECT boundary_id,action_digest,attempt_scope_digest
                  FROM authorization_recovery_markers
                  WHERE authorization_instance=?1 AND attempt_id=?2 AND marker='not_entered'",
                 params![witness.authorization_instance.as_str(), witness.attempt_id.as_str()],
-                |row| Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?)),
+                |row| Ok((
+                    row.get::<_,String>(0)?,
+                    row.get::<_,String>(1)?,
+                    row.get::<_,Option<String>>(2)?,
+                )),
             )
             .optional()?
         {
-            if boundary_id == witness.boundary_id && action_digest == witness.action_digest {
+            let expected_scope=compute_attempt_scope_digest(&witness.boundary_id,&witness.attempt_id)?;
+            if boundary_id == witness.boundary_id
+                && action_digest == witness.action_digest
+                && stored_scope.as_deref() == Some(expected_scope.as_str())
+            {
                 return Ok(false);
             }
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
@@ -3330,14 +3338,15 @@ fn validate_native_authority_pin_set(
 
         tx.execute(
             "INSERT INTO authorization_recovery_markers
-             (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker)
-             VALUES (?1,?2,?3,?4,?5,'not_entered')",
+             (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker,attempt_scope_digest)
+             VALUES (?1,?2,?3,?4,?5,'not_entered',?6)",
             params![
                 witness.authorization_instance.as_str(),
                 witness.attempt_id.as_str(),
                 witness.boundary_id.as_str(),
                 witness.action_digest.as_str(),
-                witness.authority_epoch as i64
+                witness.authority_epoch as i64,
+                compute_attempt_scope_digest(&witness.boundary_id,&witness.attempt_id)?,
             ],
         )?;
 
