@@ -157,7 +157,7 @@ function assertSemanticSceneSamples(samples) {
   }
 }
 
-function assertSemanticMovieSamples(samples) {
+function assertSemanticMovieSamples(samples, label = 'WebGPU') {
   const byName = new Map(samples.map(sample => [sample.name, sample.rgba]));
   const left = byName.get('left');
   const right = byName.get('right');
@@ -166,19 +166,19 @@ function assertSemanticMovieSamples(samples) {
 
   if (!left || !right || !top || !bottom) {
     throw new QualificationError(
-      `WebGPU semantic movie probes missing: ${JSON.stringify(samples)}`,
+      `${label} semantic movie probes missing: ${JSON.stringify(samples)}`,
       'renderer',
     );
   }
   if (!(left[0] + 20 < right[0])) {
     throw new QualificationError(
-      `WebGPU movie horizontal gradient is not increasing red left-to-right: ${JSON.stringify(samples)}`,
+      `${label} movie horizontal gradient is not increasing red left-to-right: ${JSON.stringify(samples)},
       'renderer',
     );
   }
   if (!(top[1] + 20 < bottom[1])) {
     throw new QualificationError(
-      `WebGPU movie vertical gradient is not increasing green top-to-bottom: ${JSON.stringify(samples)}`,
+      `${label} movie vertical gradient is not increasing green top-to-bottom: ${JSON.stringify(samples)},
       'renderer',
     );
   }
@@ -455,6 +455,18 @@ async function runMode(mode) {
       );
     }
 
+    const semanticFallbackMovieSamples = await canvasPixelSamples(
+      page,
+      '#canvas2d-movie-fallback',
+      [
+        { name: 'left', x: 4, y: 12 },
+        { name: 'right', x: 28, y: 12 },
+        { name: 'top', x: 16, y: 2 },
+        { name: 'bottom', x: 16, y: 22 },
+      ],
+    );
+    assertSemanticMovieSamples(semanticFallbackMovieSamples, 'Canvas2D fallback');
+
     const firstFallbackCanvasHash = await canvasPngHash(page, '#canvas2d-movie-fallback');
     const firstPortraitSource = await page.$eval(
       'img.portrait',
@@ -497,6 +509,7 @@ async function runMode(mode) {
       fallback,
       canvas_hash: firstFallbackCanvasHash,
       portrait_hash: firstPortraitHash,
+      semantic_movie_samples: semanticFallbackMovieSamples,
       deterministic_fixture: true,
       deterministic_repeat: true,
       page_errors: pageErrors,
