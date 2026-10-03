@@ -195,10 +195,11 @@ impl Movie {
         }
         let width = width_raw as u32;
         let height = height_raw as u32;
-        let channels = m["channels"].as_u64()? as usize;
-        if channels != 1 && channels != 3 {
+        let channels_raw = m["channels"].as_u64()?;
+        if channels_raw != 1 && channels_raw != 3 {
             return None;
         }
+        let channels = channels_raw as usize;
         let engine = base64::engine::general_purpose::STANDARD;
         let px = (width as usize).checked_mul(height as usize)?;
         if px == 0 || px > MAX_MOVIE_PIXELS {
@@ -783,6 +784,12 @@ mod tests {
     fn movie_parser_rejects_unsupported_channels() {
         assert!(Movie::from_json(&movie_json(2, 2, 2, 1)).is_none());
     }
+
+    #[test]
+    fn movie_parser_rejects_channels_that_would_truncate_on_wasm() {
+        assert!(Movie::from_json(&movie_json(2, 2, (u32::MAX as u64) + 1, 1)).is_none());
+    }
+
 
     #[test]
     fn movie_parser_rejects_dimension_overflow_before_cast() {
