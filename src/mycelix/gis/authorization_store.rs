@@ -725,22 +725,25 @@ impl SqliteAuthorizationStore {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
 
-        let occupied: Option<(String, String, String)> = tx
+        let occupied: Option<(String, String, String, String)> = tx
             .query_row(
-                "SELECT authorization_instance,attempt_id,boundary_id
+                "SELECT authorization_instance,attempt_id,boundary_id,state
                  FROM authorization_dispatches
                  WHERE relying_party_id=?1 AND target_identity=?2 AND action_digest=?3
-                   AND state IN ('dispatch_pending','invoked','indeterminate')
+                   AND state IN ('dispatch_pending','invoked','indeterminate','succeeded')
                  LIMIT 1",
                 params![
                     self.relying_party_id.as_str(),
                     expected_effect.target_identity.as_str(),
                     expected_digest.as_str()
                 ],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .optional()?;
-        if occupied.is_some() {
+        if let Some((_, _, _, state)) = occupied {
+            if state == "succeeded" {
+                return Err(AuthorizationConsumptionError::ActionAlreadyClosed.into());
+            }
             return Err(AuthorizationConsumptionError::ActionAlreadyInFlight.into());
         }
 
@@ -2559,6 +2562,64 @@ mod tests {
             ),
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::ActionAlreadyInFlight
+            ))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn executed_action_instance_remains_closed_to_fresh_authority() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-auth-action-closed-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-closed").unwrap();
+        store.pin_native_authority_namespace("issuer.closed","issuer.closed/authority/v1").unwrap();
+
+        let effect=super::super::ActionEffectBinding::new("target-closed","prod","adapter-closed");
+        let action=EpistemicAction::new("closed-action","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+
+        let witness_a=ActionAuthorizationWitness {
+            authorization_instance:"closed-a".into(), action_id:action.id.clone(),
+            action_digest:digest.clone(), support_digest:"support-a".into(),
+            frame:"frame@1".into(), policy:"policy@1".into(), decision:"execute".into(),
+            issued_at:"2026-10-03T06:30:00Z".into(), expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "closed-a",action.id.clone(),digest.clone(),"support-a","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness_a,&action,"frame@1","attempt-closed-a","boundary-A"
+        ).unwrap();
+        let record_a=store.mark_dispatch_pending_bound_from_pinned_native_authority(
+            "closed-a","attempt-closed-a",&action,&effect,"boundary-A",
+            "operation:closed-a","issuer.closed","native-closed-a"
+        ).unwrap();
+        store.mark_invoked_bound(&record_a).unwrap();
+        store.commit_bound_verified(
+            &record_a,
+            &verified_evidence(&record_a,ExecutionOutcome::Succeeded),
+            &TestProviderVerifier,
+        ).unwrap();
+
+        let witness_b=ActionAuthorizationWitness {
+            authorization_instance:"closed-b".into(), action_id:action.id.clone(),
+            action_digest:record_a.action_digest.clone(), support_digest:"support-b".into(),
+            frame:"frame@1".into(), policy:"policy@1".into(), decision:"execute".into(),
+            issued_at:"2026-10-03T06:30:01Z".into(), expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "closed-b",action.id.clone(),record_a.action_digest.clone(),"support-b","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness_b,&action,"frame@1","attempt-closed-b","boundary-B"
+        ).unwrap();
+        assert!(matches!(
+            store.mark_dispatch_pending_bound_from_pinned_native_authority(
+                "closed-b","attempt-closed-b",&action,&effect,"boundary-B",
+                "operation:closed-b","issuer.closed","native-closed-b"
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ActionAlreadyClosed
             ))
         ));
         let _=std::fs::remove_file(path);
