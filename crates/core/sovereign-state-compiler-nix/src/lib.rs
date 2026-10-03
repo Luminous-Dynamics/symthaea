@@ -258,7 +258,7 @@ impl TargetAdapter for NixOSTargetAdapter {
                 &mut steps,
                 PlanStepKind::StageArtifacts,
                 [Capability::InstallApplication],
-                format!("stage {} application artifact(s)", install.len()),
+                format!("stage {} application package input(s)", install.len()),
             );
             Self::push_step(
                 &mut steps,
