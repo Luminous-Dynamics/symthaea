@@ -1254,7 +1254,7 @@ impl KnowledgePersistence {
                     rusqlite::params![
                         relation.source_memory_id,
                         relation.target_memory_id,
-                        format!("{:?}", relation.kind),
+                        provenance_kind_storage_code(relation.kind),
                         relation.created_at
                     ],
                 )
