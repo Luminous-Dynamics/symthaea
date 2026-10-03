@@ -375,7 +375,6 @@ fn serde_rejects_duplicate_map_keys_before_canonicalization() {
     assert!(serde_json::from_str::<ExecutionLineageV1>(text).is_err());
 }
 
-
 #[test]
 fn serde_reordering_does_not_change_lineage_identity() {
     let first = r#"{
@@ -441,7 +440,10 @@ fn serde_reordering_does_not_change_lineage_identity() {
 
     assert_eq!(first, second);
     assert_eq!(first.digest(), second.digest());
-    assert_eq!(first.workload_digest().unwrap(), second.workload_digest().unwrap());
+    assert_eq!(
+        first.workload_digest().unwrap(),
+        second.workload_digest().unwrap()
+    );
     assert_eq!(
         first.environment_digest().unwrap(),
         second.environment_digest().unwrap()
