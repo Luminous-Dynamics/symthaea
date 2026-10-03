@@ -2054,6 +2054,56 @@ impl KnowledgePersistence {
     }
 }
 
+fn verify_table_column_contract(
+    conn: &rusqlite::Connection,
+    table: &str,
+    expected: &[(&str, &str, bool, i64)],
+) -> Result<(), String> {
+    let pragma = format!("PRAGMA table_info({table})");
+    let mut stmt = conn
+        .prepare(&pragma)
+        .map_err(|e| format!("Schema integrity column check for {table}: {e}"))?;
+    let actual = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, i64>(5)?,
+            ))
+        })
+        .map_err(|e| format!("Schema integrity column query for {table}: {e}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Schema integrity column row for {table}: {e}"))?;
+
+    for (column, expected_type, expected_not_null, expected_pk) in expected {
+        let (_, actual_type, actual_not_null, actual_pk) = actual
+            .iter()
+            .find(|(name, _, _, _)| name == column)
+            .ok_or_else(|| {
+                format!("Schema integrity check failed: missing column {column} on {table}")
+            })?;
+
+        if actual_type.to_ascii_uppercase() != *expected_type {
+            return Err(format!(
+                "Schema integrity check failed: column {column} on {table} has declared type {actual_type}, expected {expected_type}"
+            ));
+        }
+        if (*actual_not_null != 0) != *expected_not_null {
+            return Err(format!(
+                "Schema integrity check failed: column {column} on {table} has wrong NOT NULL contract"
+            ));
+        }
+        if *actual_pk != *expected_pk {
+            return Err(format!(
+                "Schema integrity check failed: column {column} on {table} has primary-key position {actual_pk}, expected {expected_pk}"
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<(), String> {
     const REQUIRED_TABLES: &[&str] = &[
         "knowledge_facts",
@@ -2089,6 +2139,42 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
             return Err(format!("Schema integrity check failed: missing table {name}"));
         }
     }
+
+    verify_table_column_contract(
+        conn,
+        "knowledge_provenance_relations",
+        &[
+            ("source_memory_id", "TEXT", true, 1i64),
+            ("target_memory_id", "TEXT", true, 2),
+            ("kind", "TEXT", true, 3),
+            ("created_at", "TEXT", true, 4),
+        ],
+    )?;
+    verify_table_column_contract(
+        conn,
+        "knowledge_snapshot_receipts",
+        &[
+            ("generation", "INTEGER", false, 1i64),
+            ("canonical_digest_hex", "TEXT", true, 0),
+            ("receipt_digest_hex", "TEXT", true, 0),
+        ],
+    )?;
+    verify_table_column_contract(
+        conn,
+        "knowledge_snapshot_validation_receipts",
+        &[
+            ("validation_event", "TEXT", false, 1i64),
+            ("validation_sequence", "INTEGER", true, 0),
+            ("generation", "INTEGER", true, 0),
+            ("snapshot_digest_hex", "TEXT", true, 0),
+            ("validator_ref", "TEXT", true, 0),
+            ("validator_version", "TEXT", true, 0),
+            ("validation_profile", "TEXT", true, 0),
+            ("conforms", "INTEGER", true, 0),
+            ("report_digest_hex", "TEXT", false, 0),
+            ("receipt_digest_hex", "TEXT", true, 0),
+        ],
+    )?;
 
     for name in REQUIRED_TRIGGERS {
         let sql: Option<String> = conn
@@ -3240,6 +3326,49 @@ mod tests {
         let err = p.ensure_schema(&conn).unwrap_err();
         assert!(err.contains("Schema integrity check failed"));
         assert!(err.contains("trg_knowledge_snapshot_receipts_no_update"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_schema_column_attestation_rejects_nullable_validation_sequence() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_column_contract_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE knowledge_snapshot_validation_receipts (
+                validation_event TEXT PRIMARY KEY,
+                validation_sequence INTEGER,
+                generation INTEGER NOT NULL,
+                snapshot_digest_hex TEXT NOT NULL,
+                validator_ref TEXT NOT NULL,
+                validator_version TEXT NOT NULL,
+                validation_profile TEXT NOT NULL,
+                conforms INTEGER NOT NULL,
+                report_digest_hex TEXT,
+                receipt_digest_hex TEXT NOT NULL
+            );",
+        )
+        .unwrap();
+
+        let err = verify_table_column_contract(
+            &conn,
+            "knowledge_snapshot_validation_receipts",
+            &[
+                ("validation_event", "TEXT", false, 1),
+                ("validation_sequence", "INTEGER", true, 0),
+            ],
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            "Schema integrity check failed: column validation_sequence on knowledge_snapshot_validation_receipts has wrong NOT NULL contract"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
