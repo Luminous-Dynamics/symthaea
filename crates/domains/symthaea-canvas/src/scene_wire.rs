@@ -562,6 +562,29 @@ mod tests {
     }
 
     #[test]
+    fn oversized_compiled_scene_falls_back_to_inert_root() {
+        let polygon = SceneNode::polygon(
+            (0..MAX_POLYGON_POINTS)
+                .map(|i| (i as f32 * 1000.0, (i as f32 + 1.0) * -1000.0))
+                .collect(),
+            true,
+        );
+        let mut root = SceneNode::group(None);
+        for _ in 0..255 {
+            root.children.push(polygon.clone());
+        }
+
+        let wire = RemoteScene::from_scene(&root);
+        assert_eq!(wire.version, RemoteScene::VERSION);
+        assert!(matches!(wire.root.primitive, WirePrimitive::Group));
+        assert!(
+            wire.root.children.is_empty(),
+            "oversized wire scene must be replaced atomically"
+        );
+        assert!(wire.serialized_len() <= MAX_SCENE_BYTES);
+    }
+
+    #[test]
     fn hostile_scene_is_bounded_and_effect_free() {
         let mut root = SceneNode::group(None);
         for _ in 0..600 {
