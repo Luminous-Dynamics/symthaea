@@ -209,7 +209,7 @@ The qualification harness now covers the paper's published \(n\in\{500,1000,2000
 ### Published-grid storage ledger
 
 Raviv's Remark 6 distinguishes representation size from recovery work: an arbitrary codebook supplied explicitly requires \(|C_i|n\) bits per factor, while a linear code can be represented by its generator matrix using \(k_i n\) bits. The qualification harness now records those theoretical payload sizes separately from the actual packed-`u64` generator storage used by this implementation, along with target storage. These are raw representation quantities, not a composite efficiency score; struct/allocator overhead is intentionally excluded.
- When the sampled factor bases are jointly independent, the unique GF(2) representation makes exact original-factor recovery testable; when dependence occurs, the fixture is classified instead of being silently treated as uniquely identifiable.
+ When the sampled factor bases are jointly independent, the unique GF(2) representation makes exact original-factor recovery testable; when dependence occurs, the fixture is classified rather than treated as a benchmark failure. The published success contract remains valid factor membership plus exact rebinding, while exact retrieval of the originally sampled factors is only asserted in the identifiable cases.
 
 
 ## Non-goals
