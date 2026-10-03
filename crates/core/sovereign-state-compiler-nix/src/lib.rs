@@ -959,6 +959,37 @@ mod tests {
     }
 
     #[test]
+    fn rollback_rejects_same_generation_with_different_realization() {
+        let mut intent = DeploymentIntent::new("rollback-realization-drift", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_KEY.into(), StateValue::Bool(true));
+        intent.desired_state.properties.insert(
+            ROLLBACK_GENERATION_KEY.into(),
+            StateValue::Integer(42),
+        );
+        intent.desired_state.properties.insert(
+            ROLLBACK_REALIZATION_KEY.into(),
+            StateValue::String("/nix/store/aaa-nixos-system-host".into()),
+        );
+        intent.required_resources.insert(
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource"),
+        );
+
+        assert_eq!(
+            rollback_adapter(42, "/nix/store/bbb-nixos-system-host").compile(&intent),
+            Err(NixOSAdapterError::PlanValidation(
+                PlanValidationError::MissingTargetResource(
+                    nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                        .expect("generation resource")
+                )
+            ))
+        );
+    }
+
+    #[test]
     fn rollback_rejects_snapshot_with_different_generation_or_realization() {
         let mut intent = DeploymentIntent::new("rollback-drift", "host-01");
         intent
