@@ -32,6 +32,7 @@ pub enum TopologyResolutionVerificationIssue {
     FutureVerification,
     StaleVerification,
     MissingFreshness,
+    WrongFreshnessScheme,
     WrongFreshnessSource,
     FreshnessRollback,
     EmptyFreshnessMarker,
@@ -73,6 +74,7 @@ pub struct TopologyResolutionVerificationPolicy {
     pub schema_version: String,
     pub policy_id: String,
     pub expected_verifier_id: String,
+    pub required_freshness_scheme: Option<String>,
     pub required_freshness_source_id: Option<String>,
     pub minimum_freshness_epoch: Option<u64>,
 }
@@ -211,6 +213,11 @@ impl TopologyResolutionVerificationGate {
             {
                 issues.push(TopologyResolutionVerificationIssue::EmptyFreshnessMarker);
             }
+            if let Some(expected_scheme) = self.policy.required_freshness_scheme.as_deref() {
+                if freshness.scheme != expected_scheme {
+                    issues.push(TopologyResolutionVerificationIssue::WrongFreshnessScheme);
+                }
+            }
             if freshness.source_id != expected_source {
                 issues.push(TopologyResolutionVerificationIssue::WrongFreshnessSource);
             }
@@ -304,6 +311,7 @@ mod tests {
                 schema_version: "0.1".into(),
                 policy_id: "topology-resolution-verification-v1".into(),
                 expected_verifier_id: "mycelix-topology-verifier".into(),
+                required_freshness_scheme: Some("epoch-marker-v1".into()),
                 required_freshness_source_id: Some("topology-epoch-bell".into()),
                 minimum_freshness_epoch: Some(7),
             },
@@ -334,6 +342,17 @@ mod tests {
         let d = gate().assess(&resolution(), Some(&r), 3_000);
         assert_eq!(d.state, TopologyResolutionVerificationState::Quarantined);
         assert!(d.issues.contains(&TopologyResolutionVerificationIssue::FreshnessRollback));
+    }
+
+    #[test]
+    fn freshness_scheme_must_match_policy() {
+        let mut r = result();
+        r.freshness.as_mut().unwrap().scheme = "unexpected-scheme".into();
+        let d = gate().assess(&resolution(), Some(&r), 3_000);
+        assert_eq!(d.state, TopologyResolutionVerificationState::Quarantined);
+        assert!(d
+            .issues
+            .contains(&TopologyResolutionVerificationIssue::WrongFreshnessScheme));
     }
 
     #[test]
