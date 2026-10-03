@@ -252,6 +252,25 @@ jobs:
           test -n "$PACKING_BOUNDARY"
           printf 'packing_boundary=%s\n' "$PACKING_BOUNDARY" >> "$GITHUB_OUTPUT"
 
+      - name: Capture exact algebraic multiplicity ledger
+        id: algebraic
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity algebraic_multiplicity_ledger_is_exhaustively_self_consistent -- --nocapture 2>&1)"
+          LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^ALGEBRAIC_LEDGER=')"
+          test "$LEDGER_COUNT" -eq 1
+          ALGEBRAIC_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^ALGEBRAIC_LEDGER=//p')"
+          test -n "$ALGEBRAIC_LEDGER"
+          printf 'algebraic_ledger=%s\n' "$ALGEBRAIC_LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture higher-order dependency stress
+        id: higher_order
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity higher_order_dependency_stress_has_pairwise_trivial_cases -- --nocapture 2>&1)"
+          SWEEP_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^HIGHER_ORDER_SWEEP=')"
+          test "$SWEEP_COUNT" -eq 1
+          HIGHER_ORDER_SWEEP="$(printf '%s\n' "$OUTPUT" | sed -n 's/^HIGHER_ORDER_SWEEP=//p')"
+          test -n "$HIGHER_ORDER_SWEEP"
+          printf 'higher_order_sweep=%s\n' "$HIGHER_ORDER_SWEEP" >> "$GITHUB_OUTPUT"
       - name: Strict Clippy
         id: clippy
         run: |
@@ -313,6 +332,12 @@ jobs:
           search_ledger_schema=linear-code-search-v1
           search_ledger_status=${{ steps.search_space.outcome }}
           search_ledger=${{ steps.search_space.outputs.search_ledger }}
+          algebraic_ledger_schema=linear-code-algebra-v1
+          algebraic_ledger_status=${{ steps.algebraic.outcome }}
+          algebraic_ledger=${{ steps.algebraic.outputs.algebraic_ledger }}
+          higher_order_dependency_schema=linear-code-higher-order-v1
+          higher_order_dependency_status=${{ steps.higher_order.outcome }}
+          higher_order_dependency=${{ steps.higher_order.outputs.higher_order_sweep }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
@@ -330,6 +355,8 @@ jobs:
           linear_code_unit_tests=${{ steps.unit_tests.outcome }}
           ambiguity_integration_test=${{ steps.integration_tests.outcome }}
           strict_clippy=${{ steps.clippy.outcome }}
+          algebraic_multiplicity_qualification=${{ steps.algebraic.outcome }}
+          higher_order_dependency_qualification=${{ steps.higher_order.outcome }}
           receipt_semantics=descriptive-only
           EOF
           if [ "${{ steps.harness.outcome }}" = "success" ] && [ -f "${{ steps.harness.outputs.path }}/Cargo.lock" ]; then
