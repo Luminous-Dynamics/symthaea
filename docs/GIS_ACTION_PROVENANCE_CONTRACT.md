@@ -352,6 +352,10 @@ Strict effectful admission now requires the adapter identifier named by the froz
 
 Settlement additionally re-reads the adapter pin and requires it to match the frozen record. The same persisted-pin check runs before provider entry, before the boundary performs the pre-entry status verification. A later adapter replacement, database-side pin mutation, or presenter-selected revision therefore cannot silently reinterpret an already-authorized attempt. This aligns with AEB-07's requirement that the relying party pin every adapter revision and, in the native compilation contract, the verifier/adapter implementation identity and digest. citeturn281056view0
 
+### Cross-table attempt ownership fence
+
+The boundary-scoped attempt namespace is now checked not only per durable row, but across the complete attempt lineage. For the same (authorization_instance, attempt_id), leases, receipts, status checks, recovery markers, terminal evidence, and dispatch records must agree on one non-empty boundary owner. Historical receipts or terminal evidence with a missing boundary may be backfilled only from the authoritative dispatch row; a conflicting non-empty boundary is never overwritten and causes startup or runtime validation to fail closed. This closes a cross-table splice in which every row could carry a locally valid (boundary_id, attempt_scope_digest) pair while the records described different execution boundaries. citeturn399269view0
+
 ### Bound receipts preserve the native provider replay key
 
 Bound terminal receipts now persist the exact provider idempotency key used by the native-replay-derived dispatch. Re-reading or idempotently replaying a terminal receipt therefore returns that same key rather than reconstructing the legacy authorization-instance-derived key.
