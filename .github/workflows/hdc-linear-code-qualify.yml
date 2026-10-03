@@ -171,6 +171,16 @@ jobs:
           test -n "$GEOMETRY_LEDGER"
           printf 'geometry_ledger=%s\n' "$GEOMETRY_LEDGER" >> "$GITHUB_OUTPUT"
 
+      - name: Capture geometry seed sweep
+        id: geometry_sweep
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity small_code_geometry_seed_sweep_is_exhaustively_self_consistent -- --nocapture 2>&1)"
+          GEOMETRY_SWEEP_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^GEOMETRY_SWEEP=')"
+          test "$GEOMETRY_SWEEP_COUNT" -eq 4
+          GEOMETRY_SWEEP="$(printf '%s\n' "$OUTPUT" | sed -n 's/^GEOMETRY_SWEEP=//p' | paste -sd '|' -)"
+          test -n "$GEOMETRY_SWEEP"
+          printf 'geometry_sweep=%s\n' "$GEOMETRY_SWEEP" >> "$GITHUB_OUTPUT"
+
       - name: Capture deterministic work ledger
         id: work
         run: |
@@ -247,6 +257,9 @@ jobs:
           geometry_ledger_schema=linear-code-geometry-v1
           geometry_ledger_status=${{ steps.geometry.outcome }}
           geometry_ledger=${{ steps.geometry.outputs.geometry_ledger }}
+          geometry_sweep_schema=linear-code-geometry-sweep-v1
+          geometry_sweep_status=${{ steps.geometry_sweep.outcome }}
+          geometry_sweep=${{ steps.geometry_sweep.outputs.geometry_sweep }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
