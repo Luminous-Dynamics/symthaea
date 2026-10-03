@@ -1884,19 +1884,21 @@ impl KnowledgePersistence {
         verify_snapshot_receipts_in_tx(&tx)?;
         verify_snapshot_validation_receipts_in_tx(&tx)?;
 
-        // Enforce stable fact identity at the SQLite boundary. NULL remains allowed
-        // only for the pre-migration representation; the migration above materializes all
-        // legacy NULLs before this guard is installed.
+        // Enforce stable fact identity at the SQLite boundary. Because the migration above
+        // materializes every legacy NULL identity before committing, newly inserted or updated
+        // fact rows must always carry a non-blank identity.
         tx.execute_batch(
-            "CREATE TRIGGER IF NOT EXISTS trg_knowledge_facts_memory_id_no_blank_insert
+            "DROP TRIGGER IF EXISTS trg_knowledge_facts_memory_id_no_blank_insert;
+             DROP TRIGGER IF EXISTS trg_knowledge_facts_memory_id_no_blank_update;
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_facts_memory_id_required_insert
              BEFORE INSERT ON knowledge_facts
-             WHEN NEW.memory_id IS NOT NULL AND trim(NEW.memory_id) = ''
+             WHEN NEW.memory_id IS NULL OR trim(NEW.memory_id) = ''
              BEGIN
                  SELECT RAISE(ABORT, 'knowledge_facts memory_id must be non-empty');
              END;
-             CREATE TRIGGER IF NOT EXISTS trg_knowledge_facts_memory_id_no_blank_update
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_facts_memory_id_required_update
              BEFORE UPDATE OF memory_id ON knowledge_facts
-             WHEN NEW.memory_id IS NOT NULL AND trim(NEW.memory_id) = ''
+             WHEN NEW.memory_id IS NULL OR trim(NEW.memory_id) = ''
              BEGIN
                  SELECT RAISE(ABORT, 'knowledge_facts memory_id must be non-empty');
              END;
@@ -2434,6 +2436,16 @@ mod tests {
             )
             .unwrap_err();
         assert!(insert_err.to_string().contains("memory_id must be non-empty"));
+
+        let null_insert_err = conn
+            .execute(
+                "INSERT INTO knowledge_facts
+                 (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+                 VALUES (NULL, ?1, 'null', 0.5, 1, 0)",
+                [vec![0x33u8; BinaryHV::BYTES]],
+            )
+            .unwrap_err();
+        assert!(null_insert_err.to_string().contains("memory_id must be non-empty"));
 
         p.save_facts(&[FactRecord {
             memory_id: "memory-trigger".into(),
