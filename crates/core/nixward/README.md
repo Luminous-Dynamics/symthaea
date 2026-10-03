@@ -78,7 +78,9 @@ system realization and that a selected system-profile generation agrees with
 its exact realization before constructing an SSC `TargetSnapshot`.
 
 The bridge does not authorize or execute anything; native realization remains
-owned by Nixward.
+owned by Nixward. Live generation and runtime links must resolve to concrete
+`/nix/store/...` realizations; incomplete, ambiguous, or non-store realization
+identity fails closed before an SSC `TargetSnapshot` is produced.
 
 ## Standalone-repository direction
 
