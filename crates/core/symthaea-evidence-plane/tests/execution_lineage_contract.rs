@@ -34,6 +34,34 @@ fn public_execution_lineage_namespace_exposes_validated_identity() {
 }
 
 #[test]
+fn public_execution_lineage_namespace_exposes_checked_admission_paths() {
+    let base = fixture();
+    let mut changed = base.clone();
+    changed.source_revision = "d".repeat(40);
+
+    let guard = EvidenceLineageGuardV1::prepare(&base).unwrap();
+    assert_eq!(
+        guard.try_check(&changed).unwrap(),
+        EvidenceLineageDecision::ReprepareBeforeEvidence
+    );
+
+    assert_eq!(
+        qualify_lineage_perturbation(&base, &changed, false),
+        LineagePerturbationResult::UnexpectedCollateralChange
+    );
+    assert_eq!(
+        symthaea_evidence_plane::execution_lineage::try_qualify_lineage_perturbation(
+            &base,
+            &changed,
+            true,
+        )
+        .unwrap(),
+        LineagePerturbationResult::ExpectedDependencyChanged
+    );
+    assert_eq!(base.validated_digest().unwrap(), base.digest());
+}
+
+#[test]
 fn workload_identity_is_stable_across_environment_only_changes() {
     let base = fixture();
     let workload = base.workload_digest().unwrap();
