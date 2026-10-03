@@ -26,6 +26,41 @@ fn canonical_fixture_fingerprint_is_emitted() {
     println!("FIXTURE_FINGERPRINT={fingerprint}");
     assert_eq!(fingerprint.len(), 64);
 
+    let codewords = code.enumerate();
+    let min_distance = codewords
+        .iter()
+        .filter(|word| word.weight() > 0)
+        .map(BinaryCodeword::weight)
+        .min()
+        .expect("non-zero codeword must exist");
+    let mut pairwise_min_distance = usize::MAX;
+    let mut max_inner_product = isize::MIN;
+    for left in &codewords {
+        for right in &codewords {
+            if left == right {
+                continue;
+            }
+            let distance = left
+                .words()
+                .iter()
+                .zip(right.words())
+                .map(|(a, b)| (a ^ b).count_ones() as usize)
+                .sum::<usize>();
+            pairwise_min_distance = pairwise_min_distance.min(distance);
+            max_inner_product =
+                max_inner_product.max(CANONICAL_FIXTURE_DIMENSION as isize - 2 * distance as isize);
+        }
+    }
+    assert_eq!(pairwise_min_distance, min_distance);
+    assert_eq!(
+        max_inner_product,
+        CANONICAL_FIXTURE_DIMENSION as isize - 2 * min_distance as isize
+    );
+    println!(
+        "FIXTURE_GEOMETRY=dimension={CANONICAL_FIXTURE_DIMENSION};rank={CANONICAL_FIXTURE_RANK};seed=0x{CANONICAL_FIXTURE_SEED:X};codewords={};min_distance={min_distance};max_bipolar_inner_product={max_inner_product}",
+        codewords.len(),
+    );
+
     // The fingerprint is intentionally sensitive to basis ordering: the
     // ordered packed basis is part of fixture identity, not merely the span.
     let mut reordered_basis = code.basis().to_vec();
