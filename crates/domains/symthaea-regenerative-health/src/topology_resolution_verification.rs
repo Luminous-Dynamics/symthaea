@@ -31,6 +31,25 @@ pub enum TopologyResolutionVerificationIssue {
     InvalidVerificationWindow,
     FutureVerification,
     StaleVerification,
+    MissingFreshness,
+    WrongFreshnessScheme,
+    WrongFreshnessSource,
+    FreshnessRollback,
+    FreshnessPolicyMismatch,
+    EmptyFreshnessMarker,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TopologyResolutionFreshness {
+    /// Transport-neutral freshness scheme identifier (for example a signed
+    /// epoch marker, monotonic counter, or other protocol freshness handle).
+    pub scheme: String,
+    /// Authority/source that issued the freshness marker.
+    pub source_id: String,
+    /// Receiver-visible freshness epoch/counter.
+    pub epoch: u64,
+    /// Digest identifying the exact marker used.
+    pub marker_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -46,6 +65,9 @@ pub struct TopologyResolutionVerificationResult {
     pub policy_fingerprint: String,
     /// Fingerprint of the verifier execution environment identity.
     pub environment_fingerprint: String,
+    /// Fingerprint of the exact freshness acceptance policy applied by the verifier.
+    pub freshness_policy_fingerprint: Option<String>,
+    pub freshness: Option<TopologyResolutionFreshness>,
     pub verified_at_ms: u64,
     pub valid_until_ms: u64,
 }
@@ -55,6 +77,10 @@ pub struct TopologyResolutionVerificationPolicy {
     pub schema_version: String,
     pub policy_id: String,
     pub expected_verifier_id: String,
+    pub required_freshness_scheme: Option<String>,
+    pub required_freshness_source_id: Option<String>,
+    pub minimum_freshness_epoch: Option<u64>,
+    pub expected_freshness_policy_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +93,11 @@ pub struct TopologyResolutionVerificationDecision {
     pub verification_report_digest: Option<String>,
     pub policy_fingerprint: Option<String>,
     pub environment_fingerprint: Option<String>,
+    pub freshness_scheme: Option<String>,
+    pub freshness_source_id: Option<String>,
+    pub freshness_epoch: Option<u64>,
+    pub freshness_marker_digest: Option<String>,
+    pub freshness_policy_fingerprint: Option<String>,
     pub issues: Vec<TopologyResolutionVerificationIssue>,
 }
 
@@ -76,6 +107,37 @@ pub struct TopologyResolutionVerificationGate {
 }
 
 impl TopologyResolutionVerificationGate {
+    fn decision(
+            schema_version: String,
+            policy_id: String,
+            verification: &TopologyResolutionVerificationResult,
+            issues: Vec<TopologyResolutionVerificationIssue>,
+        ) -> TopologyResolutionVerificationDecision {
+            TopologyResolutionVerificationDecision {
+                schema_version,
+                policy_id,
+                state: if issues.is_empty() {
+                    TopologyResolutionVerificationState::Verified
+                } else {
+                    TopologyResolutionVerificationState::Quarantined
+                },
+                verifier_id: Some(verification.verifier_id.clone()),
+                verification_reference: Some(verification.verification_reference.clone()),
+                verification_report_digest: Some(verification.verification_report_digest.clone()),
+                policy_fingerprint: Some(verification.policy_fingerprint.clone()),
+                environment_fingerprint: Some(verification.environment_fingerprint.clone()),
+                freshness_scheme: verification.freshness.as_ref().map(|item| item.scheme.clone()),
+                freshness_source_id: verification.freshness.as_ref().map(|item| item.source_id.clone()),
+                freshness_epoch: verification.freshness.as_ref().map(|item| item.epoch),
+                freshness_marker_digest: verification
+                    .freshness
+                    .as_ref()
+                    .map(|item| item.marker_digest.clone()),
+                freshness_policy_fingerprint: verification.freshness_policy_fingerprint.clone(),
+                issues,
+            }
+        }
+
     pub fn new(
         policy: TopologyResolutionVerificationPolicy,
     ) -> Result<Self, &'static str> {
@@ -105,6 +167,11 @@ impl TopologyResolutionVerificationGate {
                 verification_report_digest: None,
                 policy_fingerprint: None,
                 environment_fingerprint: None,
+                freshness_scheme: None,
+                freshness_source_id: None,
+                freshness_epoch: None,
+                freshness_marker_digest: None,
+                freshness_policy_fingerprint: None,
                 issues: vec![],
             };
         };
@@ -118,6 +185,7 @@ impl TopologyResolutionVerificationGate {
             || verification.policy_fingerprint.trim().is_empty()
             || verification.environment_fingerprint.trim().is_empty()
         {
+
             issues.push(TopologyResolutionVerificationIssue::EmptyIdentity);
         }
 
@@ -140,24 +208,69 @@ impl TopologyResolutionVerificationGate {
         } else if now_ms > verification.valid_until_ms {
             issues.push(TopologyResolutionVerificationIssue::StaleVerification);
         }
-
-        let state = if issues.is_empty() {
-            TopologyResolutionVerificationState::Verified
-        } else {
-            TopologyResolutionVerificationState::Quarantined
-        };
-
-        TopologyResolutionVerificationDecision {
-            schema_version: self.policy.schema_version.clone(),
-            policy_id: self.policy.policy_id.clone(),
-            state,
-            verifier_id: Some(verification.verifier_id.clone()),
-            verification_reference: Some(verification.verification_reference.clone()),
-            verification_report_digest: Some(verification.verification_report_digest.clone()),
-            policy_fingerprint: Some(verification.policy_fingerprint.clone()),
-            environment_fingerprint: Some(verification.environment_fingerprint.clone()),
-            issues,
+        if let Some(expected_source) = self.policy.required_freshness_source_id.as_deref() {
+            let Some(freshness) = verification.freshness.as_ref() else {
+                issues.push(TopologyResolutionVerificationIssue::MissingFreshness);
+                return Self::decision(self.policy.schema_version.clone(), self.policy.policy_id.clone(), verification, issues);
+            };
+            if freshness.scheme.trim().is_empty()
+                || freshness.source_id.trim().is_empty()
+                || freshness.marker_digest.trim().is_empty()
+                || freshness.epoch == 0
+            {
+                issues.push(TopologyResolutionVerificationIssue::EmptyFreshnessMarker);
+            }
+            if let Some(expected_scheme) =
+                self.policy.required_freshness_scheme.as_deref()
+            {
+                if freshness.scheme != expected_scheme {
+                    issues.push(TopologyResolutionVerificationIssue::WrongFreshnessScheme);
+                }
+            }
+            if freshness.source_id != expected_source {
+                issues.push(TopologyResolutionVerificationIssue::WrongFreshnessSource);
+            }
+            if let Some(minimum_epoch) = self.policy.minimum_freshness_epoch {
+                if freshness.epoch < minimum_epoch {
+                    issues.push(TopologyResolutionVerificationIssue::FreshnessRollback);
+                }
+            }
+            let Some(policy_fingerprint) =
+                verification.freshness_policy_fingerprint.as_deref()
+            else {
+                issues.push(TopologyResolutionVerificationIssue::FreshnessPolicyMismatch);
+                return Self::decision(
+                    self.policy.schema_version.clone(),
+                    self.policy.policy_id.clone(),
+                    verification,
+                    issues,
+                );
+            };
+            if let Some(expected) = self
+                .policy
+                .expected_freshness_policy_fingerprint
+                .as_deref()
+            {
+                if policy_fingerprint != expected {
+                    issues.push(TopologyResolutionVerificationIssue::FreshnessPolicyMismatch);
+                }
+            }
+        } else if let Some(freshness) = verification.freshness.as_ref() {
+            if freshness.scheme.trim().is_empty()
+                || freshness.source_id.trim().is_empty()
+                || freshness.marker_digest.trim().is_empty()
+                || freshness.epoch == 0
+            {
+                issues.push(TopologyResolutionVerificationIssue::EmptyFreshnessMarker);
+            }
         }
+
+        Self::decision(
+            self.policy.schema_version.clone(),
+            self.policy.policy_id.clone(),
+            verification,
+            issues,
+        )
     }
 }
 
@@ -210,6 +323,13 @@ mod tests {
             verification_report_digest: "report-digest-2".into(),
             policy_fingerprint: "policy-fingerprint-2".into(),
             environment_fingerprint: "environment-fingerprint-2".into(),
+            freshness_policy_fingerprint: Some("freshness-policy-7".into()),
+            freshness: Some(TopologyResolutionFreshness {
+                scheme: "epoch-marker-v1".into(),
+                source_id: "topology-epoch-bell".into(),
+                epoch: 7,
+                marker_digest: "epoch-marker-7".into(),
+            }),
             verified_at_ms: 2_100,
             valid_until_ms: 4_000,
         }
@@ -221,6 +341,10 @@ mod tests {
                 schema_version: "0.1".into(),
                 policy_id: "topology-resolution-verification-v1".into(),
                 expected_verifier_id: "mycelix-topology-verifier".into(),
+                required_freshness_scheme: Some("epoch-marker-v1".into()),
+                required_freshness_source_id: Some("topology-epoch-bell".into()),
+                minimum_freshness_epoch: Some(7),
+                expected_freshness_policy_fingerprint: Some("freshness-policy-7".into()),
             },
         )
         .unwrap()
@@ -230,6 +354,44 @@ mod tests {
     fn exact_verifier_result_is_admitted() {
         let d = gate().assess(&resolution(), Some(&result()), 3_000);
         assert_eq!(d.state, TopologyResolutionVerificationState::Verified);
+    }
+
+    #[test]
+    fn missing_required_freshness_is_quarantined() {
+        let mut r = result();
+        r.freshness = None;
+        let d = gate().assess(&resolution(), Some(&r), 3_000);
+        assert_eq!(d.state, TopologyResolutionVerificationState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionVerificationIssue::MissingFreshness));
+    }
+
+    #[test]
+    fn older_freshness_epoch_is_quarantined() {
+        let mut r = result();
+        r.freshness.as_mut().unwrap().epoch = 6;
+        let d = gate().assess(&resolution(), Some(&r), 3_000);
+        assert_eq!(d.state, TopologyResolutionVerificationState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionVerificationIssue::FreshnessRollback));
+    }
+
+    #[test]
+    fn freshness_policy_fingerprint_must_match() {
+        let mut r = result();
+        r.freshness_policy_fingerprint = Some("wrong-policy".into());
+        let d = gate().assess(&resolution(), Some(&r), 3_000);
+        assert_eq!(d.state, TopologyResolutionVerificationState::Quarantined);
+        assert!(d
+            .issues
+            .contains(&TopologyResolutionVerificationIssue::FreshnessPolicyMismatch));
+    }
+
+    #[test]
+    fn freshness_source_must_match_policy() {
+        let mut r = result();
+        r.freshness.as_mut().unwrap().source_id = "unexpected-bell".into();
+        let d = gate().assess(&resolution(), Some(&r), 3_000);
+        assert_eq!(d.state, TopologyResolutionVerificationState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionVerificationIssue::WrongFreshnessSource));
     }
 
     #[test]
