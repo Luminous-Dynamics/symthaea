@@ -3030,6 +3030,21 @@ mod tests {
         (store,action,witness)
     }
 
+    struct FixedClock {
+        now: DateTime<Utc>,
+        source_id: &'static str,
+    }
+
+    impl TrustedAuthorizationClock for FixedClock {
+        fn source_id(&self) -> &str {
+            self.source_id
+        }
+
+        fn now_utc(&self) -> Result<DateTime<Utc>, AuthorizationStoreError> {
+            Ok(self.now)
+        }
+    }
+
     struct TestProviderVerifier;
 
     impl ProviderEvidenceVerifier for TestProviderVerifier {
@@ -3640,6 +3655,68 @@ mod tests {
             format!("sha256:v2:{}",hex::encode(Sha256::digest(digest_material))),
             snapshot.1
         );
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn trusted_clock_source_is_injectable_and_pinned_across_reopen() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-trusted-clock-{}.db",std::process::id()
+        ));
+        let policy=AuthorizationClockPolicy {
+            max_age_seconds: 3600,
+            allowed_skew_seconds: 30,
+            require_expiry: true,
+        };
+        let now=DateTime::parse_from_rfc3339("2026-10-03T06:30:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let store=SqliteAuthorizationStore::open_with_relying_party_clock_and_policy(
+            &path,
+            "rp-trusted-clock",
+            Arc::new(FixedClock { now, source_id:"fixed-test-clock/v1" }),
+            policy,
+        ).unwrap();
+
+        let effect=super::super::ActionEffectBinding::new(
+            "target-trusted-clock","prod","adapter"
+        );
+        let action=EpistemicAction::new(
+            "trusted-clock-action","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect);
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"trusted-clock-action".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:Some("2026-10-03T07:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "trusted-clock-action",action.id.clone(),digest,
+            "support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-trusted-clock","boundary-clock"
+        ).unwrap();
+
+        assert!(matches!(
+            SqliteAuthorizationStore::open_with_relying_party_clock_and_policy(
+                &path,
+                "rp-trusted-clock",
+                Arc::new(FixedClock {
+                    now,
+                    source_id:"different-clock/v1"
+                }),
+                policy,
+            ),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
         let _=std::fs::remove_file(path);
     }
 
