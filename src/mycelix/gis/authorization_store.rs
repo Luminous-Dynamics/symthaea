@@ -139,6 +139,9 @@ impl ProviderStatusVerifierConfiguration {
     ) -> Self {
         Self {
             verifier_id: verifier_id.into(),
+            verifier_revision: "test-verifier/rev1".into(),
+            verifier_implementation_id: "test-verifier".into(),
+            verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
             verifier_config_digest: verifier_config_digest.into(),
         }
     }
@@ -4159,6 +4162,9 @@ mod tests {
                 configuration: ProviderVerifierConfiguration {
                     relying_party_id: "legacy-local".into(),
                     verifier_id: "test-verifier/v1".into(),
+                    verifier_revision: "test-verifier/rev1".into(),
+                    verifier_implementation_id: "test-verifier".into(),
+                    verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
                     verifier_config_digest: "sha256:test-verifier-config".into(),
                     trust_anchor_digest: "sha256:test-trust-anchors".into(),
                     evidence_profile_digest: "sha256:test-evidence-profile".into(),
@@ -4199,6 +4205,9 @@ mod tests {
                 configuration: ProviderVerifierConfiguration {
                     relying_party_id: self.relying_party_id.clone(),
                     verifier_id: "test-verifier/v1".into(),
+                    verifier_revision: "test-verifier/rev1".into(),
+                    verifier_implementation_id: "test-verifier".into(),
+                    verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
                     verifier_config_digest: "sha256:test-verifier-config".into(),
                     trust_anchor_digest: "sha256:test-trust-anchors".into(),
                     evidence_profile_digest: "sha256:test-evidence-profile".into(),
@@ -4329,6 +4338,9 @@ mod tests {
             &ProviderVerifierConfiguration {
                 relying_party_id: store.relying_party_id().to_owned(),
                 verifier_id: "test-verifier/v1".into(),
+                verifier_revision: "test-verifier/rev1".into(),
+                verifier_implementation_id: "test-verifier".into(),
+                verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
                 verifier_config_digest: "sha256:test-verifier-config".into(),
                 trust_anchor_digest: "sha256:test-trust-anchors".into(),
                 evidence_profile_digest: "sha256:test-evidence-profile".into(),
@@ -4662,6 +4674,9 @@ mod tests {
         let pinned=ProviderVerifierConfiguration {
             relying_party_id:"rp-verifier-write-once".into(),
             verifier_id:"test-verifier/v1".into(),
+            verifier_revision: "test-verifier/rev1".into(),
+            verifier_implementation_id: "test-verifier".into(),
+            verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
             verifier_config_digest:"sha256:test-verifier-config".into(),
             trust_anchor_digest:"sha256:test-trust-anchors".into(),
             evidence_profile_digest:"sha256:test-evidence-profile".into(),
@@ -4732,6 +4747,9 @@ mod tests {
                     configuration:ProviderVerifierConfiguration {
                         relying_party_id:"legacy-local".into(),
                         verifier_id:"test-verifier/v2".into(),
+                        verifier_revision: "test-verifier/rev2".into(),
+                        verifier_implementation_id: "test-verifier".into(),
+                        verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
                         verifier_config_digest:"sha256:tampered-config".into(),
                         trust_anchor_digest:"sha256:test-trust-anchors".into(),
                         evidence_profile_digest:"sha256:test-evidence-profile".into(),
@@ -5909,6 +5927,9 @@ mod tests {
                     configuration:ProviderVerifierConfiguration {
                         relying_party_id:"rp-B".into(),
                         verifier_id:"test-verifier/v1".into(),
+                        verifier_revision: "test-verifier/rev1".into(),
+                        verifier_implementation_id: "test-verifier".into(),
+                        verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
                         verifier_config_digest:"sha256:test-verifier-config".into(),
                         trust_anchor_digest:"sha256:test-trust-anchors".into(),
                         evidence_profile_digest:"sha256:test-evidence-profile".into(),
