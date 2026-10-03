@@ -15,7 +15,7 @@ use std::collections::BTreeSet;
 
 const BRANCH_SET_DOMAIN: &[u8] = b"symthaea:topology-branch-set:v1\n";
 
-fn branch_set_digest(branches: &[TopologyBranchReference]) -> String {
+pub(crate) fn branch_set_digest(branches: &[TopologyBranchReference]) -> String {
     let mut unique = BTreeSet::new();
     unique.extend(branches.iter().cloned());
     let mut bytes = Vec::new();
@@ -178,19 +178,7 @@ impl TopologyResolutionGate {
                 policy_id: self.policy.policy_id.clone(),
                 state: if observed_successors.is_empty() {
                     TopologyResolutionState::InsufficientEvidence
-                } else if unique_observed
-                    .iter()
-                    .map(|branch| {
-                        (
-                            branch.predecessor_epoch,
-                            branch.predecessor_topology_digest.as_str(),
-                            branch.successor_topology_digest.as_str(),
-                        )
-                    })
-                    .collect::<BTreeSet<_>>()
-                    .len()
-                    > 1
-                {
+                } else if unique_observed.len() > 1 {
                     TopologyResolutionState::Conflicted
                 } else {
                     TopologyResolutionState::InsufficientEvidence
@@ -460,6 +448,15 @@ mod tests {
         let d = gate().assess(None, &[a, b], 3_000);
         assert_eq!(d.state, TopologyResolutionState::Conflicted);
         assert!(d.resolution_id.is_none());
+    }
+
+    #[test]
+    fn unresolved_activation_time_fork_is_conflicted() {
+        let a = branch("topology-v2");
+        let mut b = a.clone();
+        b.successor_effective_from_ms = 1_600;
+        let d = gate().assess(None, &[a, b], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Conflicted);
     }
 
     #[test]
