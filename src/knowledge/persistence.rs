@@ -1803,6 +1803,24 @@ impl KnowledgePersistence {
         )
         .map_err(|e| format!("Schema validation sequence index: {e}"))?;
 
+        // Existing legacy databases may already contain orphaned validation rows because
+        // SQLite foreign-key enforcement is connection-local. Fail the migration closed rather
+        // than committing a repaired schema around an invalid historical ledger.
+        let mut foreign_key_check = tx
+            .prepare("PRAGMA foreign_key_check")
+            .map_err(|e| format!("Schema foreign-key check prepare: {e}"))?;
+        let foreign_key_violations = foreign_key_check
+            .query_map([], |_| Ok(()))
+            .map_err(|e| format!("Schema foreign-key check query: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Schema foreign-key check row: {e}"))?;
+        if !foreign_key_violations.is_empty() {
+            return Err(format!(
+                "Schema foreign-key check failed: {} violation(s)",
+                foreign_key_violations.len()
+            ));
+        }
+
         // Enforce append-only receipt history at the SQLite boundary. Migration backfills
         // above intentionally happen before these triggers are created.
         tx.execute_batch(
