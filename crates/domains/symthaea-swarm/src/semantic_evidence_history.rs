@@ -223,7 +223,7 @@ fn entry_commitment(
             hasher.update(&[1]);
             hasher.update(previous.as_bytes());
         }
-        None => hasher.update(&[0]),
+        None => { hasher.update(&[0]); }
     }
 
     hasher.update(evidence_digest.as_bytes());
