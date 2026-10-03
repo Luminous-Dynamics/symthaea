@@ -1819,10 +1819,10 @@ mod tests {
     fn execution_lineage_digest_is_insertion_order_independent() {
         let mut a = lineage_fixture();
         let mut b = lineage_fixture();
-        a.lock_digests.insert("z".into(), "2".into());
-        a.lock_digests.insert("a".into(), "1".into());
-        b.lock_digests.insert("a".into(), "1".into());
-        b.lock_digests.insert("z".into(), "2".into());
+        a.lock_digests.insert("z".into(), "22".repeat(8));
+        a.lock_digests.insert("a".into(), "11".repeat(8));
+        b.lock_digests.insert("a".into(), "11".repeat(8));
+        b.lock_digests.insert("z".into(), "22".repeat(8));
         assert_eq!(a.digest(), b.digest());
     }
 
@@ -1894,7 +1894,7 @@ mod tests {
         revision.source_revision = "c".repeat(40);
         let mut lock = base.clone();
         lock.lock_digests
-            .insert("Cargo.lock".into(), "lock999".into());
+            .insert("Cargo.lock".into(), "aa11bb22cc33dd44".into());
         let mut argv = base.clone();
         argv.argv.push("--nocapture".into());
 
