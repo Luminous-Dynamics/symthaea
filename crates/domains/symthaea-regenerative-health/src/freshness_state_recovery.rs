@@ -421,8 +421,7 @@ mod tests {
                 _: &crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt,
             ) -> bool { true }
         }
-        assert!(VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).is_err());
-        let err = FreshnessAnchorAssuranceError::InvalidProfile;
+        let err = VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap_err();
         assert_eq!(
             err,
             FreshnessAnchorAssuranceError::InsufficientCapabilities {
