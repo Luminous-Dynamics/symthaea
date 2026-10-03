@@ -259,3 +259,75 @@ Possible protocol namespace:
 `ssc/v1`
 
 "Sovereign Deploy" can remain an informal descriptive phrase during migration, but the architecture should avoid freezing the shorter name into public APIs if a more exact name is accepted.
+
+
+## Interoperability and canonicalization
+
+The v0.1 Rust crate uses deterministic serde/JSON serialization for its internal
+preview digests. This is sufficient to bind objects inside the same
+implementation, but it is deliberately **not** presented as a cross-language
+cryptographic canonicalization standard.
+
+Before external signing/interoperability is stabilized, the protocol should
+adopt an explicit canonical representation. JSON Canonicalization Scheme
+(JCS, RFC 8785) is a candidate because it defines deterministic property
+ordering and primitive serialization for hash/signature operations. The choice
+should be frozen in a protocol version rather than inferred from a library's
+serializer.
+
+Supply-chain evidence should likewise use established attestation/artifact
+formats by reference where practical. in-toto provides a stable attestation
+framework; SLSA defines provenance concepts; OCI already models
+content-addressable artifacts and platform-specific image variants. The
+compiler should bind these references into its plan rather than inventing
+parallel provenance semantics.
+
+## New invariants in the v0.1 prototype
+
+Authorization validation now requires:
+
+- a non-empty authority identifier;
+- a non-empty nonce;
+- intent digest equality;
+- target-profile digest equality;
+- exact compiled-plan digest equality;
+- a valid time window;
+- every granted capability to be supported by the target;
+- every required/step capability to be both supported and granted.
+
+This deliberately separates the four sets that matter:
+
+`required ∩ granted ∩ supported`
+
+with the additional invariant:
+
+`granted ⊆ supported`.
+
+The first relationship prevents privilege escalation through an unsupported or
+unapproved requested operation. The second prevents an authorization object
+from claiming authority the target cannot actually realize.
+
+## Platform evidence model
+
+Target discovery should eventually return more than an OS label. The target
+profile needs to evolve toward a structured capability and evidence document
+containing target identity, platform family, architecture, management channel,
+available operations, and freshness/lifecycle metadata.
+
+This is important because modern platforms increasingly expose declarative
+desired-state and status channels rather than unrestricted command execution.
+Microsoft DSC 3 is explicitly declarative and cross-platform; Apple exposes
+device-management capabilities and status reports; Android Management API
+represents managed-device configuration as policy. These should map into the
+same neutral capability model without pretending their authority surfaces are
+identical.
+
+References:
+
+- RFC 8785: JSON Canonicalization Scheme.
+- in-toto specifications and Attestation Framework.
+- SLSA provenance specification.
+- OCI Image Specification.
+- Microsoft Desired State Configuration.
+- Apple Device Management declarations/status.
+- Android Management API policies.
