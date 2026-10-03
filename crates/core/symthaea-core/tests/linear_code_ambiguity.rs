@@ -66,9 +66,7 @@ fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
     assert!(first_work.projection_word_xor_ops > 0);
     assert!(first_work.solve_row_xor_words > 0);
 
-    println!(
-        "WORK_FIXTURE_SPEC=dimension=96;left_rank=6;right_rank=6;seed=0x1111"
-    );
+    println!("WORK_FIXTURE_SPEC=dimension=96;left_rank=6;right_rank=6;seed=0x1111");
     println!(
         "WORK_LEDGER=span_membership_checks={};basis_rank_pivots={};basis_rank_row_xor_words={};basis_rank_input_word_copies={};solve_basis_bit_probes={};solve_matrix_word_cells={};solve_pivots={};solve_row_xor_words={};retained_generators={};projection_word_xor_ops={}",
         first_work.span_membership_checks,
