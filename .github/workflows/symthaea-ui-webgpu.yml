@@ -44,6 +44,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y chromium
 
+      - name: Validate qualification harness syntax
+        working-directory: crates/bridges/symthaea-web
+        run: node --check test-webgpu-qualification.mjs
+
       - name: Build qualification fixture
         working-directory: crates/bridges/symthaea-ui
         run: trunk build --release --features browser-qualification --dist dist
