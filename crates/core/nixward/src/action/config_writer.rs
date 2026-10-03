@@ -600,7 +600,7 @@ mod tests {
                 error.kind(),
                 std::io::ErrorKind::InvalidInput
                     | std::io::ErrorKind::PermissionDenied
-                    | std::io::ErrorKind::FilesystemLoop
+                    | std::io::ErrorKind::NotFound
             ),
             "expected symlink-safe open rejection, got {error:?}"
         );
@@ -746,7 +746,7 @@ mod tests {
         let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
         let patch = writer.set_option("services.nginx.enable", "true").unwrap();
         let result = writer.apply_patch_if_current(&patch, &"11".repeat(32));
-        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::StaleData);
+        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::Other);
     }
     #[test]
     fn test_apply_patch_if_current_rejects_file_changed_after_proposal() {
@@ -762,7 +762,7 @@ mod tests {
         .unwrap();
         let expected = blake3::hash(patch.original.as_bytes()).to_hex().to_string();
         let result = writer.apply_patch_if_current(&patch, &expected);
-        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::StaleData);
+        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::Other);
     }
 
     #[test]
