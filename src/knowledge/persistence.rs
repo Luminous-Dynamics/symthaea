@@ -2637,6 +2637,111 @@ mod tests {
     }
 
     #[test]
+    fn test_legacy_provenance_normalization_preserves_existing_snapshot_receipt() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_legacy_provenance_receipt_compatibility_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let fact = FactRecord {
+            memory_id: "legacy-receipt-fact".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x5A; BinaryHV::BYTES],
+            source_text: "legacy receipt".into(),
+            confidence: 0.8,
+            domain: Some("compatibility".into()),
+            cycle: 3,
+            is_causal: false,
+        };
+        let relation = ProvenanceRelationRecord {
+            source_memory_id: fact.memory_id.clone(),
+            target_memory_id: "external-source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "event:legacy".into(),
+        };
+        let snapshot = KnowledgePersistenceSnapshot {
+            facts: vec![fact.clone()],
+            provenance_relations: vec![relation.clone()],
+            causal_edges: Vec::new(),
+            ontology: Vec::new(),
+        };
+        let canonical_digest = snapshot.canonical_digest_hex();
+        let receipt = KnowledgeSnapshotReceipt {
+            generation: 1,
+            canonical_digest_hex: canonical_digest.clone(),
+            receipt_digest_hex: String::new(),
+        };
+        let receipt_digest = receipt.canonical_receipt_digest_hex();
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id TEXT,
+                    canonical_identity TEXT,
+                    provenance_family TEXT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE knowledge_provenance_relations (
+                    source_memory_id TEXT NOT NULL,
+                    target_memory_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+                );
+                CREATE TABLE knowledge_snapshot_receipts (
+                    generation INTEGER PRIMARY KEY AUTOINCREMENT,
+                    canonical_digest_hex TEXT NOT NULL,
+                    receipt_digest_hex TEXT NOT NULL
+                );
+                INSERT INTO knowledge_facts
+                    (memory_id, canonical_identity, provenance_family, vector_blob,
+                     source_text, confidence, domain, cycle, is_causal)
+                VALUES ('legacy-receipt-fact', NULL, NULL, ?1, 'legacy receipt',
+                        0.8, 'compatibility', 3, 0);
+                INSERT INTO knowledge_provenance_relations
+                    (source_memory_id, target_memory_id, kind, created_at)
+                VALUES ('legacy-receipt-fact', 'external-source', 'DerivedFrom', 'event:legacy');
+                INSERT INTO knowledge_snapshot_receipts
+                    (generation, canonical_digest_hex, receipt_digest_hex)
+                VALUES (1, ?2, ?3);",
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let conn = p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+
+        let stored_kind: String = conn
+            .query_row(
+                "SELECT kind FROM knowledge_provenance_relations
+                 WHERE source_memory_id = 'legacy-receipt-fact'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored_kind, "derived_from");
+
+        let (loaded, verified_receipt) = p.load_snapshot_with_receipt().unwrap().unwrap();
+        assert_eq!(loaded, snapshot);
+        assert_eq!(verified_receipt.generation, 1);
+        assert_eq!(verified_receipt.canonical_digest_hex, canonical_digest);
+        assert_eq!(verified_receipt.receipt_digest_hex, receipt_digest);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_schema_migration_rejects_unknown_provenance_kind() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_unknown_provenance_kind_migration_test_{}",
