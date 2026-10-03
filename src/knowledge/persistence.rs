@@ -1517,8 +1517,11 @@ impl KnowledgePersistence {
         // migration atomic. Without a write transaction, two first-time openers can
         // race on ALTER TABLE / index creation and a failure midway can expose an
         // intermediate schema to another connection.
-        let tx = conn
-            .transaction_with_behavior(TransactionBehavior::Immediate)
+        // `ensure_schema` intentionally accepts a shared connection reference because
+        // it is invoked by read-only callers as well as writers. `new_unchecked` gives
+        // us the same IMMEDIATE behavior without requiring every call site to borrow the
+        // connection mutably; rusqlite still rejects a nested transaction at runtime.
+        let tx = rusqlite::Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
             .map_err(|e| format!("Begin schema migration transaction: {e}"))?;
 
         tx.execute_batch(
