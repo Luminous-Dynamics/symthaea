@@ -10,6 +10,7 @@
 
 use std::path::{Path, PathBuf};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
+use url::Url;
 
 use super::{
     ActionAuthorizationWitness, AuthorizationConsumptionError, AuthorizationLease,
@@ -437,24 +438,82 @@ impl SqliteAuthorizationStore {
                 |row| row.get(0),
             )
             .optional()?;
-        match existing {
-            Some(namespace) if namespace != authority_namespace => {
+        if let Some(namespace) = existing.as_deref() {
+            if namespace != authority_namespace {
                 return Err(AuthorizationStoreError::InvalidState(format!(
                     "authority namespace pin for {issuer} is already established as {namespace}"
                 )));
             }
-            Some(_) => {}
-            None => {
-                tx.execute(
-                    "INSERT INTO authorization_native_authority_pins(issuer,authority_namespace)
-                     VALUES (?1,?2)",
-                    params![issuer, authority_namespace],
-                )?;
+            tx.commit()?;
+            return Ok(());
+        }
+
+        let normalized_issuer = normalize_native_issuer(issuer);
+        let mut stmt = tx.prepare(
+            "SELECT issuer,authority_namespace
+             FROM authorization_native_authority_pins",
+        )?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let existing_issuer: String = row.get(0)?;
+            let existing_namespace: String = row.get(1)?;
+            if normalize_native_issuer(&existing_issuer) == normalized_issuer
+                && existing_namespace != authority_namespace
+            {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "authority namespace collision: {issuer} normalizes with {existing_issuer},                      but the established namespaces differ"
+                )));
             }
         }
+
+        tx.execute(
+            "INSERT INTO authorization_native_authority_pins(issuer,authority_namespace)
+             VALUES (?1,?2)",
+            params![issuer, authority_namespace],
+        )?;
         tx.commit()?;
         Ok(())
     }
+
+fn normalize_native_issuer(issuer: &str) -> String {
+    let candidate = if issuer.len() > 5 {
+        let lower = issuer.as_bytes();
+        let http = lower[..5].eq_ignore_ascii_case(b"http:");
+        let https = issuer.len() > 6 && lower[..6].eq_ignore_ascii_case(b"https:");
+        if (http || https) && !issuer[issuer.find(':').unwrap_or(0) + 1..].starts_with("//") {
+            let colon = issuer.find(':').unwrap_or(0);
+            format!("{}//{}", &issuer[..colon + 1], &issuer[colon + 1..])
+        } else {
+            issuer.to_owned()
+        }
+    } else {
+        issuer.to_owned()
+    };
+
+    let Ok(mut url) = Url::parse(&candidate) else {
+        return issuer.to_owned();
+    };
+    let Some(host) = url.host_str() else {
+        return issuer.to_owned();
+    };
+
+    if url.scheme().eq_ignore_ascii_case("http") && url.port() == Some(80)
+        || url.scheme().eq_ignore_ascii_case("https") && url.port() == Some(443)
+    {
+        let _ = url.set_port(None);
+    }
+
+    let normalized_host = host.strip_suffix('.').unwrap_or(host);
+    if normalized_host != host {
+        if let Err(_) = url.set_host(Some(normalized_host)) {
+            return issuer.to_owned();
+        }
+    }
+
+    let path = url.path().trim_end_matches('/');
+    url.set_path(path);
+    url.to_string()
+}
 
     fn native_authority_pin_set_id(&self) -> String {
         format!("{}:native-authority-pins:v1", self.relying_party_id)
@@ -2186,6 +2245,35 @@ mod tests {
                 AuthorizationConsumptionError::InvalidBinding
             ))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn issuer_normalization_collisions_cannot_split_authority_namespace() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-issuer-normalization-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-issuer-normalization"
+        ).unwrap();
+
+        store.pin_native_authority_namespace(
+            "HTTPS://Issuer.Example.:443/","authority/v1"
+        ).unwrap();
+        store.pin_native_authority_namespace(
+            "https://issuer.example","authority/v1"
+        ).unwrap();
+
+        assert!(matches!(
+            store.pin_native_authority_namespace(
+                "https://issuer.example/","authority/v2"
+            ),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        let normalized_a=normalize_native_issuer("HTTPS://Issuer.Example.:443/");
+        let normalized_b=normalize_native_issuer("https://issuer.example");
+        assert_eq!(normalized_a,normalized_b);
+
         let _=std::fs::remove_file(path);
     }
 
