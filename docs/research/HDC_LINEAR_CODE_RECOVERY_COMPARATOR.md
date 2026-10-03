@@ -125,6 +125,19 @@ Output:
 - operation counts or equivalent deterministic work proxy;
 - failure classification.
 
+#### Deterministic work ledger
+
+The comparator now exposes a research-only `LinearCodeWork` ledger rather than relying on wall-clock timing. It records:
+
+- span-membership checks used while constructing the maximal independent subset;
+- rank pivots and packed-word XOR work during rank tests;
+- solve pivots and packed-word XOR work during the GF(2) solve;
+- retained generators in the resulting independent basis.
+
+Repeated execution of the same deterministic fixture must produce both the same recovered result and the same ledger. These counters are algorithmic work units, not a universal hardware-independent runtime estimate, and must not be collapsed into a composite performance score.
+
+This ledger is intended to test the structure of the recovery algorithm before timing or energy measurements are introduced. In particular, the measurement should preserve the distinction between the maximal-independent-subset construction and the final linear solve described by the paper.
+
 ### Stage D — matched resonator control
 
 Run the existing two-factor resonator harness against an ordinary bipolar random-code fixture with the same dimensions and codebook cardinality.
@@ -162,7 +175,8 @@ The branch is ready for an evidence-producing benchmark only when:
 - the clean fixture's identifiability conditions are explicit and the recovery result matches exhaustive truth (including ambiguity) on all validation fixtures;
 - intentionally corrupted queries produce classified outcomes rather than silent false positives;
 - the resonator control uses the same ground-truth factor set and independently verified fixture;
-- the evidence schema records the representation family explicitly.
+- the evidence schema records the representation family explicitly;
+- deterministic work ledgers are reproducible on repeated qualification fixtures and distinguish construction work from solve work.
 
 ## Why this is the next step
 
