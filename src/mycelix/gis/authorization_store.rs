@@ -126,7 +126,41 @@ pub enum ProviderStatusVerificationError {
     VerificationFailed,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderStatusVerifierConfiguration {
+    pub verifier_id: String,
+    pub verifier_config_digest: String,
+}
+
+impl ProviderStatusVerifierConfiguration {
+    pub fn new(
+        verifier_id: impl Into<String>,
+        verifier_config_digest: impl Into<String>,
+    ) -> Self {
+        Self {
+            verifier_id: verifier_id.into(),
+            verifier_config_digest: verifier_config_digest.into(),
+        }
+    }
+
+    fn validate(&self) -> Result<(), AuthorizationStoreError> {
+        if self.verifier_id.is_empty() || self.verifier_config_digest.is_empty() {
+            return Err(
+                AuthorizationConsumptionError::ProviderStatusVerificationRequired.into()
+            );
+        }
+        Ok(())
+    }
+}
+
 pub trait ProviderStatusVerifier {
+    /// Stable identity/configuration selected by the relying party.
+    /// Legacy implementations return an unconfigured value and are rejected by
+    /// the strict effectful boundary until explicitly pinned.
+    fn configuration(&self) -> ProviderStatusVerifierConfiguration {
+        ProviderStatusVerifierConfiguration::new("", "")
+    }
+
     fn verify_current_status(
         &self,
         purpose: ProviderStatusVerificationPurpose,
@@ -790,6 +824,92 @@ impl SqliteAuthorizationStore {
         Ok(())
     }
 
+    /// Pin the relying-party-selected status verifier identity and configuration digest.
+    pub fn pin_provider_status_verifier_configuration(
+        &self,
+        configuration: &ProviderStatusVerifierConfiguration,
+    ) -> Result<(), AuthorizationStoreError> {
+        configuration.validate()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let existing_id: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_verifier_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let existing_digest: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_verifier_config_digest'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match (existing_id, existing_digest) {
+            (Some(id), Some(digest))
+                if id == configuration.verifier_id
+                    && digest == configuration.verifier_config_digest => {}
+            (Some(id), Some(digest)) => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "provider status verifier mismatch: pinned {id}/{digest}"
+                )));
+            }
+            (None, None) => {
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value)
+                     VALUES('provider_status_verifier_id',?1)",
+                    params![configuration.verifier_id.as_str()],
+                )?;
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value)
+                     VALUES('provider_status_verifier_config_digest',?1)",
+                    params![configuration.verifier_config_digest.as_str()],
+                )?;
+            }
+            _ => {
+                return Err(AuthorizationStoreError::InvalidState(
+                    "provider status verifier metadata is partially configured".into()
+                ));
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn pinned_provider_status_verifier_configuration(
+        &self,
+    ) -> Result<ProviderStatusVerifierConfiguration, AuthorizationStoreError> {
+        let connection = self.connection()?;
+        let verifier_id: Option<String> = connection
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_verifier_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let verifier_config_digest: Option<String> = connection
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_verifier_config_digest'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let configuration = match (verifier_id, verifier_config_digest) {
+            (Some(verifier_id), Some(verifier_config_digest)) =>
+                ProviderStatusVerifierConfiguration::new(verifier_id, verifier_config_digest),
+            _ => return Err(
+                AuthorizationConsumptionError::ProviderStatusVerificationRequired.into()
+            ),
+        };
+        configuration.validate()?;
+        Ok(configuration)
+    }
+
     fn pinned_provider_status_source_digest(
         &self,
     ) -> Result<String, AuthorizationStoreError> {
@@ -1428,6 +1548,16 @@ fn validate_native_authority_pin_set(
         .map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
         let pinned_status_source_digest =
             self.pinned_provider_status_source_digest()?;
+        let pinned_status_verifier_configuration =
+            self.pinned_provider_status_verifier_configuration()?;
+        if status_verifier.configuration() != pinned_status_verifier_configuration {
+            self.close_pre_dispatch_status_failure(
+                authorization_instance,
+                attempt_id,
+                boundary_id,
+            )?;
+            return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+        }
         let status = match status_verifier.verify_current_status(
             ProviderStatusVerificationPurpose::Admission,
             issuer,
@@ -1806,6 +1936,12 @@ fn validate_native_authority_pin_set(
         status_verifier: &V,
     ) -> Result<(), AuthorizationStoreError> {
         let pinned_status_source_digest = self.pinned_provider_status_source_digest()?;
+        let pinned_status_verifier_configuration =
+            self.pinned_provider_status_verifier_configuration()?;
+        if status_verifier.configuration() != pinned_status_verifier_configuration {
+            self.close_pre_entry_status_failure(record)?;
+            return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+        }
         if record.status_source_digest != pinned_status_source_digest {
             return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
         }
@@ -3260,6 +3396,13 @@ mod tests {
     struct TestProviderStatusVerifier;
 
     impl ProviderStatusVerifier for TestProviderStatusVerifier {
+        fn configuration(&self) -> ProviderStatusVerifierConfiguration {
+            ProviderStatusVerifierConfiguration::new(
+                "test-status-verifier/v1",
+                "sha256:test-status-verifier-config",
+            )
+        }
+
         fn verify_current_status(
             &self,
             purpose: ProviderStatusVerificationPurpose,
@@ -3334,6 +3477,12 @@ mod tests {
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         const ISSUER: &str = "test-issuer";
         store.pin_provider_status_source_digest("sha256:test-status-source")?;
+        store.pin_provider_status_verifier_configuration(
+            &ProviderStatusVerifierConfiguration::new(
+                "test-status-verifier/v1",
+                "sha256:test-status-verifier-config",
+            )
+        )?;
         const NAMESPACE: &str = "test-authority/v1";
         store.pin_native_authority_namespace(ISSUER, NAMESPACE)?;
         let status_identifier = format!("status:{}", native_authorization_id.as_ref());
@@ -4829,6 +4978,28 @@ mod tests {
     }
 
     #[test]
+    fn provider_status_verifier_configuration_is_write_once() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-verifier-pin-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let config=ProviderStatusVerifierConfiguration::new(
+            "status-verifier/v1","sha256:status-verifier-config"
+        );
+        store.pin_provider_status_verifier_configuration(&config).unwrap();
+        store.pin_provider_status_verifier_configuration(&config).unwrap();
+        assert!(matches!(
+            store.pin_provider_status_verifier_configuration(
+                &ProviderStatusVerifierConfiguration::new(
+                    "status-verifier/v2","sha256:other"
+                )
+            ),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn status_lookup_is_not_attempted_before_structural_dispatch_validation() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-status-ordering-{}.db",std::process::id()
@@ -4985,6 +5156,7 @@ mod tests {
         ));
         let store=SqliteAuthorizationStore::open_with_relying_party(
         store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
+        store.pin_provider_status_verifier_configuration(&ProviderStatusVerifierConfiguration::new("test-status-verifier/v1","sha256:test-status-verifier-config")).unwrap();
             &path,"rp-status-failure"
         ).unwrap();
         store.pin_native_authority_namespace("issuer.status","issuer.status/authority/v1").unwrap();
@@ -5048,6 +5220,7 @@ mod tests {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-action-closed-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-closed").unwrap();
         store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
+        store.pin_provider_status_verifier_configuration(&ProviderStatusVerifierConfiguration::new("test-status-verifier/v1","sha256:test-status-verifier-config")).unwrap();
         store.pin_native_authority_namespace("issuer.closed","issuer.closed/authority/v1").unwrap();
 
         let effect=super::super::ActionEffectBinding::new("target-closed","prod","adapter-closed");
