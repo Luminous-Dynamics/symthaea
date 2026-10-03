@@ -304,56 +304,70 @@ impl TargetAdapter for NixOSTargetAdapter {
             "observe target before applying state",
         );
 
-        if let Some(mode) = activation_mode {
-            let (required, description) = match mode {
-                NixActivationMode::Switch => (
-                    [
-                        Capability::ConfigureSystem,
-                        Capability::UpdateSystem,
-                        Capability::ModifyBootChain,
-                    ],
-                    "activate the NixOS configuration and make its generation current",
-                ),
-                NixActivationMode::Test => (
-                    [
-                        Capability::ConfigureSystem,
-                        Capability::UpdateSystem,
-                        Capability::ObserveHardware,
-                    ],
-                    "temporarily activate the NixOS configuration without changing the boot default",
-                ),
-                NixActivationMode::Boot => (
-                    [
-                        Capability::ConfigureSystem,
-                        Capability::UpdateSystem,
-                        Capability::ModifyBootChain,
-                    ],
-                    "build the NixOS configuration and select it for the next boot without activating now",
-                ),
-                NixActivationMode::DryActivate => (
-                    [Capability::ConfigureSystem, Capability::UpdateSystem],
-                    "evaluate NixOS activation changes without activating the configuration",
-                ),
-                NixActivationMode::Rollback { .. } => {
-                    return Err(NixOSAdapterError::ConflictingActivationModes);
-                }
-            };
+        match activation_mode {
+            Some(NixActivationMode::Switch)
+            | Some(NixActivationMode::Test)
+            | Some(NixActivationMode::Boot)
+            | Some(NixActivationMode::DryActivate) => {
+                let (required, description) = match activation_mode {
+                    Some(NixActivationMode::Switch) => (
+                        [
+                            Capability::ConfigureSystem,
+                            Capability::UpdateSystem,
+                            Capability::ModifyBootChain,
+                        ],
+                        "activate the NixOS configuration and make its generation current",
+                    ),
+                    Some(NixActivationMode::Test) => (
+                        [
+                            Capability::ConfigureSystem,
+                            Capability::UpdateSystem,
+                            Capability::ObserveHardware,
+                        ],
+                        "temporarily activate the NixOS configuration without changing the boot default",
+                    ),
+                    Some(NixActivationMode::Boot) => (
+                        [
+                            Capability::ConfigureSystem,
+                            Capability::UpdateSystem,
+                            Capability::ModifyBootChain,
+                        ],
+                        "build the NixOS configuration and select it for the next boot without activating now",
+                    ),
+                    Some(NixActivationMode::DryActivate) => (
+                        [Capability::ConfigureSystem, Capability::UpdateSystem],
+                        "evaluate NixOS activation changes without activating the configuration",
+                    ),
+                    Some(NixActivationMode::Rollback { .. }) | None => {
+                        unreachable!("matched non-rollback activation mode")
+                    }
+                };
 
-            if !intent.artifacts.is_empty() {
+                if !intent.artifacts.is_empty() {
+                    Self::push_step(
+                        &mut steps,
+                        PlanStepKind::StageArtifacts,
+                        [Capability::UpdateSystem],
+                        format!("stage {} NixOS deployment artifact(s)", intent.artifacts.len()),
+                    );
+                }
+
                 Self::push_step(
                     &mut steps,
-                    PlanStepKind::StageArtifacts,
-                    [Capability::UpdateSystem],
-                    format!("stage {} NixOS deployment artifact(s)", intent.artifacts.len()),
+                    PlanStepKind::ApplyDesiredState,
+                    required,
+                    description,
                 );
             }
-
-            Self::push_step(
-                &mut steps,
-                PlanStepKind::ApplyDesiredState,
-                required,
-                description,
-            );
+            Some(NixActivationMode::Rollback { generation }) => {
+                Self::push_step(
+                    &mut steps,
+                    PlanStepKind::Rollback,
+                    [Capability::Rollback],
+                    format!("roll back to NixOS generation {generation}"),
+                );
+            }
+            None => {}
         }
 
         if !install.is_empty() {
@@ -389,14 +403,6 @@ impl TargetAdapter for NixOSTargetAdapter {
             );
         }
 
-        if let Some(generation) = rollback_generation {
-            Self::push_step(
-                &mut steps,
-                PlanStepKind::Rollback,
-                [Capability::Rollback],
-                format!("roll back to NixOS generation {generation}"),
-            );
-        }
 
         if reboot {
             Self::push_step(
@@ -420,18 +426,19 @@ impl TargetAdapter for NixOSTargetAdapter {
         };
 
         let has_mutation = steps.iter().any(|step| {
-            if !matches!(
-                step.kind,
-                PlanStepKind::StageArtifacts
-                    | PlanStepKind::ApplyDesiredState
-                    | PlanStepKind::Reboot
-                    | PlanStepKind::Rollback
-            ) {
-                return false;
+            match step.kind {
+                PlanStepKind::StageArtifacts => {
+                    !matches!(activation_mode, Some(NixActivationMode::DryActivate))
+                }
+                PlanStepKind::ApplyDesiredState => {
+                    !matches!(activation_mode, Some(NixActivationMode::DryActivate))
+                        || !install.is_empty()
+                        || !remove.is_empty()
+                        || home_manager
+                }
+                PlanStepKind::Reboot | PlanStepKind::Rollback => true,
+                _ => false,
             }
-
-            !matches!(activation_mode, Some(NixActivationMode::DryActivate))
-                || matches!(step.kind, PlanStepKind::Rollback | PlanStepKind::Reboot)
         });
 
         let rollback_allowed = has_mutation
@@ -691,6 +698,46 @@ mod tests {
         assert_eq!(
             adapter().compile(&intent),
             Err(NixOSAdapterError::RollbackGenerationRequired)
+        );
+    }
+
+    #[test]
+    fn rollback_is_a_typed_activation_mode() {
+        let mut intent = DeploymentIntent::new("rollback-mode-1", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_KEY.into(), StateValue::Bool(true));
+        intent.desired_state.properties.insert(
+            ROLLBACK_GENERATION_KEY.into(),
+            StateValue::Integer(7),
+        );
+
+        let mode = NixActivationMode::Rollback { generation: 7 };
+        assert_eq!(mode, NixActivationMode::Rollback { generation: 7 });
+        let plan = adapter().compile(&intent).expect("compile");
+        assert_eq!(plan.steps[1].kind, PlanStepKind::Rollback);
+    }
+
+    #[test]
+    fn rollback_cannot_be_combined_with_rebuild() {
+        let mut intent = DeploymentIntent::new("rollback-conflict-1", "host-01");
+        intent.desired_state.properties.insert(
+            REBUILD_KEY.into(),
+            StateValue::String("switch".into()),
+        );
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_KEY.into(), StateValue::Bool(true));
+        intent.desired_state.properties.insert(
+            ROLLBACK_GENERATION_KEY.into(),
+            StateValue::Integer(7),
+        );
+
+        assert_eq!(
+            adapter().compile(&intent),
+            Err(NixOSAdapterError::ConflictingActivationModes)
         );
     }
 
