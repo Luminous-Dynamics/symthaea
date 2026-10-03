@@ -608,6 +608,39 @@ impl SqliteAuthorizationStore {
     /// This is the preferred entry point for production native authorization
     /// handoffs. The older free-form replay-identity API remains for staged
     /// migration but is deprecated because it cannot prove its derivation inputs.
+    /// Canonical native-authorization entry point. The issuer is only a
+    /// lookup key; the relying-party-pinned authority namespace is resolved
+    /// inside the boundary before replay identity derivation.
+    pub fn mark_dispatch_pending_bound_from_pinned_native_authority(
+        &self,
+        authorization_instance: &str,
+        attempt_id: &str,
+        action: &EpistemicAction,
+        expected_effect: &super::ActionEffectBinding,
+        boundary_id: &str,
+        operation_id: &str,
+        issuer: &str,
+        native_authorization_id: &str,
+    ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
+        let authority_namespace = self.pinned_native_authority_namespace(issuer)?;
+        let replay = super::NativeReplayDerivation::derive(
+            authority_namespace,
+            native_authorization_id,
+        )
+        .map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
+        self.mark_dispatch_pending_bound_with_provenance(
+            authorization_instance,
+            attempt_id,
+            action,
+            expected_effect,
+            boundary_id,
+            operation_id,
+            &replay.native_replay_identity,
+            Some(&replay),
+        )
+    }
+
+    #[deprecated(note = "use mark_dispatch_pending_bound_from_pinned_native_authority")]
     pub fn mark_dispatch_pending_bound_from_native_authority(
         &self,
         authorization_instance: &str,
@@ -2247,6 +2280,65 @@ mod tests {
     }
 
     #[test]
+    fn pinned_native_authority_namespace_drives_canonical_replay_derivation() {
+        let path=std::env::temp_dir().join(format!("symthaea-gis-native-pin-{}.db",std::process::id()));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-native-pin").unwrap();
+
+        assert!(matches!(
+            store.mark_dispatch_pending_bound_from_pinned_native_authority(
+                "missing","attempt-missing",
+                &EpistemicAction::new("missing-action","intervention",super::super::ActionRisk::Critical),
+                &super::super::ActionEffectBinding::new("target-missing","prod","adapter"),
+                "boundary","operation","issuer.unpinned","native-auth"
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidNativeReplayProvenance
+            ))
+        ));
+
+        store.pin_native_authority_namespace(
+            "issuer.example","issuer.example/authority/v1"
+        ).unwrap();
+        store.pin_native_authority_namespace(
+            "issuer.example","issuer.example/authority/v1"
+        ).unwrap();
+        assert!(matches!(
+            store.pin_native_authority_namespace(
+                "issuer.example","issuer.example/authority/v2"
+            ),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+
+        let effect=super::super::ActionEffectBinding::new("target-pin","prod","adapter-pin");
+        let action=EpistemicAction::new("native-pin-action","intervention",super::super::ActionRisk::Critical)
+            .with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"native-pin".into(), action_id:action.id.clone(),
+            action_digest:digest.clone(), frame:"frame@1".into(),
+            support_digest:"support".into(), policy:"policy@1".into(),
+            decision:"execute".into(), issued_at:"2026-10-03T06:00:00Z".into(),
+            expires_at:None, authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "native-pin",action.id.clone(),digest,"support","policy@1",1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-native-pin","boundary-pin"
+        ).unwrap();
+
+        let record=store.mark_dispatch_pending_bound_from_pinned_native_authority(
+            "native-pin","attempt-native-pin",&action,&effect,"boundary-pin",
+            "operation:native-pin","issuer.example","native-auth-pin"
+        ).unwrap();
+        let expected=super::super::NativeReplayDerivation::derive(
+            "issuer.example/authority/v1","native-auth-pin"
+        ).unwrap();
+        assert_eq!(record.native_replay_identity,expected.native_replay_identity);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn operation_and_native_replay_identity_tampering_is_rejected() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-identity-fence-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
@@ -3021,6 +3113,13 @@ mod tests {
             [], |row| row.get(0)
         ).unwrap();
         assert_eq!(rp_count,1);
+
+        let pin_table_count:i64=lease.query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type='table' AND name='authorization_native_authority_pins'",
+            [], |row| row.get(0)
+        ).unwrap();
+        assert_eq!(pin_table_count,1);
 
         let metadata:String=lease.query_row(
             "SELECT value FROM authorization_store_metadata WHERE key='relying_party_id'",
