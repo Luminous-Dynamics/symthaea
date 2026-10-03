@@ -311,7 +311,10 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
         }
     }
 
-    assert_eq!(cases, dimensions.len() * ranks.len() * factor_counts.len() * repeats);
+    assert_eq!(
+        cases,
+        dimensions.len() * ranks.len() * factor_counts.len() * repeats
+    );
     assert_eq!(cases, 81);
     assert_eq!(failures, 0);
     assert_eq!(valid_representative, cases);
