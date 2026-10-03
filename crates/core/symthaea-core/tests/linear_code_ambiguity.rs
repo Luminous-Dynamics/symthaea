@@ -28,8 +28,9 @@ fn canonical_fixture_fingerprint_is_emitted() {
 
     // The fingerprint is intentionally sensitive to basis ordering: the
     // ordered packed basis is part of fixture identity, not merely the span.
-    let mut reordered = code.clone();
-    reordered.basis.reverse();
+    let mut reordered_basis = code.basis().to_vec();
+    reordered_basis.reverse();
+    let reordered = RandomLinearCode::from_basis(reordered_basis).expect("reordered basis");
     assert_ne!(code.fingerprint(), reordered.fingerprint());
 
     // Dimension is also part of the domain-separated identity.
@@ -578,7 +579,7 @@ fn overlapping_subspaces_without_shared_generators_still_recover_representativel
     // basis. This exercises overlap at the subspace level rather than only
     // through duplicate generator identities.
     let shared = parent.basis()[0].bound(&parent.basis()[1]);
-    let right_basis = vec![shared, parent.basis()[2].clone()];
+    let right_basis = vec![shared.clone(), parent.basis()[2].clone()];
     let right = RandomLinearCode::from_basis(right_basis).expect("right subcode");
 
     assert!(left.contains(&shared));
