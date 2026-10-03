@@ -149,17 +149,22 @@ jobs:
             --test linear_code_ambiguity canonical_fixture_fingerprint_is_emitted -- --nocapture 2>&1)"
           FIXTURE_SPEC_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^FIXTURE_SPEC=')"
           FINGERPRINT_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^FIXTURE_FINGERPRINT=')"
+          FIXTURE_GEOMETRY_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^FIXTURE_GEOMETRY=')"
           test "$FIXTURE_SPEC_COUNT" -eq 1
           test "$FINGERPRINT_COUNT" -eq 1
+          test "$FIXTURE_GEOMETRY_COUNT" -eq 1
           FINGERPRINT="$(printf '%s\n' "$OUTPUT" | sed -n 's/^FIXTURE_FINGERPRINT=//p')"
           FIXTURE_SPEC="$(printf '%s\n' "$OUTPUT" | sed -n 's/^FIXTURE_SPEC=//p')"
           test -n "$FIXTURE_SPEC"
+          FIXTURE_GEOMETRY="$(printf '%s\n' "$OUTPUT" | sed -n 's/^FIXTURE_GEOMETRY=//p')"
+          test -n "$FIXTURE_GEOMETRY"
           test "${#FINGERPRINT}" -eq 64
           case "$FINGERPRINT" in
             (*[!0-9a-f]*) exit 1 ;;
           esac
           printf 'fingerprint=%s\n' "$FINGERPRINT" >> "$GITHUB_OUTPUT"
           printf 'fixture_spec=%s\n' "$FIXTURE_SPEC" >> "$GITHUB_OUTPUT"
+          printf 'fixture_geometry=%s\n' "$FIXTURE_GEOMETRY" >> "$GITHUB_OUTPUT"
 
       - name: Capture deterministic code geometry ledger
         id: geometry
@@ -245,6 +250,8 @@ jobs:
           fixture_spec=${{ steps.fingerprint.outputs.fixture_spec }}
           fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
           fixture_fingerprint_schema=blake3-256-symthaea-hdc-linear-code-v1
+          fixture_geometry_schema=linear-code-geometry-v1
+          fixture_geometry=${{ steps.fingerprint.outputs.fixture_geometry }}
           work_ledger_schema=linear-code-work-v1
           scaling_ledger_schema=linear-code-scaling-v1
           scaling_ledger_status=${{ steps.scaling.outcome }}
