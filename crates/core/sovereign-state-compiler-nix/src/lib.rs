@@ -83,7 +83,7 @@ pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
 /// * `applications.install`: list of logical artifact/package identifiers
 /// * `applications.remove`: list of logical package identifiers
 /// * `system.reboot`: boolean
-/// /// * `nixos.rollback`: boolean; `true` requires `nixos.rollback-generation`
+/// * `nixos.rollback`: boolean; `true` requires `nixos.rollback-generation`
 /// * `nixos.rollback-generation`: non-negative generation number
 ///
 /// Unknown properties are rejected rather than silently ignored.
@@ -426,7 +426,7 @@ impl TargetAdapter for NixOSTargetAdapter {
         );
 
         let verification = VerificationPolicy {
-            required_properties: intent.desired_state.properties.keys().cloned().collect(),
+            expected_state: intent.desired_state.clone(),
             require_attestation: false,
         };
 
