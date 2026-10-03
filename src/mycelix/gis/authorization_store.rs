@@ -9,7 +9,10 @@
 //! Indeterminate and requires explicit reconciliation.
 
 use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use chrono::{DateTime, SecondsFormat, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
+use sha2::{Digest, Sha256};
 use url::Url;
 
 use super::{
@@ -86,6 +89,90 @@ pub enum ProviderEvidenceKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderVerificationPurpose {
     TerminalOutcome,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AuthorizationClockPolicy {
+    pub max_age_seconds: u64,
+    pub allowed_skew_seconds: u64,
+    pub require_expiry: bool,
+}
+
+impl Default for AuthorizationClockPolicy {
+    fn default() -> Self {
+        Self {
+            max_age_seconds: 48 * 60 * 60,
+            allowed_skew_seconds: 5 * 60,
+            require_expiry: true,
+        }
+    }
+}
+
+impl AuthorizationClockPolicy {
+    fn digest(&self) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"symthaea:gis:authorization-clock-policy:v1\n");
+        hasher.update(self.max_age_seconds.to_be_bytes());
+        hasher.update(self.allowed_skew_seconds.to_be_bytes());
+        hasher.update([self.require_expiry as u8]);
+        format!("sha256:{}", hex::encode(hasher.finalize()))
+    }
+
+    fn validate(
+        &self,
+        issued_at: &str,
+        expires_at: Option<&str>,
+        now: DateTime<Utc>,
+    ) -> Result<(String, Option<String>), AuthorizationStoreError> {
+        let issued = DateTime::parse_from_rfc3339(issued_at)
+            .map_err(|_| AuthorizationConsumptionError::AuthorizationValidityWindowFailed)?
+            .with_timezone(&Utc);
+
+        let expiry = match expires_at {
+            Some(value) => Some(
+                DateTime::parse_from_rfc3339(value)
+                    .map_err(|_| AuthorizationConsumptionError::AuthorizationValidityWindowFailed)?
+                    .with_timezone(&Utc),
+            ),
+            None if self.require_expiry => {
+                return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+            }
+            None => None,
+        };
+
+        let skew = Duration::from_secs(self.allowed_skew_seconds);
+        if issued > now + skew
+            || now > issued + Duration::from_secs(self.max_age_seconds) + skew
+        {
+            return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+        }
+
+        if let Some(expiry) = expiry {
+            if expiry <= issued || now > expiry + skew {
+                return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+            }
+            if expiry > issued + Duration::from_secs(self.max_age_seconds) {
+                return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+            }
+        }
+
+        let normalize = |value: DateTime<Utc>| {
+            value.to_rfc3339_opts(SecondsFormat::Secs, true)
+        };
+        Ok((normalize(issued), expiry.map(normalize)))
+    }
+}
+
+fn trusted_utc_now() -> Result<DateTime<Utc>, AuthorizationStoreError> {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| AuthorizationStoreError::InvalidState(
+            "system clock is before UNIX epoch".into(),
+        ))?;
+    DateTime::<Utc>::from_timestamp(duration.as_secs() as i64, duration.subsec_nanos())
+        .ok_or_else(|| AuthorizationStoreError::InvalidState(
+            "system clock timestamp is out of range".into(),
+        ))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -206,6 +293,7 @@ impl DurableDispatchRecord {
 pub struct SqliteAuthorizationStore {
     path: PathBuf,
     relying_party_id: String,
+    clock_policy: AuthorizationClockPolicy,
 }
 
 impl SqliteAuthorizationStore {
@@ -220,6 +308,18 @@ impl SqliteAuthorizationStore {
         path: impl AsRef<Path>,
         relying_party_id: impl Into<String>,
     ) -> Result<Self, AuthorizationStoreError> {
+        Self::open_with_relying_party_and_clock_policy(
+            path,
+            relying_party_id,
+            AuthorizationClockPolicy::default(),
+        )
+    }
+
+    pub fn open_with_relying_party_and_clock_policy(
+        path: impl AsRef<Path>,
+        relying_party_id: impl Into<String>,
+        clock_policy: AuthorizationClockPolicy,
+    ) -> Result<Self, AuthorizationStoreError> {
         let path = path.as_ref().to_path_buf();
         let relying_party_id = relying_party_id.into();
         if relying_party_id.is_empty() {
@@ -231,7 +331,7 @@ impl SqliteAuthorizationStore {
             std::fs::create_dir_all(parent)
                 .map_err(|e| AuthorizationStoreError::InvalidState(e.to_string()))?;
         }
-        let store = Self { path, relying_party_id };
+        let store = Self { path, relying_party_id, clock_policy };
         let mut connection = store.connection()?;
         connection.execute_batch(
             "PRAGMA journal_mode=WAL;
@@ -262,7 +362,10 @@ impl SqliteAuthorizationStore {
                remaining_executions INTEGER NOT NULL,
                state TEXT NOT NULL,
                attempt_id TEXT,
-               boundary_id TEXT
+               boundary_id TEXT,
+               validity_issued_at TEXT,
+               validity_expires_at TEXT,
+               validity_policy_digest TEXT
              );
              CREATE TABLE IF NOT EXISTS authorization_receipts (
                authorization_instance TEXT NOT NULL,
@@ -320,6 +423,9 @@ impl SqliteAuthorizationStore {
                native_replay_derivation_digest TEXT,
                native_authority_pin_set_id TEXT,
                native_authority_pin_set_digest TEXT,
+               validity_issued_at TEXT,
+               validity_expires_at TEXT,
+               validity_policy_digest TEXT,
                relying_party_id TEXT,
                action_id TEXT NOT NULL,
                action_digest TEXT NOT NULL,
@@ -333,6 +439,9 @@ impl SqliteAuthorizationStore {
              );",
         )?;
         ensure_column(&mut connection, "authorization_leases", "boundary_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_leases", "validity_issued_at", "TEXT")?;
+        ensure_column(&mut connection, "authorization_leases", "validity_expires_at", "TEXT")?;
+        ensure_column(&mut connection, "authorization_leases", "validity_policy_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_namespace", "TEXT")?;
@@ -340,6 +449,9 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_dispatches", "native_replay_derivation_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "validity_issued_at", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "validity_expires_at", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "validity_policy_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
@@ -348,6 +460,9 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_derivation_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "validity_issued_at", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "validity_expires_at", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "validity_policy_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
@@ -372,6 +487,29 @@ impl SqliteAuthorizationStore {
         )?;
 
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let clock_policy_digest = store.clock_policy.digest();
+        let configured_policy: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata WHERE key='authorization_clock_policy_digest'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match configured_policy {
+            Some(existing) if existing != clock_policy_digest => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "authorization clock policy mismatch: store is pinned to {existing}"
+                )));
+            }
+            Some(_) => {}
+            None => {
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value) VALUES('authorization_clock_policy_digest',?1)",
+                    params![clock_policy_digest.as_str()],
+                )?;
+            }
+        }
+
         let configured: Option<String> = tx
             .query_row(
                 "SELECT value FROM authorization_store_metadata WHERE key='relying_party_id'",
