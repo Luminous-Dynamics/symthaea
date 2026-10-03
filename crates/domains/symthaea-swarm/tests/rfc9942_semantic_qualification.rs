@@ -183,3 +183,24 @@ fn rfc9162_inclusion_and_consistency_path_bounds_are_tree_size_derived() {
     assert!(Rfc9162ConsistencyProof::from_cbor(&max_consistency).is_ok());
 }
 
+
+#[test]
+fn cose_extension_values_accept_well_formed_simple_items_and_round_trip_exactly() {
+    for value in [&[0xe0][..], &[0xf3][..], &[0xf8, 0x20][..]] {
+        let mut protected = Vec::new();
+        protected.extend_from_slice(&[0xa1, 0x07]);
+        protected.extend_from_slice(value);
+
+        let mut encoded = Vec::new();
+        encoded.extend_from_slice(&[0xd2, 0x84]);
+        encoded.push(0x43);
+        encoded.extend_from_slice(&protected);
+        encoded.push(0xa0);
+        encoded.push(0xf6);
+        encoded.extend_from_slice(&[0x41, 0xaa]);
+
+        let decoded = Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+            .expect("well-formed generic COSE header value must be accepted");
+        assert_eq!(decoded.to_cbor(), encoded);
+    }
+}
