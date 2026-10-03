@@ -304,6 +304,10 @@ pub struct DurableDispatchRecord {
     pub operation_id: String,
     /// Native replay identity derived by the native authorization path.
     pub native_replay_identity: String,
+    /// Frozen native issuer used to select the relying-party pin.
+    pub native_issuer: String,
+    /// Frozen authority namespace resolved from the issuer pin.
+    pub native_authority_namespace: String,
     pub status_identifier: String,
     pub status_source_digest: String,
     pub status_observed_at: String,
@@ -327,6 +331,8 @@ impl DurableDispatchRecord {
         attempt_id: impl Into<String>,
         operation_id: impl Into<String>,
         native_replay_identity: impl Into<String>,
+        native_issuer: impl Into<String>,
+        native_authority_namespace: impl Into<String>,
         action_id: impl Into<String>,
         action_digest: impl Into<String>,
         provider_idempotency_key: impl Into<String>,
@@ -339,6 +345,8 @@ impl DurableDispatchRecord {
             attempt_id: attempt_id.into(),
             operation_id: operation_id.into(),
             native_replay_identity: native_replay_identity.into(),
+            native_issuer: native_issuer.into(),
+            native_authority_namespace: native_authority_namespace.into(),
             status_identifier: status.status_identifier.clone(),
             status_source_digest: status.status_source_digest.clone(),
             status_observed_at: status.status_observed_at.clone(),
@@ -1365,6 +1373,8 @@ fn validate_native_authority_pin_set(
             attempt_id,
             operation_id,
             native_replay_identity,
+            native_issuer,
+            &native_replay_provenance.authority_namespace,
             &action.id,
             &expected_digest,
             &lease
@@ -1439,8 +1449,8 @@ fn validate_native_authority_pin_set(
         let pre_entry_status = status_verifier
             .verify_current_status(
                 ProviderStatusVerificationPurpose::PreEntry,
-                "",
-                "",
+                &record.native_issuer,
+                &record.native_authority_namespace,
                 &record.native_replay_identity,
                 &record.status_identifier,
                 &record.action_digest,
@@ -1455,6 +1465,9 @@ fn validate_native_authority_pin_set(
             Some(&record.status_source_digest),
             true,
         )?;
+        if pre_entry_status.status_identifier != record.status_identifier {
+            return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+        }
 
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
