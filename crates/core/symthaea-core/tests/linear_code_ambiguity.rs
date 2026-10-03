@@ -3,9 +3,21 @@ use symthaea_core::hdc::linear_code::{
     recover_independent_bound, recover_linear_bound, solve_linear_combination,
 };
 
+const CANONICAL_FIXTURE_DIMENSION: usize = 96;
+const CANONICAL_FIXTURE_RANK: usize = 8;
+const CANONICAL_FIXTURE_SEED: u64 = 0xC0DE;
+
+
 #[test]
 fn canonical_fixture_fingerprint_is_emitted() {
-    let code = RandomLinearCode::generate(96, 8, 0xC0DE);
+    let code = RandomLinearCode::generate(
+        CANONICAL_FIXTURE_DIMENSION,
+        CANONICAL_FIXTURE_RANK,
+        CANONICAL_FIXTURE_SEED,
+    );
+    println!(
+        "FIXTURE_SPEC=dimension={CANONICAL_FIXTURE_DIMENSION};rank={CANONICAL_FIXTURE_RANK};seed=0x{CANONICAL_FIXTURE_SEED:X}"
+    );
     let fingerprint = code
         .fingerprint()
         .iter()
