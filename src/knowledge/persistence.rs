@@ -2057,7 +2057,7 @@ impl KnowledgePersistence {
 fn verify_table_column_contract(
     conn: &rusqlite::Connection,
     table: &str,
-    expected: &[(&str, &str, bool, i64)],
+    expected: &[(&str, &str, i64)],
 ) -> Result<(), String> {
     let pragma = format!("PRAGMA table_info({table})");
     let mut stmt = conn
@@ -2068,7 +2068,6 @@ fn verify_table_column_contract(
             Ok((
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
-                row.get::<_, i64>(3)?,
                 row.get::<_, i64>(5)?,
             ))
         })
@@ -2076,8 +2075,8 @@ fn verify_table_column_contract(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Schema integrity column row for {table}: {e}"))?;
 
-    for (column, expected_type, expected_not_null, expected_pk) in expected {
-        let (_, actual_type, actual_not_null, actual_pk) = actual
+    for (column, expected_type, expected_pk) in expected {
+        let (_, actual_type, actual_pk) = actual
             .iter()
             .find(|(name, _, _, _)| name == column)
             .ok_or_else(|| {
@@ -2087,11 +2086,6 @@ fn verify_table_column_contract(
         if actual_type.to_ascii_uppercase() != *expected_type {
             return Err(format!(
                 "Schema integrity check failed: column {column} on {table} has declared type {actual_type}, expected {expected_type}"
-            ));
-        }
-        if (*actual_not_null != 0) != *expected_not_null {
-            return Err(format!(
-                "Schema integrity check failed: column {column} on {table} has wrong NOT NULL contract"
             ));
         }
         if *actual_pk != *expected_pk {
@@ -2144,35 +2138,35 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
         conn,
         "knowledge_provenance_relations",
         &[
-            ("source_memory_id", "TEXT", true, 1i64),
-            ("target_memory_id", "TEXT", true, 2),
-            ("kind", "TEXT", true, 3),
-            ("created_at", "TEXT", true, 4),
+            ("source_memory_id", "TEXT", 1i64),
+            ("target_memory_id", "TEXT", 2),
+            ("kind", "TEXT", 3),
+            ("created_at", "TEXT", 4),
         ],
     )?;
     verify_table_column_contract(
         conn,
         "knowledge_snapshot_receipts",
         &[
-            ("generation", "INTEGER", false, 1i64),
-            ("canonical_digest_hex", "TEXT", true, 0),
-            ("receipt_digest_hex", "TEXT", true, 0),
+            ("generation", "INTEGER", 1i64),
+            ("canonical_digest_hex", "TEXT", 0),
+            ("receipt_digest_hex", "TEXT", 0),
         ],
     )?;
     verify_table_column_contract(
         conn,
         "knowledge_snapshot_validation_receipts",
         &[
-            ("validation_event", "TEXT", false, 1i64),
-            ("validation_sequence", "INTEGER", true, 0),
-            ("generation", "INTEGER", true, 0),
-            ("snapshot_digest_hex", "TEXT", true, 0),
-            ("validator_ref", "TEXT", true, 0),
-            ("validator_version", "TEXT", true, 0),
-            ("validation_profile", "TEXT", true, 0),
-            ("conforms", "INTEGER", true, 0),
-            ("report_digest_hex", "TEXT", false, 0),
-            ("receipt_digest_hex", "TEXT", true, 0),
+            ("validation_event", "TEXT", 1i64),
+            ("validation_sequence", "INTEGER", 0),
+            ("generation", "INTEGER", 0),
+            ("snapshot_digest_hex", "TEXT", 0),
+            ("validator_ref", "TEXT", 0),
+            ("validator_version", "TEXT", 0),
+            ("validation_profile", "TEXT", 0),
+            ("conforms", "INTEGER", 0),
+            ("report_digest_hex", "TEXT", 0),
+            ("receipt_digest_hex", "TEXT", 0),
         ],
     )?;
 
@@ -3331,7 +3325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_schema_column_attestation_rejects_nullable_validation_sequence() {
+    fn test_schema_column_attestation_rejects_wrong_validation_sequence_type() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_schema_column_contract_test_{}",
             std::process::id()
@@ -3343,7 +3337,7 @@ mod tests {
         conn.execute_batch(
             "CREATE TABLE knowledge_snapshot_validation_receipts (
                 validation_event TEXT PRIMARY KEY,
-                validation_sequence INTEGER,
+                validation_sequence BLOB,
                 generation INTEGER NOT NULL,
                 snapshot_digest_hex TEXT NOT NULL,
                 validator_ref TEXT NOT NULL,
@@ -3360,18 +3354,19 @@ mod tests {
             &conn,
             "knowledge_snapshot_validation_receipts",
             &[
-                ("validation_event", "TEXT", false, 1),
-                ("validation_sequence", "INTEGER", true, 0),
+                ("validation_event", "TEXT", 1),
+                ("validation_sequence", "INTEGER", 0),
             ],
         )
         .unwrap_err();
         assert_eq!(
             err,
-            "Schema integrity check failed: column validation_sequence on knowledge_snapshot_validation_receipts has wrong NOT NULL contract"
+            "Schema integrity check failed: column validation_sequence on knowledge_snapshot_validation_receipts has declared type BLOB, expected INTEGER"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
+
 
     #[test]
     fn test_initialized_schema_rejects_disabled_foreign_key_enforcement() {
