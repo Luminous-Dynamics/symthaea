@@ -144,3 +144,18 @@ A future Mycelix implementation can bind these records to signed lifecycle event
 **An older authority decision must never regain current authority merely because its signature or validity interval remains acceptable.**
 
 Currentness is a lifecycle property, not merely a validity-window property.
+
+
+## Downstream audit identity
+
+A resolved decision exposes three stable identifiers for downstream evidence chaining:
+
+- the resolution ID;
+- the monotonic resolution epoch; and
+- the authority statement digest.
+
+These are deliberately distinct. The resolution ID names the lifecycle decision, the epoch establishes its position in the authority-decision history, and the statement digest identifies the exact authority statement.
+
+A downstream evidence envelope can therefore reference the decision without copying or reinterpreting the authority statement itself.
+
+The contract still does not calculate or cryptographically verify that digest. It treats the digest as an authoritative-layer identity claim and leaves verification to the trust/provenance system.
