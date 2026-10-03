@@ -43,6 +43,8 @@ LEGACY_SERVICE_CONSTRUCTOR_PATTERN='\bServiceManager::(start|stop|restart|reload
 LEGACY_SERVICE_RENDERER_PATTERN='\bServiceManager::render_legacy_command[[:space:]]*\('
 REVERSE_SERVICE_CONVERSION_PATTERN='impl[[:space:]]+(TryFrom|From)<[^>]*NixOSCommand[^>]*>[[:space:]]+for[[:space:]]+NixServiceOperationV1'
 IMPLICIT_SERVICE_RESTART_PATTERN='_[[:space:]]*=>[[:space:]]*NixOSCommand::Custom[[:space:]]*\{[[:space:]]*command:[[:space:]]*["\x27]systemctl["\x27]'
+VALIDATED_OPERATION_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceOperationV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceOperationV1\b'
+OBSERVED_STATE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceObservedStateV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceObservedStateV1\b'
 
 scan_diagnostic_boundary() {
   local file="$1"
@@ -138,12 +140,12 @@ run_boundary_check() {
   # through their parsing/validation boundaries. Their closed leaf enums may
   # deserialize, but the aggregates must not: deserializing them would bypass
   # canonicalization, identity checks, or observation provenance.
-  if matches="$(rg -n --pcre2 'Deserialize[^\\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\\n]*Deserialize' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
+  if matches="$(rg -U -n --pcre2 "${VALIDATED_OPERATION_DESERIALIZATION_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_domain.rs"; then
     echo "ERROR: validated NixServiceOperationV1 must not deserialize around its constructor" >&2
     echo "${matches}" >&2
     failed=1
   fi
-  if matches="$(rg -n --pcre2 'Deserialize[^\\n]*\\bNixServiceObservedStateV1\\b|NixServiceObservedStateV1[^\\n]*Deserialize' "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
+  if matches="$(rg -U -n --pcre2 "${OBSERVED_STATE_DESERIALIZATION_PATTERN}" '${ROOT}/crates/core/nixward/src/action/service_state.rs"; then
     echo "ERROR: NixServiceObservedStateV1 must not deserialize around its observation boundary" >&2
     echo "${matches}" >&2
     failed=1
@@ -237,24 +239,48 @@ run_self_test() {
     return 1
   fi
 
-  # The validated aggregate must be rejected, while the closed enum remains
+  # The validated aggregates must be rejected, while the closed enum remains
   # permitted to deserialize. This prevents the fence itself from regressing
   # into an over-broad "no Deserialize in service_domain.rs" rule.
-  printf '%s\n' '#[derive(Deserialize)] struct NixServiceOperationV1;' > "${tmp}/aggregate-deserialize.rs"
-  if rg -n --pcre2 'Deserialize[^\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\n]*Deserialize' "${tmp}/aggregate-deserialize.rs"; then :; else
-    echo "ERROR: CROSS-022 self-test failed to detect aggregate deserialization" >&2
+  printf '%s\n' 
+}
+
+run_self_test
+run_boundary_check
+echo "CROSS-015: Nixward governed observation boundary is clean."
+#[derive(\n    Debug,\n    Deserialize,\n)]\npub struct NixServiceOperationV1;' > "${tmp}/aggregate-deserialize.rs"
+  if rg -U -n --pcre2 "${VALIDATED_OPERATION_DESERIALIZATION_PATTERN}" "${tmp}/aggregate-deserialize.rs"; then :; else
+    echo "ERROR: CROSS-022 self-test failed to detect multiline aggregate deserialization" >&2
     return 1
   fi
 
-  printf '%s\n' '#[derive(Deserialize)] enum NixServiceOperationKindV1 { Start }' > "${tmp}/enum-deserialize.rs"
-  if rg -n --pcre2 'Deserialize[^\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\n]*Deserialize' "${tmp}/enum-deserialize.rs"; then
+  printf '%s\n' 
+}
+
+run_self_test
+run_boundary_check
+echo "CROSS-015: Nixward governed observation boundary is clean."
+#[derive(\n    Deserialize,\n)]\nenum NixServiceOperationKindV1 { Start }' > "${tmp}/enum-deserialize.rs"
+  if rg -U -n --pcre2 "${VALIDATED_OPERATION_DESERIALIZATION_PATTERN}" "${tmp}/enum-deserialize.rs"; then
     echo "ERROR: CROSS-022 self-test falsely rejected closed operation enum deserialization" >&2
     return 1
   fi
 
-  printf '%s\n' '#[derive(Deserialize)] struct NixServiceObservedStateV1;' > "${tmp}/observed-state-deserialize.rs"
-  if rg -n --pcre2 'Deserialize[^\n]*\\bNixServiceObservedStateV1\\b|NixServiceObservedStateV1[^\n]*Deserialize' "${tmp}/observed-state-deserialize.rs"; then :; else
-    echo "ERROR: CROSS-022 self-test failed to detect observed-state deserialization" >&2
+  printf '%s\n' 
+}
+
+run_self_test
+run_boundary_check
+echo "CROSS-015: Nixward governed observation boundary is clean."
+#[derive(\n    Debug,\n    Deserialize,\n)]\npub struct NixServiceObservedStateV1;' > "${tmp}/observed-state-deserialize.rs"
+  if rg -U -n --pcre2 "${OBSERVED_STATE_DESERIALIZATION_PATTERN}" "${tmp}/observed-state-deserialize.rs"; then :; else
+    echo "ERROR: CROSS-022 self-test failed to detect multiline observed-state deserialization" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'impl Deserialize for NixServiceOperationV1 { }' > "${tmp}/aggregate-custom-deserialize.rs"
+  if rg -U -n --pcre2 "${VALIDATED_OPERATION_DESERIALIZATION_PATTERN}" "${tmp}/aggregate-custom-deserialize.rs"; then :; else
+    echo "ERROR: CROSS-022 self-test failed to detect custom aggregate deserialization" >&2
     return 1
   fi
 }
