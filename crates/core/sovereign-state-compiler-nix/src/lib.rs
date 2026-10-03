@@ -24,6 +24,18 @@ const REMOVE_KEY: &str = "applications.remove";
 const REBOOT_KEY: &str = "system.reboot";
 const ROLLBACK_KEY: &str = "nixos.rollback";
 const ROLLBACK_GENERATION_KEY: &str = "nixos.rollback-generation";
+pub const NIXOS_GENERATION_RESOURCE_KIND: &str = "nixos-generation";
+
+/// Construct the resource identity used to bind a rollback to a specific
+/// observed NixOS generation.
+pub fn nixos_generation_resource(generation: u64) -> sovereign_state_compiler::ResourceRef {
+    sovereign_state_compiler::ResourceRef {
+        kind: NIXOS_GENERATION_RESOURCE_KIND.into(),
+        identity: sovereign_state_compiler::ContentDigest::blake3(
+            generation.to_string().as_bytes(),
+        ),
+    }
+}
 
 /// Concrete NixOS activation semantics carried by the target adapter.
 ///
@@ -84,7 +96,7 @@ pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
 /// * `applications.remove`: list of logical package identifiers
 /// * `system.reboot`: boolean
 /// * `nixos.rollback`: boolean; `true` requires `nixos.rollback-generation`
-/// * `nixos.rollback-generation`: non-negative generation number
+/// * `nixos.rollback-generation`: positive generation number, explicitly bound in `required_resources`
 ///
 /// Unknown properties are rejected rather than silently ignored.
 #[derive(Debug, Clone)]
@@ -178,8 +190,11 @@ impl NixOSTargetAdapter {
     ) -> Result<Option<u64>, NixOSAdapterError> {
         match intent.desired_state.properties.get(key) {
             None => Ok(None),
-            Some(sovereign_state_compiler::StateValue::Integer(value)) if *value >= 0 => {
+            Some(sovereign_state_compiler::StateValue::Integer(value)) if *value > 0 => {
                 Ok(Some(*value as u64))
+            }
+            Some(sovereign_state_compiler::StateValue::Integer(_)) => {
+                Err(NixOSAdapterError::InvalidRollbackGeneration)
             }
             Some(_) => Err(NixOSAdapterError::PropertyType {
                 key,
@@ -293,6 +308,13 @@ impl TargetAdapter for NixOSTargetAdapter {
             (None, Some(generation)) => Some(NixActivationMode::Rollback { generation }),
             (None, None) => None,
         };
+
+        if let Some(NixActivationMode::Rollback { generation }) = activation_mode {
+            let required_resource = nixos_generation_resource(generation);
+            if !intent.required_resources.contains(&required_resource) {
+                return Err(NixOSAdapterError::UnboundRollbackGeneration(generation));
+            }
+        }
 
         if matches!(activation_mode, Some(NixActivationMode::Rollback { .. }))
             && (!install.is_empty() || !remove.is_empty() || home_manager)
@@ -488,8 +510,12 @@ pub enum NixOSAdapterError {
     EmptyListItem { key: &'static str },
     #[error("unsupported nixos.rebuild mode: {0}")]
     InvalidRebuildMode(String),
-    #[error("nixos.rollback=true requires a non-negative nixos.rollback-generation")]
+    #[error("nixos.rollback=true requires a positive nixos.rollback-generation")]
     RollbackGenerationRequired,
+    #[error("nixos.rollback-generation must be greater than zero")]
+    InvalidRollbackGeneration,
+    #[error("rollback generation {0} is not bound to an observed NixOS generation resource")]
+    UnboundRollbackGeneration(u64),
     #[error("NixOS activation modes cannot be combined in one intent")]
     ConflictingActivationModes,
     #[error("compiled plan violates neutral compiler invariants: {0}")]
@@ -707,6 +733,54 @@ mod tests {
     }
 
     #[test]
+    fn rollback_generation_resource_identity_is_deterministic() {
+        assert_eq!(
+            nixos_generation_resource(42),
+            nixos_generation_resource(42)
+        );
+        assert_ne!(
+            nixos_generation_resource(42),
+            nixos_generation_resource(43)
+        );
+    }
+
+    #[test]
+    fn rollback_requires_observed_generation_binding() {
+        let mut intent = DeploymentIntent::new("rollback-bound-1", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_KEY.into(), StateValue::Bool(true));
+        intent.desired_state.properties.insert(
+            ROLLBACK_GENERATION_KEY.into(),
+            StateValue::Integer(42),
+        );
+
+        assert_eq!(
+            adapter().compile(&intent),
+            Err(NixOSAdapterError::UnboundRollbackGeneration(42))
+        );
+    }
+
+    #[test]
+    fn rollback_rejects_generation_zero() {
+        let mut intent = DeploymentIntent::new("rollback-zero", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_KEY.into(), StateValue::Bool(true));
+        intent.desired_state.properties.insert(
+            ROLLBACK_GENERATION_KEY.into(),
+            StateValue::Integer(0),
+        );
+
+        assert_eq!(
+            adapter().compile(&intent),
+            Err(NixOSAdapterError::InvalidRollbackGeneration)
+        );
+    }
+
+    #[test]
     fn rollback_is_a_typed_activation_mode() {
         let mut intent = DeploymentIntent::new("rollback-mode-1", "host-01");
         intent
@@ -717,6 +791,7 @@ mod tests {
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(7),
         );
+        intent.required_resources.insert(nixos_generation_resource(7));
 
         let mode = NixActivationMode::Rollback { generation: 7 };
         assert_eq!(mode, NixActivationMode::Rollback { generation: 7 });
@@ -739,6 +814,7 @@ mod tests {
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(7),
         );
+        intent.required_resources.insert(nixos_generation_resource(7));
 
         assert_eq!(
             adapter().compile(&intent),
@@ -757,6 +833,7 @@ mod tests {
             ROLLBACK_GENERATION_KEY.into(),
             StateValue::Integer(42),
         );
+        intent.required_resources.insert(nixos_generation_resource(42));
 
         let plan = adapter().compile(&intent).expect("compile");
         assert!(plan.steps.iter().any(|step| {
