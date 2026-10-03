@@ -293,6 +293,7 @@ The branch is ready for a benchmark-producing Stage-C/Stage-D experiment only wh
 - every generated code is full-rank and reproducible from the recorded seed, `ChaCha12Rng` algorithm, dependency lock, and revision;
 - two-factor and three-factor clean recovery match exhaustive truth;
 - overlap/dependence is classified as non-unique or rejected rather than mislabeled as exact recovery;
+- bounded exhaustive overlap fixtures verify recovery existence against the independent factor-pair truth oracle, not merely successful reconstruction of selected targets;
 - corrupted targets have explicit in-span/out-of-span classification;
 - the resonator control uses a separately validated, representation-matched fixture;
 - evidence records representation family, factor count, code ranks, seed, corruption model, and revision.
