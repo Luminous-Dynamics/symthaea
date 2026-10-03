@@ -253,6 +253,9 @@ pub struct NixServiceObservedStateV1 {
     unit: String,
     /// The canonical systemd Unit identity returned in `Id`.
     resolved_id: String,
+    /// Canonicalized names bound to the unit at observation time.
+    /// Sorted deterministically because systemd exposes aliases as a set.
+    observed_names: Vec<String>,
     load_state: ServiceLoadStateV1,
     active_state: ServiceActiveStateV1,
     unit_file_state: ServiceUnitFileStateV1,
@@ -273,6 +276,7 @@ impl NixServiceObservedStateV1 {
 
         Ok(Self {
             resolved_id: unit.clone(),
+            observed_names: vec![unit.clone()],
             unit,
             load_state,
             active_state,
@@ -327,6 +331,7 @@ impl NixServiceObservedStateV1 {
         let observed_names = observed_names.ok_or(NixServiceStateErrorV1::MissingNames)?;
         let observed_id = canonical_service_unit(observed_id)
             .map_err(|_| NixServiceStateErrorV1::InvalidObservedUnitIdentity)?;
+        let observed_names = normalize_observed_names(&observed_names)?;
         validate_observed_identity(&requested_unit, &observed_id, &observed_names)?;
 
         let mut state = Self::new(
@@ -337,6 +342,7 @@ impl NixServiceObservedStateV1 {
             sub_state.ok_or(NixServiceStateErrorV1::MissingSubState)?,
         )?;
         state.resolved_id = observed_id;
+        state.observed_names = observed_names;
         Ok(state)
     }
 
@@ -385,6 +391,7 @@ impl NixServiceObservedStateV1 {
         let observed_names = observed_names.ok_or(NixServiceStateErrorV1::MissingNames)?;
         let observed_id = canonical_service_unit(observed_id)
             .map_err(|_| NixServiceStateErrorV1::InvalidObservedUnitIdentity)?;
+        let observed_names = normalize_observed_names(&observed_names)?;
         validate_observed_identity(&requested_unit, &observed_id, &observed_names)?;
 
         let mut state = Self::new(
@@ -395,6 +402,7 @@ impl NixServiceObservedStateV1 {
             sub_state.ok_or(NixServiceStateErrorV1::MissingSubState)?,
         )?;
         state.resolved_id = observed_id;
+        state.observed_names = observed_names;
 
         let capabilities = NixServiceOperationCapabilitiesV1::from_observed_state(
             &state,
@@ -438,6 +446,11 @@ impl NixServiceObservedStateV1 {
         if canonical_resolved != self.resolved_id {
             return Err(NixServiceStateErrorV1::InvalidObservedUnitIdentity);
         }
+        let canonical_names = normalize_observed_names_from_vec(&self.observed_names)?;
+        if canonical_names != self.observed_names {
+            return Err(NixServiceStateErrorV1::InvalidObservedUnitIdentity);
+        }
+        validate_observed_identity_set(&self.unit, &self.resolved_id, &self.observed_names)?;
         validate_sub_state(&self.sub_state)
     }
 
@@ -448,6 +461,10 @@ impl NixServiceObservedStateV1 {
         hasher.update(SERVICE_STATE_DOMAIN_V1);
         write_len_prefixed(&mut hasher, self.unit.as_bytes());
         write_len_prefixed(&mut hasher, self.resolved_id.as_bytes());
+        write_len_prefixed(&mut hasher, &(self.observed_names.len() as u64).to_be_bytes());
+        for name in &self.observed_names {
+            write_len_prefixed(&mut hasher, name.as_bytes());
+        }
         hasher.update(&[self.load_state.discriminant()]);
         hasher.update(&[self.active_state.discriminant()]);
         hasher.update(&[self.unit_file_state.discriminant()]);
@@ -468,20 +485,50 @@ fn canonical_service_unit(unit: String) -> Result<String, NixServiceStateErrorV1
 fn validate_observed_identity(
     requested_unit: &str,
     observed_id: &str,
-    observed_names: &str,
+    observed_names: &[String],
 ) -> Result<(), NixServiceStateErrorV1> {
-    let requested_present = observed_names
-        .split_whitespace()
-        .any(|name| name == requested_unit);
-    let id_present = observed_names
-        .split_whitespace()
-        .any(|name| name == observed_id);
+    validate_observed_identity_set(requested_unit, observed_id, observed_names)
+}
+
+fn validate_observed_identity_set(
+    requested_unit: &str,
+    observed_id: &str,
+    observed_names: &[String],
+) -> Result<(), NixServiceStateErrorV1> {
+    let requested_present = observed_names.iter().any(|name| name == requested_unit);
+    let id_present = observed_names.iter().any(|name| name == observed_id);
 
     if requested_present && id_present {
         Ok(())
     } else {
         Err(NixServiceStateErrorV1::IdentityMismatch)
     }
+}
+
+fn normalize_observed_names(raw: &str) -> Result<Vec<String>, NixServiceStateErrorV1> {
+    let mut names = raw
+        .split_whitespace()
+        .map(|name| {
+            canonical_service_unit(name.to_string())
+                .map_err(|_| NixServiceStateErrorV1::InvalidObservedUnitIdentity)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    normalize_observed_names_from_vec(&mut names)
+}
+
+fn normalize_observed_names_from_vec(
+    names: &[String],
+) -> Result<Vec<String>, NixServiceStateErrorV1> {
+    if names.is_empty() {
+        return Err(NixServiceStateErrorV1::MissingNames);
+    }
+
+    let mut canonical = names.to_vec();
+    canonical.sort();
+    if canonical.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(NixServiceStateErrorV1::DuplicateObservedName);
+    }
+    Ok(canonical)
 }
 
 fn parse_yes_no(value: &str) -> Result<bool, NixServiceStateErrorV1> {
@@ -537,6 +584,8 @@ pub enum NixServiceStateErrorV1 {
     InvalidObservedUnitIdentity,
     #[error("required systemd Names property is missing")]
     MissingNames,
+    #[error("duplicate observed systemd unit name")]
+    DuplicateObservedName,
     #[error("service unit is not in canonical form")]
     NonCanonicalServiceUnit,
     #[error("service SubState is empty")]
@@ -655,6 +704,99 @@ UnitFileState=enabled
 
         assert_eq!(value.unit(), "dbus-org.freedesktop.network1.service");
         assert_eq!(value.resolved_id(), "systemd-networkd.service");
+    }
+
+    #[test]
+    fn observed_name_order_is_canonicalized_for_digest_stability() {
+        let a = NixServiceObservedStateV1::parse_systemd_observation(
+            "alias.service",
+            "Id=real.service
+Names=real.service alias.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+        )
+        .unwrap()
+        .0;
+        let b = NixServiceObservedStateV1::parse_systemd_observation(
+            "alias.service",
+            "Id=real.service
+Names=alias.service real.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+        )
+        .unwrap()
+        .0;
+
+        assert_eq!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn observed_name_set_changes_pre_state_digest() {
+        let a = NixServiceObservedStateV1::parse_systemd_observation(
+            "alias.service",
+            "Id=real.service
+Names=real.service alias.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+        )
+        .unwrap()
+        .0;
+        let b = NixServiceObservedStateV1::parse_systemd_observation(
+            "alias.service",
+            "Id=real.service
+Names=real.service alias.service second-alias.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+        )
+        .unwrap()
+        .0;
+
+        assert_ne!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn duplicate_observed_names_are_rejected() {
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_observation(
+                "nginx",
+                "Id=nginx.service
+Names=nginx.service nginx.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::DuplicateObservedName
+        );
     }
 
     #[test]
