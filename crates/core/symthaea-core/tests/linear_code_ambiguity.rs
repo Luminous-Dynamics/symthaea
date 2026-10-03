@@ -418,7 +418,8 @@ fn exhaustive_bounded_distance_oracle_separates_detection_from_correction() {
         .filter(|word| word.weight() > 0)
         .map(|word| hamming_distance(word, &BinaryCodeword::zero(16)))
         .min()
-        .expect("non-zero codeword must exist");    assert!(
+        .expect("non-zero codeword must exist");
+    assert!(
         min_distance >= 3,
         "deterministic noise fixture must admit a non-trivial correction radius"
     );
