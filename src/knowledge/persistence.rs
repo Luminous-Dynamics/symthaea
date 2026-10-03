@@ -1134,9 +1134,11 @@ impl KnowledgePersistence {
 
     /// Load all persistence domains from one SQLite read transaction.
     ///
-    /// The returned records are all observed from a single database snapshot.
+    /// The returned records are all observed from a single database snapshot. When a
+    /// committed snapshot receipt exists, the live projection is verified against it
+    /// before records are returned; older databases without receipts remain readable.
     /// This prevents startup restore from combining facts/provenance/causal/ontology
-    /// rows committed by different snapshot generations.
+    /// rows committed by different snapshot generations or silently accepting receipt drift.
     pub fn load_snapshot(&mut self) -> Result<KnowledgePersistenceSnapshot, String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
