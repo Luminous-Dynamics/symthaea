@@ -3870,6 +3870,35 @@ mod tests {
     }
 
     #[test]
+    fn terminal_verifier_configuration_is_write_once() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-verifier-write-once-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-verifier-write-once"
+        ).unwrap();
+        let pinned=ProviderVerifierConfiguration {
+            relying_party_id:"rp-verifier-write-once".into(),
+            verifier_id:"test-verifier/v1".into(),
+            verifier_config_digest:"sha256:test-verifier-config".into(),
+            trust_anchor_digest:"sha256:test-trust-anchors".into(),
+            evidence_profile_digest:"sha256:test-evidence-profile".into(),
+        };
+        store.pin_provider_evidence_verifier_configuration(&pinned).unwrap();
+        store.pin_provider_evidence_verifier_configuration(&pinned).unwrap();
+
+        let changed=ProviderVerifierConfiguration {
+            verifier_config_digest:"sha256:changed-config".into(),
+            ..pinned.clone()
+        };
+        assert!(matches!(
+            store.pin_provider_evidence_verifier_configuration(&changed),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn terminal_verifier_configuration_mismatch_is_rejected() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-verifier-config-mismatch-{}.db",std::process::id()
