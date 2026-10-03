@@ -1979,7 +1979,7 @@ mod tests {
     }
 
     #[test]
-    fn btree_state_serializes_deterministically {
+    fn btree_state_serializes_deterministically() {
         let mut intent = DeploymentIntent::new("intent-1", "host-01");
         intent
             .desired_state
