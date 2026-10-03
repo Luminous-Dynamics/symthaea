@@ -246,6 +246,11 @@ impl SqliteAuthorizationStore {
                issuer TEXT PRIMARY KEY,
                authority_namespace TEXT NOT NULL
              );
+             CREATE TABLE IF NOT EXISTS authorization_native_authority_pin_sets (
+               pin_set_id TEXT NOT NULL,
+               pin_set_digest TEXT PRIMARY KEY,
+               snapshot TEXT NOT NULL
+             );
              CREATE TABLE IF NOT EXISTS authorization_leases (
                authorization_instance TEXT PRIMARY KEY,
                action_id TEXT NOT NULL,
@@ -328,12 +333,16 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_dispatches", "native_authority_namespace", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_authorization_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "native_replay_derivation_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_dispatches", "native_authority_pin_set_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_dispatches", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "operation_id", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_identity", "TEXT NOT NULL DEFAULT ''")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_namespace", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_authorization_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "native_replay_derivation_digest", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_terminal_evidence", "native_authority_pin_set_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "relying_party_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
@@ -440,6 +449,83 @@ impl SqliteAuthorizationStore {
             }
         }
         tx.commit()?;
+        Ok(())
+    }
+
+    fn native_authority_pin_set_id(&self) -> String {
+        format!("{}:native-authority-pins:v1", self.relying_party_id)
+    }
+
+    fn persist_native_authority_pin_set_snapshot(
+        &self,
+        tx: &Transaction<'_>,
+    ) -> Result<(String, String), AuthorizationStoreError> {
+        let mut stmt = tx.prepare(
+            "SELECT issuer,authority_namespace
+             FROM authorization_native_authority_pins
+             ORDER BY issuer ASC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        let mut canonical = Vec::with_capacity(64);
+        canonical.extend_from_slice(b"symthaea:gis:native-pin-set:v1\n");
+        for row in rows {
+            let (issuer, namespace) = row?;
+            append_len_prefixed(&mut canonical, issuer.as_bytes());
+            append_len_prefixed(&mut canonical, namespace.as_bytes());
+        }
+
+        let pin_set_id = self.native_authority_pin_set_id();
+        let pin_set_digest = format!("sha256:{}", hex::encode(Sha256::digest(&canonical)));
+        let snapshot = hex::encode(&canonical);
+
+        tx.execute(
+            "INSERT OR IGNORE INTO authorization_native_authority_pin_sets
+             (pin_set_id,pin_set_digest,snapshot)
+             VALUES (?1,?2,?3)",
+            params![pin_set_id.as_str(), pin_set_digest.as_str(), snapshot.as_str()],
+        )?;
+
+        let stored: String = tx.query_row(
+            "SELECT snapshot
+             FROM authorization_native_authority_pin_sets
+             WHERE pin_set_id=?1 AND pin_set_digest=?2",
+            params![pin_set_id.as_str(), pin_set_digest.as_str()],
+            |row| row.get(0),
+        )?;
+        if stored != snapshot {
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+        }
+
+        Ok((pin_set_id, pin_set_digest))
+    }
+
+    fn validate_native_authority_pin_set_snapshot(
+        tx: &Transaction<'_>,
+        pin_set_id: Option<&str>,
+        pin_set_digest: Option<&str>,
+    ) -> Result<(), AuthorizationStoreError> {
+        let (Some(pin_set_id), Some(pin_set_digest)) = (pin_set_id, pin_set_digest) else {
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+        };
+        let snapshot: String = tx.query_row(
+            "SELECT snapshot
+             FROM authorization_native_authority_pin_sets
+             WHERE pin_set_id=?1 AND pin_set_digest=?2",
+            params![pin_set_id, pin_set_digest],
+            |row| row.get(0),
+        ).optional()?
+            .ok_or_else(|| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
+        let canonical = hex::decode(&snapshot)
+            .map_err(|_| AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidNativeReplayProvenance
+            ))?;
+        let derived = format!("sha256:{}", hex::encode(Sha256::digest(&canonical)));
+        if derived != pin_set_digest {
+            return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
+        }
         Ok(())
     }
 
@@ -751,6 +837,9 @@ impl SqliteAuthorizationStore {
         }
 
         lease.mark_dispatch_pending(attempt_id)?;
+        let (native_authority_pin_set_id, native_authority_pin_set_digest) =
+            self.persist_native_authority_pin_set_snapshot(&tx)?;
+
         let record = DurableDispatchRecord::new(
             authorization_instance,
             attempt_id,
@@ -779,14 +868,17 @@ impl SqliteAuthorizationStore {
             "INSERT INTO authorization_dispatches
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
-              relying_party_id,action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,'dispatch_pending')",
+              native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,
+              action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,'dispatch_pending')",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity,
                 native_replay_provenance.authority_namespace.as_str(),
                 native_replay_provenance.native_authorization_id.as_str(),
                 native_replay_provenance.derivation_digest.as_str(),
+                native_authority_pin_set_id.as_str(),
+                native_authority_pin_set_digest.as_str(),
                 self.relying_party_id.as_str(),
                 record.action_id, record.action_digest, record.provider_idempotency_key,
                 record.target_identity, record.audience, record.adapter, record.boundary_id],
