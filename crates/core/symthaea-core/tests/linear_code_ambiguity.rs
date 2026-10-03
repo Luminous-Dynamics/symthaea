@@ -661,6 +661,40 @@ fn overlapping_recovery_is_order_deterministic_but_not_permutation_invariant() {
 }
 
 #[test]
+fn overlapping_recovery_remains_valid_under_basis_reordering() {
+    let parent = RandomLinearCode::generate(12, 6, 0xB515);
+    let left = RandomLinearCode::from_basis(parent.basis()[..4].to_vec()).expect("left subcode");
+    let right =
+        RandomLinearCode::from_basis(parent.basis()[2..6].to_vec()).expect("right subcode");
+
+    let mut left_reordered_basis = left.basis().to_vec();
+    left_reordered_basis.reverse();
+    let left_reordered =
+        RandomLinearCode::from_basis(left_reordered_basis).expect("reordered left basis");
+
+    let mut right_reordered_basis = right.basis().to_vec();
+    right_reordered_basis.reverse();
+    let right_reordered =
+        RandomLinearCode::from_basis(right_reordered_basis).expect("reordered right basis");
+
+    for target in parent.enumerate() {
+        let recovered =
+            recover_linear_bound(&target, &[&left, &right]).expect("original ordering recovers");
+        assert_eq!(recovered.len(), 2);
+        assert!(left.contains(&recovered[0]));
+        assert!(right.contains(&recovered[1]));
+        assert_eq!(recovered[0].bound(&recovered[1]), target);
+
+        let reordered = recover_linear_bound(&target, &[&left_reordered, &right_reordered])
+            .expect("reordered bases recover");
+        assert_eq!(reordered.len(), 2);
+        assert!(left_reordered.contains(&reordered[0]));
+        assert!(right_reordered.contains(&reordered[1]));
+        assert_eq!(reordered[0].bound(&reordered[1]), target);
+    }
+}
+
+#[test]
 fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
     let parent = RandomLinearCode::generate(96, 8, 0x4444);
     let left = RandomLinearCode::from_basis(parent.basis()[..4].to_vec()).expect("left subcode");
