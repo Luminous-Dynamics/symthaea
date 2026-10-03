@@ -99,11 +99,18 @@ impl TargetProfile {
 /// The observation digest is deliberately separate from the platform label:
 /// a disk, boot chain, management enrollment, architecture, or other
 /// target-specific fact can change while the platform name remains the same.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct ResourceRef {
+    pub kind: String,
+    pub identity: ContentDigest,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TargetSnapshot {
     pub profile: TargetProfile,
     pub observed_at_ms: u64,
     pub observation_digest: ContentDigest,
+    pub resources: BTreeSet<ResourceRef>,
 }
 
 impl TargetSnapshot {
@@ -162,6 +169,7 @@ pub struct DeploymentIntent {
     pub artifacts: Vec<ArtifactRef>,
     pub desired_state: DesiredState,
     pub required_capabilities: BTreeSet<Capability>,
+    pub required_resources: BTreeSet<ResourceRef>,
     pub expires_at_ms: Option<u64>,
 }
 
@@ -174,6 +182,7 @@ impl DeploymentIntent {
             artifacts: Vec::new(),
             desired_state: DesiredState::default(),
             required_capabilities: BTreeSet::new(),
+            required_resources: BTreeSet::new(),
             expires_at_ms: None,
         }
     }
@@ -288,6 +297,12 @@ impl DeploymentPlan {
             None,
         )?;
 
+        for resource in &self.intent.required_resources {
+            if !self.target_snapshot.resources.contains(resource) {
+                return Err(PlanValidationError::MissingTargetResource(resource.clone()));
+            }
+        }
+
         if !self.rollback.allowed && self.rollback.max_attempts != 0 {
             return Err(PlanValidationError::RollbackAttemptsWithoutPermission);
         }
@@ -401,6 +416,12 @@ impl AuthorizationEvidence {
             Some(&self.granted_capabilities),
         )?;
 
+        for resource in &plan.intent.required_resources {
+            if !plan.target_snapshot.resources.contains(resource) {
+                return Err(PlanValidationError::MissingTargetResource(resource.clone()));
+            }
+        }
+
         for step in &plan.steps {
             validate_capabilities(
                 &step.required_capabilities,
@@ -467,6 +488,8 @@ pub enum PlanValidationError {
     MissingTargetCapability(Capability),
     #[error("required capability {0:?} is not granted")]
     MissingGrantedCapability(Capability),
+    #[error("required target resource is absent from the observed snapshot")]
+    MissingTargetResource(ResourceRef),
     #[error("plan step sequence is not contiguous from zero")]
     NonContiguousPlanSequence,
     #[error("plan step sequence overflowed")]
@@ -521,6 +544,10 @@ mod tests {
         let mut intent = DeploymentIntent::new("intent-1", "host-01");
         intent.required_capabilities.insert(Capability::ConfigureSystem);
         intent.required_capabilities.insert(Capability::Rollback);
+        intent.required_resources.insert(ResourceRef {
+            kind: "block-device".into(),
+            identity: ContentDigest::blake3(b"disk-serial-123"),
+        });
 
         DeploymentPlan {
             schema_version: SCHEMA_VERSION.into(),
@@ -529,6 +556,12 @@ mod tests {
                 profile: sample_profile(),
                 observed_at_ms: 90,
                 observation_digest: ContentDigest::blake3(b"hardware-observation"),
+                resources: [ResourceRef {
+                    kind: "block-device".into(),
+                    identity: ContentDigest::blake3(b"disk-serial-123"),
+                }]
+                .into_iter()
+                .collect(),
             },
             max_target_snapshot_age_ms: Some(200),
             steps: vec![
