@@ -374,13 +374,8 @@ impl ExecutionLineageV1 {
         }
         validate_git_object_id("source_revision", &self.source_revision)?;
         validate_git_object_id("source_tree", &self.source_tree)?;
-        if self
-            .repository_source_snapshot_id
-            .as_str()
-            != self
-                .repository_source_snapshot_id
-                .as_str()
-                .to_ascii_lowercase()
+        if self.repository_source_snapshot_id.as_str()
+            != self.repository_source_snapshot_id.as_str().to_ascii_lowercase()
         {
             return Err("repository_source_snapshot_id must be canonical lowercase hex".into());
         }
@@ -505,10 +500,10 @@ impl ExecutionLineageV1 {
 /// the evidence-plane contract and downstream R4.5 work.
 pub mod execution_lineage {
     pub use super::{
-        qualify_lineage_perturbation, try_qualify_lineage_perturbation, EvidenceLineageCommitError,
-        EvidenceLineageDecision,
-        ExecutionLineageDriftFieldV1, ExecutionLineageDriftV1, EvidenceLineageGuardV1,
-        ExecutionLineageV1, LineagePerturbationResult, RepositorySourceSnapshotId,
+        EvidenceLineageCommitError, EvidenceLineageDecision, EvidenceLineageGuardV1,
+        ExecutionLineageDriftFieldV1, ExecutionLineageDriftV1, ExecutionLineageV1,
+        LineagePerturbationResult, RepositorySourceSnapshotId, qualify_lineage_perturbation,
+        try_qualify_lineage_perturbation,
     };
 }
 
@@ -639,9 +634,7 @@ fn validate_digest(value: &str) -> Result<(), String> {
         let mut bytes = algorithm.bytes();
         let valid_first = matches!(bytes.next(), Some(b'a'..=b'z'));
         let valid_rest = bytes.all(|b| {
-            b.is_ascii_lowercase()
-                || b.is_ascii_digit()
-                || matches!(b, b'-' | b'_' | b'.')
+            b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'-' | b'_' | b'.')
         });
         if !valid_first || !valid_rest {
             return Err(format!(
@@ -659,9 +652,7 @@ fn validate_digest(value: &str) -> Result<(), String> {
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
     {
-        return Err(format!(
-            "invalid or non-canonical digest syntax: {value:?}"
-        ));
+        return Err(format!("invalid or non-canonical digest syntax: {value:?}"));
     }
     Ok(())
 }
@@ -692,11 +683,7 @@ fn append_set(hasher: &mut blake3::Hasher, field: &str, values: &BTreeSet<String
     }
 }
 
-fn append_optional_str(
-    hasher: &mut blake3::Hasher,
-    field: &str,
-    value: Option<&str>,
-) {
+fn append_optional_str(hasher: &mut blake3::Hasher, field: &str, value: Option<&str>) {
     append_bytes(hasher, field.as_bytes());
     match value {
         Some(value) => {
@@ -820,8 +807,7 @@ impl ExecutionLineageDriftV1 {
             ),
             (
                 ExecutionLineageDriftFieldV1::RepositorySourceSnapshotId,
-                prepared.repository_source_snapshot_id
-                    != observed.repository_source_snapshot_id,
+                prepared.repository_source_snapshot_id != observed.repository_source_snapshot_id,
             ),
             (
                 ExecutionLineageDriftFieldV1::LockDigests,
@@ -950,7 +936,10 @@ impl EvidenceLineageGuardV1 {
     ///
     /// This is the preferred decision path for callers that do not already
     /// have a separately validated lineage.
-    pub fn try_check(&self, current: &ExecutionLineageV1) -> Result<EvidenceLineageDecision, String> {
+    pub fn try_check(
+        &self,
+        current: &ExecutionLineageV1,
+    ) -> Result<EvidenceLineageDecision, String> {
         let current_digest = current.validated_digest()?;
         Ok(if self.prepared_digest == current_digest {
             EvidenceLineageDecision::Stable
@@ -1504,9 +1493,13 @@ mod tests {
         let mut lineage = lineage_fixture();
         lineage.source_repository.clear();
 
-        let error = serde_json::to_value(&lineage)
-            .expect_err("invalid direct lineage must not serialize");
-        assert!(error.to_string().contains("empty lineage field source_repository"));
+        let error =
+            serde_json::to_value(&lineage).expect_err("invalid direct lineage must not serialize");
+        assert!(
+            error
+                .to_string()
+                .contains("empty lineage field source_repository")
+        );
     }
 
     #[test]
@@ -1814,8 +1807,7 @@ mod tests {
     #[test]
     fn execution_lineage_guard_allows_same_lineage_after_evidence() {
         let base = lineage_fixture();
-        let mut guard =
-            EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
+        let mut guard = EvidenceLineageGuardV1::prepare(&base).expect("valid lineage preparation");
         guard
             .commit_evidence(&base)
             .expect("stable lineage commits evidence");
@@ -1836,7 +1828,9 @@ mod tests {
     #[test]
     fn execution_lineage_validation_rejects_invalid_digest() {
         let mut lineage = lineage_fixture();
-        lineage.immutable_input_digests.insert("fixture.json".into(), "not-a-digest".into());
+        lineage
+            .immutable_input_digests
+            .insert("fixture.json".into(), "not-a-digest".into());
         assert!(lineage.validate().is_err());
     }
 
@@ -1929,7 +1923,9 @@ mod tests {
         let base_environment = base.environment_digest().expect("valid environment");
 
         let mut environment = base.clone();
-        environment.toolchain_versions.insert("cargo".into(), "2.0.0".into());
+        environment
+            .toolchain_versions
+            .insert("cargo".into(), "2.0.0".into());
         environment.host_triple = "aarch64-unknown-linux-gnu".into();
         environment.target_triple = "wasm32-unknown-unknown".into();
         environment.nix_identity = None;
