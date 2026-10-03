@@ -677,6 +677,7 @@ impl SqliteAuthorizationStore {
                outcome TEXT NOT NULL,
                action_digest TEXT NOT NULL,
                authority_epoch INTEGER NOT NULL,
+               provider_idempotency_key TEXT,
                boundary_id TEXT,
                PRIMARY KEY(authorization_instance, attempt_id, phase)
              );
@@ -795,6 +796,7 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_terminal_evidence", "validity_policy_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "adapter", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "relying_party_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_receipts", "provider_idempotency_key", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_recovery_markers", "operation_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "verifier_config_digest", "TEXT NOT NULL DEFAULT ''")?;
@@ -3637,11 +3639,11 @@ fn insert_receipt_with_boundary(
     };
     tx.execute(
         "INSERT INTO authorization_receipts
-         (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,boundary_id)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+         (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,provider_idempotency_key,boundary_id)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
         params![
             r.authorization_instance, r.action_id, r.attempt_id, phase, outcome,
-            r.action_digest, r.authority_epoch as i64, boundary_id
+            r.action_digest, r.authority_epoch as i64, r.provider_idempotency_key, boundary_id
         ],
     )?;
     Ok(())
@@ -3650,7 +3652,8 @@ fn load_receipt(
     tx: &Transaction<'_>, authorization_instance: &str, attempt_id: &str, phase: &str,
 ) -> Result<Option<ExecutionReceipt>, AuthorizationStoreError> {
     tx.query_row(
-        "SELECT authorization_instance,action_id,attempt_id,outcome,action_digest,authority_epoch
+        "SELECT authorization_instance,action_id,attempt_id,outcome,action_digest,authority_epoch,
+                provider_idempotency_key
          FROM authorization_receipts
          WHERE authorization_instance=?1 AND attempt_id=?2 AND phase=?3",
         params![authorization_instance,attempt_id,phase],
@@ -3666,7 +3669,8 @@ fn load_receipt(
             let attempt_id: String = r.get(2)?;
             let action_digest: String = r.get(4)?;
             let authority_epoch = r.get::<_,i64>(5)? as u64;
-            let lease = AuthorizationLease::new_with_instance(
+            let provider_idempotency_key: Option<String> = r.get(6)?;
+            let fallback_lease = AuthorizationLease::new_with_instance(
                 authorization_instance.clone(),
                 action_id.clone(),
                 action_digest.clone(),
@@ -3681,7 +3685,9 @@ fn load_receipt(
                 attempt_id,
                 outcome,
                 action_digest,
-                provider_idempotency_key: lease.provider_idempotency_key(),
+                provider_idempotency_key: provider_idempotency_key
+                    .filter(|key| !key.is_empty())
+                    .unwrap_or_else(|| fallback_lease.provider_idempotency_key()),
                 authority_epoch,
             })
         },
@@ -6714,6 +6720,66 @@ mod tests {
             ))
         ));
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn bound_receipt_replays_preserve_native_provider_identity() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-receipt-provider-key-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-receipt-provider-key","prod","adapter-receipt"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"receipt-provider-key".into(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T07:10:00Z".into(),
+            expires_at:Some("2026-10-04T07:10:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-receipt-provider-key","boundary-receipt"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-receipt-provider-key",
+            &action,&effect,"boundary-receipt",
+            "operation:receipt-provider-key","native-receipt-provider-key"
+        ).unwrap();
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let first=store.commit_bound_verified(
+            &record,&evidence,&TestProviderVerifier
+        ).unwrap();
+        assert_eq!(first.provider_idempotency_key,record.provider_idempotency_key);
+
+        let second=store.commit_bound_verified(
+            &record,&evidence,&TestProviderVerifier
+        ).unwrap();
+        assert_eq!(second.provider_idempotency_key,record.provider_idempotency_key);
+        assert_ne!(
+            second.provider_idempotency_key,
+            AuthorizationLease::new_with_instance(
+                record.authorization_instance.clone(),
+                record.action_id.clone(),
+                record.action_digest.clone(),
+                String::new(),
+                String::new(),
+                1,
+                1,
+            ).provider_idempotency_key()
+        );
+        let _=std::fs::remove_file(path);
     }
 
     #[test]
