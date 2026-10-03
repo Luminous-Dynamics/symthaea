@@ -379,6 +379,7 @@ mod tests {
                 component_id: "wing-root".into(),
                 asset_id: "vehicle-1".into(),
                 independence_group: format!("group-{sensor_id}"),
+                previous_topology_attestation: None,
                 topology_attestation: SensorTopologyAttestation {
                     schema_version: "0.1".into(),
                     asset_id: "vehicle-1".into(),
@@ -582,6 +583,70 @@ mod tests {
             issue,
             TemporalFusionIssue::TopologyAttestation(
                 SensorTopologyAttestationIssue::TopologyIdentityMismatch
+            )
+        )));
+    }
+
+    #[test]
+    fn legitimate_epoch_transition_requires_direct_predecessor() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        let mut previous = p.independence.topology_attestation.clone();
+        previous.valid_until_ms = 2_000;
+        let mut current = p.independence.topology_attestation.clone();
+        current.topology_version = "2".into();
+        current.topology_digest = "topology-v2".into();
+        current.epoch_binding.epoch = 2;
+        current.epoch_binding.predecessor_topology_digest = Some("topology-v1".into());
+        current.epoch_binding.effective_from_ms = 1_500;
+        current.issued_at_ms = 1_500;
+        current.verification_result.verified_at_ms = 1_500;
+        p.independence.previous_topology_attestation = Some(previous);
+        p.independence.topology_attestation = current;
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Corroborated);
+    }
+
+    #[test]
+    fn topology_epoch_rollback_is_conflicted() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        let previous = p.independence.topology_attestation.clone();
+        p.independence.previous_topology_attestation = Some({
+            let mut a = previous.clone();
+            a.epoch_binding.epoch = 2;
+            a.topology_digest = "topology-v2".into();
+            a.topology_version = "2".into();
+            a.epoch_binding.predecessor_topology_digest = Some("topology-v1".into());
+            a
+        });
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::TopologyEpochRollback
+            )
+        )));
+    }
+
+    #[test]
+    fn topology_epoch_fork_cannot_transition_without_matching_predecessor() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        let previous = p.independence.topology_attestation.clone();
+        p.independence.previous_topology_attestation = Some(previous);
+        p.independence.topology_attestation.epoch_binding.epoch = 2;
+        p.independence.topology_attestation.topology_digest = "topology-fork".into();
+        p.independence.topology_attestation.topology_version = "2".into();
+        p.independence.topology_attestation.epoch_binding.predecessor_topology_digest =
+            Some("not-the-previous-digest".into());
+        p.independence.topology_attestation.epoch_binding.effective_from_ms = 1_500;
+        p.independence.topology_attestation.issued_at_ms = 1_500;
+        p.independence.topology_attestation.verification_result.verified_at_ms = 1_500;
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::InvalidEpochTransition
             )
         )));
     }
