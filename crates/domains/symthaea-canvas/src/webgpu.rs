@@ -387,10 +387,6 @@ fn emit_polygon_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) -
     {
         return false;
     }
-    if !is_simple_polygon(points) {
-        return false;
-    }
-
     // Remove only exact adjacent duplicates. They are common at shape seams and
     // otherwise create zero-area candidate ears that can stall triangulation.
     let mut polygon = Vec::with_capacity(points.len());
@@ -409,6 +405,9 @@ fn emit_polygon_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) -
     }
     if polygon.len() < 3 {
         return true;
+    }
+    if !is_simple_polygon(points, &polygon) {
+        return false;
     }
 
     let area2 = polygon
@@ -492,15 +491,15 @@ fn cross(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
 /// The wire scene is remote input, so a bow-tie or otherwise crossing polygon
 /// must not be handed to the triangulator. The input is already bounded to
 /// 128 points, making this O(n²) check small and deterministic.
-fn is_simple_polygon(points: &[[f32; 2]]) -> bool {
-    let n = points.len();
+fn is_simple_polygon(points: &[[f32; 2]], polygon: &[usize]) -> bool {
+    let n = polygon.len();
     if n < 4 {
         return true;
     }
 
     for i in 0..n {
-        let a = points[i];
-        let b = points[(i + 1) % n];
+        let a = points[polygon[i]];
+        let b = points[polygon[(i + 1) % n]];
 
         for j in (i + 1)..n {
             // Adjacent edges are allowed to meet at their shared endpoint.
@@ -508,8 +507,8 @@ fn is_simple_polygon(points: &[[f32; 2]]) -> bool {
                 continue;
             }
 
-            let c = points[j];
-            let d = points[(j + 1) % n];
+            let c = points[polygon[j]];
+            let d = points[polygon[(j + 1) % n]];
             if segments_intersect_or_touch(a, b, c, d) {
                 return false;
             }
@@ -1411,6 +1410,27 @@ mod tests {
         let scene = GpuScene::from_scene(&polygon);
         assert!(scene.vertices.is_empty());
         assert_eq!(scene.skipped_nodes, 1);
+    }
+
+    #[test]
+    fn adjacent_duplicate_polygon_vertices_are_normalized() {
+        let polygon = SceneNode::polygon(
+            vec![
+                (20.0, 20.0),
+                (140.0, 20.0),
+                (140.0, 20.0),
+                (140.0, 140.0),
+                (20.0, 140.0),
+            ],
+            true,
+        )
+        .with_style(Style {
+            fill: Some(Color::rgb(0.3, 0.5, 0.8)),
+            ..Style::default()
+        });
+        let scene = GpuScene::from_scene(&polygon);
+        assert_eq!(scene.vertex_count(), 9);
+        assert_eq!(scene.skipped_nodes, 0);
     }
 
     #[test]
