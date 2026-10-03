@@ -700,10 +700,20 @@ impl ReceiptAttestationVerificationReport {
     /// Reports are serializable public data, so callers must not assume these
     /// redundant fields remain mutually consistent after deserialization.
     pub fn has_consistent_identity_bindings(&self) -> bool {
-        (self.verifier_version == VERIFIER_VERSION
-            || self.verifier_version == LEGACY_REPORT_VERIFIER_VERSION)
+        let supported_version = self.verifier_version == VERIFIER_VERSION
+            || self.verifier_version == LEGACY_REPORT_VERIFIER_VERSION;
+        let expected_procedure_fingerprint = if self.verifier_version == VERIFIER_VERSION {
+            EvaluationProcedure::attestation_ed25519().fingerprint()
+        } else if self.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
+            EvaluationProcedure::attestation_ed25519_v1().fingerprint()
+        } else {
+            return false;
+        };
+
+        supported_version
             && self.policy_fingerprint == self.policy_inputs.fingerprint()
             && self.environment_fingerprint == self.environment_identity.fingerprint()
+            && self.procedure_fingerprint == expected_procedure_fingerprint
     }
 
     fn failed(
@@ -3425,6 +3435,37 @@ mod tests {
             trace.terminal_outcome(),
             Some(ReceiptAttestationVerificationOutcome::InvalidSignature)
         );
+    }
+
+    #[test]
+    fn current_report_cannot_adopt_legacy_procedure_semantics() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        report.procedure_fingerprint =
+            EvaluationProcedure::attestation_ed25519_v1().fingerprint();
+        report.execution_trace = EvaluationTrace {
+            procedure_fingerprint: report.procedure_fingerprint.clone(),
+            results: EvaluationProcedure::attestation_ed25519_v1()
+                .checks
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, check)| EvaluationCheckResult {
+                    sequence: index as u32,
+                    check,
+                    stage: VerificationStage::Passed,
+                })
+                .collect(),
+        };
+
+        assert!(!report.has_consistent_identity_bindings());
+        assert!(!report.to_evidence_evaluation().is_consistent_with_report(&report));
     }
 
     #[test]
