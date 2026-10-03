@@ -52,7 +52,14 @@ fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
     assert_eq!(first_work.span_membership_checks, parent.rank());
     assert!(first_work.basis_rank_pivots > 0);
     assert!(first_work.solve_pivots > 0);
+    assert_eq!(first_work.solve_basis_bit_probes, parent.dimension() * parent.rank());
+    assert_eq!(
+        first_work.solve_matrix_word_cells,
+        parent.dimension() * (parent.rank().div_ceil(64) + 1)
+    );
+    assert!(first_work.basis_rank_input_word_copies > 0);
     assert!(first_work.basis_rank_row_xor_words > 0);
+    assert!(first_work.projection_word_xor_ops > 0);
     assert!(first_work.solve_row_xor_words > 0);
 
     println!(
