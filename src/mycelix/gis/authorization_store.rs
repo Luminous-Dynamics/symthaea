@@ -1686,6 +1686,20 @@ fn validate_native_authority_pin_set(
 
         let mut lease = load_lease(&tx, authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
+        let persisted_operation_id: Option<String> = tx
+            .query_row(
+                "SELECT operation_id FROM authorization_leases
+                 WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+                params![authorization_instance, attempt_id, boundary_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        // The operation identifier is frozen during bound preparation. Never
+        // let a caller replace it at DispatchPending, even if every other
+        // action/native/status binding still matches.
+        if persisted_operation_id.as_deref() != Some(operation_id) {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
         let expected_digest = action.canonical_action_digest();
         if lease.action_id != action.id || lease.action_digest != expected_digest {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
