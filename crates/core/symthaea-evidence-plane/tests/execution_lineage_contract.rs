@@ -1,6 +1,7 @@
 use symthaea_evidence_plane::execution_lineage::{
     qualify_lineage_perturbation, EvidenceLineageDecision, EvidenceLineageGuardV1,
-    ExecutionLineageV1, LineagePerturbationResult, RepositorySourceSnapshotId,
+    ExecutionLineageDriftFieldV1, ExecutionLineageV1, LineagePerturbationResult,
+    RepositorySourceSnapshotId,
 };
 
 fn fixture() -> ExecutionLineageV1 {
@@ -84,116 +85,137 @@ fn workload_identity_is_stable_across_environment_only_changes() {
 fn every_canonical_lineage_field_changes_identity_and_drift_report() {
     let base = fixture();
 
-    let cases: Vec<(&str, ExecutionLineageV1, _)> = vec![
-        ({
+    let cases: Vec<(&str, ExecutionLineageV1, ExecutionLineageDriftFieldV1)> = vec![
+        {
             let mut lineage = base.clone();
             lineage.source_repository = "another-org/symthaea".into();
-            ("source_repository", lineage)
-        }),
-        ({
+            (
+                "source_repository",
+                lineage,
+                ExecutionLineageDriftFieldV1::SourceRepository,
+            )
+        },
+        {
             let mut lineage = base.clone();
             lineage.source_revision = "d".repeat(40);
-            ("source_revision", lineage)
-        }),
-        ({
+            (
+                "source_revision",
+                lineage,
+                ExecutionLineageDriftFieldV1::SourceRevision,
+            )
+        },
+        {
             let mut lineage = base.clone();
             lineage.source_tree = "e".repeat(40);
-            ("source_tree", lineage)
-        }),
-        ({
+            (
+                "source_tree",
+                lineage,
+                ExecutionLineageDriftFieldV1::SourceTree,
+            )
+        },
+        {
             let mut lineage = base.clone();
             lineage.repository_source_snapshot_id =
                 RepositorySourceSnapshotId::parse(&"f".repeat(64)).unwrap();
-            ("repository_source_snapshot_id", lineage)
-        }),
-        ({
+            (
+                "repository_source_snapshot_id",
+                lineage,
+                ExecutionLineageDriftFieldV1::RepositorySourceSnapshotId,
+            )
+        },
+        {
             let mut lineage = base.clone();
             lineage
                 .lock_digests
                 .insert("Cargo.lock".into(), "sha256:1122334455667788".into());
-            ("lock_digests", lineage)
-        }),
-        ({
+            ("lock_digests", lineage, ExecutionLineageDriftFieldV1::LockDigests)
+        },
+        {
             let mut lineage = base.clone();
             lineage
                 .toolchain_versions
                 .insert("cargo".into(), "1.96.0".into());
-            ("toolchain_versions", lineage)
-        }),
-        ({
+            (
+                "toolchain_versions",
+                lineage,
+                ExecutionLineageDriftFieldV1::ToolchainVersions,
+            )
+        },
+        {
             let mut lineage = base.clone();
             lineage.host_triple = "aarch64-unknown-linux-gnu".into();
-            ("host_triple", lineage)
-        }),
-        ({
+            ("host_triple", lineage, ExecutionLineageDriftFieldV1::HostTriple)
+        },
+        {
             let mut lineage = base.clone();
             lineage.target_triple = "wasm32-unknown-unknown".into();
-            ("target_triple", lineage)
-        }),
-        ({
+            (
+                "target_triple",
+                lineage,
+                ExecutionLineageDriftFieldV1::TargetTriple,
+            )
+        },
+        {
             let mut lineage = base.clone();
             lineage.nix_identity = None;
-            ("nix_identity", lineage)
-        }),
-        ({
+            ("nix_identity", lineage, ExecutionLineageDriftFieldV1::NixIdentity)
+        },
+        {
             let mut lineage = base.clone();
             lineage.feature_flags.insert("research".into());
-            ("feature_flags", lineage)
-        }),
-        ({
+            (
+                "feature_flags",
+                lineage,
+                ExecutionLineageDriftFieldV1::FeatureFlags,
+            )
+        },
+        {
             let mut lineage = base.clone();
             lineage.cwd = "/workspace/changed".into();
-            ("working_directory", lineage)
-        }),
-        ({
+            (
+                "working_directory",
+                lineage,
+                ExecutionLineageDriftFieldV1::WorkingDirectory,
+            )
+        },
+        {
             let mut lineage = base.clone();
             lineage.argv.push("--nocapture".into());
-            ("command_argv", lineage)
-        }),
-        ({
+            ("command_argv", lineage, ExecutionLineageDriftFieldV1::CommandArgv)
+        },
+        {
             let mut lineage = base.clone();
             lineage
                 .allowed_env
                 .insert("RUSTFLAGS".into(), "-Copt-level=3".into());
-            ("allowed_environment", lineage)
-        }),
-        ({
+            (
+                "allowed_environment",
+                lineage,
+                ExecutionLineageDriftFieldV1::AllowedEnvironment,
+            )
+        },
+        {
             let mut lineage = base.clone();
             lineage
                 .immutable_input_digests
                 .insert("dataset.bin".into(), "blake3:1122334455667788".into());
-            ("immutable_input_digests", lineage)
-        }),
+            (
+                "immutable_input_digests",
+                lineage,
+                ExecutionLineageDriftFieldV1::ImmutableInputDigests,
+            )
+        },
     ];
 
-    for (name, changed) in cases {
+    for (name, changed, expected_field) in cases {
         assert!(changed.validate().is_ok(), "{name} fixture must remain valid");
         assert_ne!(
             base.digest(),
             changed.digest(),
             "{name} must be identity-material"
         );
-        let report = symthaea_evidence_plane::execution_lineage::ExecutionLineageDriftV1::between(
-            &base,
-            &changed,
-        )
-        .unwrap()
-        .expect("changed lineage must report drift");
-        assert_eq!(report.changed_fields.len(), 1, "{name} should have isolated drift");
-        assert_eq!(
-            format!("{:?}", report.changed_fields[0]),
-            name
-                .split('_')
-                .enumerate()
-                .map(|(index, part)| if index == 0 {
-                    let mut chars = part.chars();
-                    chars.next().unwrap().to_ascii_uppercase().to_string() + chars.as_str()
-                } else {
-                    let mut chars = part.chars();
-                    chars.next().unwrap().to_ascii_uppercase().to_string() + chars.as_str()
-                })
-                .collect::<String>()
-        );
+        let report = ExecutionLineageDriftFieldV1::report(&base, &changed);
+        assert_eq!(report, vec![expected_field], "{name} drift must be isolated");
     }
 }
 
