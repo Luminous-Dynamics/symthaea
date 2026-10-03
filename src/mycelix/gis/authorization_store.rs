@@ -8454,6 +8454,85 @@ mod tests {
     }
 
     #[test]
+    fn bound_receipt_identity_tampering_is_rejected_on_read() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-receipt-tamper-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-receipt-tamper","prod","adapter-receipt-tamper"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"receipt-tamper".into(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T07:20:00Z".into(),
+            expires_at:Some("2026-10-04T07:20:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1,
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-receipt-tamper","boundary-receipt-tamper"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-receipt-tamper",
+            &action,&effect,"boundary-receipt-tamper",
+            "operation:receipt-tamper","native-receipt-tamper"
+        ).unwrap();
+
+        let tampered_scope=compute_attempt_scope_digest(
+            &record.boundary_id,&record.attempt_id
+        ).unwrap();
+        store.connection().unwrap().execute(
+            "INSERT INTO authorization_receipts(
+                authorization_instance,action_id,attempt_id,phase,outcome,action_digest,
+                authority_epoch,provider_idempotency_key,boundary_id,attempt_scope_digest
+             ) VALUES(?1,?2,?3,'final','succeeded',?4,?5,?6,?7,?8)",
+            params![
+                record.authorization_instance,
+                record.action_id,
+                record.attempt_id,
+                "forged-action-digest",
+                witness.authority_epoch as i64,
+                record.provider_idempotency_key,
+                record.boundary_id,
+                tampered_scope,
+            ],
+        ).unwrap();
+
+        let mut connection=store.connection().unwrap();
+        let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        let err=load_receipt(
+            &tx,
+            &record.authorization_instance,
+            &record.attempt_id,
+            "final",
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+        tx.rollback().unwrap();
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn terminal_record_splicing_is_rejected_before_settlement() {
         let path = std::env::temp_dir().join(format!(
             "symthaea-gis-record-splice-{}.db",
