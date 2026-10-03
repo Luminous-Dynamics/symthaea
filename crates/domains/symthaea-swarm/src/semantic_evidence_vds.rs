@@ -578,7 +578,8 @@ impl Rfc9942ReceiptEnvelope {
         cbor_bytes(&mut out,&self.signature); out
     }
 
-    fn protected_header_cbor(&self)->Vec<u8>{        let mut out=Vec::new(); cbor_map_len(&mut out,(2+self.protected_extensions.len()) as u64);
+    fn protected_header_cbor(&self)->Vec<u8>{
+        let mut out=Vec::new(); cbor_map_len(&mut out,(2+self.protected_extensions.len()) as u64);
         cbor_int(&mut out,COSE_ALG_HEADER_LABEL); cbor_int(&mut out,self.algorithm_id);
         cbor_int(&mut out,RFC9942_VDS_HEADER_LABEL); cbor_uint(&mut out,self.vds_id);
         for entry in &self.protected_extensions { out.extend_from_slice(entry); }
@@ -1077,7 +1078,8 @@ impl Rfc9942ReceiptCollection {
         }
         if receipts.len() > MAX_RFC9942_RECEIPTS {
             return Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded);
-        }        let mut total_bytes = 0usize;
+        }
+        let mut total_bytes = 0usize;
         for receipt in &receipts {
             let len = receipt.to_cbor().len();
             if len > MAX_RFC9942_RECEIPT_BYTES {
@@ -1576,7 +1578,8 @@ pub struct ChainedHistoryVds;
 impl HistoryVds for ChainedHistoryVds {
     fn vds_name(&self) -> &'static str { "symthaea-chained-history-v1" }
     fn verify_consistency(
-        &self,        _request: &ConsistencyRequest,
+        &self,
+        _request: &ConsistencyRequest,
         _proof: &ConsistencyProof,
     ) -> ConsistencyStatus {
         ConsistencyStatus::Unsupported
@@ -2085,7 +2088,8 @@ pub struct EvidenceVdsLeaf([u8; 32]);
 impl EvidenceVdsLeaf {
     pub fn from_evidence_digest(digest: crate::semantic_evidence_digest::EvidenceDigest) -> Self {
         let mut input = Vec::with_capacity(1 + 2 + 2 + DOMAIN.len() + 32);
-        input.extend_from_slice(&(DOMAIN.len() as u16).to_be_bytes());        input.extend_from_slice(DOMAIN);
+        input.extend_from_slice(&(DOMAIN.len() as u16).to_be_bytes());
+        input.extend_from_slice(DOMAIN);
         input.extend_from_slice(&VERSION.to_be_bytes());
         input.extend_from_slice(&1u16.to_be_bytes());
         input.extend_from_slice(digest.as_bytes());
@@ -2584,7 +2588,8 @@ mod tests {
     }
     #[test]
     fn rfc9942_receipt_envelope_round_trips_attached_payload() {
-        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
         let root=[0x22;32];
         let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Attached(root),vec![0xAA;64]).unwrap();
         let decoded=Rfc9942ReceiptEnvelope::from_cbor(&receipt.to_cbor()).unwrap();
@@ -3083,7 +3088,8 @@ mod tests {
         ).unwrap();
         assert_eq!(
             cryptographically_valid_but_inconsistent.verify_ed25519_consistency(
-                older,signing_key.verifying_key().as_bytes(),b"",None            ),
+                older,signing_key.verifying_key().as_bytes(),b"",None
+            ),
             Err(Rfc9942VdpError::NoMatchingProof)
         );
 
@@ -3582,7 +3588,8 @@ mod tests {
             Err(Rfc9162ProofVerificationError::InvalidProof)
         );
         let wrong_size = VdsTreeHead::new(head.tree_size() + 1, head.root());
-        assert_eq!(            vds.verify_rfc9942_inclusion_cbor(&leaves[2], wrong_size, &proof),
+        assert_eq!(
+            vds.verify_rfc9942_inclusion_cbor(&leaves[2], wrong_size, &proof),
             Err(Rfc9162ProofVerificationError::TreeSizeMismatch)
         );
     }
@@ -4081,7 +4088,8 @@ mod tests {
         cbor_int(&mut protected_unknown_crit, 999);
 
         let mut unprotected = Vec::new();
-        cbor_map_len(&mut unprotected, 1);        cbor_int(&mut unprotected, RFC9942_VDP_HEADER_LABEL);
+        cbor_map_len(&mut unprotected, 1);
+        cbor_int(&mut unprotected, RFC9942_VDP_HEADER_LABEL);
         unprotected.extend_from_slice(&vdp.to_cbor());
         let mut wire = Vec::new();
         cbor_tag(&mut wire, COSE_SIGN1_TAG);
