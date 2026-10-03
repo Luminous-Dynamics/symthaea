@@ -134,12 +134,17 @@ run_boundary_check() {
     failed=1
   fi
 
-  # Domain invariants must be established by NixServiceOperationV1::new().
-  # The closed operation enum may deserialize because it contains no free-form
-  # data or normalization boundary. The aggregate must not deserialize because
-  # that would bypass canonicalization and admit non-canonical unit strings.
-  if matches="$(rg -n --pcre2 'Deserialize[^\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\n]*Deserialize' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
+  # Validated service-domain and observed-state aggregates must be constructed
+  # through their parsing/validation boundaries. Their closed leaf enums may
+  # deserialize, but the aggregates must not: deserializing them would bypass
+  # canonicalization, identity checks, or observation provenance.
+  if matches="$(rg -n --pcre2 'Deserialize[^\\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\\n]*Deserialize' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
     echo "ERROR: validated NixServiceOperationV1 must not deserialize around its constructor" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+  if matches="$(rg -n --pcre2 'Deserialize[^\\n]*\\bNixServiceObservedStateV1\\b|NixServiceObservedStateV1[^\\n]*Deserialize' "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
+    echo "ERROR: NixServiceObservedStateV1 must not deserialize around its observation boundary" >&2
     echo "${matches}" >&2
     failed=1
   fi
@@ -244,6 +249,12 @@ run_self_test() {
   printf '%s\n' '#[derive(Deserialize)] enum NixServiceOperationKindV1 { Start }' > "${tmp}/enum-deserialize.rs"
   if rg -n --pcre2 'Deserialize[^\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\n]*Deserialize' "${tmp}/enum-deserialize.rs"; then
     echo "ERROR: CROSS-022 self-test falsely rejected closed operation enum deserialization" >&2
+    return 1
+  fi
+
+  printf '%s\n' '#[derive(Deserialize)] struct NixServiceObservedStateV1;' > "${tmp}/observed-state-deserialize.rs"
+  if rg -n --pcre2 'Deserialize[^\n]*\\bNixServiceObservedStateV1\\b|NixServiceObservedStateV1[^\n]*Deserialize' "${tmp}/observed-state-deserialize.rs"; then :; else
+    echo "ERROR: CROSS-022 self-test failed to detect observed-state deserialization" >&2
     return 1
   fi
 }
