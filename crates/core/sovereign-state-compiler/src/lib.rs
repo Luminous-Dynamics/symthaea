@@ -179,7 +179,7 @@ impl DeploymentIntent {
     }
 
     pub fn digest(&self) -> Result<ContentDigest, serde_json::Error> {
-        canonical_digest(self, TARGET_PROFILE_DIGEST_DOMAIN)
+        canonical_digest(self, PLAN_DIGEST_DOMAIN)
     }
 }
 
@@ -454,7 +454,7 @@ fn canonical_digest<T: Serialize>(
 pub trait TargetAdapter {
     type Error: std::error::Error + Send + Sync + 'static;
 
-    fn describe_target(&self) -> Result<TargetProfile, Self::Error>;
+    fn describe_target(&self) -> Result<TargetSnapshot, Self::Error>;
 
     fn compile(&self, intent: &DeploymentIntent) -> Result<DeploymentPlan, Self::Error>;
 }
