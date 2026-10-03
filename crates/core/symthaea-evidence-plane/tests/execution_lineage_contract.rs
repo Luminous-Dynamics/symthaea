@@ -50,12 +50,8 @@ fn public_execution_lineage_namespace_exposes_checked_admission_paths() {
         LineagePerturbationResult::UnexpectedCollateralChange
     );
     assert_eq!(
-        symthaea_evidence_plane::execution_lineage::try_qualify_lineage_perturbation(
-            &base,
-            &changed,
-            true,
-        )
-        .unwrap(),
+        symthaea_evidence_plane::execution_lineage::try_qualify_lineage_perturbation(&base, &changed, true)
+            .unwrap(),
         LineagePerturbationResult::ExpectedDependencyChanged
     );
     assert_eq!(base.validated_digest().unwrap(), base.digest());
