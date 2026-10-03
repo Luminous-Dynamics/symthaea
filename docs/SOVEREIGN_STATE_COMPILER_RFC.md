@@ -438,6 +438,13 @@ The generation resource identity is content-addressed and is included in the aut
 
 A rollback request without the corresponding observed generation resource is rejected. Rollback is also mutually exclusive with rebuild, application installation/removal, and Home Manager mutation in the same intent. Reboot may be composed afterward because it is an explicit subsequent lifecycle step.
 
+The adapter also rejects ambiguous lifecycle compositions. In particular,
+`dry-activate` cannot be combined with another state mutation or reboot,
+and `test` / `boot` cannot be followed by an implicit reboot in the
+same intent. These combinations would otherwise make the single recorded
+verification disposition describe a different final transition than the plan
+actually performs.
+
 This establishes the stronger invariant:
 
 `same host + same authority + same nominal generation number`
