@@ -423,16 +423,18 @@ pub fn recover_direct_sum_bound(
     Some((factors.next()?, factors.next()?))
 }
 
-/// Recover a representative factorization for a clean XOR bound using the
-/// maximal-independent-subset construction from Raviv's Theorem 2.
+/// Recover a deterministic representative factorization for a clean XOR bound.
 ///
-/// The returned factorization is valid when one exists, but it is deliberately
-/// not labeled unique: overlapping factor subcodes can admit multiple valid
-/// decompositions. Each retained generator is assigned deterministically to the
-/// first factor whose supplied basis contains it. This is a faithful
-/// representation-level implementation of the paper's constructive recovery
-/// path; callers needing a uniqueness guarantee should use
-/// recover_independent_bound instead.
+/// The maximal-independent-subset construction and GF(2) solve follow Raviv's
+/// Theorem 2. For product/direct-sum factors, the retained generators are
+/// already partitioned by factor and this specializes to the paper's exact
+/// recovery setting. For overlapping factors, the paper explicitly allows
+/// non-unique factorizations; this implementation adds a deterministic
+/// owner-based representative rule by assigning each retained generator to
+/// the first factor whose supplied basis contains it. That owner rule is a
+/// Symthaea research extension, not a claim that the paper specifies a unique
+/// projection for overlapping bases. Callers needing uniqueness guarantees
+/// should use recover_independent_bound instead.
 pub fn recover_linear_bound(
     target: &BinaryCodeword,
     factors: &[&RandomLinearCode],
