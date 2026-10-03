@@ -2047,6 +2047,12 @@ impl KnowledgePersistence {
         )
         .map_err(|e| format!("Schema receipt immutability triggers: {e}"))?;
 
+        // Validate the fully materialized schema while it is still inside the
+        // migration transaction. This prevents a partially upgraded legacy database
+        // from becoming visible as "initialized" before the same runtime attestation
+        // that protects later fast-path opens has passed.
+        verify_initialized_schema_integrity(conn)?;
+
         tx.commit()
             .map_err(|e| format!("Commit schema migration transaction: {e}"))?;
         self.initialized = true;
