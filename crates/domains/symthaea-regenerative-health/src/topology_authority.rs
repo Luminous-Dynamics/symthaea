@@ -15,8 +15,8 @@ use crate::topology_resolution::{
     TopologyResolutionIssue, TopologyResolutionPolicy, TopologyResolutionState,
 };
 use crate::topology_revocation::{
-    TopologyLifecycleRevocation, TopologyRevocationDecision, TopologyRevocationGate,
-    TopologyRevocationIssue, TopologyRevocationPolicy, TopologyRevocationState,
+    TopologyLifecycleRevocation, TopologyRevocationGate, TopologyRevocationIssue,
+    TopologyRevocationPolicy, TopologyRevocationState,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
