@@ -579,8 +579,11 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                     result_digest.update(&(algebra.dependency_order.unwrap_or(0) as u64).to_le_bytes());
 
                     let target_multiplicity =
-                        factorization_count_for_target(&target, &factors)
-                            .expect("generated target must be representable");
+                        factorization_count_for_target(&target, &factors);
+                    let Some(target_multiplicity) = target_multiplicity else {
+                        nonexistent_targets += 1;
+                        continue;
+                    };
                     assert_eq!(
                         target_multiplicity.exponent(),
                         algebra.kernel_dimension,
@@ -659,7 +662,6 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     assert_eq!(valid_representative, cases);
     assert_eq!(unique_cases + non_unique_valid, cases);
     assert_eq!(nonexistent_targets, 0);
-    assert!(max_kernel_dimension >= 0);
 
     let result_digest = result_digest.finalize();
     let result_digest = result_digest
