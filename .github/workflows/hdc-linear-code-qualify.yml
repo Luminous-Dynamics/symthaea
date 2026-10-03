@@ -186,6 +186,16 @@ jobs:
           test -n "$GEOMETRY_SWEEP"
           printf 'geometry_sweep=%s\n' "$GEOMETRY_SWEEP" >> "$GITHUB_OUTPUT"
 
+      - name: Capture paper-scale binding recovery matrix
+        id: paper_matrix
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity paper_scale_binding_recovery_smoke_matrix_is_valid -- --nocapture 2>&1)"
+          PAPER_MATRIX_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^PAPER_MATRIX=')"
+          test "$PAPER_MATRIX_COUNT" -eq 1
+          PAPER_MATRIX="$(printf '%s\n' "$OUTPUT" | sed -n 's/^PAPER_MATRIX=//p')"
+          test -n "$PAPER_MATRIX"
+          printf 'paper_matrix=%s\n' "$PAPER_MATRIX" >> "$GITHUB_OUTPUT"
+
       - name: Capture deterministic work ledger
         id: work
         run: |
@@ -267,6 +277,9 @@ jobs:
           geometry_sweep_schema=linear-code-geometry-sweep-v2
           geometry_sweep_status=${{ steps.geometry_sweep.outcome }}
           geometry_sweep=${{ steps.geometry_sweep.outputs.geometry_sweep }}
+          paper_matrix_schema=linear-code-paper-matrix-v1
+          paper_matrix_status=${{ steps.paper_matrix.outcome }}
+          paper_matrix=${{ steps.paper_matrix.outputs.paper_matrix }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
