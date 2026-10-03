@@ -5,11 +5,40 @@
 //! Deterministic validity boundary for sensor-topology attestations.
 //!
 //! This contract establishes when a topology/dependency declaration is
-//! temporally admissible. It does not establish that the attestation issuer
-//! or the declared physical topology is truthful; authoritative provenance
-//! remains an external trust-layer responsibility.
+//! locally admissible. It deliberately separates an attestation reference
+//! from authoritative verification: a well-formed reference is not proof
+//! that the issuer or declared physical topology is truthful.
 
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthoritativeAttestationReference {
+    /// Stable identifier assigned by the authoritative attestation service.
+    pub attestation_id: String,
+    /// Identity of the authority expected to have issued the attestation.
+    pub issuer_id: String,
+    /// Digest of the authoritative attestation statement.
+    pub attestation_digest: String,
+    /// External evidence/result reference used to verify the statement.
+    pub verification_reference: String,
+}
+
+impl AuthoritativeAttestationReference {
+    fn validate(&self, expected_issuer_id: &str) -> Result<(), SensorTopologyAttestationIssue> {
+        if self.attestation_id.trim().is_empty()
+            || self.issuer_id.trim().is_empty()
+            || self.attestation_digest.trim().is_empty()
+            || self.verification_reference.trim().is_empty()
+            || expected_issuer_id.trim().is_empty()
+        {
+            return Err(SensorTopologyAttestationIssue::EmptyAttestationReference);
+        }
+        if self.issuer_id != expected_issuer_id {
+            return Err(SensorTopologyAttestationIssue::AttestationIssuerMismatch);
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SensorTopologyAttestation {
@@ -23,16 +52,21 @@ pub struct SensorTopologyAttestation {
     pub issued_at_ms: u64,
     pub valid_until_ms: u64,
     pub evidence_id: String,
+    /// Reference into the authoritative provenance/attestation layer.
+    pub authoritative_reference: AuthoritativeAttestationReference,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SensorTopologyAttestationIssue {
     EmptyIdentity,
+    EmptyAttestationReference,
+    AttestationIssuerMismatch,
     InvalidValidityWindow,
     FutureAttestation,
     StaleAttestation,
     ConfigurationMismatch,
     TopologyIdentityMismatch,
+    AttestationReferenceMismatch,
 }
 
 impl SensorTopologyAttestation {
@@ -41,6 +75,7 @@ impl SensorTopologyAttestation {
         expected_asset_id: &str,
         expected_component_id: &str,
         expected_configuration_digest: &str,
+        expected_issuer_id: &str,
         observation_timestamp_ms: u64,
     ) -> Result<(), SensorTopologyAttestationIssue> {
         if self.schema_version.trim().is_empty()
@@ -56,6 +91,8 @@ impl SensorTopologyAttestation {
         {
             return Err(SensorTopologyAttestationIssue::EmptyIdentity);
         }
+
+        self.authoritative_reference.validate(expected_issuer_id)?;
 
         if self.issued_at_ms > self.valid_until_ms {
             return Err(SensorTopologyAttestationIssue::InvalidValidityWindow);
@@ -79,6 +116,10 @@ impl SensorTopologyAttestation {
 
         Ok(())
     }
+
+    pub fn same_authoritative_reference(&self, other: &Self) -> bool {
+        self.authoritative_reference == other.authoritative_reference
+    }
 }
 
 #[cfg(test)]
@@ -97,20 +138,26 @@ mod tests {
             issued_at_ms: 500,
             valid_until_ms: 2_500,
             evidence_id: "topology-e-1".into(),
+            authoritative_reference: AuthoritativeAttestationReference {
+                attestation_id: "att-topology-1".into(),
+                issuer_id: "mycelix-topology-authority".into(),
+                attestation_digest: "att-digest-1".into(),
+                verification_reference: "verify-1".into(),
+            },
         }
     }
 
     #[test]
     fn valid_attestation_is_admitted_at_observation_time() {
         assert!(attestation()
-            .validate("vehicle-1", "wing-root", "cfg-1", 1_000)
+            .validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000)
             .is_ok());
     }
 
     #[test]
     fn stale_attestation_is_not_reused_after_expiry() {
         assert_eq!(
-            attestation().validate("vehicle-1", "wing-root", "cfg-1", 2_501),
+            attestation().validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 2_501),
             Err(SensorTopologyAttestationIssue::StaleAttestation)
         );
     }
@@ -118,7 +165,7 @@ mod tests {
     #[test]
     fn future_attestation_cannot_qualify_past_observation() {
         assert_eq!(
-            attestation().validate("vehicle-1", "wing-root", "cfg-1", 499),
+            attestation().validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 499),
             Err(SensorTopologyAttestationIssue::FutureAttestation)
         );
     }
@@ -126,11 +173,11 @@ mod tests {
     #[test]
     fn topology_binding_must_match_asset_and_component_identity() {
         assert_eq!(
-            attestation().validate("vehicle-2", "wing-root", "cfg-1", 1_000),
+            attestation().validate("vehicle-2", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
             Err(SensorTopologyAttestationIssue::TopologyIdentityMismatch)
         );
         assert_eq!(
-            attestation().validate("vehicle-1", "tail-root", "cfg-1", 1_000),
+            attestation().validate("vehicle-1", "tail-root", "cfg-1", "mycelix-topology-authority", 1_000),
             Err(SensorTopologyAttestationIssue::TopologyIdentityMismatch)
         );
     }
@@ -138,9 +185,37 @@ mod tests {
     #[test]
     fn topology_binding_must_match_configuration() {
         assert_eq!(
-            attestation().validate("vehicle-1", "wing-root", "cfg-attacker", 1_000),
+            attestation().validate("vehicle-1", "wing-root", "cfg-attacker", "mycelix-topology-authority", 1_000),
             Err(SensorTopologyAttestationIssue::ConfigurationMismatch)
         );
     }
 
+    #[test]
+    fn issuer_must_match_authoritative_policy() {
+        let mut a = attestation();
+        a.authoritative_reference.issuer_id = "attacker".into();
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::AttestationIssuerMismatch)
+        );
+    }
+
+    #[test]
+    fn missing_reference_cannot_be_admitted() {
+        let mut a = attestation();
+        a.authoritative_reference.attestation_id.clear();
+        assert_eq!(
+            a.validate("vehicle-1", "wing-root", "cfg-1", "mycelix-topology-authority", 1_000),
+            Err(SensorTopologyAttestationIssue::EmptyAttestationReference)
+        );
+    }
+
+    #[test]
+    fn authoritative_reference_identity_is_exactly_comparable() {
+        let a = attestation();
+        let mut b = attestation();
+        assert!(a.same_authoritative_reference(&b));
+        b.authoritative_reference.attestation_digest = "att-digest-2".into();
+        assert!(!a.same_authoritative_reference(&b));
+    }
 }
