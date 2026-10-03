@@ -512,6 +512,42 @@ mod tests {
     }
 
     #[test]
+    fn stale_topology_epoch_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.epoch_binding.epoch = 0;
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::InvalidEpochBinding
+            )
+        )));
+    }
+
+    #[test]
+    fn rollback_to_previous_topology_epoch_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.epoch_binding.epoch = 0;
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+    }
+
+    #[test]
+    fn forked_epoch_digest_is_rejected_by_expected_topology_binding() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.topology_digest = "topology-fork".into();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::TopologyIdentityMismatch
+            )
+        )));
+    }
+
+    #[test]
     fn stale_verification_result_cannot_create_quorum() {
         let mut p = pair("strain-a", 0.5, 1.5);
         p.independence.topology_attestation.verification_result.valid_until_ms = 999;
