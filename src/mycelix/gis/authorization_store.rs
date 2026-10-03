@@ -3098,7 +3098,6 @@ fn validate_native_authority_pin_set(
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
         self.validate_persisted_provider_verifier_configuration(&tx, &verified.configuration)?;
-        self.validate_persisted_provider_verifier_configuration(&tx, &verified.configuration)?;
         let row: (
             String, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>,
             Option<String>, Option<String>, Option<String>, Option<String>
@@ -3464,6 +3463,8 @@ fn validate_native_authority_pin_set(
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
+        self.validate_persisted_provider_verifier_configuration(&tx, &verified.configuration)?;
+
         let row = tx.query_row(
             "SELECT operation_id,native_replay_identity,relying_party_id,action_id,action_digest,
                     provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
