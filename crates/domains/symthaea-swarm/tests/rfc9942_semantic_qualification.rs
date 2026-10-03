@@ -384,3 +384,66 @@ fn rfc9942_semantic_state_cannot_confuse_valid_signature_with_wrong_entry() {
         Err(Rfc9942VdpError::NoMatchingProof)
     );
 }
+
+
+#[test]
+fn rfc9942_consistency_state_binds_signature_to_detached_root() {
+    let leaves = vec![
+        b"old-a".to_vec(),
+        b"old-b".to_vec(),
+        b"new-c".to_vec(),
+        b"new-d".to_vec(),
+    ];
+    let vds = Rfc9162Sha256Vds;
+    let older = vds.tree_head(&leaves[..2].to_vec());
+    let newer = vds.tree_head(&leaves);
+    let proof = vds.prove(&leaves, 2).unwrap().to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Consistency, vec![proof]).unwrap();
+
+    let unsigned = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp.clone(),
+        Rfc9942ReceiptPayload::Detached,
+        vec![0u8; 64],
+    )
+    .unwrap();
+
+    let rng = SystemRandom::new();
+    let signing_key = EcdsaKeyPair::from_private_key_and_public_key(
+        &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+        &RFC8392_PRIVATE_D,
+        &rfc8392_public_key(),
+        &rng,
+    )
+    .unwrap();
+    let root = newer.root();
+    let tbs = unsigned.signature1_tbs(&[], Some(&root)).unwrap();
+    let signature = signing_key.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Detached,
+        signature,
+    )
+    .unwrap();
+    let key = rfc8392_public_key();
+
+    let state = receipt
+        .verify_es256_consistency_state(older, &key, &[], Some(&root))
+        .unwrap();
+    assert_eq!(state.algorithm_id(), COSE_ES256_ALGORITHM_ID);
+    assert_eq!(state.vds_id(), 1);
+    assert_eq!(
+        state.proof().consistency_heads(),
+        Some((older, newer))
+    );
+
+    // A detached root is part of the signed Sig_structure. Supplying a
+    // different root therefore fails cryptographically before proof evaluation.
+    let wrong_root = [0xA5; 32];
+    assert_eq!(
+        receipt.verify_es256_consistency_state(older, &key, &[], Some(&wrong_root)),
+        Err(Rfc9942VdpError::InvalidEs256Signature)
+    );
+}
