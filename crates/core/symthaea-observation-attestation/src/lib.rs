@@ -3648,6 +3648,85 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn resolver_snapshot_is_retained_when_proof_purpose_is_unauthorized() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let method = ResolvedVerificationMethod {
+            verification_method: envelope.attester_id.clone(),
+            verifying_key: signing_key.verifying_key(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec!["authentication".into()],
+        };
+        let resolver = InMemoryVerificationMethodResolver::new([method]);
+        let expected_snapshot = resolver
+            .snapshot_fingerprint_for(&envelope.attester_id)
+            .expect("active method has a scoped snapshot");
+
+        let report = Ed25519ReceiptVerifier::new(
+            envelope.attester_id.clone(),
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_with_resolver_report(&envelope, &receipt, &resolver);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized
+        );
+        assert_eq!(
+            report.resolved_verification_method.as_deref(),
+            Some(envelope.attester_id.as_str())
+        );
+        assert_eq!(
+            report.resolution_snapshot_fingerprint.as_deref(),
+            Some(expected_snapshot.as_str())
+        );
+        assert!(report.execution_trace.is_well_formed());
+        assert_eq!(
+            report.execution_trace.results.last().map(|result| result.stage),
+            Some(VerificationStage::Failed(
+                ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized
+            ))
+        );
+    }
+
+    #[test]
+    fn resolver_error_does_not_attach_unpaired_verifier_snapshot() {
+        struct UnavailableResolver;
+
+        impl VerificationMethodResolver for UnavailableResolver {
+            fn resolve(
+                &self,
+                _verification_method: &str,
+            ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
+                Err(VerificationMethodResolutionError::Unavailable)
+            }
+        }
+
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            envelope.attester_id.clone(),
+            signing_key.verifying_key(),
+            150,
+        )
+        .with_resolution_snapshot_fingerprint("verifier-later-state");
+
+        let report =
+            verifier.verify_with_resolver_report(&envelope, &receipt, &UnavailableResolver);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable
+        );
+        assert_eq!(
+            report.resolved_verification_method.as_deref(),
+            Some(envelope.attester_id.as_str())
+        );
+        assert!(report.resolution_snapshot_fingerprint.is_none());
+        assert!(report.execution_trace.is_well_formed());
+    }
+
     #[test]
     fn resolver_snapshot_is_retained_when_resolution_reaches_terminal_failure() {
         let (envelope, signing_key, receipt) = envelope_and_key();
