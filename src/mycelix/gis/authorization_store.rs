@@ -749,6 +749,66 @@ impl SqliteAuthorizationStore {
         &self.relying_party_id
     }
 
+    /// Pin the relying-party-selected provider status source digest.
+    ///
+    /// The status verifier may authenticate evidence, but it must not choose the
+    /// trust source accepted by the boundary. The digest is therefore write-once
+    /// and durable alongside the relying-party store policy.
+    pub fn pin_provider_status_source_digest(
+        &self,
+        status_source_digest: &str,
+    ) -> Result<(), AuthorizationStoreError> {
+        if status_source_digest.is_empty() {
+            return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+        }
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let existing: Option<String> = tx
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_source_digest'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match existing {
+            Some(existing) if existing != status_source_digest => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "provider status source digest is already pinned as {existing}"
+                )));
+            }
+            Some(_) => {}
+            None => {
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value)
+                     VALUES('provider_status_source_digest',?1)",
+                    params![status_source_digest],
+                )?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn pinned_provider_status_source_digest(
+        &self,
+    ) -> Result<String, AuthorizationStoreError> {
+        let connection = self.connection()?;
+        connection
+            .query_row(
+                "SELECT value FROM authorization_store_metadata
+                 WHERE key='provider_status_source_digest'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                AuthorizationStoreError::Consumption(
+                    AuthorizationConsumptionError::ProviderStatusVerificationRequired,
+                )
+            })
+    }
+
     /// Pin one issuer to one authority namespace for this relying-party domain.
     /// The mapping is write-once; attempting to change an established pin fails closed.
     pub fn pin_native_authority_namespace(
@@ -1366,6 +1426,8 @@ fn validate_native_authority_pin_set(
             native_authorization_id,
         )
         .map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
+        let pinned_status_source_digest =
+            self.pinned_provider_status_source_digest()?;
         let status = match status_verifier.verify_current_status(
             ProviderStatusVerificationPurpose::Admission,
             issuer,
@@ -1376,7 +1438,7 @@ fn validate_native_authority_pin_set(
             &expected_effect.target_identity,
             &expected_effect.audience,
             &expected_effect.adapter,
-            None,
+            Some(pinned_status_source_digest.as_str()),
         ) {
             Ok(status) => status,
             Err(_) => {
@@ -1388,7 +1450,9 @@ fn validate_native_authority_pin_set(
                 return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
             }
         };
-        self.validate_provider_status_evidence(&status, None, true)?;
+        self.validate_provider_status_evidence(
+            &status, Some(&pinned_status_source_digest), true
+        )?;
         self.mark_dispatch_pending_bound_with_provenance(
             authorization_instance,
             attempt_id,
@@ -1741,6 +1805,10 @@ fn validate_native_authority_pin_set(
         record: &DurableDispatchRecord,
         status_verifier: &V,
     ) -> Result<(), AuthorizationStoreError> {
+        let pinned_status_source_digest = self.pinned_provider_status_source_digest()?;
+        if record.status_source_digest != pinned_status_source_digest {
+            return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+        }
         let pre_entry_status = match status_verifier.verify_current_status(
             ProviderStatusVerificationPurpose::PreEntry,
             &record.native_issuer,
@@ -3248,6 +3316,7 @@ mod tests {
         native_authorization_id: impl AsRef<str>,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         const ISSUER: &str = "test-issuer";
+        store.pin_provider_status_source_digest("sha256:test-status-source")?;
         const NAMESPACE: &str = "test-authority/v1";
         store.pin_native_authority_namespace(ISSUER, NAMESPACE)?;
         let status_identifier = format!("status:{}", native_authorization_id.as_ref());
@@ -4443,6 +4512,7 @@ mod tests {
         let path=std::env::temp_dir().join(format!("symthaea-gis-native-pin-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-native-pin").unwrap();
 
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
         assert!(matches!(
             store.mark_dispatch_pending_bound_from_pinned_native_authority(
                 "missing","attempt-missing",
@@ -4487,6 +4557,7 @@ mod tests {
             &witness,&action,"frame@1","attempt-native-pin","boundary-pin"
         ).unwrap();
 
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
         let record=store.mark_dispatch_pending_bound_from_pinned_native_authority(
             "native-pin","attempt-native-pin",&action,&effect,"boundary-pin",
             "operation:native-pin","issuer.example","native-auth-pin",
