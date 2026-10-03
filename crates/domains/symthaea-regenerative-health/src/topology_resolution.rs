@@ -48,6 +48,7 @@ pub enum TopologyResolutionIssue {
     PredecessorMismatch,
     SuccessorNotObserved,
     SuccessorEpochMismatch,
+    InvalidSuccessorEffectiveTime,
     MissingPreservedBranch,
     DuplicateObservedBranch,
     InconsistentObservedPredecessor,
@@ -62,6 +63,9 @@ pub struct TopologyBranchReference {
     pub predecessor_topology_digest: String,
     pub successor_epoch: u64,
     pub successor_topology_digest: String,
+    /// Preserved from the lifecycle successor statement so resolution does
+    /// not discard the temporal boundary at which the topology becomes effective.
+    pub successor_effective_from_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,6 +77,7 @@ pub struct TopologyLifecycleResolution {
     pub predecessor_topology_digest: String,
     pub selected_successor_epoch: u64,
     pub selected_successor_topology_digest: String,
+    pub selected_successor_effective_from_ms: u64,
     /// Monotonic authority-resolution sequence. Later resolutions link to
     /// the digest of the prior resolution rather than mutating it.
     pub resolution_epoch: u64,
@@ -235,6 +240,10 @@ impl TopologyResolutionGate {
             issues.push(TopologyResolutionIssue::SuccessorEpochMismatch);
         }
 
+        if resolution.selected_successor_effective_from_ms == 0 {
+            issues.push(TopologyResolutionIssue::InvalidSuccessorEffectiveTime);
+        }
+
         if resolution.resolution_epoch == 0 {
             issues.push(TopologyResolutionIssue::SuccessorEpochMismatch);
         } else if resolution.resolution_epoch != self.policy.expected_resolution_epoch {
@@ -267,6 +276,7 @@ impl TopologyResolutionGate {
             predecessor_topology_digest: resolution.predecessor_topology_digest.clone(),
             successor_epoch: resolution.selected_successor_epoch,
             successor_topology_digest: resolution.selected_successor_topology_digest.clone(),
+            successor_effective_from_ms: resolution.selected_successor_effective_from_ms,
         };
 
         if !unique_observed.contains(&selected) {
@@ -352,6 +362,7 @@ mod tests {
             predecessor_topology_digest: "topology-v1".into(),
             successor_epoch: 2,
             successor_topology_digest: digest.into(),
+            successor_effective_from_ms: 1_500,
         }
     }
 
@@ -364,6 +375,7 @@ mod tests {
             predecessor_topology_digest: "topology-v1".into(),
             selected_successor_epoch: 2,
             selected_successor_topology_digest: selected.into(),
+            selected_successor_effective_from_ms: 1_500,
             resolution_epoch: 1,
             predecessor_resolution_digest: None,
             observed_successors_digest: branch_set_digest(&observed),
@@ -396,6 +408,16 @@ mod tests {
             branch_set_digest(&[a.clone(), b.clone()]),
             branch_set_digest(&[b, a]),
         );
+    }
+
+    #[test]
+    fn zero_successor_effective_time_is_quarantined() {
+        let a = branch("topology-v2a");
+        let mut r = resolution("topology-v2a", vec![a.clone()]);
+        r.selected_successor_effective_from_ms = 0;
+        let d = gate().assess(Some(&r), &[a], 3_000);
+        assert_eq!(d.state, TopologyResolutionState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionIssue::InvalidSuccessorEffectiveTime));
     }
 
     #[test]
