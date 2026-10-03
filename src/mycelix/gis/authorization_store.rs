@@ -1284,6 +1284,25 @@ impl SqliteAuthorizationStore {
             stored.as_deref() == Some(*expected)
         }) {
             // Already pinned to exactly this configuration.
+        } else if existing[0].as_deref() == Some(values[0])
+            && existing[1].as_deref() == Some(values[1])
+            && existing[2].is_none()
+            && existing[3].is_none()
+            && existing[4].is_none()
+            && existing[5].as_deref() == Some(values[5])
+            && existing[6].as_deref() == Some(values[6])
+            && existing[7].as_deref() == Some(values[7])
+        {
+            // Complete a historical five-field pin with the newly required
+            // revision and implementation provenance. Existing values are never changed.
+            for index in 2..5 {
+                let (key, _) = keys[index];
+                let value = values[index];
+                tx.execute(
+                    "INSERT INTO authorization_store_metadata(key,value) VALUES(?1,?2)",
+                    params![key, value],
+                )?;
+            }
         } else {
             return Err(AuthorizationStoreError::InvalidState(
                 "provider evidence verifier configuration is already pinned differently".into()
@@ -4698,6 +4717,53 @@ mod tests {
             AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidBinding
             )
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn historical_verifier_pin_can_be_completed_once() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-verifier-pin-upgrade-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-verifier-pin-upgrade"
+        ).unwrap();
+        let metadata=[
+            ("provider_evidence_verifier_relying_party_id","rp-verifier-pin-upgrade"),
+            ("provider_evidence_verifier_id","test-verifier/v1"),
+            ("provider_evidence_verifier_config_digest","sha256:test-verifier-config"),
+            ("provider_evidence_verifier_trust_anchor_digest","sha256:test-trust-anchors"),
+            ("provider_evidence_verifier_evidence_profile_digest","sha256:test-evidence-profile"),
+        ];
+        for (key,value) in metadata {
+            store.connection().unwrap().execute(
+                "INSERT INTO authorization_store_metadata(key,value) VALUES(?1,?2)",
+                params![key,value],
+            ).unwrap();
+        }
+        let upgraded=ProviderVerifierConfiguration {
+            relying_party_id:"rp-verifier-pin-upgrade".into(),
+            verifier_id:"test-verifier/v1".into(),
+            verifier_revision:"test-verifier/rev1".into(),
+            verifier_implementation_id:"test-verifier".into(),
+            verifier_implementation_digest:"sha256:test-verifier-implementation".into(),
+            verifier_config_digest:"sha256:test-verifier-config".into(),
+            trust_anchor_digest:"sha256:test-trust-anchors".into(),
+            evidence_profile_digest:"sha256:test-evidence-profile".into(),
+        };
+        store.pin_provider_evidence_verifier_configuration(&upgraded).unwrap();
+        assert_eq!(
+            store.pinned_provider_evidence_verifier_configuration().unwrap(),
+            upgraded
+        );
+        let changed=ProviderVerifierConfiguration {
+            verifier_implementation_digest:"sha256:changed".into(),
+            ..upgraded
+        };
+        assert!(matches!(
+            store.pin_provider_evidence_verifier_configuration(&changed),
+            Err(AuthorizationStoreError::InvalidState(_))
         ));
         let _=std::fs::remove_file(path);
     }
