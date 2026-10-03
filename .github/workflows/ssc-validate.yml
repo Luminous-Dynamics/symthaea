@@ -1,5 +1,5 @@
 name: Sovereign State Compiler Validation
-# Boundary contract: validate the neutral core and plan-only target adapters on every branch push/PR.
+# Boundary contract: validate the neutral core and plan-only target adapters on every relevant branch push/PR.
 
 on:
   push:
@@ -8,8 +8,11 @@ on:
   pull_request:
     paths:
       - "crates/core/sovereign-state-compiler/**"
+      - "crates/core/sovereign-state-compiler-nix/**"
+      - "crates/core/nixward/**"
       - "Cargo.toml"
       - "Cargo.lock"
+      - "rust-toolchain.toml"
       - ".github/workflows/ssc-validate.yml"
 
 permissions:
@@ -26,6 +29,7 @@ jobs:
       - name: Install Rust 1.96
         run: |
           rustup toolchain install 1.96.0 --profile minimal
+          rustup component add rustfmt --toolchain 1.96.0
           rustup default 1.96.0
 
       - name: Format check
