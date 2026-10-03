@@ -7057,6 +7057,33 @@ mod tests {
     }
 
     #[test]
+    fn startup_rejects_forged_persisted_attempt_scope() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-attempt-scope-startup-{}.db",std::process::id()
+        ));
+        {
+            let store=SqliteAuthorizationStore::open(&path).unwrap();
+            store.connection().unwrap().execute(
+                "INSERT INTO authorization_leases(
+                    authorization_instance,action_id,action_digest,support_digest,policy,
+                    authority_epoch,remaining_executions,state,attempt_id,operation_id,
+                    boundary_id,attempt_scope_digest
+                 ) VALUES(
+                    'startup-auth','startup-action','startup-digest','startup-support','startup-policy',
+                    1,1,'prepared','startup-attempt','startup-operation','startup-boundary','sha256:forged-scope'
+                 )",
+                [],
+            ).unwrap();
+        }
+        assert!(matches!(
+            SqliteAuthorizationStore::open(&path),
+            Err(AuthorizationStoreError::InvalidState(message))
+                if message.contains("attempt scope digest mismatch")
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn persisted_attempt_scope_tampering_is_rejected() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-attempt-scope-tamper-{}.db",std::process::id()
