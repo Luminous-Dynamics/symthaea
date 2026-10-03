@@ -834,6 +834,13 @@ fn normalize_native_issuer(issuer: &str) -> String {
         if boundary_id.is_empty() || attempt_id.is_empty() {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+        let (validity_issued_at, validity_expires_at) = self.clock_policy.validate(
+            &witness.issued_at,
+            witness.expires_at.as_deref(),
+            trusted_utc_now()?,
+        )?;
+        let validity_policy_digest = self.clock_policy.digest();
+
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
@@ -854,6 +861,18 @@ fn normalize_native_issuer(issuer: &str) -> String {
         let mut lease = load_lease(&tx, &witness.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
         lease.prepare_for_execution(witness, action, current_frame, attempt_id)?;
+
+        tx.execute(
+            "UPDATE authorization_leases
+             SET validity_issued_at=?2,validity_expires_at=?3,validity_policy_digest=?4
+             WHERE authorization_instance=?1",
+            params![
+                witness.authorization_instance.as_str(),
+                validity_issued_at.as_str(),
+                validity_expires_at.as_deref(),
+                validity_policy_digest.as_str(),
+            ],
+        )?;
 
         let changed = tx.execute(
             "UPDATE authorization_leases
@@ -1052,6 +1071,22 @@ fn normalize_native_issuer(issuer: &str) -> String {
         let (native_authority_pin_set_id, native_authority_pin_set_digest) =
             self.persist_native_authority_pin_set_snapshot(&tx)?;
 
+        let lease_validity: (String, Option<String>, String) = tx.query_row(
+            "SELECT validity_issued_at,validity_expires_at,validity_policy_digest
+             FROM authorization_leases
+             WHERE authorization_instance=?1",
+            params![authorization_instance],
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+        )?;
+        self.clock_policy.validate(
+            &lease_validity.0,
+            lease_validity.1.as_deref(),
+            trusted_utc_now()?,
+        )?;
+        if lease_validity.2 != self.clock_policy.digest() {
+            return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+        }
+
         let record = DurableDispatchRecord::new(
             authorization_instance,
             attempt_id,
@@ -1080,9 +1115,10 @@ fn normalize_native_issuer(issuer: &str) -> String {
             "INSERT INTO authorization_dispatches
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
-              native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,
+              native_authority_pin_set_id,native_authority_pin_set_digest,
+              validity_issued_at,validity_expires_at,validity_policy_digest,relying_party_id,
               action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,'dispatch_pending')",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,'dispatch_pending')",
             params![
                 record.authorization_instance, record.attempt_id, record.operation_id,
                 record.native_replay_identity,
@@ -1091,6 +1127,9 @@ fn normalize_native_issuer(issuer: &str) -> String {
                 native_replay_provenance.derivation_digest.as_str(),
                 native_authority_pin_set_id.as_str(),
                 native_authority_pin_set_digest.as_str(),
+                lease_validity.0.as_str(),
+                lease_validity.1.as_deref(),
+                lease_validity.2.as_str(),
                 self.relying_party_id.as_str(),
                 record.action_id, record.action_digest, record.provider_idempotency_key,
                 record.target_identity, record.audience, record.adapter, record.boundary_id],
@@ -1211,6 +1250,45 @@ fn normalize_native_issuer(issuer: &str) -> String {
             return Err(AuthorizationConsumptionError::AttemptMismatch.into());
         }
         tx.commit()?;
+        Ok(())
+    }
+
+    fn validate_persisted_authorization_validity(
+        &self,
+        issued_at: Option<&str>,
+        expires_at: Option<&str>,
+        policy_digest: Option<&str>,
+        enforce_now: bool,
+    ) -> Result<(), AuthorizationStoreError> {
+        if policy_digest != Some(self.clock_policy.digest().as_str()) {
+            return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+        }
+        let issued_at = issued_at
+            .ok_or_else(|| AuthorizationConsumptionError::AuthorizationValidityWindowFailed)?;
+        let issued = DateTime::parse_from_rfc3339(issued_at)
+            .map_err(|_| AuthorizationConsumptionError::AuthorizationValidityWindowFailed)?
+            .with_timezone(&Utc);
+        let expiry = match expires_at {
+            Some(value) => Some(
+                DateTime::parse_from_rfc3339(value)
+                    .map_err(|_| AuthorizationConsumptionError::AuthorizationValidityWindowFailed)?
+                    .with_timezone(&Utc),
+            ),
+            None if self.clock_policy.require_expiry => {
+                return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+            }
+            None => None,
+        };
+        if expiry.is_some_and(|value| value <= issued)
+            || expiry.is_some_and(|value| {
+                value > issued + Duration::seconds(self.clock_policy.max_age_seconds as i64)
+            })
+        {
+            return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
+        }
+        if enforce_now {
+            self.clock_policy.validate(issued_at, expires_at, trusted_utc_now()?)?;
+        }
         Ok(())
     }
 
