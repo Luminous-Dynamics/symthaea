@@ -99,13 +99,9 @@ run_boundary_check() {
 
   # The transport waist is allowed to execute systemctl. Every other protected
   # authority module must remain free of direct host observation.
-  #
   # CROSS-022: governed authority/effect-binding modules must not consume the
-  # legacy Custom command representation as semantic input. The legacy service
-  # renderer is a one-way compatibility projection only.
+  # legacy Custom command representation as semantic input.
   for file in "${AUTHORITY_FILES[@]}"; do
-    # authorization.rs explicitly rejects Custom commands in the generic
-    # intent constructor; these references are negative guards, not inputs.
     [[ "${file}" == "crates/core/nixward/src/action/authorization.rs" ]] && continue
     if matches="$(scan_legacy_custom_command "${ROOT}/${file}")"; then
       echo "ERROR: governed authority module consumes legacy NixOSCommand::Custom: ${file}" >&2
@@ -115,8 +111,6 @@ run_boundary_check() {
   done
 
   # CROSS-022: compatibility rendering is not an authority primitive.
-  # Authority modules must not invoke the legacy renderer directly, even if
-  # they avoid mentioning NixOSCommand at the call site.
   for file in "${AUTHORITY_FILES[@]}"; do
     [[ "${file}" == "crates/core/nixward/src/action/service_manager.rs" ]] && continue
     if matches="$(scan_legacy_service_renderer "${ROOT}/${file}")"; then
@@ -127,17 +121,13 @@ run_boundary_check() {
   done
 
   # CROSS-022: the service domain is one-way from semantic data toward the
-  # compatibility renderer. A reverse From/TryFrom implementation would make
-  # legacy command bytes semantic input again.
+  # compatibility renderer.
   if matches="$(scan_reverse_service_conversion "${ROOT}/crates/core/nixward/src")"; then
     echo "ERROR: reverse NixOSCommand -> NixServiceOperationV1 conversion is forbidden" >&2
     echo "${matches}" >&2
     failed=1
   fi
 
-  # CROSS-022: the typed service domain is intentionally upstream of the
-  # legacy command representation. It must not mention NixOSCommand at all,
-  # preventing accidental reverse conversion or semantic coupling.
   if matches="$(rg -n '\bNixOSCommand\b' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
     echo "ERROR: typed service domain must not depend on legacy NixOSCommand representation" >&2
     echo "${matches}" >&2
@@ -145,11 +135,10 @@ run_boundary_check() {
   fi
 
   # Domain invariants must be established by NixServiceOperationV1::new().
-  # The closed operation enum itself may deserialize because it has no free-form
-  # data or normalization boundary. The aggregate NixServiceOperationV1 must not
-  # derive/implement Deserialize, because that would bypass its validating
-  # constructor and admit non-canonical unit strings.
-  if matches="$(rg -n --pcre2 'Deserialize[^\\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\\n]*Deserialize' "+'"${ROOT}/crates/core/nixward/src/action/service_domain.rs"'+")"; then
+  # The closed operation enum may deserialize because it contains no free-form
+  # data or normalization boundary. The aggregate must not deserialize because
+  # that would bypass canonicalization and admit non-canonical unit strings.
+  if matches="$(rg -n --pcre2 'Deserialize[^\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\n]*Deserialize' "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
     echo "ERROR: validated NixServiceOperationV1 must not deserialize around its constructor" >&2
     echo "${matches}" >&2
     failed=1
@@ -164,10 +153,6 @@ run_boundary_check() {
     fi
   done
 
-  # CROSS-022: legacy ServiceManager lifecycle constructors remain
-  # compatibility APIs, but governed callers must use the fallible typed
-  # bridges. Keep the compatibility implementation and its regression tests
-  # out of this scan.
   local nixward_src="${ROOT}/crates/core/nixward/src"
   if matches="$(rg -n --pcre2 "${LEGACY_SERVICE_CONSTRUCTOR_PATTERN}" "${nixward_src}" --glob '*.rs' --glob '!**/action/service_manager.rs')"; then
     echo "ERROR: Nixward caller uses infallible legacy ServiceManager constructor" >&2
@@ -175,8 +160,6 @@ run_boundary_check() {
     failed=1
   fi
 
-  # CROSS-022: no wildcard action-category fallback may synthesize a
-  # systemctl command. New categories must be mapped explicitly or rejected.
   local daemon="${ROOT}/crates/core/nixward/src/bin/nixward_daemon.rs"
   if [[ ! -f "${daemon}" ]]; then
     echo "ERROR: Nixward daemon source is missing" >&2
@@ -196,71 +179,71 @@ run_self_test() {
   trap 'rm -rf "${tmp}"' RETURN
 
   printf '%s\n' 'let _ = ServiceStatus;' > "${tmp}/diagnostic.rs"
-  if scan_diagnostic_boundary "${tmp}/diagnostic.rs"; then
-    :
-  else
+  if scan_diagnostic_boundary "${tmp}/diagnostic.rs"; then :; else
     echo "ERROR: CROSS-015 self-test failed to detect diagnostic type" >&2
     return 1
   fi
 
   printf '%s\n' 'Command::new("systemctl");' > "${tmp}/systemctl.rs"
-  if scan_direct_systemctl "${tmp}/systemctl.rs"; then
-    :
-  else
+  if scan_direct_systemctl "${tmp}/systemctl.rs"; then :; else
     echo "ERROR: CROSS-015 self-test failed to detect direct systemctl command use" >&2
     return 1
   fi
 
   printf '%s\n' '_ => NixOSCommand::Custom { command: "systemctl", args: vec!["restart"], };' > "${tmp}/implicit-restart.rs"
-  if scan_implicit_service_restart "${tmp}/implicit-restart.rs"; then
-    :
-  else
+  if scan_implicit_service_restart "${tmp}/implicit-restart.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect implicit service restart fallback" >&2
     return 1
   fi
 
   printf '%s\n' 'NixServiceObservedStateV1::parse_systemd_properties(...);' > "${tmp}/typed.rs"
+  if scan_diagnostic_boundary "${tmp}/typed.rs"; then
+    echo "ERROR: CROSS-015 self-test falsely rejected typed evidence" >&2
+    return 1
+  fi
+
   printf '%s\n' 'NixOSCommand::Custom { .. };' > "${tmp}/legacy-domain.rs"
-  if rg -n '\bNixOSCommand\b' "${tmp}/legacy-domain.rs"; then
-    :
-  else
+  if rg -n '\bNixOSCommand\b' "${tmp}/legacy-domain.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect legacy command dependency" >&2
     return 1
   fi
+
   printf '%s\n' 'ServiceManager::render_legacy_command(&typed);' > "${tmp}/legacy-renderer.rs"
-  if scan_legacy_service_renderer "${tmp}/legacy-renderer.rs"; then
-    :
-  else
+  if scan_legacy_service_renderer "${tmp}/legacy-renderer.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect legacy renderer usage" >&2
     return 1
   fi
 
   printf '%s\n' 'impl TryFrom<&NixOSCommand> for NixServiceOperationV1 {}' > "${tmp}/reverse-service.rs"
-  if scan_reverse_service_conversion "${tmp}/reverse-service.rs"; then
-    :
-  else
+  if scan_reverse_service_conversion "${tmp}/reverse-service.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect reverse service conversion" >&2
     return 1
   fi
 
   printf '%s\n' 'ServiceManager::restart("nginx");' > "${tmp}/legacy-service.rs"
-  if scan_legacy_service_constructor "${tmp}/legacy-service.rs"; then
-    :
-  else
+  if scan_legacy_service_constructor "${tmp}/legacy-service.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect legacy ServiceManager constructor" >&2
     return 1
   fi
 
   printf '%s\n' 'let _ = NixOSCommand::Custom { .. };' > "${tmp}/legacy-custom.rs"
-  if scan_legacy_custom_command "${tmp}/legacy-custom.rs"; then
-    :
-  else
+  if scan_legacy_custom_command "${tmp}/legacy-custom.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect legacy Custom command material" >&2
     return 1
   fi
 
-  if scan_diagnostic_boundary "${tmp}/typed.rs"; then
-    echo "ERROR: CROSS-015 self-test falsely rejected typed evidence" >&2
+  # The validated aggregate must be rejected, while the closed enum remains
+  # permitted to deserialize. This prevents the fence itself from regressing
+  # into an over-broad "no Deserialize in service_domain.rs" rule.
+  printf '%s\n' '#[derive(Deserialize)] struct NixServiceOperationV1;' > "${tmp}/aggregate-deserialize.rs"
+  if rg -n --pcre2 'Deserialize[^\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\n]*Deserialize' "${tmp}/aggregate-deserialize.rs"; then :; else
+    echo "ERROR: CROSS-022 self-test failed to detect aggregate deserialization" >&2
+    return 1
+  fi
+
+  printf '%s\n' '#[derive(Deserialize)] enum NixServiceOperationKindV1 { Start }' > "${tmp}/enum-deserialize.rs"
+  if rg -n --pcre2 'Deserialize[^\n]*for[[:space:]]+NixServiceOperationV1|NixServiceOperationV1[^\n]*Deserialize' "${tmp}/enum-deserialize.rs"; then
+    echo "ERROR: CROSS-022 self-test falsely rejected closed operation enum deserialization" >&2
     return 1
   fi
 }
