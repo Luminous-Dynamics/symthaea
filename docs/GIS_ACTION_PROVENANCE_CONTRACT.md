@@ -276,6 +276,8 @@ This is an implementation hardening of AEB-07, not a claim that the draft mandat
 ### Execution identity lattice
 
 The effect boundary now records the execution identities that must not be conflated:
+Before an effect-bound dispatch can reach the native status verifier, the material effect-binding identities must all be concrete: target identity, audience/environment identity, and adapter identity cannot be empty. This check is structural rather than semantic—provider-specific meaning remains the responsibility of the pinned native/status/adapter layers—but an empty material identity is never admitted as a valid frozen effect contract.
+
 
 - **Authorization instance** identifies the durable grant of authority.
 - **Operation ID** identifies the logical operation being attempted.
