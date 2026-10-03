@@ -3886,10 +3886,10 @@ mod tests {
 
         let mut unknown_vds = good_protected.clone();
         let vds_pos = unknown_vds
-            .windows(5)
-            .position(|w| w == [0x19, 0x01, 0x8b, 0x01, 0x00])
+            .windows(4)
+            .position(|w| w == [0x19, 0x01, 0x8b, 0x01])
             .expect("vds label/value fixture");
-        unknown_vds[vds_pos + 4] = 0x02;
+        unknown_vds[vds_pos + 3] = 0x02;
         assert_eq!(
             Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&unknown_vds, &good_unprotected)),
             Err(Rfc9942VdpError::VdsMismatch(2))
