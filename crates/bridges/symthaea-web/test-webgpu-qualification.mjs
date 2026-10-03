@@ -168,7 +168,7 @@ class QualificationError extends Error {
 }
 
 async function runMode(mode) {
-  const swiftShaderMode = mode === 'webgpu-swiftshader';
+  const swiftShaderMode = mode === 'webgpu' || mode === 'webgpu-swiftshader';
   const hardwareMode = mode === 'webgpu-hardware';
   const gpuMode = swiftShaderMode || hardwareMode;
   if (!gpuMode && mode !== 'fallback') {
@@ -258,7 +258,7 @@ async function runMode(mode) {
       }
 
       await page.screenshot({
-        path: path.join(SCREENSHOT_DIR, 'webgpu.png'),
+        path: path.join(SCREENSHOT_DIR, `${mode}.png`),
         fullPage: false,
       });
 
@@ -358,7 +358,7 @@ async function runMode(mode) {
     }
 
     await page.screenshot({
-      path: path.join(SCREENSHOT_DIR, 'fallback.png'),
+      path: path.join(SCREENSHOT_DIR, `${mode}.png`),
       fullPage: false,
     });
 
