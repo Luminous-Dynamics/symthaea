@@ -169,7 +169,7 @@ impl Rfc9942VerifiedProof {
     pub const fn consistency_heads(&self) -> Option<(VdsTreeHead, VdsTreeHead)> {
         match self {
             Self::Inclusion { .. } => None,
-            Self::Consistency { older, newer } => Some((*older, *newer)),
+            Self::Consistency { older, newer, .. } => Some((*older, *newer)),
         }
     }
 }
