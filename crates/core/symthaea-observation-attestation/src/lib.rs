@@ -499,6 +499,12 @@ pub struct EvaluationTrace {
 }
 
 impl EvaluationTrace {
+    /// The representation produced when a legacy report was serialized without
+    /// the first-class execution-trace field.
+    fn is_legacy_absent_placeholder(&self) -> bool {
+        self.procedure_fingerprint.is_empty() && self.results.is_empty()
+    }
+
     /// Reconstruct an execution trace from compatibility report stages.
     ///
     /// Current reports capture the trace directly. This method exists for
@@ -547,7 +553,9 @@ impl EvaluationTrace {
 
         let matches_trace = if report.execution_trace.is_well_formed() {
             self == &report.execution_trace
-        } else if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
+        } else if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION
+            && report.execution_trace.is_legacy_absent_placeholder()
+        {
             self.results == EvaluationTrace::from_report_legacy(report).results
         } else {
             false
@@ -1267,10 +1275,13 @@ impl EvidenceEvaluation {
         let context = VerificationContext::from_report(report);
         let execution_trace = if report.execution_trace.is_well_formed() {
             report.execution_trace.clone()
-        } else if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
+        } else if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION
+            && report.execution_trace.is_legacy_absent_placeholder()
+        {
             // Compatibility path for legacy serialized reports that predate
-            // first-class execution traces. Current reports must preserve a
-            // malformed trace rather than silently replacing it with a projection.
+            // first-class execution traces. Only the empty absent-field placeholder
+            // may be projected; an explicit malformed legacy trace is evidence that
+            // must remain visible and fail consistency validation.
             EvaluationTrace::from_report_legacy(report)
         } else {
             report.execution_trace.clone()
@@ -3445,6 +3456,34 @@ mod tests {
             evaluation.execution_trace,
             EvaluationTrace::default()
         );
+        assert!(!evaluation.execution_trace.is_well_formed());
+        assert!(!evaluation.is_consistent_with_report(&report));
+    }
+
+    #[test]
+    fn legacy_v3_malformed_trace_is_not_repaired() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let mut report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        report.verifier_version = "symthaea-observation-attestation-report-v3";
+        report.procedure_fingerprint =
+            EvaluationProcedure::attestation_ed25519_v1().fingerprint();
+        report.execution_trace = EvaluationTrace {
+            procedure_fingerprint: report.procedure_fingerprint.clone(),
+            results: vec![EvaluationCheckResult {
+                sequence: 7,
+                check: EvaluationCheck::CryptographicProof,
+                stage: VerificationStage::Passed,
+            }],
+        };
+
+        let evaluation = report.to_evidence_evaluation();
+
+        assert_eq!(evaluation.execution_trace, report.execution_trace);
         assert!(!evaluation.execution_trace.is_well_formed());
         assert!(!evaluation.is_consistent_with_report(&report));
     }
