@@ -21,7 +21,7 @@ const GOVERNED_PROPERTIES: &str = "Id,Names,LoadState,ActiveState,SubState,UnitF
 ///
 /// The transport is observational only and may become stale immediately after
 /// the command returns; it is never execution authority.
-pub fn observe_service_properties(unit: &str) -> Result<String, std::io::Error> {
+pub(crate) fn observe_service_properties(unit: &str) -> Result<String, std::io::Error> {
     observe_projection(unit, GOVERNED_PROPERTIES)
 }
 
@@ -29,7 +29,7 @@ pub fn observe_service_properties(unit: &str) -> Result<String, std::io::Error> 
 ///
 /// Enablement evidence deliberately uses this narrower projection so it does
 /// not become dependent on unrelated CanStart/CanStop/CanReload fields.
-pub fn observe_service_state_properties(unit: &str) -> Result<String, std::io::Error> {
+pub(crate) fn observe_service_state_properties(unit: &str) -> Result<String, std::io::Error> {
     observe_projection(unit, OBSERVED_STATE_PROPERTIES)
 }
 
