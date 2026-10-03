@@ -551,12 +551,16 @@ impl EvaluationTrace {
             return false;
         }
 
-        let matches_trace = if report.execution_trace.is_well_formed() {
+        let matches_trace = if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
+            if report.execution_trace.is_legacy_absent_placeholder() {
+                self.results == EvaluationTrace::from_report_legacy(report).results
+            } else {
+                // The execution_trace field did not exist in legacy v3 evidence.
+                // Never treat a newer field as part of a historical v3 identity.
+                false
+            }
+        } else if report.execution_trace.is_well_formed() {
             self == &report.execution_trace
-        } else if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION
-            && report.execution_trace.is_legacy_absent_placeholder()
-        {
-            self.results == EvaluationTrace::from_report_legacy(report).results
         } else {
             false
         };
@@ -1273,15 +1277,10 @@ pub struct EvidenceEvaluation {
 impl EvidenceEvaluation {
     pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
         let context = VerificationContext::from_report(report);
-        let execution_trace = if report.execution_trace.is_well_formed() {
-            report.execution_trace.clone()
-        } else if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION
-            && report.execution_trace.is_legacy_absent_placeholder()
-        {
-            // Compatibility path for legacy serialized reports that predate
-            // first-class execution traces. Only the empty absent-field placeholder
-            // may be projected; an explicit malformed legacy trace is evidence that
-            // must remain visible and fail consistency validation.
+        let execution_trace = if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
+            // Legacy v3 canonical identity predates first-class execution traces.
+            // Always reconstruct from the historical stage projection; any newer
+            // trace field is outside the v3 evidence contract.
             EvaluationTrace::from_report_legacy(report)
         } else {
             report.execution_trace.clone()
@@ -3461,7 +3460,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_v3_malformed_trace_is_not_repaired() {
+    fn legacy_v3_ignores_unbound_current_execution_trace() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let mut report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
@@ -3482,10 +3481,12 @@ mod tests {
         };
 
         let evaluation = report.to_evidence_evaluation();
+        let legacy_projection = EvaluationTrace::from_report_legacy(&report);
 
-        assert_eq!(evaluation.execution_trace, report.execution_trace);
-        assert!(!evaluation.execution_trace.is_well_formed());
-        assert!(!evaluation.is_consistent_with_report(&report));
+        assert_eq!(evaluation.execution_trace, legacy_projection);
+        assert_ne!(evaluation.execution_trace, report.execution_trace);
+        assert!(evaluation.execution_trace.is_well_formed());
+        assert!(evaluation.is_consistent_with_report(&report));
     }
 
     #[test]
