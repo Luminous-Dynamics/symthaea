@@ -1590,20 +1590,28 @@ impl KnowledgePersistence {
         )
         .map_err(|e| format!("Schema legacy memory identity backfill: {e}"))?;
 
-        let blank_memory_id_count: i64 = tx
-            .query_row(
-                "SELECT COUNT(*)
-                 FROM knowledge_facts
-                 WHERE memory_id IS NOT NULL AND trim(memory_id) = ''",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(|e| format!("Schema legacy memory identity validation: {e}"))?;
-        if blank_memory_id_count > 0 {
-            return Err(format!(
-                "Schema legacy memory identity validation failed: {} blank memory_id value(s)",
-                blank_memory_id_count
-            ));
+        let legacy_memory_ids = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT rowid, memory_id
+                     FROM knowledge_facts
+                     WHERE memory_id IS NOT NULL",
+                )
+                .map_err(|e| format!("Schema legacy memory identity validation prepare: {e}"))?;
+            stmt.query_map([], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| format!("Schema legacy memory identity validation query: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Schema legacy memory identity validation row: {e}"))?
+        };
+        for (rowid, memory_id) in legacy_memory_ids {
+            if memory_id.trim().is_empty() {
+                return Err(format!(
+                    "Schema legacy memory identity validation failed: row {} has blank memory_id",
+                    rowid
+                ));
+            }
         }
 
         // Add snapshot-receipt self-digest support to databases created by the
@@ -3917,6 +3925,13 @@ mod tests {
                  (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
                  VALUES ('   ', ?1, 'blank identity', 0.5, 1, 0)",
                 [vec![0x55u8; BinaryHV::BYTES]],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO knowledge_facts
+                 (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+                 VALUES (?1, ?2, 'tab identity', 0.5, 2, 0)",
+                rusqlite::params!["\t\n", vec![0x66u8; BinaryHV::BYTES]],
             )
             .unwrap();
         }
