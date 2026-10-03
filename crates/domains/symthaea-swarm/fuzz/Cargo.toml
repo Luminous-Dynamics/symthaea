@@ -15,3 +15,18 @@ symthaea-swarm = { path = "..", default-features = false, features = ["semantic-
 name = "fuzz_cose_key_es256"
 path = "fuzz_targets/fuzz_cose_key_es256.rs"
 doc = false
+
+[[bin]]
+name = "fuzz_rfc9942_receipt"
+path = "fuzz_targets/fuzz_rfc9942_receipt.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_rfc9942_signature_with_receipts"
+path = "fuzz_targets/fuzz_rfc9942_signature_with_receipts.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_rfc9942_proofs"
+path = "fuzz_targets/fuzz_rfc9942_proofs.rs"
+doc = false
