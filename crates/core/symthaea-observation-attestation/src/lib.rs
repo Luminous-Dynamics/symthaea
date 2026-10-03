@@ -54,7 +54,7 @@ impl VerificationPolicyInputs {
             value.as_deref().is_none_or(|value| !value.is_empty())
         };
 
-        self.policy_version == POLICY_VERSION
+        !self.policy_version.is_empty()
             && self.cryptosuite == CRYPTOSUITE
             && optional_nonempty(&self.expected_proof_purpose)
             && optional_nonempty(&self.expected_domain)
@@ -2503,6 +2503,25 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn custom_policy_version_remains_a_valid_policy_identity() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .with_policy_version("symthaea-observation-verification-policy-v2")
+        .verify_report(&envelope, &receipt);
+
+        assert!(report.policy_inputs.is_well_formed());
+        assert!(report.has_consistent_identity_bindings());
+        assert_eq!(
+            report.policy_inputs.policy_version,
+            "symthaea-observation-verification-policy-v2"
+        );
+    }
 
     #[test]
     fn verification_policy_self_validation_rejects_semantic_rebinding() {
