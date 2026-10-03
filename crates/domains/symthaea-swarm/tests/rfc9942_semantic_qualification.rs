@@ -193,7 +193,7 @@ fn cose_extension_values_accept_well_formed_simple_items_and_round_trip_exactly(
 
         let mut encoded = Vec::new();
         encoded.extend_from_slice(&[0xd2, 0x84]);
-        encoded.push(0x43);
+        encoded.push(0x45);
         encoded.extend_from_slice(&protected);
         encoded.push(0xa0);
         encoded.push(0xf6);
