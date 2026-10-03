@@ -392,6 +392,15 @@ impl AuthorizationEvidence {
             return Err(PlanValidationError::AuthorizationPlanDigestMismatch);
         }
 
+        if let Some(intent_expiry) = plan.intent.expires_at_ms {
+            if now_ms > intent_expiry {
+                return Err(PlanValidationError::IntentExpired);
+            }
+            if self.valid_until_ms.is_some_and(|until| until > intent_expiry) {
+                return Err(PlanValidationError::AuthorizationExceedsIntentExpiry);
+            }
+        }
+
         if let (Some(from), Some(until)) = (self.valid_from_ms, self.valid_until_ms)
             && from > until
         {
@@ -508,6 +517,10 @@ pub enum PlanValidationError {
     TargetSnapshotStale { age_ms: u64, max_age_ms: u64 },
     #[error("authorization validity window is invalid")]
     AuthorizationWindowInvalid,
+    #[error("deployment intent has expired")]
+    IntentExpired,
+    #[error("authorization outlives deployment intent expiry")]
+    AuthorizationExceedsIntentExpiry,
     #[error("authorization authority identifier is empty")]
     EmptyAuthority,
     #[error("authorization nonce is empty")]
@@ -681,6 +694,31 @@ mod tests {
                 age_ms: 201,
                 max_age_ms: 200
             })
+        );
+    }
+
+    #[test]
+    fn rejects_authorization_beyond_intent_expiry() {
+        let mut plan = sample_plan();
+        plan.intent.expires_at_ms = Some(180);
+        let mut auth = authorization_for(&plan);
+        auth.valid_until_ms = Some(200);
+
+        assert_eq!(
+            plan.authorize(auth, 150),
+            Err(PlanValidationError::AuthorizationExceedsIntentExpiry)
+        );
+    }
+
+    #[test]
+    fn rejects_expired_intent() {
+        let mut plan = sample_plan();
+        plan.intent.expires_at_ms = Some(149);
+        let auth = authorization_for(&plan);
+
+        assert_eq!(
+            plan.authorize(auth, 150),
+            Err(PlanValidationError::IntentExpired)
         );
     }
 
