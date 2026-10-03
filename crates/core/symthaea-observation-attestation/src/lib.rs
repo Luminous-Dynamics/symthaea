@@ -3095,6 +3095,11 @@ mod tests {
         changed_context.context_fingerprint = "tampered-context".into();
         assert!(!changed_context.is_well_formed());
 
+        let mut recomputed_context = evaluation.clone();
+        recomputed_context.context.verifier_id = "attacker-verifier";
+        recomputed_context.context_fingerprint = recomputed_context.context.fingerprint();
+        assert!(!recomputed_context.is_well_formed());
+
         let mut changed_trace = evaluation;
         changed_trace.execution_trace = EvaluationTrace::default();
         assert!(!changed_trace.is_well_formed());
