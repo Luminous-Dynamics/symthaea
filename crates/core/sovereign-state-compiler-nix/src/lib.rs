@@ -509,6 +509,7 @@ impl TargetAdapter for NixOSTargetAdapter {
             None if !install.is_empty() || !remove.is_empty() || home_manager => {
                 DeploymentDisposition::Applied
             }
+            None if reboot => DeploymentDisposition::Rebooted,
             None => DeploymentDisposition::Unchanged,
         };
 
@@ -1131,6 +1132,21 @@ mod tests {
         assert!(plan_b.steps.iter().any(|step| {
             step.kind == PlanStepKind::Rollback && step.description.contains("generation 43")
         }));
+    }
+
+    #[test]
+    fn reboot_only_uses_rebooted_disposition() {
+        let mut intent = DeploymentIntent::new("reboot-only", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(REBOOT_KEY.into(), StateValue::Bool(true));
+        let plan = adapter().compile(&intent).expect("compile");
+
+        assert_eq!(
+            plan.verification.disposition,
+            DeploymentDisposition::Rebooted
+        );
     }
 
     #[test]
