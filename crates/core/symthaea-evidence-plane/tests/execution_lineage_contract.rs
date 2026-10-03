@@ -128,7 +128,11 @@ fn every_canonical_lineage_field_changes_identity_and_drift_report() {
             lineage
                 .lock_digests
                 .insert("Cargo.lock".into(), "sha256:1122334455667788".into());
-            ("lock_digests", lineage, ExecutionLineageDriftFieldV1::LockDigests)
+            (
+                "lock_digests",
+                lineage,
+                ExecutionLineageDriftFieldV1::LockDigests,
+            )
         },
         {
             let mut lineage = base.clone();
@@ -144,7 +148,11 @@ fn every_canonical_lineage_field_changes_identity_and_drift_report() {
         {
             let mut lineage = base.clone();
             lineage.host_triple = "aarch64-unknown-linux-gnu".into();
-            ("host_triple", lineage, ExecutionLineageDriftFieldV1::HostTriple)
+            (
+                "host_triple",
+                lineage,
+                ExecutionLineageDriftFieldV1::HostTriple,
+            )
         },
         {
             let mut lineage = base.clone();
@@ -158,7 +166,11 @@ fn every_canonical_lineage_field_changes_identity_and_drift_report() {
         {
             let mut lineage = base.clone();
             lineage.nix_identity = None;
-            ("nix_identity", lineage, ExecutionLineageDriftFieldV1::NixIdentity)
+            (
+                "nix_identity",
+                lineage,
+                ExecutionLineageDriftFieldV1::NixIdentity,
+            )
         },
         {
             let mut lineage = base.clone();
@@ -181,7 +193,11 @@ fn every_canonical_lineage_field_changes_identity_and_drift_report() {
         {
             let mut lineage = base.clone();
             lineage.argv.push("--nocapture".into());
-            ("command_argv", lineage, ExecutionLineageDriftFieldV1::CommandArgv)
+            (
+                "command_argv",
+                lineage,
+                ExecutionLineageDriftFieldV1::CommandArgv,
+            )
         },
         {
             let mut lineage = base.clone();
@@ -220,7 +236,11 @@ fn every_canonical_lineage_field_changes_identity_and_drift_report() {
             )
             .unwrap()
             .expect("changed lineage must report drift");
-        assert_eq!(report.changed_fields, vec![expected_field], "{name} drift must be isolated");
+        assert_eq!(
+            report.changed_fields,
+            vec![expected_field],
+            "{name} drift must be isolated"
+        );
     }
 }
 
