@@ -10,7 +10,8 @@ use std::collections::BTreeSet;
 
 use sovereign_state_compiler::{
     Capability, DeploymentDisposition, DeploymentIntent, DeploymentPlan, PlanStep, PlanStepKind,
-    PlanValidationError, RollbackPolicy, TargetAdapter, TargetId, TargetSnapshot, VerificationPolicy,
+    PlanValidationError, RollbackPolicy, TargetAdapter, TargetId, TargetSnapshot,
+    VerificationPolicy,
 };
 use thiserror::Error;
 
@@ -119,7 +120,7 @@ impl NixActivationMode {
                 "temporarily activate the NixOS configuration without changing the boot default"
             }
             Self::Boot => {
-                "build the NixOS configuration and select it for the next boot without activating now"
+                "build the NixOS configuration and select it for the next boot without activating now",
             }
             Self::DryActivate => {
                 "evaluate NixOS activation changes without activating the configuration"
@@ -480,7 +481,10 @@ impl TargetAdapter for NixOSTargetAdapter {
                     &mut steps,
                     PlanStepKind::Rollback,
                     [Capability::Rollback],
-                    format!("{} {generation}", NixActivationMode::Rollback { generation }.description()),
+                    format!(
+                        "{} {generation}",
+                        NixActivationMode::Rollback { generation }.description()
+                    ),
                 );
             }
             None => {}
@@ -652,10 +656,10 @@ mod tests {
     fn compiles_a_nixos_switch_without_native_commands() {
         let adapter = adapter();
         let mut intent = DeploymentIntent::new("switch-1", "host-01");
-        intent.desired_state.properties.insert(
-            REBUILD_KEY.into(),
-            StateValue::String("switch".into()),
-        );
+        intent
+            .desired_state
+            .properties
+            .insert(REBUILD_KEY.into(), StateValue::String("switch".into()));
         intent.artifacts.push(ArtifactRef {
             id: ArtifactId::from("system-config"),
             version: Some("2026.10.03".into()),
@@ -690,7 +694,9 @@ mod tests {
 
     #[test]
     fn deterministic_nixos_rebuild_plan_vectors() {
-        let set = |capabilities: &[Capability]| capabilities.iter().copied().collect::<BTreeSet<_>>();
+        let set = |capabilities: &[Capability]| {
+            capabilities.iter().copied().collect::<BTreeSet<_>>()
+        };
         let vectors = [
             (
                 "switch",
@@ -820,10 +826,10 @@ mod tests {
     fn rejects_invalid_rebuild_mode() {
         let adapter = adapter();
         let mut intent = DeploymentIntent::new("bad-2", "host-01");
-        intent.desired_state.properties.insert(
-            REBUILD_KEY.into(),
-            StateValue::String("execute-shell".into()),
-        );
+        intent
+            .desired_state
+            .properties
+            .insert(REBUILD_KEY.into(), StateValue::String("execute-shell".into()));
 
         assert_eq!(
             adapter.compile(&intent),
@@ -1004,12 +1010,18 @@ mod tests {
             ROLLBACK_REALIZATION_KEY.into(),
             StateValue::String("/nix/store/aaa-nixos-system-host".into()),
         );
-        intent.required_resources.insert(nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"));
+        intent.required_resources.insert(
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource"),
+        );
 
         assert_eq!(
             rollback_adapter(43, "/nix/store/bbb-nixos-system-host").compile(&intent),
             Err(NixOSAdapterError::PlanValidation(
-                PlanValidationError::MissingTargetResource(nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"))
+                PlanValidationError::MissingTargetResource(
+                    nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                        .expect("generation resource"),
+                )
             ))
         );
     }
@@ -1047,21 +1059,26 @@ mod tests {
             ROLLBACK_REALIZATION_KEY.into(),
             StateValue::String("/nix/store/aaa-nixos-system-host".into()),
         );
-        intent.required_resources.insert(nixos_generation_resource(7, "/nix/store/aaa-nixos-system-host").expect("generation resource"));
+        intent.required_resources.insert(
+            nixos_generation_resource(7, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource"),
+        );
 
         let mode = NixActivationMode::Rollback { generation: 7 };
         assert_eq!(mode, NixActivationMode::Rollback { generation: 7 });
-        let plan = rollback_adapter(7, "/nix/store/aaa-nixos-system-host").compile(&intent).expect("compile");
+        let plan = rollback_adapter(7, "/nix/store/aaa-nixos-system-host")
+            .compile(&intent)
+            .expect("compile");
         assert_eq!(plan.steps[1].kind, PlanStepKind::Rollback);
     }
 
     #[test]
     fn rollback_cannot_be_combined_with_rebuild() {
         let mut intent = DeploymentIntent::new("rollback-conflict-1", "host-01");
-        intent.desired_state.properties.insert(
-            REBUILD_KEY.into(),
-            StateValue::String("switch".into()),
-        );
+        intent
+            .desired_state
+            .properties
+            .insert(REBUILD_KEY.into(), StateValue::String("switch".into()));
         intent
             .desired_state
             .properties
@@ -1074,7 +1091,10 @@ mod tests {
             ROLLBACK_REALIZATION_KEY.into(),
             StateValue::String("/nix/store/aaa-nixos-system-host".into()),
         );
-        intent.required_resources.insert(nixos_generation_resource(7, "/nix/store/aaa-nixos-system-host").expect("generation resource"));
+        intent.required_resources.insert(
+            nixos_generation_resource(7, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource"),
+        );
 
         assert_eq!(
             adapter().compile(&intent),
@@ -1097,9 +1117,14 @@ mod tests {
             ROLLBACK_REALIZATION_KEY.into(),
             StateValue::String("/nix/store/aaa-nixos-system-host".into()),
         );
-        intent.required_resources.insert(nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("generation resource"));
+        intent.required_resources.insert(
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource"),
+        );
 
-        let plan = rollback_adapter(42, "/nix/store/aaa-nixos-system-host").compile(&intent).expect("compile");
+        let plan = rollback_adapter(42, "/nix/store/aaa-nixos-system-host")
+            .compile(&intent)
+            .expect("compile");
         assert!(plan.steps.iter().any(|step| {
             step.kind == PlanStepKind::Rollback && step.description.contains("generation 42")
         }));
@@ -1109,10 +1134,10 @@ mod tests {
     #[test]
     fn dry_activate_is_not_marked_as_mutating_for_rollback_policy() {
         let mut intent = DeploymentIntent::new("dry-1", "host-01");
-        intent.desired_state.properties.insert(
-            REBUILD_KEY.into(),
-            StateValue::String("dry-activate".into()),
-        );
+        intent
+            .desired_state
+            .properties
+            .insert(REBUILD_KEY.into(), StateValue::String("dry-activate".into()));
 
         let plan = adapter().compile(&intent).expect("compile");
         assert!(!plan.rollback.allowed);
@@ -1284,10 +1309,17 @@ mod tests {
             StateValue::String("/nix/store/bbb-nixos-system-host".into()),
         );
         b.required_resources.clear();
-        b.required_resources.insert(nixos_generation_resource(43, "/nix/store/bbb-nixos-system-host").expect("generation resource"));
+        b.required_resources.insert(
+            nixos_generation_resource(43, "/nix/store/bbb-nixos-system-host")
+                .expect("generation resource"),
+        );
 
-        let plan_a = rollback_adapter(42, "/nix/store/aaa-nixos-system-host").compile(&a).expect("compile a");
-        let plan_b = rollback_adapter(43, "/nix/store/bbb-nixos-system-host").compile(&b).expect("compile b");
+        let plan_a = rollback_adapter(42, "/nix/store/aaa-nixos-system-host")
+            .compile(&a)
+            .expect("compile a");
+        let plan_b = rollback_adapter(43, "/nix/store/bbb-nixos-system-host")
+            .compile(&b)
+            .expect("compile b");
 
         assert_ne!(
             plan_a.digest().expect("digest a"),
