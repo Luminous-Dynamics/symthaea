@@ -219,7 +219,7 @@ The research-only GF(2) kernel now has both a general representative-recovery pa
 Implemented:
 
 - solve_linear_combination performs packed-u64 Gaussian elimination over GF(2).
-- recover_linear_bound follows Raviv's Theorem 2 construction: it forms a maximal linearly independent subset of the union of factor generator bases, solves the resulting system, and deterministically assigns retained generators to their first owning factor.
+- `recover_linear_bound` follows Raviv's Theorem 2 for the maximal-independent-subset and GF(2)-solve stages. In the product/direct-sum regime, exhaustive tests validate exact factor recovery. For overlapping factors, the final owner assignment is a deterministic Symthaea extension used to return one valid representative without claiming theorem-specified uniqueness.
 - recover_direct_sum_bound is the two-factor specialization for structurally disjoint subcodes.
 - recover_independent_bound generalizes direct-sum recovery to F factor codebooks when the concatenated generator bases are jointly independent.
 - The general API preserves factor order and returns a valid representative factorization without labeling it unique.
