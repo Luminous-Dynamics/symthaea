@@ -67,6 +67,9 @@ fn recovery_work_ledger_is_deterministic_and_semantically_linked() {
     assert!(first_work.solve_row_xor_words > 0);
 
     println!(
+        "WORK_FIXTURE_SPEC=dimension=96;left_rank=6;right_rank=6;seed=0x1111"
+    );
+    println!(
         "WORK_LEDGER=span_membership_checks={};basis_rank_pivots={};basis_rank_row_xor_words={};basis_rank_input_word_copies={};solve_basis_bit_probes={};solve_matrix_word_cells={};solve_pivots={};solve_row_xor_words={};retained_generators={};projection_word_xor_ops={}",
         first_work.span_membership_checks,
         first_work.basis_rank_pivots,
@@ -110,7 +113,7 @@ fn recovery_work_scales_over_small_structural_fixtures() {
         );
 
         println!(
-            "SCALING_LEDGER=dimension={dimension};rank={};span_checks={};rank_pivots={};rank_row_xor_words={};solve_pivots={};solve_row_xor_words={};retained_generators={}",
+            "SCALING_LEDGER=dimension={dimension};left_rank={left_rank};right_rank={right_rank};rank={};seed=0x{seed:X};span_checks={};rank_pivots={};rank_row_xor_words={};solve_pivots={};solve_row_xor_words={};retained_generators={}",
             parent.rank(),
             work.span_membership_checks,
             work.basis_rank_pivots,
