@@ -2270,6 +2270,7 @@ fn validate_native_authority_pin_set(
             &replay,
             &status,
             &adapter_configuration,
+            &pinned_status_verifier_configuration,
         )
     }
 
@@ -2302,6 +2303,32 @@ fn validate_native_authority_pin_set(
         Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into())
     }
 
+    fn validate_persisted_provider_status_verifier_configuration(
+        &self,
+        tx: &Transaction<'_>,
+        expected: &ProviderStatusVerifierConfiguration,
+    ) -> Result<(), AuthorizationStoreError> {
+        for (key, expected_value) in [
+            ("provider_status_verifier_id", expected.verifier_id.as_str()),
+            ("provider_status_verifier_revision", expected.verifier_revision.as_str()),
+            ("provider_status_verifier_implementation_id", expected.verifier_implementation_id.as_str()),
+            ("provider_status_verifier_implementation_digest", expected.verifier_implementation_digest.as_str()),
+            ("provider_status_verifier_config_digest", expected.verifier_config_digest.as_str()),
+        ] {
+            let stored: Option<String> = tx
+                .query_row(
+                    "SELECT value FROM authorization_store_metadata WHERE key=?1",
+                    params![key],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if stored.as_deref() != Some(expected_value) {
+                return Err(AuthorizationConsumptionError::ProviderStatusVerificationRequired.into());
+            }
+        }
+        Ok(())
+    }
+
     fn mark_dispatch_pending_bound_with_provenance(
         &self,
         authorization_instance: &str,
@@ -2315,6 +2342,7 @@ fn validate_native_authority_pin_set(
         native_replay_provenance: &super::NativeReplayDerivation,
         status: &ProviderStatusEvidence,
         adapter_configuration: &ProviderAdapterConfiguration,
+        status_verifier_configuration: &ProviderStatusVerifierConfiguration,
     ) -> Result<DurableDispatchRecord, AuthorizationStoreError> {
         if action.effect_binding.as_ref() != Some(expected_effect)
             || boundary_id.is_empty()
@@ -2341,6 +2369,10 @@ fn validate_native_authority_pin_set(
         self.validate_provider_status_evidence(status, None, true)?;
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        self.validate_persisted_provider_status_verifier_configuration(
+            &tx,
+            status_verifier_configuration,
+        )?;
 
         let prior_owner: Option<(String, String)> = tx
             .query_row(
@@ -6560,6 +6592,124 @@ mod tests {
             ),
             Err(AuthorizationStoreError::InvalidState(_))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn status_verifier_pin_drift_after_verification_is_rejected() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-verifier-drift-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-status-drift").unwrap();
+        store.pin_native_authority_namespace("issuer.drift","issuer.drift/authority/v1").unwrap();
+        store.pin_provider_status_source_digest("sha256:test-status-source").unwrap();
+        store.pin_provider_status_verifier_configuration(
+            &ProviderStatusVerifierConfiguration::new(
+                "test-status-verifier/v1","test-status-verifier/rev1",
+                "test-status-verifier","sha256:test-status-verifier-implementation",
+                "sha256:test-status-verifier-config"
+            )
+        ).unwrap();
+        store.pin_provider_adapter_configuration(
+            &ProviderAdapterConfiguration::new(
+                "adapter-status-drift","test-adapter/v1",
+                "sha256:test-adapter-implementation"
+            )
+        ).unwrap();
+
+        let effect=super::super::ActionEffectBinding::new("target-status-drift","prod","adapter-status-drift");
+        let action=EpistemicAction::new(
+            "status-verifier-drift","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"status-verifier-drift".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"support".into(),
+            policy:"policy@1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:20:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-status-verifier-drift","boundary-drift"
+        ).unwrap();
+
+        struct MutatingStatusVerifier { path: std::path::PathBuf }
+        impl ProviderStatusVerifier for MutatingStatusVerifier {
+            fn configuration(&self) -> ProviderStatusVerifierConfiguration {
+                ProviderStatusVerifierConfiguration::new(
+                    "test-status-verifier/v1","test-status-verifier/rev1",
+                    "test-status-verifier","sha256:test-status-verifier-implementation",
+                    "sha256:test-status-verifier-config"
+                )
+            }
+
+            fn verify_current_status(
+                &self,
+                _purpose:ProviderStatusVerificationPurpose,
+                _issuer:&str,
+                _authority_namespace:&str,
+                native_authorization_id:&str,
+                status_identifier:&str,
+                _action_digest:&str,
+                _target_identity:&str,
+                _audience:&str,
+                _adapter:&str,
+                _expected_source_digest:Option<&str>,
+            ) -> Result<ProviderStatusEvidence,ProviderStatusVerificationError> {
+                let conn=Connection::open(&self.path)
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                conn.execute(
+                    "UPDATE authorization_store_metadata
+                     SET value='sha256:tampered-status-implementation'
+                     WHERE key='provider_status_verifier_implementation_digest'",
+                    []
+                ).map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                let observed=trusted_utc_now()
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                Ok(ProviderStatusEvidence {
+                    status_identifier:status_identifier.to_owned(),
+                    status_source_digest:"sha256:test-status-source".into(),
+                    status_observed_at:observed.to_rfc3339_opts(SecondsFormat::Secs,true),
+                    status_valid_until:(observed+Duration::seconds(1800))
+                        .to_rfc3339_opts(SecondsFormat::Secs,true),
+                    status_evidence_digest:format!("sha256:status:{native_authorization_id}"),
+                })
+            }
+        }
+
+        let err=store.mark_dispatch_pending_bound_from_pinned_native_authority(
+            &witness.authorization_instance,
+            "attempt-status-verifier-drift",
+            &action,
+            &effect,
+            "boundary-drift",
+            "operation:status-verifier-drift",
+            "issuer.drift",
+            "native-status-drift",
+            "status:native-status-drift",
+            &MutatingStatusVerifier { path:path.clone() },
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderStatusVerificationRequired
+            )
+        ));
+        let state:String=store.connection().unwrap().query_row(
+            "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+            params![witness.authorization_instance],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(state,"prepared");
         let _=std::fs::remove_file(path);
     }
 
