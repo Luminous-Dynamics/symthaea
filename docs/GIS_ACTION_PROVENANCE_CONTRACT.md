@@ -342,3 +342,11 @@ Terminal provider evidence is now accepted only under a write-once relying-party
 
 The verifier's returned configuration is therefore evidence about what verifier claims it used, not a presenter-controlled trust root. The durable store selects the accepted configuration and requires an exact match before consuming the authorization. This follows the AEB-07 requirement that verifier revisions, trust anchors, and related validation inputs be relying-party-selected rather than introduced by presented data. citeturn102081search0turn102081search2
 
+
+### Immutable attempt provenance commitment
+
+Each strict effectful dispatch now carries a deterministic attempt_binding_digest committed at DispatchPending. The digest is domain-separated and length-prefixed over the immutable attempt provenance tuple: authorization instance, attempt and operation identities, native replay identity and derivation witness, issuer/authority namespace, relying-party identity, action identity/digest, provider idempotency key, effect target/audience/adapter, admission status evidence, and the frozen authorization validity window and native-authority pin-set snapshot.
+
+Lifecycle state is deliberately excluded from the commitment because state transitions are governed by the transactional state machine. Before provider entry and again before terminal settlement or reconciliation, the durable store recomputes the commitment from the persisted row and requires exact equality with the caller's dispatch record. This means database-side mutation of status evidence, validity provenance, target, operation, replay derivation, or other committed material fields cannot be repaired merely by presenting a matching caller object.
+
+This is an implementation-level provenance commitment rather than a new AEB standard requirement; it strengthens the AEB-07 rule that an operation record must bind the native replay identity and action key to the executor-owned action and operation identifier, and that reconciliation must remain attached to the original attempt. citeturn914749search0turn914749search1
