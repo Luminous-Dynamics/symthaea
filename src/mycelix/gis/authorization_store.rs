@@ -717,6 +717,11 @@ fn backfill_attempt_scope_digests(
     Ok(())
 }
 
+fn append_len_prefixed<H: Digest>(hasher: &mut H, value: &[u8]) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value);
+}
+
 fn compute_attempt_binding_digest(
 
     authorization_instance: &str,
