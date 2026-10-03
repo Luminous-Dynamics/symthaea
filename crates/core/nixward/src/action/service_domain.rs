@@ -49,6 +49,9 @@ fn canonical_service_unit_v1(unit: &str) -> Result<String, NixServiceOperationEr
     if unit.is_empty() {
         return Err(NixServiceOperationErrorV1::EmptyUnit);
     }
+    if unit.contains('/') || unit.contains('\\') {
+        return Err(NixServiceOperationErrorV1::PathLikeUnit);
+    }
     if unit.ends_with(".service") {
         validate_service_unit_shape_v1(unit)?;
         return Ok(unit.to_string());
