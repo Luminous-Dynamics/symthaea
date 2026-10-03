@@ -1123,18 +1123,6 @@ fn validate_native_authority_pin_set(
         let mut lease = load_lease(&tx, authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(authorization_instance.to_owned()))?;
         lease.mark_dispatch_pending(attempt_id)?;
-        tx.execute(
-            "INSERT INTO authorization_status_checks
-             (authorization_instance,attempt_id,phase,status_identifier,status_source_digest,
-              status_observed_at,status_valid_until,status_evidence_digest)
-             VALUES (?1,?2,'admission',?3,?4,?5,?6,?7)",
-            params![
-                authorization_instance, attempt_id,
-                status.status_identifier.as_str(), status.status_source_digest.as_str(),
-                status.status_observed_at.as_str(), status.status_valid_until.as_str(),
-                status.status_evidence_digest.as_str(),
-            ],
-        )?;
         let changed = tx.execute(
             "UPDATE authorization_leases SET state='dispatch_pending', attempt_id=?2
              WHERE authorization_instance=?1 AND state='prepared' AND attempt_id=?2",
