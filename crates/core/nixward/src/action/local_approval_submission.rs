@@ -520,14 +520,14 @@ mod tests {
             &submission,
             &request,
             &peer(1000, 10),
-            action::temporal::AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
         )
         .unwrap();
         let second = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1001, 11),
-            action::temporal::AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
         )
         .unwrap();
 
@@ -550,7 +550,7 @@ mod tests {
             &submission,
             &request,
             &peer(1000, 10),
-            action::temporal::AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
         )
         .unwrap();
 
