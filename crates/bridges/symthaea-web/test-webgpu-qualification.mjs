@@ -280,6 +280,7 @@ async function runMode(mode) {
 
     return {
       mode,
+      qualification_profile: 'forced-gpu-disabled',
       capability,
       fallback,
       deterministic_fixture: true,
