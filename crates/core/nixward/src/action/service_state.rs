@@ -624,6 +624,7 @@ CanReload=no
         let error = NixServiceObservedStateV1::parse_systemd_properties(
             "nginx",
             "Id=nginx.service
+Names=nginx.service
 LoadState=loaded
 ActiveState=active
 SubState=running
@@ -827,6 +828,7 @@ CanReload=yes
             NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
                 "Id=nginx.service
+Names=nginx.service
 LoadState=loaded
 ActiveState=active
 SubState=running
@@ -843,6 +845,7 @@ SubState=running
             NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
                 "Id=nginx.service
+Names=nginx.service
 LoadState=loaded
 ActiveState=active
 ActiveState=inactive
@@ -860,6 +863,7 @@ CanReload=yes
             NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
                 "Id=nginx.service
+Names=nginx.service
 LoadState=loaded
 ActiveState=active
 SubState=running
@@ -881,6 +885,7 @@ MainPID=42
             NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
                 "Id=nginx.service
+Names=nginx.service
 LoadState=loaded
 ActiveState=unknown
 SubState=running
@@ -897,6 +902,7 @@ CanReload=yes
             NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
                 "Id=nginx.service
+Names=nginx.service
 LoadState=loaded
 ActiveState=active
 SubState=running state
@@ -913,6 +919,7 @@ CanReload=yes
             NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
                 "Id=nginx.service
+Names=nginx.service
 ActiveState=active
 SubState=running
 UnitFileState=enabled
@@ -949,6 +956,7 @@ CanReload=yes
             NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
                 "Id=nginx-alias.service
+Names=nginx-alias.service
 LoadState=loaded
 ActiveState=active
 SubState=running
@@ -969,6 +977,7 @@ CanReload=yes
             NixServiceObservedStateV1::parse_systemd_properties(
                 "nginx",
                 "Id=nginx.service
+Names=nginx.service
 LoadState=future
 ActiveState=active
 SubState=running
