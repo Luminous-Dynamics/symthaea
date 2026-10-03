@@ -68,6 +68,18 @@ The current in-tree implementation includes:
 - post-execution verification work
 - optional Symthaea cognitive integration
 
+## SSC observation bridge
+
+Nixward now exposes a read-only SSC observation bridge at `ssc_bridge`.
+It captures exact NixOS generation realizations plus the selected system-profile
+realization and the `/run/current-system` and `/run/booted-system` realizations.
+The bridge validates that the generation marked current agrees with the running
+system realization and that a selected system-profile generation agrees with
+its exact realization before constructing an SSC `TargetSnapshot`.
+
+The bridge does not authorize or execute anything; native realization remains
+owned by Nixward.
+
 ## Standalone-repository direction
 
 Nixward is currently hosted inside Symthaea while the SSC/Nixward boundary is being proven.
