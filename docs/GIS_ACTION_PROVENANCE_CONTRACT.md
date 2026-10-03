@@ -352,6 +352,8 @@ Strict effectful admission now requires the adapter identifier named by the froz
 
 Settlement additionally re-reads the adapter pin and requires it to match the frozen record. The same persisted-pin check runs before provider entry, before the boundary performs the pre-entry status verification. A later adapter replacement, database-side pin mutation, or presenter-selected revision therefore cannot silently reinterpret an already-authorized attempt. This aligns with AEB-07's requirement that the relying party pin every adapter revision and, in the native compilation contract, the verifier/adapter implementation identity and digest. citeturn281056view0
 
+Prepared operation identity is now unique in the durable lease domain as well: `authorization_leases.operation_id` is write-fenced while non-empty, and preparation checks for an existing owner before binding a new attempt. This closes the pre-DISPATCH_PENDING window in which two concurrent attempts could otherwise freeze the same logical operation identifier. The operation identifier remains separate from the action digest and provider replay derivations, as required by the execution-boundary model. citeturn651511search0
+
 ### Cross-table attempt ownership fence
 
 Commits `8af20f2f6618d17896b6d8b6513b3d99bf24aa10`, `002cc4385eb1545ca78372e9bde138d7d6f7d6b7`, `a2e407a9de6a3ed862ebc24ff740c2f0e6fab786`, and `e4bddd6de7ec709c4b75cba99d6151203145f1a4` complete and adversarially exercise this fence at startup, provider-entry/settlement validation, and direct cross-table splice tests.
