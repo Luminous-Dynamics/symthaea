@@ -312,6 +312,8 @@ impl DeploymentPlan {
             None,
         )?;
 
+        validate_artifacts(&self.intent.artifacts)?;
+
         for resource in &self.intent.required_resources {
             if !self.target_snapshot.resources.contains(resource) {
                 return Err(PlanValidationError::MissingTargetResource(resource.clone()));
@@ -550,6 +552,28 @@ impl AuthorizationEvidence {
     }
 }
 
+fn validate_artifacts(artifacts: &[ArtifactRef]) -> Result<(), PlanValidationError> {
+    for artifact in artifacts {
+        if artifact.digest.algorithm.is_empty() || artifact.digest.value.is_empty() {
+            return Err(PlanValidationError::InvalidArtifactDigest(
+                artifact.id.clone(),
+            ));
+        }
+        for attestation in &artifact.provenance {
+            if attestation.media_type.is_empty()
+                || attestation.uri.is_empty()
+                || attestation.digest.algorithm.is_empty()
+                || attestation.digest.value.is_empty()
+            {
+                return Err(PlanValidationError::InvalidAttestationReference(
+                    artifact.id.clone(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_capabilities(
     required: &BTreeSet<Capability>,
     supported: &BTreeSet<Capability>,
@@ -612,6 +636,10 @@ pub enum PlanValidationError {
     SequenceOverflow,
     #[error("rollback attempts are configured without rollback permission")]
     RollbackAttemptsWithoutPermission,
+    #[error("artifact has an empty or incomplete content digest")]
+    InvalidArtifactDigest(ArtifactId),
+    #[error("artifact attestation reference is incomplete")]
+    InvalidAttestationReference(ArtifactId),
     #[error("authorization intent digest does not match the compiled intent")]
     AuthorizationIntentDigestMismatch,
     #[error("authorization target-profile digest does not match the compiled target")]
@@ -790,6 +818,49 @@ mod tests {
                     .next()
                     .expect("required resource")
                     .clone()
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_artifact_without_digest() {
+        let mut plan = sample_plan();
+        plan.intent.artifacts.push(ArtifactRef {
+            id: ArtifactId::from("missing-digest"),
+            version: Some("1.0.0".into()),
+            digest: ContentDigest {
+                algorithm: String::new(),
+                value: String::new(),
+            },
+            provenance: Vec::new(),
+        });
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::InvalidArtifactDigest(
+                ArtifactId::from("missing-digest")
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_incomplete_attestation_reference() {
+        let mut plan = sample_plan();
+        plan.intent.artifacts.push(ArtifactRef {
+            id: ArtifactId::from("attested"),
+            version: Some("1.0.0".into()),
+            digest: ContentDigest::blake3(b"artifact"),
+            provenance: vec![AttestationRef {
+                media_type: "application/json".into(),
+                uri: String::new(),
+                digest: ContentDigest::blake3(b"attestation"),
+            }],
+        });
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::InvalidAttestationReference(
+                ArtifactId::from("attested")
             ))
         );
     }
