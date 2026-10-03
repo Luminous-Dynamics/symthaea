@@ -482,6 +482,26 @@ does not constitute the same rollback authorization unless the exact observed ge
 
 The adapter remains plan-only. The existence, exact realization, current/default/active status, and successful transition to that generation remain Nixward verification responsibilities.
 
+### Nixward observation bridge
+
+The in-tree Nixward bridge is a read-only observation boundary. It enumerates
+/nix/var/nix/profiles/system-N-link generation links, resolves each link to
+its exact /nix/store/... realization, and records the explicit system-profile
+generation plus the /run/current-system and /run/booted-system realizations.
+
+The bridge fails closed on incomplete observation identity: zero or duplicate
+generation ordinals, missing realizations, a realization that does not resolve
+under /nix/store, multiple generations claiming the running realization, a
+running-generation realization mismatch, or a system-profile generation whose
+realization does not match the resolved profile target. Generation observations
+are sorted by ordinal before being promoted into the deterministic SSC
+TargetSnapshot.
+
+These facts are evidence, not authority. The bridge performs no authorization,
+command execution, reboot, or mutation. The exact observation digest is then
+available for SSC target-snapshot binding and for Nixward's later post-state
+verification pass.
+
 ## Resource binding
 
 Capabilities alone are insufficient for operations that mutate a concrete
