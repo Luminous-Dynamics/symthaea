@@ -249,7 +249,10 @@ impl ServiceUnitFileStateV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NixServiceObservedStateV1 {
+    /// The exact unit name requested by the caller, in canonical spelling.
     unit: String,
+    /// The canonical systemd Unit identity returned in `Id`.
+    resolved_id: String,
     load_state: ServiceLoadStateV1,
     active_state: ServiceActiveStateV1,
     unit_file_state: ServiceUnitFileStateV1,
@@ -269,6 +272,7 @@ impl NixServiceObservedStateV1 {
         validate_sub_state(&sub_state)?;
 
         Ok(Self {
+            resolved_id: unit.clone(),
             unit,
             load_state,
             active_state,
@@ -340,6 +344,7 @@ impl NixServiceObservedStateV1 {
     ) -> Result<(Self, NixServiceOperationCapabilitiesV1), NixServiceStateErrorV1> {
         let requested_unit = canonical_service_unit(requested_unit.into())?;
         let mut observed_id = None;
+        let mut observed_names = None;
         let mut load_state = None;
         let mut active_state = None;
         let mut sub_state = None;
@@ -357,6 +362,7 @@ impl NixServiceObservedStateV1 {
             }
             match key {
                 "Id" if observed_id.is_none() => observed_id = Some(value.to_string()),
+                "Names" if observed_names.is_none() => observed_names = Some(value.to_string()),
                 "LoadState" if load_state.is_none() => load_state = Some(ServiceLoadStateV1::parse(value)?),
                 "ActiveState" if active_state.is_none() => active_state = Some(ServiceActiveStateV1::parse(value)?),
                 "SubState" if sub_state.is_none() => sub_state = Some(value.to_string()),
@@ -364,22 +370,27 @@ impl NixServiceObservedStateV1 {
                 "CanStart" if can_start.is_none() => can_start = Some(parse_yes_no(value)?),
                 "CanStop" if can_stop.is_none() => can_stop = Some(parse_yes_no(value)?),
                 "CanReload" if can_reload.is_none() => can_reload = Some(parse_yes_no(value)?),
-                "Id" | "LoadState" | "ActiveState" | "SubState" | "UnitFileState"
+                "Id" | "Names" | "LoadState" | "ActiveState" | "SubState" | "UnitFileState"
                 | "CanStart" | "CanStop" | "CanReload" => return Err(NixServiceStateErrorV1::DuplicateProperty),
                 _ => return Err(NixServiceStateErrorV1::UnexpectedProperty),
             }
         }
 
         let observed_id = observed_id.ok_or(NixServiceStateErrorV1::MissingId)?;
-        if observed_id != requested_unit { return Err(NixServiceStateErrorV1::IdentityMismatch); }
+        let observed_names = observed_names.ok_or(NixServiceStateErrorV1::MissingNames)?;
+        let observed_id = canonical_service_unit(observed_id)
+            .map_err(|_| NixServiceStateErrorV1::InvalidObservedUnitIdentity)?;
+        validate_observed_identity(&requested_unit, &observed_id, &observed_names)?;
 
-        let state = Self::new(
+        let mut state = Self::new(
             requested_unit,
             load_state.ok_or(NixServiceStateErrorV1::MissingLoadState)?,
             active_state.ok_or(NixServiceStateErrorV1::MissingActiveState)?,
             unit_file_state.ok_or(NixServiceStateErrorV1::MissingUnitFileState)?,
             sub_state.ok_or(NixServiceStateErrorV1::MissingSubState)?,
         )?;
+        state.resolved_id = observed_id;
+
         let capabilities = NixServiceOperationCapabilitiesV1::from_observed_state(
             &state,
             can_start.ok_or(NixServiceStateErrorV1::MissingCanStart)?,
@@ -388,9 +399,13 @@ impl NixServiceObservedStateV1 {
         )?;
         Ok((state, capabilities))
     }
-
     pub fn unit(&self) -> &str {
         &self.unit
+    }
+
+    /// Return the canonical systemd Unit identity resolved by the observation.
+    pub fn resolved_id(&self) -> &str {
+        &self.resolved_id
     }
 
     pub fn load_state(&self) -> ServiceLoadStateV1 {
@@ -414,6 +429,10 @@ impl NixServiceObservedStateV1 {
         if canonical != self.unit {
             return Err(NixServiceStateErrorV1::NonCanonicalServiceUnit);
         }
+        let canonical_resolved = canonical_service_unit(self.resolved_id.clone())?;
+        if canonical_resolved != self.resolved_id {
+            return Err(NixServiceStateErrorV1::InvalidObservedUnitIdentity);
+        }
         validate_sub_state(&self.sub_state)
     }
 
@@ -423,6 +442,7 @@ impl NixServiceObservedStateV1 {
         let mut hasher = Hasher::new();
         hasher.update(SERVICE_STATE_DOMAIN_V1);
         write_len_prefixed(&mut hasher, self.unit.as_bytes());
+        write_len_prefixed(&mut hasher, self.resolved_id.as_bytes());
         hasher.update(&[self.load_state.discriminant()]);
         hasher.update(&[self.active_state.discriminant()]);
         hasher.update(&[self.unit_file_state.discriminant()]);
@@ -438,6 +458,25 @@ fn canonical_service_unit(unit: String) -> Result<String, NixServiceStateErrorV1
     )
     .map_err(|_| NixServiceStateErrorV1::InvalidServiceUnit)
     .map(|operation| operation.unit().to_string())
+}
+
+fn validate_observed_identity(
+    requested_unit: &str,
+    observed_id: &str,
+    observed_names: &str,
+) -> Result<(), NixServiceStateErrorV1> {
+    let requested_present = observed_names
+        .split_whitespace()
+        .any(|name| name == requested_unit);
+    let id_present = observed_names
+        .split_whitespace()
+        .any(|name| name == observed_id);
+
+    if requested_present && id_present {
+        Ok(())
+    } else {
+        Err(NixServiceStateErrorV1::IdentityMismatch)
+    }
 }
 
 fn parse_yes_no(value: &str) -> Result<bool, NixServiceStateErrorV1> {
@@ -487,8 +526,12 @@ pub enum NixServiceStateErrorV1 {
     InvalidPreStateDigest,
     #[error("invalid service unit")]
     InvalidServiceUnit,
-    #[error("systemd Id does not match the requested canonical service unit")]
+    #[error("systemd Id does not match the requested canonical service unit or observed Names")]
     IdentityMismatch,
+    #[error("invalid canonical systemd Unit identity")]
+    InvalidObservedUnitIdentity,
+    #[error("required systemd Names property is missing")]
+    MissingNames,
     #[error("service unit is not in canonical form")]
     NonCanonicalServiceUnit,
     #[error("service SubState is empty")]
@@ -585,6 +628,87 @@ CanStart=yes
         )
         .unwrap_err();
         assert_eq!(error, NixServiceStateErrorV1::UnexpectedProperty);
+    }
+
+    #[test]
+    fn alias_identity_is_bound_through_observed_names() {
+        let (value, capabilities) = NixServiceObservedStateV1::parse_systemd_observation(
+            "dbus-org.freedesktop.network1.service",
+            "Id=systemd-networkd.service
+Names=systemd-networkd.service dbus-org.freedesktop.network1.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+        )
+        .unwrap();
+
+        assert_eq!(value.unit(), "dbus-org.freedesktop.network1.service");
+        assert_eq!(value.resolved_id(), "systemd-networkd.service");
+        assert!(capabilities.can_start());
+        assert_eq!(capabilities.pre_state_digest(), value.digest().unwrap());
+    }
+
+    #[test]
+    fn alias_identity_rejects_unrelated_name_set() {
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_observation(
+                "dbus-org.freedesktop.network1.service",
+                "Id=systemd-networkd.service
+Names=systemd-networkd.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::IdentityMismatch
+        );
+    }
+
+    #[test]
+    fn changing_resolved_identity_changes_pre_state_digest() {
+        let a = NixServiceObservedStateV1::parse_systemd_observation(
+            "alias.service",
+            "Id=real-a.service
+Names=real-a.service alias.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+        )
+        .unwrap()
+        .0;
+        let b = NixServiceObservedStateV1::parse_systemd_observation(
+            "alias.service",
+            "Id=real-b.service
+Names=real-b.service alias.service
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
+",
+        )
+        .unwrap()
+        .0;
+
+        assert_ne!(a.resolved_id(), b.resolved_id());
+        assert_ne!(a.digest().unwrap(), b.digest().unwrap());
     }
 
     #[test]
