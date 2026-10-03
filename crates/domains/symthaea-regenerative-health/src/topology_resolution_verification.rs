@@ -40,6 +40,12 @@ pub struct TopologyResolutionVerificationResult {
     pub resolution_id: String,
     pub authority_statement_digest: String,
     pub verification_reference: String,
+    /// Fingerprint of the complete verifier report that produced this result.
+    pub verification_report_digest: String,
+    /// Fingerprint of the exact verifier policy inputs.
+    pub policy_fingerprint: String,
+    /// Fingerprint of the verifier execution environment identity.
+    pub environment_fingerprint: String,
     pub verified_at_ms: u64,
     pub valid_until_ms: u64,
 }
@@ -58,6 +64,9 @@ pub struct TopologyResolutionVerificationDecision {
     pub state: TopologyResolutionVerificationState,
     pub verifier_id: Option<String>,
     pub verification_reference: Option<String>,
+    pub verification_report_digest: Option<String>,
+    pub policy_fingerprint: Option<String>,
+    pub environment_fingerprint: Option<String>,
     pub issues: Vec<TopologyResolutionVerificationIssue>,
 }
 
@@ -93,6 +102,9 @@ impl TopologyResolutionVerificationGate {
                 state: TopologyResolutionVerificationState::InsufficientEvidence,
                 verifier_id: None,
                 verification_reference: None,
+                verification_report_digest: None,
+                policy_fingerprint: None,
+                environment_fingerprint: None,
                 issues: vec![],
             };
         };
@@ -102,6 +114,9 @@ impl TopologyResolutionVerificationGate {
             || verification.resolution_id.trim().is_empty()
             || verification.authority_statement_digest.trim().is_empty()
             || verification.verification_reference.trim().is_empty()
+            || verification.verification_report_digest.trim().is_empty()
+            || verification.policy_fingerprint.trim().is_empty()
+            || verification.environment_fingerprint.trim().is_empty()
         {
             issues.push(TopologyResolutionVerificationIssue::EmptyIdentity);
         }
@@ -138,6 +153,9 @@ impl TopologyResolutionVerificationGate {
             state,
             verifier_id: Some(verification.verifier_id.clone()),
             verification_reference: Some(verification.verification_reference.clone()),
+            verification_report_digest: Some(verification.verification_report_digest.clone()),
+            policy_fingerprint: Some(verification.policy_fingerprint.clone()),
+            environment_fingerprint: Some(verification.environment_fingerprint.clone()),
             issues,
         }
     }
@@ -189,6 +207,9 @@ mod tests {
             resolution_id: "resolution-2".into(),
             authority_statement_digest: "resolution-digest-2".into(),
             verification_reference: "resolution-verify-2".into(),
+            verification_report_digest: "report-digest-2".into(),
+            policy_fingerprint: "policy-fingerprint-2".into(),
+            environment_fingerprint: "environment-fingerprint-2".into(),
             verified_at_ms: 2_100,
             valid_until_ms: 4_000,
         }
@@ -240,6 +261,15 @@ mod tests {
         r.authority_statement_digest = "wrong-digest".into();
         let d = gate().assess(&resolution(), Some(&r), 3_000);
         assert!(d.issues.contains(&TopologyResolutionVerificationIssue::StatementMismatch));
+    }
+
+    #[test]
+    fn missing_report_provenance_is_quarantined() {
+        let mut r = result();
+        r.verification_report_digest.clear();
+        let d = gate().assess(&resolution(), Some(&r), 3_000);
+        assert_eq!(d.state, TopologyResolutionVerificationState::Quarantined);
+        assert!(d.issues.contains(&TopologyResolutionVerificationIssue::EmptyIdentity));
     }
 
     #[test]
