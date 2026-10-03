@@ -1174,7 +1174,7 @@ mod tests {
         assert!(matches!(
             err,
             LocalApprovalSocketErrorV1::RequestStore(
-                LocalApprovalRequestStoreErrorV1::ProjectionDigestMismatch
+                LocalApprovalRequestStoreErrorV1::Admission(LocalApprovalAdmissionErrorV1::ProjectionDigestMismatch)
             )
         ));
         assert!(store.is_pending(&request_id).unwrap());
