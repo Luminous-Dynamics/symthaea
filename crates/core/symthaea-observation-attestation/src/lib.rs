@@ -1329,12 +1329,13 @@ impl EvaluationBoundary {
         let mut established = self.established.clone();
         let mut not_established = self.not_established.clone();
         let mut indeterminate = self.indeterminate.clone();
+        // Canonicalization sorts claims for stable ordering but deliberately does
+        // not deduplicate malformed inputs. Validation and canonical identity are
+        // separate: malformed evidence must not hash to the same identity as a
+        // well-formed boundary merely because canonicalization repaired it.
         established.sort_by_key(|v| evaluation_claim_tag(*v));
-        established.dedup();
         not_established.sort_by_key(|v| evaluation_claim_tag(*v));
-        not_established.dedup();
         indeterminate.sort_by_key(|v| evaluation_claim_tag(*v));
-        indeterminate.dedup();
 
         let mut bytes = Vec::new();
         for claims in [&established, &not_established, &indeterminate] {
@@ -3189,6 +3190,32 @@ mod tests {
             ..context.clone()
         }.fingerprint());
         assert!(!context.is_well_formed());
+    }
+
+    #[test]
+    fn evaluation_boundary_canonical_identity_preserves_duplicates() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let boundary = EvaluationBoundary::from_report(&report);
+
+        let mut duplicate = boundary.clone();
+        duplicate
+            .not_established
+            .push(EvaluationClaim::EvaluatorIndependence);
+
+        assert!(!duplicate.is_well_formed());
+        assert_ne!(duplicate.canonical_bytes(), boundary.canonical_bytes());
+
+        let clean_evaluation = report.to_evidence_evaluation();
+        let mut tampered_evaluation = clean_evaluation.clone();
+        tampered_evaluation.boundary = duplicate;
+        assert!(!tampered_evaluation.is_well_formed());
+        assert_ne!(tampered_evaluation.fingerprint(), clean_evaluation.fingerprint());
     }
 
     #[test]
