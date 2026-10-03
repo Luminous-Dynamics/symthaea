@@ -152,6 +152,22 @@ fn recovery_crosses_u64_packing_boundaries() {
 }
 
 #[test]
+fn exhaustive_direct_sum_recovery_matches_all_factor_pairs() {
+    let (parent, left, right) =
+        RandomLinearCode::generate_direct_sum(10, 2, 2, 0x5A11).expect("valid direct sum");
+    assert_eq!(basis_rank(parent.basis(), 10), parent.rank());
+
+    for left_word in left.enumerate() {
+        for right_word in right.enumerate() {
+            let target = left_word.bound(&right_word);
+            let recovered =
+                recover_direct_sum_bound(&target, &left, &right).expect("pair must recover");
+            assert_eq!(recovered, (left_word.clone(), right_word.clone()));
+        }
+    }
+}
+
+#[test]
 fn arbitrary_same_subspace_bound_is_not_uniquely_identifiable() {
     let code = RandomLinearCode::generate(96, 8, 0xD00D);
     let a = code.encode(&[true, false, true, false, false, true, false, true]);
