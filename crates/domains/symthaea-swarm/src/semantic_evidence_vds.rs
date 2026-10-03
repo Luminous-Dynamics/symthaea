@@ -1756,10 +1756,21 @@ impl<'a> CborReader<'a> {
     fn finish(self)->Result<(),Rfc9162ProofDecodeError>{ if self.offset==self.bytes.len(){Ok(())}else{Err(Rfc9162ProofDecodeError::TrailingBytes)} }
 }
 
+fn rfc9162_ceil_log2(n: u64) -> usize {
+    if n <= 1 {
+        0
+    } else {
+        (u64::BITS - (n - 1).leading_zeros()) as usize
+    }
+}
+
 impl Rfc9162ConsistencyProof {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
         let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-        let first=r.read_u64()?; let second=r.read_u64()?; let n=r.read_array_len()?; if n>MAX_RFC9162_CONSISTENCY_PROOF_PATH{return Err(Rfc9162ProofDecodeError::InvalidStructure)} let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
+        let first=r.read_u64()?; let second=r.read_u64()?; let n=r.read_array_len()?;
+        let max_path=rfc9162_ceil_log2(second).saturating_add(1);
+        if n>MAX_RFC9162_CONSISTENCY_PROOF_PATH || n>max_path{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+        let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
         if first==0 || first>=second || path.is_empty(){return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         Ok(Self::new(first,second,path))
     }
@@ -1768,7 +1779,10 @@ impl Rfc9162ConsistencyProof {
 impl Rfc9162InclusionProof {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
         let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-        let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?; let n=r.read_array_len()?; if n>MAX_RFC9162_INCLUSION_PROOF_PATH{return Err(Rfc9162ProofDecodeError::InvalidStructure)} let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
+        let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?; let n=r.read_array_len()?;
+        let max_path=rfc9162_ceil_log2(tree_size);
+        if n>MAX_RFC9162_INCLUSION_PROOF_PATH || n>max_path{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+        let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
         if tree_size==0 || leaf_index>=tree_size{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         Ok(Self::new(tree_size,leaf_index,path))
     }
