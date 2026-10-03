@@ -11,6 +11,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::freshness_anchor_assurance::{
+    FreshnessAnchorAssuranceError, FreshnessAnchorCapabilities,
+};
 use crate::freshness_reconciliation::{FreshnessAcceptancePolicy, FreshnessAcceptanceState};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -77,6 +80,12 @@ pub trait FreshnessRecoveryAnchorStore {
         expected: Option<&FreshnessRecoveryAnchor>,
         next: &FreshnessRecoveryAnchor,
     ) -> bool;
+
+    /// Existing implementations default to non-authoritative software
+    /// persistence. Backends must opt in by declaring all required properties.
+    fn capabilities(&self) -> FreshnessAnchorCapabilities {
+        FreshnessAnchorCapabilities::software_only()
+    }
 }
 
 impl FreshnessRecoveryRecord {
@@ -212,6 +221,11 @@ pub fn prepare_record(
     )
 }
 
+/// Commit an anchor using the mechanical store interface only.
+///
+/// This validates the recovery chain but does not establish that the backing
+/// store is rollback-resistant. Use commit_authoritative_anchor when the
+/// anchor is intended to authorize recovery after receiver rollback.
 pub fn commit_anchor<S: FreshnessRecoveryAnchorStore>(
     store: &S,
     expected: Option<&FreshnessRecoveryAnchor>,
@@ -236,6 +250,18 @@ pub fn commit_anchor<S: FreshnessRecoveryAnchorStore>(
     } else {
         Err("recovery anchor compare-and-swap failed")
     }
+}
+
+/// Commit an anchor only when the backing store explicitly satisfies the
+/// authoritative anti-rollback contract.
+pub fn commit_authoritative_anchor<S: FreshnessRecoveryAnchorStore>(
+    store: &S,
+    expected: Option<&FreshnessRecoveryAnchor>,
+    record: &FreshnessRecoveryRecord,
+) -> Result<(), FreshnessAnchorAssuranceError> {
+    store.capabilities().require_authoritative()?;
+    commit_anchor(store, expected, record)
+        .map_err(|message| FreshnessAnchorAssuranceError::CommitRejected(message.into()))
 }
 
 #[cfg(test)]
@@ -349,4 +375,50 @@ mod tests {
             Err("recovery generation is not strictly monotonic")
         );
     }
+    #[test]
+    fn software_only_store_cannot_make_authoritative_commit() {
+        struct SoftwareStore;
+        impl FreshnessRecoveryAnchorStore for SoftwareStore {
+            fn load(&self) -> Option<FreshnessRecoveryAnchor> { None }
+            fn compare_and_swap(
+                &self,
+                _: Option<&FreshnessRecoveryAnchor>,
+                _: &FreshnessRecoveryAnchor,
+            ) -> bool { true }
+        }
+
+        let r = record(0, state(), None);
+        let err = commit_authoritative_anchor(&SoftwareStore, None, &r).unwrap_err();
+        assert_eq!(
+            err,
+            FreshnessAnchorAssuranceError::InsufficientCapabilities {
+                missing: vec![
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::Authentication,
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::Monotonicity,
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::RollbackResistance,
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::AtomicUpdate,
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn fully_capable_store_can_make_authoritative_commit() {
+        struct AuthoritativeStore;
+        impl FreshnessRecoveryAnchorStore for AuthoritativeStore {
+            fn load(&self) -> Option<FreshnessRecoveryAnchor> { None }
+            fn compare_and_swap(
+                &self,
+                _: Option<&FreshnessRecoveryAnchor>,
+                _: &FreshnessRecoveryAnchor,
+            ) -> bool { true }
+            fn capabilities(&self) -> FreshnessAnchorCapabilities {
+                FreshnessAnchorCapabilities::authoritative()
+            }
+        }
+
+        let r = record(0, state(), None);
+        assert!(commit_authoritative_anchor(&AuthoritativeStore, None, &r).is_ok());
+    }
+
 }
