@@ -508,6 +508,35 @@ mod tests {
     }
 
     #[test]
+    fn stale_verification_result_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.verification_result.valid_until_ms = 999;
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::StaleVerificationResult
+            )
+        )));
+    }
+
+    #[test]
+    fn verification_reference_substitution_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.verification_result.verification_reference =
+            "verify-attacker".into();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::VerificationReferenceMismatch
+            )
+        )));
+    }
+
+    #[test]
     fn wrong_attestation_issuer_cannot_enter_independence_quorum() {
         let mut p = pair("strain-a", 0.5, 1.5);
         p.independence.topology_attestation.authoritative_reference.issuer_id = "attacker".into();
