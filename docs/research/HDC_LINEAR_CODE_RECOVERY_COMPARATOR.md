@@ -74,7 +74,7 @@ Required primitives:
 
 - GF(2) packed bit-vector representation;
 - XOR/addition over GF(2);
-- deterministic random full-rank generator matrix;
+- deterministic random full-rank generator matrix using the pinned `rand_chacha` `ChaCha12Rng` algorithm;
 - row-reduction / rank;
 - deterministic basis construction;
 - Boolean subspace membership;
@@ -85,7 +85,7 @@ Tests should cover:
 - closure under XOR;
 - zero-vector membership;
 - rank preservation;
-- deterministic regeneration from seed;
+- deterministic regeneration from seed, with the RNG algorithm and dependency lock recorded;
 - round-trip conversion;
 - XOR/Hadamard equivalence under the bipolar mapping;
 - rejection of malformed dimensions.
@@ -154,7 +154,7 @@ Do not expand the benchmark matrix until the algebraic invariants and oracle sem
 The branch is ready for an evidence-producing benchmark only when:
 
 - every generated code is full-rank according to its declared rank;
-- every fixture is reproducible byte-for-byte from its seed and revision;
+- every fixture is reproducible byte-for-byte from its seed, pinned RNG algorithm, dependency lock, and revision;
 - the clean fixture's identifiability conditions are explicit and the recovery result matches exhaustive truth (including ambiguity) on all validation fixtures;
 - intentionally corrupted queries produce classified outcomes rather than silent false positives;
 - the resonator control uses the same ground-truth factor set and independently verified fixture;
@@ -247,7 +247,7 @@ A September 2026 result by Silas further sharpens the random-linear-code decodin
 The branch is ready for a benchmark-producing Stage-C/Stage-D experiment only when:
 
 - the focused Rust qualification workflow is green on the exact PR head;
-- every generated code is full-rank and reproducible;
+- every generated code is full-rank and reproducible from the recorded seed, `ChaCha12Rng` algorithm, dependency lock, and revision;
 - two-factor and three-factor clean recovery match exhaustive truth;
 - overlap/dependence is classified as non-unique or rejected rather than mislabeled as exact recovery;
 - corrupted targets have explicit in-span/out-of-span classification;
