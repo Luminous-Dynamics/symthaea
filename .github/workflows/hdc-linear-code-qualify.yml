@@ -103,11 +103,13 @@ jobs:
           cargo generate-lockfile --manifest-path "$HARNESS/Cargo.toml"
           LOCK_SHA256="$(sha256sum "$HARNESS/Cargo.lock" | cut -d" " -f1)"
           CARGO_VERSION="$(cargo --version)"
+          RUSTC_VERSION="$(rustc --version)"
           UNIT_TEST_COUNT="$(cargo test --locked --manifest-path "$HARNESS/Cargo.toml" --lib linear_code -- --list | awk '/^[^[:space:]].*: test$/ { count++ } END { print count+0 }')"
           INTEGRATION_TEST_COUNT="$(cargo test --locked --manifest-path "$HARNESS/Cargo.toml" --test linear_code_ambiguity -- --list | awk '/^[^[:space:]].*: test$/ { count++ } END { print count+0 }')"
           echo "path=$HARNESS" >> "$GITHUB_OUTPUT"
           echo "lock_sha256=$LOCK_SHA256" >> "$GITHUB_OUTPUT"
           echo "cargo_version=$CARGO_VERSION" >> "$GITHUB_OUTPUT"
+          echo "rustc_version=$RUSTC_VERSION" >> "$GITHUB_OUTPUT"
           echo "unit_test_count=$UNIT_TEST_COUNT" >> "$GITHUB_OUTPUT"
           echo "integration_test_count=$INTEGRATION_TEST_COUNT" >> "$GITHUB_OUTPUT"
 
@@ -155,11 +157,11 @@ jobs:
           source_sha256=${{ steps.provenance.outputs.source_sha256 }}
           integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
           cargo_version=${{ steps.harness.outputs.cargo_version }}
+          rustc_version=${{ steps.harness.outputs.rustc_version }}
           dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
           unit_test_inventory=${{ steps.harness.outputs.unit_test_count }}
           integration_test_inventory=${{ steps.harness.outputs.integration_test_count }}
           fixture_fingerprint_status=${{ steps.fingerprint.outcome == 'success' && 'captured' || 'not-captured' }}
-          fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
           fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
