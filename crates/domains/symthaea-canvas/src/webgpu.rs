@@ -482,8 +482,9 @@ fn emit_polygon_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) -
     true
 }
 
-fn cross(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
-    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+fn cross(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f64 {
+    (f64::from(b[0]) - f64::from(a[0])) * (f64::from(c[1]) - f64::from(a[1]))
+        - (f64::from(b[1]) - f64::from(a[1])) * (f64::from(c[0]) - f64::from(a[0]))
 }
 
 /// Reject self-intersecting simple-polygon violations before ear clipping.
