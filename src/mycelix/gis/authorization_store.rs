@@ -1167,8 +1167,6 @@ impl SqliteAuthorizationStore {
              CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_operation_uq
                ON authorization_leases(operation_id)
                WHERE operation_id IS NOT NULL AND operation_id <> '';
-               ON authorization_dispatches(operation_id)
-               WHERE operation_id <> '';
              DROP INDEX IF EXISTS authorization_dispatch_action_fence_idx;
              CREATE INDEX authorization_dispatch_action_fence_idx
                ON authorization_dispatches(relying_party_id, target_identity, action_digest, state);",
