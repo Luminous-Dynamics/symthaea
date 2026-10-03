@@ -82,5 +82,18 @@ jobs:
           key: ${{ runner.os }}-es256-cose-fuzz-${{ hashFiles('crates/domains/symthaea-swarm/fuzz/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-es256-cose-fuzz-
+      - name: Assert expected fuzz target inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="$(cargo metadata --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --no-deps --format-version 1)"
+          for target in \
+            fuzz_cose_key_es256 \
+            fuzz_rfc9942_receipt \
+            fuzz_rfc9942_signature_with_receipts \
+            fuzz_rfc9942_proofs
+          do
+            grep -F '"name":"'"$target"'"' <<<"$metadata" >/dev/null
+          done
       - name: Check fuzz manifest
         run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bins
