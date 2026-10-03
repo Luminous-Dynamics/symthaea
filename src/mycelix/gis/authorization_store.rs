@@ -1604,7 +1604,7 @@ fn validate_native_authority_pin_set(
         receipt.provider_idempotency_key = record.provider_idempotency_key.clone();
         update_lease_with_boundary(&tx, &lease, Some(&record.boundary_id))?;
         tx.execute(
-            "INSERT OR REPLACE INTO authorization_terminal_evidence
+            "INSERT INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
               native_authority_pin_set_id,native_authority_pin_set_digest,
@@ -1976,7 +1976,7 @@ fn validate_native_authority_pin_set(
         }
         insert_receipt_with_boundary(&tx, &receipt, "reconciled", Some(&record.boundary_id))?;
         tx.execute(
-            "INSERT OR REPLACE INTO authorization_terminal_evidence
+            "INSERT INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
               native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,boundary_id,
@@ -2658,6 +2658,72 @@ mod tests {
                 AuthorizationConsumptionError::InvalidBinding
             ))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_evidence_storage_is_insert_only_for_attempt() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-terminal-insert-only-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-terminal-insert-only","prod","adapter-terminal"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"terminal-insert-only".into(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:35:00Z".into(),
+            expires_at:Some("2026-10-04T06:35:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1","attempt-terminal-insert-only","boundary-terminal"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,&witness.authorization_instance,"attempt-terminal-insert-only",
+            &action,&effect,"boundary-terminal",
+            "operation:terminal-insert-only","native-terminal-insert-only"
+        ).unwrap();
+        store.commit_bound_verified(
+            &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier
+        ).unwrap();
+
+        let err=store.connection().unwrap().execute(
+            "INSERT INTO authorization_terminal_evidence(
+                authorization_instance,attempt_id,operation_id,native_replay_identity,
+                action_digest,provider_idempotency_key,target_identity,audience,adapter,
+                outcome,evidence_id,evidence_digest,verifier_id,verifier_config_digest,
+                trust_anchor_digest,evidence_profile_digest,verification_digest
+             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
+            params![
+                record.authorization_instance,record.attempt_id,"tampered-operation",
+                record.native_replay_identity,record.action_digest,record.provider_idempotency_key,
+                record.target_identity,record.audience,"tampered-adapter","succeeded",
+                "tampered-evidence","sha256:tampered","tampered-verifier",
+                "sha256:tampered-config","sha256:tampered-anchor","sha256:tampered-profile",
+                "sha256:tampered-verification"
+            ],
+        ).unwrap_err();
+        assert!(matches!(err, rusqlite::Error::SqliteFailure(_, _)));
+        let adapter:String=store.connection().unwrap().query_row(
+            "SELECT adapter FROM authorization_terminal_evidence
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(adapter,record.adapter);
         let _=std::fs::remove_file(path);
     }
 
