@@ -1,4 +1,5 @@
 name: Sovereign State Compiler Validation
+# Boundary contract: validate the neutral core and plan-only target adapters on every branch push/PR.
 
 on:
   push:
