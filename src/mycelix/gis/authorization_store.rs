@@ -484,6 +484,12 @@ impl SqliteAuthorizationStore {
         &self, witness: &ActionAuthorizationWitness, action: &EpistemicAction,
         current_frame: &str, attempt_id: &str,
     ) -> Result<(), AuthorizationStoreError> {
+        // Effect-bound actions must use the boundary-owned lifecycle so the
+        // durable dispatch record, native replay provenance, same-action fence,
+        // and provider verifier controls cannot be bypassed by the legacy API.
+        if action.effect_binding().is_some() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let bound: Option<String> = tx
@@ -2023,6 +2029,42 @@ mod tests {
             ISSUER,
             native_authorization_id,
         )
+    }
+
+    #[test]
+    fn unbound_prepare_rejects_effect_bound_actions() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-effect-prepare-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let action=EpistemicAction::new(
+            "effect-bound-prepare","intervention",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect);
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"effect-bound-prepare".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T06:50:00Z".into(),
+            expires_at:None,
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),action.id.clone(),digest,
+            witness.support_digest.clone(),witness.policy.clone(),1,1
+        )).unwrap();
+        assert!(matches!(
+            store.prepare_for_execution(&witness,&action,"frame@1","attempt-effect-bound"),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+        let _=std::fs::remove_file(path);
     }
 
     #[test]
