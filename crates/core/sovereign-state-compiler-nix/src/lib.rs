@@ -728,7 +728,7 @@ mod tests {
                     (
                         PlanStepKind::ApplyDesiredState,
                         set(&[
-                            Capability::ObserveHardware,
+                            Capability::ObserveState,
                             Capability::ConfigureSystem,
                             Capability::UpdateSystem,
                         ]),
