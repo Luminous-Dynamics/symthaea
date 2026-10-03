@@ -325,6 +325,10 @@ mod tests {
 
     #[test]
     fn invalid_service_unit_is_rejected_before_legacy_rendering() {
+        use super::super::service_domain::{
+            NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1,
+        };
+
         let error = NixServiceOperationV1::new(
             "../nginx.service",
             NixServiceOperationKindV1::Start,
