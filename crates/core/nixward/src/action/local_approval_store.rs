@@ -21,7 +21,7 @@ use super::local_approval::{
     PendingNixApprovalRequestV1,
 };
 use super::local_approval_submission::{
-    LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV2,
+    LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1, LocalApprovalSubmissionV2,
     admit_verified_local_submission_v2,
 };
 use super::approver_evidence::{
