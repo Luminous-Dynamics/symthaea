@@ -1,4 +1,3 @@
-use serde_json::json;
 use symthaea_evidence_plane::execution_lineage::{
     EvidenceLineageDecision, EvidenceLineageGuardV1, ExecutionLineageV1, RepositorySourceSnapshotId,
 };
@@ -74,28 +73,47 @@ fn guard_refuses_cross_execution_evidence_after_commit() {
 
 #[test]
 fn serde_rejects_duplicate_map_keys_before_canonicalization() {
-    let mut value = serde_json::to_value(fixture()).unwrap();
-    let object = value.as_object_mut().unwrap();
-    object.insert(
-        "lock_digests".into(),
-        json!({
-            "Cargo.lock": "sha256:0011223344556677",
-            "other": "blake3:0011223344556677"
-        }),
-    );
-    let mut text = serde_json::to_string(&value).unwrap();
-    text = text.replace(
-        "\"lock_digests\":{\"Cargo.lock\":\"sha256:0011223344556677\",\"other\":\"blake3:0011223344556677\"}",
-        "\"lock_digests\":{\"Cargo.lock\":\"sha256:0011223344556677\",\"Cargo.lock\":\"blake3:0011223344556677\"}",
-    );
-    assert!(serde_json::from_str::<ExecutionLineageV1>(&text).is_err());
+    let text = r#"{
+        "source_repository":"luminous-dynamics/symthaea",
+        "source_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "repository_source_snapshot_id":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "lock_digests":{
+            "Cargo.lock":"sha256:0011223344556677",
+            "Cargo.lock":"blake3:8899aabbccddeeff"
+        },
+        "toolchain_versions":{"rustc":"1.96.0"},
+        "host_triple":"x86_64-unknown-linux-gnu",
+        "target_triple":"x86_64-unknown-linux-gnu",
+        "nix_identity":"nix:fixture",
+        "feature_flags":["default"],
+        "cwd":"/workspace",
+        "argv":["cargo","test"],
+        "allowed_env":{"RUST_BACKTRACE":"0"},
+        "immutable_input_digests":{"fixture":"blake3:8899aabbccddeeff"}
+    }"#;
+
+    assert!(serde_json::from_str::<ExecutionLineageV1>(text).is_err());
 }
 
 #[test]
 fn serde_rejects_duplicate_feature_members_before_set_canonicalization() {
-    let value = serde_json::to_value(fixture()).unwrap();
-    let mut object = value.as_object().unwrap().clone();
-    object.insert("feature_flags".into(), json!(["default", "default"]));
-    let text = serde_json::to_string(&object).unwrap();
-    assert!(serde_json::from_str::<ExecutionLineageV1>(&text).is_err());
+    let text = r#"{
+        "source_repository":"luminous-dynamics/symthaea",
+        "source_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_tree":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "repository_source_snapshot_id":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "lock_digests":{"Cargo.lock":"sha256:0011223344556677"},
+        "toolchain_versions":{"rustc":"1.96.0"},
+        "host_triple":"x86_64-unknown-linux-gnu",
+        "target_triple":"x86_64-unknown-linux-gnu",
+        "nix_identity":"nix:fixture",
+        "feature_flags":["default","default"],
+        "cwd":"/workspace",
+        "argv":["cargo","test"],
+        "allowed_env":{"RUST_BACKTRACE":"0"},
+        "immutable_input_digests":{"fixture":"blake3:8899aabbccddeeff"}
+    }"#;
+
+    assert!(serde_json::from_str::<ExecutionLineageV1>(text).is_err());
 }
