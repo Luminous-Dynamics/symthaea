@@ -436,6 +436,43 @@ pub fn App() -> impl IntoView {
         });
     }
 
+    // Poll WebGPU device health so a static cognitive projection can
+    // demote to its compatibility renderer even when no new scene arrives.
+    Effect::new(move |_| {
+        let renderer = Rc::clone(&webgpu_renderer);
+        spawn_local(async move {
+            loop {
+                gloo_timers::future::TimeoutFuture::new(500).await;
+                let lost = renderer
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(WebGpuRenderer::is_device_lost);
+                if lost {
+                    webgpu_ready.set(false);
+                    break;
+                }
+            }
+        });
+    });
+
+    // Poll the movie renderer independently for the same device-loss handoff.
+    Effect::new(move |_| {
+        let renderer = Rc::clone(&movie_webgpu_renderer);
+        spawn_local(async move {
+            loop {
+                gloo_timers::future::TimeoutFuture::new(500).await;
+                let lost = renderer
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(WebGpuMovieRenderer::is_device_lost);
+                if lost {
+                    movie_webgpu_ready.set(false);
+                    break;
+                }
+            }
+        });
+    });
+
     // Poll GET-equivalent /v1/service status every 5s. This is baseline
     // liveness feedback independent of the telemetry WS above, which stays
     // silent whenever the daemon's experience bridge is off (the common
