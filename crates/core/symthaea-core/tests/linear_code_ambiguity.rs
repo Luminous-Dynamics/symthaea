@@ -615,6 +615,36 @@ fn overlapping_subspaces_without_shared_generators_still_recover_representativel
 }
 
 #[test]
+fn overlapping_recovery_is_order_deterministic_but_not_permutation_invariant() {
+    let parent = RandomLinearCode::generate(96, 4, 0x7B7B);
+    let left = RandomLinearCode::from_basis(parent.basis()[..2].to_vec()).expect("left subcode");
+    let shared = parent.basis()[0].bound(&parent.basis()[1]);
+    let right =
+        RandomLinearCode::from_basis(vec![shared, parent.basis()[2].clone()]).expect("right subcode");
+
+    let target = parent.basis()[0].clone();
+    let first = recover_linear_bound(&target, &[&left, &right]).expect("forward recovery");
+    let repeated = recover_linear_bound(&target, &[&left, &right]).expect("repeat recovery");
+    assert_eq!(first, repeated);
+    assert_eq!(first.len(), 2);
+    assert!(left.contains(&first[0]));
+    assert!(right.contains(&first[1]));
+    assert_eq!(first[0].bound(&first[1]), target);
+
+    let reversed =
+        recover_linear_bound(&target, &[&right, &left]).expect("reversed recovery");
+    assert_eq!(reversed.len(), 2);
+    assert!(right.contains(&reversed[0]));
+    assert!(left.contains(&reversed[1]));
+    assert_eq!(reversed[0].bound(&reversed[1]), target);
+
+    // The theorem's representative construction is deterministic for a fixed
+    // factor ordering, but overlap means the representative is allowed to
+    // change when the factor ordering changes.
+    assert_ne!(first, reversed);
+}
+
+#[test]
 fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
     let parent = RandomLinearCode::generate(96, 8, 0x4444);
     let left = RandomLinearCode::from_basis(parent.basis()[..4].to_vec()).expect("left subcode");
