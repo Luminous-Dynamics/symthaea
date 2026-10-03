@@ -714,6 +714,38 @@ fn exhaustive_overlapping_recovery_preserves_valid_factorization() {
 }
 
 #[test]
+fn exhaustive_overlapping_recovery_existence_matches_truth_oracle() {
+    let parent = RandomLinearCode::generate(10, 5, 0x5A13);
+    let left = RandomLinearCode::from_basis(parent.basis()[..3].to_vec()).expect("left subcode");
+    let right =
+        RandomLinearCode::from_basis(parent.basis()[2..5].to_vec()).expect("right subcode");
+
+    let left_words = left.enumerate();
+    let right_words = right.enumerate();
+
+    for mask in 0..(1usize << 10) {
+        let target = BinaryCodeword::from_words(10, vec![mask as u64]);
+        let oracle_exists = left_words
+            .iter()
+            .any(|a| right_words.iter().any(|b| a.bound(b) == target));
+        let recovered = recover_linear_bound(&target, &[&left, &right]);
+
+        assert_eq!(
+            recovered.is_some(),
+            oracle_exists,
+            "recovery existence mismatch for target mask={mask:#x}"
+        );
+
+        if let Some(factors) = recovered {
+            assert_eq!(factors.len(), 2);
+            assert!(left.contains(&factors[0]));
+            assert!(right.contains(&factors[1]));
+            assert_eq!(factors[0].bound(&factors[1]), target);
+        }
+    }
+}
+
+#[test]
 fn general_recovery_rejects_target_outside_union_span() {
     let parent = RandomLinearCode::generate(16, 5, 0xBADA);
     let left = RandomLinearCode::from_basis(parent.basis()[..3].to_vec()).expect("left subcode");
