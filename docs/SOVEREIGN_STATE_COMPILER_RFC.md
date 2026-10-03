@@ -372,6 +372,7 @@ Authorization validation now requires:
 - no granted capability may be unrelated to the compiled authority requirements;
 - artifact and external attestation references must carry concrete digests and
   non-empty reference metadata;
+- every compiled deployment plan contains a terminal `Verify` lifecycle step;
 - verification carries exact expected state values and a typed transition disposition rather than property names alone;
 - the transition disposition is included in the compiled plan digest and therefore in authorization;
 - execution receipts separate mechanical execution outcome from typed postcondition outcome;
