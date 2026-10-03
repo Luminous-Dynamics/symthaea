@@ -215,6 +215,7 @@ Implemented:
 - recover_independent_bound generalizes direct-sum recovery to F factor codebooks when the concatenated generator bases are jointly independent.
 - The general API preserves factor order and returns a valid representative factorization without labeling it unique.
 - The independent API remains fail-closed on overlapping/dependent factors when a uniqueness-guaranteed decomposition is required.
+- For overlapping factors, representative recovery is deterministic for a fixed factor ordering, but the representative may change when factor order changes; permutation-invariance is not claimed.
 - The existing exhaustive two-factor oracle remains the ground truth.
 - A three-factor parent-basis-partition fixture validates exact recovery against exhaustive truth.
 - An overlap fixture now validates that representative recovery works while exhaustive enumeration demonstrates multiple valid decompositions.
