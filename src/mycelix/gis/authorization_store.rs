@@ -57,6 +57,7 @@ pub struct RecoveryAuthorizationWitness {
     pub authorization_instance: String,
     pub attempt_id: String,
     /// Logical operation identity supplied by the recovery authority.
+    /// Required by strict operation-bound recovery; legacy witnesses may leave it empty.
     pub operation_id: String,
     pub boundary_id: String,
     pub action_digest: String,
@@ -69,12 +70,14 @@ impl RecoveryAuthorizationWitness {
     pub fn is_bound_to(&self, lease: &AuthorizationLease) -> bool {
         !self.authorization_instance.is_empty()
             && !self.attempt_id.is_empty()
-            && !self.operation_id.is_empty()
             && !self.boundary_id.is_empty()
             && !self.policy.is_empty()
             && !self.issued_at.is_empty()
             && self.authorization_instance == lease.authorization_instance
-            && self.operation_id == lease.operation_id.as_deref().unwrap_or("")
+            && lease.operation_id
+                .as_deref()
+                .map(|operation_id| self.operation_id == operation_id)
+                .unwrap_or(true)
             && self.action_digest == lease.action_digest
             && self.policy == lease.policy
             && self.authority_epoch == lease.authority_epoch
@@ -1109,6 +1112,7 @@ fn validate_native_authority_pin_set(
     /// Persisting the boundary while the lease is still Prepared means a crash
     /// before DispatchPending cannot leave the reservation ownerless.
     /// Bound attempt IDs are unique within this durable state domain.
+    #[deprecated(note = "use prepare_for_execution_bound_with_operation for strict operation provenance")]
     pub fn prepare_for_execution_bound(
         &self,
         witness: &ActionAuthorizationWitness,
@@ -1117,7 +1121,48 @@ fn validate_native_authority_pin_set(
         attempt_id: &str,
         boundary_id: &str,
     ) -> Result<(), AuthorizationStoreError> {
-        if boundary_id.is_empty() || attempt_id.is_empty() {
+        self.prepare_for_execution_bound_internal(
+            witness, action, current_frame, attempt_id, boundary_id, None
+        )
+    }
+
+    /// Canonical effectful preparation. The logical operation ID is frozen
+    /// before DispatchPending so exact pre-dispatch recovery can bind it.
+    pub fn prepare_for_execution_bound_with_operation(
+        &self,
+        witness: &ActionAuthorizationWitness,
+        action: &EpistemicAction,
+        current_frame: &str,
+        attempt_id: &str,
+        boundary_id: &str,
+        operation_id: &str,
+    ) -> Result<(), AuthorizationStoreError> {
+        if operation_id.is_empty() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        self.prepare_for_execution_bound_internal(
+            witness,
+            action,
+            current_frame,
+            attempt_id,
+            boundary_id,
+            Some(operation_id),
+        )
+    }
+
+    fn prepare_for_execution_bound_internal(
+        &self,
+        witness: &ActionAuthorizationWitness,
+        action: &EpistemicAction,
+        current_frame: &str,
+        attempt_id: &str,
+        boundary_id: &str,
+        operation_id: Option<&str>,
+    ) -> Result<(), AuthorizationStoreError> {
+        if boundary_id.is_empty()
+            || attempt_id.is_empty()
+            || operation_id.is_some_and(|id| id.is_empty())
+        {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
         let (validity_issued_at, validity_expires_at) = self.clock_policy.validate(
@@ -1187,10 +1232,15 @@ fn validate_native_authority_pin_set(
 
         let changed = tx.execute(
             "UPDATE authorization_leases
-             SET state='prepared', attempt_id=?2, boundary_id=?3
+             SET state='prepared', attempt_id=?2, operation_id=?3, boundary_id=?4
              WHERE authorization_instance=?1 AND state='ready'
                AND remaining_executions>0 AND boundary_id IS NULL",
-            params![witness.authorization_instance.as_str(), attempt_id, boundary_id],
+            params![
+                witness.authorization_instance.as_str(),
+                attempt_id,
+                operation_id,
+                boundary_id,
+            ],
         )?;
         if changed != 1 {
             return Err(AuthorizationConsumptionError::NotReady.into());
@@ -2767,6 +2817,7 @@ fn migrate_legacy_schema(connection: &mut Connection) -> Result<(), Authorizatio
            remaining_executions INTEGER NOT NULL,
            state TEXT NOT NULL,
            attempt_id TEXT,
+           operation_id TEXT,
            boundary_id TEXT
          );
 
@@ -2785,9 +2836,9 @@ fn migrate_legacy_schema(connection: &mut Connection) -> Result<(), Authorizatio
     tx.execute(
         "INSERT INTO authorization_leases
          (authorization_instance,action_id,action_digest,support_digest,policy,
-          authority_epoch,remaining_executions,state,attempt_id,boundary_id)
+          authority_epoch,remaining_executions,state,attempt_id,operation_id,boundary_id)
          SELECT action_id,action_id,action_digest,support_digest,policy,
-                authority_epoch,remaining_executions,state,attempt_id,NULL
+                authority_epoch,remaining_executions,state,attempt_id,NULL,NULL
          FROM authorization_leases_legacy",
         [],
     )?;
