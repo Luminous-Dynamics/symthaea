@@ -548,6 +548,122 @@ fn backfill_status_check_boundary_ownership(
     Ok(())
 }
 
+fn backfill_bound_attempt_boundaries_from_dispatch(
+    connection: &mut Connection,
+) -> Result<(), AuthorizationStoreError> {
+    // Receipts and terminal evidence can span schema generations. When a
+    // bound dispatch is authoritative, fill only a missing boundary owner.
+    // Never overwrite an already-present historical boundary.
+    for table in ["authorization_receipts", "authorization_terminal_evidence"] {
+        connection.execute(
+            &format!(
+                "UPDATE {table}
+                 SET boundary_id=(
+                     SELECT d.boundary_id
+                     FROM authorization_dispatches d
+                     WHERE d.authorization_instance={table}.authorization_instance
+                       AND d.attempt_id={table}.attempt_id
+                 )
+                 WHERE (boundary_id IS NULL OR boundary_id='')
+                   AND EXISTS(
+                     SELECT 1
+                     FROM authorization_dispatches d
+                     WHERE d.authorization_instance={table}.authorization_instance
+                       AND d.attempt_id={table}.attempt_id
+                       AND d.boundary_id IS NOT NULL
+                       AND d.boundary_id <> ''
+                   )"
+            ),
+            [],
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_attempt_boundary_consistency(
+    connection: &Connection,
+) -> Result<(), AuthorizationStoreError> {
+    let mut owners =
+        std::collections::BTreeMap::<(String,String),String>::new();
+    for table in [
+        "authorization_leases",
+        "authorization_receipts",
+        "authorization_status_checks",
+        "authorization_recovery_markers",
+        "authorization_terminal_evidence",
+        "authorization_dispatches",
+    ] {
+        let mut stmt = connection.prepare(&format!(
+            "SELECT authorization_instance,attempt_id,boundary_id
+             FROM {table}
+             WHERE attempt_id IS NOT NULL
+               AND attempt_id <> ''
+               AND boundary_id IS NOT NULL
+               AND boundary_id <> ''"
+        ))?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_,String>(0)?,
+                row.get::<_,String>(1)?,
+                row.get::<_,String>(2)?,
+            ))
+        })?;
+        for row in rows {
+            let (authorization_instance,attempt_id,boundary_id)=row?;
+            let key=(authorization_instance.clone(),attempt_id.clone());
+            if let Some(existing)=owners.insert(key,boundary_id.clone()) {
+                if existing != boundary_id {
+                    return Err(AuthorizationStoreError::InvalidState(format!(
+                        "attempt boundary mismatch for {authorization_instance}/{attempt_id}:                          {existing} vs {boundary_id} in {table}"
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_attempt_boundary_consistency_for_attempt(
+    tx: &Transaction<'_>,
+    authorization_instance: &str,
+    attempt_id: &str,
+    expected_boundary: &str,
+) -> Result<(), AuthorizationStoreError> {
+    if authorization_instance.is_empty()
+        || attempt_id.is_empty()
+        || expected_boundary.is_empty()
+    {
+        return Err(AuthorizationConsumptionError::InvalidBinding.into());
+    }
+    for table in [
+        "authorization_leases",
+        "authorization_receipts",
+        "authorization_status_checks",
+        "authorization_recovery_markers",
+        "authorization_terminal_evidence",
+        "authorization_dispatches",
+    ] {
+        let mut stmt = tx.prepare(&format!(
+            "SELECT boundary_id
+             FROM {table}
+             WHERE authorization_instance=?1
+               AND attempt_id=?2
+               AND boundary_id IS NOT NULL
+               AND boundary_id <> ''"
+        ))?;
+        let rows = stmt.query_map(
+            params![authorization_instance,attempt_id],
+            |row| row.get::<_,String>(0),
+        )?;
+        for row in rows {
+            if row? != expected_boundary {
+                return Err(AuthorizationConsumptionError::InvalidBinding.into());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn backfill_attempt_scope_digests(
     connection: &mut Connection,
 ) -> Result<(), AuthorizationStoreError> {
@@ -1027,7 +1143,9 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_status_checks", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_status_checks", "attempt_scope_digest", "TEXT")?;
         backfill_status_check_boundary_ownership(&mut connection)?;
+        backfill_bound_attempt_boundaries_from_dispatch(&mut connection)?;
         backfill_attempt_scope_digests(&mut connection)?;
+        validate_attempt_boundary_consistency(&connection)?;
         connection.execute_batch(
             "CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
                ON authorization_leases(attempt_id)
