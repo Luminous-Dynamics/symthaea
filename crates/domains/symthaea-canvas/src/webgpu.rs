@@ -387,6 +387,9 @@ fn emit_polygon_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) -
     {
         return false;
     }
+    if !is_simple_polygon(points) {
+        return false;
+    }
 
     // Remove only exact adjacent duplicates. They are common at shape seams and
     // otherwise create zero-area candidate ears that can stall triangulation.
@@ -482,6 +485,81 @@ fn emit_polygon_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) -
 
 fn cross(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
     (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+}
+
+/// Reject self-intersecting simple-polygon violations before ear clipping.
+///
+/// The wire scene is remote input, so a bow-tie or otherwise crossing polygon
+/// must not be handed to the triangulator. The input is already bounded to
+/// 128 points, making this O(n²) check small and deterministic.
+fn is_simple_polygon(points: &[[f32; 2]]) -> bool {
+    let n = points.len();
+    if n < 4 {
+        return true;
+    }
+
+    for i in 0..n {
+        let a = points[i];
+        let b = points[(i + 1) % n];
+
+        for j in (i + 1)..n {
+            // Adjacent edges are allowed to meet at their shared endpoint.
+            if j == i + 1 || (i == 0 && j == n - 1) {
+                continue;
+            }
+
+            let c = points[j];
+            let d = points[(j + 1) % n];
+            if segments_intersect_or_touch(a, b, c, d) {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
+fn segments_intersect_or_touch(
+    a: [f32; 2],
+    b: [f32; 2],
+    c: [f32; 2],
+    d: [f32; 2],
+) -> bool {
+    const EPSILON: f32 = 1e-6;
+
+    let ab_c = cross(a, b, c);
+    let ab_d = cross(a, b, d);
+    let cd_a = cross(c, d, a);
+    let cd_b = cross(c, d, b);
+
+    if !ab_c.is_finite() || !ab_d.is_finite() || !cd_a.is_finite() || !cd_b.is_finite() {
+        return false;
+    }
+
+    let proper = ((ab_c > EPSILON && ab_d < -EPSILON)
+        || (ab_c < -EPSILON && ab_d > EPSILON))
+        && ((cd_a > EPSILON && cd_b < -EPSILON)
+            || (cd_a < -EPSILON && cd_b > EPSILON));
+    if proper {
+        return true;
+    }
+
+    (ab_c.abs() <= EPSILON && point_on_segment(a, b, c, EPSILON))
+        || (ab_d.abs() <= EPSILON && point_on_segment(a, b, d, EPSILON))
+        || (cd_a.abs() <= EPSILON && point_on_segment(c, d, a, EPSILON))
+        || (cd_b.abs() <= EPSILON && point_on_segment(c, d, b, EPSILON))
+}
+
+fn point_on_segment(
+    a: [f32; 2],
+    b: [f32; 2],
+    point: [f32; 2],
+    epsilon: f32,
+) -> bool {
+    point[0] >= a[0].min(b[0]) - epsilon
+        && point[0] <= a[0].max(b[0]) + epsilon
+        && point[1] >= a[1].min(b[1]) - epsilon
+        && point[1] <= a[1].max(b[1]) + epsilon
 }
 
 fn point_in_triangle(
@@ -1313,6 +1391,27 @@ mod tests {
         let scene = GpuScene::from_scene(&polygon);
         assert_eq!(scene.vertex_count(), 12, "six-point simple polygon needs four triangles");
         assert_eq!(scene.skipped_nodes, 0);
+    }
+
+    #[test]
+    #[test]
+    fn self_intersecting_polygon_is_rejected() {
+        let polygon = SceneNode::polygon(
+            vec![
+                (20.0, 20.0),
+                (140.0, 140.0),
+                (20.0, 140.0),
+                (140.0, 20.0),
+            ],
+            true,
+        )
+        .with_style(Style {
+            fill: Some(Color::rgb(0.8, 0.2, 0.2)),
+            ..Style::default()
+        });
+        let scene = GpuScene::from_scene(&polygon);
+        assert!(scene.vertices.is_empty());
+        assert_eq!(scene.skipped_nodes, 1);
     }
 
     #[test]
