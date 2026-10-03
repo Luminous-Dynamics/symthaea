@@ -125,6 +125,23 @@ async function waitForProjection(page, selector, display) {
   );
 }
 
+async function waitForVisible(page, selector) {
+  await page.waitForFunction(
+    selector => {
+      const element = document.querySelector(selector);
+      if (!element) return false;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && rect.width > 0
+        && rect.height > 0;
+    },
+    { timeout: 30_000 },
+    selector,
+  );
+}
+
 async function runMode(mode) {
   const gpuMode = mode === 'webgpu';
   if (!gpuMode && mode !== 'fallback') {
@@ -213,7 +230,7 @@ async function runMode(mode) {
     }
 
     await waitForProjection(page, '#canvas2d-movie-fallback', 'block');
-    await waitForProjection(page, 'img.portrait', 'block').catch(() => {});
+    await waitForVisible(page, 'img.portrait');
     await sleep(100);
 
     const fallback = await page.evaluate(() => {
