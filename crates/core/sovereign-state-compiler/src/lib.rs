@@ -1646,6 +1646,38 @@ mod tests {
     }
 
     #[test]
+    fn required_attestation_accepts_concrete_receipt_evidence() {
+        let mut plan = sample_plan();
+        plan.verification.require_attestation = true;
+        plan.target_snapshot
+            .profile
+            .capabilities
+            .insert(Capability::AttestState);
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            observed_disposition: authorized.plan.verification.disposition,
+            started_at_ms: 151,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Satisfied,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+            evidence: vec![AttestationRef {
+                media_type: "application/json".into(),
+                uri: "urn:example:attestation:1".into(),
+                digest: ContentDigest::blake3(b"attestation"),
+            }],
+        };
+
+        assert!(receipt.validate_for(&authorized).is_ok());
+    }
+
+    #[test]
     fn receipt_rejects_incomplete_attestation_evidence() {
         let plan = sample_plan();
         let auth = authorization_for(&plan);
