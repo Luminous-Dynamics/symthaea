@@ -1983,6 +1983,38 @@ impl KnowledgePersistence {
              BEGIN
                  SELECT RAISE(ABORT, 'knowledge_facts memory_id must be non-empty');
              END;
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_provenance_relation_required_insert
+             BEFORE INSERT ON knowledge_provenance_relations
+             WHEN NEW.source_memory_id IS NULL
+                  OR trim(NEW.source_memory_id) = ''
+                  OR NEW.target_memory_id IS NULL
+                  OR trim(NEW.target_memory_id) = ''
+                  OR NEW.source_memory_id = NEW.target_memory_id
+                  OR NEW.created_at IS NULL
+                  OR trim(NEW.created_at) = ''
+                  OR NEW.kind NOT IN (
+                      'derived_from', 'revised_from', 'supersedes',
+                      'contradicts', 'corroborates', 'representation_of'
+                  )
+             BEGIN
+                 SELECT RAISE(ABORT, 'knowledge_provenance_relations requires valid identities, timestamp, and stable kind');
+             END;
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_provenance_relation_required_update
+             BEFORE UPDATE OF source_memory_id, target_memory_id, kind, created_at ON knowledge_provenance_relations
+             WHEN NEW.source_memory_id IS NULL
+                  OR trim(NEW.source_memory_id) = ''
+                  OR NEW.target_memory_id IS NULL
+                  OR trim(NEW.target_memory_id) = ''
+                  OR NEW.source_memory_id = NEW.target_memory_id
+                  OR NEW.created_at IS NULL
+                  OR trim(NEW.created_at) = ''
+                  OR NEW.kind NOT IN (
+                      'derived_from', 'revised_from', 'supersedes',
+                      'contradicts', 'corroborates', 'representation_of'
+                  )
+             BEGIN
+                 SELECT RAISE(ABORT, 'knowledge_provenance_relations requires valid identities, timestamp, and stable kind');
+             END;
              CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_validation_receipts_required_insert
              BEFORE INSERT ON knowledge_snapshot_validation_receipts
              WHEN NEW.validation_event IS NULL
@@ -2034,6 +2066,8 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
     const REQUIRED_TRIGGERS: &[&str] = &[
         "trg_knowledge_facts_memory_id_required_insert",
         "trg_knowledge_facts_memory_id_required_update",
+        "trg_knowledge_provenance_relation_required_insert",
+        "trg_knowledge_provenance_relation_required_update",
         "trg_knowledge_snapshot_validation_receipts_required_insert",
         "trg_knowledge_snapshot_receipts_no_update",
         "trg_knowledge_snapshot_receipts_no_delete",
@@ -2832,6 +2866,74 @@ mod tests {
         assert_eq!(verified_receipt.generation, 1);
         assert_eq!(verified_receipt.canonical_digest_hex, canonical_digest);
         assert_eq!(verified_receipt.receipt_digest_hex, receipt_digest);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_sqlite_provenance_triggers_reject_out_of_band_invalid_rows() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_provenance_trigger_guard_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut persistence = KnowledgePersistence::new(&db_path);
+        persistence
+            .save_provenance_relations(&[])
+            .expect("schema initialization should succeed");
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let invalid_kind = conn.execute(
+            "INSERT INTO knowledge_provenance_relations
+             (source_memory_id, target_memory_id, kind, created_at)
+             VALUES ('derived', 'source', 'DerivedFrom', 'cycle:1')",
+            [],
+        );
+        assert!(invalid_kind.is_err());
+
+        conn.execute(
+            "INSERT INTO knowledge_provenance_relations
+             (source_memory_id, target_memory_id, kind, created_at)
+             VALUES ('derived', 'source', 'derived_from', 'cycle:1')",
+            [],
+        )
+        .unwrap();
+
+        let invalid_update = conn.execute(
+            "UPDATE knowledge_provenance_relations
+             SET kind = 'NotAProvenanceKind'
+             WHERE source_memory_id = 'derived' AND target_memory_id = 'source'",
+            [],
+        );
+        assert!(invalid_update.is_err());
+
+        let invalid_self_reference = conn.execute(
+            "UPDATE knowledge_provenance_relations
+             SET target_memory_id = source_memory_id
+             WHERE source_memory_id = 'derived' AND target_memory_id = 'source'",
+            [],
+        );
+        assert!(invalid_self_reference.is_err());
+
+        let invalid_blank_timestamp = conn.execute(
+            "UPDATE knowledge_provenance_relations
+             SET created_at = '   '
+             WHERE source_memory_id = 'derived' AND target_memory_id = 'source'",
+            [],
+        );
+        assert!(invalid_blank_timestamp.is_err());
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_provenance_relations",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
