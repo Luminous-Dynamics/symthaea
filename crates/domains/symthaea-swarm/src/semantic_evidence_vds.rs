@@ -3934,4 +3934,62 @@ mod tests {
     }
 
 
+    #[test]
+    fn rfc9942_crit_header_binding_is_fail_closed() {
+        let proof = Rfc9162InclusionProof::new(2, 0, vec![[0xAA; 32]]).to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+        let mut protected_unknown_crit = Vec::new();
+        cbor_map_len(&mut protected_unknown_crit, 3);
+        cbor_int(&mut protected_unknown_crit, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected_unknown_crit, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected_unknown_crit, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected_unknown_crit, RFC9162_VDS_ID);
+        cbor_int(&mut protected_unknown_crit, COSE_CRIT_HEADER_LABEL);
+        cbor_array_len(&mut protected_unknown_crit, 1);
+        cbor_int(&mut protected_unknown_crit, 999);
+
+        let mut unprotected = Vec::new();
+        cbor_map_len(&mut unprotected, 1);
+        cbor_int(&mut unprotected, RFC9942_VDP_HEADER_LABEL);
+        unprotected.extend_from_slice(&vdp.to_cbor());
+        let mut wire = Vec::new();
+        cbor_tag(&mut wire, COSE_SIGN1_TAG);
+        cbor_array_len(&mut wire, 4);
+        cbor_bytes(&mut wire, &protected_unknown_crit);
+        wire.extend_from_slice(&unprotected);
+        cbor_bytes(&mut wire, &[0x11; 32]);
+        cbor_bytes(&mut wire, &[0x22; 64]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&wire),
+            Err(Rfc9942VdpError::CriticalHeaderNotUnderstood)
+        );
+
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, 2);
+        cbor_int(&mut protected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected, RFC9162_VDS_ID);
+        let mut unprotected_crit = Vec::new();
+        cbor_map_len(&mut unprotected_crit, 2);
+        cbor_int(&mut unprotected_crit, COSE_CRIT_HEADER_LABEL);
+        cbor_array_len(&mut unprotected_crit, 1);
+        cbor_int(&mut unprotected_crit, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut unprotected_crit, RFC9942_VDP_HEADER_LABEL);
+        unprotected_crit.extend_from_slice(&vdp.to_cbor());
+        let mut wire = Vec::new();
+        cbor_tag(&mut wire, COSE_SIGN1_TAG);
+        cbor_array_len(&mut wire, 4);
+        cbor_bytes(&mut wire, &protected);
+        wire.extend_from_slice(&unprotected_crit);
+        cbor_bytes(&mut wire, &[0x11; 32]);
+        cbor_bytes(&mut wire, &[0x22; 64]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&wire),
+            Err(Rfc9942VdpError::CriticalHeaderNotProtected)
+        );
+    }
+
+
 }
