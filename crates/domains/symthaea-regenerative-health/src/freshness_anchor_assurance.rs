@@ -182,6 +182,7 @@ pub enum FreshnessAnchorAssuranceError {
     InsufficientCapabilities {
         missing: Vec<FreshnessAnchorCapability>,
     },
+    CommitRejected(String),
 }
 
 #[cfg(test)]
