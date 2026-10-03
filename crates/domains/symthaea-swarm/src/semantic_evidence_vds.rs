@@ -1737,7 +1737,23 @@ impl<'a> CborReader<'a> {
             4 => { let n=self.read_array_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_value(depth+1)?;} Ok(()) },
             5 => { let n=self.read_map_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_label()?;self.skip_value(depth+1)?;} Ok(()) },
             6 => { self.read_tag()?; self.skip_value(depth+1) },
-            7 => { let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; match initial {0xf4|0xf5|0xf6|0xf7=>{self.offset+=1;Ok(())},0xf9=>{self.take(3)?;Ok(())},0xfa=>{self.take(5)?;Ok(())},0xfb=>{self.take(9)?;Ok(())},_=>Err(Rfc9162ProofDecodeError::InvalidEncoding)} },
+            7 => {
+                let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                match initial {
+                    0xe0..=0xf7 => { self.offset+=1; Ok(()) },
+                    0xf8 => {
+                        self.offset+=1;
+                        let value=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                        if value < 0x20 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
+                        self.offset+=1;
+                        Ok(())
+                    },
+                    0xf9 => { self.take(3)?; Ok(()) },
+                    0xfa => { self.take(5)?; Ok(()) },
+                    0xfb => { self.take(9)?; Ok(()) },
+                    _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                }
+            },
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
     }
