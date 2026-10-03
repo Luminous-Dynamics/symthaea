@@ -1884,10 +1884,23 @@ impl KnowledgePersistence {
         verify_snapshot_receipts_in_tx(&tx)?;
         verify_snapshot_validation_receipts_in_tx(&tx)?;
 
-        // Enforce append-only receipt history at the SQLite boundary. Migration backfills
-        // above intentionally happen before these triggers are created.
+        // Enforce stable fact identity at the SQLite boundary. NULL remains allowed
+        // only for the pre-migration representation; the migration above materializes all
+        // legacy NULLs before this guard is installed.
         tx.execute_batch(
-            "CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_receipts_no_update
+            "CREATE TRIGGER IF NOT EXISTS trg_knowledge_facts_memory_id_no_blank_insert
+             BEFORE INSERT ON knowledge_facts
+             WHEN NEW.memory_id IS NOT NULL AND trim(NEW.memory_id) = ''
+             BEGIN
+                 SELECT RAISE(ABORT, 'knowledge_facts memory_id must be non-empty');
+             END;
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_facts_memory_id_no_blank_update
+             BEFORE UPDATE OF memory_id ON knowledge_facts
+             WHEN NEW.memory_id IS NOT NULL AND trim(NEW.memory_id) = ''
+             BEGIN
+                 SELECT RAISE(ABORT, 'knowledge_facts memory_id must be non-empty');
+             END;
+             CREATE TRIGGER IF NOT EXISTS trg_knowledge_snapshot_receipts_no_update
              BEFORE UPDATE ON knowledge_snapshot_receipts
              BEGIN
                  SELECT RAISE(ABORT, 'knowledge_snapshot_receipts is append-only: UPDATE prohibited');
@@ -2397,6 +2410,64 @@ mod tests {
         let mut p = KnowledgePersistence::default();
         assert!(!p.is_configured());
         assert!(p.save_facts(&[]).is_err());
+    }
+
+    #[test]
+    fn test_fact_memory_identity_cannot_be_blank_after_schema_migration() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_fact_memory_identity_trigger_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let conn = p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+
+        let insert_err = conn
+            .execute(
+                "INSERT INTO knowledge_facts
+                 (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+                 VALUES ('   ', ?1, 'blank', 0.5, 1, 0)",
+                [vec![0x11u8; BinaryHV::BYTES]],
+            )
+            .unwrap_err();
+        assert!(insert_err.to_string().contains("memory_id must be non-empty"));
+
+        p.save_facts(&[FactRecord {
+            memory_id: "memory-trigger".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x22u8; BinaryHV::BYTES],
+            source_text: "valid".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        let update_err = conn
+            .execute(
+                "UPDATE knowledge_facts
+                 SET memory_id = '\t'
+                 WHERE memory_id = 'memory-trigger'",
+                [],
+            )
+            .unwrap_err();
+        assert!(update_err.to_string().contains("memory_id must be non-empty"));
+
+        let persisted: String = conn
+            .query_row(
+                "SELECT memory_id FROM knowledge_facts WHERE memory_id = 'memory-trigger'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(persisted, "memory-trigger");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
