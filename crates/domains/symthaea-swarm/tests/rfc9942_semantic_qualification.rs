@@ -260,3 +260,29 @@ fn cose_extension_accepts_full_range_negative_integer_labels() {
         .expect("full-range negative COSE label must be accepted");
     assert_eq!(decoded.to_cbor(), encoded);
 }
+
+#[test]
+fn cose_extension_accepts_full_range_integer_values() {
+    for value in [
+        [
+            0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        ],
+        [
+            0x3b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        ],
+    ] {
+        // Protected map = { 999 => value }; total serialized map size is 14 bytes.
+        let mut protected = Vec::with_capacity(14);
+        protected.extend_from_slice(&[0xa1, 0x19, 0x03, 0xe7]);
+        protected.extend_from_slice(&value);
+
+        let mut encoded = Vec::new();
+        encoded.extend_from_slice(&[0xd2, 0x84, 0x4e]);
+        encoded.extend_from_slice(&protected);
+        encoded.extend_from_slice(&[0xa0, 0xf6, 0x41, 0xaa]);
+
+        let decoded = Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+            .expect("full-range generic integer value must be accepted");
+        assert_eq!(decoded.to_cbor(), encoded);
+    }
+}
