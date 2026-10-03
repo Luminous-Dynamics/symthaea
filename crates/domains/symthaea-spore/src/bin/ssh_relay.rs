@@ -139,6 +139,59 @@ fn parse_stage(output: &str) -> Option<NixosAnywhereStage> {
     }
 }
 
+/// Validate browser Origin values against explicit production hosts.
+///
+/// Production trust is an exact-origin policy. We intentionally do not trust
+/// arbitrary subdomains of a parent domain, because a dangling DNS record can
+/// otherwise become a browser trust-boundary bypass.
+fn is_allowed_web_origin(origin: &str) -> bool {
+    const PRODUCTION_ORIGINS: &[&str] = &[
+        "https://install.nixforhumanity.org",
+        "https://symthaea.luminousdynamics.io",
+        "https://luminousdynamics.io",
+        "https://pulse.luminousdynamics.io",
+        "https://mycelix.luminousdynamics.io",
+        "https://nixforhumanity.org",
+    ];
+
+    if PRODUCTION_ORIGINS
+        .iter()
+        .any(|allowed| origin.eq_ignore_ascii_case(allowed))
+    {
+        return true;
+    }
+
+    // Local development is protected separately by the relay authentication token.
+    // Never extend this exception to arbitrary network hosts.
+    let (scheme, authority) = if let Some(rest) = origin.strip_prefix("http://") {
+        ("http", rest)
+    } else if let Some(rest) = origin.strip_prefix("https://") {
+        ("https", rest)
+    } else {
+        return false;
+    };
+
+    if scheme != "http"
+        || authority.is_empty()
+        || authority.chars().any(|c| matches!(c, '/' | '?' | '#' | '@'))
+    {
+        return false;
+    }
+
+    let host = authority
+        .rsplit_once(':')
+        .map(|(host, port)| {
+            if port.is_empty() || !port.chars().all(|c| c.is_ascii_digit()) {
+                ""
+            } else {
+                host
+            }
+        })
+        .unwrap_or(authority)
+        .to_ascii_lowercase();
+
+    host == "localhost" || host == "127.0.0.1"
+}
 // Security validators imported from symthaea_spore::security (see use statement above).
 // Local definitions removed — single source of truth for fuzzing and testing.
 
@@ -2364,14 +2417,7 @@ async fn handle_connection(
     > {
         if let Some(origin) = req.headers().get("origin") {
             let origin_str = origin.to_str().unwrap_or("");
-            let allowed = origin_str.starts_with("http://localhost")
-                || origin_str.starts_with("https://localhost")
-                || origin_str.starts_with("http://127.0.0.1")
-                || origin_str.starts_with("https://127.0.0.1")
-                || origin_str.contains("luminousdynamics.io")
-                || origin_str.contains("nixforhumanity.org")
-                || origin_str.contains("mycelix.net")
-                || origin_str.contains("relationalharmonics.org");
+            let allowed = is_allowed_web_origin(origin_str);
             if !allowed {
                 eprintln!(
                     "[{}] Rejected WebSocket: disallowed Origin '{}'",
@@ -5274,14 +5320,7 @@ async fn main() {
                         > {
                             if let Some(origin) = req.headers().get("origin") {
                                 let o = origin.to_str().unwrap_or("");
-                                let ok = o.starts_with("http://localhost")
-                                    || o.starts_with("https://localhost")
-                                    || o.starts_with("http://127.0.0.1")
-                                    || o.starts_with("https://127.0.0.1")
-                                    || o.contains("luminousdynamics.io")
-                                    || o.contains("nixforhumanity.org")
-                                    || o.contains("mycelix.net")
-                                    || o.contains("relationalharmonics.org");
+                                let ok = is_allowed_web_origin(o);
                                 if !ok {
                                     eprintln!(
                                         "[{}] Rejected TLS WebSocket: disallowed Origin '{}'",
@@ -5425,6 +5464,40 @@ mod tests {
         assert_eq!(validate_disk_path("  /dev/sda  ").unwrap(), "/dev/sda");
     }
 
+    // ── WebSocket Origin validation ──
+
+    #[test]
+    fn origin_accepts_explicit_production_hosts() {
+        assert!(is_allowed_web_origin("https://install.nixforhumanity.org"));
+        assert!(is_allowed_web_origin("https://pulse.luminousdynamics.io"));
+        assert!(is_allowed_web_origin("https://mycelix.luminousdynamics.io"));
+    }
+
+    #[test]
+    fn origin_rejects_retired_and_unverified_domains() {
+        assert!(!is_allowed_web_origin("https://mycelix.net"));
+        assert!(!is_allowed_web_origin("https://relationalharmonics.org"));
+        assert!(!is_allowed_web_origin("https://mycelix.com"));
+    }
+
+    #[test]
+    fn origin_rejects_arbitrary_subdomains_and_suffix_confusion() {
+        assert!(!is_allowed_web_origin("https://foo.luminousdynamics.io"));
+        assert!(!is_allowed_web_origin("https://luminousdynamics.io.attacker.example"));
+    }
+
+    #[test]
+    fn origin_rejects_noncanonical_ports_and_paths() {
+        assert!(!is_allowed_web_origin("https://install.nixforhumanity.org:443"));
+        assert!(!is_allowed_web_origin("https://install.nixforhumanity.org/login"));
+    }
+
+    #[test]
+    fn origin_allows_local_development() {
+        assert!(is_allowed_web_origin("http://localhost:3000"));
+        assert!(is_allowed_web_origin("http://127.0.0.1:8091"));
+        assert!(!is_allowed_web_origin("http://localhost.attacker.example:3000"));
+    }
     // ── token_eq (constant-time comparison) ──
 
     #[test]
