@@ -397,6 +397,57 @@ mod tests {
     }
 
     #[test]
+    fn stale_topology_attestation_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.valid_until_ms = 1_999;
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::StaleAttestation
+            )
+        )));
+    }
+
+    #[test]
+    fn future_topology_attestation_cannot_create_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.issued_at_ms = 1_001;
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::FutureAttestation
+            )
+        )));
+    }
+
+    #[test]
+    fn topology_substitution_cannot_enter_independence_quorum() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.independence.topology_attestation.component_id = "tail-root".into();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.iter().any(|issue| matches!(
+            issue,
+            TemporalFusionIssue::TopologyAttestation(
+                SensorTopologyAttestationIssue::TopologyIdentityMismatch
+            )
+        )));
+    }
+
+    #[test]
+    fn configuration_rotation_requires_new_topology_attestation() {
+        let mut p = pair("strain-a", 0.5, 1.5);
+        p.current.configuration_digest = "cfg-2".into();
+        let d = fusion_gate().assess(&[p, pair("strain-b", 0.6, 1.6)]);
+        assert_eq!(d.state, TemporalFusionState::Conflicted);
+        assert!(d.issues.contains(&TemporalFusionIssue::IndependenceConfigurationMismatch));
+    }
+
+    #[test]
     fn non_monotonic_observation_is_not_admitted() {
         let mut p = pair("strain-a", 0.5, 1.5);
         p.current.timestamp_ms = 1_000;
