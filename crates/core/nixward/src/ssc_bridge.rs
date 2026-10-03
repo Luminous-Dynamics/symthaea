@@ -48,6 +48,8 @@ pub enum SscObservationError {
     MissingRealization,
     #[error("NixOS generation observation contains multiple current generations")]
     MultipleCurrentGenerations,
+    #[error("NixOS generation observation contains a duplicate generation ordinal")]
+    DuplicateGenerationNumber,
     #[error("NixOS generation marked current does not match /run/current-system")]
     CurrentGenerationRealizationMismatch,
     #[error("NixOS system profile does not identify an exact generation")]
@@ -70,10 +72,11 @@ impl From<serde_json::Error> for SscObservationError {
 
 impl NixSystemObservation {
     pub fn observe() -> Result<Self, SscObservationError> {
-        let generations = GenerationObserver::list_generations()?
+        let mut generations = GenerationObserver::list_generations()?
             .into_iter()
             .map(Self::generation)
             .collect::<Result<Vec<_>, _>>()?;
+        generations.sort_by_key(|entry| entry.number);
 
         let observation = Self {
             generations,
@@ -101,6 +104,14 @@ impl NixSystemObservation {
     }
 
     pub fn validate(&self) -> Result<(), SscObservationError> {
+        let mut previous_number = None;
+        for entry in &self.generations {
+            if previous_number == Some(entry.number) {
+                return Err(SscObservationError::DuplicateGenerationNumber);
+            }
+            previous_number = Some(entry.number);
+        }
+
         let mut current = self.generations.iter().filter(|entry| entry.current);
         let Some(current_generation) = current.next() else {
             return Err(SscObservationError::CurrentGenerationRealizationMismatch);
@@ -204,9 +215,13 @@ fn parse_profile_generation_name(name: &str) -> Result<u64, SscObservationError>
         return Err(SscObservationError::MissingSystemProfileGeneration);
     };
 
-    number
+    let number = number
         .parse::<u64>()
-        .map_err(|error| SscObservationError::Io(error.to_string()))
+        .map_err(|error| SscObservationError::Io(error.to_string()))?;
+    if number == 0 {
+        return Err(SscObservationError::MissingSystemProfileGeneration);
+    }
+    Ok(number)
 }
 
 fn read_realization(link: &Path) -> Result<String, SscObservationError> {
@@ -239,6 +254,42 @@ mod tests {
         assert_eq!(
             parse_profile_generation_name("system-42").expect_err("non-generation"),
             SscObservationError::MissingSystemProfileGeneration
+        );
+    }
+
+    #[test]
+    fn profile_generation_parser_rejects_zero() {
+        assert_eq!(
+            parse_profile_generation_name("system-0-link")
+                .expect_err("generation zero"),
+            SscObservationError::MissingSystemProfileGeneration
+        );
+    }
+
+    #[test]
+    fn observation_validation_rejects_duplicate_generation_numbers() {
+        let observation = NixSystemObservation {
+            generations: vec![
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: true,
+                },
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: false,
+                },
+            ],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert_eq!(
+            observation.validate().expect_err("duplicate generation"),
+            SscObservationError::DuplicateGenerationNumber
         );
     }
 
