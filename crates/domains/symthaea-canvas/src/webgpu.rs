@@ -1394,7 +1394,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn self_intersecting_polygon_is_rejected() {
         let polygon = SceneNode::polygon(
             vec![
