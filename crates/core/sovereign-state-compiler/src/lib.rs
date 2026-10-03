@@ -648,7 +648,25 @@ mod tests {
 
         assert_eq!(
             plan.authorize(auth, 150),
-            Err(PlanValidationError::AuthorizationTargetSnapshotDigestMismatch)
+            Err(PlanValidationError::AuthorizationTargetDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_missing_observed_resource() {
+        let mut plan = sample_plan();
+        plan.target_snapshot.resources.clear();
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::MissingTargetResource(
+                plan.intent
+                    .required_resources
+                    .iter()
+                    .next()
+                    .expect("required resource")
+                    .clone()
+            ))
         );
     }
 
