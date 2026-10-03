@@ -3,13 +3,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-canvas
 //!
-//! Living topology UI: real-time SVG projection of Symthaea's cognitive geometry.
+//! Living topology UI: real-time SVG and WebGPU projection of Symthaea's cognitive geometry.
 //!
 //! Converts cognitive telemetry (consciousness level, neuromodulators, Betti numbers,
 //! Cantor depth, harmony activations) into a declarative scene graph, then renders
-//! self-contained animated SVG.
+//! self-contained SVG or GPU-rendered geometry.
 //!
-//! Pipeline: `CognitiveSnapshot → AestheticEngine → AestheticState → build_scene() → render_svg()`
+//! Pipeline: `CognitiveSnapshot → AestheticEngine → AestheticState → build_scene() → renderer`
 //!
 //! Total pipeline target: <500µs per frame.
 
@@ -22,7 +22,10 @@ pub mod color;
 pub mod geometry;
 pub mod scene_features;
 pub mod scene_graph;
+pub mod scene_wire;
 pub mod svg_renderer;
+#[cfg(feature = "webgpu")]
+pub mod webgpu;
 pub mod validation;
 
 use serde::{Deserialize, Serialize};
@@ -35,8 +38,15 @@ pub use color::{Color, Palette};
 pub use geometry::build_scene;
 pub use scene_features::{SceneFeatures, extract_scene_features};
 pub use scene_graph::SceneNode;
+pub use scene_wire::{RemoteScene, WireNode, WirePrimitive, WireStyle, WireTransform};
 pub use svg_renderer::{SvgRenderOptions, render_svg, render_svg_with_options};
 pub use validation::{SnapshotLimits, SnapshotSanitization};
+#[cfg(feature = "webgpu")]
+pub use webgpu::{GpuScene, GpuVertex};
+#[cfg(all(feature = "webgpu", target_arch = "wasm32"))]
+pub use webgpu::WebGpuMovieRenderer;
+#[cfg(all(feature = "webgpu", target_arch = "wasm32"))]
+pub use webgpu::WebGpuRenderer;
 
 /// Lightweight snapshot of cognitive state, decoupled from CycleMetadata.
 ///

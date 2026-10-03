@@ -14,9 +14,16 @@ against the `symthaea` crate itself, so this stays a small, fast WASM build.
   arrives after a query, and only when the daemon was started with
   `--experience-bridge`. See the gateway's own doc comments in
   `src/bin/symthaea.rs` for why.
+- **WebGPU cognitive canvas**: when WebGPU is available, the self-portrait is
+  rendered from the typed `canvas_scene` scene protocol. The legacy `canvas_svg`
+  projection remains the compatibility/export fallback.
 - A small always-on daemon-status poll (`GET`-equivalent `status` every 5s)
   gives baseline liveness feedback even when the experience bridge — and
   therefore the telemetry stream — is off, which is the common case.
+
+The browser scene protocol is renderer-neutral: the daemon sends semantic
+primitives, never backend-specific GPU buffers. `symthaea-canvas` owns the
+protocol and WebGPU implementation; the UI selects the backend at runtime.
 
 Not yet built: Steward (sleep/save/introspect/audit) and Bench
 (leaderboard/compare) panes from the plan doc's Phase 3 sketch — the

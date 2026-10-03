@@ -1,0 +1,72 @@
+name: Symthaea UI WebGPU qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-ui/**"
+      - "crates/bridges/symthaea-web/test-webgpu-qualification.mjs"
+      - "crates/domains/symthaea-canvas/**"
+      - ".github/workflows/symthaea-ui-webgpu.yml"
+  workflow_dispatch:
+
+jobs:
+  webgpu-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Trunk and wasm-bindgen CLI
+        uses: taiki-e/install-action@v2
+        with:
+          tool: trunk@0.21.14,wasm-bindgen-cli@0.2.125
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install browser-test dependencies
+        working-directory: crates/bridges/symthaea-web
+        run: npm ci
+
+      - name: Install Chromium + Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium xvfb xauth libvulkan1 mesa-vulkan-drivers
+
+      - name: Validate qualification harness syntax
+        working-directory: crates/bridges/symthaea-web
+        run: node --check test-webgpu-qualification.mjs
+
+      - name: Build qualification fixture
+        working-directory: crates/bridges/symthaea-ui
+        run: trunk build --release --features browser-qualification --dist dist
+
+      - name: Run SwiftShader WebGPU + fallback qualification
+        working-directory: crates/bridges/symthaea-ui
+        env:
+          CHROMIUM_PATH: /usr/bin/chromium
+          WEBGPU_HEADLESS: "false"
+          WEBGPU_ARTIFACT: webgpu-qualification.json
+          WEBGPU_SCREENSHOTS: webgpu-qualification-screenshots
+        run: xvfb-run -a node ../symthaea-web/test-webgpu-qualification.mjs
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: symthaea-ui-webgpu-qualification
+          path: |
+            webgpu-qualification.json
+            webgpu-qualification-screenshots/
+          if-no-files-found: warn

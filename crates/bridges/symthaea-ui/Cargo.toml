@@ -5,6 +5,10 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Unified Leptos web UI for symthaea-service — Converse + Observe panes over the HTTP gateway (SYMTHAEA_UNIFIED_UI_PLAN_2026-07-10.md Phase 3)"
 
+[features]
+default = []
+browser-qualification = []
+
 [dependencies]
 leptos = { version = "0.8", features = ["csr"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -12,6 +16,7 @@ serde_json = "1.0"
 gloo-net = "0.5"
 gloo-timers = { version = "0.3", features = ["futures"] }
 futures = "0.3"
+symthaea-canvas = { path = "../../domains/symthaea-canvas", default-features = false, features = ["webgpu"] }
 wasm-bindgen-futures = "0.4"
 wasm-bindgen = "0.2"
 base64 = "0.22"
@@ -21,4 +26,6 @@ web-sys = { version = "0.3", features = [
     "HtmlCanvasElement",
     "CanvasRenderingContext2d",
     "ImageData",
+    "ReadableStream",
+    "ReadableStreamDefaultReader",
 ] }

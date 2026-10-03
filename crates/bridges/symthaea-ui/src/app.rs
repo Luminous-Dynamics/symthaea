@@ -14,6 +14,13 @@ use base64::Engine as _;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use serde_json::Value;
+use std::cell::RefCell;
+use std::rc::Rc;
+use symthaea_canvas::{GpuScene, RemoteScene, WebGpuMovieRenderer, WebGpuRenderer};
+#[cfg(feature = "browser-qualification")]
+use symthaea_canvas::{Color, SceneNode};
+#[cfg(feature = "browser-qualification")]
+use symthaea_canvas::scene_graph::{Style, Transform};
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
@@ -40,7 +47,7 @@ struct Vitals {
     moral_score: f64,
     coherence: f64,
     gwt_broadcast: bool,
-    dream_insights: usize,
+    dream_insights: u64,
     surprise_triggered: bool,
     reasoning_confidence: f32,
 }
@@ -64,7 +71,7 @@ impl Vitals {
             moral_score: f64_at("value_evaluator_score"),
             coherence: f64_at("harmonic_field_coherence"),
             gwt_broadcast: v["gwt_broadcast"].as_bool().unwrap_or(false),
-            dream_insights: v["dream_insights"].as_u64().unwrap_or(0) as usize,
+            dream_insights: v["dream_insights"].as_u64().unwrap_or(0),
             surprise_triggered: v["surprise_triggered"].as_bool().unwrap_or(false),
             reasoning_confidence: f64_at("reasoning_confidence") as f32,
         }
@@ -83,56 +90,178 @@ struct Movie {
     semantic_coherence: f32,
 }
 
-/// Generous upper bound on a single "mental movie" frame's pixel count
-/// (far more than a telemetry visualization frame plausibly needs). The
-/// gateway URL is a user-editable text field, so a malicious or
-/// compromised gateway must not be able to drive an unbounded (or, on
-/// 32-bit wasm, integer-overflowing) allocation via `width`/`height`.
-const MAX_MOVIE_PIXELS: usize = 4096 * 4096;
+/// Bound decoded mental-movie dimensions, frame count, and expanded RGBA
+/// storage together. The gateway is remote input and must not be able to
+/// drive an unbounded allocation through width/height/frame multiplicity.
+const MAX_MOVIE_PIXELS: usize = 2048 * 2048;
+const MAX_MOVIE_FRAMES: usize = 24;
+const MAX_MOVIE_RGBA_BYTES: usize = 32 * 1024 * 1024;
+
+#[cfg(feature = "browser-qualification")]
+fn browser_qualification_scene() -> RemoteScene {
+    let background = SceneNode::rect(0.0, 0.0, 512.0, 512.0).with_style(Style {
+        fill: Some(Color::rgb(0.04, 0.06, 0.10)),
+        ..Style::default()
+    });
+    let concave = SceneNode::polygon(
+        vec![
+            (52.0, 72.0),
+            (420.0, 72.0),
+            (420.0, 180.0),
+            (246.0, 180.0),
+            (246.0, 430.0),
+            (52.0, 430.0),
+        ],
+        true,
+    )
+    .with_style(Style {
+        fill: Some(Color::rgba(0.92, 0.48, 0.16, 0.9)),
+        stroke: Some(Color::rgb(0.95, 0.9, 0.75)),
+        stroke_width: Some(3.0),
+        ..Style::default()
+    });
+    let circle = SceneNode::circle(360.0, 350.0, 70.0).with_style(Style {
+        fill: Some(Color::rgba(0.18, 0.72, 0.92, 0.75)),
+        ..Style::default()
+    });
+    let transform_group = SceneNode::group(Some("transformed"))
+        .with_transform(Transform {
+            translate_x: 18.0,
+            translate_y: -14.0,
+            rotate_deg: 7.0,
+            scale: 0.82,
+        })
+        .with_style(Style {
+            opacity: Some(0.65),
+            ..Style::default()
+        })
+        .with_child(
+            SceneNode::line(80.0, 470.0, 450.0, 120.0).with_style(Style {
+                stroke: Some(Color::rgb(0.9, 0.96, 1.0)),
+                stroke_width: Some(4.0),
+                ..Style::default()
+            }),
+        );
+    RemoteScene::from_scene(
+        &SceneNode::group(Some("browser-qualification"))
+            .with_child(background)
+            .with_child(concave)
+            .with_child(circle)
+            .with_child(transform_group),
+    )
+}
+
+#[cfg(feature = "browser-qualification")]
+fn browser_qualification_portrait() -> String {
+    use base64::Engine as _;
+    const SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="#0a0f1a"/><circle cx="256" cy="256" r="150" fill="#2eb8ea" fill-opacity=".22" stroke="#f2ead0" stroke-width="4"/><path d="M156 290 C196 210 232 210 256 270 C280 210 316 210 356 290" fill="none" stroke="#f2ead0" stroke-width="6"/><circle cx="210" cy="255" r="12" fill="#f2ead0"/><circle cx="302" cy="255" r="12" fill="#f2ead0"/></svg>"##;
+    format!(
+        "data:image/svg+xml;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(SVG.as_bytes())
+    )
+}
+
+#[cfg(feature = "browser-qualification")]
+fn browser_qualification_movie() -> Movie {
+    let width = 32u32;
+    let height = 24u32;
+    let mut rgba = Vec::with_capacity((width * height * 4) as usize);
+    for y in 0..height {
+        for x in 0..width {
+            let r = ((x * 255) / (width - 1)) as u8;
+            let g = ((y * 255) / (height - 1)) as u8;
+            let b = (((x + y) * 255) / (width + height - 2)) as u8;
+            rgba.extend_from_slice(&[r, g, b, 255]);
+        }
+    }
+    Movie {
+        frames_rgba: vec![rgba],
+        width,
+        height,
+        semantic_coherence: 1.0,
+    }
+}
 
 impl Movie {
     fn from_json(v: &Value) -> Option<Movie> {
         use base64::Engine as _;
         let m = v.get("mental_movie")?;
-        let width = m["width"].as_u64()? as u32;
-        let height = m["height"].as_u64()? as u32;
-        let channels = m["channels"].as_u64()? as usize;
+        let width_raw = m["width"].as_u64()?;
+        let height_raw = m["height"].as_u64()?;
+        if width_raw == 0
+            || height_raw == 0
+            || width_raw > 2048
+            || height_raw > 2048
+        {
+            return None;
+        }
+        let width = width_raw as u32;
+        let height = height_raw as u32;
+        let channels_raw = m["channels"].as_u64()?;
+        if channels_raw != 1 && channels_raw != 3 {
+            return None;
+        }
+        let channels = channels_raw as usize;
         let engine = base64::engine::general_purpose::STANDARD;
         let px = (width as usize).checked_mul(height as usize)?;
         if px == 0 || px > MAX_MOVIE_PIXELS {
             return None;
         }
-        let rgba_capacity = px.checked_mul(4)?;
-        let frames_rgba: Vec<Vec<u8>> = m["frames_b64"]
-            .as_array()?
-            .iter()
-            .filter_map(|f| engine.decode(f.as_str()?).ok())
-            .filter(|raw| raw.len() >= px * channels.max(1))
-            .map(|raw| {
-                let mut rgba = Vec::with_capacity(rgba_capacity);
-                for i in 0..px {
-                    let (r, g, b) = if channels >= 3 {
-                        (
-                            raw[i * channels],
-                            raw[i * channels + 1],
-                            raw[i * channels + 2],
-                        )
-                    } else {
-                        (raw[i], raw[i], raw[i])
-                    };
-                    rgba.extend_from_slice(&[r, g, b, 255]);
-                }
-                rgba
-            })
-            .collect();
-        if frames_rgba.is_empty() {
+        let frame_bytes = px.checked_mul(4)?;
+        let expected_raw_bytes = px.checked_mul(channels)?;
+        let frames = m["frames_b64"].as_array()?;
+        if frames.is_empty() || frames.len() > MAX_MOVIE_FRAMES {
             return None;
         }
+        let total_rgba_bytes = frame_bytes.checked_mul(frames.len())?;
+        if total_rgba_bytes > MAX_MOVIE_RGBA_BYTES {
+            return None;
+        }
+
+        let mut frames_rgba = Vec::with_capacity(frames.len());
+        for encoded in frames {
+            let encoded = encoded.as_str()?;
+            let max_encoded_len = expected_raw_bytes
+                .checked_add(2)?
+                .checked_div(3)?
+                .checked_mul(4)?;
+            if encoded.len() > max_encoded_len {
+                return None;
+            }
+            let raw = engine.decode(encoded).ok()?;
+            if raw.len() != expected_raw_bytes {
+                return None;
+            }
+
+            let mut rgba = Vec::with_capacity(frame_bytes);
+            for i in 0..px {
+                let (r, g, b) = if channels == 3 {
+                    (
+                        raw[i * channels],
+                        raw[i * channels + 1],
+                        raw[i * channels + 2],
+                    )
+                } else {
+                    let value = raw[i];
+                    (value, value, value)
+                };
+                rgba.extend_from_slice(&[r, g, b, 255]);
+            }
+            frames_rgba.push(rgba);
+        }
+
+        let semantic_coherence = m["semantic_coherence"]
+            .as_f64()
+            .map(|value| value as f32)
+            .filter(|value| value.is_finite())
+            .unwrap_or(0.0)
+            .clamp(-1.0, 1.0);
+
         Some(Movie {
             frames_rgba,
             width,
             height,
-            semantic_coherence: m["semantic_coherence"].as_f64().unwrap_or(0.0) as f32,
+            semantic_coherence,
         })
     }
 }
@@ -173,6 +302,33 @@ pub fn App() -> impl IntoView {
     let movie = RwSignal::new(Option::<Movie>::None);
     let movie_frame = RwSignal::new(0_usize);
     let movie_canvas = NodeRef::<leptos::html::Canvas>::new();
+    let movie_webgpu_canvas = NodeRef::<leptos::html::Canvas>::new();
+    let webgpu_canvas = NodeRef::<leptos::html::Canvas>::new();
+    let gpu_scene = RwSignal::new(Option::<RemoteScene>::None);
+
+    #[cfg(feature = "browser-qualification")]
+    {
+        let enabled = web_sys::window()
+            .and_then(|window| window.location().search().ok())
+            .is_some_and(|search| search.contains("symthaea_webgpu_fixture=1"));
+        if enabled {
+            let scene = browser_qualification_scene();
+            let fixture_movie = browser_qualification_movie();
+            let fixture_portrait = browser_qualification_portrait();
+            Effect::new(move |_| {
+                gpu_scene.set(Some(scene.clone()));
+                movie.set(Some(fixture_movie.clone()));
+                portrait.set(Some(fixture_portrait.clone()));
+            });
+        }
+    }
+    let webgpu_ready = RwSignal::new(false);
+    let movie_webgpu_ready = RwSignal::new(false);
+    let webgpu_renderer: Rc<RefCell<Option<WebGpuRenderer>>> = Rc::new(RefCell::new(None));
+    let movie_webgpu_renderer: Rc<RefCell<Option<WebGpuMovieRenderer>>> =
+        Rc::new(RefCell::new(None));
+    let webgpu_init_started = Rc::new(RefCell::new(false));
+    let movie_webgpu_init_started = Rc::new(RefCell::new(false));
 
     // Open the telemetry stream once, on mount, against whatever gateway
     // URL is set at that moment. Reconnecting on URL change is a v1 nicety
@@ -188,6 +344,13 @@ pub fn App() -> impl IntoView {
                 if let Some(svg) = portrait_from_json(&payload) {
                     portrait.set(Some(svg));
                 }
+                if let Some(scene_value) = payload.get("canvas_scene") {
+                    if let Ok(scene) = serde_json::from_value::<RemoteScene>(scene_value.clone()) {
+                        if scene.is_supported() {
+                            gpu_scene.set(Some(scene));
+                        }
+                    }
+                }
                 if let Some(m) = Movie::from_json(&payload) {
                     movie.set(Some(m));
                     movie_frame.set(0);
@@ -197,6 +360,132 @@ pub fn App() -> impl IntoView {
             ws_connected.set(false);
         });
     });
+
+    // Initialize WebGPU once after the browser canvas is mounted. Failure is
+    // non-fatal: the existing SVG projection remains the compatibility path.
+    {
+        let renderer = Rc::clone(&webgpu_renderer);
+        let started = Rc::clone(&webgpu_init_started);
+        Effect::new(move |_| {
+            if *started.borrow() {
+                return;
+            }
+            let Some(canvas) = webgpu_canvas.get() else {
+                return;
+            };
+            *started.borrow_mut() = true;
+            let renderer = Rc::clone(&renderer);
+            spawn_local(async move {
+                match WebGpuRenderer::new(canvas).await {
+                    Ok(gpu) => {
+                        *renderer.borrow_mut() = Some(gpu);
+                        webgpu_ready.set(true);
+                    }
+                    Err(error) => {
+                        leptos::logging::warn!("WebGPU unavailable: {error}");
+                    }
+                }
+            });
+        });
+    }
+
+    // Initialize the WebGPU movie renderer independently from the cognitive
+    // scene renderer. Either projection can degrade to its legacy path alone.
+    {
+        let renderer = Rc::clone(&movie_webgpu_renderer);
+        let started = Rc::clone(&movie_webgpu_init_started);
+        Effect::new(move |_| {
+            if *started.borrow() {
+                return;
+            }
+            let Some(canvas) = movie_webgpu_canvas.get() else {
+                return;
+            };
+            *started.borrow_mut() = true;
+            let renderer = Rc::clone(&renderer);
+            spawn_local(async move {
+                match WebGpuMovieRenderer::new(canvas).await {
+                    Ok(gpu) => {
+                        *renderer.borrow_mut() = Some(gpu);
+                        movie_webgpu_ready.set(true);
+                    }
+                    Err(error) => {
+                        leptos::logging::warn!("WebGPU movie renderer unavailable: {error}");
+                    }
+                }
+            });
+        });
+    }
+
+    // Render each typed cognitive scene through WebGPU. The renderer-neutral
+    // scene is reconstructed into native scene nodes only at the backend edge.
+    {
+        let renderer = Rc::clone(&webgpu_renderer);
+        Effect::new(move |_| {
+            if !webgpu_ready.get() {
+                return;
+            }
+            let Some(scene) = gpu_scene.get() else {
+                return;
+            };
+            let native = scene.to_scene_node();
+            let gpu = GpuScene::from_scene(&native);
+            let mut renderer_ref = renderer.borrow_mut();
+            let Some(renderer) = renderer_ref.as_mut() else {
+                return;
+            };
+            if let Err(error) = renderer.render(&gpu) {
+                leptos::logging::warn!("WebGPU cognitive canvas render failed: {error}");
+                webgpu_ready.set(false);
+            }
+        });
+    }
+
+    // Poll WebGPU device health so a static cognitive projection can
+    // demote to its compatibility renderer even when no new scene arrives.
+    Effect::new(move |_| {
+        if !webgpu_ready.get() {
+            return;
+        }
+        let renderer = Rc::clone(&webgpu_renderer);
+        spawn_local(async move {
+            loop {
+                gloo_timers::future::TimeoutFuture::new(500).await;
+                let lost = renderer
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(WebGpuRenderer::is_device_lost);
+                if lost {
+                    webgpu_ready.set(false);
+                    break;
+                }
+            }
+        });
+    });
+
+    // Poll the movie renderer independently for the same device-loss handoff.
+    {
+        let renderer = Rc::clone(&movie_webgpu_renderer);
+        Effect::new(move |_| {
+            if !movie_webgpu_ready.get() {
+                return;
+            }
+            let renderer = Rc::clone(&renderer);
+            spawn_local(async move {
+                loop {
+                    gloo_timers::future::TimeoutFuture::new(500).await;
+                    let lost = renderer
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(WebGpuMovieRenderer::is_device_lost);
+                    if lost {
+                        movie_webgpu_ready.set(false);
+                        break;
+                    }
+                }
+            });
+        });
+    }
 
     // Poll GET-equivalent /v1/service status every 5s. This is baseline
     // liveness feedback independent of the telemetry WS above, which stays
@@ -228,10 +517,34 @@ pub fn App() -> impl IntoView {
         });
     });
 
-    // Draw the current imagination frame whenever the movie or frame index
-    // changes. putImageData wants RGBA at native size; CSS scales it up with
+    // Render the current imagination frame through WebGPU when available.
+    // The texture is persistent across frames; only the RGBA payload changes.
+    Effect::new(move |_| {
+        if !movie_webgpu_ready.get() {
+            return;
+        }
+        let idx = movie_frame.get();
+        let Some(movie) = movie.get() else {
+            return;
+        };
+        let mut renderer_ref = movie_webgpu_renderer.borrow_mut();
+        let Some(renderer) = renderer_ref.as_mut() else {
+            return;
+        };
+        let frame = &movie.frames_rgba[idx % movie.frames_rgba.len()];
+        if let Err(error) = renderer.render(movie.width, movie.height, frame) {
+            leptos::logging::warn!("WebGPU movie render failed: {error}");
+            movie_webgpu_ready.set(false);
+        }
+    });
+
+    // Draw the current imagination frame through Canvas2D as a graceful
+    // fallback. putImageData wants RGBA at native size; CSS scales it up with
     // image-rendering: pixelated.
     Effect::new(move |_| {
+        if movie_webgpu_ready.get() {
+            return;
+        }
         let idx = movie_frame.get();
         let Some(canvas) = movie_canvas.get() else {
             return;
@@ -363,18 +676,37 @@ pub fn App() -> impl IntoView {
             // Projections: what she renders of herself. Panes appear only
             // once the corresponding stream has actually delivered content.
             <section class="projections" style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
-                {move || portrait.get().map(|portrait_src| view! {
-                    <div class="projection-pane">
-                        <h2 style="font-size:0.9em;opacity:0.7;">"self-portrait"</h2>
+                <div class="projection-pane"
+                    style:display=move || {
+                        let visible = webgpu_ready.get() || portrait.with(|p| p.is_some());
+                        if visible { "block" } else { "none" }
+                    }
+                >
+                    <h2 style="font-size:0.9em;opacity:0.7;">"self-portrait"</h2>
+                    <canvas id="webgpu-cognitive-canvas" node_ref=webgpu_canvas
+                        aria-label="WebGPU cognitive projection"
+                        style="width:220px;height:220px;border-radius:8px;"
+                        style:display=move || if webgpu_ready.get() { "block" } else { "none" }
+                        width="512" height="512"
+                    ></canvas>
+                    {move || (!webgpu_ready.get()).then(|| portrait.get()).flatten().map(|portrait_src| view! {
                         <img class="portrait" style="max-width:220px;" src=portrait_src
-                            alt="Live cognitive self-portrait" />
-                    </div>
-                })}
+                            alt="Live cognitive self-portrait (SVG fallback)" />
+                    })}
+                </div>
                 <div class="projection-pane"
                     style:display=move || if movie.with(|m| m.is_some()) { "block" } else { "none" }
                 >
                     <h2 style="font-size:0.9em;opacity:0.7;">"imagination"</h2>
-                    <canvas node_ref=movie_canvas
+                    <canvas id="webgpu-movie-canvas" node_ref=movie_webgpu_canvas
+                        aria-label="WebGPU mental movie"
+                        style:display=move || if movie_webgpu_ready.get() { "block" } else { "none" }
+                        style="width:192px;height:192px;image-rendering:pixelated;border-radius:8px;"
+                        width="192" height="192"
+                    ></canvas>
+                    <canvas id="canvas2d-movie-fallback" node_ref=movie_canvas
+                        aria-label="Canvas 2D mental movie fallback"
+                        style:display=move || if movie_webgpu_ready.get() { "none" } else { "block" }
                         style="width:192px;height:192px;image-rendering:pixelated;border-radius:8px;"
                     ></canvas>
                     {move || movie.with(|m| m.as_ref().map(|m| view! {
@@ -412,5 +744,95 @@ pub fn App() -> impl IntoView {
                 </form>
             </section>
         </div>
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine as _;
+
+    fn movie_json(width: u64, height: u64, channels: u64, frames: usize) -> Value {
+        // Keep malformed-dimension fixtures tiny: the parser must reject them
+        // before any payload-sized allocation becomes possible.
+        let raw_len = if width <= 64 && height <= 64 {
+            width
+                .checked_mul(height)
+                .and_then(|px| px.checked_mul(channels))
+                .unwrap_or(0) as usize
+        } else {
+            0
+        };
+        let raw = vec![7_u8; raw_len];
+        let encoded = base64::engine::general_purpose::STANDARD.encode(raw);
+        serde_json::json!({
+            "mental_movie": {
+                "width": width,
+                "height": height,
+                "channels": channels,
+                "frames_b64": vec![encoded; frames],
+                "semantic_coherence": 1.7
+            }
+        })
+    }
+
+    #[test]
+    fn movie_parser_accepts_bounded_grayscale_frame() {
+        let movie = Movie::from_json(&movie_json(2, 2, 1, 1)).expect("valid movie");
+        assert_eq!(movie.frames_rgba.len(), 1);
+        assert_eq!(movie.frames_rgba[0], vec![7, 7, 7, 255, 7, 7, 7, 255, 7, 7, 7, 255, 7, 7, 7, 255]);
+        assert_eq!(movie.semantic_coherence, 1.0);
+    }
+
+    #[test]
+    fn movie_parser_rejects_unsupported_channels() {
+        assert!(Movie::from_json(&movie_json(2, 2, 2, 1)).is_none());
+    }
+
+    #[test]
+    fn movie_parser_rejects_channels_that_would_truncate_on_wasm() {
+        assert!(Movie::from_json(&movie_json(2, 2, (u32::MAX as u64) + 1, 1)).is_none());
+    }
+
+
+    #[test]
+    fn movie_parser_rejects_dimension_overflow_before_cast() {
+        assert!(Movie::from_json(&movie_json((u32::MAX as u64) + 1, 1, 1, 1)).is_none());
+    }
+
+    #[test]
+    fn movie_parser_rejects_excessive_frame_count() {
+        assert!(Movie::from_json(&movie_json(2, 2, 1, MAX_MOVIE_FRAMES + 1)).is_none());
+    }
+
+    #[test]
+    fn movie_parser_rejects_total_rgba_budget_before_decode() {
+        let oversized = serde_json::json!({
+            "mental_movie": {
+                "width": 2048,
+                "height": 2048,
+                "channels": 1,
+                "frames_b64": ["", "", ""],
+            }
+        });
+        assert!(Movie::from_json(&oversized).is_none());
+    }
+
+    #[test]
+    fn movie_parser_rejects_oversized_base64_before_decode() {
+        let width = 64_u32;
+        let height = 64_u32;
+        let expected_raw_bytes = (width * height) as usize;
+        let max_encoded_len = expected_raw_bytes.div_ceil(3) * 4;
+        let oversized = serde_json::json!({
+            "mental_movie": {
+                "width": width,
+                "height": height,
+                "channels": 1,
+                "frames_b64": ["A".repeat(max_encoded_len + 1)],
+            }
+        });
+        assert!(Movie::from_json(&oversized).is_none());
     }
 }
