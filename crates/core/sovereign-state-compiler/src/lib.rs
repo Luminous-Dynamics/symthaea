@@ -290,6 +290,13 @@ impl AuthorizationEvidence {
         plan: &DeploymentPlan,
         now_ms: u64,
     ) -> Result<(), PlanValidationError> {
+        if self.authority_id.is_empty() {
+            return Err(PlanValidationError::EmptyAuthority);
+        }
+        if self.nonce.is_empty() {
+            return Err(PlanValidationError::EmptyNonce);
+        }
+
         let intent_digest = plan
             .intent
             .digest()
@@ -321,6 +328,12 @@ impl AuthorizationEvidence {
         }
         if self.valid_until_ms.is_some_and(|until| now_ms > until) {
             return Err(PlanValidationError::AuthorizationExpired);
+        }
+
+        for capability in &self.granted_capabilities {
+            if !plan.target_profile.capabilities.contains(capability) {
+                return Err(PlanValidationError::GrantedCapabilityNotSupported(*capability));
+            }
         }
 
         validate_capabilities(
@@ -409,6 +422,12 @@ pub enum PlanValidationError {
     AuthorizationPlanDigestMismatch,
     #[error("authorization validity window is invalid")]
     AuthorizationWindowInvalid,
+    #[error("authorization authority identifier is empty")]
+    EmptyAuthority,
+    #[error("authorization nonce is empty")]
+    EmptyNonce,
+    #[error("authorization grants a capability unsupported by target")]
+    GrantedCapabilityNotSupported(Capability),
     #[error("authorization is not yet valid")]
     AuthorizationNotYetValid,
     #[error("authorization has expired")]
@@ -535,6 +554,44 @@ mod tests {
         assert_eq!(
             plan.authorize(auth, 201),
             Err(PlanValidationError::AuthorizationExpired)
+        );
+    }
+
+    #[test]
+    fn rejects_granted_capability_unsupported_by_target() {
+        let plan = sample_plan();
+        let mut auth = authorization_for(&plan);
+        auth.granted_capabilities.insert(Capability::Reboot);
+
+        assert_eq!(
+            plan.authorize(auth, 150),
+            Err(PlanValidationError::GrantedCapabilityNotSupported(
+                Capability::Reboot
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_empty_authority() {
+        let plan = sample_plan();
+        let mut auth = authorization_for(&plan);
+        auth.authority_id.clear();
+
+        assert_eq!(
+            plan.authorize(auth, 150),
+            Err(PlanValidationError::EmptyAuthority)
+        );
+    }
+
+    #[test]
+    fn rejects_empty_nonce() {
+        let plan = sample_plan();
+        let mut auth = authorization_for(&plan);
+        auth.nonce.clear();
+
+        assert_eq!(
+            plan.authorize(auth, 150),
+            Err(PlanValidationError::EmptyNonce)
         );
     }
 
