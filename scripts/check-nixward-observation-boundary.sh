@@ -45,8 +45,8 @@ REVERSE_SERVICE_CONVERSION_PATTERN='impl[[:space:]]+(TryFrom|From)<[^>]*NixOSCom
 IMPLICIT_SERVICE_RESTART_PATTERN='_[[:space:]]*=>[[:space:]]*NixOSCommand::Custom[[:space:]]*\{[[:space:]]*command:[[:space:]]*["\x27]systemctl["\x27]'
 VALIDATED_OPERATION_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceOperationV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceOperationV1\b'
 OBSERVED_STATE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceObservedStateV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceObservedStateV1\b'
-OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceObservedStateV1[[:space:]]*\{.*?pub[[:space:]]+fn[[:space:]]+new[[:space:]]*\('
-OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
+OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceObservedStateV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
+OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
 
 scan_diagnostic_boundary() {
   local file="$1"
@@ -309,6 +309,21 @@ run_self_test() {
     return 1
   fi
 }
+
+  printf '%s\n' 'pub async fn parse_systemd_properties(...) {}' > "$tmp/observed-state-public-async-parser.rs"
+  if scan_public_observation_factory "$tmp/observed-state-public-async-parser.rs"; then :; else
+    echo "ERROR: CROSS-023 self-test failed to detect public async observed-state parser" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'impl NixServiceObservedStateV1 {
+    pub async fn new(
+        unit: String,
+    ) {}' > "$tmp/observed-state-public-async-constructor.rs"
+  if rg -U -n --pcre2 "$OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN" "$tmp/observed-state-public-async-constructor.rs"; then :; else
+    echo "ERROR: CROSS-022 self-test failed to detect public async observed-state constructor" >&2
+    return 1
+  fi
 
 run_self_test
 run_boundary_check
