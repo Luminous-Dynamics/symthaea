@@ -1238,6 +1238,11 @@ impl SqliteAuthorizationStore {
                     && implementation_id == configuration.verifier_implementation_id
                     && implementation_digest == configuration.verifier_implementation_digest
                     && digest == configuration.verifier_config_digest => {}
+            (Some(id), Some(digest), _, _, _) => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "provider status verifier mismatch: pinned {id}/{digest}"
+                )));
+            }
             (Some(id), Some(digest), None, None, None)
                 if id == configuration.verifier_id
                     && digest == configuration.verifier_config_digest => {
@@ -1251,16 +1256,6 @@ impl SqliteAuthorizationStore {
                         params![key, value],
                     )?;
                 }
-            }
-            (Some(id), Some(digest), revision, implementation_id, implementation_digest) => {
-                return Err(AuthorizationStoreError::InvalidState(format!(
-                    "provider status verifier mismatch: pinned {id}/{digest}"
-                )));
-            }
-            _ => {
-                return Err(AuthorizationStoreError::InvalidState(
-                    "provider status verifier metadata is partially configured".into()
-                ));
             }
             (None, None, None, None, None) => {
                 tx.execute(
@@ -6564,6 +6559,43 @@ mod tests {
         store.pin_provider_status_source_digest("sha256:status-source-a").unwrap();
         assert!(matches!(
             store.pin_provider_status_source_digest("sha256:status-source-b"),
+            Err(AuthorizationStoreError::InvalidState(_))
+        ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn historical_status_verifier_pin_can_be_completed_once() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-status-verifier-upgrade-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        for (key,value) in [
+            ("provider_status_verifier_id","status-verifier/v1"),
+            ("provider_status_verifier_config_digest","sha256:status-verifier-config"),
+        ] {
+            store.connection().unwrap().execute(
+                "INSERT INTO authorization_store_metadata(key,value) VALUES(?1,?2)",
+                params![key,value],
+            ).unwrap();
+        }
+        let upgraded=ProviderStatusVerifierConfiguration::new(
+            "status-verifier/v1","status-verifier/rev1",
+            "status-verifier","sha256:status-verifier-implementation",
+            "sha256:status-verifier-config"
+        );
+        store.pin_provider_status_verifier_configuration(&upgraded).unwrap();
+        assert_eq!(
+            store.pinned_provider_status_verifier_configuration().unwrap(),
+            upgraded
+        );
+        let changed=ProviderStatusVerifierConfiguration::new(
+            "status-verifier/v1","status-verifier/rev2",
+            "status-verifier","sha256:status-verifier-implementation",
+            "sha256:status-verifier-config"
+        );
+        assert!(matches!(
+            store.pin_provider_status_verifier_configuration(&changed),
             Err(AuthorizationStoreError::InvalidState(_))
         ));
         let _=std::fs::remove_file(path);
