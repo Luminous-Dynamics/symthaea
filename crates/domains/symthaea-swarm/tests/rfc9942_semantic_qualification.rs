@@ -12,6 +12,7 @@ use symthaea_swarm::semantic_evidence_vds::{
     COSE_ES256_ALGORITHM_ID,
 };
 use ring::{rand::SystemRandom, signature::EcdsaKeyPair};
+use sha2::Digest;
 
 #[test]
 fn rfc9942_inclusion_and_consistency_preserve_required_verification_order() {
@@ -365,17 +366,16 @@ fn rfc9942_semantic_state_cannot_confuse_valid_signature_with_wrong_entry() {
         .unwrap();
     assert_eq!(state.algorithm_id(), COSE_ES256_ALGORITHM_ID);
     assert_eq!(state.vds_id(), 1);
-    match state.proof() {
-        Rfc9942VerifiedProof::Inclusion { head, candidate_leaf } => {
-            assert_eq!(head.tree_size(), 2);
-            let mut leaf_input = Vec::with_capacity(1 + b"candidate".len());
-            leaf_input.push(0x00);
-            leaf_input.extend_from_slice(b"candidate");
-            let expected_leaf: [u8; 32] = sha2::Sha256::digest(&leaf_input).into();
-            assert_eq!(candidate_leaf, expected_leaf);
-        }
-        Rfc9942VerifiedProof::Consistency { .. } => panic!("expected inclusion state"),
-    }
+    assert!(matches!(
+        state.proof(),
+        Rfc9942VerifiedProof::Inclusion { .. }
+    ));
+    assert_eq!(state.proof().inclusion_head().unwrap().tree_size(), 2);
+    let mut leaf_input = Vec::with_capacity(1 + b"candidate".len());
+    leaf_input.push(0x00);
+    leaf_input.extend_from_slice(b"candidate");
+    let expected_leaf: [u8; 32] = sha2::Sha256::digest(&leaf_input).into();
+    assert_eq!(state.proof().inclusion_candidate_leaf(), Some(expected_leaf));
 
     // The same validly signed Receipt must not be composable with a different
     // candidate entry. This closes the signature-success/semantic-proof gap.
