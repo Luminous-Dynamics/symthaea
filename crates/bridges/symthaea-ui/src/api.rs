@@ -16,6 +16,8 @@ use gloo_net::http::Request;
 use gloo_net::websocket::Message;
 use gloo_net::websocket::futures::WebSocket;
 use serde_json::Value;
+use wasm_bindgen::JsValue;
+use wasm_bindgen_futures::JsFuture;
 
 /// Bound one inbound telemetry text frame before handing it to serde_json.
 ///
@@ -40,6 +42,68 @@ fn parse_telemetry_text(text: &str) -> Result<Value, String> {
     serde_json::from_str::<Value>(text).map_err(|error| format!("telemetry payload was not JSON: {error}"))
 }
 
+async fn parse_service_response(resp: gloo_net::http::Response) -> Result<Value, String> {
+    if let Some(length) = resp.headers().get("content-length") {
+        if let Ok(length) = length.parse::<usize>() {
+            validate_service_response_len(length)?;
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        let stream = resp
+            .body()
+            .ok_or_else(|| "service response has no readable body".to_string())?;
+        let reader = web_sys::ReadableStreamDefaultReader::new(&stream)
+            .map_err(|error| format!("failed to create response reader: {error:?}"))?;
+        let mut bytes = Vec::new();
+
+        loop {
+            let result = JsFuture::from(reader.read())
+                .await
+                .map_err(|error| format!("failed to read response chunk: {error:?}"))?;
+            let done = js_sys::Reflect::get(&result, &JsValue::from_str("done"))
+                .map_err(|error| format!("failed to inspect response chunk: {error:?}"))?
+                .as_bool()
+                .unwrap_or(false);
+            if done {
+                break;
+            }
+
+            let value = js_sys::Reflect::get(&result, &JsValue::from_str("value"))
+                .map_err(|error| format!("failed to inspect response chunk value: {error:?}"))?;
+            let chunk = js_sys::Uint8Array::new(&value);
+            let chunk_len = chunk.length() as usize;
+            let next_len = bytes
+                .len()
+                .checked_add(chunk_len)
+                .ok_or_else(|| "service response size overflow".to_string())?;
+            validate_service_response_len(next_len)?;
+
+            let old_len = bytes.len();
+            bytes.resize(next_len, 0);
+            chunk.copy_to(&mut bytes[old_len..]);
+        }
+
+        reader.release_lock();
+        let text = String::from_utf8(bytes)
+            .map_err(|error| format!("service response was not valid UTF-8: {error}"))?;
+        return serde_json::from_str::<Value>(&text)
+            .map_err(|error| format!("failed to parse response: {error}"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| format!("failed to read response: {e}"))?;
+        validate_service_response_len(text.len())?;
+        serde_json::from_str::<Value>(&text)
+            .map_err(|error| format!("failed to parse response: {error}"))
+    }
+}
+
 /// Send one `{"type":"query","content":...}` request to `POST /v1/service`
 /// and return the parsed JSON response (a `Response::QueryResponse` or
 /// `Response::Error` per the wire protocol).
@@ -53,9 +117,7 @@ pub async fn send_query(gateway: &str, content: &str) -> Result<Value, String> {
         .send()
         .await
         .map_err(|e| format!("request failed: {e}"))?;
-    resp.json::<Value>()
-        .await
-        .map_err(|e| format!("failed to parse response: {e}"))
+    parse_service_response(resp).await
 }
 
 /// One request/response round-trip for status/introspect/etc — same shape
@@ -70,9 +132,7 @@ pub async fn send_simple(gateway: &str, request_type: &str) -> Result<Value, Str
         .send()
         .await
         .map_err(|e| format!("request failed: {e}"))?;
-    resp.json::<Value>()
-        .await
-        .map_err(|e| format!("failed to parse response: {e}"))
+    parse_service_response(resp).await
 }
 
 /// Open the live telemetry WebSocket and invoke `on_message` for each
