@@ -373,6 +373,7 @@ Authorization validation now requires:
 - artifact and external attestation references must carry concrete digests and
   non-empty reference metadata;
 - every compiled deployment plan contains a terminal `Verify` lifecycle step;
+- adapters must reject declared artifact inputs that have no corresponding realization operation rather than silently dropping them;
 - verification carries exact expected state values and a typed transition disposition rather than property names alone;
 - the transition disposition is included in the compiled plan digest and therefore in authorization;
 - execution receipts separate mechanical execution outcome from typed postcondition outcome;
