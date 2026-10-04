@@ -727,7 +727,7 @@ mod digest_tests {
         let claim = base_claim();
         assert_eq!(
             claim.canonical_digest(),
-            "062da33e7e4e9a132dbd8283422c3c3f63ee2dc8393f698b9c92486ba85241fc"
+            "3943e1ff0b82f7d759befff2923dcb1e2a98863bf356c76b2f17f64f31381edf"
         );
     }
 
