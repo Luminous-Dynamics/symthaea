@@ -68,6 +68,26 @@ fn valid_key() -> Vec<u8> {
     key(&valid_fields())
 }
 
+fn indefinite_map(fields: &[Vec<u8>], include_break: bool) -> Vec<u8> {
+    let mut out = vec![0xbf];
+    for field in fields {
+        out.extend_from_slice(field);
+    }
+    if include_break {
+        out.push(0xff);
+    }
+    out
+}
+
+fn cose_key_with_indefinite_root(extra_fields: usize, include_break: bool) -> Vec<u8> {
+    let mut fields = valid_fields();
+    for label in 0..extra_fields {
+        let label = 100u8.checked_add(label as u8).expect("test label must fit");
+        fields.push(vec![0x18, label, 0x00]);
+    }
+    indefinite_map(&fields, include_break)
+}
+
 fn indefinite_bstr_with_exact_chunk_cap(bytes: &[u8]) -> Vec<u8> {
     assert!(MAX_CBOR_BSTR_CHUNKS >= 1);
     let mut out = vec![0x5f];
@@ -97,6 +117,42 @@ fn indefinite_text_with_exact_chunk_cap(bytes: &[u8]) -> Vec<u8> {
     out.push(0xff);
     out
 }
+
+
+#[test]
+fn cose_key_accepts_indefinite_map_root() {
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&cose_key_with_indefinite_root(0, true))
+        .expect("RFC 8949 indefinite map must be accepted at the COSE_Key root");
+    assert_eq!(parsed.kid(), Some(b"rfc9052-c7.1".as_slice()));
+    assert_eq!(&parsed.public_key_sec1()[1..33], &X);
+}
+
+#[test]
+fn cose_key_accepts_exact_indefinite_map_entry_cap_before_break() {
+    let extra = 32 - valid_fields().len();
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&cose_key_with_indefinite_root(extra, true))
+        .expect("the break after exactly 32 map entries is valid");
+    assert_eq!(&parsed.public_key_sec1()[33..65], &Y);
+}
+
+#[test]
+fn cose_key_rejects_indefinite_map_entry_count_above_cap() {
+    let extra = 33 - valid_fields().len();
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&cose_key_with_indefinite_root(extra, true)),
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+    );
+}
+
+#[test]
+fn cose_key_rejects_unterminated_exact_indefinite_map_entry_cap() {
+    let extra = 32 - valid_fields().len();
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&cose_key_with_indefinite_root(extra, false)),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
+}
+
 
 
 #[test]
