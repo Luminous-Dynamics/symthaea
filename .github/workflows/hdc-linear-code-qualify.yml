@@ -356,7 +356,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-qualification.txt <<EOF
           HDC Linear-Code Recovery Qualification
           ======================================
-          receipt_schema=hdc-linear-code-qualification-v3
+          receipt_schema=hdc-linear-code-qualification-v4
           event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
           runner_os=${{ steps.runner.outputs.runner_os }}
@@ -369,7 +369,7 @@ jobs:
           source_sha256=${{ steps.provenance.outputs.source_sha256 }}
           integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
           qualification_workflow_sha256=${{ steps.provenance.outputs.workflow_sha256 }}
-          research_surface_status=${{ (github.event_name == 'pull_request' || github.event_name == 'push') && steps.scope.outcome || 'not-applicable' }}
+          research_surface_status=${{ steps.scope.outcome }}
           research_surface_base_sha=${{ steps.scope.outputs.scope_base_sha }}
           research_surface_head_sha=${{ steps.scope.outputs.scope_head_sha }}
           research_surface_paths=${{ steps.scope.outputs.changed_paths }}
@@ -446,6 +446,7 @@ jobs:
           algebraic_multiplicity_qualification=${{ steps.algebraic.outcome }}
           higher_order_dependency_qualification=${{ steps.higher_order.outcome }}
           dependency_witness_qualification=${{ steps.witness.outcome }}
+          research_surface_qualification=required-for-passed-receipt
           receipt_semantics=descriptive-only
           EOF
           if [ "${{ steps.harness.outcome }}" = "success" ] && [ -f "${{ steps.harness.outputs.path }}/Cargo.lock" ]; then
