@@ -66,6 +66,8 @@ pub enum SscObservationError {
     SystemProfileRealizationMismatch,
     #[error("authorized deployment requires an unobserved NixOS resource")]
     AuthorizedResourceMissing(ResourceRef),
+    #[error("fresh NixOS observation digest does not match the authorized pre-state")]
+    AuthorizedObservationDigestMismatch,
     #[error("NixOS observation could not construct the canonical target adapter: {0}")]
     AdapterConstruction(String),
 }
@@ -176,6 +178,10 @@ impl NixSystemObservation {
         authorized: &AuthorizedDeploymentPlan,
     ) -> Result<(), SscObservationError> {
         self.validate()?;
+
+        if self.observation_digest()? != authorized.plan.target_snapshot.observation_digest {
+            return Err(SscObservationError::AuthorizedObservationDigestMismatch);
+        }
 
         let observed_resources = self
             .generations
