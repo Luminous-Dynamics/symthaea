@@ -1075,6 +1075,72 @@ fn rfc9942_verified_state_records_selected_proof_index() {
 }
 
 #[test]
+fn rfc9942_round_trip_preserves_unprotected_header_entry_order() {
+    fn bstr(bytes: &[u8]) -> Vec<u8> {
+        assert!(bytes.len() < 256);
+        let mut out = if bytes.len() < 24 {
+            vec![0x40 | bytes.len() as u8]
+        } else {
+            vec![0x58, bytes.len() as u8]
+        };
+        out.extend_from_slice(bytes);
+        out
+    }
+
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Detached,
+        vec![0xAA; 64],
+    )
+    .unwrap();
+    let receipt_wire = {
+        let vdp_bytes = receipt.vdp().to_cbor();
+        let mut protected = Vec::new();
+        protected.extend_from_slice(&[0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b]);
+        protected.extend_from_slice(&[0x19, 0x01, 0x8c]);
+        let mut out = vec![0xd2, 0x84];
+        out.extend_from_slice(&bstr(&protected));
+        out.extend_from_slice(&[
+            0xa2,
+            0x19, 0x23, 0x28, 0x01,
+            0x19, 0x01, 0x8c,
+        ]);
+        out.extend_from_slice(&vdp_bytes);
+        out.extend_from_slice(&[0xf6, 0x58, 0x40]);
+        out.extend_from_slice(&[0xAA; 64]);
+        out
+    };
+
+    // The unrelated extension (9000: 1) intentionally precedes vdp (396).
+    let parsed_receipt = Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire).unwrap();
+    assert_eq!(parsed_receipt.to_cbor(), receipt_wire);
+
+    let collection = Rfc9942ReceiptCollection::new(vec![parsed_receipt]).unwrap().to_cbor();
+    let outer_wire = {
+        let protected = [0xa1, 0x01, 0x26];
+        let mut unprotected = vec![
+            0xa2,
+            0x19, 0x23, 0x28, 0x01,
+            0x19, 0x01, 0x8a,
+        ];
+        unprotected.extend_from_slice(&collection);
+        let mut out = vec![0xd2, 0x84];
+        out.extend_from_slice(&bstr(&protected));
+        out.extend_from_slice(&unprotected);
+        out.extend_from_slice(&[0x66, b'p', b'a', b'y', b'l', b'o', b'a', b'd']);
+        out.extend_from_slice(&[0x58, 0x40]);
+        out.extend_from_slice(&[0xBB; 64]);
+        out
+    };
+
+    let parsed_outer = Rfc9942SignatureWithReceipts::from_cbor(&outer_wire).unwrap();
+    assert_eq!(parsed_outer.to_cbor(), outer_wire);
+}
+
+#[test]
 fn rfc9942_es256_binds_external_aad() {
     let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
     let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
