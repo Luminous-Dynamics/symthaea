@@ -1626,22 +1626,20 @@ pub trait VerificationMethodResolver {
         verification_method: &str,
     ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError>;
 
-    /// Resolve a verification method and bind it to the resolver snapshot that
-    /// produced the result.
+    /// Resolve a verification method and, when the implementation can prove the
+    /// pairing came from one consistency-preserving view, bind it to a snapshot.
     ///
-    /// The default implementation preserves backwards compatibility for existing
-    /// resolvers, but performs the snapshot lookup separately. Resolvers backed by
-    /// mutable or remote state should override this method and obtain both values
-    /// from the same atomic/durable view.
+    /// The compatibility default intentionally returns no snapshot. Combining
+    /// resolve() with a separate snapshot_fingerprint_for() observation can create
+    /// split-brain evidence for mutable resolvers, so a resolver must override this
+    /// method to claim a paired snapshot.
     fn resolve_with_snapshot(
         &self,
         verification_method: &str,
     ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
-        let resolved = self.resolve(verification_method)?;
-        let snapshot_fingerprint = self.snapshot_fingerprint_for(verification_method);
         Ok(ResolvedVerificationMethodSnapshot {
-            resolved,
-            snapshot_fingerprint,
+            resolved: self.resolve(verification_method)?,
+            snapshot_fingerprint: None,
         })
     }
 
@@ -1698,6 +1696,22 @@ impl VerificationMethodResolver for InMemoryVerificationMethodResolver {
             .ok_or(VerificationMethodResolutionError::Unavailable)
     }
 
+    fn resolve_with_snapshot(
+        &self,
+        verification_method: &str,
+    ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+        let resolved = self
+            .methods
+            .get(verification_method)
+            .cloned()
+            .ok_or(VerificationMethodResolutionError::Unavailable)?;
+        let snapshot_fingerprint = Some(Self::method_snapshot_fingerprint(&resolved));
+        Ok(ResolvedVerificationMethodSnapshot {
+            resolved,
+            snapshot_fingerprint,
+        })
+    }
+
     fn snapshot_fingerprint(&self) -> Option<String> {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea:verification-method-resolver-snapshot:v1\n");
@@ -1724,11 +1738,18 @@ impl VerificationMethodResolver for InMemoryVerificationMethodResolver {
     }
 
     fn snapshot_fingerprint_for(&self, verification_method: &str) -> Option<String> {
-        let method = self.methods.get(verification_method)?;
+        self.methods
+            .get(verification_method)
+            .map(Self::method_snapshot_fingerprint)
+    }
+}
+
+impl InMemoryVerificationMethodResolver {
+    fn method_snapshot_fingerprint(method: &ResolvedVerificationMethod) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea:verification-method-resolution-snapshot:v2\n");
-        hasher.update(&(verification_method.len() as u64).to_be_bytes());
-        hasher.update(verification_method.as_bytes());
+        hasher.update(&(method.verification_method.len() as u64).to_be_bytes());
+        hasher.update(method.verification_method.as_bytes());
         hasher.update(&method.verifying_key.to_bytes());
         hasher.update(&[match method.status {
             VerificationMethodStatus::Active => 0,
@@ -1744,7 +1765,7 @@ impl VerificationMethodResolver for InMemoryVerificationMethodResolver {
             hasher.update(&(purpose.len() as u64).to_be_bytes());
             hasher.update(purpose.as_bytes());
         }
-        Some(hasher.finalize().to_hex().to_string())
+        hasher.finalize().to_hex().to_string()
     }
 }
 
@@ -2902,6 +2923,46 @@ mod tests {
             base.snapshot_fingerprint(),
             changed_authorization.snapshot_fingerprint()
         );
+    }
+
+    #[test]
+    fn default_resolve_with_snapshot_refuses_unpaired_snapshot_claims() {
+        struct SplitBrainDefaultResolver {
+            method: ResolvedVerificationMethod,
+            snapshot_calls: std::cell::Cell<u32>,
+        }
+
+        impl VerificationMethodResolver for SplitBrainDefaultResolver {
+            fn resolve(
+                &self,
+                _verification_method: &str,
+            ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
+                Ok(self.method.clone())
+            }
+
+            fn snapshot_fingerprint_for(&self, _verification_method: &str) -> Option<String> {
+                self.snapshot_calls.set(self.snapshot_calls.get() + 1);
+                Some("later-state".into())
+            }
+        }
+
+        let (envelope, signing_key, _) = envelope_and_key();
+        let resolver = SplitBrainDefaultResolver {
+            method: ResolvedVerificationMethod {
+                verification_method: envelope.attester_id,
+                verifying_key: signing_key.verifying_key(),
+                status: VerificationMethodStatus::Active,
+                allowed_proof_purposes: vec!["observation-independence".into()],
+            },
+            snapshot_calls: std::cell::Cell::new(0),
+        };
+
+        let paired = resolver
+            .resolve_with_snapshot("did:example:attester-a#key-1")
+            .expect("compatibility resolution should succeed");
+
+        assert_eq!(paired.snapshot_fingerprint, None);
+        assert_eq!(resolver.snapshot_calls.get(), 0);
     }
 
     #[test]
