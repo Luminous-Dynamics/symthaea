@@ -9,6 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::linguistic_frame::LinguisticFrame;
 use crate::speech_plan::{IntonationIntent, SpeechPlan};
 
 /// Stable identity for the phonological-plan contract.
@@ -128,19 +129,31 @@ pub struct PhonologicalPlan {
 }
 
 impl PhonologicalPlan {
-    pub fn from_speech_plan(plan: &SpeechPlan) -> Self {
+    /// Build phonological state from the explicit linguistic formulation boundary.
+    pub fn from_linguistic_frame(frame: &LinguisticFrame) -> Self {
         Self {
+
             version: PHONOLOGICAL_PLAN_VERSION.to_string(),
             content_binding: ContentBindingStatus::RoleStructureOnly,
             lexical_provenance: None,
-            source_intent: plan.intent.clone(),
-            focus_role: plan.focus_role.clone(),
-            intonation: plan.prosody.intonation,
-            rate: sanitize_rate(plan.prosody.rate),
-            pause_weight: sanitize_unit(plan.prosody.pause_weight),
+            source_intent: frame.constituents
+                .iter()
+                .find(|slot| slot.role == "ACTION")
+                .map(|slot| slot.prime.clone())
+                .unwrap_or_else(|| "UNBOUND".to_string()),
+            focus_role: frame.focus_role.clone(),
+            intonation: frame.prosody.intonation,
+            rate: sanitize_rate(frame.prosody.rate),
+            pause_weight: sanitize_unit(frame.prosody.pause_weight),
             segments: Vec::new(),
             syllables: Vec::new(),
         }
+    }
+
+    /// Compatibility wrapper for callers that have only a SpeechPlan.
+    pub fn from_speech_plan(plan: &SpeechPlan) -> Self {
+        let frame = LinguisticFrame::from_speech_plan(plan);
+        Self::from_linguistic_frame(&frame)
     }
 
     /// Bind an explicit phoneme sequence without changing the upstream speech plan.
