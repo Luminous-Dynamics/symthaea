@@ -146,8 +146,8 @@ pub use speech_delivery_feedback::{
     SpeechDeliveryTarget, SPEECH_DELIVERY_FEEDBACK_VERSION,
 };
 pub use speech_feedback::{
-    SpeechFeedbackError, SpeechFeedbackReceipt, SpeechSensoryObservation, SpeechSensoryTarget,
-    SPEECH_FEEDBACK_VERSION,
+    SpeechFeedbackError, SpeechFeedbackReceipt, SpeechFeedbackReceiptError,
+    SpeechSensoryObservation, SpeechSensoryTarget, SPEECH_FEEDBACK_VERSION,
 };
 pub use speech_plan::{
     ClauseMode, EpistemicDelivery, IntonationIntent, ProsodicIntent, SpeechMonitorPlan,
