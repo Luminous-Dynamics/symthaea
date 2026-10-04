@@ -1129,8 +1129,21 @@ impl KnowledgePersistence {
     pub fn latest_snapshot_validation_receipts(
         &mut self,
     ) -> Result<Vec<KnowledgeSnapshotValidationReceipt>, String> {
-        self.load_latest_snapshot_validation_receipt_records(false)
+        self.load_snapshot_validation_receipt_records(false, true)
             .map(|records| records.into_iter().map(|record| record.receipt).collect())
+    }
+
+    /// Load every append-only validation receipt in ledger sequence order.
+    ///
+    /// Unlike the latest-generation API, this exposes historical validation records as well,
+    /// including the assigned sequence and stored v2 self-digest. The entire validation ledger
+    /// is integrity-verified in the same SQLite transaction before any records are returned.
+    /// Historical generations are intentionally not reconstructed from the current projection;
+    /// their ledger bindings remain independently auditable.
+    pub fn snapshot_validation_receipt_records(
+        &mut self,
+    ) -> Result<Vec<KnowledgeSnapshotValidationReceiptRecord>, String> {
+        self.load_snapshot_validation_receipt_records(true, false)
     }
 
     /// Load latest-generation validation receipts together with their SQLite append sequence.
@@ -1140,12 +1153,13 @@ impl KnowledgePersistence {
     pub fn latest_snapshot_validation_receipt_records(
         &mut self,
     ) -> Result<Vec<KnowledgeSnapshotValidationReceiptRecord>, String> {
-        self.load_latest_snapshot_validation_receipt_records(true)
+        self.load_snapshot_validation_receipt_records(true, true)
     }
 
-    fn load_latest_snapshot_validation_receipt_records(
+    fn load_snapshot_validation_receipt_records(
         &mut self,
         order_by_sequence: bool,
+        latest_generation_only: bool,
     ) -> Result<Vec<KnowledgeSnapshotValidationReceiptRecord>, String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
@@ -1170,17 +1184,22 @@ impl KnowledgePersistence {
         } else {
             "v.validation_event ASC"
         };
+        let generation_filter = if latest_generation_only {
+            " WHERE v.generation = (
+                 SELECT generation
+                 FROM knowledge_snapshot_receipts
+                 ORDER BY generation DESC
+                 LIMIT 1
+             )"
+        } else {
+            ""
+        };
         let query = format!(
             "SELECT v.validation_sequence, v.validation_event, v.generation, v.snapshot_digest_hex,
                     v.validator_ref, v.validator_version, v.validation_profile, v.conforms,
                     v.report_digest_hex, v.receipt_digest_hex
              FROM knowledge_snapshot_validation_receipts v
-             WHERE v.generation = (
-                 SELECT generation
-                 FROM knowledge_snapshot_receipts
-                 ORDER BY generation DESC
-                 LIMIT 1
-             )
+             {generation_filter}
              ORDER BY {order_clause}"
         );
         let mut stmt = tx
@@ -7351,6 +7370,113 @@ mod tests {
                     .canonical_digest_hex_for_sequence(record.validation_sequence)
             );
         }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_validation_receipt_records_export_full_history() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_validation_history_export_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let first_fact = FactRecord {
+            memory_id: "history-export-one".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x71; BinaryHV::BYTES],
+            source_text: "history export one".into(),
+            confidence: 0.6,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&first_fact), &[], &[], &[])
+            .unwrap();
+
+        let first_snapshot = p.latest_snapshot_receipt().unwrap().unwrap();
+        p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:history-one".into(),
+            generation: first_snapshot.generation,
+            snapshot_digest_hex: first_snapshot.canonical_digest_hex.clone(),
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        })
+        .unwrap();
+
+        let second_fact = FactRecord {
+            memory_id: "history-export-two".into(),
+            source_text: "history export two".into(),
+            cycle: 2,
+            ..first_fact
+        };
+        p.save_snapshot(std::slice::from_ref(&second_fact), &[], &[], &[])
+            .unwrap();
+
+        let second_snapshot = p.latest_snapshot_receipt().unwrap().unwrap();
+        p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:history-two".into(),
+            generation: second_snapshot.generation,
+            snapshot_digest_hex: second_snapshot.canonical_digest_hex.clone(),
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: false,
+            report_digest_hex: Some("report-history-two".into()),
+        })
+        .unwrap();
+        p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:history-three".into(),
+            generation: second_snapshot.generation,
+            snapshot_digest_hex: second_snapshot.canonical_digest_hex,
+            validator_ref: "validator:test-2".into(),
+            validator_version: "v2".into(),
+            validation_profile: "profile:test-2".into(),
+            conforms: true,
+            report_digest_hex: None,
+        })
+        .unwrap();
+
+        let all = p.snapshot_validation_receipt_records().unwrap();
+        assert_eq!(all.len(), 3);
+        assert_eq!(
+            all.iter()
+                .map(|record| record.validation_sequence)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(
+            all.iter()
+                .map(|record| record.receipt.validation_event.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "validation:history-one",
+                "validation:history-two",
+                "validation:history-three"
+            ]
+        );
+        assert_eq!(all[0].receipt.generation, 1);
+        assert_eq!(all[1].receipt.generation, 2);
+        assert_eq!(all[2].receipt.generation, 2);
+        assert!(all.iter().all(KnowledgeSnapshotValidationReceiptRecord::verify_self_digest));
+
+        let latest = p.latest_snapshot_validation_receipt_records().unwrap();
+        assert_eq!(latest.len(), 2);
+        assert_eq!(
+            latest
+                .iter()
+                .map(|record| record.validation_sequence)
+                .collect::<Vec<_>>(),
+            vec![2, 3]
+        );
+        assert!(latest.iter().all(KnowledgeSnapshotValidationReceiptRecord::verify_self_digest));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
