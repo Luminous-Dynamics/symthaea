@@ -102,3 +102,37 @@ jobs:
           done
       - name: Check fuzz manifest
         run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bins
+
+  fuzz-smoke:
+    name: ES256 COSE bounded fuzz smoke
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_FUZZ_VERSION: 0.12.0
+      FUZZ_RUNS: 1024
+      FUZZ_SEED: 9942
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install nightly Rust for libFuzzer instrumentation
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58
+        with:
+          toolchain: nightly
+      - name: Install pinned cargo-fuzz
+        run: cargo install cargo-fuzz --version "${{ env.CARGO_FUZZ_VERSION }}" --locked
+      - name: Run bounded fuzz smoke corpus
+        working-directory: crates/domains/symthaea-swarm/fuzz
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in \
+            fuzz_cose_key_es256 \
+            fuzz_rfc9942_receipt \
+            fuzz_rfc9942_signature_with_receipts \
+            fuzz_rfc9942_proofs
+          do
+            cargo fuzz run "$target" -- -runs="${FUZZ_RUNS}" -seed="${FUZZ_SEED}" -print_final_stats=1
+          done
