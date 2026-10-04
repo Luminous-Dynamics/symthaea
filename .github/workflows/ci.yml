@@ -702,17 +702,6 @@ jobs:
           nix build .#checks.x86_64-linux.eval-service-module
           nix build .#checks.x86_64-linux.service-module-smoke
 
-  test-spore-tpm2:
-    name: Spore TPM2 Emulator Smoke
-    runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v14
-
       - name: Verify TSS 2.0 linker prerequisites
         run: nix develop .#inoculation --command bash tests/tpm2-tss-linkage-smoke.sh
 
