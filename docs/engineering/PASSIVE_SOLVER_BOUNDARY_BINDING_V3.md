@@ -60,6 +60,15 @@ provenance.
 
 The v3 contract distinguishes:
 
+The recorded boundary matching tolerance is part of the realized-boundary identity,
+so the selection decision is reproducible rather than depending on an unstated
+runtime default. The current connectivity default is 50 micrometers (0.05 mm).
+
+The mesh-side selection is the interface rim on the candidate surface. It is not,
+by itself, a claim that the solver's own face/patch topology is identical; the
+solver-specific external handle remains a separate adapter mapping.
+
+
 same intended geometry
 → same exact mesh
 → same realized boundary selection
