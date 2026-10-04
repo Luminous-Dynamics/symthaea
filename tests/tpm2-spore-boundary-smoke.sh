@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# TPM plumbing smoke test only. An emulator is not hardware-backed authority.
+# This validates that Spore's Nix development environment can exercise the
+# primitives required by the later concrete regenerative-health adapter.
+
+: "${TMPDIR:=/tmp}"
+ROOT=$(mktemp -d "${TMPDIR%/}/symthaea-tpm-smoke.XXXXXX")
+TPM_STATE="$ROOT/tpm-state"
+CTRL_PORT=2322
+TPM_PORT=2321
+NV_INDEX=0x1500016
+NV_AUTH=index
+CHALLENGE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+
+cleanup() {
+  if [ -n "${SWTPM_PID:-}" ]; then
+    kill "$SWTPM_PID" 2>/dev/null || true
+    wait "$SWTPM_PID" 2>/dev/null || true
+  fi
+  rm -rf "$ROOT"
+}
+trap cleanup EXIT
+
+for cmd in swtpm swtpm_setup tpm2_startup tpm2_getcap tpm2_nvdefine tpm2_nvincrement tpm2_nvreadpublic tpm2_nvread tpm2_createprimary tpm2_readpublic tpm2_quote tpm2_checkquote tpm2_nvcertify tpm2_verifysignature tpm2_nvundefine tpm2_print; do
+  command -v "$cmd" >/dev/null || { echo "missing required command: $cmd" >&2; exit 2; }
+done
+
+mkdir -p "$TPM_STATE"
+swtpm_setup --tpm2 --tpmstate "$TPM_STATE" --overwrite >/dev/null
+swtpm socket --tpm2 --tpmstate "dir=$TPM_STATE" --ctrl "type=tcp,port=$CTRL_PORT" --server "type=tcp,port=$TPM_PORT" --flags not-need-init >/dev/null 2>&1 &
+SWTPM_PID=$!
+
+for _ in $(seq 1 50); do
+  if TPM2TOOLS_TCTI="swtpm:host=127.0.0.1,port=$TPM_PORT" tpm2_getcap properties-fixed >/dev/null 2>&1; then break; fi
+  sleep 0.1
+done
+export TPM2TOOLS_TCTI="swtpm:host=127.0.0.1,port=$TPM_PORT"
+
+tpm2_startup -c
+tpm2_getcap properties-fixed > "$ROOT/tpm-properties.txt"
+grep -Eq 'TPM2_PT_FAMILY_INDICATOR:.*2\.0|TPM2_PT_FAMILY_INDICATOR:' "$ROOT/tpm-properties.txt"
+
+# Define an eight-byte counter and advance it to generation 1.
+tpm2_nvdefine -Q -C o -s 8 -a 'ownerread|authread|authwrite|nt=counter' "$NV_INDEX" -p "$NV_AUTH"
+tpm2_nvincrement -Q -C "$NV_INDEX" "$NV_INDEX" -P "$NV_AUTH"
+tpm2_nvread -Q -C "$NV_INDEX" -s 8 -P "$NV_AUTH" -o "$ROOT/counter.bin" "$NV_INDEX"
+[ "$(xxd -p "$ROOT/counter.bin")" = "0000000000000001" ]
+
+# Pin the public NV object and its Name.
+tpm2_nvreadpublic > "$ROOT/nv-public.txt"
+grep -Fq "$NV_INDEX" "$ROOT/nv-public.txt"
+
+# Create a restricted RSA signing key for the emulator test.
+tpm2_createprimary -Q -C o -g sha256 -G rsa -a 'fixedtpm|fixedparent|sensitivedataorigin|userwithauth|restricted|sign' -c "$ROOT/ak.ctx"
+tpm2_readpublic -Q -c "$ROOT/ak.ctx" -f pem -o "$ROOT/ak.pem"
+
+# Quote PCR 7 and authenticate the exact fresh challenge.
+tpm2_quote -Q -c "$ROOT/ak.ctx" -l sha256:7 -q "$CHALLENGE" -m "$ROOT/quote.attest" -s "$ROOT/quote.sig" -o "$ROOT/quote.pcrs" -g sha256
+tpm2_checkquote -Q -u "$ROOT/ak.pem" -m "$ROOT/quote.attest" -s "$ROOT/quote.sig" -f "$ROOT/quote.pcrs" -g sha256 -q "$CHALLENGE" -l sha256:7
+tpm2_print -Q -t TPMS_ATTEST "$ROOT/quote.attest" > "$ROOT/quote.yaml"
+
+# Certify the complete eight-byte NV counter with the same challenge.
+tpm2_nvcertify -Q -C "$ROOT/ak.ctx" -c "$NV_INDEX" -p "$NV_AUTH" -g sha256 -f plain -s rsassa -o "$ROOT/nv.sig" --attestation "$ROOT/nv.attest" --size 8 --offset 0 -q "$CHALLENGE" "$NV_INDEX"
+test -s "$ROOT/nv.attest"
+test -s "$ROOT/nv.sig"
+tpm2_print -Q -t TPMS_ATTEST "$ROOT/nv.attest" > "$ROOT/nv.yaml"
+tpm2_verifysignature -Q -c "$ROOT/ak.ctx" -g sha256 -m "$ROOT/nv.attest" -s "$ROOT/nv.sig" -f rsassa
+
+tpm2_nvundefine -Q -C o "$NV_INDEX"
+
+echo 'TPM2 Spore boundary smoke test: PASS'
+echo "challenge=$CHALLENGE"
+echo "nv_index=$NV_INDEX"
+echo 'counter_generation=1'
+echo 'quote=pcr7+challenge verified'
+echo 'nv_certification=full_contents offset=0 size=8 verified'
+echo 'authority_claim=none (software TPM emulator)'
