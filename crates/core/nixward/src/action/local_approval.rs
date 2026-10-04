@@ -536,10 +536,10 @@ mod tests {
             a, b,
             "structured rebuild semantics must not collapse to identical approval text"
         );
-        assert_eq!(a, "nixos-rebuild switch flake=.#workstation");
+        assert_eq!(a, r#"nixos-rebuild switch flake=".#workstation""#);
         assert_eq!(
             b,
-            "nixos-rebuild switch flake=<none> extra-args=[--flake .#workstation]"
+            r#"nixos-rebuild switch flake=<none> extra-args=[--flake ".#workstation"]"#
         );
     }
 
