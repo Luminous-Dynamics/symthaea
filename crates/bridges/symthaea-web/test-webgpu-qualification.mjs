@@ -321,13 +321,24 @@ async function waitForProjection(page, selector, display, classification = 'rend
 async function waitForQualificationRecovery(page, selector) {
   try {
     await page.waitForFunction(
-      selector => document.querySelector(selector)?.getAttribute('data-qualification-recovered') === 'true',
+      selector => {
+        const canvas = document.querySelector(selector);
+        if (!canvas) return false;
+        const initCount = Number.parseInt(
+          canvas.getAttribute('data-qualification-init-count') || '',
+          10,
+        );
+        return canvas.getAttribute('data-qualification-recovery-requested') === 'true'
+          && canvas.getAttribute('data-qualification-recovered') === 'true'
+          && Number.isInteger(initCount)
+          && initCount >= 2;
+      },
       { timeout: 30_000 },
       selector,
     );
   } catch (error) {
     throw new QualificationError(
-      `WebGPU renderer ${selector} did not recover after the qualification-only device-loss exercise: ${error instanceof Error ? error.message : String(error)}`,
+      `WebGPU renderer ${selector} did not complete the deterministic recovery proof (requested loss + second initialization): ${error instanceof Error ? error.message : String(error)}`,
       'renderer',
     );
   }
@@ -563,12 +574,18 @@ async function runMode(mode) {
         semantic_movie_samples: semanticMovieSamples,
         deterministic_repeat: true,
         page_errors: pageErrors,
-        device_recovery: await page.evaluate(() => ({
-          cognitive_init_count: document.querySelector('#webgpu-cognitive-canvas')?.getAttribute('data-qualification-init-count') || null,
-          movie_init_count: document.querySelector('#webgpu-movie-canvas')?.getAttribute('data-qualification-init-count') || null,
-          cognitive_recovered: document.querySelector('#webgpu-cognitive-canvas')?.getAttribute('data-qualification-recovered') === 'true',
-          movie_recovered: document.querySelector('#webgpu-movie-canvas')?.getAttribute('data-qualification-recovered') === 'true',
-        })),
+        device_recovery: await page.evaluate(() => {
+          const cognitive = document.querySelector('#webgpu-cognitive-canvas');
+          const movie = document.querySelector('#webgpu-movie-canvas');
+          return {
+            cognitive_init_count: cognitive?.getAttribute('data-qualification-init-count') || null,
+            movie_init_count: movie?.getAttribute('data-qualification-init-count') || null,
+            cognitive_recovery_requested: cognitive?.getAttribute('data-qualification-recovery-requested') === 'true',
+            movie_recovery_requested: movie?.getAttribute('data-qualification-recovery-requested') === 'true',
+            cognitive_recovered: cognitive?.getAttribute('data-qualification-recovered') === 'true',
+            movie_recovered: movie?.getAttribute('data-qualification-recovered') === 'true',
+          };
+        }),
       };
     }
 
