@@ -72,6 +72,10 @@ pub struct CognitiveConsentLease {
     pub purpose: CommunicationPurpose,
     pub read_scopes: BTreeSet<CognitiveChannel>,
     pub write_scopes: BTreeSet<CognitiveChannel>,
+    #[serde(default = "default_public_sensitivity")]
+    pub max_read_sensitivity: CognitiveSensitivity,
+    #[serde(default = "default_public_sensitivity")]
+    pub max_write_sensitivity: CognitiveSensitivity,
     pub issued_at_unix_s: u64,
     pub expires_at_unix_s: u64,
     pub consent_epoch: u64,
@@ -88,6 +92,18 @@ impl CognitiveConsentLease {
             return Err("consent lease identity or time bounds are invalid".into());
         }
         Ok(())
+    }
+
+    pub fn authorizes_sensitivity(
+        &self,
+        direction: ChannelDirection,
+        sensitivity: CognitiveSensitivity,
+    ) -> bool {
+        let maximum = match direction {
+            ChannelDirection::Read => self.max_read_sensitivity,
+            ChannelDirection::Write => self.max_write_sensitivity,
+        };
+        sensitivity <= maximum
     }
 
     pub fn authorizes(
@@ -254,6 +270,9 @@ impl AuthorizedNeurosemanticMessage {
         ) {
             return Err("communication is not authorized by the active consent lease".into());
         }
+        if !lease.authorizes_sensitivity(self.packet.direction, self.packet.sensitivity) {
+            return Err("packet sensitivity exceeds the consent lease ceiling".into());
+        }
 
         Ok(())
     }
@@ -386,6 +405,8 @@ mod tests {
             purpose: CommunicationPurpose::HumanCollaboration,
             read_scopes: BTreeSet::from([CognitiveChannel::Semantic]),
             write_scopes: BTreeSet::from([CognitiveChannel::Semantic]),
+            max_read_sensitivity: CognitiveSensitivity::Private,
+            max_write_sensitivity: CognitiveSensitivity::Private,
             issued_at_unix_s: 100,
             expires_at_unix_s: 200,
             consent_epoch: 7,
@@ -651,6 +672,45 @@ mod tests {
         assert!(tracker
             .observe_authorized(&message, &revoked, 150)
             .is_err());
+    }
+
+    #[test]
+    fn sensitivity_ceiling_is_enforced() {
+        let base = lease();
+        let packet = NeurosemanticPacket::new(
+            15,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::HighlyPrivate,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: base.consent_epoch,
+            lease_id: base.lease_id.clone(),
+        };
+        assert!(message.validate(&base, 150).is_err());
+        let mut elevated = base.clone();
+        elevated.max_write_sensitivity = CognitiveSensitivity::HighlyPrivate;
+        assert!(message.validate(&elevated, 150).is_ok());
+    }
+
+    #[test]
+    fn legacy_leases_default_to_public_sensitivity() {
+        let lease = lease();
+        let mut value = serde_json::to_value(&lease).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("max_read_sensitivity");
+        object.remove("max_write_sensitivity");
+        let restored: CognitiveConsentLease = serde_json::from_value(value).unwrap();
+        assert_eq!(restored.max_read_sensitivity, CognitiveSensitivity::Public);
+        assert_eq!(restored.max_write_sensitivity, CognitiveSensitivity::Public);
     }
 
     #[test]
