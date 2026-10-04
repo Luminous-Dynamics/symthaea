@@ -396,6 +396,8 @@ Authorization validation now requires:
 - an `Unproven` outcome remains representable without proof, and a mechanical `Succeeded` receipt is not treated as verified success unless the postcondition is `Satisfied`;
 - execution receipts bind the exact authorized plan, pre-execution snapshot, and
   post-execution observation;
+- Nixward performs a fresh resource-identity preflight before mutation rather
+  than trusting the original snapshot indefinitely;
 - receipt timestamps must remain within the authorization validity window;
 - the final target snapshot observation timestamp must fall between execution start and finish, so stale or future evidence cannot be claimed as post-state proof.
 - pre-execution target observations must not be future-dated relative to authorization;
@@ -502,6 +504,13 @@ These facts are evidence, not authority. The bridge performs no authorization,
 command execution, reboot, or mutation. The exact observation digest is then
 available for SSC target-snapshot binding and for Nixward's later post-state
 verification pass.
+
+Before a previously authorized plan reaches mutation, a fresh Nixward
+observation can be checked against the authorization as a read-only preflight:
+every concrete resource named by the intent must still be present with the same
+identity. In particular, a generation rollback must still resolve to the exact
+generation-plus-realization resource that was authorized. Missing or drifted
+resources fail closed before execution.
 
 The prototype `applications.install` and `applications.remove` properties are
 adapter-local vocabulary. They MUST be bound to an explicit Nix profile scope
