@@ -154,6 +154,7 @@ impl TpmNvCounterEvidence {
             && self.nv_public_data_size == 8
             && self.nv_certify_offset == 0
             && self.nv_certify_size == 8
+    }
 
     /// Validate the evidence envelope against the exact freshness receipt.
     ///
@@ -217,6 +218,7 @@ impl TpmNvCounterEvidence {
         write_string(&mut hasher, &self.nv_public_digest);
         hasher.update(&[match self.nv_certify_mode {
             TpmNvCertificationMode::FullContents => 0,
+            TpmNvCertificationMode::DigestOfContents => 1,
         }]);
         hasher.update(&self.nv_public_data_size.to_le_bytes());
         hasher.update(&self.nv_certify_offset.to_le_bytes());
@@ -274,6 +276,9 @@ pub fn verify_tpm_nv_counter<V: TpmNvCounterEvidenceVerifier>(
     }
     if !matches!(profile.backing, FreshnessAnchorBacking::HardwareProtected) {
         return Err(TpmNvCounterVerificationError::BackingMismatch);
+    }
+    if !matches!(evidence.nv_certify_mode, TpmNvCertificationMode::FullContents) {
+        return Err(TpmNvCounterVerificationError::InvalidEvidence);
     }
     if !matches!(
         evidence.persistence_mode,
