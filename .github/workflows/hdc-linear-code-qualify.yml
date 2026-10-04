@@ -54,10 +54,11 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ steps.head.outputs.sha }}
         run: |
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           CHANGED_PATHS="$RUNNER_TEMP/hdc-linear-code-changed-paths"
-          git diff --name-only "$BASE_SHA" "$GITHUB_SHA" | sort -u > "$CHANGED_PATHS"
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" | sort -u > "$CHANGED_PATHS"
           test -s "$CHANGED_PATHS"
           while IFS= read -r changed_path; do
             case "$changed_path" in
