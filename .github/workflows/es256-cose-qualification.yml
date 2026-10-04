@@ -123,6 +123,35 @@ jobs:
           toolchain: nightly
       - name: Install pinned cargo-fuzz
         run: cargo install cargo-fuzz --version "${{ env.CARGO_FUZZ_VERSION }}" --locked
+      - name: Prepare deterministic parser seeds
+        working-directory: crates/domains/symthaea-swarm/fuzz
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from base64 import b64decode
+          from pathlib import Path
+
+          seeds = {
+              "fuzz_cose_key_es256/seed-valid-public-key.cbor":
+                  "pAECIAEhWCAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBCJYIAUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUF",
+              "fuzz_rfc9942_receipt/seed-inclusion-receipt.cbor":
+                  "0oRHogEmGQGLAaEZAYyhIIFYJoMCAIFYIBERERERERERERERERERERERERERERERERERERERERER9lhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "fuzz_rfc9942_receipt/seed-consistency-receipt.cbor":
+                  "0oRHogEmGQGLAaEZAYyhIYFYJoMBAoFYIBERERERERERERERERERERERERERERERERERERERERER9lhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "fuzz_rfc9942_signature_with_receipts/seed-signature-with-receipt.cbor":
+                  "0oRDoQEmoRkBioFYfNKER6IBJhkBiwGhGQGMoSCBWCaDAgCBWCAREREREREREREREREREREREREREREREREREREREREREfZYQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABHcGF5bG9hZFhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "fuzz_rfc9942_proofs/seed-inclusion-vdp.cbor":
+                  "oSCBWCaDAgCBWCAREREREREREREREREREREREREREREREREREREREREREQ==",
+              "fuzz_rfc9942_proofs/seed-consistency-vdp.cbor":
+                  "oSGBWCaDAQKBWCAREREREREREREREREREREREREREREREREREREREREREQ==",
+          }
+
+          for relative, encoded in seeds.items():
+              path = Path("corpus") / relative
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(b64decode(encoded, validate=True))
+          PY
       - name: Run bounded fuzz smoke corpus
         working-directory: crates/domains/symthaea-swarm/fuzz
         shell: bash
