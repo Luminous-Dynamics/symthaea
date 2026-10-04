@@ -5,12 +5,17 @@ edition = "2024"
 description = "Modality-neutral, evidence-calibrated communication contracts for Symthaea"
 license = "AGPL-3.0-or-later"
 
+[features]
+default = []
+hdc-codec = ["dep:symthaea-core"]
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
 clap = { workspace = true }
 hound = { workspace = true }
+symthaea-core = { path = "../symthaea-core", default-features = false, optional = true }
 
 [[bin]]
 name = "symthaea-comm-eval"
