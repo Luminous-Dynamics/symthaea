@@ -572,6 +572,52 @@ mod tests {
     }
 
     #[test]
+    fn data_policy_is_deny_by_default() {
+        let policy = NeurosemanticDataPolicy::default();
+        assert!(!policy.validates());
+        assert!(!policy.allows_purpose(CommunicationPurpose::HumanCollaboration));
+    }
+
+    #[test]
+    fn data_policy_requires_explicit_inference_and_purpose() {
+        let mut policy = semantic_policy();
+        assert!(policy.validates());
+        policy.inference_classes.clear();
+        assert!(!policy.validates());
+        let mut policy = semantic_policy();
+        policy.permitted_purposes.clear();
+        assert!(!policy.validates());
+    }
+
+    #[test]
+    fn legacy_lease_data_permissions_default_to_empty_and_deny() {
+        let lease = lease();
+        let mut value = serde_json::to_value(&lease).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("read_data_classes");
+        object.remove("write_data_classes");
+        object.remove("read_inference_classes");
+        object.remove("write_inference_classes");
+        let restored: CognitiveConsentLease = serde_json::from_value(value).unwrap();
+        assert!(restored.read_data_classes.is_empty());
+        assert!(restored.write_data_classes.is_empty());
+        assert!(!restored.authorizes_data_policy(ChannelDirection::Read, &semantic_policy()));
+    }
+
+    #[test]
+    fn data_class_and_inference_authorization_are_independent() {
+        let lease = lease();
+        let policy = semantic_policy();
+        assert!(lease.authorizes_data_policy(ChannelDirection::Read, &policy));
+        let mut identity = policy.clone();
+        identity.inference_classes = BTreeSet::from([NeurosemanticInferenceClass::Identity]);
+        assert!(!lease.authorizes_data_policy(ChannelDirection::Read, &identity));
+        let mut decoded_claim = policy;
+        decoded_claim.data_class = NeurosemanticDataClass::DecodedClaim;
+        assert!(!lease.authorizes_data_policy(ChannelDirection::Read, &decoded_claim));
+    }
+
+    #[test]
     fn consent_is_deny_by_default() {
         let l = lease();
         assert!(!l.authorizes(
