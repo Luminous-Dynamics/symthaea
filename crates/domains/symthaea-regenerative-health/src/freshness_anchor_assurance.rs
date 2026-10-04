@@ -210,6 +210,65 @@ impl FreshnessAnchorProfile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FreshnessAnchorEvidenceKind {
+    HardwareMonotonicCounter {
+        backend_identity_digest: String,
+        counter_namespace_digest: String,
+        observed_counter: u64,
+    },
+    RemoteMonotonicSequence {
+        authority_identity_digest: String,
+        authority_namespace_digest: String,
+        observed_sequence: u64,
+    },
+    QuorumMonotonicSequence {
+        quorum_policy_digest: String,
+        member_set_digest: String,
+        threshold: u16,
+        observed_sequence: u64,
+        certificate_digest: String,
+    },
+}
+
+impl FreshnessAnchorEvidenceKind {
+    pub fn observed_sequence(&self) -> u64 {
+        match self {
+            Self::HardwareMonotonicCounter { observed_counter, .. } => *observed_counter,
+            Self::RemoteMonotonicSequence { observed_sequence, .. } => *observed_sequence,
+            Self::QuorumMonotonicSequence { observed_sequence, .. } => *observed_sequence,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let nonempty = |value: &str| !value.trim().is_empty();
+        match self {
+            Self::HardwareMonotonicCounter {
+                backend_identity_digest,
+                counter_namespace_digest,
+                ..
+            } => nonempty(backend_identity_digest) && nonempty(counter_namespace_digest),
+            Self::RemoteMonotonicSequence {
+                authority_identity_digest,
+                authority_namespace_digest,
+                ..
+            } => nonempty(authority_identity_digest) && nonempty(authority_namespace_digest),
+            Self::QuorumMonotonicSequence {
+                quorum_policy_digest,
+                member_set_digest,
+                threshold,
+                certificate_digest,
+                ..
+            } => {
+                nonempty(quorum_policy_digest)
+                    && nonempty(member_set_digest)
+                    && *threshold > 0
+                    && nonempty(certificate_digest)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FreshnessAnchorVerificationReceipt {
     pub schema_version: String,
     pub profile_fingerprint: String,
@@ -217,8 +276,11 @@ pub struct FreshnessAnchorVerificationReceipt {
     pub generation: u64,
     pub state_fingerprint: String,
     pub verifier_reference: String,
+    pub verifier_policy_digest: String,
+    pub reference_values_digest: String,
     pub evidence_reference: String,
     pub evidence_digest: String,
+    pub evidence_kind: FreshnessAnchorEvidenceKind,
 }
 
 pub trait FreshnessAnchorEvidenceVerifier {
@@ -249,8 +311,11 @@ impl VerifiedFreshnessAnchor {
             || receipt.receiver_id.trim().is_empty()
             || receipt.state_fingerprint.trim().is_empty()
             || receipt.verifier_reference.trim().is_empty()
+            || receipt.verifier_policy_digest.trim().is_empty()
+            || receipt.reference_values_digest.trim().is_empty()
             || receipt.evidence_reference.trim().is_empty()
             || receipt.evidence_digest.trim().is_empty()
+            || !receipt.evidence_kind.validate()
         {
             return Err(FreshnessAnchorAssuranceError::InvalidReceipt);
         }
@@ -396,8 +461,15 @@ mod tests {
             generation: 7,
             state_fingerprint: "state-1".into(),
             verifier_reference: "verifier-1".into(),
+            verifier_policy_digest: "policy-digest-1".into(),
+            reference_values_digest: "reference-values-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
+            evidence_kind: FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
+                authority_identity_digest: "authority-id-1".into(),
+                authority_namespace_digest: "namespace-1".into(),
+                observed_sequence: 7,
+            },
         };
         let err = VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap_err();
         assert_eq!(err, FreshnessAnchorAssuranceError::ProfileBindingMismatch);
