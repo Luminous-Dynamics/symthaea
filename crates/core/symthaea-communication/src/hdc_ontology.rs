@@ -1541,7 +1541,8 @@ mod tests {
         assert!(calibration.validates());
     }
 
-        fn conformal_cosine_nonconformity_is_bounded_and_monotone() {
+    #[test]
+    fn conformal_cosine_nonconformity_is_bounded_and_monotone() {
         assert_eq!(
             HdcOntologyConformalCalibration::nonconformity_from_cosine(1.0).unwrap(),
             0.0
@@ -1559,7 +1560,6 @@ mod tests {
     }
 
     #[test]
-#[test]
     fn conformal_non_max_threshold_requires_enough_calibration_cases() {
         assert_eq!(
             HdcOntologyConformalCalibration::minimum_cases_for_non_max_threshold(0.10)
@@ -1573,7 +1573,8 @@ mod tests {
         );
     }
 
-        fn conformal_prediction_set_is_thresholded_and_deterministic() {
+    #[test]
+    fn conformal_prediction_set_is_thresholded_and_deterministic() {
         let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
             "codebook",
             &[0.0, 0.05, 0.1, 0.2],
@@ -1612,7 +1613,6 @@ mod tests {
     }
 
     #[test]
-#[test]
     fn conformal_calibration_rejects_invalid_scores_and_alpha() {
         assert!(HdcOntologyConformalCalibration::from_nonconformity_scores(
             "codebook",
