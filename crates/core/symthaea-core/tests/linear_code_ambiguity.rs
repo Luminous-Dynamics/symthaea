@@ -329,10 +329,7 @@ fn algebraic_multiplicity_ledger_is_exhaustively_self_consistent() {
     assert!(!pair_algebra.unique_factorization);
     assert_eq!(pair_algebra.dependency_order, Some(2));
 
-    let pair_targets = [
-        shared.encode(&[false]),
-        shared.encode(&[true]),
-    ];
+    let pair_targets = [shared.encode(&[false]), shared.encode(&[true])];
     for target in pair_targets {
         assert_eq!(
             factorization_count_for_target(&target, &pair)
@@ -345,7 +342,10 @@ fn algebraic_multiplicity_ledger_is_exhaustively_self_consistent() {
     for left in shared.enumerate() {
         for right in shared.enumerate() {
             let target = left.bound(&right);
-            if let Some((_, count)) = pair_fibers.iter_mut().find(|(candidate, _)| *candidate == target) {
+            if let Some((_, count)) = pair_fibers
+                .iter_mut()
+                .find(|(candidate, _)| *candidate == target)
+            {
                 *count += 1;
             } else {
                 pair_fibers.push((target, 1));
@@ -385,7 +385,10 @@ fn algebraic_multiplicity_ledger_is_exhaustively_self_consistent() {
         for b in c2.enumerate() {
             for d in c3.enumerate() {
                 let target = a.bound(&b).bound(&d);
-                if let Some((_, count)) = triple_fibers.iter_mut().find(|(candidate, _)| *candidate == target) {
+                if let Some((_, count)) = triple_fibers
+                    .iter_mut()
+                    .find(|(candidate, _)| *candidate == target)
+                {
                     *count += 1;
                 } else {
                     triple_fibers.push((target, 1));
@@ -549,7 +552,10 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
 
                     let algebra = factorization_algebra(&factors).expect("valid paper fixture");
                     assert_eq!(algebra.factor_dimension_sum, rank * factor_count);
-                    assert_eq!(algebra.union_generator_rank, basis_rank(&combined_basis, dimension));
+                    assert_eq!(
+                        algebra.union_generator_rank,
+                        basis_rank(&combined_basis, dimension)
+                    );
                     assert_eq!(
                         algebra.factor_dimension_sum,
                         algebra.union_generator_rank + algebra.kernel_dimension
@@ -558,10 +564,7 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                         algebra.factorization_count_per_target.exponent(),
                         algebra.kernel_dimension
                     );
-                    assert_eq!(
-                        algebra.unique_factorization,
-                        algebra.kernel_dimension == 0
-                    );
+                    assert_eq!(algebra.unique_factorization, algebra.kernel_dimension == 0);
                     max_kernel_dimension = max_kernel_dimension.max(algebra.kernel_dimension);
                     if let Some(order) = algebra.dependency_order {
                         max_dependency_order = max_dependency_order.max(order);
@@ -570,16 +573,18 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                     result_digest.update(&(algebra.factor_dimension_sum as u64).to_le_bytes());
                     result_digest.update(&(algebra.union_generator_rank as u64).to_le_bytes());
                     result_digest.update(&(algebra.kernel_dimension as u64).to_le_bytes());
-                    result_digest.update(&(algebra.raw_factor_tuple_count.exponent() as u64).to_le_bytes());
-                    result_digest.update(&(algebra.reachable_target_count.exponent() as u64).to_le_bytes());
+                    result_digest
+                        .update(&(algebra.raw_factor_tuple_count.exponent() as u64).to_le_bytes());
+                    result_digest
+                        .update(&(algebra.reachable_target_count.exponent() as u64).to_le_bytes());
                     result_digest.update(
                         &(algebra.factorization_count_per_target.exponent() as u64).to_le_bytes(),
                     );
                     result_digest.update(&[algebra.unique_factorization as u8]);
-                    result_digest.update(&(algebra.dependency_order.unwrap_or(0) as u64).to_le_bytes());
+                    result_digest
+                        .update(&(algebra.dependency_order.unwrap_or(0) as u64).to_le_bytes());
 
-                    let target_multiplicity =
-                        factorization_count_for_target(&target, &factors);
+                    let target_multiplicity = factorization_count_for_target(&target, &factors);
                     let Some(target_multiplicity) = target_multiplicity else {
                         nonexistent_targets += 1;
                         continue;
