@@ -595,7 +595,7 @@ mod tests {
         let digest = observation.observation_digest().expect("digest");
         let bytes = serde_json::to_vec(&observation).expect("serialize");
         assert_ne!(digest, ContentDigest::blake3(&bytes));
-        assert_eq!(super::NIXOS_OBSERVATION_DIGEST_DOMAIN.len(), 44);
+        assert_eq!(super::NIXOS_OBSERVATION_DIGEST_DOMAIN.len(), 43);
     }
 
     #[test]
