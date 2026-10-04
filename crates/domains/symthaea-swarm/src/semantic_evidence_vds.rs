@@ -3388,6 +3388,93 @@ mod tests {
     }
 
     #[test]
+    fn rfc9942_receipt_envelope_accepts_indefinite_protected_header_map() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+
+        let protected=vec![
+            0xbf,
+            0x01, 0x26,
+            0x19, 0x01, 0x8b, 0x01,
+            0xff,
+        ];
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,1);
+        cbor_int(&mut bytes,RFC9942_VDP_HEADER_LABEL);
+        bytes.extend_from_slice(&vdp.to_cbor());
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes,&[0xAA;64]);
+
+        let decoded=Rfc9942ReceiptEnvelope::from_cbor(&bytes)
+            .expect("an indefinite protected-header map is valid CBOR");
+        assert_eq!(decoded.to_cbor(),bytes);
+        assert_eq!(decoded.algorithm_id(),-7);
+        assert_eq!(decoded.vds_id(),1);
+    }
+
+    #[test]
+    fn rfc9942_receipt_envelope_accepts_indefinite_unprotected_header_map() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,2);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected,-7);
+        cbor_int(&mut protected,RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected,1);
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        bytes.push(0xbf);
+        cbor_int(&mut bytes,RFC9942_VDP_HEADER_LABEL);
+        bytes.extend_from_slice(&vdp.to_cbor());
+        cbor_int(&mut bytes,7);
+        cbor_uint(&mut bytes,1);
+        bytes.push(0xff);
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes,&[0xAA;64]);
+
+        let decoded=Rfc9942ReceiptEnvelope::from_cbor(&bytes)
+            .expect("an indefinite unprotected-header map is valid CBOR");
+        assert_eq!(decoded.to_cbor(),bytes);
+        assert_eq!(decoded.vds_id(),1);
+    }
+
+    #[test]
+    fn rfc9942_receipt_envelope_rejects_unterminated_indefinite_header_map() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+
+        let protected=vec![
+            0xbf,
+            0x01, 0x26,
+            0x19, 0x01, 0x8b, 0x01,
+        ];
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,1);
+        cbor_int(&mut bytes,RFC9942_VDP_HEADER_LABEL);
+        bytes.extend_from_slice(&vdp.to_cbor());
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes,&[0xAA;64]);
+
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&bytes),
+            Err(Rfc9942VdpError::InvalidEncoding)
+        );
+    }
+
+    #[test]
     fn rfc9942_receipt_envelope_accepts_standard_extension_labels() {
         let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
         let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
