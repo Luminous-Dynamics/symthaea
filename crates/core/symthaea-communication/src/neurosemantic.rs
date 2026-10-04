@@ -265,6 +265,17 @@ pub enum ReplayDecision {
 }
 
 impl NeurosemanticReplayTracker {
+    /// Authorize first, then apply replay/collision protection.
+    pub fn observe_authorized(
+        &mut self,
+        message: &AuthorizedNeurosemanticMessage,
+        lease: &CognitiveConsentLease,
+        now_unix_s: u64,
+    ) -> Result<ReplayDecision, String> {
+        message.validate(lease, now_unix_s)?;
+        self.observe(message)
+    }
+
     pub fn observe(
         &mut self,
         message: &AuthorizedNeurosemanticMessage,
