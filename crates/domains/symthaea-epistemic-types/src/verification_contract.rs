@@ -22,6 +22,41 @@ use serde::{Deserialize, Serialize};
 
 pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 1;
 
+/// Typed identifier for the verification relationship under which a verification
+/// method is permitted to validate a proof.
+///
+/// This is deliberately distinct from proof purpose: adapters must establish both
+/// the requested purpose and the controller-document relationship rather than
+/// assuming that one string semantically subsumes the other.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ClaimVerificationRelationship(String);
+
+impl ClaimVerificationRelationship {
+    pub fn new(value: impl Into<String>) -> Result<Self, VerificationFailure> {
+        let value = value.into();
+        if value.trim().is_empty() {
+            return Err(VerificationFailure::Structural(
+                "claim verification relationship must be non-empty".into(),
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
+        if self.0.trim().is_empty() {
+            Err(VerificationFailure::Structural(
+                "claim verification relationship must be non-empty".into(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 fn is_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -39,6 +74,7 @@ pub struct VerificationRequest {
     pub proof_purpose: ClaimProofPurpose,
     pub verification_method: ClaimVerificationMethod,
     pub expected_controller: ClaimControllerIdentity,
+    pub expected_verification_relationship: ClaimVerificationRelationship,
 }
 
 impl VerificationRequest {
@@ -52,6 +88,7 @@ impl VerificationRequest {
         claim: &FederatedClaim,
         expected_purpose: ClaimProofPurpose,
         expected_controller: ClaimControllerIdentity,
+        expected_verification_relationship: ClaimVerificationRelationship,
     ) -> Result<Self, VerificationFailure> {
         claim
             .validate_structure()
@@ -101,6 +138,7 @@ impl VerificationRequest {
             proof_purpose: expected_purpose,
             verification_method,
             expected_controller,
+            expected_verification_relationship,
         })
     }
 
@@ -141,6 +179,7 @@ impl VerificationRequest {
         self.expected_controller
             .validate_structure()
             .map_err(|reason| VerificationFailure::Structural(reason.to_owned()))?;
+        self.expected_verification_relationship.validate_structure()?;
         Ok(())
     }
 }
@@ -160,6 +199,7 @@ pub struct VerificationEvidence {
     pub proof_purpose: ClaimProofPurpose,
     pub verification_method: ClaimVerificationMethod,
     pub controller: ClaimControllerIdentity,
+    pub verification_relationship: ClaimVerificationRelationship,
     pub controller_document_ref: String,
     pub controller_document_digest: String,
     pub verification_relationship: String,
@@ -184,7 +224,14 @@ impl VerificationEvidence {
 
         let controller_document_ref = controller_document_ref.into();
         let controller_document_digest = controller_document_digest.into();
-        let verification_relationship = verification_relationship.into();
+        let verification_relationship =
+            ClaimVerificationRelationship::new(verification_relationship)?;
+        if verification_relationship != request.expected_verification_relationship {
+            return Err(VerificationFailure::VerificationRelationshipMismatch {
+                expected: request.expected_verification_relationship.clone(),
+                actual: verification_relationship,
+            });
+        }
         let cryptosuite = cryptosuite.into();
         let signed_payload_digest = signed_payload_digest.into();
         let proof_digest = proof_digest.into();
@@ -221,6 +268,7 @@ impl VerificationEvidence {
             proof_purpose: request.proof_purpose.clone(),
             verification_method: request.verification_method.clone(),
             controller: request.expected_controller.clone(),
+            verification_relationship,
             controller_document_ref,
             controller_document_digest,
             verification_relationship,
@@ -269,6 +317,7 @@ impl VerificationEvidence {
             proof_purpose: self.proof_purpose.clone(),
             verification_method: self.verification_method.clone(),
             expected_controller: self.controller.clone(),
+            expected_verification_relationship: self.verification_relationship.clone(),
         };
         request.validate_structure()?;
 
@@ -305,6 +354,7 @@ impl VerificationEvidence {
             && self.proof_purpose == request.proof_purpose
             && self.verification_method == request.verification_method
             && self.controller == request.expected_controller
+            && self.verification_relationship == request.expected_verification_relationship
     }
 }
 
@@ -340,7 +390,10 @@ pub enum VerificationFailure {
         expected: ClaimControllerIdentity,
         actual: ClaimControllerIdentity,
     },
-    VerificationRelationshipMismatch,
+    VerificationRelationshipMismatch {
+        expected: ClaimVerificationRelationship,
+        actual: ClaimVerificationRelationship,
+    },
     CryptographicVerificationFailed,
 }
 
@@ -407,6 +460,7 @@ mod tests {
             &claim,
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
         )
         .unwrap();
 
@@ -416,6 +470,10 @@ mod tests {
             "https://example.test/controller#key-1"
         );
         assert_eq!(request.dependencies().len(), 2);
+        assert_eq!(
+            request.expected_verification_relationship.as_str(),
+            "assertionMethod"
+        );
     }
 
     #[test]
@@ -491,6 +549,31 @@ mod tests {
                 &"33".repeat(32),
             ),
             Err(VerificationFailure::Structural(_))
+        ));
+    }
+
+    #[test]
+    fn evidence_rejects_a_controller_relationship_different_from_the_request() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            VerificationEvidence::from_adapter_attestation(
+                &request,
+                "https://example.test/controller",
+                &"11".repeat(32),
+                "authentication",
+                "ed25519",
+                &"22".repeat(32),
+                &"33".repeat(32),
+            ),
+            Err(VerificationFailure::VerificationRelationshipMismatch { .. })
         ));
     }
 
