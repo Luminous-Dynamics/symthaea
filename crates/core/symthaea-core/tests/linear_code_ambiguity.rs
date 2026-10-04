@@ -1635,12 +1635,10 @@ fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
     assert!(recover_independent_bound(&target, &[&left, &overlapping]).is_none());
 }
 
-
 #[test]
 fn affine_fiber_certificate_matches_exact_kernel_geometry_across_all_targets() {
     let parent = RandomLinearCode::generate(8, 4, 0xF1BE2);
-    let left =
-        RandomLinearCode::from_basis(parent.basis()[..3].to_vec()).expect("left subcode");
+    let left = RandomLinearCode::from_basis(parent.basis()[..3].to_vec()).expect("left subcode");
     let right =
         RandomLinearCode::from_basis(parent.basis()[2..].to_vec()).expect("overlapping subcode");
     let factors = [&left, &right];
