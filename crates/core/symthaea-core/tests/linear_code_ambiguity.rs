@@ -1674,7 +1674,10 @@ fn exact_factorization_neighborhood_identity_holds_under_hamming_noise() {
         all_factorization_targets.len(),
         1usize << algebra.factor_dimension_sum
     );
-    assert_eq!(reachable_targets.len(), 1usize << algebra.union_generator_rank);
+    assert_eq!(
+        reachable_targets.len(),
+        1usize << algebra.union_generator_rank
+    );
 
     let hamming_distance = |left: &BinaryCodeword, right: &BinaryCodeword| {
         left.words()
