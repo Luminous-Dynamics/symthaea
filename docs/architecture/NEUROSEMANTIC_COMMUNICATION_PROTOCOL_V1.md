@@ -272,3 +272,18 @@ interpretation, preventing silent coordinate-system substitution.
 
 This remains synthetic representation/retrieval evidence. It is not neural decoding,
 semantic-understanding evidence, or evidence of preserving subjective intent.
+
+
+## Machine-readable data and inference policy
+
+The protocol now separates three different properties that must not be conflated:
+
+- **data class** — what kind of cognitive artifact exists (raw neural recording, derived neural feature, semantic representation, decoded claim, personalized decoder/model state);
+- **inference classes** — what information the artifact may expose or enable (signal pattern, unit pattern, linguistic content, semantic content, affective state, intent, identity);
+- **transport sensitivity** — the network/data-handling sensitivity label already enforced by the consent lease.
+
+Each neurosemantic packet carries a versioned data policy. A policy must explicitly name its data class, at least one inference class, and at least one permitted communication purpose.
+
+Consent leases separately authorize data classes and inference classes for read and write directions. Legacy leases deserialize those permissions as empty sets, so they cannot silently acquire access to newly introduced cognitive data or inference classes.
+
+Recent iBCI governance work likewise distinguishes raw recordings, processed features, decoded inferences, and personalized model parameters, while identifying conflated consent and weak misuse guardrails as important gaps. citeturn230238search0turn230238search1
