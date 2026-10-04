@@ -388,6 +388,23 @@ References: https://arxiv.org/abs/2606.24471 ; https://eccc.weizmann.ac.il/repor
 
 A September 2026 result by Silas further sharpens the random-linear-code decoding boundary: at rates approaching Hamming list-decoding capacity, the worst-case list size is asymptotically determined for every finite field, with the binary case recovering the previously tight constant-order behavior. This is useful context for future Stage-E experiments, but it is a coding-theoretic asymptotic/list-decoding statement, not a claim about the small deterministic fixtures used here.
 
+### Stage-E decoder boundary update
+
+Recent September 2026 coding-theory results make the next experiment more precise. Silas determines the typical worst-case list size of random linear codes at capacity up to the sharp binary constant-order boundary, while Yuan and Zhu obtain asymptotically optimal list-size scaling for every fixed finite field. Doron et al. independently show that random linear codes exhibit near-random-code discrepancy behavior for list-decoding above capacity.
+
+For a future noisy HDC comparator, this suggests recording at least three separate observables:
+
+- whether the intended codeword remains in the candidate list;
+- candidate-list cardinality at the observed corruption radius;
+- whether factorization itself is uniquely identifiable after mapping candidate codewords back through the affine factorization fiber.
+
+These quantities must remain distinct. A decoder may produce a short list while the factorization fiber still contains multiple valid tuples, and a large factorization fiber can persist even when the target codeword itself is exactly identified. No Stage-E decoder is introduced by this design update.
+
+Sources:
+- Silas (2026), *The list size of random linear codes at capacity*: https://arxiv.org/abs/2609.06570
+- Yuan & Zhu (2026), *Asymptotically Optimal List Size of Random Linear Codes*: https://arxiv.org/abs/2609.01070
+- Doron et al. (2026), *Discrepancy for Random Linear Codes*: https://eccc.weizmann.ac.il/report/2026/222/
+
 ### Acceptance gates
 
 The branch is ready for a benchmark-producing Stage-C/Stage-D experiment only when:
