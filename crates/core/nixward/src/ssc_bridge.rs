@@ -248,7 +248,7 @@ impl NixSystemObservation {
     /// observation through the live observer immediately before mutation;
     /// this method validates supplied evidence but does not perform a new read.
     /// It does not authorize or execute the plan.
-    pub(crate) fn validate_against_authorized_plan(
+    fn validate_against_authorized_plan(
         &self,
         authorized: &AuthorizedDeploymentPlan,
     ) -> Result<(), SscObservationError> {
@@ -277,7 +277,7 @@ impl NixSystemObservation {
     /// Construct the canonical NixOS SSC adapter from this validated observation.
     /// This remains read-only: adapter creation captures the exact observation
     /// snapshot but does not authorize or execute any deployment.
-    pub(crate) fn target_adapter(
+    fn target_adapter(
         &self,
     ) -> Result<NixOSTargetAdapter, SscObservationError> {
         let snapshot = self.target_snapshot()?;
@@ -285,7 +285,7 @@ impl NixSystemObservation {
             .map_err(|error| SscObservationError::AdapterConstruction(error.to_string()))
     }
 
-    pub(crate) fn target_snapshot(&self) -> Result<TargetSnapshot, SscObservationError> {
+    fn target_snapshot(&self) -> Result<TargetSnapshot, SscObservationError> {
         self.validate()?;
         let observation_digest = self.observation_digest()?;
         let resources = self
