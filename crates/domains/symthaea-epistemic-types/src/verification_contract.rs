@@ -494,6 +494,7 @@ mod tests {
             &claim,
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/other").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
         )
         .unwrap_err();
         assert!(matches!(
@@ -509,6 +510,7 @@ mod tests {
             &claim,
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
         )
         .unwrap();
 
@@ -535,6 +537,7 @@ mod tests {
             &claim,
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
         )
         .unwrap();
 
@@ -584,6 +587,7 @@ mod tests {
             &claim,
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
         )
         .unwrap();
         let a = VerificationEvidence::from_adapter_attestation(
@@ -616,6 +620,7 @@ mod tests {
             &changed_claim,
             ClaimProofPurpose::new("assertionMethod").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
         )
         .unwrap();
         let c = VerificationEvidence::from_adapter_attestation(
