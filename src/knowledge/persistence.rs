@@ -1510,9 +1510,15 @@ impl KnowledgePersistence {
             // `initialized` is process-local state. Another connection/process can still
             // mutate SQLite schema objects after this instance has initialized them, so do
             // not let the fast path mask loss of the invariants that enforce stable identity,
-            // append-only receipts, and validation sequencing.
+            // append-only receipts, and validation sequencing. Hold the same write lock used
+            // by migration so the entire attestation observes one stable schema state.
             verify_schema_user_version(conn)?;
-            return verify_initialized_schema_integrity(conn);
+            let tx = rusqlite::Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
+                .map_err(|e| format!("Begin schema attestation transaction: {e}"))?;
+            verify_initialized_schema_integrity(conn)?;
+            tx.commit()
+                .map_err(|e| format!("Commit schema attestation transaction: {e}"))?;
+            return Ok(());
         }
 
         // Once a database has completed the current migration, the user-version marker makes
@@ -1522,7 +1528,11 @@ impl KnowledgePersistence {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .map_err(|e| format!("Schema user-version check: {e}"))?;
         if user_version == CURRENT_SCHEMA_USER_VERSION {
+            let tx = rusqlite::Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
+                .map_err(|e| format!("Begin schema attestation transaction: {e}"))?;
             verify_initialized_schema_integrity(conn)?;
+            tx.commit()
+                .map_err(|e| format!("Commit schema attestation transaction: {e}"))?;
             self.initialized = true;
             return Ok(());
         }
@@ -4523,6 +4533,54 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM knowledge_facts", [], |row| row.get(0))
             .unwrap();
         assert_eq!(fact_count, 1);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_current_schema_attestation_commits_nested_probe_rollback() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_attestation_transaction_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "attestation-transaction".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x95; BinaryHV::BYTES],
+            source_text: "attestation transaction".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        let conn = p.open_connection().unwrap();
+        let sentinel_count_before: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_facts WHERE memory_id LIKE '__epf011_trigger_probe_fact_%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        let mut reopened = KnowledgePersistence::new(&db_path);
+        let reopened_conn = reopened.open_connection().unwrap();
+        reopened.ensure_schema(&reopened_conn).unwrap();
+
+        let sentinel_count_after: i64 = reopened_conn
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_facts WHERE memory_id LIKE '__epf011_trigger_probe_fact_%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(sentinel_count_after, sentinel_count_before);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
