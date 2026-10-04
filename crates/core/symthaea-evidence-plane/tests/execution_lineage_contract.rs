@@ -334,6 +334,32 @@ fn drift_report_rejects_invalid_lineage() {
     );
 }
 
+
+#[test]
+fn invalid_post_commit_lineage_cannot_bypass_committed_guard_state() {
+    let base = fixture();
+    let mut invalid = base.clone();
+    invalid.source_revision = "not-a-git-object".into();
+    let mut changed = base.clone();
+    changed.source_revision = "d".repeat(40);
+
+    let mut guard = EvidenceLineageGuardV1::prepare(&base).unwrap();
+    guard.commit_evidence(&base).unwrap();
+
+    assert!(matches!(
+        guard.commit_evidence(&invalid),
+        Err(EvidenceLineageCommitError::InvalidCurrentLineage(_))
+    ));
+    assert_eq!(
+        guard.try_check(&base).unwrap(),
+        EvidenceLineageDecision::Stable
+    );
+    assert_eq!(
+        guard.try_check(&changed).unwrap(),
+        EvidenceLineageDecision::RefuseMixedLineageAfterEvidence
+    );
+}
+
 #[test]
 fn guard_refuses_cross_execution_evidence_after_commit() {
     let base = fixture();
