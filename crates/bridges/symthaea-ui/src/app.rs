@@ -329,6 +329,14 @@ pub fn App() -> impl IntoView {
         Rc::new(RefCell::new(None));
     let webgpu_init_started = Rc::new(RefCell::new(false));
     let movie_webgpu_init_started = Rc::new(RefCell::new(false));
+    #[cfg(feature = "browser-qualification")]
+    let qualification_cognitive_init_count = Rc::new(RefCell::new(0_u32));
+    #[cfg(feature = "browser-qualification")]
+    let qualification_movie_init_count = Rc::new(RefCell::new(0_u32));
+    #[cfg(feature = "browser-qualification")]
+    let qualification_cognitive_loss_requested = Rc::new(RefCell::new(false));
+    #[cfg(feature = "browser-qualification")]
+    let qualification_movie_loss_requested = Rc::new(RefCell::new(false));
 
     // Open the telemetry stream once, on mount, against whatever gateway
     // URL is set at that moment. Reconnecting on URL change is a v1 nicety
@@ -366,6 +374,10 @@ pub fn App() -> impl IntoView {
     {
         let renderer = Rc::clone(&webgpu_renderer);
         let started = Rc::clone(&webgpu_init_started);
+        #[cfg(feature = "browser-qualification")]
+        let init_count = Rc::clone(&qualification_cognitive_init_count);
+        #[cfg(feature = "browser-qualification")]
+        let loss_requested = Rc::clone(&qualification_cognitive_loss_requested);
         Effect::new(move |_| {
             let ready = webgpu_ready.get();
             if ready || *started.borrow() {
@@ -381,6 +393,47 @@ pub fn App() -> impl IntoView {
                     Ok(gpu) => {
                         *renderer.borrow_mut() = Some(gpu);
                         webgpu_ready.set(true);
+                        #[cfg(feature = "browser-qualification")]
+                        {
+                            let count = {
+                                let mut count = init_count.borrow_mut();
+                                *count += 1;
+                                *count
+                            };
+                            if let Some(canvas) = webgpu_canvas.get_untracked() {
+                                let _ = canvas.set_attribute(
+                                    "data-qualification-init-count",
+                                    &count.to_string(),
+                                );
+                            }
+                            if count >= 2 {
+                                if let Some(canvas) = webgpu_canvas.get_untracked() {
+                                    let _ = canvas.set_attribute("data-qualification-recovered", "true");
+                                }
+                            } else if web_sys::window()
+                                .and_then(|window| window.location().search().ok())
+                                .is_some_and(|search| search.contains("symthaea_webgpu_recovery=1"))
+                            {
+                                let renderer_for_loss = Rc::clone(&renderer);
+                                let requested_for_loss = Rc::clone(&loss_requested);
+                                spawn_local(async move {
+                                    gloo_timers::future::TimeoutFuture::new(100).await;
+                                    if *requested_for_loss.borrow() {
+                                        return;
+                                    }
+                                    if let Some(renderer) = renderer_for_loss.borrow().as_ref() {
+                                        *requested_for_loss.borrow_mut() = true;
+                                        if let Some(canvas) = webgpu_canvas.get_untracked() {
+                                            let _ = canvas.set_attribute(
+                                                "data-qualification-recovery-requested",
+                                                "true",
+                                            );
+                                        }
+                                        renderer.qualification_force_device_loss();
+                                    }
+                                });
+                            }
+                        }
                     }
                     Err(error) => {
                         leptos::logging::warn!("WebGPU unavailable: {error}");
@@ -395,6 +448,10 @@ pub fn App() -> impl IntoView {
     {
         let renderer = Rc::clone(&movie_webgpu_renderer);
         let started = Rc::clone(&movie_webgpu_init_started);
+        #[cfg(feature = "browser-qualification")]
+        let init_count = Rc::clone(&qualification_movie_init_count);
+        #[cfg(feature = "browser-qualification")]
+        let loss_requested = Rc::clone(&qualification_movie_loss_requested);
         Effect::new(move |_| {
             let ready = movie_webgpu_ready.get();
             if ready || *started.borrow() {
@@ -410,6 +467,47 @@ pub fn App() -> impl IntoView {
                     Ok(gpu) => {
                         *renderer.borrow_mut() = Some(gpu);
                         movie_webgpu_ready.set(true);
+                        #[cfg(feature = "browser-qualification")]
+                        {
+                            let count = {
+                                let mut count = init_count.borrow_mut();
+                                *count += 1;
+                                *count
+                            };
+                            if let Some(canvas) = movie_webgpu_canvas.get_untracked() {
+                                let _ = canvas.set_attribute(
+                                    "data-qualification-init-count",
+                                    &count.to_string(),
+                                );
+                            }
+                            if count >= 2 {
+                                if let Some(canvas) = movie_webgpu_canvas.get_untracked() {
+                                    let _ = canvas.set_attribute("data-qualification-recovered", "true");
+                                }
+                            } else if web_sys::window()
+                                .and_then(|window| window.location().search().ok())
+                                .is_some_and(|search| search.contains("symthaea_webgpu_recovery=1"))
+                            {
+                                let renderer_for_loss = Rc::clone(&renderer);
+                                let requested_for_loss = Rc::clone(&loss_requested);
+                                spawn_local(async move {
+                                    gloo_timers::future::TimeoutFuture::new(100).await;
+                                    if *requested_for_loss.borrow() {
+                                        return;
+                                    }
+                                    if let Some(renderer) = renderer_for_loss.borrow().as_ref() {
+                                        *requested_for_loss.borrow_mut() = true;
+                                        if let Some(canvas) = movie_webgpu_canvas.get_untracked() {
+                                            let _ = canvas.set_attribute(
+                                                "data-qualification-recovery-requested",
+                                                "true",
+                                            );
+                                        }
+                                        renderer.qualification_force_device_loss();
+                                    }
+                                });
+                            }
+                        }
                     }
                     Err(error) => {
                         leptos::logging::warn!("WebGPU movie renderer unavailable: {error}");
