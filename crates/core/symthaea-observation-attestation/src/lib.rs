@@ -803,6 +803,21 @@ impl ReceiptAttestationVerificationReport {
             && self.procedure_fingerprint == expected_procedure_fingerprint
     }
 
+    /// Verify that a current report is bound to this exact attestation envelope payload.
+    ///
+    /// The report's payload fingerprint commits to the complete signed payload, including
+    /// attester identity, verification method, proof purpose, validity interval, domain,
+    /// and challenge. This helper intentionally does not verify the envelope's detached
+    /// proof; it only checks report↔envelope identity binding.
+    pub fn matches_attestation_envelope(
+        &self,
+        envelope: &ReceiptAttestationEnvelope,
+    ) -> bool {
+        self.verifier_version == VERIFIER_VERSION
+            && self.attestation_payload_fingerprint == envelope.payload_fingerprint()
+            && self.receipt_fingerprint == envelope.receipt_fingerprint
+    }
+
     /// Validate metadata that accompanies the execution trace but is not itself
     /// represented by a trace result.
     ///
@@ -2518,6 +2533,23 @@ mod tests {
             verifier.verify_detached_proof(&envelope, &receipt),
             ReceiptAttestationVerificationOutcome::Verified
         );
+    }
+
+    #[test]
+    fn report_binds_exact_attestation_envelope_payload() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = resolved_report(&verifier, &envelope, &receipt);
+        assert_eq!(report.outcome, ReceiptAttestationVerificationOutcome::Verified);
+        assert!(report.matches_attestation_envelope(&envelope));
+
+        let mut changed = envelope;
+        changed.domain = Some("different-domain".into());
+        assert!(!report.matches_attestation_envelope(&changed));
     }
 
     #[test]
