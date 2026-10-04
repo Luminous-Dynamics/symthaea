@@ -373,7 +373,7 @@ impl FederatedClaim {
         }
 
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:federated-claim-digest:v2\0");
+        bytes.extend_from_slice(b"symthaea:federated-claim-digest:v3\0");
         bytes.extend_from_slice(&self.schema_version.to_be_bytes());
         bytes.extend_from_slice(&FEDERATED_CLAIM_DIGEST_VERSION.to_be_bytes());
         field(&mut bytes, "claim_identity", Some(&self.claim_identity));
@@ -1633,7 +1633,7 @@ mod digest_tests {
         let claim = base_claim();
         assert_eq!(
             claim.canonical_digest(),
-            "99ce0d23b4db8dba9fc0c31d7f7d47a01dbaff803c024c278691897685a7b124"
+            "8ee65411dd8839b4ec1dbdfdb184bc24ebb23edf6ed1e673fed5e5c2e26957d2"
         );
     }
 
