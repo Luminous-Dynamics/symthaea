@@ -107,10 +107,16 @@ jobs:
           SOURCE_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/src/hdc/linear_code.rs" | cut -d" " -f1)"
           TEST_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" | cut -d" " -f1)"
           WORKFLOW_SHA256="$(sha256sum "$GITHUB_WORKSPACE/.github/workflows/hdc-linear-code-qualify.yml" | cut -d" " -f1)"
+          MANIFEST_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/Cargo.toml" | cut -d" " -f1)"
+          HDC_MOD_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/src/hdc/mod.rs" | cut -d" " -f1)"
+          RESEARCH_DOC_SHA256="$(sha256sum "$GITHUB_WORKSPACE/docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md" | cut -d" " -f1)"
           TOOLCHAIN_FILE_SHA256="$(sha256sum "$GITHUB_WORKSPACE/rust-toolchain.toml" | cut -d" " -f1)"
           echo "source_sha256=$SOURCE_SHA256" >> "$GITHUB_OUTPUT"
           echo "test_sha256=$TEST_SHA256" >> "$GITHUB_OUTPUT"
           echo "workflow_sha256=$WORKFLOW_SHA256" >> "$GITHUB_OUTPUT"
+          echo "manifest_sha256=$MANIFEST_SHA256" >> "$GITHUB_OUTPUT"
+          echo "hdc_mod_sha256=$HDC_MOD_SHA256" >> "$GITHUB_OUTPUT"
+          echo "research_doc_sha256=$RESEARCH_DOC_SHA256" >> "$GITHUB_OUTPUT"
           echo "toolchain_file_sha256=$TOOLCHAIN_FILE_SHA256" >> "$GITHUB_OUTPUT"
 
       - name: Focused formatting
@@ -119,6 +125,16 @@ jobs:
           rustfmt +1.96.1 --check --edition 2024 \
             crates/core/symthaea-core/src/hdc/linear_code.rs \
             crates/core/symthaea-core/tests/linear_code_ambiguity.rs
+
+      - name: Validate research integration surface
+        id: integration_surface
+        run: |
+          cargo +1.96.1 metadata --no-deps --format-version=1 \
+            --manifest-path crates/core/symthaea-core/Cargo.toml > "$RUNNER_TEMP/symthaea-core-metadata.json"
+          rustfmt +1.96.1 --check --edition 2024 \
+            crates/core/symthaea-core/src/hdc/mod.rs
+          grep -Eq "^[[:space:]]*pub mod linear_code;" \
+            crates/core/symthaea-core/src/hdc/mod.rs
 
       - name: Build isolated linear-code qualification harness
         id: harness
@@ -345,7 +361,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-qualification.txt <<EOF
           HDC Linear-Code Recovery Qualification
           ======================================
-          receipt_schema=hdc-linear-code-qualification-v4
+          receipt_schema=hdc-linear-code-qualification-v5
           event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
           runner_os=${{ steps.runner.outputs.runner_os }}
@@ -358,6 +374,9 @@ jobs:
           source_sha256=${{ steps.provenance.outputs.source_sha256 }}
           integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
           qualification_workflow_sha256=${{ steps.provenance.outputs.workflow_sha256 }}
+          cargo_manifest_sha256=${{ steps.provenance.outputs.manifest_sha256 }}
+          hdc_mod_sha256=${{ steps.provenance.outputs.hdc_mod_sha256 }}
+          research_doc_sha256=${{ steps.provenance.outputs.research_doc_sha256 }}
           research_surface_status=${{ steps.scope.outcome }}
           research_surface_base_sha=${{ steps.scope.outputs.scope_base_sha }}
           research_surface_head_sha=${{ steps.scope.outputs.scope_head_sha }}
@@ -428,6 +447,7 @@ jobs:
           production_default_changed=false
           qualification_status=${{ (github.event_name != 'pull_request' || steps.scope.outcome == 'success') && steps.format.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.fingerprint.outcome == 'success' && steps.geometry.outcome == 'success' && steps.geometry_sweep.outcome == 'success' && steps.search_space.outcome == 'success' && steps.storage.outcome == 'success' && steps.paper_matrix.outcome == 'success' && steps.work.outcome == 'success' && steps.scaling.outcome == 'success' && steps.packing.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           focused_formatting=${{ steps.format.outcome }}
+          research_integration_surface=${{ steps.integration_surface.outcome }}
           isolated_harness=${{ steps.harness.outcome }}
           linear_code_unit_tests=${{ steps.unit_tests.outcome }}
           ambiguity_integration_test=${{ steps.integration_tests.outcome }}
@@ -802,7 +822,7 @@ jobs:
           decoder_oracle=exhaustive-bounded-distance
           decoder_oracle_is_production=false
           production_default_changed=false
-          qualification_status=${{ steps.scope.outcome == 'success' && steps.format.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.fingerprint.outcome == 'success' && steps.geometry.outcome == 'success' && steps.geometry_sweep.outcome == 'success' && steps.search_space.outcome == 'success' && steps.storage.outcome == 'success' && steps.paper_matrix.outcome == 'success' && steps.work.outcome == 'success' && steps.scaling.outcome == 'success' && steps.packing.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.scope.outcome == 'success' && steps.format.outcome == 'success' && steps.integration_surface.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.fingerprint.outcome == 'success' && steps.geometry.outcome == 'success' && steps.geometry_sweep.outcome == 'success' && steps.search_space.outcome == 'success' && steps.storage.outcome == 'success' && steps.paper_matrix.outcome == 'success' && steps.work.outcome == 'success' && steps.scaling.outcome == 'success' && steps.packing.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           focused_formatting=${{ steps.format.outcome }}
           isolated_harness=${{ steps.harness.outcome }}
           linear_code_unit_tests=${{ steps.unit_tests.outcome }}
