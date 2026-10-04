@@ -55,6 +55,19 @@ jobs:
           ! rg -n 'std::process|Command::new|tokio|ssh|nix-env|nixos-rebuild' \
             crates/core/nixward/src/ssc_bridge.rs
 
+      - name: Legacy NixOS executor introduction guard
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+          if git diff --unified=0 "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" -- \
+            'src/action/**' \
+            'crates/core/nixward/src/action/**' \
+            'crates/core/nixward/src/lib.rs' |
+            rg -n '^\+[^+].*(NixOSExecutor::new|execute_confirmed\(|NixOSCommand::Custom|use .*NixOSExecutor)'; then
+            echo "New legacy NixOS executor authority surface detected; route privileged execution through the governed Nixward/SSC boundary."
+            exit 1
+          fi
       - name: Build isolated SSC validation workspace
         run: |
           set -euo pipefail
