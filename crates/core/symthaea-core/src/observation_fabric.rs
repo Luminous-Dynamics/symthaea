@@ -2978,6 +2978,51 @@ mod tests {
     }
 
     #[test]
+    fn independence_verification_scope_identity_is_deterministic_and_scoped() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+
+        let assessment = graph
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
+        let fingerprint = graph
+            .independence_verification_scope_fingerprint()
+            .expect("scope fingerprint");
+        assert_eq!(fingerprint, assessment.examined_scope_fingerprint);
+        assert_eq!(fingerprint.len(), 64);
+
+        // Observation ordering is not part of the closed-world scope identity.
+        let reordered = ObservationGraph {
+            observations: graph.observations.iter().cloned().rev().collect(),
+            relations: graph.relations.clone(),
+        };
+        assert_eq!(
+            reordered.independence_verification_scope_fingerprint().expect("reordered scope"),
+            fingerprint
+        );
+
+        // Unrelated measurement fields do not enter the bounded independence predicate.
+        let mut unrelated = graph.clone();
+        unrelated.observations[0].quality.confidence = 0.42;
+        assert_eq!(
+            unrelated.independence_verification_scope_fingerprint().expect("unrelated scope"),
+            fingerprint
+        );
+
+        // A provenance field actually used by the verifier changes the scope identity.
+        let mut relevant = graph;
+        relevant.observations[0].provenance.source.platform_id = Some("platform-9".into());
+        assert_ne!(
+            relevant.independence_verification_scope_fingerprint().expect("relevant scope"),
+            fingerprint
+        );
+    }
+    #[test]
     fn independence_receipt_is_attestation_ready() {
         let mut second = fixture();
         second.id = "obs-002".into();
