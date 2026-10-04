@@ -19,6 +19,7 @@ pub mod checkpoint;
 pub mod code_analysis;
 pub mod cognitive_loop;
 pub mod linguistic_frame;
+pub mod phonological_plan;
 pub mod compiler_trainer;
 pub mod consensus_engine;
 pub mod controller;
@@ -54,6 +55,7 @@ pub mod species_learning;
 pub mod speech_encoder;
 pub mod speech_plan;
 pub mod speech_feedback;
+pub mod speech_delivery_feedback;
 pub mod structural_generator;
 pub mod structural_scorer;
 pub mod substrate_binding;
@@ -149,7 +151,7 @@ pub use speech_feedback::{
 };
 pub use speech_plan::{
     ClauseMode, EpistemicDelivery, IntonationIntent, ProsodicIntent, SpeechMonitorPlan,
-    SpeechPlan, SpeechPlanRole, SPEECH_PLAN_VERSION,
+    SpeechPlan, SpeechPlanError, SpeechPlanRole, SPEECH_PLAN_VERSION,
 };
 pub use structural_generator::StructuralGenerator;
 pub use structural_scorer::{NixStructuralScorer, StructuralVerdict};
