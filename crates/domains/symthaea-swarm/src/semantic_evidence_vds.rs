@@ -2545,10 +2545,10 @@ impl<'a> CborReader<'a> {
                         Ok(())
                     }
                     _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
-                }?
+                }
             }
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
-        };
+        }?;
         if self.offset > limit_end {
             return Err(Rfc9162ProofDecodeError::InvalidStructure);
         }
