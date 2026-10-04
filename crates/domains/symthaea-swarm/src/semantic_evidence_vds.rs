@@ -801,15 +801,16 @@ impl Rfc9942ReceiptEnvelope {
             if !unprotected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
             let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_)=>None };
             if label==Some(COSE_CRIT_HEADER_LABEL){return Err(Rfc9942VdpError::CriticalHeaderNotProtected);}
+            let mut value_reader=CborReader::new(&raw_value);
             if label==Some(RFC9942_VDP_HEADER_LABEL){
                 if vdp.is_some(){return Err(Rfc9942VdpError::InvalidStructure);}
-                let mut value_reader=CborReader::new(&raw_value);
                 let parsed=Rfc9942Vdp::from_reader(&mut value_reader)?;
                 value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                 vdp=Some(parsed);
             }else{
                 unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
                 value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             }
         }
         if unprotected_labels.iter().any(|label| protected_labels.contains(label)) {
