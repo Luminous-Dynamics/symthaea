@@ -2103,5 +2103,63 @@ mod adversarial_contract_tests {
         assert!(claim.validate_structure().is_ok());
         assert_ne!(claim.canonical_digest(), claim().canonical_digest());
     }
+
+    #[test]
+    fn federation_dependency_bindings_include_verification_resolution_requirements() {
+        let (receipt, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view =
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let controller =
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap();
+        let method =
+            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap();
+        let claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            view,
+            receipt,
+        )
+        .unwrap()
+        .with_authorship(
+            ClaimAuthorship::new(
+                ClaimAuthorIdentity::new("author:1").unwrap(),
+                ClaimProofPurpose::new("assertionMethod").unwrap(),
+                Some(method.clone()),
+            )
+            .unwrap()
+            .with_verification_controller(controller.clone())
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            claim.validation_outcome(std::iter::empty()),
+            FederationValidationOutcome::Valid
+        ));
+
+        let outcome = claim.validation_outcome([
+            FederationDependency::VerificationMethod(method.as_str().to_owned()),
+            FederationDependency::ControllerDocument(controller.as_str().to_owned()),
+        ]);
+        let FederationValidationOutcome::Unresolved(dependencies) = outcome else {
+            panic!("expected verification dependencies to remain unresolved");
+        };
+        assert!(dependencies.contains(&FederationDependency::VerificationMethod(
+            method.as_str().to_owned()
+        )));
+        assert!(dependencies.contains(&FederationDependency::ControllerDocument(
+            controller.as_str().to_owned()
+        )));
+    }
+
 }
 
