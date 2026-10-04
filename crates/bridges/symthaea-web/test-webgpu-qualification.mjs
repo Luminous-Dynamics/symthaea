@@ -46,6 +46,23 @@ const CHECKED_OUT_SHA = (() => {
   }
 })();
 const EXPECTED_CHECKED_OUT_SHA = process.env.EXPECTED_CHECKED_OUT_SHA || null;
+
+function commandVersion(command, args) {
+  try {
+    return execFileSync(command, args, { encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+}
+
+const QUALIFICATION_ENVIRONMENT = {
+  node: process.version,
+  chromium: commandVersion(CHROMIUM, ['--version']),
+  rustc: commandVersion('rustc', ['--version']),
+  runner_os: process.env.RUNNER_OS || null,
+  runner_arch: process.env.RUNNER_ARCH || null,
+  runner_name: process.env.RUNNER_NAME || null,
+};
 if (process.env.GITHUB_EVENT_NAME === 'pull_request' && !EXPECTED_CHECKED_OUT_SHA) {
   throw new Error('qualification missing EXPECTED_CHECKED_OUT_SHA for pull_request run');
 }
@@ -611,6 +628,7 @@ try {
     workflow_sha: process.env.GITHUB_SHA || null,
     checked_out_sha: CHECKED_OUT_SHA,
     expected_pr_head_sha: EXPECTED_CHECKED_OUT_SHA,
+    qualification_environment: QUALIFICATION_ENVIRONMENT,
     run_id: process.env.GITHUB_RUN_ID || null,
     workflow_ref: process.env.GITHUB_WORKFLOW_REF || null,
     ok: Object.keys(failures).length === 0,
