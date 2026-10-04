@@ -768,7 +768,7 @@ impl FederatedClaim {
     /// This is intentionally narrower than cryptographic verification: an adapter must
     /// still resolve the verification method, confirm its controller, validate the
     /// permitted verification relationship, and perform cryptographic verification.
-    pub fn authorship_is_bound_for(
+    pub fn authorship_is_structurally_bound_for(
         &self,
         expected_purpose: &ClaimProofPurpose,
         expected_controller: &ClaimControllerIdentity,
@@ -1094,15 +1094,15 @@ mod tests {
         .unwrap();
 
         assert!(claim.authorship_verification_binding_is_complete());
-        assert!(claim.authorship_is_bound_for(
+        assert!(claim.authorship_is_structurally_bound_for(
             &ClaimProofPurpose::new("assertionMethod").unwrap(),
             &controller,
         ));
-        assert!(!claim.authorship_is_bound_for(
+        assert!(!claim.authorship_is_structurally_bound_for(
             &ClaimProofPurpose::new("authentication").unwrap(),
             &controller,
         ));
-        assert!(!claim.authorship_is_bound_for(
+        assert!(!claim.authorship_is_structurally_bound_for(
             &ClaimProofPurpose::new("assertionMethod").unwrap(),
             &other_controller,
         ));
