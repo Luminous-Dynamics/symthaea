@@ -375,6 +375,36 @@ mod tests {
     }
 
     #[test]
+    fn primary_stress_dominates_secondary_when_derived() {
+        let segments = vec![
+            PhonemeSlot::new("AE", 0, SyllableStress::Secondary, true, false, false),
+            PhonemeSlot::new("IY", 0, SyllableStress::Primary, false, false, true),
+        ];
+
+        let syllables = derive_syllables(&segments);
+        assert_eq!(syllables[0].stress, SyllableStress::Primary);
+    }
+
+    #[test]
+    fn role_only_status_rejects_bound_segments() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        let segments = vec![PhonemeSlot::new(
+            "AH",
+            0,
+            SyllableStress::None,
+            true,
+            false,
+            false,
+        )];
+
+        let error = plan
+            .bind_segments(segments, ContentBindingStatus::RoleStructureOnly)
+            .expect_err("binding status must match payload");
+
+        assert_eq!(error, PhonologicalPlanError::RoleOnlyWithSegments);
+    }
+
+    #[test]
     fn lexical_binding_requires_actual_segments() {
         let mut plan = PhonologicalPlan::from_speech_plan(&plan());
 
