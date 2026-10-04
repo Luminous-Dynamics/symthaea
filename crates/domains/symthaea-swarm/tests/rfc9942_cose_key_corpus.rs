@@ -308,6 +308,25 @@ fn receipt_accepts_unknown_unprotected_extension_and_round_trips() {
 }
 
 #[test]
+fn outer_cose_accepts_large_tagged_opaque_extension_and_round_trips() {
+    let payload = vec![0x5a, 0x00, 0x00, 0x10, 0x01];
+    payload.extend_from_slice(&[0xaa; 4097]);
+    let mut protected = vec![0xa0];
+    let mut unprotected = vec![0xa1, 0x18, 0x1e, 0xd8, 0x18];
+    unprotected.extend_from_slice(&payload);
+
+    let mut bytes = vec![0xd2, 0x84];
+    bytes.extend_from_slice(&bstr(&protected));
+    bytes.extend_from_slice(&unprotected);
+    bytes.push(0xf6);
+    bytes.extend_from_slice(&bstr(&[0u8; 64]));
+
+    let parsed = Rfc9942SignatureWithReceipts::from_cbor(&bytes)
+        .expect("tagged opaque bstr values must remain accepted under the protocol-specific bound");
+    assert_eq!(parsed.to_cbor(), bytes);
+}
+
+#[test]
 fn outer_cose_accepts_unknown_protected_extension_and_round_trips() {
     let bytes = outer_with_unknown_extension(true);
     let parsed = Rfc9942SignatureWithReceipts::from_cbor(&bytes)
