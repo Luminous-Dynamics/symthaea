@@ -29,6 +29,13 @@ pub struct HardwareProfile {
     pub gpu_hybrid: bool,
     pub has_wifi: bool,
     pub has_tpm: bool,
+    /// Observed TCG TPM specification major version when available.
+    #[serde(default)]
+    pub tpm2_spec_major: Option<u8>,
+    /// Whether measured Unified Kernel Image state was observed.
+    /// This remains an observation, not attestation.
+    #[serde(default)]
+    pub measured_uki: bool,
     pub has_secure_boot: bool,
     pub setup_mode: bool,
     pub efi_available: bool,
@@ -253,6 +260,19 @@ impl SovereignConfigGenerator {
                     "TPM2 is available for LUKS key protection, but TPM presence/enrollment is not an attestation or freshness proof; authoritative recovery trust requires separately verified evidence."
                         .into(),
                 );
+                if let Some(version) = hardware.tpm2_spec_major {
+                    if version != 2 {
+                        warnings.push(format!(
+                            "Observed TPM specification major version {version}; TPM2 unlock policy expects major version 2."
+                        ));
+                    }
+                }
+                if hardware.measured_uki {
+                    warnings.push(
+                        "Measured UKI state was observed; it may inform boot-policy selection, but it does not by itself constitute a verified attestation."
+                            .into(),
+                    );
+                }
             } else {
                 warnings.push(
                     "TPM2 unlock was requested but no TPM was reported by the hardware profile; enrollment must be treated as failed until the target is re-probed."
@@ -913,6 +933,42 @@ struct ReasonedOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tpm_observations_inform_policy_without_minting_attestation() {
+        let mut generator = SovereignConfigGenerator::new();
+        let hardware = HardwareProfile {
+            has_tpm: true,
+            tpm2_spec_major: Some(2),
+            measured_uki: true,
+            ..Default::default()
+        };
+        let choices = UserChoices {
+            tpm2_unlock: true,
+            encryption: true,
+            ..Default::default()
+        };
+        let result = generator.generate(&hardware, &choices, &MigrationData::default());
+        assert!(result.warnings.iter().any(|warning| warning.contains("Measured UKI")));
+        assert!(result.warnings.iter().any(|warning| warning.contains("not an attestation or freshness proof")));
+    }
+
+    #[test]
+    fn non_tpm2_spec_version_warns_without_becoming_authority() {
+        let mut generator = SovereignConfigGenerator::new();
+        let hardware = HardwareProfile {
+            has_tpm: true,
+            tpm2_spec_major: Some(1),
+            ..Default::default()
+        };
+        let choices = UserChoices {
+            tpm2_unlock: true,
+            encryption: true,
+            ..Default::default()
+        };
+        let result = generator.generate(&hardware, &choices, &MigrationData::default());
+        assert!(result.warnings.iter().any(|warning| warning.contains("major version 1")));
+    }
 
     #[test]
     fn tpm_unlock_warning_does_not_claim_attestation() {
