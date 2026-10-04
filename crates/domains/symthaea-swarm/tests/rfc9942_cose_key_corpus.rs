@@ -82,8 +82,8 @@ fn indefinite_map(fields: &[Vec<u8>], include_break: bool) -> Vec<u8> {
 fn cose_key_with_indefinite_root(extra_fields: usize, include_break: bool) -> Vec<u8> {
     let mut fields = valid_fields();
     for label in 0..extra_fields {
-        let label = 100u8.checked_add(label as u8).expect("test label must fit");
-        fields.push(vec![0x18, label, 0x00]);
+        let label = 5u8.checked_add(label as u8).expect("test label must fit");
+        fields.push(vec![label, 0x00]);
     }
     indefinite_map(&fields, include_break)
 }
@@ -190,7 +190,7 @@ fn cose_key_rejects_bstr_chunk_count_above_exact_cap() {
     fields[5] = encoded;
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&key(&fields)),
-        Err(Rfc9942VdpError::InvalidEncoding)
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
     );
 }
 
@@ -317,7 +317,7 @@ fn cose_key_rejects_wrong_coordinate_length() {
     bytes.remove(pos + 4);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
-        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+        Err(Rfc9942VdpError::InvalidEncoding)
     );
 }
 
@@ -353,7 +353,7 @@ fn cose_key_rejects_non_map_root_and_trailing_bytes() {
     bytes.push(0x00);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
-        Err(Rfc9942VdpError::InvalidEncoding)
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
     );
 }
 
