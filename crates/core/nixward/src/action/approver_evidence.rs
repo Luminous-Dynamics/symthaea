@@ -58,6 +58,16 @@ pub enum RequiredApprovalProfileV1 {
 }
 
 impl RequiredApprovalProfileV1 {
+    pub(crate) const fn as_ref(self) -> &'static str {
+        match self {
+            Self::SameUidProcessV1 => "same-uid-process-v1",
+            Self::LocalOperatorGroupV1 => "local-operator-group-v1",
+            Self::PolkitAuthorizedOperatorV1 => "polkit-authorized-operator-v1",
+            Self::XeniaAuthenticatedOperatorV1 => "xenia-authenticated-operator-v1",
+            Self::XeniaStateBoundPermitV1 => "xenia-state-bound-permit-v1",
+        }
+    }
+
     pub(crate) fn parse_ref(value: &str) -> Result<Self, ApproverEvidenceErrorV1> {
         match value {
             "same-uid-process-v1" => Ok(Self::SameUidProcessV1),
