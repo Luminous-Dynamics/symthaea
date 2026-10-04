@@ -29,3 +29,7 @@ required-features = ["hdc-codec"]
 [[example]]
 name = "neurosemantic_hdc_interlingua_n0"
 required-features = ["hdc-codec"]
+
+[[example]]
+name = "neurosemantic_hdc_grounded_identity_n0"
+required-features = ["hdc-codec"]
