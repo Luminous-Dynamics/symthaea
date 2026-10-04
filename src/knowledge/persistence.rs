@@ -168,12 +168,27 @@ fn is_hex_digest(value: &str) -> bool {
 }
 
 impl KnowledgeSnapshotReceipt {
-    fn canonical_receipt_digest_hex(&self) -> String {
+    /// Recompute the exact v1 self-digest used by persistence verification.
+    ///
+    /// This exposes the canonical receipt primitive so external evidence tooling can
+    /// independently validate a persisted snapshot receipt without reimplementing
+    /// the digest algorithm.
+    pub fn canonical_receipt_digest_hex(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea.epf-011.snapshot-receipt.v1");
         digest_u64(&mut hasher, self.generation);
         digest_str(&mut hasher, &self.canonical_digest_hex);
         hasher.finalize().to_hex().to_string()
+    }
+
+    /// The self-digest recomputed from the receipt's public fields.
+    pub fn recomputed_receipt_digest_hex(&self) -> String {
+        self.canonical_receipt_digest_hex()
+    }
+
+    /// Whether the stored self-digest exactly matches the canonical receipt digest.
+    pub fn verify_self_digest(&self) -> bool {
+        self.receipt_digest_hex == self.recomputed_receipt_digest_hex()
     }
 }
 
@@ -7209,6 +7224,28 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_receipt_self_digest_is_externally_recomputable() {
+        let receipt = KnowledgeSnapshotReceipt {
+            generation: 7,
+            canonical_digest_hex: "a".repeat(64),
+            receipt_digest_hex: String::new(),
+        };
+        let digest = receipt.canonical_receipt_digest_hex();
+        let persisted = KnowledgeSnapshotReceipt {
+            receipt_digest_hex: digest.clone(),
+            ..receipt
+        };
+        assert_eq!(persisted.recomputed_receipt_digest_hex(), digest);
+        assert!(persisted.verify_self_digest());
+
+        let tampered = KnowledgeSnapshotReceipt {
+            generation: 8,
+            ..persisted
+        };
+        assert!(!tampered.verify_self_digest());
     }
 
     #[test]
