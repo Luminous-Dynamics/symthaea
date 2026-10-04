@@ -48,11 +48,21 @@ jobs:
 
       - name: Enforce research surface
         id: scope
-        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ steps.head.outputs.sha }}
         run: |
+          BASE_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            git fetch --no-tags --depth=1 origin "research/hdc-resonator-cleanup-rules-v1"
+            BASE_SHA="$(git rev-parse "origin/research/hdc-resonator-cleanup-rules-v1")"
+          fi
+          case "$BASE_SHA" in
+            ""|0000000000000000000000000000000000000000)
+              printf "Unable to establish a prior/base revision for research-surface qualification.\n"
+              exit 1
+              ;;
+          esac
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           CHANGED_PATHS="$RUNNER_TEMP/hdc-linear-code-changed-paths"
           git diff --name-only "$BASE_SHA" "$HEAD_SHA" | sort -u > "$CHANGED_PATHS"
@@ -72,7 +82,7 @@ jobs:
             esac
           done < "$CHANGED_PATHS"
           ACTUAL_COUNT="$(wc -l < "$CHANGED_PATHS" | tr -d " ")"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             EXPECTED_COUNT=6
             test "$ACTUAL_COUNT" -eq "$EXPECTED_COUNT"
           fi
@@ -802,7 +812,7 @@ jobs:
           decoder_oracle=exhaustive-bounded-distance
           decoder_oracle_is_production=false
           production_default_changed=false
-          qualification_status=${{ steps.format.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.fingerprint.outcome == 'success' && steps.geometry.outcome == 'success' && steps.geometry_sweep.outcome == 'success' && steps.search_space.outcome == 'success' && steps.storage.outcome == 'success' && steps.paper_matrix.outcome == 'success' && steps.work.outcome == 'success' && steps.scaling.outcome == 'success' && steps.packing.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.scope.outcome == 'success' && steps.format.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.fingerprint.outcome == 'success' && steps.geometry.outcome == 'success' && steps.geometry_sweep.outcome == 'success' && steps.search_space.outcome == 'success' && steps.storage.outcome == 'success' && steps.paper_matrix.outcome == 'success' && steps.work.outcome == 'success' && steps.scaling.outcome == 'success' && steps.packing.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           focused_formatting=${{ steps.format.outcome }}
           isolated_harness=${{ steps.harness.outcome }}
           linear_code_unit_tests=${{ steps.unit_tests.outcome }}
