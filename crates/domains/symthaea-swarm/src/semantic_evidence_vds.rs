@@ -1381,7 +1381,10 @@ impl Rfc9942ReceiptCollection {
     }
 
     fn from_reader(reader: &mut CborReader<'_>) -> Result<Self, Rfc9942VdpError> {
-        let items=reader.read_array_items_bounded(MAX_RFC9942_RECEIPTS).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        let items=reader.read_array_items_bounded(MAX_RFC9942_RECEIPTS).map_err(|error|match error {
+            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded,
+            _=>Rfc9942VdpError::InvalidEncoding,
+        })?;
         if items.is_empty() {
             return Err(Rfc9942VdpError::EmptyReceiptCollection);
         }
