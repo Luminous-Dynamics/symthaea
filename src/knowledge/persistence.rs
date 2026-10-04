@@ -191,6 +191,16 @@ impl KnowledgeSnapshotReceipt {
         self.receipt_digest_hex == self.recomputed_receipt_digest_hex()
     }
 
+    /// Whether the receipt satisfies its structural metadata invariants and self-digest.
+    ///
+    /// Unlike verify_self_digest, this rejects malformed generation/digest fields as well.
+    pub fn verify_integrity(&self) -> bool {
+        self.generation > 0
+            && is_hex_digest(&self.canonical_digest_hex)
+            && is_hex_digest(&self.receipt_digest_hex)
+            && self.verify_self_digest()
+    }
+
     /// Compute a canonical commitment over an already verified receipt history.
     ///
     /// The ordered generation, canonical snapshot digest, and per-receipt self-digest are
@@ -327,6 +337,14 @@ impl KnowledgeSnapshotValidationReceiptRecord {
     /// Whether the stored self-digest exactly matches the canonical v2 digest.
     pub fn verify_self_digest(&self) -> bool {
         self.stored_receipt_digest_hex == self.recomputed_receipt_digest_hex()
+    }
+
+    /// Whether the receipt record satisfies metadata and self-digest invariants.
+    ///
+    /// This includes the linked receipt's structural input validation as well as the
+    /// sequence-bound stored self-digest.
+    pub fn verify_integrity(&self) -> bool {
+        self.receipt.validate_input().is_ok() && self.verify_self_digest()
     }
 
     /// Compute a canonical commitment over an already verified validation history.
@@ -7454,6 +7472,18 @@ mod tests {
             ..persisted
         };
         assert!(!tampered.verify_self_digest());
+
+        let malformed = KnowledgeSnapshotReceipt {
+            canonical_digest_hex: "not-a-digest".into(),
+            receipt_digest_hex: String::new(),
+            ..persisted
+        };
+        let malformed = KnowledgeSnapshotReceipt {
+            receipt_digest_hex: malformed.canonical_receipt_digest_hex(),
+            ..malformed
+        };
+        assert!(malformed.verify_self_digest());
+        assert!(!malformed.verify_integrity());
     }
 
     #[test]
@@ -7904,6 +7934,33 @@ mod tests {
 
         validation.snapshot_digest_hex = "a".repeat(64);
         assert!(validation.validate_input().is_ok());
+
+        let record = KnowledgeSnapshotValidationReceiptRecord {
+            validation_sequence: 1,
+            receipt: validation,
+            stored_receipt_digest_hex: String::new(),
+        };
+        let record = KnowledgeSnapshotValidationReceiptRecord {
+            stored_receipt_digest_hex: record.recomputed_receipt_digest_hex(),
+            ..record
+        };
+        assert!(record.verify_self_digest());
+        assert!(record.verify_integrity());
+
+        let malformed_record = KnowledgeSnapshotValidationReceiptRecord {
+            receipt: KnowledgeSnapshotValidationReceipt {
+                validator_ref: String::new(),
+                ..record.receipt
+            },
+            stored_receipt_digest_hex: String::new(),
+            ..record
+        };
+        let malformed_record = KnowledgeSnapshotValidationReceiptRecord {
+            stored_receipt_digest_hex: malformed_record.recomputed_receipt_digest_hex(),
+            ..malformed_record
+        };
+        assert!(malformed_record.verify_self_digest());
+        assert!(!malformed_record.verify_integrity());
     }
 
     #[test]
