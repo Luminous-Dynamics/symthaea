@@ -293,38 +293,6 @@ impl NixOSTargetAdapter {
         }
     }
 
-    fn property_string_list(
-        intent: &DeploymentIntent,
-        key: &'static str,
-    ) -> Result<Vec<String>, NixOSAdapterError> {
-        let Some(value) = intent.desired_state.properties.get(key) else {
-            return Ok(Vec::new());
-        };
-
-        let sovereign_state_compiler::StateValue::List(values) = value else {
-            return Err(NixOSAdapterError::PropertyType {
-                key,
-                expected: "list of strings",
-            });
-        };
-
-        values
-            .iter()
-            .map(|value| match value {
-                sovereign_state_compiler::StateValue::String(item) if !item.is_empty() => {
-                    Ok(item.clone())
-                }
-                sovereign_state_compiler::StateValue::String(_) => {
-                    Err(NixOSAdapterError::EmptyListItem { key })
-                }
-                _ => Err(NixOSAdapterError::PropertyType {
-                    key,
-                    expected: "list of strings",
-                }),
-            })
-            .collect()
-    }
-
     fn reject_unknown_properties(intent: &DeploymentIntent) -> Result<(), NixOSAdapterError> {
         const SUPPORTED: [&str; 8] = [
             REBUILD_KEY,
@@ -381,9 +349,9 @@ impl TargetAdapter for NixOSTargetAdapter {
 
         let rebuild = Self::property_string(intent, REBUILD_KEY)?;
         let home_manager = Self::property_bool(intent, HOME_MANAGER_KEY)?.unwrap_or(false);
-        let install = Self::property_string_list(intent, INSTALL_KEY)?;
-        let remove = Self::property_string_list(intent, REMOVE_KEY)?;
-        if !install.is_empty() || !remove.is_empty() {
+        if intent.desired_state.properties.contains_key(INSTALL_KEY)
+            || intent.desired_state.properties.contains_key(REMOVE_KEY)
+        {
             return Err(NixOSAdapterError::ApplicationMutationScopeRequired);
         }
         let reboot = Self::property_bool(intent, REBOOT_KEY)?.unwrap_or(false);
@@ -410,9 +378,7 @@ impl TargetAdapter for NixOSTargetAdapter {
         };
 
         match activation_mode {
-            Some(NixActivationMode::DryActivate)
-                if reboot || !install.is_empty() || !remove.is_empty() || home_manager =>
-            {
+            Some(NixActivationMode::DryActivate) if reboot || home_manager => {
                 return Err(NixOSAdapterError::ConflictingTransitionSemantics);
             }
             Some(NixActivationMode::Test | NixActivationMode::Boot) if reboot => {
@@ -431,18 +397,11 @@ impl TargetAdapter for NixOSTargetAdapter {
             }
         }
 
-        if matches!(activation_mode, Some(NixActivationMode::Rollback { .. }))
-            && (!install.is_empty() || !remove.is_empty() || home_manager)
-        {
+        if matches!(activation_mode, Some(NixActivationMode::Rollback { .. })) && home_manager {
             return Err(NixOSAdapterError::ConflictingActivationModes);
         }
 
-        if !intent.artifacts.is_empty()
-            && activation_mode.is_none()
-            && install.is_empty()
-            && remove.is_empty()
-            && !home_manager
-        {
+        if !intent.artifacts.is_empty() && activation_mode.is_none() && !home_manager {
             return Err(NixOSAdapterError::ArtifactsRequireRealization);
         }
 
@@ -495,30 +454,6 @@ impl TargetAdapter for NixOSTargetAdapter {
             None => {}
         }
 
-        if !install.is_empty() {
-            Self::push_step(
-                &mut steps,
-                PlanStepKind::StageArtifacts,
-                [Capability::InstallApplication],
-                format!("stage {} application package input(s)", install.len()),
-            );
-            Self::push_step(
-                &mut steps,
-                PlanStepKind::ApplyDesiredState,
-                [Capability::InstallApplication],
-                format!("install applications: {}", install.join(", ")),
-            );
-        }
-
-        if !remove.is_empty() {
-            Self::push_step(
-                &mut steps,
-                PlanStepKind::ApplyDesiredState,
-                [Capability::RemoveApplication],
-                format!("remove applications: {}", remove.join(", ")),
-            );
-        }
-
         if home_manager {
             Self::push_step(
                 &mut steps,
@@ -546,9 +481,7 @@ impl TargetAdapter for NixOSTargetAdapter {
 
         let disposition = match activation_mode {
             Some(mode) => mode.verification_disposition(),
-            None if !install.is_empty() || !remove.is_empty() || home_manager => {
-                DeploymentDisposition::Applied
-            }
+            None if home_manager => DeploymentDisposition::Applied,
             None if reboot => DeploymentDisposition::Rebooted,
             None => DeploymentDisposition::Unchanged,
         };
@@ -564,10 +497,7 @@ impl TargetAdapter for NixOSTargetAdapter {
                 activation_mode.is_none_or(|mode| mode.mutates_target_state())
             }
             PlanStepKind::ApplyDesiredState => {
-                activation_mode.is_none_or(|mode| mode.mutates_target_state())
-                    || !install.is_empty()
-                    || !remove.is_empty()
-                    || home_manager
+                activation_mode.is_none_or(|mode| mode.mutates_target_state()) || home_manager
             }
             PlanStepKind::Reboot | PlanStepKind::Rollback => true,
             _ => false,
