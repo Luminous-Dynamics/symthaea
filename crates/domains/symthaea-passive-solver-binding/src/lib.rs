@@ -794,6 +794,30 @@ fn radial_distance(point: [f64; 3], interface: &PortInterface) -> f64 {
 }
 
 
+/// Validate a complete binding set against the exact candidate geometry and mesh.
+///
+/// This is the recommended final pre-dispatch gate: set structure is checked first,
+/// then every binding is re-checked against the same semantic geometry digest and
+/// exact TriangleMesh representation.
+pub fn validate_binding_set_against_candidate(
+    interfaces: &[PortInterface],
+    bindings: &[SolverBoundaryBinding],
+    candidate_geometry_digest: [u8; 32],
+    candidate: &TriangleMesh,
+) -> Result<(), SolverBindingError> {
+    validate_binding_set(interfaces, bindings)?;
+
+    for binding in bindings {
+        let interface = interfaces
+            .iter()
+            .find(|interface| interface.port == binding.port)
+            .ok_or(SolverBindingError::PortMismatch)?;
+        binding.validate_against_candidate(interface, candidate_geometry_digest, candidate)?;
+    }
+
+    Ok(())
+}
+
 /// Deterministic identity for a complete, validated set of solver bindings.
 ///
 /// The digest is order-independent with respect to the supplied binding slice,
@@ -1217,6 +1241,34 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.boundary_edge_count, 4);
         assert!(a.boundary_perimeter_micrometers > 0);
+    }
+
+    #[test]
+    fn binding_set_candidate_gate_rejects_mesh_drift() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let mut changed = candidate.clone();
+        changed.vertices[0][2] += 0.125;
+        let binding = SolverBoundaryBinding::verified(
+            &interface,
+            "test-adapter/v1",
+            "patch:inlet",
+            [3; 32],
+            &changed,
+            select_boundary_patch(&interface, &changed, 0.05).unwrap(),
+            0.05,
+        )
+        .unwrap();
+
+        assert_eq!(
+            validate_binding_set_against_candidate(
+                &[interface],
+                &[binding],
+                [3; 32],
+                &candidate,
+            ),
+            Err(SolverBindingError::CandidateMeshDigestMismatch)
+        );
     }
 
     #[test]
