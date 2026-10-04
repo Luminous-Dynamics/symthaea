@@ -2,7 +2,7 @@ use blake3::Hasher;
 use symthaea_core::hdc::linear_code::{
     BinaryCodeword, LinearCodeWork, RandomLinearCode, basis_rank,
     factorization_algebra, factorization_count_for_target, factorization_dependency_witness,
-    recover_direct_sum_bound, recover_independent_bound,
+    factorization_kernel_basis, recover_direct_sum_bound, recover_independent_bound,
     recover_linear_bound, recover_linear_bound_with_work, solve_linear_combination,
 };
 
@@ -322,9 +322,15 @@ fn dependency_witness_ledger_is_canonical_and_verifiable() {
         .expect("c3");
     let factors = [&c1, &c2, &c3];
 
+    let algebra = factorization_algebra(&factors).expect("algebra");
+    let kernel = factorization_kernel_basis(&factors).expect("kernel basis");
+    assert_eq!(kernel.len(), algebra.kernel_dimension);
+    assert_eq!(kernel.len(), 1);
+
     let first = factorization_dependency_witness(&factors).expect("dependency exists");
     let second = factorization_dependency_witness(&factors).expect("dependency exists");
     assert_eq!(first, second);
+    assert_eq!(first, kernel[0]);
     assert_eq!(first.generator_coefficients, vec![true, true, true]);
     assert_eq!(first.factor_support, vec![0, 1, 2]);
     assert_eq!(first.generator_support_size(), 3);
@@ -336,12 +342,12 @@ fn dependency_witness_ledger_is_canonical_and_verifiable() {
     assert!(!tampered.verifies_against(&factors));
 
     println!(
-        "DEPENDENCY_WITNESS=fixture=three-way;generator_coefficients=111;factor_support=0,1,2;generator_support_size={};factor_support_size={};verifies=true",
+        "DEPENDENCY_WITNESS=fixture=three-way;kernel_dimension={};generator_coefficients=111;factor_support=0,1,2;generator_support_size={};factor_support_size={};verifies=true",
+        algebra.kernel_dimension,
         first.generator_support_size(),
         first.factor_support_size(),
     );
 }
-
 #[test]
 fn independent_dependency_witness_is_absent() {
     let (_, left, right) =
@@ -634,41 +640,47 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                     );
 
                     let jointly_independent = algebra.unique_factorization;
-                    let dependency_witness = if jointly_independent {
-                        None
+                    let kernel_basis = if jointly_independent {
+                        Vec::new()
                     } else {
-                        let witness = factorization_dependency_witness(&factors)
-                            .expect("dependent factors must expose a kernel witness");
-                        assert!(witness.verifies_against(&factors));
-                        assert!(
-                            witness.factor_support_size()
-                                >= algebra.dependency_order.unwrap_or(2)
-                        );
-                        Some(witness)
+                        let kernel_basis = factorization_kernel_basis(&factors)
+                            .expect("dependent factors must expose a complete kernel basis");
+                        assert_eq!(kernel_basis.len(), algebra.kernel_dimension);
+                        for witness in &kernel_basis {
+                            assert!(witness.verifies_against(&factors));
+                            assert!(
+                                witness.factor_support_size()
+                                    >= algebra.dependency_order.unwrap_or(2)
+                            );
+                        }
+                        kernel_basis
                     };
 
-                    if let Some(witness) = &dependency_witness {
-                        witnessed_dependency_cases += 1;
-                        result_digest.update(b"dependency-witness");
-                        result_digest.update(
-                            &(witness.generator_coefficients.len() as u64).to_le_bytes(),
-                        );
-                        for coefficient in &witness.generator_coefficients {
-                            result_digest.update(&[*coefficient as u8]);
-                        }
-                        result_digest.update(&(witness.factor_support.len() as u64).to_le_bytes());
-                        for factor_index in &witness.factor_support {
-                            result_digest.update(&(*factor_index as u64).to_le_bytes());
-                        }
-                        result_digest.update(&(witness.generator_support_size() as u64).to_le_bytes());
+                    if kernel_basis.is_empty() {
+                        result_digest.update(b"no-dependency-kernel");
                     } else {
-                        result_digest.update(b"no-dependency-witness");
+                        witnessed_dependency_cases += 1;
+                        result_digest.update(b"dependency-kernel-basis");
+                        result_digest.update(&(kernel_basis.len() as u64).to_le_bytes());
+                        for witness in &kernel_basis {
+                            result_digest.update(
+                                &(witness.generator_coefficients.len() as u64).to_le_bytes(),
+                            );
+                            for coefficient in &witness.generator_coefficients {
+                                result_digest.update(&[*coefficient as u8]);
+                            }
+                            result_digest.update(
+                                &(witness.factor_support.len() as u64).to_le_bytes(),
+                            );
+                            for factor_index in &witness.factor_support {
+                                result_digest.update(&(*factor_index as u64).to_le_bytes());
+                            }
+                        }
                     }
 
                     if !jointly_independent {
                         jointly_dependent += 1;
                     }
-
                     let (recovered, work) = recover_linear_bound_with_work(&target, &factors);
                     total_work.span_membership_checks += work.span_membership_checks;
                     total_work.basis_rank_pivots += work.basis_rank_pivots;
