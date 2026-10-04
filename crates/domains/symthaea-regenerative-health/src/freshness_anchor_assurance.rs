@@ -147,14 +147,31 @@ pub struct FreshnessAnchorProfile {
 
 impl FreshnessAnchorProfile {
     /// Compute the exact content commitment for the profile's security
-    /// semantics. The commitment changes if backing, provenance, or any
-    /// capability changes.
-    pub fn fingerprint(&self) -> Result<String, serde_json::Error> {
-        let bytes = serde_json::to_vec(self)?;
+    /// semantics using explicit, versioned field framing.
+    pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea:freshness-anchor-profile:v1\\0");
-        hasher.update(&bytes);
-        Ok(hasher.finalize().to_hex().to_string())
+        hasher.update(&[match self.backing {
+            FreshnessAnchorBacking::HardwareProtected => 0,
+            FreshnessAnchorBacking::RemoteAuthority => 1,
+            FreshnessAnchorBacking::ReplicatedQuorum => 2,
+            FreshnessAnchorBacking::SoftwareOnly => 3,
+        }]);
+        for value in [&self.schema_version, &self.provenance] {
+            hasher.update(&(value.len() as u64).to_le_bytes());
+            hasher.update(value.as_bytes());
+        }
+        for value in [
+            self.capabilities.integrity_protected,
+            self.capabilities.authenticated,
+            self.capabilities.monotonic,
+            self.capabilities.rollback_resistant,
+            self.capabilities.atomic_update,
+            self.capabilities.crash_persistent,
+        ] {
+            hasher.update(&[u8::from(value)]);
+        }
+        hasher.finalize().to_hex().to_string()
     }
 
     pub fn new(
@@ -237,9 +254,7 @@ impl VerifiedFreshnessAnchor {
         {
             return Err(FreshnessAnchorAssuranceError::InvalidReceipt);
         }
-        let profile_fingerprint = profile
-            .fingerprint()
-            .map_err(|_| FreshnessAnchorAssuranceError::InvalidReceipt)?;
+        let profile_fingerprint = profile.fingerprint();
         if receipt.profile_fingerprint != profile_fingerprint {
             return Err(FreshnessAnchorAssuranceError::ProfileBindingMismatch);
         }
@@ -354,7 +369,7 @@ mod tests {
         .unwrap();
         let mut b = a.clone();
         b.provenance = "remote://authority-b".into();
-        assert_ne!(a.fingerprint().unwrap(), b.fingerprint().unwrap());
+        assert_ne!(a.fingerprint(), b.fingerprint());
     }
 
     #[test]
@@ -407,7 +422,7 @@ mod tests {
         .unwrap();
         let receipt = FreshnessAnchorVerificationReceipt {
             schema_version: "0.1".into(),
-            profile_fingerprint: profile.fingerprint().unwrap(),
+            profile_fingerprint: profile.fingerprint(),
             receiver_id: "receiver-1".into(),
             generation: 7,
             state_fingerprint: "state-1".into(),
