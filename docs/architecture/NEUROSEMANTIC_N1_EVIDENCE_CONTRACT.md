@@ -57,6 +57,27 @@ HdcOntologyConformalCalibration primitive. It is intentionally not wired into
 the N0 decoder's acceptance policy yet. This prevents the current empirical
 score/margin calibration from inheriting a distribution-free claim by proximity.
 
+The isolated primitive now also defines a versioned baseline nonconformity score,
+cosine-nonconformity-v1:
+
+s(y, x) = (1 - cosine(x, y)) / 2,
+
+where cosine must be finite and lie in [-1, 1]. The score therefore lies in
+[0, 1], with larger values meaning less conformity. The primitive can turn a
+complete, deterministic candidate universe into a set-valued prediction by
+including every candidate whose nonconformity is at most the calibrated q.
+Candidate identifiers must be unique and non-empty; invalid similarities fail
+closed; the emitted set is canonicalized by stable identifier.
+
+This is deliberately a baseline score, not a claim that cosine alone is the
+best N1 uncertainty statistic. Recent 2026 HDC/conformal work combines prototype
+distance, runner-up gap, and internal vote dispersion, and uses label-conditional
+thresholds to improve uncertainty behavior under subject and distribution shifts.
+Those richer terms are candidates for a later preregistered score revision rather
+than silent post-hoc tuning here. The full candidate universe must be part of the
+N1 protocol: a conformal set over an incomplete or opportunistically filtered
+candidate pool cannot inherit the intended coverage statement.
+
 Small calibration sets are structurally weak. At alpha=0.10, at least 19
 calibration cases are needed before the finite-sample rank can fall below the
 maximum observed nonconformity score; at alpha=0.05, the corresponding minimum
