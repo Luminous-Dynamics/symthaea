@@ -4938,7 +4938,7 @@ mod tests {
         let action = EpistemicAction::new("durable-action","intervention",super::super::ActionRisk::Critical);
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-        let witness =     operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(), authorization_instance:action.id.clone(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
@@ -5283,7 +5283,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"malformed-effect".into(),
             action_digest:digest.clone(),
@@ -5341,7 +5341,7 @@ mod tests {
         ).with_effect_binding(effect);
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"effect-bound-prepare".into(),
             action_digest:digest.clone(),
@@ -5394,7 +5394,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"verifier-order".into(),
             action_digest:digest.clone(),
@@ -5461,7 +5461,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"reconcile-verifier-order".into(),
             action_digest:digest.clone(),
@@ -5517,7 +5517,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"verifier-pin".into(),
             action_digest:digest.clone(),
@@ -5641,7 +5641,7 @@ mod tests {
         .with_effect_binding(effect.clone());
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-        let witness =     operation_id: None,
+            operation_id: None,
             authorization_instance: "adapter-stale-commit".into(),
             action_id: action.id.clone(),
             action_digest: digest.clone(),
@@ -5796,7 +5796,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"adapter-preentry-tamper".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -5857,7 +5857,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"adapter-tamper".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -6010,7 +6010,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"verifier-implementation-drift".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -6066,7 +6066,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"verifier-external-drift".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -6181,7 +6181,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"terminal-replay-no-verifier".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -6250,7 +6250,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"reconcile-terminal-replay".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -6322,7 +6322,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"terminal-replay-missing-evidence".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -6428,7 +6428,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"terminal-replay-pin-snapshot".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -6519,7 +6519,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"terminal-replay-epoch".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -6604,7 +6604,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"reconcile-verifier-external-drift".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -6733,7 +6733,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"verifier-config-mismatch".into(),
             action_digest:digest.clone(),
@@ -6782,7 +6782,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"terminal-insert-only".into(),
             action_digest:digest.clone(),
@@ -6856,7 +6856,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"native-issuer".into(),
             action_digest:digest.clone(),
@@ -6915,7 +6915,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"terminal-adapter".into(),
             action_digest:digest.clone(),
@@ -7072,7 +7072,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"pin-snapshot-1".into(),
             action_digest:digest.clone(),
@@ -7202,7 +7202,7 @@ mod tests {
         ).with_effect_binding(effect);
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"trusted-clock-action".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -7296,7 +7296,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"validity-immutable".into(),
             action_digest:digest.clone(),
@@ -7325,7 +7325,7 @@ mod tests {
         ).unwrap();
 
         let extended=ActionAuthorizationWitness {
-        let extended=    operation_id: None,
+            operation_id: None,
             issued_at:"2026-10-03T06:00:00Z".into(),
             expires_at:Some("2026-10-05T06:00:00Z".into()),
             ..witness.clone()
@@ -7367,7 +7367,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"validity-dispatch".into(),
             action_digest:digest.clone(),
@@ -7414,7 +7414,7 @@ mod tests {
         assert_eq!(state,"expired");
 
         let renewed=ActionAuthorizationWitness {
-        let renewed=    operation_id: None,
+            operation_id: None,
             issued_at:"2026-10-03T08:00:00Z".into(),
             expires_at:Some("2026-10-04T12:00:00Z".into()),
             ..witness.clone()
@@ -7443,7 +7443,7 @@ mod tests {
         ).with_effect_binding(effect);
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"validity-admission".into(),
             action_digest:digest.clone(),
@@ -7483,7 +7483,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"validity-preentry".into(),
             action_digest:digest.clone(),
@@ -7585,7 +7585,7 @@ mod tests {
         let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"verifier-kind".into(),
             action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(),
@@ -7628,7 +7628,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"terminal-binding".into(),
             action_digest:digest.clone(),
@@ -7681,7 +7681,7 @@ mod tests {
         let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"verifier-binding".into(),
             action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(),
@@ -7721,7 +7721,7 @@ mod tests {
         let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"reconcile-key".into(), action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(), support_digest:witness.support_digest,
             frame:witness.frame, policy:witness.policy, authority_epoch:witness.authority_epoch,
@@ -7757,7 +7757,7 @@ mod tests {
         let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"provider-key-fence".into(),
             action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(),
@@ -7799,7 +7799,7 @@ mod tests {
         let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"provider-key-fence".into(),
             action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(),
@@ -7844,7 +7844,7 @@ mod tests {
         let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"native-derived".into(),action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(),frame:witness.frame, support_digest:witness.support_digest,
             policy:witness.policy,authority_epoch:witness.authority_epoch,
@@ -7913,7 +7913,7 @@ mod tests {
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"verifier-rp".into(), action_id:action.id.clone(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"support".into(), policy:"policy@1".into(),
@@ -8000,7 +8000,7 @@ mod tests {
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"native-pin".into(), action_id:action.id.clone(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"support".into(), policy:"policy@1".into(),
@@ -8034,7 +8034,7 @@ mod tests {
         let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"identity-fence".into(),
             action_id:action.id.clone(),
             action_digest:action.canonical_action_digest(),
@@ -8101,7 +8101,7 @@ mod tests {
 
         let digest=action.canonical_action_digest();
         let fresh_witness=ActionAuthorizationWitness {
-        let fresh_witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"approval-new".into(),
             issued_at:"2026-10-02T20:02:00Z".into(),
             ..old_witness
@@ -8171,7 +8171,7 @@ mod tests {
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(), authorization_instance:action.id.clone(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
@@ -8219,13 +8219,13 @@ mod tests {
         let digest=action.canonical_action_digest();
 
         let witness_a=ActionAuthorizationWitness {
-        let witness_a=    operation_id: None,
+            operation_id: None,
             authorization_instance:"fence-a".into(), action_id:action.id.clone(),
             action_digest:digest.clone(), support_digest:"support-a".into(),
             frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
         };
         let witness_b=ActionAuthorizationWitness {
-        let witness_b=    operation_id: None,
+            operation_id: None,
             authorization_instance:"fence-b".into(), action_id:action.id.clone(),
             action_digest:digest, support_digest:"support-b".into(),
             frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
@@ -8366,7 +8366,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"status-verifier-drift".into(),
             action_digest:digest.clone(),
@@ -8503,7 +8503,7 @@ mod tests {
         .with_effect_binding(effect.clone());
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-        let witness =     operation_id: None,
+            operation_id: None,
             action_id: action.id.clone(),
             authorization_instance: "native-pin-admission".into(),
             action_digest: digest.clone(),
@@ -8662,7 +8662,7 @@ mod tests {
         .with_effect_binding(effect.clone());
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-        let witness =     operation_id: None,
+            operation_id: None,
             action_id: action.id.clone(),
             authorization_instance: "status-source-admission".into(),
             action_digest: digest,
@@ -8818,7 +8818,7 @@ mod tests {
         .with_effect_binding(effect.clone());
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-        let witness =     operation_id: None,
+            operation_id: None,
             action_id: action.id.clone(),
             authorization_instance: "status-source-drift".into(),
             action_digest: digest.clone(),
@@ -8977,7 +8977,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"status-ordering".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -9058,7 +9058,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"status-admission-failure".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -9140,7 +9140,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             authorization_instance:"status-failure".into(),
             action_id:action.id.clone(),
             action_digest:digest.clone(),
@@ -9206,7 +9206,7 @@ mod tests {
         let digest=action.canonical_action_digest();
 
         let witness_a=ActionAuthorizationWitness {
-        let witness_a=    operation_id: None,
+            operation_id: None,
             authorization_instance:"closed-a".into(), action_id:action.id.clone(),
             action_digest:digest.clone(), support_digest:"support-a".into(),
             frame:"frame@1".into(), policy:"policy@1".into(), decision:"execute".into(),
@@ -9231,7 +9231,7 @@ mod tests {
         ).unwrap();
 
         let witness_b=ActionAuthorizationWitness {
-        let witness_b=    operation_id: None,
+            operation_id: None,
             authorization_instance:"closed-b".into(), action_id:action.id.clone(),
             action_digest:record_a.action_digest.clone(), support_digest:"support-b".into(),
             frame:"frame@1".into(), policy:"policy@1".into(), decision:"execute".into(),
@@ -9267,13 +9267,13 @@ mod tests {
         let action_b=EpistemicAction::new("native-b","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let witness_a=ActionAuthorizationWitness {
-        let witness_a=    operation_id: None,
+            operation_id: None,
             authorization_instance:"native-a".into(), action_id:action_a.id.clone(),
             action_digest:action_a.canonical_action_digest(), support_digest:"support-a".into(),
             frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
         };
         let witness_b=ActionAuthorizationWitness {
-        let witness_b=    operation_id: None,
+            operation_id: None,
             authorization_instance:"native-b".into(), action_id:action_b.id.clone(),
             action_digest:action_b.canonical_action_digest(), support_digest:"support-b".into(),
             frame:"frame@1".into(), policy:"policy@1".into(), authority_epoch:1,
@@ -9311,7 +9311,7 @@ mod tests {
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(), authorization_instance:"approval-legacy-fence".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
@@ -9352,7 +9352,7 @@ mod tests {
         );
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"recovery-validity".into(),
             action_digest:digest.clone(),
@@ -9410,7 +9410,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"operation-recovery".into(),
             action_digest:digest.clone(),
@@ -9474,7 +9474,7 @@ mod tests {
         let action=EpistemicAction::new("pre-recovery","intervention",super::super::ActionRisk::Critical);
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(), authorization_instance:"approval-pre-recovery".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
@@ -9525,7 +9525,7 @@ mod tests {
         let action=EpistemicAction::new("pre-recovery-fence","intervention",super::super::ActionRisk::Critical);
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(), authorization_instance:"approval-pre-fence".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
@@ -9607,7 +9607,7 @@ mod tests {
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(), authorization_instance:"approval-after-dispatch".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
@@ -9655,7 +9655,7 @@ mod tests {
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(), authorization_instance:"approval-boundary".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
@@ -9717,7 +9717,7 @@ mod tests {
         );
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"approval-bulk-prepared".into(),
             action_digest:digest.clone(),
@@ -9778,7 +9778,7 @@ mod tests {
         let action=EpistemicAction::new("boundary-prepared","intervention",super::super::ActionRisk::Critical);
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(), authorization_instance:"approval-prepared".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
@@ -9842,7 +9842,7 @@ mod tests {
         let digest_a=action_a.canonical_action_digest();
         let digest_b=action_b.canonical_action_digest();
         let witness_a=ActionAuthorizationWitness {
-        let witness_a=    operation_id: None,
+            operation_id: None,
             action_id:action_a.id.clone(),
             authorization_instance:"operation-approval-a".into(),
             action_digest:digest_a.clone(),
@@ -9855,7 +9855,7 @@ mod tests {
             authority_epoch:1,
         };
         let witness_b=ActionAuthorizationWitness {
-        let witness_b=    operation_id: None,
+            operation_id: None,
             action_id:action_b.id.clone(),
             authorization_instance:"operation-approval-b".into(),
             action_digest:digest_b.clone(),
@@ -9997,7 +9997,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"approval-cross-table".into(),
             action_digest:digest.clone(),
@@ -10069,7 +10069,7 @@ mod tests {
             ).with_effect_binding(effect.clone());
             let digest=action.canonical_action_digest();
             let witness=ActionAuthorizationWitness {
-            let witness=    operation_id: None,
+                operation_id: None,
                 action_id:action.id.clone(),
                 authorization_instance:"approval-cross-table-startup".into(),
                 action_digest:digest.clone(),
@@ -10143,7 +10143,7 @@ mod tests {
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(), authorization_instance:"approval-scope".into(),
             action_digest:digest.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
@@ -10191,14 +10191,14 @@ mod tests {
         let digest_a=action_a.canonical_action_digest();
         let digest_b=action_b.canonical_action_digest();
         let witness_a=ActionAuthorizationWitness {
-        let witness_a=    operation_id: None,
+            operation_id: None,
             action_id:action_a.id.clone(), authorization_instance:"scope-approval-a".into(),
             action_digest:digest_a.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
             issued_at:"2026-10-02T20:11:00Z".into(), expires_at:Some("2026-10-04T12:00:00Z".into()), authority_epoch:1,
         };
         let witness_b=ActionAuthorizationWitness {
-        let witness_b=    operation_id: None,
+            operation_id: None,
             action_id:action_b.id.clone(), authorization_instance:"scope-approval-b".into(),
             action_digest:digest_b.clone(), frame:"frame@1".into(),
             support_digest:"sha256:support".into(), policy:"policy-v1".into(), decision:"execute".into(),
@@ -10254,7 +10254,7 @@ mod tests {
         ).with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"recovery-provenance-approval".into(),
             action_digest:digest.clone(),
@@ -10356,7 +10356,7 @@ mod tests {
             (&store_b,"rp-approval-b","attempt-rp-b","boundary-B","operation-rp-b","native-rp-b"),
         ] {
             let witness=ActionAuthorizationWitness {
-            let witness=    operation_id: None,
+                operation_id: None,
                 authorization_instance:instance.into(),
                 action_id:action.id.clone(),
                 action_digest:digest.clone(),
@@ -10536,7 +10536,7 @@ mod tests {
         );
         let action = action.with_effect_binding(effect.clone());
         let witness = ActionAuthorizationWitness {
-        let witness =     operation_id: None,
+            operation_id: None,
             action_id: action.id.clone(),
             authorization_instance: witness.authorization_instance.clone(),
             action_digest: action.canonical_action_digest(),
@@ -10587,7 +10587,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"receipt-provider-key".into(),
             action_digest:digest.clone(),
@@ -10648,7 +10648,7 @@ mod tests {
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
-        let witness=    operation_id: None,
+            operation_id: None,
             action_id:action.id.clone(),
             authorization_instance:"receipt-tamper".into(),
             action_digest:digest.clone(),
