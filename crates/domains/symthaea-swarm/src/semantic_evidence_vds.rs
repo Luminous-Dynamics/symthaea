@@ -948,20 +948,34 @@ impl Rfc9942SignatureWithReceipts {
     pub fn protected_algorithm_id(&self) -> Result<i64, Rfc9942VdpError> {
         let protected=self.protected_header_bytes();
         let mut reader=CborReader::new(&protected);
-        let len=reader.read_map_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-        let mut algorithm=None;
-        for _ in 0..len {
-            let label=reader.read_cose_label().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-            if label==Some(COSE_ALG_HEADER_LABEL) {
-                let value=reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-                algorithm=Some(value);
-            } else {
-                reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-            }
-        }
+        let entries=reader.read_map_entries_bounded(32).map_err(|error|match error {
+            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+            _=>Rfc9942VdpError::InvalidEncoding,
+        })?;
         reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+
+        let mut algorithm=None;
+        for (raw_key,raw_value) in entries {
+            let mut key_reader=CborReader::new(&raw_key);
+            let label=key_reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            key_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            let mut value_reader=CborReader::new(&raw_value);
+            match label {
+                CborLabelKey::Integer(COSE_ALG_HEADER_LABEL) => {
+                    let value=value_reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    if algorithm.replace(value).is_some() {
+                        return Err(Rfc9942VdpError::InvalidStructure);
+                    }
+                }
+                _ => {
+                    value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                }
+            }
+            value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        }
         algorithm.ok_or(Rfc9942VdpError::InvalidStructure)
     }
+
 
     /// Verify the outer COSE_Sign1 signature with ES256, binding the
     /// algorithm to the protected `alg=1:-7` value.
