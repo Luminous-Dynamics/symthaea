@@ -2229,13 +2229,6 @@ fn validate_native_authority_pin_set(
         attempt_id: &str,
         boundary_id: &str,
     ) -> Result<(), AuthorizationStoreError> {
-        // Deprecated compatibility surface: never create a boundary-owned
-        // effect attempt without an explicit operation identifier. Such a
-        // reservation cannot legally progress through the canonical provider
-        // boundary and would otherwise strand authority in Prepared.
-        if action.effect_binding().is_some() {
-            return Err(AuthorizationConsumptionError::InvalidBinding.into());
-        }
         self.prepare_for_execution_bound_internal(
             witness, action, current_frame, attempt_id, boundary_id, None
         )
@@ -10577,51 +10570,6 @@ mod tests {
             )
             .unwrap();
         assert!(operation.is_none());
-
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn deprecated_bound_preparation_cannot_strand_effectful_authority() {
-        let path = std::env::temp_dir().join(format!(
-            "symthaea-gis-deprecated-bound-effect-{}.db",
-            std::process::id()
-        ));
-        let (store, action, witness) = fixture(&path);
-        let effect = ActionEffectBinding::new("target-effect", "prod", "adapter-A");
-        let effect_action = action.with_effect_binding(effect);
-
-        assert!(matches!(
-            store.prepare_for_execution_bound(
-                &witness,
-                &effect_action,
-                "frame@1",
-                "attempt-effect",
-                "boundary-effect",
-            ),
-            Err(AuthorizationStoreError::Consumption(
-                AuthorizationConsumptionError::InvalidBinding
-            ))
-        ));
-
-        let connection = store.connection().unwrap();
-        let state: String = connection
-            .query_row(
-                "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
-                params![witness.authorization_instance.as_str()],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(state, "ready");
-
-        let boundary: Option<String> = connection
-            .query_row(
-                "SELECT boundary_id FROM authorization_leases WHERE authorization_instance=?1",
-                params![witness.authorization_instance.as_str()],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert!(boundary.is_none());
 
         let _ = std::fs::remove_file(path);
     }
