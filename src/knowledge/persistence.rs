@@ -222,28 +222,40 @@ impl KnowledgeSnapshotReceipt {
 
 }
 
+pub const KNOWLEDGE_SNAPSHOT_RECEIPT_HISTORY_CHECKPOINT_SCHEMA: &str =
+    "symthaea.epf-011.snapshot-receipt-history-checkpoint.v1";
+
 /// A non-persistent evidence checkpoint for an externally anchored snapshot-receipt
 /// history. The checkpoint does not assert truth or authenticity by itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KnowledgeSnapshotReceiptHistoryCheckpoint {
+    pub schema_version: String,
     pub receipt_count: u64,
     pub latest_generation: u64,
     pub history_digest_hex: String,
 }
 
 impl KnowledgeSnapshotReceiptHistoryCheckpoint {
-    /// Build a checkpoint from a receipt history that has already passed ledger verification.
-    pub fn from_history(history: &[KnowledgeSnapshotReceipt]) -> Self {
-        Self {
+    /// Build a checkpoint from a receipt history, rejecting malformed/unverified histories.
+    pub fn from_history(history: &[KnowledgeSnapshotReceipt]) -> Result<Self, String> {
+        let checkpoint = Self {
+            schema_version: KNOWLEDGE_SNAPSHOT_RECEIPT_HISTORY_CHECKPOINT_SCHEMA.into(),
             receipt_count: history.len() as u64,
             latest_generation: history.last().map_or(0, |receipt| receipt.generation),
             history_digest_hex: KnowledgeSnapshotReceipt::canonical_history_digest_hex(history),
+        };
+        if checkpoint.verify_against_history(history) {
+            Ok(checkpoint)
+        } else {
+            Err("Cannot create snapshot receipt history checkpoint from invalid history".into())
         }
     }
 
     /// Whether the checkpoint exactly matches a structurally valid receipt history.
     pub fn verify_against_history(&self, history: &[KnowledgeSnapshotReceipt]) -> bool {
-        if !is_hex_digest(&self.history_digest_hex)
+        if self.schema_version != KNOWLEDGE_SNAPSHOT_RECEIPT_HISTORY_CHECKPOINT_SCHEMA
+        if self.schema_version != KNOWLEDGE_SNAPSHOT_RECEIPT_HISTORY_CHECKPOINT_SCHEMA
+            || !is_hex_digest(&self.history_digest_hex)
             || self.receipt_count != history.len() as u64
             || self.latest_generation != history.last().map_or(0, |receipt| receipt.generation)
         {
@@ -425,10 +437,14 @@ impl KnowledgeSnapshotValidationReceiptRecord {
     }
 }
 
+pub const KNOWLEDGE_SNAPSHOT_VALIDATION_RECEIPT_HISTORY_CHECKPOINT_SCHEMA: &str =
+    "symthaea.epf-011.snapshot-validation-receipt-history-checkpoint.v1";
+
 /// A non-persistent evidence checkpoint for an externally anchored validation-receipt
 /// history. The checkpoint does not assert truth, validator authority, or authenticity by itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
+    pub schema_version: String,
     pub receipt_count: u64,
     pub latest_validation_sequence: u64,
     pub latest_generation: u64,
@@ -436,9 +452,12 @@ pub struct KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
 }
 
 impl KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
-    /// Build a checkpoint from validation records that have already passed ledger verification.
-    pub fn from_history(history: &[KnowledgeSnapshotValidationReceiptRecord]) -> Self {
-        Self {
+    /// Build a checkpoint from validation records, rejecting malformed/unverified histories.
+    pub fn from_history(
+        history: &[KnowledgeSnapshotValidationReceiptRecord],
+    ) -> Result<Self, String> {
+        let checkpoint = Self {
+            schema_version: KNOWLEDGE_SNAPSHOT_VALIDATION_RECEIPT_HISTORY_CHECKPOINT_SCHEMA.into(),
             receipt_count: history.len() as u64,
             latest_validation_sequence: history
                 .last()
@@ -446,6 +465,14 @@ impl KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
             latest_generation: history.last().map_or(0, |record| record.receipt.generation),
             history_digest_hex:
                 KnowledgeSnapshotValidationReceiptRecord::canonical_history_digest_hex(history),
+        };
+        if checkpoint.verify_against_history(history) {
+            Ok(checkpoint)
+        } else {
+            Err(
+                "Cannot create snapshot validation receipt history checkpoint from invalid history"
+                    .into(),
+            )
         }
     }
 
@@ -454,7 +481,8 @@ impl KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
         &self,
         history: &[KnowledgeSnapshotValidationReceiptRecord],
     ) -> bool {
-        if !is_hex_digest(&self.history_digest_hex)
+        if self.schema_version != KNOWLEDGE_SNAPSHOT_VALIDATION_RECEIPT_HISTORY_CHECKPOINT_SCHEMA
+            || !is_hex_digest(&self.history_digest_hex)
             || self.receipt_count != history.len() as u64
             || self.latest_validation_sequence
                 != history.last().map_or(0, |record| record.validation_sequence)
@@ -1124,7 +1152,7 @@ impl KnowledgePersistence {
         &mut self,
     ) -> Result<KnowledgeSnapshotReceiptHistoryCheckpoint, String> {
         self.snapshot_receipt_history()
-            .map(|history| KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&history))
+            .and_then(|history| KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&history))
     }
 
     /// Verify the current complete snapshot-receipt history against an external checkpoint.
@@ -1465,7 +1493,9 @@ impl KnowledgePersistence {
         &mut self,
     ) -> Result<KnowledgeSnapshotValidationReceiptHistoryCheckpoint, String> {
         self.snapshot_validation_receipt_records()
-            .map(|history| KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(&history))
+            .and_then(|history| {
+                KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(&history)
+            })
     }
 
     /// Verify the current complete validation-receipt history against an external checkpoint.
@@ -7635,7 +7665,7 @@ mod tests {
             .unwrap();
 
         let prefix_checkpoint =
-            KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&history[..1]);
+            KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&history[..1]).unwrap();
         assert!(prefix_checkpoint.verify_prefix_against_history(&history));
         p.verify_snapshot_receipt_history_checkpoint_prefix(&prefix_checkpoint)
             .unwrap();
@@ -7988,7 +8018,7 @@ mod tests {
             .unwrap();
 
         let prefix_checkpoint =
-            KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(&all[..2]);
+            KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(&all[..2]).unwrap();
         assert!(prefix_checkpoint.verify_prefix_against_history(&all));
         p.verify_snapshot_validation_receipt_history_checkpoint_prefix(&prefix_checkpoint)
             .unwrap();
