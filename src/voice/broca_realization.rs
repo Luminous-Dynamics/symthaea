@@ -10,7 +10,7 @@
 
 #![cfg(all(feature = "ssm_language", feature = "vocal-tract"))]
 
-use symthaea_broca::{IntonationIntent, ProsodicIntent, SpeechPlan, SpeechSensoryTarget};
+use symthaea_broca::{IntonationIntent, PhonemeSlot, ProsodicIntent, SpeechPlan, SpeechSensoryTarget};
 use symthaea_vocal_tract::pipeline::{Intonation, PitchAccent, ProsodyContext, SourceType};
 
 /// Timing/articulation state supplied by the phonological/realization layer.
@@ -26,6 +26,36 @@ pub struct BrocaFramePosition {
     pub syllable_progress: f32,
     pub prev_source_type: Option<SourceType>,
     pub next_source_type: Option<SourceType>,
+}
+
+impl BrocaFramePosition {
+    /// Construct frame metadata directly from an explicit phonological slot.
+    ///
+    /// Timing and neighboring source types remain owned by the realization scheduler;
+    /// stress, onset, and information-structural focus come from the phonological plan.
+    pub fn from_phoneme_slot(
+        slot: &PhonemeSlot,
+        utterance_progress: f32,
+        phoneme_progress: f32,
+        phrase_index: u8,
+        phrase_progress: f32,
+        syllable_progress: f32,
+        prev_source_type: Option<SourceType>,
+        next_source_type: Option<SourceType>,
+    ) -> Self {
+        Self {
+            utterance_progress,
+            phoneme_progress,
+            stress: slot.stress.ordinal().min(2),
+            phrase_index,
+            phrase_progress,
+            is_focus: slot.is_focus,
+            is_syllable_onset: slot.is_syllable_onset,
+            syllable_progress,
+            prev_source_type,
+            next_source_type,
+        }
+    }
 }
 
 impl Default for BrocaFramePosition {
@@ -224,6 +254,32 @@ mod tests {
         let context = adapter.context(f32::NAN, BrocaFramePosition::default());
 
         assert_eq!(context.base_f0, 120.0);
+    }
+
+    #[test]
+    fn phonological_slot_binds_stress_focus_and_onset_metadata() {
+        let slot = PhonemeSlot::new(
+            "AH1",
+            0,
+            symthaea_broca::SyllableStress::Primary,
+            true,
+            true,
+            false,
+        );
+        let position = BrocaFramePosition::from_phoneme_slot(
+            &slot,
+            0.25,
+            0.5,
+            0,
+            0.25,
+            0.1,
+            None,
+            None,
+        );
+
+        assert_eq!(position.stress, 1);
+        assert!(position.is_focus);
+        assert!(position.is_syllable_onset);
     }
 
     #[test]
