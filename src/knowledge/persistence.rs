@@ -7550,12 +7550,22 @@ mod tests {
             history_digest
         );
 
+        let checkpoint = p.snapshot_receipt_history_checkpoint().unwrap();
+        assert_eq!(checkpoint.receipt_count, 2);
+        assert_eq!(checkpoint.latest_generation, 2);
+        assert!(checkpoint.verify_against_history(&history));
+
         let mut reordered = history.clone();
         reordered.swap(0, 1);
         assert_ne!(
             KnowledgeSnapshotReceipt::canonical_history_digest_hex(&reordered),
             history_digest
         );
+        assert!(!checkpoint.verify_against_history(&reordered));
+
+        let mut truncated = history.clone();
+        truncated.pop();
+        assert!(!checkpoint.verify_against_history(&truncated));
 
         assert_eq!(
             p.latest_snapshot_receipt().unwrap().unwrap(),
@@ -7874,12 +7884,23 @@ mod tests {
             history_digest
         );
 
+        let checkpoint = p.snapshot_validation_receipt_history_checkpoint().unwrap();
+        assert_eq!(checkpoint.receipt_count, 3);
+        assert_eq!(checkpoint.latest_validation_sequence, 3);
+        assert_eq!(checkpoint.latest_generation, 2);
+        assert!(checkpoint.verify_against_history(&all));
+
         let mut reordered = all.clone();
         reordered.swap(0, 1);
         assert_ne!(
             KnowledgeSnapshotValidationReceiptRecord::canonical_history_digest_hex(&reordered),
             history_digest
         );
+        assert!(!checkpoint.verify_against_history(&reordered));
+
+        let mut truncated = all.clone();
+        truncated.pop();
+        assert!(!checkpoint.verify_against_history(&truncated));
 
         let latest = p.latest_snapshot_validation_receipt_records().unwrap();
         assert_eq!(latest.len(), 2);
