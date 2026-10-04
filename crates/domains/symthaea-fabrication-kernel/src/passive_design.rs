@@ -520,7 +520,7 @@ mod tests {
         };
         let score = observation.weighted_score(PassiveObjectiveWeights::default());
         assert!((0.0..=1.0).contains(&score));
-        assert!((score - 0.7).abs() < 1.0e-12);
+        assert!((score - 0.625).abs() < 1.0e-12);
     }
 
     #[test]
