@@ -106,7 +106,7 @@ It does not establish:
 
 Those remain separate epistemic boundaries in the Evidence Fabric.
 
-For consumers holding both a report and the original envelope, `ReceiptAttestationVerificationReport::matches_attestation_envelope()` provides the explicit report↔payload identity check. It first rejects internally inconsistent report identity bindings, then verifies the current v5 payload fingerprint and receipt fingerprint match the supplied envelope. It does not replace full report execution-trace validation, detached proof verification, or resolver validation.
+For consumers holding both a report and the original envelope, `ReceiptAttestationVerificationReport::matches_attestation_envelope()` provides the explicit report↔payload identity check. It first rejects internally inconsistent report identity bindings and structurally invalid envelopes, then verifies the current v5 payload fingerprint and receipt fingerprint match the supplied envelope. It does not replace full report execution-trace validation, detached proof verification, or resolver validation.
 
 ## Replayability guidance
 
