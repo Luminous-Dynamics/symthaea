@@ -354,10 +354,21 @@ impl LinearCodeAlgebra {
     ///
     /// Both identities are exact because the factor-to-bound map is linear over GF(2).
     pub const fn satisfies_conservation_law(self) -> bool {
-        self.factor_dimension_sum == self.union_generator_rank + self.kernel_dimension
-            && self.raw_factor_tuple_count.exponent()
-                == self.reachable_target_count.exponent()
-                    + self.factorization_count_per_target.exponent()
+        let Some(rank_sum) = self
+            .union_generator_rank
+            .checked_add(self.kernel_dimension)
+        else {
+            return false;
+        };
+        let Some(exponent_sum) = self
+            .reachable_target_count
+            .exponent()
+            .checked_add(self.factorization_count_per_target.exponent())
+        else {
+            return false;
+        };
+        self.factor_dimension_sum == rank_sum
+            && self.raw_factor_tuple_count.exponent() == exponent_sum
             && self.unique_factorization == (self.kernel_dimension == 0)
             && self.factorization_count_per_target.is_one() == self.unique_factorization
     }
