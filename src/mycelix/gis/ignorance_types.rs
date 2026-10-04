@@ -453,6 +453,11 @@ impl EpistemicFrameRevision {
     }
 
     /// Whether this revision is structurally meaningful rather than a no-op.
+    /// Whether this revision is structurally meaningful rather than a no-op.
+    ///
+    /// Frame content is versioned by `EpistemicFrame::identity()`. A semantic
+    /// change without an identity change is not representable as a distinct
+    /// append-only frame state and must not masquerade as one.
     pub fn changes_frame(&self) -> bool {
         self.prior_frame != self.revised_frame
     }
@@ -788,6 +793,25 @@ impl std::error::Error for FrameLineageError {}
 #[cfg(test)]
 mod frame_identity_divergence_tests {
     use super::*;
+
+    #[test]
+    fn same_frame_identity_cannot_claim_a_revision() {
+        let frame = EpistemicFrame::default();
+        let mut revised = frame.clone();
+        revised.ontology_id = "different-ontology".to_string();
+
+        let revision = EpistemicFrameRevision::new(
+            &frame,
+            &revised,
+            "ontology changed without version bump",
+            None,
+            "invalid identity reuse",
+            vec!["c1".to_string()],
+        );
+
+        assert!(!revision.changes_frame());
+        assert_eq!(revision.prior_frame, revision.revised_frame);
+    }
 
     #[test]
     fn distinct_frame_id_is_provenance_divergence() {
