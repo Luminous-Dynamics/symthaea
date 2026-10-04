@@ -126,6 +126,29 @@ A deployment SHOULD retain enough resolver evidence to reconstruct the verificat
 
 This mirrors the broader auditability principle in RFC 9943: systems intended for later audit should retain enough information to reproduce the checks that were applicable when a statement was accepted. RFC 9943 also distinguishes authentication/registration evidence from the truth or accuracy of the statement itself.
 
+## Graph-relative receipt revalidation
+
+Receipt integrity, attestation verification, and current graph correspondence are separate evidence properties.
+
+`IndependenceVerificationReceipt::verify_integrity()` answers whether the receipt's stored assessment fingerprint is consistent with the receipt fields. A receipt can therefore remain intrinsically coherent after the observation graph changes.
+
+`IndependenceVerificationReceipt::verify_against_graph_detailed(&graph)` is the stronger operation. It re-runs the bounded independence assessment against the supplied closed-world graph and distinguishes:
+
+- `VerifiedAgainstGraph`: the current graph reproduces the receipt's recorded assessment;
+- `GraphMismatch`: the receipt is internally coherent, but the current graph no longer reproduces that assessment;
+- `InvalidReceiptIntegrity`: the receipt itself is internally inconsistent;
+- `UnsupportedVerifierVersion`: the receipt was produced under an unsupported assessment contract.
+
+`ReceiptAttestationVerificationReport` and `EvidenceEvaluation` do not perform that graph revalidation. Their receipt fingerprint identifies the exact historical receipt that was attested; it is not a graph snapshot, a current-state proof, or a substitute for re-running the assessment.
+
+### Consumer rule
+
+Consumers that make a **current graph-state decision** MUST obtain the authoritative observation graph and perform `verify_against_graph_detailed()` (or an equivalent explicitly recorded graph-relative verification). A historical `Verified` attestation or a well-formed `EvidenceEvaluation` MUST NOT be promoted into a claim that the same result still holds in the current graph.
+
+When the authoritative graph is unavailable, the current-graph correspondence state MUST remain explicitly unestablished or indeterminate. Consumers SHOULD retain the graph-relative verification outcome, verifier version, and scope evidence needed to audit why a current-state decision was accepted.
+
+This is intentionally analogous to freshness: a durable identifier can establish which state was referenced without proving that the referenced state is still current. The current RATS Many-Verifiers draft explicitly places freshness verification on verifiers, and the RATS Epoch Markers draft notes that some freshness mechanisms require receiver-side state to determine whether a marker is still the appropriate unused value. The W3C Verifiable Credential Data Integrity 1.1 Working Draft likewise treats proof purpose, domain, and challenge as explicit verification inputs rather than as general semantic truth guarantees.
+
 ## Compatibility rule
 
 Historical report fingerprints must remain reconstructable.
