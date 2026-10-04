@@ -36,6 +36,11 @@ pub const HDC_ONTOLOGY_CODEBOOK_ALGORITHM: &str =
 pub const HDC_ONTOLOGY_ROLE_REVISION: &str =
     "source-relation-target-stable-identity-v1";
 pub const HDC_ONTOLOGY_EDGE_TARGET_PERMUTATION: usize = 1;
+/// N0 resource bounds for identity-aware graph reconstruction.
+pub const HDC_ONTOLOGY_MAX_NODES: usize = 256;
+pub const HDC_ONTOLOGY_MAX_EDGES: usize = 2048;
+/// Hard ceiling on receiver-side edge candidates before ranking allocation.
+pub const HDC_ONTOLOGY_MAX_EDGE_CANDIDATES: usize = 1_000_000;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HdcConceptIdentityBinding {
@@ -239,6 +244,8 @@ impl HdcOntologyRepresentation {
             && !self.source_manifest_hash.trim().is_empty()
             && self.node_count > 0
             && self.edge_count > 0
+            && self.node_count <= HDC_ONTOLOGY_MAX_NODES
+            && self.edge_count <= HDC_ONTOLOGY_MAX_EDGES
             && self.node_quantization.validates()
             && self.edge_quantization.validates()
             && self.node_quantization.dimension == HDC_DIMENSION
@@ -683,7 +690,14 @@ impl HdcOntologyCodebook {
             }
         }
 
-        let mut edge_candidates = Vec::new();
+        let candidate_count = edge_candidate_count(selected_nodes.len(), self.relations.len())?;
+        if candidate_count > HDC_ONTOLOGY_MAX_EDGE_CANDIDATES {
+            return Err(format!(
+                "ontology HDC edge candidate budget exceeded: {candidate_count} > {HDC_ONTOLOGY_MAX_EDGE_CANDIDATES}"
+            ));
+        }
+
+        let mut edge_candidates = Vec::with_capacity(candidate_count);
         for source in &selected_nodes {
             for relation_id in self.relations.keys() {
                 for target in &selected_nodes {
@@ -924,7 +938,13 @@ impl HdcOntologyCodebook {
     ) -> Result<Vec<HdcOntologyRetrievalCandidate>, String> {
         let edge_bundle = representation.edge_frame.to_binary()?.to_continuous();
         let selected_nodes = decoded_concepts.values().cloned().collect::<Vec<_>>();
-        let mut candidates = Vec::new();
+        let candidate_count = edge_candidate_count(selected_nodes.len(), self.relations.len())?;
+        if candidate_count > HDC_ONTOLOGY_MAX_EDGE_CANDIDATES {
+            return Err(format!(
+                "ontology HDC edge candidate budget exceeded: {candidate_count} > {HDC_ONTOLOGY_MAX_EDGE_CANDIDATES}"
+            ));
+        }
+        let mut candidates = Vec::with_capacity(candidate_count);
         for source in &selected_nodes {
             for relation_id in self.relations.keys() {
                 for target in &selected_nodes {
@@ -1219,6 +1239,13 @@ fn selection_stats(
     Ok((min_selected, min_selected - max_unselected))
 }
 
+fn edge_candidate_count(node_count: usize, relation_count: usize) -> Result<usize, String> {
+    node_count
+        .checked_mul(relation_count)
+        .and_then(|count| count.checked_mul(node_count))
+        .ok_or_else(|| "ontology HDC edge candidate count overflowed usize".into())
+}
+
 fn sort_candidates(candidates: &mut [HdcOntologyRetrievalCandidate]) {
     candidates.sort_by(|a, b| {
         b.score
@@ -1319,6 +1346,28 @@ fn kind_tag(kind: &ConceptKind) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn representation_declared_graph_size_is_bounded() {
+        let (training, training_manifest) = training_graph_and_manifest();
+        let codebook =
+            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
+                .unwrap();
+        let mut representation = codebook.encode_graph(&training, &training_manifest).unwrap();
+        representation.node_count = HDC_ONTOLOGY_MAX_NODES + 1;
+        assert!(!representation.validates());
+        representation.node_count = training.nodes.len();
+        representation.edge_count = HDC_ONTOLOGY_MAX_EDGES + 1;
+        assert!(!representation.validates());
+    }
+
+    #[test]
+    fn edge_candidate_budget_is_fail_closed() {
+        assert_eq!(edge_candidate_count(9, 4).unwrap(), 324);
+        assert!(edge_candidate_count(usize::MAX, 2).is_err());
+        let over = edge_candidate_count(512, 4_096).unwrap();
+        assert!(over > HDC_ONTOLOGY_MAX_EDGE_CANDIDATES);
+    }
 
     #[test]
     fn empirical_calibration_never_weakens_baseline() {
