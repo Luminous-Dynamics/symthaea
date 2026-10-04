@@ -45,6 +45,7 @@ def main() -> int:
     decoder = load_json(artifact_dir / "decoder-ab.json") or {}
     exercism = load_json(artifact_dir / "exercism-bench.json") or {}
     compare = load_json(artifact_dir / "checkpoint-compare.json")
+    attribution = load_json(artifact_dir / "attribution-harness.json")
     run_manifest = manifest(artifact_dir / "measurement-manifest.env")
 
     decoder_agg = decoder.get("aggregate", {})
@@ -93,6 +94,22 @@ def main() -> int:
                 f"threshold {fmt(failure.get('threshold'))}"
             )
 
+    if attribution is not None:
+        lines += ["", "## Controlled Attribution", ""]
+        lines.append(f"- Evidence level: `{fmt(attribution.get('evidence_level'))}`")
+        lines.append(f"- Seed: `{fmt(attribution.get('seed_phrase'))}`")
+        for condition in attribution.get("conditions") or []:
+            lines.append(
+                f"- `{condition.get('condition')}`: exact repeat {fmt(condition.get('exact_repeat'))}, "
+                f"max repeat delta {fmt(condition.get('repeat_max_abs_delta'))}, "
+                f"feedback {fmt(condition.get('feedback_enabled'))}"
+            )
+        attribution_conditions = attribution.get("conditions") or []
+        rate_applied = bool(attribution_conditions) and all(
+            condition.get("rate_target_applied_by_pipeline")
+            for condition in attribution_conditions
+        )
+        lines.append(f"- Rate target applied by current pipeline: `{fmt(rate_applied)}`")
     if compare is not None:
         lines += [
             "",

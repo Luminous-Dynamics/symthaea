@@ -2543,3 +2543,10 @@ name = "recurrent_mask_recovery"
 # observed. Must be declared here -- autoexamples = false.
 [[example]]
 name = "action_semantics_probe"
+
+
+# Deterministic Broca/vocal-tract attribution harness.
+[[bin]]
+name = "broca-attribution-harness"
+path = "src/bin/broca_attribution_harness.rs"
+required-features = ["ssm_language", "vocal-tract"]

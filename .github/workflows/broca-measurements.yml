@@ -8,7 +8,9 @@ on:
       - "Cargo.lock"
       - "crates/domains/symthaea-broca/**"
       - "scripts/broca_measurement_artifacts.sh"
+      - "scripts/broca_measurement_summary.py"
       - "scripts/broca_capture_baseline.sh"
+      - "src/bin/broca_attribution_harness.rs"
       - ".github/workflows/broca-measurements.yml"
   workflow_dispatch:
 

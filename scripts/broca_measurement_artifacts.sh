@@ -57,6 +57,7 @@ JSON
   echo "broca_cargo_unlocked=${BROCA_CARGO_UNLOCKED:-0}"
   broca_write_runtime_manifest
   echo "broca_skip_exercism=${BROCA_SKIP_EXERCISM:-0}"
+  echo "broca_run_attribution_harness=${BROCA_RUN_ATTRIBUTION_HARNESS:-1}"
   echo "broca_exercism_attempts=${BROCA_EXERCISM_ATTEMPTS:-1}"
   echo "broca_exercism_max_exercises=${BROCA_EXERCISM_MAX_EXERCISES:-0}"
   echo "broca_exercism_timeout=${BROCA_EXERCISM_TIMEOUT:-}"
@@ -98,6 +99,23 @@ if [[ -n "${BROCA_CHECKPOINT_PATH:-}" ]]; then
   echo "[broca] NOTE: exercism-bench drives the separate Liquid-Mamba fusion pathway, not the checkpoint at \$BROCA_CHECKPOINT_PATH — its results below are informational only, not a promotion signal for that checkpoint."
 fi
 
+# Deterministic attribution evidence: compares neutral, existing vocal-tract-only,
+# Broca-only, composed, and composed+feedback conditions.
+# The resulting JSON is also rendered by broca_measurement_summary.py for reviewer-facing evidence.
+if [[ "${BROCA_RUN_ATTRIBUTION_HARNESS:-1}" == "1" ]]; then
+  cargo run "${cargo_locked_args[@]}" --features "ssm_language,vocal-tract" --bin broca-attribution-harness -- \
+    --json-out "$OUT_DIR/attribution-harness.json"
+else
+  cat > "$OUT_DIR/attribution-harness.json" <<'JSON'
+{
+  "schema_version": 1,
+  "evidence_level": "skipped",
+  "measured": false,
+  "conditions": [],
+  "limitations": ["Attribution harness disabled by BROCA_RUN_ATTRIBUTION_HARNESS=0."]
+}
+JSON
+fi
 # Deterministic architecture-contract evidence: exercises the full intent × epistemic matrix
 # without invoking a stochastic language or acoustic backend.
 cargo run "${cargo_locked_args[@]}" -p symthaea-broca --bin broca-production-contract-audit -- \
