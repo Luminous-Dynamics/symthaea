@@ -205,6 +205,8 @@ fn main() -> Result<(), String> {
         "all_structurally_equivalent": true,
         "same_codebook_for_all_cases": true,
         "reordered_representation_exact": reordered_representation_exact,
+        "lexical_invariance_exact": lexical_invariance_exact,
+        "identifier_invariance_exact": identifier_invariance_exact,
         "wrong_codebook_rejected": wrong_codebook_rejected,
         "conservative_clean_decode": conservative_clean_decode,
     });
