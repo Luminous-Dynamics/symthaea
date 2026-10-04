@@ -238,3 +238,13 @@ for f32 continuous storage, a 32x storage reduction before protocol framing.
 
 The codec does not invoke the current semantic decoder and does not claim semantic
 reversibility. Quantization loss is an explicit measured boundary for later adapter work.
+
+The codec also emits a versioned provenance descriptor containing the codec identifier,
+representation types, quantizer rule, dimension, and optional encoder/codebook identifiers.
+This prevents a future receiver from silently treating vectors produced by a different
+encoder revision or codebook as interchangeable.
+
+The N0 lab additionally sweeps deterministic binary corruption at 0%, 0.1%, 1%, 5%, and
+10% nominal bit-flip probability and records binary similarity plus full-dimension cosine
+similarity to the original continuous vector. These are transport/representation metrics
+only; they are not semantic-accuracy metrics.
