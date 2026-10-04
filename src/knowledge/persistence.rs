@@ -1106,6 +1106,19 @@ impl KnowledgePersistence {
             .map(|history| KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&history))
     }
 
+    /// Verify the current complete snapshot-receipt history against an external checkpoint.
+    pub fn verify_snapshot_receipt_history_checkpoint(
+        &mut self,
+        checkpoint: &KnowledgeSnapshotReceiptHistoryCheckpoint,
+    ) -> Result<(), String> {
+        let history = self.snapshot_receipt_history()?;
+        if checkpoint.verify_against_history(&history) {
+            Ok(())
+        } else {
+            Err("Snapshot receipt history checkpoint mismatch".into())
+        }
+    }
+
     /// Load the latest committed complete-snapshot receipt.
     ///
     /// This receipt is append-only and is only advanced by successful
@@ -1419,6 +1432,19 @@ impl KnowledgePersistence {
     ) -> Result<KnowledgeSnapshotValidationReceiptHistoryCheckpoint, String> {
         self.snapshot_validation_receipt_records()
             .map(|history| KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(&history))
+    }
+
+    /// Verify the current complete validation-receipt history against an external checkpoint.
+    pub fn verify_snapshot_validation_receipt_history_checkpoint(
+        &mut self,
+        checkpoint: &KnowledgeSnapshotValidationReceiptHistoryCheckpoint,
+    ) -> Result<(), String> {
+        let history = self.snapshot_validation_receipt_records()?;
+        if checkpoint.verify_against_history(&history) {
+            Ok(())
+        } else {
+            Err("Snapshot validation receipt history checkpoint mismatch".into())
+        }
     }
 
     fn load_snapshot_validation_receipt_records(
@@ -7554,6 +7580,8 @@ mod tests {
         assert_eq!(checkpoint.receipt_count, 2);
         assert_eq!(checkpoint.latest_generation, 2);
         assert!(checkpoint.verify_against_history(&history));
+        p.verify_snapshot_receipt_history_checkpoint(&checkpoint)
+            .unwrap();
 
         let mut reordered = history.clone();
         reordered.swap(0, 1);
@@ -7889,6 +7917,8 @@ mod tests {
         assert_eq!(checkpoint.latest_validation_sequence, 3);
         assert_eq!(checkpoint.latest_generation, 2);
         assert!(checkpoint.verify_against_history(&all));
+        p.verify_snapshot_validation_receipt_history_checkpoint(&checkpoint)
+            .unwrap();
 
         let mut reordered = all.clone();
         reordered.swap(0, 1);
