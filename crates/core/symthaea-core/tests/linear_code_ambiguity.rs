@@ -408,6 +408,25 @@ fn dependency_witness_ledger_is_canonical_and_verifiable() {
         assert_eq!(reconstructed, repeated_target);
         fiber_coefficients.push(coefficients);
     }
+    let mut target_counts = repeated
+        .enumerate()
+        .iter()
+        .map(|target| (target.clone(), 0usize))
+        .collect::<Vec<_>>();
+    for first in repeated.enumerate() {
+        for second in repeated.enumerate() {
+            for third in repeated.enumerate() {
+                let target = first.bound(&second).bound(&third);
+                let (_, count) = target_counts
+                    .iter_mut()
+                    .find(|(candidate, _)| *candidate == target)
+                    .expect("target is reachable");
+                *count += 1;
+            }
+        }
+    }
+    assert!(target_counts.iter().all(|(_, count)| *count == expected_fiber_size));
+    assert_eq!(target_counts.len(), 4);
     assert_eq!(fiber_coefficients.len(), expected_fiber_size);
     assert!(!repeated_algebra.factorization_count_per_target.is_one());
     assert_eq!(
