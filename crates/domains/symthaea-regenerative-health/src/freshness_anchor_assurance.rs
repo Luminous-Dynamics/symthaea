@@ -540,7 +540,6 @@ mod tests {
     }
 
     #[test]
-    fn evidence_kind_must_match_backing() {    #[test]
     fn evidence_kind_must_match_backing() {
         let profile = FreshnessAnchorProfile::new(
             FreshnessAnchorBacking::RemoteAuthority,
