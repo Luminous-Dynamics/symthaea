@@ -184,22 +184,70 @@ fn main() -> Result<(), String> {
         &mapping_provenance_hash,
     );
 
+    let receiver = graph(
+        "receiver-agent", "sender", "receiver-agent-grounding",
+        "receiver-event", "approach", "receiver-event-grounding",
+        "receiver-object", "target", "receiver-object-grounding",
+        "initiates", "targets",
+    );
+    let receiver_concepts = [
+        ("receiver-agent", "concept:agent/sender"),
+        ("receiver-event", "concept:event/approach"),
+        ("receiver-object", "concept:object/target"),
+    ];
+    let receiver_manifest = manifest(
+        &receiver,
+        &receiver_concepts,
+        &training_relations,
+        scheme_id,
+        &mapping_provenance_hash,
+    );
+
     let held_out_representation = codebook.encode_graph(&held_out, &held_out_manifest)?;
-    let expected_concepts = concept_identity_map(&held_out, &held_out_concepts);
+    let expected_concepts = concept_identity_map(&receiver, &receiver_concepts);
     let expected_relations = vec![
         "relation:initiates".to_string(),
         "relation:targets".to_string(),
     ];
 
     let policy = HdcOntologyDecodePolicy::conservative_default();
+    let decoded = codebook.decode_graph_with_policy(
+        &held_out_representation,
+        &held_out_manifest,
+        &receiver_manifest,
+        policy,
+    )?;
     let metrics = codebook.measure_roundtrip(
         &held_out,
         &held_out_representation,
         &held_out_manifest,
+        &receiver_manifest,
         &expected_concepts,
         &expected_relations,
         policy,
     )?;
+
+    let source_groundings_preserved = {
+        let mut expected_groundings = held_out
+            .nodes
+            .iter()
+            .map(|node| node.grounded_by.clone())
+            .collect::<Vec<_>>();
+        let mut observed_groundings = decoded
+            .graph
+            .nodes
+            .iter()
+            .map(|node| node.grounded_by.clone())
+            .collect::<Vec<_>>();
+        expected_groundings.sort();
+        observed_groundings.sort();
+        expected_groundings == observed_groundings
+    };
+    let receiver_local_ids_used = decoded
+        .graph
+        .nodes
+        .iter()
+        .all(|node| node.id.starts_with("receiver-"));
 
     let same_hdc_frames = training_representation.node_frame == held_out_representation.node_frame
         && training_representation.edge_frame == held_out_representation.edge_frame;
@@ -263,6 +311,8 @@ fn main() -> Result<(), String> {
         || metrics.edge_precision != 1.0
         || metrics.edge_recall != 1.0
         || !new_grounding_allowed_without_recodebook
+        || !source_groundings_preserved
+        || !receiver_local_ids_used
         || !novel_oov_rejected
         || !wrong_scheme_rejected
         || !wrong_mapping_provenance_rejected
@@ -287,6 +337,9 @@ fn main() -> Result<(), String> {
         "summary": {
             "same_codebook_for_held_out_groundings": new_grounding_allowed_without_recodebook,
             "same_hdc_frames_for_same_stable_structure": same_hdc_frames,
+            "source_groundings_preserved": source_groundings_preserved,
+            "receiver_local_ids_used": receiver_local_ids_used,
+            "source_manifest_differs_from_receiver": held_out_manifest.manifest_hash() != receiver_manifest.manifest_hash(),
             "concept_identity_exact": metrics.concept_identity_exact,
             "relation_identity_exact": metrics.relation_identity_exact,
             "structurally_equivalent": metrics.structural_equivalence,
