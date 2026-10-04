@@ -816,10 +816,7 @@ impl ReceiptAttestationVerificationReport {
     /// and challenge. This helper intentionally does not verify the envelope's detached
     /// proof; it only checks report↔envelope identity binding and must be paired
     /// with the report's own well-formedness and proof-verification checks.
-    pub fn matches_attestation_envelope(
-        &self,
-        envelope: &ReceiptAttestationEnvelope,
-    ) -> bool {
+    pub fn matches_attestation_envelope(&self, envelope: &ReceiptAttestationEnvelope) -> bool {
         self.verifier_version == VERIFIER_VERSION
             && self.attestation_payload_fingerprint == envelope.payload_fingerprint()
             && self.receipt_fingerprint == envelope.receipt_fingerprint
