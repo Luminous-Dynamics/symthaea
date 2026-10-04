@@ -90,10 +90,7 @@ pub fn compare_graphs(
                 .unwrap_or(0)
         })
         .sum::<usize>();
-    let edge_intersection = expected_edges
-        .iter()
-        .filter(|key| observed_edges.binary_search(key).is_ok())
-        .count();
+    let edge_intersection = multiset_intersection_len(&expected_edges, &observed_edges);
 
     let metrics = InterlinguaMetrics {
         schema_version: INTERLINGUA_BENCHMARK_SCHEMA_VERSION,
@@ -251,6 +248,26 @@ fn multiset_edges_equal(
     expected == observed
 }
 
+fn multiset_intersection_len<T: Ord>(expected: &[T], observed: &[T]) -> usize {
+    let mut expected_index = 0;
+    let mut observed_index = 0;
+    let mut intersection = 0;
+
+    while expected_index < expected.len() && observed_index < observed.len() {
+        match expected[expected_index].cmp(&observed[observed_index]) {
+            std::cmp::Ordering::Less => expected_index += 1,
+            std::cmp::Ordering::Greater => observed_index += 1,
+            std::cmp::Ordering::Equal => {
+                intersection += 1;
+                expected_index += 1;
+                observed_index += 1;
+            }
+        }
+    }
+
+    intersection
+}
+
 fn canonical_node_key(node: &ConceptNode) -> String {
     let mut grounded = node.grounded_by.clone();
     grounded.sort();
@@ -386,6 +403,19 @@ mod tests {
         let metrics = compare_graphs(&expected, &observed).unwrap();
         assert!(!metrics.structural_equivalence);
         assert!(metrics.edge_recall < 1.0);
+    }
+
+    #[test]
+    fn duplicate_expected_edge_does_not_exceed_metric_bounds() {
+        let mut expected = fixture();
+        if let Some(edge) = expected.edges.last().cloned() {
+            expected.edges.push(edge);
+        }
+        let observed = fixture();
+        let metrics = compare_graphs(&expected, &observed).unwrap();
+        assert!(metrics.edge_recall < 1.0);
+        assert!((0.0..=1.0).contains(&metrics.edge_precision));
+        assert!((0.0..=1.0).contains(&metrics.edge_recall));
     }
 
     #[test]
