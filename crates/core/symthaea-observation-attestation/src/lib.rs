@@ -2541,6 +2541,10 @@ mod tests {
         let mut evaluation = report.to_evidence_evaluation();
         evaluation.verification_report_fingerprint = "not-a-fingerprint".into();
         assert!(!evaluation.is_well_formed());
+
+        let mut policy = report.policy_inputs.clone();
+        policy.expected_challenge_fingerprint = Some("A".repeat(64));
+        assert!(!policy.is_well_formed());
     }
 
     #[test]
