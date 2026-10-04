@@ -2435,7 +2435,10 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
             let unique: i64 = row
                 .get(2)
                 .map_err(|e| format!("Schema integrity index uniqueness for {table}: {e}"))?;
-            if name == index && unique != 0 {
+            let partial: i64 = row
+                .get(4)
+                .map_err(|e| format!("Schema integrity index partial flag for {table}: {e}"))?;
+            if name == index && unique != 0 && partial == 0 {
                 let info_pragma = format!("PRAGMA index_info({index})");
                 let mut info_stmt = conn
                     .prepare(&info_pragma)
@@ -4047,7 +4050,47 @@ mod tests {
     }
 
     #[test]
-    fn test_fact_memory_identity_cannot_be_blank_after_schema_migration {
+    fn test_initialized_schema_rejects_partial_identity_index() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_partial_identity_index_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "partial-index".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x72; BinaryHV::BYTES],
+            source_text: "partial index".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        let conn = p.open_connection().unwrap();
+        conn.execute_batch(
+            "DROP INDEX idx_facts_memory_id_unique;
+             CREATE UNIQUE INDEX idx_facts_memory_id_unique
+             ON knowledge_facts(memory_id)
+             WHERE memory_id IS NOT NULL;",
+        )
+        .unwrap();
+
+        let err = verify_initialized_schema_integrity(&conn).unwrap_err();
+        assert!(err.contains(
+            "unique index idx_facts_memory_id_unique on knowledge_facts has the wrong definition"
+        ));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_fact_memory_identity_cannot_be_blank_after_schema_migration() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_fact_memory_identity_trigger_test_{}",
             std::process::id()
