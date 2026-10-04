@@ -153,6 +153,9 @@ impl PhonologicalPlan {
         &self,
         frame: &LinguisticFrame,
     ) -> Result<(), PhonologicalPlanError> {
+        if frame.validate().is_err() {
+            return Err(PhonologicalPlanError::UpstreamMismatch);
+        }
         self.validate()?;
         if !self.source_intent.is_empty()
             && (self.source_intent != frame.source_intent
