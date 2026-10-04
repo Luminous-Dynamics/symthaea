@@ -7009,6 +7009,8 @@ mod tests {
     }
 
 
+    #[test]
+    fn durable_terminal_state_survives_restart_and_remains_idempotent() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
         store.prepare_for_execution(&witness,&action,"frame@1","attempt-1").unwrap();
@@ -9203,5 +9205,4 @@ mod tests {
         )));
         tx.rollback().unwrap();
         let _=std::fs::remove_file(path);
-    }
-
+}
