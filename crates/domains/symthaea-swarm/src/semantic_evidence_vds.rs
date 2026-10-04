@@ -2341,15 +2341,6 @@ impl<'a> CborReader<'a> {
         self.skip_value_with_limits(depth, max_bstr_len, 64, usize::MAX)
     }
 
-    fn skip_value_with_bstr_and_array_limit(
-        &mut self,
-        depth: usize,
-        max_bstr_len: usize,
-        max_array_items: usize,
-    ) -> Result<(), Rfc9162ProofDecodeError> {
-        self.skip_value_with_limits(depth, max_bstr_len, max_array_items, usize::MAX)
-    }
-
     fn skip_value_with_limits(
         &mut self,
         depth: usize,
@@ -2574,7 +2565,11 @@ impl<'a> CborReader<'a> {
         if ai == 31 {
             loop {
                 if self.offset >= limit_end {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(if limit_end < self.bytes.len() {
+                        Rfc9162ProofDecodeError::InvalidStructure
+                    } else {
+                        Rfc9162ProofDecodeError::UnexpectedEof
+                    });
                 }
                 if self.bytes.get(self.offset).copied() == Some(0xff) {
                     self.offset += 1;
@@ -2673,7 +2668,11 @@ impl<'a> CborReader<'a> {
         if ai == 31 {
             loop {
                 if self.offset >= limit_end {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(if limit_end < self.bytes.len() {
+                        Rfc9162ProofDecodeError::InvalidStructure
+                    } else {
+                        Rfc9162ProofDecodeError::UnexpectedEof
+                    });
                 }
                 if self.bytes.get(self.offset).copied() == Some(0xff) {
                     self.offset += 1;
