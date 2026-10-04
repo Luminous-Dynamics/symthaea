@@ -99,9 +99,9 @@ if [[ -n "${BROCA_CHECKPOINT_PATH:-}" ]]; then
   echo "[broca] NOTE: exercism-bench drives the separate Liquid-Mamba fusion pathway, not the checkpoint at \$BROCA_CHECKPOINT_PATH — its results below are informational only, not a promotion signal for that checkpoint."
 fi
 
-# Deterministic attribution evidence: separates neutral, existing vocal-tract,
-# The resulting JSON is also rendered by broca_measurement_summary.py for reviewer-facing evidence.
+# Deterministic attribution evidence: compares neutral, existing vocal-tract-only,
 # Broca-only, composed, and composed+feedback conditions.
+# The resulting JSON is also rendered by broca_measurement_summary.py for reviewer-facing evidence.
 if [[ "${BROCA_RUN_ATTRIBUTION_HARNESS:-1}" == "1" ]]; then
   cargo run "${cargo_locked_args[@]}" --features "ssm_language,vocal-tract" --bin broca-attribution-harness -- \
     --json-out "$OUT_DIR/attribution-harness.json"
