@@ -330,6 +330,15 @@ impl SolverBoundaryEvidenceLevel {
     pub fn is_verified(self) -> bool {
         matches!(self, Self::AdapterAttested | Self::SolverEntityAttested)
     }
+
+    /// Whether this evidence level satisfies a caller's minimum requirement.
+    pub fn satisfies(self, minimum: Self) -> bool {
+        match (self, minimum) {
+            (_, Self::AdapterAttested) => true,
+            (Self::SolverEntityAttested, Self::SolverEntityAttested) => true,
+            (Self::AdapterAttested, Self::SolverEntityAttested) => false,
+        }
+    }
 }
 
 /// Solver-side entity evidence returned by a live-capable adapter.
@@ -604,6 +613,10 @@ pub enum SolverBindingError {
     EmptySolverEntityMappingDigest,
     SolverEntityHandleMismatch,
     SolverEntityMappingDigestMismatch,
+    InsufficientEvidenceLevel {
+        actual: SolverBoundaryEvidenceLevel,
+        required: SolverBoundaryEvidenceLevel,
+    },
     PortMismatch,
     InterfaceDigestMismatch,
     SolverBoundaryMismatch,
@@ -1199,9 +1212,33 @@ pub fn validate_binding_set_against_candidate(
     candidate_geometry_digest: [u8; 32],
     candidate: &TriangleMesh,
 ) -> Result<(), SolverBindingError> {
+    validate_binding_set_against_candidate_with_minimum_evidence(
+        interfaces,
+        bindings,
+        candidate_geometry_digest,
+        candidate,
+        SolverBoundaryEvidenceLevel::AdapterAttested,
+    )
+}
+
+/// Variant of the final pre-dispatch gate that makes the required evidence level explicit.
+pub fn validate_binding_set_against_candidate_with_minimum_evidence(
+    interfaces: &[PortInterface],
+    bindings: &[SolverBoundaryBinding],
+    candidate_geometry_digest: [u8; 32],
+    candidate: &TriangleMesh,
+    minimum_evidence: SolverBoundaryEvidenceLevel,
+) -> Result<(), SolverBindingError> {
     validate_binding_set(interfaces, bindings)?;
 
     for binding in bindings {
+        if !binding.evidence_level.satisfies(minimum_evidence) {
+            return Err(SolverBindingError::InsufficientEvidenceLevel {
+                actual: binding.evidence_level,
+                required: minimum_evidence,
+            });
+        }
+
         let interface = interfaces
             .iter()
             .find(|interface| interface.port == binding.port)
@@ -1447,6 +1484,56 @@ mod tests {
             ),
             Err(SolverBindingError::EmptySolverEntityFingerprint)
         );
+    }
+
+    #[test]
+    fn adapter_attestation_cannot_satisfy_solver_entity_requirement() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let binding = bind_with_adapter(
+            &FixtureAdapter,
+            &interface,
+            &candidate,
+            [7; 32],
+            0.05,
+        )
+        .unwrap();
+
+        assert_eq!(
+            validate_binding_set_against_candidate_with_minimum_evidence(
+                std::slice::from_ref(&interface),
+                std::slice::from_ref(&binding),
+                [7; 32],
+                &candidate,
+                SolverBoundaryEvidenceLevel::SolverEntityAttested,
+            ),
+            Err(SolverBindingError::InsufficientEvidenceLevel {
+                actual: SolverBoundaryEvidenceLevel::AdapterAttested,
+                required: SolverBoundaryEvidenceLevel::SolverEntityAttested,
+            })
+        );
+    }
+
+    #[test]
+    fn solver_entity_attestation_satisfies_minimum_evidence_requirement() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let binding = bind_with_adapter_and_entity_attestation(
+            &FixtureAdapter,
+            &interface,
+            &candidate,
+            [7; 32],
+            0.05,
+        )
+        .unwrap();
+
+        assert!(validate_binding_set_against_candidate_with_minimum_evidence(
+            std::slice::from_ref(&interface),
+            std::slice::from_ref(&binding),
+            [7; 32],
+            &candidate,
+            SolverBoundaryEvidenceLevel::SolverEntityAttested,
+        ).is_ok());
     }
 
     #[test]
