@@ -2186,6 +2186,46 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
     )?;
     verify_table_column_contract(
         conn,
+        "knowledge_facts",
+        &[
+            ("id", "INTEGER", 1i64),
+            ("memory_id", "TEXT", 0),
+            ("canonical_identity", "TEXT", 0),
+            ("provenance_family", "TEXT", 0),
+            ("vector_blob", "BLOB", 0),
+            ("source_text", "TEXT", 0),
+            ("confidence", "REAL", 0),
+            ("domain", "TEXT", 0),
+            ("cycle", "INTEGER", 0),
+            ("is_causal", "INTEGER", 0),
+        ],
+    )?;
+    verify_table_column_contract(
+        conn,
+        "knowledge_causal_edges",
+        &[
+            ("cause", "TEXT", 1i64),
+            ("effect", "TEXT", 2),
+            ("strength", "REAL", 0),
+            ("is_inhibitory", "INTEGER", 0),
+            ("cycle", "INTEGER", 0),
+        ],
+    )?;
+    verify_table_column_contract(
+        conn,
+        "knowledge_ontology",
+        &[
+            ("name", "TEXT", 1i64),
+            ("vector_blob", "BLOB", 0),
+            ("usage_count", "INTEGER", 0),
+            ("utility", "REAL", 0),
+            ("created_at_cycle", "INTEGER", 0),
+            ("last_used_cycle", "INTEGER", 0),
+            ("is_a_parent", "TEXT", 0),
+        ],
+    )?;
+    verify_table_column_contract(
+        conn,
         "knowledge_snapshot_receipts",
         &[
             ("generation", "INTEGER", 1i64),
@@ -3674,6 +3714,45 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+
+    #[test]
+    fn test_initialized_schema_rejects_missing_core_fact_identity_column() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_core_fact_schema_drift_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "core-fact-schema".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x42; BinaryHV::BYTES],
+            source_text: "core fact schema".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        let conn = p.open_connection().unwrap();
+        conn.execute_batch(
+            "ALTER TABLE knowledge_facts
+             RENAME COLUMN memory_id TO memory_identifier;",
+        )
+        .unwrap();
+
+        let err = verify_initialized_schema_integrity(&conn).unwrap_err();
+        assert_eq!(
+            err,
+            "Schema integrity check failed: missing column memory_id on knowledge_facts"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn test_schema_trigger_attestation_rejects_comment_only_receipt_guard() {
