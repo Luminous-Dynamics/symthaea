@@ -3457,17 +3457,24 @@ fn validate_native_authority_pin_set(
         evidence: &ProviderTerminalEvidence,
         verifier: &V,
     ) -> Result<ExecutionReceipt, AuthorizationStoreError> {
-        let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
-
-        // Phase 1: snapshot the durable binding without holding a write lock while
-        // executing the provider-controlled verifier.
+        // Phase 1: validate the durable binding and service an already-terminal
+        // idempotent read without invoking foreign verifier code.
         {
             let mut connection = self.connection()?;
             let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
-            self.validate_persisted_dispatch_record(&tx, record)?;
+            let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
+            if matches!(persisted_state, "succeeded" | "failed") {
+                if let Some(receipt) =
+                    load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")?
+                {
+                    return Ok(receipt);
+                }
+                return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+            }
             tx.commit()?;
         }
 
+        let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
         let verified = verifier
             .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
