@@ -449,6 +449,8 @@ The qualification workflow now locks this research branch to the declared six-fi
 
 For pull-request runs, the workflow compares the exact PR head against the PR base and fails closed if any other path is present. The receipt records the accepted path set. This is a provenance boundary rather than a build optimization: the qualification should not silently certify production changes merely because the research tests still pass.
 
+GitHub-specific trigger semantics are part of this provenance contract. `pull_request` workflows only trigger when the workflow file is available on the repository's default branch. While this research workflow remains branch-local, the explicit push trigger on `research/hdc-linear-code-recovery-design-v1` is the automatic qualification path; the receipt therefore records `event_name` so push-based evidence is distinguishable from PR-event evidence. The workflow must not be converted to `pull_request_target` merely to obtain PR-event execution, because this qualification intentionally checks out the PR head and executes its test code; moving that execution under `pull_request_target` would change the trust boundary.
+
 ## References
 
 - Raviv, N. (2024), Linear Codes for Hyperdimensional Computing, Neural Computation 36(6), 1084–1120. DOI: 10.1162/neco_a_01665; arXiv:2403.03278.
