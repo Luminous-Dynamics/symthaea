@@ -354,8 +354,7 @@ impl LinearCodeAlgebra {
     ///
     /// Both identities are exact because the factor-to-bound map is linear over GF(2).
     pub const fn satisfies_conservation_law(self) -> bool {
-        self.factor_dimension_sum
-            == self.union_generator_rank + self.kernel_dimension
+        self.factor_dimension_sum == self.union_generator_rank + self.kernel_dimension
             && self.raw_factor_tuple_count.exponent()
                 == self.reachable_target_count.exponent()
                     + self.factorization_count_per_target.exponent()
@@ -716,10 +715,7 @@ pub fn factorization_count_for_target(
         .map(|_| algebra.factorization_count_per_target)
 }
 
-fn concatenate_factor_bases(
-    factors: &[&RandomLinearCode],
-    capacity: usize,
-) -> Vec<BinaryCodeword> {
+fn concatenate_factor_bases(factors: &[&RandomLinearCode], capacity: usize) -> Vec<BinaryCodeword> {
     let mut basis = Vec::with_capacity(capacity);
     for factor in factors {
         basis.extend(factor.basis().iter().cloned());
