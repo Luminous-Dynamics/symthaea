@@ -9,12 +9,47 @@
 //! - Command classification and safety scoring
 //! - JSON output mode for structured results
 
+use crate::action::authorization::NixLocalExecutionAuthorityV1;
+use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::process::Stdio;
 use tokio::process::Command;
 use tracing::{info, warn};
+
+#[derive(Debug, Deserialize)]
+struct NixOSGenerationRecordV1 {
+    generation: u32,
+    current: bool,
+}
+
+fn parse_generation_pre_state_identity(identity: &str) -> Result<u32, String> {
+    const PREFIX: &str = "generation:";
+    let raw = identity
+        .strip_prefix(PREFIX)
+        .ok_or_else(|| format!("unsupported pre-state identity format: {identity}"))?;
+    if raw.is_empty() {
+        return Err("generation pre-state identity has no generation number".to_string());
+    }
+    raw.parse::<u32>()
+        .map_err(|_| format!("invalid generation pre-state identity: {identity}"))
+}
+
+fn parse_current_generation(stdout: &str) -> Result<u32, String> {
+    let records: Vec<NixOSGenerationRecordV1> = serde_json::from_str(stdout)
+        .map_err(|error| format!("invalid nixos-rebuild generation JSON: {error}"))?;
+    let mut current = records.iter().filter(|record| record.current);
+    let record = current.next().ok_or_else(|| {
+        "nixos-rebuild generation JSON contained no current generation".to_string()
+    })?;
+    if current.next().is_some() {
+        return Err(
+            "nixos-rebuild generation JSON contained multiple current generations".to_string(),
+        );
+    }
+    Ok(record.generation)
+}
 
 /// NixOS-specific commands with structured parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +87,20 @@ pub enum NixOSCommand {
     CollectGarbage {
         older_than_days: Option<u32>,
         delete_all: bool,
+    },
+    /// Exact typed systemd service lifecycle operation.
+    Service {
+        operation: NixServiceOperationKindV1,
+        unit: String,
+    },
+    /// Exact NixOS configuration option mutation, followed by a fixed switch.
+    ///
+    /// The expected configuration digest binds the authorization to the file state
+    /// that was observed when the mutation was proposed.
+    ConfigPatch {
+        option_path: String,
+        value: String,
+        expected_config_digest: String,
     },
     /// Custom command with safety classification
     Custom {
@@ -127,6 +176,48 @@ impl NixOSCommand {
         }
     }
 
+    /// Validate command-specific invariants that must hold even after
+    /// confirmation. Typed service commands must remain canonical at the
+    /// final execution boundary.
+    pub(crate) fn validate_shape(&self) -> Result<(), String> {
+        match self {
+            Self::Service { operation, unit } => {
+                let typed = NixServiceOperationV1::new(unit.clone(), *operation)
+                    .map_err(|error| error.to_string())?;
+                if typed.unit() != unit {
+                    return Err(
+                        "typed service unit must be canonical at the command boundary".to_string(),
+                    );
+                }
+                Ok(())
+            }
+            Self::ConfigPatch {
+                option_path,
+                value,
+                expected_config_digest,
+            } => {
+                if option_path.trim().is_empty() {
+                    return Err("config patch option path must not be blank".to_string());
+                }
+                if value.trim().is_empty() {
+                    return Err("config patch value must not be blank".to_string());
+                }
+                if expected_config_digest.len() != 64
+                    || !expected_config_digest
+                        .bytes()
+                        .all(|b| b.is_ascii_hexdigit())
+                {
+                    return Err(
+                        "config patch expected config digest must be 64 hex characters".to_string(),
+                    );
+                }
+                Ok(())
+            }
+
+            _ => Ok(()),
+        }
+    }
+
     /// Get the safety level of this command
     pub fn safety_level(&self) -> SafetyLevel {
         match self {
@@ -167,6 +258,10 @@ impl NixOSCommand {
             Self::RebuildSwitch { .. } => SafetyLevel::SystemCritical,
 
             Self::CollectGarbage { .. } => SafetyLevel::Destructive,
+
+            Self::Service { .. } => SafetyLevel::SystemModify,
+
+            Self::ConfigPatch { .. } => SafetyLevel::SystemCritical,
 
             Self::Custom { safety_level, .. } => *safety_level,
         }
@@ -336,6 +431,22 @@ impl NixOSCommand {
                 }
                 ("nix-collect-garbage".to_string(), args)
             }
+            Self::Service { operation, unit } => (
+                "systemctl".to_string(),
+                vec![
+                    match operation {
+                        NixServiceOperationKindV1::Start => "start",
+                        NixServiceOperationKindV1::Stop => "stop",
+                        NixServiceOperationKindV1::Restart => "restart",
+                        NixServiceOperationKindV1::Reload => "reload",
+                        NixServiceOperationKindV1::Enable => "enable",
+                        NixServiceOperationKindV1::Disable => "disable",
+                    }
+                    .to_string(),
+                    unit.clone(),
+                ],
+            ),
+            Self::ConfigPatch { .. } => ("nixos-rebuild".to_string(), vec!["switch".to_string()]),
             Self::Custom { command, args, .. } => (command.clone(), args.clone()),
         }
     }
@@ -369,11 +480,67 @@ pub enum ExecutionResult {
     },
 }
 
+enum ExecutionBasisV1 {
+    Phi {
+        phi: f32,
+    },
+    LiveAuthority {
+        intent_digest: String,
+        approval_request_id: String,
+        projection_digest: String,
+    },
+}
+
+/// In-memory provenance for an execution that crossed the live Nixward
+/// authority boundary. This is separate from ExecutionRecord, whose
+/// phi_at_execution field is legacy telemetry.
+#[derive(Debug, Clone)]
+pub struct AuthorizedExecutionRecordV1 {
+    command: NixOSCommand,
+    action_intent_digest: String,
+    approval_request_id: String,
+    projection_digest: String,
+    pre_state_identity: Option<String>,
+    result: ExecutionResult,
+    timestamp_ms: u64,
+}
+
+impl AuthorizedExecutionRecordV1 {
+    pub fn command(&self) -> &NixOSCommand {
+        &self.command
+    }
+
+    pub fn action_intent_digest(&self) -> &str {
+        &self.action_intent_digest
+    }
+
+    pub fn approval_request_id(&self) -> &str {
+        &self.approval_request_id
+    }
+
+    pub fn projection_digest(&self) -> &str {
+        &self.projection_digest
+    }
+
+    pub fn pre_state_identity(&self) -> Option<&str> {
+        self.pre_state_identity.as_deref()
+    }
+
+    pub fn result(&self) -> &ExecutionResult {
+        &self.result
+    }
+
+    pub fn timestamp_ms(&self) -> u64 {
+        self.timestamp_ms
+    }
+}
+
 /// NixOS-aware command executor with Φ integration
 pub struct NixOSExecutor {
     current_generation: Option<u32>,
     thresholds: ConsciousnessThresholds,
     history: VecDeque<ExecutionRecord>,
+    authorized_history: VecDeque<AuthorizedExecutionRecordV1>,
     dry_run: bool,
 }
 
@@ -398,6 +565,7 @@ impl NixOSExecutor {
             current_generation: None,
             thresholds: ConsciousnessThresholds::default(),
             history: VecDeque::with_capacity(1000),
+            authorized_history: VecDeque::with_capacity(1000),
             dry_run: false,
         }
     }
@@ -415,26 +583,25 @@ impl NixOSExecutor {
     /// Capture the current NixOS generation for rollback
     pub async fn capture_generation(&mut self) -> anyhow::Result<u32> {
         let output = Command::new("nixos-rebuild")
-            .args(["list-generations"])
+            .args(["list-generations", "--json"])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
             .await?;
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-
-        for line in stdout.lines() {
-            if line.contains("(current)")
-                && let Some(gen_str) = line.split_whitespace().next()
-                && let Ok(r#gen) = gen_str.trim().parse::<u32>()
-            {
-                self.current_generation = Some(r#gen);
-                info!(generation = r#gen, "Captured current NixOS generation");
-                return Ok(r#gen);
-            }
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "nixos-rebuild list-generations --json failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
         }
 
-        Err(anyhow::anyhow!("Could not determine current generation"))
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let generation = parse_current_generation(&stdout)
+            .map_err(|error| anyhow::anyhow!("Could not determine current generation: {error}"))?;
+        self.current_generation = Some(generation);
+        info!(generation, "Captured current NixOS generation");
+        Ok(generation)
     }
 
     /// Execute a NixOS command, gated on `phi` clearing the command's safety
@@ -455,6 +622,12 @@ impl NixOSExecutor {
     /// SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md Phase 1.
     pub async fn execute(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
         let safety = command.safety_level();
+        if let Err(reason) = command.validate_shape() {
+            return ExecutionResult::Blocked {
+                reason,
+                safety_level: safety,
+            };
+        }
         let required_phi = safety.required_phi();
 
         if phi < required_phi {
@@ -569,21 +742,178 @@ impl NixOSExecutor {
         }
     }
 
+    /// Execute only with a live Nixward execution-authority object.
+    ///
+    /// The authority object is consumed by value and validates that the command
+    /// exactly matches the action intent whose local approval was consumed. Phi is
+    /// deliberately not an input to this authority path.
+    pub async fn execute_authorized(
+        &mut self,
+        command: NixOSCommand,
+        authority: NixLocalExecutionAuthorityV1,
+    ) -> ExecutionResult {
+        let safety = command.safety_level();
+        if let Err(reason) = command.validate_shape() {
+            return ExecutionResult::Blocked {
+                reason,
+                safety_level: safety,
+            };
+        }
+        if let Err(error) = authority.validate_command(&command) {
+            return ExecutionResult::Blocked {
+                reason: format!("execution authority rejected command: {error}"),
+                safety_level: safety,
+            };
+        }
+        if let Err(reason) = self
+            .validate_authorized_pre_state_identity(&authority)
+            .await
+        {
+            return ExecutionResult::Blocked {
+                reason,
+                safety_level: safety,
+            };
+        }
+
+        if let NixOSCommand::ConfigPatch {
+            option_path,
+            value,
+            expected_config_digest,
+        } = &command
+        {
+            if !self.dry_run {
+                let writer = super::config_writer::ConfigWriter::new();
+                let patch = match writer.set_option(option_path, value) {
+                    Ok(patch) => patch,
+                    Err(error) => {
+                        return ExecutionResult::FailedNoRollback {
+                            error: format!("config patch preparation failed: {error}"),
+                            rollback_error: None,
+                        };
+                    }
+                };
+                if let Err(error) = writer.apply_patch_if_current(&patch, expected_config_digest) {
+                    return ExecutionResult::FailedNoRollback {
+                        error: format!("config patch currentness/write failed: {error}"),
+                        rollback_error: None,
+                    };
+                }
+            }
+        }
+
+        let intent_digest = authority
+            .action_intent_digest()
+            .unwrap_or_else(|_| "<invalid-intent>".to_string());
+        let approval_request_id = authority.approval_request_id().to_string();
+        let projection_digest = authority.projection_digest().to_string();
+        let pre_state_identity = authority.pre_state_identity().map(str::to_owned);
+
+        let result = self
+            .execute_confirmed_inner(
+                command.clone(),
+                ExecutionBasisV1::LiveAuthority {
+                    intent_digest: intent_digest.clone(),
+                    approval_request_id: approval_request_id.clone(),
+                    projection_digest: projection_digest.clone(),
+                },
+            )
+            .await;
+        self.record_authorized_execution(
+            command,
+            intent_digest,
+            approval_request_id,
+            projection_digest,
+            pre_state_identity,
+            &result,
+        );
+        result
+    }
+    /// Revalidate the state identity bound into live authority immediately before dispatch.
+    ///
+    /// V1 currently binds Nixward local-authority requests to a NixOS generation.
+    /// Unknown identity formats fail closed rather than being treated as fresh.
+    async fn validate_authorized_pre_state_identity(
+        &mut self,
+        authority: &NixLocalExecutionAuthorityV1,
+    ) -> Result<(), String> {
+        let identity = authority
+            .pre_state_identity()
+            .ok_or_else(|| "execution authority has no bound pre-state identity".to_string())?;
+        let expected_generation = parse_generation_pre_state_identity(identity)?;
+        if self.dry_run {
+            return Ok(());
+        }
+
+        let actual_generation = self
+            .capture_generation()
+            .await
+            .map_err(|error| format!("could not revalidate current NixOS generation: {error}"))?;
+        if actual_generation != expected_generation {
+            return Err(format!(
+                "execution authority is stale: approved generation={} but current generation={}",
+                expected_generation, actual_generation
+            ));
+        }
+        Ok(())
+    }
+
     /// Execute unconditionally, bypassing the tier-threshold check in
     /// `execute()`. `phi` is recorded for telemetry only (`ExecutionRecord`),
     /// not checked. Only call this when the command was already confirmed by
     /// a real gate elsewhere (e.g. an explicit human approval) — this
     /// function performs no safety check of its own.
     pub async fn execute_confirmed(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
+        let safety = command.safety_level();
+        if let Err(reason) = command.validate_shape() {
+            return ExecutionResult::Blocked {
+                reason,
+                safety_level: safety,
+            };
+        }
+        if matches!(command, NixOSCommand::ConfigPatch { .. }) {
+            return ExecutionResult::Blocked {
+                reason: "ConfigPatch requires a live Nixward execution authority".to_string(),
+                safety_level: safety,
+            };
+        }
+        self.execute_confirmed_inner(command, ExecutionBasisV1::Phi { phi })
+            .await
+    }
+
+    async fn execute_confirmed_inner(
+        &mut self,
+        command: NixOSCommand,
+        basis: ExecutionBasisV1,
+    ) -> ExecutionResult {
+        let safety = command.safety_level();
         let (cmd, args) = command.to_command();
 
-        info!(
-            command = %cmd,
-            args = ?args,
-            phi = %phi,
-            confirmed = true,
-            "Executing confirmed NixOS command"
-        );
+        match &basis {
+            ExecutionBasisV1::Phi { phi } => {
+                info!(
+                    command = %cmd,
+                    args = ?args,
+                    phi = %phi,
+                    confirmed = true,
+                    "Executing confirmed NixOS command"
+                );
+            }
+            ExecutionBasisV1::LiveAuthority {
+                intent_digest,
+                approval_request_id,
+                projection_digest,
+            } => {
+                info!(
+                    command = %cmd,
+                    args = ?args,
+                    intent = %intent_digest,
+                    approval_request = %approval_request_id,
+                    projection = %projection_digest,
+                    confirmed = true,
+                    "Executing command through live Nixward authority"
+                );
+            }
+        }
 
         if self.dry_run {
             return ExecutionResult::Success {
@@ -638,8 +968,40 @@ impl NixOSExecutor {
         }
     }
 
+    fn record_authorized_execution(
+        &mut self,
+        command: NixOSCommand,
+        action_intent_digest: String,
+        approval_request_id: String,
+        projection_digest: String,
+        pre_state_identity: Option<String>,
+        result: &ExecutionResult,
+    ) {
+        self.authorized_history
+            .push_back(AuthorizedExecutionRecordV1 {
+                command,
+                action_intent_digest,
+                approval_request_id,
+                projection_digest,
+                pre_state_identity,
+                result: result.clone(),
+                timestamp_ms: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0),
+            });
+
+        if self.authorized_history.len() > 1000 {
+            self.authorized_history.pop_front();
+        }
+    }
+
     pub fn history(&self) -> &VecDeque<ExecutionRecord> {
         &self.history
+    }
+
+    pub fn authorized_history(&self) -> &VecDeque<AuthorizedExecutionRecordV1> {
+        &self.authorized_history
     }
 
     pub fn success_rate(&self, safety_level: SafetyLevel) -> Option<f32> {
@@ -666,6 +1028,79 @@ impl NixOSExecutor {
 mod tests {
     use super::*;
 
+    #[test]
+    fn generation_pre_state_identity_parser_is_strict() {
+        assert_eq!(
+            parse_generation_pre_state_identity("generation:42").unwrap(),
+            42
+        );
+        assert!(parse_generation_pre_state_identity("generation:").is_err());
+        assert!(parse_generation_pre_state_identity("generation:-1").is_err());
+        assert!(parse_generation_pre_state_identity("host:workstation").is_err());
+    }
+
+    #[test]
+    fn current_generation_parser_accepts_structured_json() {
+        let json =
+            r#"[{"generation": 874, "current": true}, {"generation": 873, "current": false}]"#;
+        assert_eq!(parse_current_generation(json).unwrap(), 874);
+    }
+
+    #[test]
+    fn current_generation_parser_rejects_missing_current_generation() {
+        let json = r#"[{"generation": 874, "current": false}]"#;
+        assert!(parse_current_generation(json).is_err());
+    }
+
+    #[test]
+    fn current_generation_parser_rejects_multiple_current_generations() {
+        let json =
+            r#"[{"generation": 874, "current": true}, {"generation": 873, "current": true}]"#;
+        assert!(parse_current_generation(json).is_err());
+    }
+
+    #[test]
+    fn current_generation_parser_rejects_malformed_json() {
+        assert!(parse_current_generation("{not-json}").is_err());
+    }
+
+    #[test]
+    fn authorized_history_records_non_phi_provenance() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        let result = ExecutionResult::Success {
+            stdout: "dry-run".to_string(),
+            stderr: String::new(),
+            execution_time_ms: 0,
+        };
+
+        executor.record_authorized_execution(
+            command.clone(),
+            "intent-123".to_string(),
+            "request-123".to_string(),
+            "projection-123".to_string(),
+            Some("generation:42".to_string()),
+            &result,
+        );
+
+        let record = executor.authorized_history().front().unwrap();
+        assert!(matches!(
+            record.command(),
+            NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Restart,
+                unit
+            } if unit == "nginx.service"
+        ));
+        assert_eq!(record.action_intent_digest(), "intent-123");
+        assert_eq!(record.approval_request_id(), "request-123");
+        assert_eq!(record.projection_digest(), "projection-123");
+        assert_eq!(record.pre_state_identity(), Some("generation:42"));
+        assert!(matches!(record.result(), ExecutionResult::Success { .. }));
+        assert!(record.timestamp_ms() > 0);
+    }
     #[test]
     fn test_command_safety_levels() {
         let search = NixOSCommand::Search {
@@ -775,6 +1210,78 @@ mod tests {
             }
             _ => panic!("Expected pending confirmation"),
         }
+    }
+
+    #[test]
+    fn config_patch_command_has_fixed_scope_and_argv() {
+        let command = NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "ab".repeat(32),
+        };
+        assert_eq!(command.safety_level(), SafetyLevel::SystemCritical);
+        assert!(command.validate_shape().is_ok());
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "nixos-rebuild");
+        assert_eq!(args, vec!["switch"]);
+    }
+
+    #[test]
+    fn invalid_config_patch_digest_is_blocked() {
+        let command = NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "not-a-digest".to_string(),
+        };
+        assert!(command.validate_shape().is_err());
+    }
+
+    #[test]
+    fn typed_service_command_has_fixed_scope_and_argv() {
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        assert_eq!(command.safety_level(), SafetyLevel::SystemModify);
+        assert!(command.validate_shape().is_ok());
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "systemctl");
+        assert_eq!(args, vec!["restart", "nginx.service"]);
+    }
+
+    #[tokio::test]
+    async fn invalid_typed_service_is_blocked_even_when_confirmed() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let command = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx*.service".to_string(),
+        };
+        let result = executor.execute_confirmed(command, 1.0).await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked {
+                safety_level: SafetyLevel::SystemModify,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_execute_confirmed_rejects_config_patch_without_authority() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let command = NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "ab".repeat(32),
+        };
+        let result = executor.execute_confirmed(command, 1.0).await;
+        assert!(matches!(
+            result,
+            ExecutionResult::Blocked {
+                safety_level: SafetyLevel::SystemCritical,
+                ..
+            }
+        ));
     }
 
     #[tokio::test]
@@ -1004,7 +1511,6 @@ mod tests {
             older_than_days: None,
             delete_all: false,
         };
-
         assert!(switch.rollback_command().is_some());
         assert!(test.rollback_command().is_some());
         assert!(boot.rollback_command().is_some());

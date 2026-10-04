@@ -3,16 +3,21 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Systemd service and unit observation.
 //!
-//! Parses output from `systemctl` to observe service states, failed units,
-//! and individual unit status. This is the primary source for the "services"
-//! dimension of the system state snapshot.
+//! Parses diagnostic output from `systemctl` to observe service lists and
+//! failed units. Governed service pre-state is obtained through the typed
+//! `NixServiceObservedStateV1` path in the action layer, not this module.
 
 use std::process::Command;
 
 /// Observes systemd unit states, dependencies, and resource usage.
 pub struct SystemdObserver;
 
-/// Information about a single systemd unit.
+/// Diagnostic information about a systemd unit.
+///
+/// This representation is intentionally compatibility/diagnostic-only. It is
+/// lossy and must not be used as governed pre-state, authorization input,
+/// effect-binding input, or execution authority. Governed service pre-state
+/// uses `NixServiceObservedStateV1` instead.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnitInfo {
     /// Unit name (e.g. "nginx.service").
@@ -56,29 +61,6 @@ impl SystemdObserver {
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         Self::parse_unit_list(&stdout)
-    }
-
-    /// Get the status of a specific unit.
-    pub fn unit_status(unit: &str) -> Result<UnitInfo, std::io::Error> {
-        let output = Command::new("systemctl")
-            .args([
-                "show",
-                unit,
-                "--no-pager",
-                "--property=Id,LoadState,ActiveState,SubState,Description",
-            ])
-            .output()?;
-
-        if !output.status.success() {
-            return Err(std::io::Error::other(format!(
-                "systemctl show {} failed: {}",
-                unit,
-                String::from_utf8_lossy(&output.stderr)
-            )));
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        Self::parse_unit_show(&stdout)
     }
 
     /// List only failed units by running
@@ -148,53 +130,8 @@ impl SystemdObserver {
         Ok(units)
     }
 
-    /// Parse `systemctl show --property=...` output.
-    ///
-    /// Format:
-    /// ```text
-    /// Id=nginx.service
-    /// LoadState=loaded
-    /// ActiveState=active
-    /// SubState=running
-    /// Description=A high performance web server
-    /// ```
-    pub fn parse_unit_show(output: &str) -> Result<UnitInfo, std::io::Error> {
-        let mut name = String::new();
-        let mut load_state = String::new();
-        let mut active_state = String::new();
-        let mut sub_state = String::new();
-        let mut description = String::new();
-
-        for line in output.lines() {
-            let trimmed = line.trim();
-            if let Some((key, value)) = trimmed.split_once('=') {
-                match key {
-                    "Id" => name = value.to_string(),
-                    "LoadState" => load_state = value.to_string(),
-                    "ActiveState" => active_state = value.to_string(),
-                    "SubState" => sub_state = value.to_string(),
-                    "Description" => description = value.to_string(),
-                    _ => {}
-                }
-            }
-        }
-
-        if name.is_empty() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "could not parse unit name from systemctl show output",
-            ));
-        }
-
-        Ok(UnitInfo {
-            name,
-            load_state,
-            active_state,
-            sub_state,
-            description,
-        })
-    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -232,34 +169,6 @@ mod tests {
         assert!(units.is_empty());
     }
 
-    const MOCK_SHOW_OUTPUT: &str = "\
-Id=nginx.service
-LoadState=loaded
-ActiveState=active
-SubState=running
-Description=A high performance web server and reverse proxy
-";
-
-    #[test]
-    fn test_parse_unit_show() {
-        let unit = SystemdObserver::parse_unit_show(MOCK_SHOW_OUTPUT).unwrap();
-        assert_eq!(unit.name, "nginx.service");
-        assert_eq!(unit.load_state, "loaded");
-        assert_eq!(unit.active_state, "active");
-        assert_eq!(unit.sub_state, "running");
-        assert_eq!(
-            unit.description,
-            "A high performance web server and reverse proxy"
-        );
-    }
-
-    #[test]
-    fn test_parse_unit_show_missing_id() {
-        let bad = "LoadState=loaded\nActiveState=active\n";
-        let result = SystemdObserver::parse_unit_show(bad);
-        assert!(result.is_err());
-    }
-
     #[test]
     fn test_parse_failed_units() {
         let mock_failed = "\
@@ -288,33 +197,13 @@ Description=A high performance web server and reverse proxy
     }
 
     #[test]
-    fn test_parse_unit_show_extra_keys_ignored() {
-        let output = "Id=test.service\nLoadState=loaded\nActiveState=active\nSubState=running\nDescription=Test\nExtraKey=ignored\n";
-        let unit = SystemdObserver::parse_unit_show(output).unwrap();
-        assert_eq!(unit.name, "test.service");
-    }
-
-    #[test]
-    fn test_parse_unit_show_empty_values() {
-        let output = "Id=test.service\nLoadState=\nActiveState=\nSubState=\nDescription=\n";
-        let unit = SystemdObserver::parse_unit_show(output).unwrap();
-        assert_eq!(unit.name, "test.service");
-        assert_eq!(unit.load_state, "");
-    }
-
-    #[test]
-    fn test_parse_unit_show_empty_output() {
-        let result = SystemdObserver::parse_unit_show("");
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_parse_unit_list_mixed_states() {
         let output = "\
-  a.service loaded active   running   Service A\n\
-  b.service loaded inactive dead      Service B\n\
-  c.service loaded failed   failed    Service C\n\
-  d.service masked inactive dead      Masked D\n";
+  a.service loaded active   running   Service A
+  b.service loaded inactive dead      Service B
+  c.service loaded failed   failed    Service C
+  d.service masked inactive dead      Masked D
+";
         let units = SystemdObserver::parse_unit_list(output).unwrap();
         assert_eq!(units.len(), 4);
         assert_eq!(units[0].active_state, "active");

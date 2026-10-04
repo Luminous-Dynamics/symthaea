@@ -13,7 +13,11 @@
 //! does NOT execute system commands, it only produces modified config text
 //! and backup/restore operations.
 
+use std::io::Read;
 use std::path::{Path, PathBuf};
+
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::process::Command;
 
 /// Result of a config write operation.
@@ -288,8 +292,91 @@ impl ConfigWriter {
         Ok(())
     }
 
-    /// Apply a patch: create backup, validate, write atomically.
+    /// Open the stable sidecar lock used to coordinate configuration writes.
+    ///
+    /// The lock must not live on the target inode itself because the actual write
+    /// below is performed with temp-file + rename, which replaces that inode.
+    fn open_write_lock(&self, target: &Path) -> Result<std::fs::File, std::io::Error> {
+        let file_name = target
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "configuration target must have a valid file name",
+                )
+            })?;
+        let lock_path = target.with_file_name(format!(".{file_name}.nixward.lock"));
+
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true).write(true).create(true);
+        #[cfg(unix)]
+        {
+            options.custom_flags(libc::O_NOFOLLOW);
+            options.mode(0o600);
+        }
+        let file = options.open(lock_path)?;
+        if !file.metadata()?.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "configuration lock target is not a regular file",
+            ));
+        }
+        file.lock()?;
+        Ok(file)
+    }
+
+    fn open_target_for_currentness(target: &Path) -> Result<std::fs::File, std::io::Error> {
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true).write(true);
+        #[cfg(unix)]
+        options.custom_flags(libc::O_NOFOLLOW);
+        let file = options.open(target)?;
+        if !file.metadata()?.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "configuration target is not a regular file",
+            ));
+        }
+        Ok(file)
+    }
+
+    /// Apply a patch only when the current file matches the approved digest while
+    /// the stable sidecar write lock is held.
+    ///
+    /// The sidecar lock is a cooperating-writer coordination primitive. It prevents
+    /// concurrent ConfigWriter instances from racing through currentness and rename,
+    /// but it cannot make arbitrary external path replacement impossible on Unix.
+    pub fn apply_patch_if_current(
+        &self,
+        patch: &ConfigPatch,
+        expected_original_digest: &str,
+    ) -> Result<WriteResult, std::io::Error> {
+        let _write_lock = self.open_write_lock(&patch.target)?;
+        let mut file = Self::open_target_for_currentness(&patch.target)?;
+        let mut current = String::new();
+        file.read_to_string(&mut current)?;
+        let current_digest = blake3::hash(current.as_bytes()).to_hex().to_string();
+        if current_digest != expected_original_digest || current != patch.original {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "configuration.nix changed after the approved state was captured",
+            ));
+        }
+
+        self.apply_patch_unlocked(patch)
+    }
+
+    /// Apply a patch: create backup, validate, and write atomically.
     pub fn apply_patch(&self, patch: &ConfigPatch) -> Result<WriteResult, std::io::Error> {
+        if patch.is_noop() || self.dry_run {
+            return self.apply_patch_unlocked(patch);
+        }
+        let _write_lock = self.open_write_lock(&patch.target)?;
+        self.apply_patch_unlocked(patch)
+    }
+
+    fn apply_patch_unlocked(&self, patch: &ConfigPatch) -> Result<WriteResult, std::io::Error> {
         if patch.is_noop() {
             return Ok(WriteResult {
                 path: patch.target.clone(),
@@ -460,6 +547,63 @@ mod tests {
 }
 "#;
 
+    #[cfg(unix)]
+    #[test]
+    fn test_write_lock_uses_stable_sidecar_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("configuration.nix");
+        fs::write(&target, SAMPLE_CONFIG).unwrap();
+        let writer = ConfigWriter::new().with_config_root(dir.path());
+
+        let lock = writer.open_write_lock(&target).unwrap();
+        let lock_path = dir.path().join(".configuration.nix.nixward.lock");
+        assert!(lock_path.is_file());
+        assert!(lock.metadata().unwrap().is_file());
+        assert_ne!(
+            lock_path, target,
+            "coordination lock must not be placed on the replaceable target inode"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_apply_patch_if_current_rejects_symlink_target() {
+        let dir = tempfile::tempdir().unwrap();
+        let real = dir.path().join("real-configuration.nix");
+        let target = dir.path().join("configuration.nix");
+        fs::write(&real, SAMPLE_CONFIG).unwrap();
+        std::os::unix::fs::symlink(&real, &target).unwrap();
+
+        let writer = ConfigWriter::new()
+            .with_config_root(dir.path())
+            .with_git_backup(false)
+            .with_dry_run(false);
+
+        let patch = ConfigPatch {
+            target: target.clone(),
+            original: SAMPLE_CONFIG.to_string(),
+            modified: SAMPLE_CONFIG.replace(
+                "networking.firewall.enable = true;",
+                "networking.firewall.enable = false;",
+            ),
+            description: "symlink rejection".to_string(),
+        };
+
+        let error = writer
+            .apply_patch_if_current(
+                &patch,
+                &blake3::hash(SAMPLE_CONFIG.as_bytes()).to_hex().to_string(),
+            )
+            .unwrap_err();
+        assert!(
+            matches!(
+                error.kind(),
+                std::io::ErrorKind::InvalidInput | std::io::ErrorKind::PermissionDenied
+            ) || matches!(error.raw_os_error(), Some(code) if code == libc::ELOOP),
+            "expected symlink-safe open rejection, got {error:?}"
+        );
+    }
+
     #[test]
     fn test_add_package_patch() {
         let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
@@ -584,6 +728,39 @@ mod tests {
         let modified = "{ boot.loader.grub.enable = false; }";
         let result = ConfigWriter::validate_content_structure(original, modified);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_apply_patch_if_current_accepts_matching_digest() {
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let patch = writer.set_option("services.nginx.enable", "true").unwrap();
+        let expected = blake3::hash(patch.original.as_bytes()).to_hex().to_string();
+        let result = writer.apply_patch_if_current(&patch, &expected).unwrap();
+        assert!(result.changed);
+    }
+
+    #[test]
+    fn test_apply_patch_if_current_rejects_stale_digest() {
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let patch = writer.set_option("services.nginx.enable", "true").unwrap();
+        let result = writer.apply_patch_if_current(&patch, &"11".repeat(32));
+        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::Other);
+    }
+    #[test]
+    fn test_apply_patch_if_current_rejects_file_changed_after_proposal() {
+        let (dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let patch = writer.set_option("services.nginx.enable", "true").unwrap();
+        fs::write(
+            dir.path().join("configuration.nix"),
+            SAMPLE_CONFIG.replace(
+                "services.openssh.enable = true;",
+                "services.openssh.enable = false;",
+            ),
+        )
+        .unwrap();
+        let expected = blake3::hash(patch.original.as_bytes()).to_hex().to_string();
+        let result = writer.apply_patch_if_current(&patch, &expected);
+        assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::Other);
     }
 
     #[test]

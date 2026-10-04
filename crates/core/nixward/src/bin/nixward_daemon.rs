@@ -16,6 +16,15 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use nixward::NixParser;
+use nixward::action::authorization::{NixActionIntentV1, NixAuthorizationErrorV1, NixLocalExecutionAuthorityV1};
+use nixward::action::local_approval::LocalApprovalDecisionKindV1;
+use nixward::action::temporal::UnixMillisV1;
+#[cfg(target_os = "linux")]
+use nixward::action::local_approval_runtime::LocalApprovalRuntimeV1;
+#[cfg(target_os = "linux")]
+use nixward::action::local_approval_store::ConsumedLocalApprovalDecisionV1;
+use nixward::action::service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
+use nixward::action::service_manager::ServiceManager;
 use nixward::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
 use nixward::ipc::{
     AlertEntry, AlertSeverity, AnomalyEntry, CausalEdgeEntry, ConcernEntry, DaemonConfig,
@@ -41,6 +50,30 @@ use symthaea_core::hdc::ContinuousHV;
 
 #[cfg(feature = "observability")]
 use nixward::observability::{Metrics, PhaseTimer, init_tracing};
+
+/// Build a semantic typed service command from the validated service domain.
+///
+/// The command retains the operation/unit distinction all the way to the executor
+/// and therefore can participate in the governed action-intent vocabulary.
+fn render_typed_service_action(
+    operation: NixServiceOperationKindV1,
+    unit: &str,
+) -> Result<nixward::action::executor::NixOSCommand, NixServiceOperationErrorV1> {
+    let typed = NixServiceOperationV1::new(unit, operation)?;
+    ServiceManager::typed_command(&typed)
+}
+
+fn action_intent_digest_for_command(
+    pre_state_identity: Option<String>,
+    command: &nixward::action::executor::NixOSCommand,
+) -> Result<String, NixAuthorizationErrorV1> {
+    let intent = NixActionIntentV1::from_command(
+        "nixward:daemon",
+        pre_state_identity,
+        command,
+    )?;
+    intent.digest()
+}
 
 /// Mutable daemon state collected across cycles.
 struct DaemonState {
@@ -98,6 +131,17 @@ struct DaemonState {
     active_healing: bool,
     /// The currently pending system command waiting for watchdog approval.
     pending_action: Option<String>,
+    /// Canonical V1 action-intent digest bound to the pending command, when governed.
+    pending_action_intent_digest: Option<String>,
+    #[cfg(target_os = "linux")]
+    /// Live local-approval runtime owned by this daemon incarnation.
+    local_approval_runtime: Option<LocalApprovalRuntimeV1>,
+    #[cfg(target_os = "linux")]
+    /// Exact request identifiers presented to the local operator.
+    pending_local_approval: Option<PendingLocalApprovalViewV1>,
+    #[cfg(target_os = "linux")]
+    /// Exact live local approval token consumed by this daemon incarnation.
+    local_approval_consumed: Option<ConsumedLocalApprovalDecisionV1>,
     /// The currently pending conversational response from Ollama.
     pending_response: Option<String>,
     /// Custom user goal set via natural language input: (goal_description, target_name, expected_value)
@@ -121,6 +165,15 @@ struct AlertTracking {
     first_seen: u64,
     consecutive_cycles: u32,
     prev_predicted_value: f64,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PendingLocalApprovalViewV1 {
+    request_id: String,
+    daemon_incarnation_ref: String,
+    action_intent_digest: String,
+    projection_digest: String,
 }
 
 impl DaemonState {
@@ -184,6 +237,13 @@ impl DaemonState {
             metacognitive_journal: Vec::new(),
             active_healing: config.active_healing,
             pending_action: None,
+            pending_action_intent_digest: None,
+            #[cfg(target_os = "linux")]
+            local_approval_runtime: None,
+            #[cfg(target_os = "linux")]
+            pending_local_approval: None,
+            #[cfg(target_os = "linux")]
+            local_approval_consumed: None,
             pending_response: None,
             custom_user_goal: None,
             stable_baseline_hv: None,
@@ -245,7 +305,7 @@ impl DaemonState {
     /// logic. Kept here: the AST-based already-configured check, which is
     /// more accurate than `set_option()`'s own naive substring search and
     /// has no equivalent inside `ConfigWriter` itself.
-    fn generate_nixos_hardening_patch(&mut self, unit: &str) -> Option<(String, String, String)> {
+    fn generate_nixos_hardening_patch(&mut self, unit: &str) -> Option<(String, String, String, String)> {
         let path = std::path::Path::new("/etc/nixos/configuration.nix");
         let content = if path.exists() {
             std::fs::read_to_string(path).ok()?
@@ -283,7 +343,8 @@ impl DaemonState {
         }
 
         let hardened_line = format!("{} = {}", path_str, value_str);
-        Some((hardened_line, path_str, value_str))
+        let config_digest = blake3::hash(content.as_bytes()).to_hex().to_string();
+        Some((hardened_line, path_str, value_str, config_digest))
     }
 
     /// Sync causal graphs and learned resolutions with other local daemons (Proposal 4)
@@ -773,6 +834,124 @@ impl DaemonState {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    fn poll_local_approval(&mut self) {
+        let Some(runtime) = self.local_approval_runtime.as_ref() else {
+            return;
+        };
+        match runtime.try_accept_and_consume() {
+            Ok(Some(consumed)) => {
+                let digest = consumed.decision_evidence().action_intent_digest.clone();
+                let request_id = consumed.request_id().to_string();
+                let matches_pending = self
+                    .pending_local_approval
+                    .as_ref()
+                    .is_some_and(|pending| {
+                        pending.request_id == request_id
+                            && pending.action_intent_digest == digest
+                            && self.pending_action_intent_digest.as_deref()
+                                == Some(digest.as_str())
+                    });
+                if !matches_pending {
+                    eprintln!(
+                        "nixward-daemon: ignoring local approval for unexpected request {} / intent {}",
+                        request_id, digest
+                    );
+                    return;
+                }
+
+                match consumed.decision_kind() {
+                    LocalApprovalDecisionKindV1::Approved => {
+                        eprintln!(
+                            "nixward-daemon: local V2 approval consumed for intent {} (request {}, projection {}).",
+                            digest,
+                            request_id,
+                            consumed.projection_digest()
+                        );
+                        self.local_approval_consumed = Some(consumed);
+                    }
+                    LocalApprovalDecisionKindV1::Denied => {
+                        eprintln!(
+                            "nixward-daemon: local V2 veto consumed for intent {} (request {}).",
+                            digest, request_id
+                        );
+                        self.local_approval_consumed = None;
+                    }
+                }
+                self.pending_local_approval = None;
+            }
+            Ok(None) => {}
+            Err(error) => {
+                eprintln!("nixward-daemon: local V2 approval poll failed: {error}");
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn poll_local_approval(&mut self) {}
+
+    #[cfg(target_os = "linux")]
+    fn ensure_local_approval_request(
+        &mut self,
+        intent: &NixActionIntentV1,
+        displayed_action: &str,
+    ) -> Result<(), String> {
+        let intent_digest = intent.digest().map_err(|error| error.to_string())?;
+        if self
+            .pending_local_approval
+            .as_ref()
+            .is_some_and(|pending| {
+                pending.action_intent_digest == intent_digest
+                    && self.pending_action.as_deref() == Some(displayed_action)
+            })
+        {
+            return Ok(());
+        }
+
+        if self.local_approval_runtime.is_none() {
+            self.local_approval_runtime = Some(
+                LocalApprovalRuntimeV1::bind_default()
+                    .map_err(|error| format!("cannot bind local approval runtime: {error}"))?,
+            );
+        }
+        let runtime = self
+            .local_approval_runtime
+            .as_ref()
+            .expect("local approval runtime just initialized");
+
+        let created_at = UnixMillisV1::new(now_secs().saturating_mul(1_000));
+        let expires_at = UnixMillisV1::new(created_at.as_u64().saturating_add(60_000));
+        let installed = runtime
+            .create_pending_request(
+                intent,
+                displayed_action,
+                "same-uid-process-v1",
+                created_at,
+                expires_at,
+            )
+            .map_err(|error| format!("cannot create local approval request: {error}"))?;
+        let projection = installed
+            .operator_projection()
+            .map_err(|error| format!("cannot create local approval projection: {error}"))?;
+
+        self.pending_local_approval = Some(PendingLocalApprovalViewV1 {
+            request_id: installed.request_id().to_string(),
+            daemon_incarnation_ref: installed.request().daemon_incarnation_id.clone(),
+            action_intent_digest: installed.request().action_intent_digest.clone(),
+            projection_digest: projection.projection_digest,
+        });
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn ensure_local_approval_request(
+        &mut self,
+        _intent: &NixActionIntentV1,
+        _displayed_action: &str,
+    ) -> Result<(), String> {
+        Err("typed local approval runtime is only implemented on Linux".to_string())
+    }
+
     /// Read the latest watchdog verdict from disk (written by `nixward watch`).
     fn refresh_watchdog_status(&mut self, state_dir: &std::path::Path) {
         let wd_path = state_dir.with_file_name("watchdog_verdict.txt");
@@ -865,6 +1044,7 @@ impl DaemonState {
     ///
     /// Returns `(active_threshold, last_plan_efe)` for TUI observability.
     fn run_active_inference_plans(&mut self, alerts: &[AlertEntry]) -> (f64, Option<f64>) {
+        self.poll_local_approval();
         let now = now_secs();
         let mut candidates = Vec::new();
 
@@ -1000,17 +1180,27 @@ impl DaemonState {
                         // Try to generate a NixOS configuration AST hardening patch (Proposal 2)
                         let patch_tweak = self.generate_nixos_hardening_patch(&target_name_clone);
 
-                        let (cmd, cmd_str, _is_patch) = if let Some((tweak, _, _)) = &patch_tweak {
+                        let (cmd, cmd_str, _patch_tweak) = if let Some((
+                            tweak,
+                            option_path,
+                            value,
+                            expected_config_digest,
+                        )) = &patch_tweak {
                             let command_str =
                                 format!("PATCH /etc/nixos/configuration.nix: {}", tweak);
                             (
-                                NixOSCommand::Custom {
-                                    command: "nixos-rebuild".into(),
-                                    args: vec!["switch".into()],
-                                    safety_level: SafetyLevel::SystemModify,
+                                NixOSCommand::ConfigPatch {
+                                    option_path: option_path.clone(),
+                                    value: value.clone(),
+                                    expected_config_digest: expected_config_digest.clone(),
                                 },
                                 command_str,
-                                true,
+                                Some((
+                                    tweak.clone(),
+                                    option_path.clone(),
+                                    value.clone(),
+                                    expected_config_digest.clone(),
+                                )),
                             )
                         } else {
                             let default_cmd = match &best_action.action {
@@ -1023,61 +1213,169 @@ impl DaemonState {
                                     extra_args: vec![],
                                 },
                                 ActionCategory::Rollback => NixOSCommand::EnvRollback,
-                                ActionCategory::Enable => NixOSCommand::Custom {
-                                    command: "systemctl".into(),
-                                    args: vec!["enable".into(), target_name_clone.clone()],
-                                    safety_level: SafetyLevel::SystemModify,
+                                ActionCategory::Enable | ActionCategory::Disable => {
+                                    let operation = match best_action.action {
+                                        ActionCategory::Enable => NixServiceOperationKindV1::Enable,
+                                        ActionCategory::Disable => NixServiceOperationKindV1::Disable,
+                                        _ => unreachable!("service-action compatibility arm only handles enable/disable"),
+                                    };
+                                    match render_typed_service_action(operation, &target_name_clone) {
+                                        Ok(cmd) => cmd,
+                                        Err(error) => {
+                                            eprintln!(
+                                                "nixward-daemon: refusing invalid typed service action for {}: {:?}",
+                                                target_name_clone, error
+                                            );
+                                            return (free_energy, None);
+                                        }
+                                    }
                                 },
-                                ActionCategory::Disable => NixOSCommand::Custom {
-                                    command: "systemctl".into(),
-                                    args: vec!["disable".into(), target_name_clone.clone()],
-                                    safety_level: SafetyLevel::SystemModify,
-                                },
-                                _ => NixOSCommand::Custom {
-                                    command: "systemctl".into(),
-                                    args: vec!["restart".into(), target_name_clone.clone()],
-                                    safety_level: SafetyLevel::SystemModify,
+                                // Only explicit service operations may reach systemctl.
+                                // Package, configuration, update, and arbitrary custom
+                                // categories have different semantics; fail closed rather
+                                // than silently translating them into a service restart.
+                                ActionCategory::Install
+                                | ActionCategory::Remove
+                                | ActionCategory::Configure
+                                | ActionCategory::Update
+                                | ActionCategory::Custom(_) => {
+                                    eprintln!(
+                                        "nixward-daemon: no supported command mapping for action category {:?}; refusing implicit service operation",
+                                        best_action.action
+                                    );
+                                    return (free_energy, None);
                                 },
                             };
                             let (bin, args) = default_cmd.to_command();
                             let command_str = format!("{} {}", bin, args.join(" "));
-                            (default_cmd, command_str, false)
+                            (default_cmd, command_str, None)
                         };
 
                         let safety = cmd.safety_level();
                         let is_modifying = safety != SafetyLevel::ReadOnly;
 
+                        let mut execution_authority = None;
+
                         if is_modifying {
-                            let is_approved = self
-                                .watchdog_status
+                            // Typed V1 actions are approved by exact semantic identity,
+                            // not by a reusable global approval bit. Bind approval to the
+                            // current pre-state generation when one is available.
+                            let pre_state_identity = self
+                                .prev_snapshot
                                 .as_ref()
-                                .map(|s| {
-                                    s.eq_ignore_ascii_case("approved")
-                                        || s.eq_ignore_ascii_case("a")
-                                        || s.eq_ignore_ascii_case("yes")
+                                .and_then(|snapshot| snapshot.generation.map(|generation| format!("generation:{generation}")));
+                            let intent_digest = match action_intent_digest_for_command(
+                                pre_state_identity,
+                                &cmd,
+                            ) {
+                                Ok(digest) => digest,
+                                Err(error) => {
+                                    eprintln!(
+                                        "nixward-daemon: refusing modifying command that cannot enter governed action-intent V1: {error}"
+                                    );
+                                    self.watchdog_status = None;
+                                    self.pending_action = None;
+                                    self.pending_action_intent_digest = None;
+                                    return (
+                                        dynamic_threshold,
+                                        Some(best_action.expected_free_energy),
+                                    );
+                                }
+                            };
+
+                            // Every modifying command must have a governed V1 semantic
+                            // identity and an approval consumed from the live V2 runtime.
+                            // The legacy watchdog verdict file is not an authority source.
+                            let is_approved = self
+                                .local_approval_consumed
+                                .as_ref()
+                                .is_some_and(|approval| {
+                                    approval.decision_kind() == LocalApprovalDecisionKindV1::Approved
+                                        && approval.decision_evidence().action_intent_digest
+                                            == intent_digest
                                 })
-                                .unwrap_or(false);
+                                && self.pending_action_intent_digest.as_deref()
+                                    == Some(intent_digest.as_str());
 
                             if !is_approved {
+                                // Modifying commands are authorized only through the live V2
+                                // local-approval runtime bound to this exact V1 intent.
+                                self.watchdog_status = None;
+                                if self.local_approval_consumed.as_ref().is_some_and(|approval| {
+                                    approval.decision_evidence().action_intent_digest != intent_digest
+                                }) {
+                                    self.local_approval_consumed = None;
+                                }
                                 self.pending_action = Some(cmd_str.clone());
+                                self.pending_action_intent_digest = intent_digest.clone();
+
+                                let intent = match NixActionIntentV1::from_command(
+                                    "nixward:daemon",
+                                    self.prev_snapshot.as_ref().and_then(|snapshot| {
+                                        snapshot
+                                            .generation
+                                            .map(|generation| format!("generation:{generation}"))
+                                    }),
+                                    &cmd,
+                                ) {
+                                    Ok(intent) => intent,
+                                    Err(error) => {
+                                        eprintln!(
+                                            "nixward-daemon: refusing modifying command that cannot construct governed intent: {error}"
+                                        );
+                                        self.pending_action = None;
+                                        self.pending_action_intent_digest = None;
+                                        self.pending_local_approval = None;
+                                        return (
+                                            dynamic_threshold,
+                                            Some(best_action.expected_free_energy),
+                                        );
+                                    }
+                                };
+                                if let Err(error) =
+                                    self.ensure_local_approval_request(&intent, &cmd_str)
+                                {
+                                    eprintln!(
+                                        "nixward-daemon: refusing typed action because local approval runtime is unavailable: {error}"
+                                    );
+                                    self.pending_action = None;
+                                    self.pending_action_intent_digest = None;
+                                    self.pending_local_approval = None;
+                                    return (
+                                        dynamic_threshold,
+                                        Some(best_action.expected_free_energy),
+                                    );
+                                }
+                                debug_assert_eq!(
+                                    intent.digest().ok().as_deref(),
+                                    Some(intent_digest.as_str())
+                                );
+
                                 eprintln!(
-                                    "nixward-daemon: Gating action [safety={:?}]. Waiting for watchdog approval: {}",
-                                    safety, cmd_str
+                                    "nixward-daemon: Gating action [safety={safety:?}]. Waiting for watchdog approval: {cmd_str}{}",
+                                    format!(" [intent={intent_digest}]")
                                 );
                                 return (dynamic_threshold, Some(best_action.expected_free_energy));
                             } else {
-                                // TOCTOU guard: the operator approved a *specific*
-                                // command (the one stored in `pending_action` when we
-                                // requested approval). The plan can change between
-                                // cycles, so if the command we would run now differs
-                                // from what was approved, re-gate instead of executing
-                                // an unapproved action.
-                                if self.pending_action.as_deref() != Some(cmd_str.as_str()) {
+                                // TOCTOU guard: the semantic V1 identity and the
+                                // human-readable rendering must still match what was
+                                // presented for approval.
+                                let approved_action_still_matches =
+                                    self.pending_action.as_deref() == Some(cmd_str.as_str())
+                                        && self.pending_action_intent_digest.as_deref()
+                                            == Some(intent_digest.as_str());
+                                if !approved_action_still_matches {
                                     eprintln!(
-                                        "nixward-daemon: Plan changed since approval; re-gating (approved {:?}, now {}).",
-                                        self.pending_action, cmd_str
+                                        "nixward-daemon: Plan changed since approval; re-gating (approved command={:?}, approved intent={:?}, now command={}, now intent={:?}).",
+                                        self.pending_action,
+                                        self.pending_action_intent_digest,
+                                        cmd_str,
+                                        intent_digest
                                     );
                                     self.pending_action = Some(cmd_str.clone());
+                                    self.pending_action_intent_digest = intent_digest.clone();
+                                    self.pending_local_approval = None;
+                                    self.local_approval_consumed = None;
                                     self.watchdog_status = None;
                                     return (
                                         dynamic_threshold,
@@ -1085,63 +1383,67 @@ impl DaemonState {
                                     );
                                 }
 
-                                eprintln!("nixward-daemon: Watchdog APPROVED action: {}", cmd_str);
-
-                                // If it was an AST configuration patch, apply the configuration change before switching!
-                                if let Some((_, option_path, value)) = &patch_tweak {
-                                    // Route through ConfigWriter -- both its write
-                                    // mechanics (apply_patch: atomicity via temp+
-                                    // rename, a git backup so restore_last_backup()
-                                    // can undo it, syntax validation before anything
-                                    // touches disk) AND its patch-construction logic
-                                    // (set_option: read the freshest on-disk content
-                                    // and splice in the option, rather than the
-                                    // daemon hand-rolling an equivalent-but-separate
-                                    // rfind('}') insert that could only ever drift
-                                    // out of sync with ConfigWriter's own copy of the
-                                    // same logic). See
-                                    // SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md
-                                    // Phase 2.
-                                    use nixward::action::config_writer::ConfigWriter;
-                                    let path = std::path::Path::new("/etc/nixos/configuration.nix");
-                                    if path.exists() {
-                                        let writer = ConfigWriter::new();
-                                        let apply_result = writer
-                                            .set_option(option_path, value)
-                                            .and_then(|patch| {
-                                                let modified = patch.modified.clone();
-                                                writer.apply_patch(&patch)?;
-                                                Ok(modified)
-                                            });
-                                        // Do NOT proceed to `nixos-rebuild switch` if the
-                                        // config write failed — a partial/unwritten/invalid
-                                        // config would rebuild the wrong system.
-                                        match apply_result {
-                                            Ok(modified) => {
-                                                let local_harden = default_snapshot_path()
-                                                    .with_file_name("symthaea_hardening.nix");
-                                                if let Err(e) =
-                                                    std::fs::write(&local_harden, &modified)
-                                                {
-                                                    eprintln!(
-                                                        "nixward-daemon: warning: failed to write local hardening snapshot ({e})."
-                                                    );
-                                                }
-                                            }
-                                            Err(e) => {
-                                                eprintln!(
-                                                    "nixward-daemon: FAILED to apply /etc/nixos/configuration.nix patch ({e}); aborting rebuild."
-                                                );
-                                                self.watchdog_status = None;
-                                                self.pending_action = None;
-                                                return (
-                                                    dynamic_threshold,
-                                                    Some(best_action.expected_free_energy),
-                                                );
-                                            }
-                                        }
+                                let intent = match NixActionIntentV1::from_command(
+                                    "nixward:daemon",
+                                    self.prev_snapshot.as_ref().and_then(|snapshot| {
+                                        snapshot
+                                            .generation
+                                            .map(|generation| format!("generation:{generation}"))
+                                    }),
+                                    &cmd,
+                                ) {
+                                    Ok(intent) => intent,
+                                    Err(error) => {
+                                        eprintln!(
+                                            "nixward-daemon: refusing approved action that cannot reconstruct governed intent: {error}"
+                                        );
+                                        self.local_approval_consumed = None;
+                                        self.pending_action = None;
+                                        self.pending_action_intent_digest = None;
+                                        return (
+                                            dynamic_threshold,
+                                            Some(best_action.expected_free_energy),
+                                        );
                                     }
-                                }
+                                };
+                                let consumed_approval = match self.local_approval_consumed.take() {
+                                    Some(approval) => approval,
+                                    None => {
+                                        eprintln!(
+                                            "nixward-daemon: approved action lost its live approval token; refusing execution"
+                                        );
+                                        self.pending_action = None;
+                                        self.pending_action_intent_digest = None;
+                                        return (
+                                            dynamic_threshold,
+                                            Some(best_action.expected_free_energy),
+                                        );
+                                    }
+                                };
+                                execution_authority = Some(match NixLocalExecutionAuthorityV1::from_consumed_local_approval(
+                                        intent,
+                                        consumed_approval,
+                                    ) {
+                                        Ok(authority) => authority,
+                                        Err(error) => {
+                                            eprintln!(
+                                                "nixward-daemon: approved action could not be promoted to execution authority: {error}"
+                                            );
+                                            self.pending_action = None;
+                                            self.pending_action_intent_digest = None;
+                                            return (
+                                                dynamic_threshold,
+                                                Some(best_action.expected_free_energy),
+                                            );
+                                        }
+                                    });
+
+                                eprintln!(
+                                    "nixward-daemon: Watchdog APPROVED action: {}{}",
+                                    cmd_str,
+                                    format!(" [intent={intent_digest}]")
+                                );
+
 
                                 // Clear verdict file
                                 let wd_path =
@@ -1149,9 +1451,16 @@ impl DaemonState {
                                 let _ = std::fs::remove_file(wd_path);
                                 self.watchdog_status = None;
                                 self.pending_action = None;
+                                self.pending_action_intent_digest = None;
+                                #[cfg(target_os = "linux")]
+                                {
+                                    self.pending_local_approval = None;
+                                    self.local_approval_consumed = None;
+                                }
                             }
                         } else {
                             self.pending_action = None;
+                            self.pending_action_intent_digest = None;
                         }
 
                         eprintln!(
@@ -1167,17 +1476,14 @@ impl DaemonState {
                                 .expect("Failed to build executor runtime");
                             rt.block_on(async {
                                 let mut executor = NixOSExecutor::new();
-                                // By the time we reach this point, `cmd` has already
-                                // cleared the real safety gate above (lines ~997-1074):
-                                // ReadOnly commands skip approval entirely (safe by
-                                // design), and every modifying command required an
-                                // explicit human "Approved" verdict via the TUI
-                                // watchdog (`is_approved`, one-shot-consumed). Calling
-                                // `execute()` with a hardcoded `phi` here would just be
-                                // re-litigating an already-satisfied gate with a fake
-                                // number — `execute_confirmed` says what actually
-                                // happened: this command was already confirmed.
-                                let result = executor.execute_confirmed(cmd, 1.0).await;
+                                // The daemon gate has consumed an exact local approval
+                                // and promoted it to a live execution-authority object.
+                                // execute_authorized verifies the exact command identity
+                                // and consumes that authority object by value.
+                                let result = match execution_authority {
+                                    Some(authority) => executor.execute_authorized(cmd, authority).await,
+                                    None => executor.execute(cmd, SafetyLevel::ReadOnly.required_phi()).await,
+                                };
                                 eprintln!("nixward-daemon: Active healing execution finished. Result: {:?}", result);
                             });
                         });
@@ -1373,6 +1679,43 @@ impl DaemonState {
             curiosity_weight: self.active_inference.curiosity_weight(),
             causal_learning_rate: self.causal_graph.learning_rate(),
             pending_action: self.pending_action.clone(),
+            pending_action_intent_digest: self.pending_action_intent_digest.clone(),
+            pending_approval_request_id: {
+                #[cfg(target_os = "linux")]
+                {
+                    self.pending_local_approval
+                        .as_ref()
+                        .map(|pending| pending.request_id.clone())
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    None
+                }
+            },
+            pending_approval_daemon_incarnation_ref: {
+                #[cfg(target_os = "linux")]
+                {
+                    self.pending_local_approval
+                        .as_ref()
+                        .map(|pending| pending.daemon_incarnation_ref.clone())
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    None
+                }
+            },
+            pending_approval_projection_digest: {
+                #[cfg(target_os = "linux")]
+                {
+                    self.pending_local_approval
+                        .as_ref()
+                        .map(|pending| pending.projection_digest.clone())
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    None
+                }
+            },
             pending_response: self.pending_response.clone(),
         }
     }
@@ -1577,6 +1920,42 @@ fn build_anomaly_prompt(unit: &str, reason: &str, message: &str) -> String {
          Briefly diagnose the likely cause and suggest a fix (2-3 sentences max).",
         unit, reason, message
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nixward::action::executor::{NixOSCommand, SafetyLevel};
+
+    #[test]
+    fn modifying_custom_command_cannot_enter_governed_intent() {
+        let command = NixOSCommand::Custom {
+            command: "nixos-rebuild".to_string(),
+            args: vec!["switch".to_string()],
+            safety_level: SafetyLevel::SystemModify,
+        };
+
+        assert_eq!(
+            action_intent_digest_for_command(None, &command).unwrap_err(),
+            NixAuthorizationErrorV1::UnsupportedCustomCommand
+        );
+    }
+
+    #[test]
+    fn typed_modifying_command_enters_governed_intent() {
+        let command = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: Vec::new(),
+        };
+
+        let digest = action_intent_digest_for_command(
+            Some("generation:42".to_string()),
+            &command,
+        )
+        .unwrap();
+
+        assert!(!digest.is_empty());
+    }
 }
 
 fn now_secs() -> u64 {
@@ -2061,6 +2440,73 @@ fn main() -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typed_watchdog_approval_is_bound_to_exact_action_intent() {
+        let restart = nixward::action::executor::NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        let enable = nixward::action::executor::NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Enable,
+            unit: "nginx.service".to_string(),
+        };
+
+        let restart_digest =
+            action_intent_digest_for_command(Some("generation:42".to_string()), &restart)
+                .unwrap();
+        let enable_digest =
+            action_intent_digest_for_command(Some("generation:42".to_string()), &enable)
+                .unwrap();
+
+        assert_ne!(restart_digest, enable_digest);
+    }
+
+    #[test]
+    fn typed_watchdog_approval_changes_when_pre_state_changes() {
+        let service = nixward::action::executor::NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        let generation_42 =
+            action_intent_digest_for_command(Some("generation:42".to_string()), &service)
+                .unwrap();
+        let generation_43 =
+            action_intent_digest_for_command(Some("generation:43".to_string()), &service)
+                .unwrap();
+
+        assert_ne!(generation_42, generation_43);
+    }
+
+    #[test]
+    fn legacy_custom_commands_have_no_v1_digest() {
+        let command = nixward::action::executor::NixOSCommand::Custom {
+            command: "nixos-rebuild".to_string(),
+            args: vec!["switch".to_string()],
+            safety_level: nixward::action::executor::SafetyLevel::SystemModify,
+        };
+        assert_eq!(
+            action_intent_digest_for_command(None, &command).unwrap_err(),
+            NixAuthorizationErrorV1::UnsupportedCustomCommand
+        );
+    }
+
+    #[test]
+    fn config_patch_enters_governed_intent_and_binds_state() {
+        let command = nixward::action::executor::NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "ab".repeat(32),
+        };
+
+        let digest = action_intent_digest_for_command(
+            Some("generation:42".to_string()),
+            &command,
+        )
+        .unwrap();
+
+        assert!(!digest.is_empty());
+    }
 
     fn test_config() -> DaemonConfig {
         DaemonConfig {
@@ -3250,4 +3696,28 @@ mod tests {
         let result = writer.apply_patch(&patch).unwrap();
         assert!(result.changed);
     }
+    #[test]
+    fn typed_service_bridge_preserves_semantic_command_kind() {
+        let command =
+            render_typed_service_action(NixServiceOperationKindV1::Enable, "nginx").unwrap();
+        assert!(matches!(
+            command,
+            nixward::action::executor::NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Enable,
+                unit,
+            } if unit == "nginx.service"
+        ));
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "systemctl");
+        assert_eq!(args, vec!["enable".to_string(), "nginx.service".to_string()]);
+    }
+
+    #[test]
+    fn legacy_service_bridge_rejects_path_like_unit() {
+        let error =
+            render_typed_service_action(NixServiceOperationKindV1::Disable, "../nginx.service")
+                .unwrap_err();
+        assert_eq!(error, NixServiceOperationErrorV1::PathLikeUnit);
+    }
+
 }

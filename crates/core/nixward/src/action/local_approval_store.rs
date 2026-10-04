@@ -1,0 +1,947 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Daemon-incarnation-bound pending local approval request store.
+//!
+//! This module owns one narrow live-state theorem:
+//!
+//! - pending requests belong to one non-rehydratable daemon incarnation;
+//! - at most one request for one exact action-intent digest is pending at a time;
+//! - replacement/supersession and consumption occur under one mutex;
+//! - a successful consume combines the exact pending request, an identity-free
+//!   client submission, and a kernel-verified local peer, then removes that
+//!   request before returning a live consumed-decision token.
+//!
+//! A consumed decision is still not Nix execution authority. A later authority
+//! layer must consume that live token under the applicable policy/state checks.
+
+use super::daemon_incarnation::LiveDaemonIncarnationV1;
+use super::local_approval::{
+    LocalApprovalDecisionKindV1, LocalApprovalErrorV1, LocalNixApprovalDecisionV1,
+    PendingNixApprovalRequestV1,
+};
+use super::local_approval_submission::{
+    LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1, LocalApprovalSubmissionV2,
+    admit_verified_local_submission_v2,
+};
+use super::approver_evidence::{
+    required_profile_accepts_evidence_v1, ApproverEvidenceErrorV1, RequiredApprovalProfileV1,
+    VerifiedApproverEvidenceProfileV1, VerifiedLocalUnixPeerCredentialV1,
+};
+use super::temporal::{AuthoritativeEvaluationV1, UnixMillisV1};
+use std::collections::HashMap;
+use std::sync::Mutex;
+use thiserror::Error;
+
+/// Live, process-incarnation-bound pending request store.
+///
+/// There is deliberately no constructor from a persisted incarnation reference,
+/// no Serialize/Deserialize implementation, and no Clone implementation.
+struct PendingApprovalRecordV1 {
+    request: PendingNixApprovalRequestV1,
+    projection_digest: String,
+}
+
+pub struct LocalApprovalRequestStoreV1 {
+    daemon_incarnation_ref: String,
+    pending: Mutex<HashMap<String, PendingApprovalRecordV1>>,
+}
+
+impl LocalApprovalRequestStoreV1 {
+    pub fn new(daemon_incarnation: &LiveDaemonIncarnationV1) -> Self {
+        Self {
+            daemon_incarnation_ref: daemon_incarnation.reference(),
+            pending: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub fn daemon_incarnation_ref(&self) -> &str {
+        &self.daemon_incarnation_ref
+    }
+
+    /// Atomically install one pending request together with the exact
+    /// projection commitment produced by the live runtime.
+    pub(crate) fn install_pending_with_projection(
+        &self,
+        request: PendingNixApprovalRequestV1,
+        projection_digest: String,
+    ) -> Result<PendingRequestInstallV1, LocalApprovalRequestStoreErrorV1> {
+        request.validate_shape()?;
+        if request.daemon_incarnation_id != self.daemon_incarnation_ref {
+            return Err(LocalApprovalRequestStoreErrorV1::DaemonIncarnationMismatch);
+        }
+        validate_projection_digest_v1(&projection_digest)?;
+
+        let request_id = request.request_id()?;
+        let intent_digest = request.action_intent_digest.clone();
+        let mut pending = self
+            .pending
+            .lock()
+            .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?;
+
+        if pending.contains_key(&request_id) {
+            return Err(LocalApprovalRequestStoreErrorV1::DuplicateRequest);
+        }
+
+        let superseded_request_ids: Vec<String> = pending
+            .iter()
+            .filter_map(|(id, existing)| {
+                (existing.request.action_intent_digest == intent_digest).then(|| id.clone())
+            })
+            .collect();
+        for id in &superseded_request_ids {
+            pending.remove(id);
+        }
+        pending.insert(
+            request_id.clone(),
+            PendingApprovalRecordV1 {
+                request,
+                projection_digest,
+            },
+        );
+
+        Ok(PendingRequestInstallV1 {
+            request_id,
+            superseded_request_ids,
+        })
+    }
+
+    /// Test-only installer for legacy pure-evidence unit coverage.
+    #[cfg(test)]
+    fn install_pending(
+        &self,
+        request: PendingNixApprovalRequestV1,
+    ) -> Result<PendingRequestInstallV1, LocalApprovalRequestStoreErrorV1> {
+        self.install_pending_with_projection(request, "00".repeat(32))
+    }
+
+    /// Atomically admit and consume one exact V2 local approval request.
+    ///
+    /// Projection-digest comparison, temporal admission, and request removal all
+    /// occur while the same pending-state mutex is held.
+    pub(crate) fn consume_verified_submission_v2(
+        &self,
+        submission: &LocalApprovalSubmissionV2,
+        verified_peer: &VerifiedLocalUnixPeerCredentialV1,
+        evaluation: AuthoritativeEvaluationV1,
+    ) -> Result<ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1> {
+        let mut pending = self
+            .pending
+            .lock()
+            .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?;
+
+        let decision = {
+            let record = pending
+                .get(&submission.request_id)
+                .ok_or(LocalApprovalRequestStoreErrorV1::RequestNotPending)?;
+            admit_verified_local_submission_v2(
+                submission,
+                &record.request,
+                &record.projection_digest,
+                verified_peer,
+                evaluation,
+            )?
+        };
+
+        let removed = pending
+            .remove(&submission.request_id)
+            .ok_or(LocalApprovalRequestStoreErrorV1::RequestDisappearedDuringConsume)?;
+        debug_assert_eq!(
+            removed.request.request_id().ok().as_deref(),
+            Some(submission.request_id.as_str())
+        );
+
+        ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &removed.request,
+            decision,
+            removed.projection_digest,
+            verified_peer,
+            evaluation,
+        )
+    }
+
+    /// Test-only legacy V1 admission, isolated from production callers.
+    #[cfg(test)]
+    fn consume_verified_submission_v1(
+        &self,
+        submission: &LocalApprovalSubmissionV1,
+        verified_peer: &VerifiedLocalUnixPeerCredentialV1,
+        evaluation: AuthoritativeEvaluationV1,
+    ) -> Result<ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1> {
+        let mut pending = self
+            .pending
+            .lock()
+            .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?;
+        let (request, projection_digest) = {
+            let record = pending
+                .get(&submission.request_id)
+                .ok_or(LocalApprovalRequestStoreErrorV1::RequestNotPending)?;
+            (record.request.clone(), record.projection_digest.clone())
+        };
+        let v2 = LocalApprovalSubmissionV2 {
+            request_id: submission.request_id.clone(),
+            daemon_incarnation_id: submission.daemon_incarnation_id.clone(),
+            action_intent_digest: submission.action_intent_digest.clone(),
+            projection_digest: "00".repeat(32),
+            decision: submission.decision,
+            decided_at_unix_ms: submission.decided_at_unix_ms,
+        };
+        let decision = admit_verified_local_submission_v2(
+            &v2,
+            &request,
+            &"00".repeat(32),
+            verified_peer,
+            evaluation,
+        )?;
+        pending.remove(&submission.request_id);
+        ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &request,
+            decision,
+            projection_digest,
+            verified_peer,
+            evaluation,
+        )
+    }
+
+    pub fn pending_count(&self) -> Result<usize, LocalApprovalRequestStoreErrorV1> {
+        Ok(self
+            .pending
+            .lock()
+            .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?
+            .len())
+    }
+
+    pub fn is_pending(
+        &self,
+        request_id: &str,
+    ) -> Result<bool, LocalApprovalRequestStoreErrorV1> {
+        Ok(self
+            .pending
+            .lock()
+            .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?
+            .contains_key(request_id))
+    }
+
+    /// Observe whether a request is pending and unexpired at one instant.
+    ///
+    /// This is a non-authoritative snapshot. It does not reserve or consume the
+    /// request and must not be used as execution admission.
+    pub fn observe_currentness(
+        &self,
+        request_id: &str,
+        now: UnixMillisV1,
+    ) -> Result<PendingRequestCurrentnessV1, LocalApprovalRequestStoreErrorV1> {
+        let pending = self
+            .pending
+            .lock()
+            .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?;
+        let request = match pending.get(request_id) {
+            Some(request) => request,
+            None => return Ok(PendingRequestCurrentnessV1::NotPending),
+        };
+
+        if now.as_u64() >= request.request.expires_at_unix_ms {
+            Ok(PendingRequestCurrentnessV1::Expired)
+        } else {
+            Ok(PendingRequestCurrentnessV1::Current)
+        }
+    }
+
+}
+
+fn validate_projection_digest_v1(value: &str) -> Result<(), LocalApprovalRequestStoreErrorV1> {
+    if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(LocalApprovalRequestStoreErrorV1::InvalidProjectionDigest);
+    }
+    Ok(())
+}
+
+impl std::fmt::Debug for LocalApprovalRequestStoreV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let pending_count = self.pending.lock().map(|p| p.len()).ok();
+        f.debug_struct("LocalApprovalRequestStoreV1")
+            .field("daemon_incarnation_ref", &self.daemon_incarnation_ref)
+            .field("pending_count", &pending_count)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingRequestInstallV1 {
+    pub request_id: String,
+    pub superseded_request_ids: Vec<String>,
+}
+
+/// Non-authoritative snapshot of live pending-request currentness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PendingRequestCurrentnessV1 {
+    Current,
+    Expired,
+    NotPending,
+}
+
+/// Live proof that one exact pending request was admitted and atomically removed.
+///
+/// This type is intentionally private-field, non-Serde, non-Clone and non-Copy.
+/// Persisted `LocalNixApprovalDecisionV1` remains audit evidence only; a later live
+/// authority layer should accept this token by value if it needs the store's
+/// single-use theorem.
+pub struct ConsumedLocalApprovalDecisionV1 {
+    request_id: String,
+    decision_evidence: LocalNixApprovalDecisionV1,
+    projection_digest: String,
+    required_approval_profile: String,
+    approver_evidence_ref: super::approver_evidence::ApproverEvidenceRefV1,
+    transport_instance_ref: String,
+    peer_observed_at_unix_ms: u64,
+    consumed_at_unix_ms: u64,
+}
+
+impl ConsumedLocalApprovalDecisionV1 {
+    /// Final internal provenance-consistency seam for a consumed approval.
+    ///
+    /// All duplicated provenance fields are derived from the same live request,
+    /// admitted decision, verified peer, and authoritative evaluation.
+    fn from_admitted_parts(
+        request: &PendingNixApprovalRequestV1,
+        decision_evidence: LocalNixApprovalDecisionV1,
+        projection_digest: String,
+        verified_peer: &VerifiedLocalUnixPeerCredentialV1,
+        evaluation: AuthoritativeEvaluationV1,
+    ) -> Result<Self, LocalApprovalRequestStoreErrorV1> {
+        request.validate_shape()?;
+        validate_projection_digest_v1(&projection_digest)?;
+        decision_evidence.validate_shape()?;
+
+        if decision_evidence.request_id != request.request_id()? {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "request id",
+            ));
+        }
+        if decision_evidence.daemon_incarnation_id != request.daemon_incarnation_id {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "daemon incarnation",
+            ));
+        }
+        if decision_evidence.action_intent_digest != request.action_intent_digest {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "action intent digest",
+            ));
+        }
+
+        let required = RequiredApprovalProfileV1::parse_ref(&request.authority_profile_ref)?;
+        let evidence_profile =
+            VerifiedApproverEvidenceProfileV1::from_reference(verified_peer.evidence_ref())?;
+        if !required_profile_accepts_evidence_v1(required, evidence_profile) {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "required/evidence profile",
+            ));
+        }
+
+        let expected_approver_ref = format!(
+            "nixward-approver-evidence-v1:local-unix-peer-credential-v1:{}",
+            verified_peer.evidence_ref().evidence_digest
+        );
+        if decision_evidence.approver_ref != expected_approver_ref {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "approver evidence reference",
+            ));
+        }
+
+        let peer_observed_at = verified_peer.audit_evidence().observed_at_unix_ms;
+        let evaluated_at = evaluation.evaluated_at().as_u64();
+        if peer_observed_at > evaluated_at {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "peer observation time",
+            ));
+        }
+        if decision_evidence.decided_at_unix_ms > evaluated_at {
+            return Err(LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "decision time",
+            ));
+        }
+
+        Ok(Self {
+            request_id: decision_evidence.request_id.clone(),
+            decision_evidence,
+            projection_digest,
+            required_approval_profile: request.authority_profile_ref.clone(),
+            approver_evidence_ref: verified_peer.evidence_ref().clone(),
+            transport_instance_ref: verified_peer.audit_evidence().transport_instance_ref.clone(),
+            peer_observed_at_unix_ms: peer_observed_at,
+            consumed_at_unix_ms: evaluated_at,
+        })
+    }
+
+    pub fn request_id(&self) -> &str {
+        &self.request_id
+    }
+
+    pub fn decision_kind(&self) -> LocalApprovalDecisionKindV1 {
+        self.decision_evidence.decision
+    }
+
+    pub fn decision_evidence(&self) -> &LocalNixApprovalDecisionV1 {
+        &self.decision_evidence
+    }
+
+    pub fn projection_digest(&self) -> &str {
+        &self.projection_digest
+    }
+
+    pub fn required_approval_profile(&self) -> &str {
+        &self.required_approval_profile
+    }
+
+    pub fn approver_evidence_ref(&self) -> &super::approver_evidence::ApproverEvidenceRefV1 {
+        &self.approver_evidence_ref
+    }
+
+    pub fn transport_instance_ref(&self) -> &str {
+        &self.transport_instance_ref
+    }
+
+    pub fn peer_observed_at(&self) -> UnixMillisV1 {
+        UnixMillisV1::new(self.peer_observed_at_unix_ms)
+    }
+
+    pub fn consumed_at(&self) -> UnixMillisV1 {
+        UnixMillisV1::new(self.consumed_at_unix_ms)
+    }
+}
+
+impl std::fmt::Debug for ConsumedLocalApprovalDecisionV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConsumedLocalApprovalDecisionV1")
+            .field("request_id", &self.request_id)
+            .field("decision", &self.decision_evidence.decision)
+            .field("projection_digest", &self.projection_digest)
+            .field("required_approval_profile", &self.required_approval_profile)
+            .field("approver_evidence_ref", &self.approver_evidence_ref)
+            .field("transport_instance_ref", &self.transport_instance_ref)
+            .field("peer_observed_at_unix_ms", &self.peer_observed_at_unix_ms)
+            .field("consumed_at_unix_ms", &self.consumed_at_unix_ms)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum LocalApprovalRequestStoreErrorV1 {
+    #[error("approval request validation failed: {0}")]
+    Request(#[from] LocalApprovalErrorV1),
+    #[error("approval submission admission failed: {0}")]
+    Admission(#[from] LocalApprovalAdmissionErrorV1),
+    #[error("approver evidence validation failed: {0}")]
+    ApproverEvidence(#[from] ApproverEvidenceErrorV1),
+    #[error("pending approval store mutex is poisoned")]
+    StorePoisoned,
+    #[error("request belongs to another daemon incarnation")]
+    DaemonIncarnationMismatch,
+    #[error("exact request is already pending")]
+    DuplicateRequest,
+    #[error("approval request is not pending in this live daemon store")]
+    RequestNotPending,
+    #[error("pending request disappeared while its consume mutex was held")]
+    RequestDisappearedDuringConsume,
+    #[error("consumed approval provenance is internally inconsistent: {0}")]
+    ConsumedProvenanceMismatch(&'static str),
+    #[error("invalid projection digest")]
+    InvalidProjectionDigest,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::action::authorization::NixActionIntentV1;
+    use crate::action::executor::NixOSCommand;
+    use crate::action::VerifiedLocalUnixPeerCredentialV1;
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    fn ms(value: u64) -> UnixMillisV1 {
+        UnixMillisV1::new(value)
+    }
+
+    fn intent() -> NixActionIntentV1 {
+        NixActionIntentV1::from_command(
+            "machine:workstation",
+            Some("generation:42".to_string()),
+            &NixOSCommand::RebuildSwitch {
+                flake: Some(".#workstation".to_string()),
+                extra_args: vec![],
+            },
+        )
+        .unwrap()
+    }
+
+    fn request_for(
+        store: &LocalApprovalRequestStoreV1,
+        nonce_byte: u8,
+    ) -> PendingNixApprovalRequestV1 {
+        PendingNixApprovalRequestV1::from_intent(
+            &intent(),
+            store.daemon_incarnation_ref().to_string(),
+            "nixos-rebuild switch --flake .#workstation",
+            "same-uid-process-v1",
+            ms(1_000),
+            ms(2_000),
+            [nonce_byte; 32],
+        )
+        .unwrap()
+    }
+
+    fn peer(uid: u32, pid: u32) -> VerifiedLocalUnixPeerCredentialV1 {
+        VerifiedLocalUnixPeerCredentialV1::from_kernel_peer_observation(
+            uid,
+            100,
+            Some(pid),
+            format!("unix-socket-instance:test-{pid}"),
+            ms(1_100),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn store_is_bound_to_live_daemon_incarnation() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let mut request = request_for(&store, 1);
+        request.daemon_incarnation_id = format!("{}-old", store.daemon_incarnation_ref());
+
+        assert_eq!(
+            store.install_pending(request).unwrap_err(),
+            LocalApprovalRequestStoreErrorV1::DaemonIncarnationMismatch
+        );
+        assert_eq!(store.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn duplicate_exact_request_is_rejected() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        store.install_pending(request.clone()).unwrap();
+
+        assert_eq!(
+            store.install_pending(request).unwrap_err(),
+            LocalApprovalRequestStoreErrorV1::DuplicateRequest
+        );
+        assert_eq!(store.pending_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn newer_request_for_same_intent_atomically_supersedes_old_request() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let old_request = request_for(&store, 1);
+        let old_id = old_request.request_id().unwrap();
+        let old_submission = LocalApprovalSubmissionV1::for_request(
+            &old_request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        store.install_pending(old_request).unwrap();
+
+        let new_request = request_for(&store, 2);
+        let new_id = new_request.request_id().unwrap();
+        let install = store.install_pending(new_request.clone()).unwrap();
+        assert_eq!(install.request_id, new_id);
+        assert_eq!(install.superseded_request_ids, vec![old_id.clone()]);
+        assert!(!store.is_pending(&old_id).unwrap());
+        assert!(store.is_pending(&new_id).unwrap());
+
+        assert_eq!(
+            store
+                .consume_verified_submission_v1(&old_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .unwrap_err(),
+            LocalApprovalRequestStoreErrorV1::RequestNotPending
+        );
+
+        let new_submission = LocalApprovalSubmissionV1::for_request(
+            &new_request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        let consumed = store
+            .consume_verified_submission_v1(&new_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .unwrap();
+        assert_eq!(consumed.request_id(), new_id);
+    }
+
+    #[test]
+    fn currentness_observation_distinguishes_current_expired_and_not_pending() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let request_id = request.request_id().unwrap();
+        store.install_pending(request).unwrap();
+
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(1_999)).unwrap(),
+            PendingRequestCurrentnessV1::Current
+        );
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(2_000)).unwrap(),
+            PendingRequestCurrentnessV1::Expired
+        );
+
+        let second = request_for(&store, 2);
+        let second_id = second.request_id().unwrap();
+        store.install_pending(second).unwrap();
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(1_500)).unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
+        assert_eq!(
+            store.observe_currentness(&second_id, ms(1_500)).unwrap(),
+            PendingRequestCurrentnessV1::Current
+        );
+    }
+
+    #[test]
+    fn stale_currentness_observation_cannot_resurrect_consumed_request() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let request_id = request.request_id().unwrap();
+        let submission = LocalApprovalSubmissionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        store.install_pending(request).unwrap();
+
+        let observation = store.observe_currentness(&request_id, ms(1_300)).unwrap();
+        assert_eq!(observation, PendingRequestCurrentnessV1::Current);
+
+        store
+            .consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_400)))
+            .unwrap();
+
+        // The earlier Current result is intentionally only a historical observation.
+        // Re-observing the live store after consumption is the only meaningful
+        // currentness check and must report that the request is no longer pending.
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(1_500)).unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
+        assert_eq!(store.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn stale_currentness_does_not_bypass_expiry_at_atomic_consume_boundary() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let request_id = request.request_id().unwrap();
+        let submission = LocalApprovalSubmissionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_900),
+        )
+        .unwrap();
+        store.install_pending(request).unwrap();
+
+        // A caller may observe Current immediately before the deadline.
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(1_999)).unwrap(),
+            PendingRequestCurrentnessV1::Current
+        );
+
+        // The atomic consume boundary re-evaluates time itself. The stale
+        // observation cannot authorize a consume at the exact expiry instant.
+        assert!(matches!(
+            store.consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(2_000))),
+            Err(LocalApprovalRequestStoreErrorV1::Admission(_))
+        ));
+        assert!(store.is_pending(&request_id).unwrap());
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(2_000)).unwrap(),
+            PendingRequestCurrentnessV1::Expired
+        );
+    }
+
+    #[test]
+    fn v2_consume_returns_self_contained_approval_provenance_capsule() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 7);
+        let projection_digest = "ab".repeat(32);
+        let request_id = request.request_id().unwrap();
+        let submission = LocalApprovalSubmissionV2 {
+            request_id: request_id.clone(),
+            daemon_incarnation_id: request.daemon_incarnation_id.clone(),
+            action_intent_digest: request.action_intent_digest.clone(),
+            projection_digest: projection_digest.clone(),
+            decision: LocalApprovalDecisionKindV1::Approved,
+            decided_at_unix_ms: 1_200,
+        };
+        store
+            .install_pending_with_projection(request, projection_digest.clone())
+            .unwrap();
+
+        let consumed = store
+            .consume_verified_submission_v2(
+                &submission,
+                &peer(1000, 42),
+                AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+            )
+            .unwrap();
+
+        assert_eq!(consumed.request_id(), request_id);
+        assert_eq!(consumed.decision_kind(), LocalApprovalDecisionKindV1::Approved);
+        assert_eq!(consumed.projection_digest(), projection_digest);
+        assert_eq!(consumed.required_approval_profile(), "same-uid-process-v1");
+        assert_eq!(consumed.approver_evidence_ref().profile, super::super::approver_evidence::ApproverEvidenceProfileV1::LocalUnixPeerCredentialV1);
+        assert_eq!(consumed.approver_evidence_ref().evidence_digest.len(), 64);
+        assert_eq!(consumed.transport_instance_ref(), "unix-socket-instance:test-42");
+        assert_eq!(consumed.peer_observed_at(), ms(1_100));
+        assert_eq!(consumed.consumed_at(), ms(1_300));
+        assert_eq!(store.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn successful_consume_removes_request_and_returns_live_token() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let request_id = request.request_id().unwrap();
+        let submission = LocalApprovalSubmissionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        store.install_pending(request).unwrap();
+
+        let consumed = store
+            .consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .unwrap();
+
+        assert_eq!(consumed.request_id(), request_id);
+        assert_eq!(consumed.decision_kind(), LocalApprovalDecisionKindV1::Approved);
+        assert_eq!(consumed.consumed_at(), ms(1_300));
+        assert_eq!(store.pending_count().unwrap(), 0);
+        assert!(!store.is_pending(&request_id).unwrap());
+    }
+
+    #[test]
+    fn invalid_submission_does_not_consume_legitimate_pending_request() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let request_id = request.request_id().unwrap();
+        let valid_submission = LocalApprovalSubmissionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        let mut hostile = valid_submission.clone();
+        hostile.action_intent_digest = "11".repeat(32);
+        store.install_pending(request).unwrap();
+
+        assert!(matches!(
+            store.consume_verified_submission_v1(&hostile, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))),
+            Err(LocalApprovalRequestStoreErrorV1::Admission(
+                LocalApprovalAdmissionErrorV1::Approval(LocalApprovalErrorV1::IntentMismatch)
+            ))
+        ));
+        assert!(store.is_pending(&request_id).unwrap());
+
+        store
+            .consume_verified_submission_v1(&valid_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .unwrap();
+        assert!(!store.is_pending(&request_id).unwrap());
+    }
+
+    #[test]
+    fn denial_is_terminal_and_consumes_pending_request() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let submission = LocalApprovalSubmissionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Denied,
+            ms(1_200),
+        )
+        .unwrap();
+        store.install_pending(request).unwrap();
+
+        let consumed = store
+            .consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .unwrap();
+        assert_eq!(consumed.decision_kind(), LocalApprovalDecisionKindV1::Denied);
+        assert_eq!(store.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn concurrent_duplicate_consumers_cannot_both_succeed() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = Arc::new(LocalApprovalRequestStoreV1::new(&daemon));
+        let request = request_for(&store, 1);
+        let submission = LocalApprovalSubmissionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        store.install_pending(request).unwrap();
+
+        let barrier = Arc::new(Barrier::new(3));
+        let mut handles = Vec::new();
+        for (uid, pid) in [(1000, 10), (1001, 11)] {
+            let store = Arc::clone(&store);
+            let barrier = Arc::clone(&barrier);
+            let submission = submission.clone();
+            handles.push(thread::spawn(move || {
+                let peer = peer(uid, pid);
+                barrier.wait();
+                store.consume_verified_submission_v1(&submission, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            }));
+        }
+        barrier.wait();
+
+        let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+        assert_eq!(
+            results
+                .iter()
+                .filter(|r| matches!(r, Err(LocalApprovalRequestStoreErrorV1::RequestNotPending)))
+                .count(),
+            1
+        );
+        assert_eq!(store.pending_count().unwrap(), 0);
+    }
+    #[test]
+    fn consumed_capsule_rejects_mismatched_approver_reference() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 9);
+        let peer = peer(1000, 9);
+        let decision = LocalNixApprovalDecisionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+            format!(
+                "nixward-approver-evidence-v1:local-unix-peer-credential-v1:{}",
+                "00".repeat(32)
+            ),
+        )
+        .unwrap();
+        let err = ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &request,
+            decision,
+            "00".repeat(32),
+            &peer,
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "approver evidence reference"
+            )
+        );
+    }
+
+    #[test]
+    fn consumed_capsule_rejects_peer_observation_after_evaluation() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 10);
+        let peer = peer(1000, 10);
+        let decision = LocalNixApprovalDecisionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+            format!(
+                "nixward-approver-evidence-v1:local-unix-peer-credential-v1:{}",
+                peer.evidence_ref().evidence_digest
+            ),
+        )
+        .unwrap();
+        let err = ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &request,
+            decision,
+            "00".repeat(32),
+            &peer,
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_000)),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "peer observation time"
+            )
+        );
+    }
+
+    #[test]
+    fn consumed_capsule_rejects_decision_after_evaluation() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 11);
+        let peer = peer(1000, 11);
+        let mut decision = LocalNixApprovalDecisionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+            format!(
+                "nixward-approver-evidence-v1:local-unix-peer-credential-v1:{}",
+                peer.evidence_ref().evidence_digest
+            ),
+        )
+        .unwrap();
+        decision.decided_at_unix_ms = 1_400;
+        let err = ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &request,
+            decision,
+            "00".repeat(32),
+            &peer,
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch("decision time")
+        );
+    }
+
+    #[test]
+    fn consumed_capsule_rejects_profile_substitution() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let mut request = request_for(&store, 12);
+        request.authority_profile_ref = "xenia-authenticated-operator-v1".to_string();
+        let peer = peer(1000, 12);
+        let decision = LocalNixApprovalDecisionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+            format!(
+                "nixward-approver-evidence-v1:local-unix-peer-credential-v1:{}",
+                peer.evidence_ref().evidence_digest
+            ),
+        )
+        .unwrap();
+        let err = ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+            &request,
+            decision,
+            "00".repeat(32),
+            &peer,
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch(
+                "required/evidence profile"
+            )
+        );
+    }
+
+}

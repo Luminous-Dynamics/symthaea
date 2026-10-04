@@ -149,13 +149,13 @@ fn main() {
                     cmd_service_status(&name, cli.format);
                 }
                 ServiceCommand::Start { name } => {
-                    cmd_execute(ServiceManager::start(&name), cli.dry_run, cli.phi);
+                    cmd_execute_service(ServiceManager::try_start(&name), cli.dry_run, cli.phi);
                 }
                 ServiceCommand::Stop { name } => {
-                    cmd_execute(ServiceManager::stop(&name), cli.dry_run, cli.phi);
+                    cmd_execute_service(ServiceManager::try_stop(&name), cli.dry_run, cli.phi);
                 }
                 ServiceCommand::Restart { name } => {
-                    cmd_execute(ServiceManager::restart(&name), cli.dry_run, cli.phi);
+                    cmd_execute_service(ServiceManager::try_restart(&name), cli.dry_run, cli.phi);
                 }
                 ServiceCommand::Failed => {
                     cmd_service_failed(cli.format);
@@ -315,6 +315,17 @@ fn cmd_search(query: &str, options: bool, limit: usize, format: OutputFormat) {
 /// anything run via this CLI's default invocation — see
 /// SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md Phase 1.
 const DEFAULT_CLI_CONFIRMATION_LEVEL: f32 = 0.35;
+
+fn cmd_execute_service(
+    result: Result<NixOSCommand, nixward::action::service_domain::NixServiceOperationErrorV1>,
+    dry_run: bool,
+    phi_override: Option<f64>,
+) {
+    match result {
+        Ok(cmd) => cmd_execute(cmd, dry_run, phi_override),
+        Err(error) => eprintln!("  Invalid service operation: {error}"),
+    }
+}
 
 fn cmd_execute(cmd: NixOSCommand, dry_run: bool, phi_override: Option<f64>) {
     let phi = phi_override
