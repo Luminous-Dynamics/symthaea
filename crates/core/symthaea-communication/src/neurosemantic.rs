@@ -618,6 +618,43 @@ mod tests {
     }
 
     #[test]
+    fn data_class_schema_is_stable() {
+        for (class, expected) in [
+            (NeurosemanticDataClass::Unknown, "Unknown"),
+            (NeurosemanticDataClass::RawNeuralRecording, "RawNeuralRecording"),
+            (NeurosemanticDataClass::DerivedNeuralFeature, "DerivedNeuralFeature"),
+            (NeurosemanticDataClass::SemanticRepresentation, "SemanticRepresentation"),
+            (NeurosemanticDataClass::DecodedClaim, "DecodedClaim"),
+            (NeurosemanticDataClass::PersonalizedDecoderModel, "PersonalizedDecoderModel"),
+        ] {
+            assert_eq!(serde_json::to_string(&class).unwrap(), format!("\"{expected}\""));
+        }
+    }
+
+    #[test]
+    fn inference_class_schema_is_stable() {
+        for (class, expected) in [
+            (NeurosemanticInferenceClass::Unknown, "Unknown"),
+            (NeurosemanticInferenceClass::SignalPattern, "SignalPattern"),
+            (NeurosemanticInferenceClass::UnitPattern, "UnitPattern"),
+            (NeurosemanticInferenceClass::LinguisticContent, "LinguisticContent"),
+            (NeurosemanticInferenceClass::SemanticContent, "SemanticContent"),
+            (NeurosemanticInferenceClass::AffectiveState, "AffectiveState"),
+            (NeurosemanticInferenceClass::Intent, "Intent"),
+            (NeurosemanticInferenceClass::Identity, "Identity"),
+        ] {
+            assert_eq!(serde_json::to_string(&class).unwrap(), format!("\"{expected}\""));
+        }
+    }
+
+    #[test]
+    fn data_policy_serialization_roundtrips() {
+        let policy = semantic_policy();
+        let encoded = serde_json::to_vec(&policy).unwrap();
+        let decoded: NeurosemanticDataPolicy = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded, policy);
+    }
+    #[test]
     fn consent_is_deny_by_default() {
         let l = lease();
         assert!(!l.authorizes(
