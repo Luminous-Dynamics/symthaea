@@ -398,7 +398,9 @@ impl FederatedClaim {
         &self,
         validation: &crate::ProvenanceValidationReport,
     ) -> bool {
-        self.admission_receipt.binds_validation(validation)
+        self.validate_structure().is_ok()
+            && validation.validate_against_relations(&self.relations).is_ok()
+            && self.admission_receipt.binds_validation(validation)
             && self.provenance_snapshot_digest == validation.snapshot_digest
             && self.provenance_validation == *validation
     }
@@ -1039,6 +1041,14 @@ mod adversarial_contract_tests {
         let mut changed = a.clone();
         changed.claim_identity.push_str(":retry-different");
         assert_ne!(a.replay_key(), changed.replay_key());
+    }
+
+    #[test]
+    fn admission_binding_is_fail_closed_for_malformed_claims() {
+        let mut claim = claim();
+        claim.statement_ref = "   ".into();
+        let validation = claim.provenance_validation.clone();
+        assert!(!claim.is_admission_bound(&validation));
     }
 
     #[test]
