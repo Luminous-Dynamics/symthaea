@@ -353,7 +353,6 @@ pub enum SolverBindingError {
     UnverifiedBinding,
     InvalidEvidenceState,
     EmptyCandidateGeometryDigest,
-    EmptyBoundaryPatchDigest,
     PortMismatch,
     InterfaceDigestMismatch,
     SolverBoundaryMismatch,
@@ -1310,22 +1309,15 @@ mod tests {
                 "patch:inlet",
                 [0; 32],
                 &candidate,
-                [2; 32],
+                select_boundary_patch(&interface, &candidate, 0.05).unwrap(),
+                0.05,
             ),
             Err(SolverBindingError::EmptyCandidateGeometryDigest)
         );
 
         assert_eq!(
-            SolverBoundaryBinding::verified(
-                &interface,
-                "test-adapter/v1",
-                "patch:inlet",
-                [3; 32],
-                &candidate,
-                select_boundary_patch(&interface, &candidate, 0.05),
-                0.05,
-            ),
-            Err(SolverBindingError::EmptyBoundaryPatchDigest)
+            BoundaryPatchSelection::from_edges(Vec::new()),
+            Err(SolverBindingError::EmptyBoundaryPatchSelection)
         );
     }
 }
