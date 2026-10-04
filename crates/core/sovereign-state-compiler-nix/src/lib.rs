@@ -218,19 +218,17 @@ impl NixOSTargetAdapter {
         observation_digest: sovereign_state_compiler::ContentDigest,
         capabilities: BTreeSet<Capability>,
         resources: BTreeSet<sovereign_state_compiler::ResourceRef>,
-    ) -> Self {
-        Self {
-            snapshot: TargetSnapshot {
-                profile: sovereign_state_compiler::TargetProfile {
-                    identity: target.into(),
-                    platform: NIXOS_PLATFORM.into(),
-                    capabilities,
-                },
-                observed_at_ms,
-                observation_digest,
-                resources,
+    ) -> Result<Self, NixOSAdapterError> {
+        Self::from_snapshot(TargetSnapshot {
+            profile: sovereign_state_compiler::TargetProfile {
+                identity: target.into(),
+                platform: NIXOS_PLATFORM.into(),
+                capabilities,
             },
-        }
+            observed_at_ms,
+            observation_digest,
+            resources,
+        })
     }
 
     pub fn from_snapshot(snapshot: TargetSnapshot) -> Result<Self, NixOSAdapterError> {
@@ -238,6 +236,14 @@ impl NixOSTargetAdapter {
             return Err(NixOSAdapterError::WrongPlatform(
                 snapshot.profile.platform.clone(),
             ));
+        }
+        if let Some(capability) = snapshot
+            .profile
+            .capabilities
+            .iter()
+            .find(|capability| !default_nixos_capabilities().contains(capability))
+        {
+            return Err(NixOSAdapterError::UnsupportedCapability(*capability));
         }
         Ok(Self { snapshot })
     }
@@ -597,6 +603,8 @@ pub enum NixOSAdapterError {
     TargetMismatch,
     #[error("target platform is not NixOS: {0}")]
     WrongPlatform(String),
+    #[error("capability {0:?} is not supported by the canonical NixOS adapter surface")]
+    UnsupportedCapability(Capability),
     #[error("unsupported NixOS state property: {0}")]
     UnsupportedProperty(String),
     #[error("state property {key} must be a {expected}")]
@@ -649,6 +657,51 @@ mod tests {
             nixos_generation_resource(generation, realization).expect("generation resource"),
         );
         NixOSTargetAdapter::from_snapshot(snapshot).expect("nixos snapshot")
+    }
+
+    #[test]
+    fn from_snapshot_rejects_unsupported_capability_surface() {
+        let mut snapshot = adapter().describe_target().expect("snapshot");
+        snapshot
+            .profile
+            .capabilities
+            .insert(Capability::CreateRecoveryEnvironment);
+
+        assert_eq!(
+            NixOSTargetAdapter::from_snapshot(snapshot),
+            Err(NixOSAdapterError::UnsupportedCapability(
+                Capability::CreateRecoveryEnvironment
+            ))
+        );
+    }
+
+    #[test]
+    fn from_observation_rejects_unsupported_capability_surface() {
+        let result = NixOSTargetAdapter::from_observation(
+            "host-01",
+            1_000,
+            ContentDigest::blake3(b"observation"),
+            [Capability::ReplaceOs].into_iter().collect(),
+            BTreeSet::new(),
+        );
+
+        assert_eq!(
+            result,
+            Err(NixOSAdapterError::UnsupportedCapability(Capability::ReplaceOs))
+        );
+    }
+
+    #[test]
+    fn from_observation_accepts_canonical_capability_surface() {
+        let result = NixOSTargetAdapter::from_observation(
+            "host-01",
+            1_000,
+            ContentDigest::blake3(b"observation"),
+            default_nixos_capabilities(),
+            BTreeSet::new(),
+        );
+
+        assert!(result.is_ok());
     }
 
     #[test]
