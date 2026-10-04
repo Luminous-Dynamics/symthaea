@@ -1994,6 +1994,7 @@ impl KnowledgePersistence {
                   OR NEW.source_memory_id = NEW.target_memory_id
                   OR NEW.created_at IS NULL
                   OR trim(NEW.created_at) = ''
+                  OR NEW.kind IS NULL
                   OR NEW.kind NOT IN (
                       'derived_from', 'revised_from', 'supersedes',
                       'contradicts', 'corroborates', 'representation_of'
@@ -2010,6 +2011,7 @@ impl KnowledgePersistence {
                   OR NEW.source_memory_id = NEW.target_memory_id
                   OR NEW.created_at IS NULL
                   OR trim(NEW.created_at) = ''
+                  OR NEW.kind IS NULL
                   OR NEW.kind NOT IN (
                       'derived_from', 'revised_from', 'supersedes',
                       'contradicts', 'corroborates', 'representation_of'
@@ -2281,6 +2283,7 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
                 "new.target_memory_id is null",
                 "new.source_memory_id = new.target_memory_id",
                 "new.created_at is null",
+                "new.kind is null",
                 "new.kind not in (",
                 "raise(abort, 'knowledge_provenance_relations requires valid identities, timestamp, and stable kind')",
             ],
@@ -2290,6 +2293,7 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
                 "new.target_memory_id is null",
                 "new.source_memory_id = new.target_memory_id",
                 "new.created_at is null",
+                "new.kind is null",
                 "new.kind not in (",
                 "raise(abort, 'knowledge_provenance_relations requires valid identities, timestamp, and stable kind')",
             ],
@@ -2538,6 +2542,22 @@ fn verify_persistence_trigger_behavior(conn: &rusqlite::Connection) -> Result<()
                     .into(),
             );
         }
+        if conn
+            .execute(
+                "INSERT INTO knowledge_provenance_relations
+                 (source_memory_id, target_memory_id, kind, created_at)
+                 VALUES ('__epf011_trigger_probe_source', '__epf011_trigger_probe_target',
+                         NULL, 'event:trigger-probe-null')",
+                [],
+            )
+            .is_ok()
+        {
+            return Err(
+                "Schema integrity check failed: provenance trigger did not reject NULL kind"
+                    .into(),
+            );
+        }
+
         if conn
             .execute(
                 "UPDATE knowledge_provenance_relations
@@ -3715,6 +3735,34 @@ mod tests {
         let err = p.ensure_schema(&conn).unwrap_err();
         assert!(err.contains("Schema integrity check failed"));
         assert!(err.contains("trg_knowledge_snapshot_receipts_no_update"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_provenance_insert_boundary_rejects_null_kind() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_provenance_null_kind_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let conn = p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+
+        let err = conn
+            .execute(
+                "INSERT INTO knowledge_provenance_relations
+                 (source_memory_id, target_memory_id, kind, created_at)
+                 VALUES ('null-kind-source', 'null-kind-target', NULL, 'event:null-kind')",
+                [],
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains(
+            "knowledge_provenance_relations requires valid identities, timestamp, and stable kind"
+        ));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
