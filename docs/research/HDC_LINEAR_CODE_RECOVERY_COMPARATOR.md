@@ -409,6 +409,10 @@ For a future noisy HDC comparator, this suggests recording at least three separa
 
 These quantities must remain distinct. A decoder may produce a short list while the factorization fiber still contains multiple valid tuples, and a large factorization fiber can persist even when the target codeword itself is exactly identified. No Stage-E decoder is introduced by this design update.
 
+The new finite oracle makes that separation executable without changing the production boundary: for a fixed noisy observation it records whether the intended codeword remains in the candidate list, how many codewords are candidates, and how many factor tuples those candidates represent after affine-fiber expansion. A candidate list of one can therefore still imply a non-unique factorization, while a candidate list larger than one can multiply that ambiguity further.
+
+This boundary is also consistent with the broader HDC literature. Deng and Raviv's noise-resilient VSA construction uses Reed-Solomon/Hadamard concatenation plus histogram recovery rather than pretending random-linear-code exact solving is itself a noisy decoder. Their construction explicitly targets efficient noisy recovery, which is a distinct algorithmic path from this branch's representation-level comparator. citeturn312077academia13turn312077academia14
+
 The Stage-E evidence schema should therefore preserve a three-layer decomposition:
 
 - **channel layer** — corruption radius, corruption distribution, erasures/soft uncertainty, and the exact observation alphabet;
