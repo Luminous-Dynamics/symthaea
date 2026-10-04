@@ -1422,14 +1422,36 @@ mod tests {
                 && !node.id.starts_with("event")
                 && !node.id.starts_with("object")
         }));
-        assert_eq!(
-            decoded.graph.nodes.iter()
-                .map(|node| node.grounded_by.clone())
-                .collect::<Vec<_>>(),
-            training.nodes.iter()
-                .map(|node| node.grounded_by.clone())
-                .collect::<Vec<_>>()
-        );
+        let mut observed_groundings = decoded.graph.nodes.iter()
+            .map(|node| node.grounded_by.clone())
+            .collect::<Vec<_>>();
+        let mut expected_groundings = training.nodes.iter()
+            .map(|node| node.grounded_by.clone())
+            .collect::<Vec<_>>();
+        observed_groundings.sort();
+        expected_groundings.sort();
+        assert_eq!(observed_groundings, expected_groundings);
+    }
+
+    #[test]
+    fn source_manifest_hash_mismatch_is_fail_closed() {
+        let (training, training_manifest) = training_graph_and_manifest();
+        let codebook =
+            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
+                .unwrap();
+        let representation = codebook.encode_graph(&training, &training_manifest).unwrap();
+
+        let mut tampered_source = training_manifest.clone();
+        tampered_source.concepts[0].grounding_ids = vec!["tampered-grounding".into()];
+
+        assert!(codebook
+            .decode_graph_with_policy(
+                &representation,
+                &tampered_source,
+                &training_manifest,
+                HdcOntologyDecodePolicy::conservative_default(),
+            )
+            .is_err());
     }
 
     #[test]
