@@ -145,6 +145,7 @@ fn main() -> Result<(), String> {
     }
 
     let expected_hash = graph_hash(&expected)?;
+    let expected_structural_hash = structural_hash(&expected)?;
     let mut summary = BTreeMap::new();
     summary.insert("benchmark_schema_version", 1_u32);
     summary.insert("cases", report.len() as u32);
@@ -165,6 +166,7 @@ fn main() -> Result<(), String> {
         "execution_revision": execution_revision,
         "claim_boundary": "synthetic_structural_preservation_only",
         "expected_graph_hash": expected_hash,
+        "expected_structural_hash": expected_structural_hash,
         "summary": summary,
         "cases": report,
     });
