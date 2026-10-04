@@ -445,6 +445,5 @@ fn main() -> Result<(), String> {
         serde_json::to_string_pretty(&output).map_err(|error| error.to_string())?
     );
 
-    let _ = receiver_graph;
     Ok(())
 }
