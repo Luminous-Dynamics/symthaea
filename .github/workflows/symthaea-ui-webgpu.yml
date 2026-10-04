@@ -6,6 +6,8 @@ on:
     paths:
       - "crates/bridges/symthaea-ui/**"
       - "crates/bridges/symthaea-web/test-webgpu-qualification.mjs"
+      - "crates/bridges/symthaea-web/package.json"
+      - "crates/bridges/symthaea-web/package-lock.json"
       - "crates/domains/symthaea-canvas/**"
       - "Cargo.toml"
       - "Cargo.lock"
