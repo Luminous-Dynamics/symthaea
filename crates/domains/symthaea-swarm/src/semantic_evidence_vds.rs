@@ -2510,12 +2510,15 @@ impl<'a> CborReader<'a> {
         }
 
         let mut items=Vec::new();
+        let mut total_len=0usize;
         if let Some(count)=count {
             items.reserve(count);
             for _ in 0..count {
                 let item=self.read_bstr_bounded(max_item_len)?;
-                let total=items.iter().map(Vec::len).sum::<usize>();
-                if total>max_total_len.saturating_sub(item.len()) {
+                total_len=total_len
+                    .checked_add(item.len())
+                    .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+                if total_len>max_total_len {
                     return Err(Rfc9162ProofDecodeError::InvalidStructure);
                 }
                 items.push(item);
@@ -2532,8 +2535,10 @@ impl<'a> CborReader<'a> {
                 return Err(Rfc9162ProofDecodeError::InvalidStructure);
             }
             let item=self.read_bstr_bounded(max_item_len)?;
-            let total=items.iter().map(Vec::len).sum::<usize>();
-            if total>max_total_len.saturating_sub(item.len()) {
+            total_len=total_len
+                .checked_add(item.len())
+                .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+            if total_len>max_total_len {
                 return Err(Rfc9162ProofDecodeError::InvalidStructure);
             }
             items.push(item);
