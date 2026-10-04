@@ -48,6 +48,7 @@ OBSERVED_STATE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\
 OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceObservedStateV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
 CAPABILITIES_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceOperationCapabilitiesV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceOperationCapabilitiesV1\b'
 CAPABILITIES_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceOperationCapabilitiesV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
+OBSERVATION_CRATE_WIDE_FACTORY_PATTERN='\bpub\(crate\)[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
 ENABLEMENT_EVIDENCE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceEnablementEvidenceV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceEnablementEvidenceV1\b'
 ENABLEMENT_EVIDENCE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceEnablementEvidenceV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
 OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
@@ -159,6 +160,11 @@ run_boundary_check() {
   # canonicalization, identity checks, or observation provenance.
   if matches="$(rg -U -n --pcre2 "${VALIDATED_OPERATION_DESERIALIZATION_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_domain.rs")"; then
     echo "ERROR: validated NixServiceOperationV1 must not deserialize around its constructor" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+  if matches="$(rg -n --pcre2 "${OBSERVATION_CRATE_WIDE_FACTORY_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
+    echo "ERROR: observation/evidence factories must not widen to crate visibility" >&2
     echo "${matches}" >&2
     failed=1
   fi
@@ -392,6 +398,12 @@ run_self_test() {
   printf '%s\n' 'pub(crate) fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-crate-parser.rs"
   if scan_public_observation_factory "${tmp}/observed-state-crate-parser.rs"; then
     echo "ERROR: CROSS-023 self-test falsely rejected crate-private observation parser" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'pub(crate) fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-crate-wide-parser.rs"
+  if rg -n --pcre2 "${OBSERVATION_CRATE_WIDE_FACTORY_PATTERN}" "${tmp}/observed-state-crate-wide-parser.rs"; then :; else
+    echo "ERROR: CROSS-027 self-test failed to detect crate-wide observation parser visibility" >&2
     return 1
   fi
 
