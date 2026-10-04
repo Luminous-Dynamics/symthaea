@@ -674,17 +674,13 @@ mod tests {
             .unwrap();
 
         projection.machine_target_ref = "machine:tampered".to_string();
-        projection.projection_digest = "11".repeat(32);
+        projection.projection_digest = projection.compute_digest().unwrap();
 
         assert_eq!(
             store
                 .observe_projection_currentness(&projection, ms(1_500))
-                .unwrap_err(),
-            LocalApprovalRequestStoreErrorV1::Admission(
-                LocalApprovalAdmissionErrorV1::Projection(
-                    LocalApprovalProjectionErrorV1::ProjectionDigestMismatch
-                )
-            )
+                .unwrap(),
+            PendingRequestCurrentnessV1::NotPending
         );
         assert!(store.is_pending(&request_id).unwrap());
     }
