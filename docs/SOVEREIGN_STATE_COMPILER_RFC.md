@@ -616,7 +616,13 @@ valid consumption record with a different authorized plan object. It can only be
 minted after plan validation and successful store acceptance.
 This makes the intended lifecycle explicit:
 
-`AuthorizedDeploymentPlan -> durable consume -> ConsumedAuthorization -> execute`.
+`AuthorizedDeploymentPlan -> durable consume -> ConsumedAuthorization ->
+execution admission -> execute`.
+
+`ConsumedAuthorization::admit_execution(now_ms)` revalidates the authorization
+at the execution-start timestamp and rejects time moving backward relative to
+consumption. This makes an authorization that expires after it is consumed
+unusable for a later mutation; the authorization remains safely burned.
 
 The invariant is:
 
