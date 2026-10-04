@@ -476,7 +476,7 @@ fn point_on_segment(
     a: [f32; 2],
     b: [f32; 2],
     point: [f32; 2],
-    epsilon: f32,
+    epsilon: f64,
 ) -> bool {
     f64::from(point[0]) >= f64::from(a[0].min(b[0])) - epsilon
         && f64::from(point[0]) <= f64::from(a[0].max(b[0])) + epsilon
