@@ -247,9 +247,6 @@ impl KnowledgeSnapshotReceiptHistoryCheckpoint {
         if (self.receipt_count == 0) != (self.latest_generation == 0) {
             return Err("Snapshot receipt history checkpoint count/generation mismatch".into());
         }
-        if self.receipt_count > 0 && self.latest_generation == 0 {
-            return Err("Snapshot receipt history checkpoint latest generation must be positive".into());
-        }
         Ok(())
     }
 
