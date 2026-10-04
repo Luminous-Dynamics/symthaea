@@ -2458,7 +2458,46 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
                         .map(Option::as_deref)
                         .eq(expected_columns.iter().copied().map(Some))
                 {
-                    found_unique = true;
+                    let info_pragma = format!("PRAGMA index_xinfo({index})");
+                    let mut xinfo_stmt = conn
+                        .prepare(&info_pragma)
+                        .map_err(|e| {
+                            format!("Schema integrity index extended columns for {index}: {e}")
+                        })?;
+                    let key_columns = xinfo_stmt
+                        .query_map([], |info_row| {
+                            Ok((
+                                info_row.get::<_, Option<String>>(2)?,
+                                info_row.get::<_, i64>(3)?,
+                                info_row.get::<_, String>(4)?,
+                                info_row.get::<_, i64>(5)?,
+                            ))
+                        })
+                        .map_err(|e| {
+                            format!("Schema integrity index extended column query for {index}: {e}")
+                        })?
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(|e| {
+                            format!("Schema integrity index extended column row for {index}: {e}")
+                        })?;
+
+                    let semantic_key_columns: Vec<_> = key_columns
+                        .into_iter()
+                        .filter(|(_, _, _, is_key)| *is_key != 0)
+                        .collect();
+
+                    let exact_key_contract = semantic_key_columns.len() == expected_columns.len()
+                        && semantic_key_columns.iter().enumerate().all(
+                            |(position, (name, desc, collation, is_key))| {
+                                *is_key != 0
+                                    && *desc == 0
+                                    && collation.eq_ignore_ascii_case("BINARY")
+                                    && name.as_deref() == Some(expected_columns[position])
+                            },
+                        );
+                    if exact_key_contract {
+                        found_unique = true;
+                    }
                 }
                 break;
             }
@@ -4382,6 +4421,45 @@ mod tests {
             )
             .unwrap();
         assert_eq!(stored_memory_id, "idempotent-schema");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_initialized_schema_rejects_non_binary_identity_index() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_collated_identity_index_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "collated-index".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x74; BinaryHV::BYTES],
+            source_text: "collated index".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        let conn = p.open_connection().unwrap();
+        conn.execute_batch(
+            "DROP INDEX idx_facts_memory_id_unique;
+             CREATE UNIQUE INDEX idx_facts_memory_id_unique
+             ON knowledge_facts(memory_id COLLATE NOCASE);",
+        )
+        .unwrap();
+
+        let err = verify_initialized_schema_integrity(&conn).unwrap_err();
+        assert!(err.contains(
+            "unique index idx_facts_memory_id_unique on knowledge_facts has the wrong definition"
+        ));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
