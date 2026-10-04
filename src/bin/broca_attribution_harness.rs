@@ -125,6 +125,8 @@ struct AttributionReport {
     attribution_note: &'static str,
     conditions: Vec<ConditionResult>,
     deltas_from_neutral: BTreeMap<String, FrameProxyDelta>,
+    feedback_delta_from_composed: FrameProxyDelta,
+    composition_interaction_delta: FrameProxyDelta,
     composition_policy: &'static str,
     feedback_probe: FeedbackProbe,
     limitations: Vec<&'static str>,
@@ -195,6 +197,32 @@ fn run() -> Result<()> {
         );
     }
 
+    let vocal_tract_only = results
+        .iter()
+        .find(|result| result.condition == "vocal-tract-only")
+        .context("vocal-tract-only condition missing")?;
+    let broca_only = results
+        .iter()
+        .find(|result| result.condition == "broca-only")
+        .context("broca-only condition missing")?;
+    let composed = results
+        .iter()
+        .find(|result| result.condition == "composed")
+        .context("composed condition missing")?;
+    let composed_feedback = results
+        .iter()
+        .find(|result| result.condition == "composed-feedback")
+        .context("composed-feedback condition missing")?;
+
+    let feedback_delta_from_composed =
+        proxy_delta(&composed_feedback.frame_proxy, &composed.frame_proxy);
+    let composition_interaction_delta = interaction_delta(
+        &composed.frame_proxy,
+        &vocal_tract_only.frame_proxy,
+        &broca_only.frame_proxy,
+        &neutral.frame_proxy,
+    );
+
     let report = AttributionReport {
         schema_version: 1,
         evidence_level: "deterministic-attribution-frame-proxy",
@@ -211,6 +239,8 @@ fn run() -> Result<()> {
             "Observed frame differences are attributable to experimental conditions only under the declared fixed-seed, fixed-schedule design; causal claims beyond those controls require separate perturbation evidence.",
         conditions: results,
         deltas_from_neutral,
+        feedback_delta_from_composed,
+        composition_interaction_delta,
         composition_policy:
             "vocal-tract owns scheduler/base-F0/stress metadata; Broca overlays intonation/arousal/pitch-accent intent in composed conditions.",
         feedback_probe: FeedbackProbe {
@@ -517,6 +547,33 @@ where
         .windows(2)
         .map(|pair| (pair[1].0 - pair[0].0).abs() + (pair[1].1 - pair[0].1).abs())
         .sum()
+}
+
+fn interaction_delta(
+    composed: &FrameProxy,
+    vocal_tract_only: &FrameProxy,
+    broca_only: &FrameProxy,
+    neutral: &FrameProxy,
+) -> FrameProxyDelta {
+    let combined_main = proxy_delta(composed, neutral);
+    let vocal = proxy_delta(vocal_tract_only, neutral);
+    let broca = proxy_delta(broca_only, neutral);
+
+    FrameProxyDelta {
+        mean_f0_delta: combined_main.mean_f0_delta - vocal.mean_f0_delta - broca.mean_f0_delta,
+        f0_span_delta: combined_main.f0_span_delta - vocal.f0_span_delta - broca.f0_span_delta,
+        mean_energy_delta:
+            combined_main.mean_energy_delta - vocal.mean_energy_delta - broca.mean_energy_delta,
+        energy_span_delta:
+            combined_main.energy_span_delta - vocal.energy_span_delta - broca.energy_span_delta,
+        mean_f1_delta: combined_main.mean_f1_delta - vocal.mean_f1_delta - broca.mean_f1_delta,
+        mean_f2_delta: combined_main.mean_f2_delta - vocal.mean_f2_delta - broca.mean_f2_delta,
+        f0_variation_delta:
+            combined_main.f0_variation_delta - vocal.f0_variation_delta - broca.f0_variation_delta,
+        formant_variation_delta: combined_main.formant_variation_delta
+            - vocal.formant_variation_delta
+            - broca.formant_variation_delta,
+    }
 }
 
 fn proxy_delta(candidate: &FrameProxy, baseline: &FrameProxy) -> FrameProxyDelta {
