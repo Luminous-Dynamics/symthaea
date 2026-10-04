@@ -136,11 +136,7 @@ impl PhonologicalPlan {
             version: PHONOLOGICAL_PLAN_VERSION.to_string(),
             content_binding: ContentBindingStatus::RoleStructureOnly,
             lexical_provenance: None,
-            source_intent: frame.constituents
-                .iter()
-                .find(|slot| slot.role == "ACTION")
-                .map(|slot| slot.prime.clone())
-                .unwrap_or_else(|| "UNBOUND".to_string()),
+            source_intent: frame.source_intent.clone(),
             focus_role: frame.focus_role.clone(),
             intonation: frame.prosody.intonation,
             rate: sanitize_rate(frame.prosody.rate),
