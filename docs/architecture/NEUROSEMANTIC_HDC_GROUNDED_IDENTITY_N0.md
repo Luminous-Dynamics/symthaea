@@ -204,7 +204,10 @@ margin boundaries.
 
 The executable calibration N0 lab keeps the calibration and evaluation cases
 disjoint, verifies exact reconstruction on the evaluation split, and separately
-runs deterministic random null frames. CI requires all null samples to abstain.
+runs 4096 deterministic random binary null frames. CI requires every null sample
+to abstain. The null generator is deliberately in the binary transport space so
+this sweep measures the decoder's rejection boundary rather than conflating it
+with continuous-to-binary quantization behavior.
 
 This is intentionally **not** conformal prediction. The calibration layer makes
 no distribution-free coverage, false-accept, or adversarial-robustness guarantee.
@@ -224,6 +227,20 @@ These are implementation safety bounds, not evidence of scalability. Raising
 them should require a new benchmark tranche that measures runtime, memory, and
 retrieval margins at the larger operating point rather than silently widening
 the accepted domain.
+
+## Evidence execution provenance
+
+Communication Evidence Gates checks that pull-request execution is performed
+against the exact immutable PR head. The evidence bundle records both the
+GitHub event SHA and the checked-out revision, and CI requires the checked-out
+revision to equal the PR head on pull-request events. The uploaded artifact is
+named from that exact PR head rather than from GitHub's synthetic merge SHA.
+
+This separates three things that must not be conflated:
+
+- the event's synthetic merge reference;
+- the exact source revision being qualified;
+- the archived evidence bundle produced by that execution.
 
 ## Evidence ladder
 
