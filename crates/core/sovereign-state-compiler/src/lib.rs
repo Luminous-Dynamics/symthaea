@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
-pub const SCHEMA_VERSION: &str = "ssc/v0.3";
+pub const SCHEMA_VERSION: &str = "ssc/v0.4";
 const INTENT_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/INTENT-DIGEST/v1\0";
 const TARGET_PROFILE_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/TARGET-PROFILE-DIGEST/v1\0";
 const TARGET_SNAPSHOT_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/TARGET-SNAPSHOT-DIGEST/v1\0";
@@ -482,6 +482,10 @@ pub struct ExecutionReceipt {
     /// This may legitimately differ from the pre-execution snapshot digest
     /// because the deployment is expected to change state.
     pub final_target_snapshot_digest: ContentDigest,
+    /// Observation time of the final target snapshot claimed by this receipt.
+    /// It must fall within the execution interval so stale evidence cannot be
+    /// presented as post-execution proof.
+    pub final_target_snapshot_observed_at_ms: u64,
     pub started_at_ms: u64,
     pub finished_at_ms: u64,
     /// Mechanical execution result. This does not imply that the target
@@ -531,6 +535,11 @@ impl ExecutionReceipt {
 
         if self.finished_at_ms < self.started_at_ms {
             return Err(ReceiptValidationError::TimestampOrderInvalid);
+        }
+        if self.final_target_snapshot_observed_at_ms < self.started_at_ms
+            || self.final_target_snapshot_observed_at_ms > self.finished_at_ms
+        {
+            return Err(ReceiptValidationError::FinalSnapshotObservationOutsideExecution);
         }
         if self.started_at_ms < plan.plan.target_snapshot.observed_at_ms {
             return Err(ReceiptValidationError::StartedBeforeTargetSnapshot);
@@ -610,6 +619,8 @@ pub enum ReceiptValidationError {
     MissingFinalSnapshotEvidence,
     #[error("execution receipt timestamps are out of order")]
     TimestampOrderInvalid,
+    #[error("execution receipt final snapshot observation falls outside the execution interval")]
+    FinalSnapshotObservationOutsideExecution,
     #[error("execution started before the authorized target snapshot was observed")]
     StartedBeforeTargetSnapshot,
     #[error("execution started before authorization became valid")]
@@ -1569,6 +1580,39 @@ mod tests {
     }
 
     #[test]
+    fn receipt_rejects_final_snapshot_observation_before_execution() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let mut receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 150,
+            observed_disposition: authorized.plan.verification.disposition,
+            started_at_ms: 151,
+            finished_at_ms: 200,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Satisfied,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized).expect_err("early final observation"),
+            ReceiptValidationError::FinalSnapshotObservationOutsideExecution
+        );
+
+        receipt.final_target_snapshot_observed_at_ms = receipt.finished_at_ms + 1;
+        assert_eq!(
+            receipt.validate_for(&authorized).expect_err("late final observation"),
+            ReceiptValidationError::FinalSnapshotObservationOutsideExecution
+        );
+    }
+
+    #[test]
     fn receipt_binds_exact_authorized_plan_and_snapshot() {
         let plan = sample_plan();
         let auth = authorization_for(&plan);
@@ -1579,6 +1623,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 200,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 200,
@@ -1603,6 +1648,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-recovery"),
+            final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
@@ -1628,6 +1674,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
@@ -1652,6 +1699,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest {
+            final_target_snapshot_observed_at_ms: 160,
                 algorithm: String::new(),
                 value: String::new(),
             },
@@ -1681,6 +1729,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
@@ -1713,6 +1762,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
@@ -1744,6 +1794,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
@@ -1771,6 +1822,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
@@ -1801,6 +1853,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
@@ -1825,6 +1878,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
             observed_disposition: DeploymentDisposition::NotActivated,
             started_at_ms: 151,
             finished_at_ms: 160,
@@ -1851,6 +1905,7 @@ mod tests {
             plan_digest: ContentDigest::blake3(b"wrong-plan"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 200,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 200,
@@ -1878,6 +1933,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 199,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 200,
             finished_at_ms: 199,
@@ -1904,6 +1960,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 150,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 99,
             finished_at_ms: 150,
@@ -1931,6 +1988,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 150,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 89,
             finished_at_ms: 150,
@@ -1957,6 +2015,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 201,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 201,
@@ -1984,6 +2043,7 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest::blake3(b"changed-state"),
+            final_target_snapshot_observed_at_ms: 199,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 199,
