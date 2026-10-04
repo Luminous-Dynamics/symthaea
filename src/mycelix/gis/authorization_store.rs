@@ -4578,6 +4578,22 @@ fn load_receipt(
         )),
     };
 
+    let persisted_authority_epoch: i64 = tx
+        .query_row(
+            "SELECT authority_epoch
+             FROM authorization_leases
+             WHERE authorization_instance=?1",
+            params![authorization_instance.as_str()],
+            |r| r.get(0),
+        )
+        .optional()?
+        .ok_or_else(|| AuthorizationConsumptionError::InvalidBinding)?;
+    if persisted_authority_epoch < 0
+        || persisted_authority_epoch as u64 != authority_epoch as u64
+    {
+        return Err(AuthorizationConsumptionError::InvalidBinding.into());
+    }
+
     if let Some(boundary) = boundary_id.as_deref() {
         let expected_scope=compute_attempt_scope_digest(boundary,&attempt_id)?;
         if attempt_scope_digest.as_deref() != Some(expected_scope.as_str()) {
@@ -6148,6 +6164,90 @@ mod tests {
             0
         );
         assert_eq!(first.outcome,ExecutionOutcome::Succeeded);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_receipt_replay_rejects_tampered_authority_epoch() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-terminal-replay-epoch-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-terminal-replay-epoch",
+            "prod",
+            "adapter-terminal-replay-epoch"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"terminal-replay-epoch".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:15:00Z".into(),
+            expires_at:Some("2026-10-05T07:15:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt-terminal-replay-epoch",
+            "boundary-terminal-replay-epoch"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt-terminal-replay-epoch",
+            &action,
+            &effect,
+            "boundary-terminal-replay-epoch",
+            "operation:terminal-replay-epoch",
+            "native-terminal-replay-epoch"
+        ).unwrap();
+
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let first=store.commit_bound_verified(
+            &record,
+            &evidence,
+            &TestProviderVerifier
+        ).unwrap();
+        assert_eq!(first.authority_epoch,1);
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_receipts
+             SET authority_epoch=999
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND phase='final'",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+
+        let calls=Arc::new(AtomicUsize::new(0));
+        let err=store.commit_bound_verified(
+            &record,
+            &evidence,
+            &CountingProviderVerifier { calls:calls.clone() },
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst),0);
+
         let _=std::fs::remove_file(path);
     }
 
