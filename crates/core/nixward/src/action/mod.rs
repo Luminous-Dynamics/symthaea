@@ -57,7 +57,7 @@ pub use gc_manager::{GcAnalysis, GcManager, GcRecommendation};
 pub use generation_manager::{Generation, GenerationDiff, GenerationManager};
 pub use local_approval::{
     LocalApprovalDecisionKindV1, LocalApprovalErrorV1, LocalNixApprovalDecisionV1,
-    PendingNixApprovalRequestV1, digest_display,
+    PendingNixApprovalRequestV1, digest_display, operator_visible_action_for_command,
 };
 pub use local_approval_ipc::LocalApprovalIpcErrorV1;
 pub use local_approval_projection::{
@@ -67,7 +67,6 @@ pub use local_approval_projection::{
 pub use local_approval_ipc::observe_linux_unix_peer_v1;
 #[cfg(target_os = "linux")]
 pub use local_approval_runtime::{
-    operator_visible_action_for_command,
     InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1, LocalApprovalRuntimeV1,
 };
 #[cfg(target_os = "linux")]
