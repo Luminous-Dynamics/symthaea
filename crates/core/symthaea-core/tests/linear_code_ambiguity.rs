@@ -747,6 +747,14 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                         affine_fiber.representative_coefficients.len(),
                         algebra.factor_dimension_sum
                     );
+                    assert!(affine_fiber.verifies_against(&target, &factors));
+                    result_digest.update(b"affine-fiber-certificate");
+                    result_digest.update(
+                        &(affine_fiber.representative_coefficients.len() as u64).to_le_bytes(),
+                    );
+                    for coefficient in &affine_fiber.representative_coefficients {
+                        result_digest.update(&[*coefficient as u8]);
+                    }
 
                     let jointly_independent = algebra.unique_factorization;
                     let kernel_basis = if jointly_independent {
