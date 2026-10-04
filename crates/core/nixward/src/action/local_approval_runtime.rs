@@ -19,6 +19,7 @@
 //! authority, generic grant accounting, `DispatchPermitV2`, or privileged broker.
 
 use super::authorization::{NixActionDescriptorV1, NixActionIntentV1};
+use super::approver_evidence::RequiredApprovalProfileV1;
 use super::executor::NixOSCommand;
 use super::daemon_incarnation::{DaemonApprovalContextErrorV1, LiveDaemonIncarnationV1};
 use super::local_approval::PendingNixApprovalRequestV1;
@@ -158,7 +159,7 @@ impl LocalApprovalRuntimeV1 {
         &self,
         intent: &NixActionIntentV1,
         command: &NixOSCommand,
-        authority_profile_ref: impl Into<String>,
+        authority_profile: RequiredApprovalProfileV1,
         created_at: UnixMillisV1,
         expires_at: UnixMillisV1,
     ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
@@ -171,7 +172,7 @@ impl LocalApprovalRuntimeV1 {
         let request = self.daemon_incarnation.create_approval_request(
             intent,
             &displayed_action,
-            authority_profile_ref,
+            authority_profile.as_ref(),
             created_at,
             expires_at,
         )?;
@@ -374,7 +375,7 @@ mod tests {
                 .create_pending_request(
                     &intent("nginx.service"),
                     &stop_command,
-                    "same-uid-process-v1",
+                    RequiredApprovalProfileV1::SameUidProcessV1,
                     UnixMillisV1::new(now.saturating_sub(1_000)),
                     UnixMillisV1::new(now + 60_000),
                 )
@@ -396,7 +397,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &command,
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -419,7 +420,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -445,7 +446,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -455,7 +456,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -487,7 +488,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -514,7 +515,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -567,7 +568,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -578,7 +579,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -630,7 +631,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -659,7 +660,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -685,7 +686,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -713,7 +714,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -724,7 +725,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -760,7 +761,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -792,7 +793,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -837,7 +838,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -848,7 +849,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "same-uid-process-v1",
+                RequiredApprovalProfileV1::SameUidProcessV1,
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
             )
