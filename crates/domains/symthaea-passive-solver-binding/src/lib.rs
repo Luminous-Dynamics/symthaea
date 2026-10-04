@@ -1001,9 +1001,14 @@ mod tests {
     fn adapter_contract_binds_against_actual_candidate_mesh() {
         let interface = interface(PortId(10), 7);
         let candidate = candidate();
-        let binding = FixtureAdapter
-            .bind(&interface, &candidate, [7; 32])
-            .unwrap();
+        let binding = bind_with_adapter(
+            &FixtureAdapter,
+            &interface,
+            &candidate,
+            [7; 32],
+            0.05,
+        )
+        .unwrap();
 
         assert_eq!(binding.port, PortId(10));
         assert_eq!(binding.external_boundary_handle, "fixture:boundary-7");
