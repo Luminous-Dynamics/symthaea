@@ -947,7 +947,7 @@ impl DaemonState {
             .create_pending_request(
                 intent,
                 command,
-                "same-uid-process-v1",
+                nixward::action::RequiredApprovalProfileV1::SameUidProcessV1,
                 created_at,
                 expires_at,
             )
