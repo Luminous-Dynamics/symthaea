@@ -1384,12 +1384,19 @@ mod tests {
     }
     #[test]
     fn algebra_is_factor_order_invariant_but_kernel_certificate_is_presentation_bound() {
-        let c1 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b01])])
-            .expect("c1");
-        let c2 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b10])])
-            .expect("c2");
-        let c3 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b11])])
-            .expect("c3");
+        let c1 = RandomLinearCode::from_basis(vec![
+            BinaryCodeword::from_words(3, vec![0b001]),
+            BinaryCodeword::from_words(3, vec![0b010]),
+        ])
+        .expect("c1");
+        let c2 = RandomLinearCode::from_basis(vec![
+            BinaryCodeword::from_words(3, vec![0b010]),
+            BinaryCodeword::from_words(3, vec![0b100]),
+        ])
+        .expect("c2");
+        let c3 =
+            RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b100])])
+                .expect("c3");
 
         let forward = [&c1, &c2, &c3];
         let reverse = [&c3, &c2, &c1];
