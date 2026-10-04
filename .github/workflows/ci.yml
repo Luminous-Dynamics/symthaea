@@ -1493,6 +1493,7 @@ jobs:
           cp -R crates/core/symthaea-evidence-plane/. "$contract_root/crate/"
 
           python3 - "$contract_root" <<'PY'
+          import re
           import sys
           import tomllib
           from pathlib import Path
@@ -1500,14 +1501,44 @@ jobs:
           root = Path(".")
           contract_root = Path(sys.argv[1])
           root_manifest = tomllib.loads((root / "Cargo.toml").read_text())
-          root_lock = tomllib.loads((root / "Cargo.lock").read_text())
+          root_lock_text = (root / "Cargo.lock").read_text()
+          root_lock = tomllib.loads(root_lock_text)
           workspace_deps = root_manifest["workspace"]["dependencies"]
 
-          def locked_version(name: str) -> str:
-              matches = [pkg["version"] for pkg in root_lock["package"] if pkg["name"] == name]
+          packages = root_lock["package"]
+          by_name = {}
+          for package in packages:
+              by_name.setdefault(package["name"], []).append(package)
+
+          def resolve_dependency(label: str):
+              parts = label.rsplit(" ", 1)
+              if len(parts) == 2 and re.fullmatch(r"\d+(?:\.\d+){0,2}(?:[-+].*)?", parts[1]):
+                  name, version = parts
+                  matches = [
+                      package for package in by_name.get(name, [])
+                      if package["version"] == version
+                  ]
+              else:
+                  name = label
+                  matches = by_name.get(name, [])
               if len(matches) != 1:
-                  raise SystemExit(f"expected exactly one checked-in {name} package, found {matches!r}")
+                  raise SystemExit(
+                      f"cannot resolve locked dependency {label!r}: "
+                      f"{[(p['name'], p['version']) for p in matches]!r}"
+                  )
               return matches[0]
+
+          roots = [p for p in packages if p["name"] == "symthaea-evidence-plane"]
+          if len(roots) != 1:
+              raise SystemExit(f"expected exactly one symthaea-evidence-plane lock package, found {len(roots)}")
+          root_package = roots[0]
+
+          expected_direct = {"blake3", "serde", "serde_json"}
+          if not expected_direct.issubset(set(root_package.get("dependencies", []))):
+              raise SystemExit(
+                  "checked-in lock is missing an evidence-plane direct dependency edge: "
+                  f"{root_package.get('dependencies', [])!r}"
+              )
 
           serde = workspace_deps["serde"]
           if not isinstance(serde, dict) or serde.get("features") != ["derive"]:
@@ -1519,6 +1550,42 @@ jobs:
               if marker not in crate_manifest:
                   raise SystemExit(f"{dependency} is no longer a workspace dependency; update this isolated harness")
 
+          selected = set()
+          stack = [root_package]
+          while stack:
+              package = stack.pop()
+              identity = (package["name"], package["version"], package.get("source"))
+              if identity in selected:
+                  continue
+              selected.add(identity)
+              for dependency in package.get("dependencies", []):
+                  stack.append(resolve_dependency(dependency))
+
+          blocks = root_lock_text.split("\n[[package]]\n")
+          header = blocks[0]
+          package_blocks = []
+          for block in blocks[1:]:
+              package = tomllib.loads("[[package]]\n" + block)["package"][0]
+              identity = (package["name"], package["version"], package.get("source"))
+              if identity in selected:
+                  package_blocks.append(block)
+
+          if len(package_blocks) != len(selected):
+              raise SystemExit(
+                  f"isolated lock closure mismatch: selected {len(selected)} packages, "
+                  f"serialized {len(package_blocks)}"
+              )
+
+          (contract_root / "Cargo.lock").write_text(
+              header + "\n[[package]]\n" + "\n[[package]]\n".join(package_blocks) + "\n"
+          )
+
+          def locked_version(name: str) -> str:
+              matches = by_name.get(name, [])
+              if len(matches) != 1:
+                  raise SystemExit(f"expected one locked {name} package, found {matches!r}")
+              return matches[0]["version"]
+
           isolated = contract_root / "Cargo.toml"
           isolated.write_text(
               "[workspace]\n"
@@ -1529,33 +1596,11 @@ jobs:
               f'serde = {{ version = "={locked_version("serde")}", features = ["derive"] }}\n'
               f'serde_json = "={locked_version("serde_json")}"\n'
           )
-          PY
 
-          cargo generate-lockfile --offline || cargo generate-lockfile
-
-          python3 - "$contract_root" <<'PY'
-          import sys
-          import tomllib
-          from pathlib import Path
-
-          contract_root = Path(sys.argv[1])
-          root_lock = tomllib.loads(Path("Cargo.lock").read_text())
-          isolated_lock = tomllib.loads((contract_root / "Cargo.lock").read_text())
-          root_versions = {}
-          isolated_versions = {}
-          for name in ("blake3", "serde", "serde_json"):
-              root_versions[name] = [pkg["version"] for pkg in root_lock["package"] if pkg["name"] == name]
-              isolated_versions[name] = [pkg["version"] for pkg in isolated_lock["package"] if pkg["name"] == name]
-              if root_versions[name] != isolated_versions[name]:
-                  raise SystemExit(
-                      f"{name} resolved differently in isolation: root={root_versions[name]!r}, "
-                      f"isolation={isolated_versions[name]!r}"
-                  )
-          print("Evidence Plane isolated dependency versions match the checked-in root lock.")
+          print(f"Evidence Plane exact lock closure: {len(selected)} packages.")
           PY
 
           cargo test --manifest-path "$contract_root/Cargo.toml" --locked
-
       - name: Verify root lock edges
         run: |
           python3 - <<'PY'
