@@ -3322,15 +3322,16 @@ mod tests {
         let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Consistency,vec![proof]).unwrap();
 
         let unsigned=Rfc9942ReceiptEnvelope::new(
-            COSE_EDDSA_ALGORITHM_ID,vdp,Rfc9942ReceiptPayload::Attached(newer.root()),Vec::new()
+            COSE_EDDSA_ALGORITHM_ID,vdp,Rfc9942ReceiptPayload::Detached,Vec::new()
         ).unwrap();
-        let signature=signing_key.sign(&unsigned.signature1_tbs(b"",None).unwrap()).to_bytes().to_vec();
+        let root=newer.root();
+        let signature=signing_key.sign(&unsigned.signature1_tbs(b"",Some(&root)).unwrap()).to_bytes().to_vec();
         let receipt=Rfc9942ReceiptEnvelope::new(
             COSE_EDDSA_ALGORITHM_ID,unsigned.vdp().clone(),unsigned.payload().clone(),signature
         ).unwrap();
         assert_eq!(
             receipt.verify_ed25519_consistency(
-                older,signing_key.verifying_key().as_bytes(),b"",None
+                older,signing_key.verifying_key().as_bytes(),b"",Some(&root)
             ).unwrap(),
             newer
         );
@@ -3339,10 +3340,10 @@ mod tests {
         let invalid_unsigned=Rfc9942ReceiptEnvelope::new(
             COSE_EDDSA_ALGORITHM_ID,
             receipt.vdp().clone(),
-            Rfc9942ReceiptPayload::Attached(wrong_root),
+            Rfc9942ReceiptPayload::Detached,
             Vec::new(),
         ).unwrap();
-        let invalid_signature=signing_key.sign(&invalid_unsigned.signature1_tbs(b"",None).unwrap()).to_bytes().to_vec();
+        let invalid_signature=signing_key.sign(&invalid_unsigned.signature1_tbs(b"",Some(&wrong_root)).unwrap()).to_bytes().to_vec();
         let cryptographically_valid_but_inconsistent=Rfc9942ReceiptEnvelope::new(
             COSE_EDDSA_ALGORITHM_ID,
             invalid_unsigned.vdp().clone(),
@@ -3351,7 +3352,7 @@ mod tests {
         ).unwrap();
         assert_eq!(
             cryptographically_valid_but_inconsistent.verify_ed25519_consistency(
-                older,signing_key.verifying_key().as_bytes(),b"",None
+                older,signing_key.verifying_key().as_bytes(),b"",Some(&wrong_root)
             ),
             Err(Rfc9942VdpError::NoMatchingProof)
         );
@@ -3363,7 +3364,7 @@ mod tests {
         ).unwrap();
         assert_eq!(
             forged.verify_ed25519_consistency(
-                older,signing_key.verifying_key().as_bytes(),b"",None
+                older,signing_key.verifying_key().as_bytes(),b"",Some(&root)
             ),
             Err(Rfc9942VdpError::InvalidEd25519Signature)
         );
