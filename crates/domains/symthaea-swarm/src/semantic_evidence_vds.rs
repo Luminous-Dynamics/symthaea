@@ -2150,10 +2150,12 @@ impl<'a> CborReader<'a> {
             }
 
             let key_start=self.offset;
-            self.skip_value_with_limits(0, max_bstr_len, max_array_items, max_total_bytes)?;
+            let remaining_before_key=max_total_bytes.saturating_sub(self.offset.saturating_sub(map_start));
+            self.skip_value_with_limits(0, max_bstr_len, max_array_items, remaining_before_key)?;
             let key_end=self.offset;
             let value_start=self.offset;
-            self.skip_value_with_limits(0, max_bstr_len, max_array_items, max_total_bytes)?;
+            let remaining_before_value=max_total_bytes.saturating_sub(self.offset.saturating_sub(map_start));
+            self.skip_value_with_limits(0, max_bstr_len, max_array_items, remaining_before_value)?;
             let value_end=self.offset;
             if self.offset.saturating_sub(map_start) > max_total_bytes {
                 return Err(Rfc9162ProofDecodeError::InvalidStructure);
