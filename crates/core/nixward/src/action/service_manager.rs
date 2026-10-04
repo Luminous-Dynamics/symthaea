@@ -490,7 +490,7 @@ mod tests {
 
         let error = ServiceManager::validated_governed_unit("../nginx").unwrap_err();
         assert_eq!(error.kind(), std::io::ErrorKind::Other);
-        assert!(error.to_string().contains("path-like"));
+        assert!(error.to_string().contains("path separators"));
     }
 
     #[test]
