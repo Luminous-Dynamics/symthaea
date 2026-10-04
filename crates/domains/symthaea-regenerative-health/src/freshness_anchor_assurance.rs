@@ -697,6 +697,42 @@ mod tests {
     }
 
     #[test]
+    fn receipt_binding_digest_changes_when_authority_semantics_change() {
+        let profile = FreshnessAnchorProfile::new(
+            FreshnessAnchorBacking::RemoteAuthority,
+            FreshnessAnchorCapabilities::authoritative(),
+            "remote://authority-a",
+        )
+        .unwrap();
+        let mut receipt = FreshnessAnchorVerificationReceipt {
+            schema_version: "0.1".into(),
+            profile_fingerprint: profile.fingerprint(),
+            receiver_id: "receiver-1".into(),
+            generation: 7,
+            state_fingerprint: "state-1".into(),
+            recovery_policy_fingerprint: "recovery-policy-1".into(),
+            authority_reference: "authority-1".into(),
+            authority_statement_digest: "authority-statement-1".into(),
+            authentication_binding: "authentication-1".into(),
+            verifier_reference: "verifier-1".into(),
+            verifier_policy_digest: "policy-digest-1".into(),
+            reference_values_digest: "reference-values-1".into(),
+            trust_anchor_set_digest: "trust-anchors-1".into(),
+            freshness_handle_digest: "freshness-handle-1".into(),
+            evidence_reference: "evidence-1".into(),
+            evidence_digest: "digest-1".into(),
+            evidence_kind: FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
+                authority_identity_digest: "authority-id-1".into(),
+                authority_namespace_digest: "namespace-1".into(),
+                observed_sequence: 7,
+            },
+        };
+        let original = receipt.binding_digest();
+        receipt.authority_statement_digest = "authority-statement-2".into();
+        assert_ne!(original, receipt.binding_digest());
+    }
+
+    #[test]
     fn quorum_evidence_requires_a_positive_threshold() {
         let evidence = FreshnessAnchorEvidenceKind::QuorumMonotonicSequence {
             quorum_policy_digest: "policy".into(),
@@ -738,6 +774,8 @@ mod tests {
             verifier_reference: "verifier-1".into(),
             verifier_policy_digest: "policy-digest-1".into(),
             reference_values_digest: "reference-values-1".into(),
+            trust_anchor_set_digest: "trust-anchors-1".into(),
+            freshness_handle_digest: "freshness-handle-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
             evidence_kind: FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
