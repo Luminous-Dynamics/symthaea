@@ -205,7 +205,7 @@ fn cose_key_rejects_tstr_chunk_count_above_exact_cap() {
     fields[0] = encoded;
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&key(&fields)),
-        Err(Rfc9942VdpError::InvalidEncoding)
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
     );
 }
 
@@ -353,7 +353,7 @@ fn cose_key_rejects_non_map_root_and_trailing_bytes() {
     bytes.push(0x00);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
-        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+        Err(Rfc9942VdpError::InvalidEncoding)
     );
 }
 
