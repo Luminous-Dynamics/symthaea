@@ -13,7 +13,7 @@ use sovereign_state_compiler::{
     TargetSnapshot,
 };
 use sovereign_state_compiler_nix::{
-    default_nixos_capabilities, nixos_generation_resource, NixOSTargetAdapter,
+    NixOSTargetAdapter, default_nixos_capabilities, nixos_generation_resource,
 };
 use thiserror::Error;
 
@@ -22,8 +22,7 @@ pub const NIXOS_CURRENT_SYSTEM: &str = "/run/current-system";
 pub const NIXOS_BOOTED_SYSTEM: &str = "/run/booted-system";
 pub const NIXOS_MACHINE_ID: &str = "/etc/machine-id";
 
-const NIXOS_OBSERVATION_DIGEST_DOMAIN: &[u8] =
-    b"LUMINOUS-DYNAMICS/SSC/NIXOS-OBSERVATION/v1\0";
+const NIXOS_OBSERVATION_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/NIXOS-OBSERVATION/v1\0";
 const NIXOS_TARGET_ID_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/NIXOS-TARGET-ID/v1\0";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,7 +70,8 @@ impl CapturedNixSystemObservation {
         &self,
         authorized: &AuthorizedDeploymentPlan,
     ) -> Result<(), SscObservationError> {
-        self.observation.validate_against_authorized_plan(authorized)
+        self.observation
+            .validate_against_authorized_plan(authorized)
     }
 
     pub fn target_adapter(&self) -> Result<NixOSTargetAdapter, SscObservationError> {
@@ -267,7 +267,9 @@ impl NixSystemObservation {
 
         for resource in &authorized.plan.intent.required_resources {
             if !observed_resources.contains(resource) {
-                return Err(SscObservationError::AuthorizedResourceMissing(resource.clone()));
+                return Err(SscObservationError::AuthorizedResourceMissing(
+                    resource.clone(),
+                ));
             }
         }
 
@@ -277,9 +279,7 @@ impl NixSystemObservation {
     /// Construct the canonical NixOS SSC adapter from this validated observation.
     /// This remains read-only: adapter creation captures the exact observation
     /// snapshot but does not authorize or execute any deployment.
-    fn target_adapter(
-        &self,
-    ) -> Result<NixOSTargetAdapter, SscObservationError> {
+    fn target_adapter(&self) -> Result<NixOSTargetAdapter, SscObservationError> {
         let snapshot = self.target_snapshot()?;
         NixOSTargetAdapter::from_snapshot(snapshot)
             .map_err(|error| SscObservationError::AdapterConstruction(error.to_string()))
@@ -461,10 +461,10 @@ mod tests {
 
     #[test]
     fn target_identity_derivation_is_stable_and_domain_separated() {
-        let one = target_identity_from_machine_id("0123456789abcdef0123456789abcdef")
-            .expect("target id");
-        let two = target_identity_from_machine_id("0123456789abcdef0123456789abcdef")
-            .expect("target id");
+        let one =
+            target_identity_from_machine_id("0123456789abcdef0123456789abcdef").expect("target id");
+        let two =
+            target_identity_from_machine_id("0123456789abcdef0123456789abcdef").expect("target id");
         let changed =
             target_identity_from_machine_id("fedcba9876543210fedcba9876543210").expect("target id");
 
@@ -603,18 +603,30 @@ mod tests {
         };
 
         for (name, mutate) in [
-            ("system_profile_realization", |observation: &mut NixSystemObservation| {
-                observation.system_profile_realization = "/etc/nixos".into();
-            }),
-            ("current_system_realization", |observation: &mut NixSystemObservation| {
-                observation.current_system_realization = "/etc/nixos".into();
-            }),
-            ("booted_system_realization", |observation: &mut NixSystemObservation| {
-                observation.booted_system_realization = "/etc/nixos".into();
-            }),
-            ("generation_realization", |observation: &mut NixSystemObservation| {
-                observation.generations[0].realization = "/etc/nixos".into();
-            }),
+            (
+                "system_profile_realization",
+                |observation: &mut NixSystemObservation| {
+                    observation.system_profile_realization = "/etc/nixos".into();
+                },
+            ),
+            (
+                "current_system_realization",
+                |observation: &mut NixSystemObservation| {
+                    observation.current_system_realization = "/etc/nixos".into();
+                },
+            ),
+            (
+                "booted_system_realization",
+                |observation: &mut NixSystemObservation| {
+                    observation.booted_system_realization = "/etc/nixos".into();
+                },
+            ),
+            (
+                "generation_realization",
+                |observation: &mut NixSystemObservation| {
+                    observation.generations[0].realization = "/etc/nixos".into();
+                },
+            ),
         ] {
             let mut observation = base.clone();
             mutate(&mut observation);
@@ -714,26 +726,24 @@ mod tests {
     fn authorized_preflight_accepts_exact_observed_generation() {
         let observation = NixSystemObservation {
             target_identity: test_target_id(),
-            generations: vec![
-                NixGenerationObservation {
-                    number: 42,
-                    realization: "/nix/store/aaa-nixos-system-host".into(),
-                    current: true,
-                },
-            ],
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
             system_profile_generation: 42,
             system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
         let adapter = sovereign_state_compiler_nix::NixOSTargetAdapter::from_snapshot(
-            captured(observation.clone()).target_snapshot().expect("snapshot"),
+            captured(observation.clone())
+                .target_snapshot()
+                .expect("snapshot"),
         )
         .expect("adapter");
-        let mut intent = sovereign_state_compiler::DeploymentIntent::new(
-            "rollback-1",
-            test_target_id(),
-        );
+        let mut intent =
+            sovereign_state_compiler::DeploymentIntent::new("rollback-1", test_target_id());
         intent.required_resources.insert(
             nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("resource"),
         );
@@ -742,7 +752,11 @@ mod tests {
         let auth = sovereign_state_compiler::AuthorizationEvidence {
             authority_id: "authority-1".into(),
             intent_digest: plan.intent.digest().expect("intent digest"),
-            target_profile_digest: plan.target_snapshot.profile.digest().expect("profile digest"),
+            target_profile_digest: plan
+                .target_snapshot
+                .profile
+                .digest()
+                .expect("profile digest"),
             target_snapshot_digest: plan.target_snapshot.digest().expect("snapshot digest"),
             plan_digest: plan.digest().expect("plan digest"),
             granted_capabilities: [Capability::Rollback, Capability::ObserveState]
@@ -754,9 +768,11 @@ mod tests {
         };
         let authorized = plan.authorize(auth, 100).expect("authorization");
 
-        assert!(captured(observation)
-            .validate_against_authorized_plan(&authorized)
-            .is_ok());
+        assert!(
+            captured(observation)
+                .validate_against_authorized_plan(&authorized)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -827,13 +843,13 @@ mod tests {
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
         let adapter = sovereign_state_compiler_nix::NixOSTargetAdapter::from_snapshot(
-            captured(observation.clone()).target_snapshot().expect("snapshot"),
+            captured(observation.clone())
+                .target_snapshot()
+                .expect("snapshot"),
         )
         .expect("adapter");
-        let mut intent = sovereign_state_compiler::DeploymentIntent::new(
-            "rollback-test",
-            test_target_id(),
-        );
+        let mut intent =
+            sovereign_state_compiler::DeploymentIntent::new("rollback-test", test_target_id());
         intent.required_capabilities.insert(Capability::Rollback);
         intent.required_resources.insert(
             nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("resource"),
@@ -848,15 +864,17 @@ mod tests {
         );
         intent.desired_state.properties.insert(
             "nixos.rollback-realization".into(),
-            sovereign_state_compiler::StateValue::String(
-                "/nix/store/aaa-nixos-system-host".into(),
-            ),
+            sovereign_state_compiler::StateValue::String("/nix/store/aaa-nixos-system-host".into()),
         );
         let plan = adapter.compile(&intent).expect("plan");
         let auth = sovereign_state_compiler::AuthorizationEvidence {
             authority_id: "authority-test".into(),
             intent_digest: plan.intent.digest().expect("intent digest"),
-            target_profile_digest: plan.target_snapshot.profile.digest().expect("profile digest"),
+            target_profile_digest: plan
+                .target_snapshot
+                .profile
+                .digest()
+                .expect("profile digest"),
             target_snapshot_digest: plan.target_snapshot.digest().expect("snapshot digest"),
             plan_digest: plan.digest().expect("plan digest"),
             granted_capabilities: [Capability::Rollback, Capability::ObserveState]
@@ -1067,17 +1085,24 @@ mod tests {
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
-        let adapter = captured(observation.clone()).target_adapter().expect("adapter");
+        let adapter = captured(observation.clone())
+            .target_adapter()
+            .expect("adapter");
         let snapshot = adapter.describe_target().expect("snapshot");
 
         assert_eq!(snapshot.profile.platform, "nixos");
         assert_eq!(snapshot.profile.identity, test_target_id());
         assert_eq!(snapshot.observed_at_ms, 100);
-        assert_eq!(snapshot.observation_digest, observation.observation_digest().expect("digest"));
-        assert!(snapshot.resources.contains(
-            &nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
-                .expect("generation resource")
-        ));
+        assert_eq!(
+            snapshot.observation_digest,
+            observation.observation_digest().expect("digest")
+        );
+        assert!(
+            snapshot.resources.contains(
+                &nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                    .expect("generation resource")
+            )
+        );
     }
 
     #[test]
@@ -1102,9 +1127,7 @@ mod tests {
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
 
-        let snapshot = observation
-            .target_snapshot()
-            .expect("snapshot");
+        let snapshot = observation.target_snapshot().expect("snapshot");
         assert_eq!(snapshot.profile.identity, test_target_id());
         assert_eq!(snapshot.profile.platform, "nixos");
         assert!(
