@@ -384,6 +384,11 @@ The recent Deng–Raviv noisy-VSA construction is a separate comparator family: 
 
 ### Current coding-theory literature boundary (September–October 2026)
 
+The current canonical fixture has rate (8/96 = 1/12), so it is useful to distinguish near-capacity theory from the low-rate regime rather than importing a single asymptotic decoder intuition. Hair and Sahai's 2026 work studies list recovery for fixed-dimension random linear codes as block length grows, with near-optimal output lists over sufficiently large prime fields. That regime is structurally complementary to this fixture, but it is not a binary-field guarantee; over (mathbb F_2), field-characteristic effects can materially change list-recovery behavior. Therefore it is a candidate future comparator, not evidence for the present Boolean implementation.
+
+Goyal and Guruswami's 2026 constraint-counting analysis also strengthens the general coding-theory picture by improving list-decoding/list-recovery tradeoffs in regimes where alphabet size is part of the asymptotic resource. Those improvements are most useful here as a warning about parameter axes: field size, rate, list size, and corruption model must be recorded explicitly rather than treating “random linear code” as one homogeneous family.
+
+
 Recent work reinforces the need to keep finite-fixture geometry and noisy decoding explicit. Doron et al. (2026) prove broad discrepancy results for random linear codes and show that, in the relevant asymptotic regime, random linear codes can behave like unstructured random codes for list-decoding above capacity. Kumar and Mon (2026) give improved near-capacity list-decoding bounds for random linear codes over finite fields. Neither result is a guarantee for a particular finite HDC fixture, so this comparator records actual code geometry instead of inferring robustness from the random-linear-code label.
 
 References: https://arxiv.org/abs/2606.24471 ; https://eccc.weizmann.ac.il/report/2026/222/ ; https://arxiv.org/abs/2609.17020
