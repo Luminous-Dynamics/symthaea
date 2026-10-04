@@ -298,6 +298,10 @@ pub enum PhonologicalPlanError {
     InvalidPauseWeight,
     FocusRoleWithoutSegments,
     FocusSegmentsWithoutRole,
+    ConflictingSyllableStress { syllable_index: usize },
+    MixedSyllableFocus { syllable_index: usize },
+    MultipleSyllableOnsets { syllable_index: usize },
+    MidSyllablePhraseBoundary { syllable_index: usize },
     EmptySegmentSymbol { index: usize },
     NonContiguousSyllableIndex { expected: usize, found: usize },
     LexicalBindingWithoutSegments,
@@ -318,6 +322,10 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::InvalidPauseWeight => write!(f, "phonological plan pause weight is outside [0, 1]"),
             Self::FocusRoleWithoutSegments => write!(f, "a focus role requires focused phonemes"),
             Self::FocusSegmentsWithoutRole => write!(f, "focused phonemes require a focus role"),
+            Self::ConflictingSyllableStress { syllable_index } => write!(f, "syllable {syllable_index} contains conflicting stress annotations"),
+            Self::MixedSyllableFocus { syllable_index } => write!(f, "syllable {syllable_index} contains mixed focus annotations"),
+            Self::MultipleSyllableOnsets { syllable_index } => write!(f, "syllable {syllable_index} contains multiple onset markers"),
+            Self::MidSyllablePhraseBoundary { syllable_index } => write!(f, "syllable {syllable_index} has an internal phrase boundary"),
             Self::EmptySegmentSymbol { index } => {
                 write!(f, "phoneme slot {index} has an empty symbol")
             }
@@ -381,10 +389,23 @@ fn validate_segment_sequence(segments: &[PhonemeSlot]) -> Result<(), Phonologica
         if segment.symbol.trim().is_empty() {
             return Err(PhonologicalPlanError::EmptySegmentSymbol { index });
         }
+        if segment.phrase_boundary_after
+            && segments
+                .get(index + 1)
+                .is_some_and(|next| next.syllable_index == segment.syllable_index)
+        {
+            return Err(PhonologicalPlanError::MidSyllablePhraseBoundary {
+                syllable_index: segment.syllable_index,
+            });
+        }
     }
 
     let mut expected_syllable = 0usize;
     let mut last_syllable = None;
+    let mut syllable_stress = SyllableStress::None;
+    let mut syllable_focus = false;
+    let mut onset_count = 0u8;
+
     for segment in segments {
         if last_syllable != Some(segment.syllable_index) {
             if segment.syllable_index != expected_syllable {
@@ -395,6 +416,29 @@ fn validate_segment_sequence(segments: &[PhonemeSlot]) -> Result<(), Phonologica
             }
             expected_syllable += 1;
             last_syllable = Some(segment.syllable_index);
+            syllable_stress = segment.stress;
+            syllable_focus = segment.is_focus;
+            onset_count = 0;
+        } else {
+            if segment.stress != syllable_stress {
+                return Err(PhonologicalPlanError::ConflictingSyllableStress {
+                    syllable_index: segment.syllable_index,
+                });
+            }
+            if segment.is_focus != syllable_focus {
+                return Err(PhonologicalPlanError::MixedSyllableFocus {
+                    syllable_index: segment.syllable_index,
+                });
+            }
+        }
+
+        if segment.is_syllable_onset {
+            onset_count += 1;
+            if onset_count > 1 {
+                return Err(PhonologicalPlanError::MultipleSyllableOnsets {
+                    syllable_index: segment.syllable_index,
+                });
+            }
         }
     }
 
