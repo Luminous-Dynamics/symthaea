@@ -675,14 +675,18 @@ pub fn certify_boundary_patch(
     })
 }
 
-fn collect_boundary_edge_keys(candidate: &TriangleMesh) -> Vec<BoundaryEdgeKey> {
-    collect_boundary_edge_records(candidate)
+fn collect_boundary_edge_keys(
+    candidate: &TriangleMesh,
+) -> Result<Vec<BoundaryEdgeKey>, SolverBindingError> {
+    Ok(collect_boundary_edge_records(candidate)?
         .into_iter()
         .map(|edge| edge.key)
-        .collect()
+        .collect())
 }
 
-fn collect_boundary_edge_records(candidate: &TriangleMesh) -> Vec<QuantizedBoundaryEdge> {
+fn collect_boundary_edge_records(
+    candidate: &TriangleMesh,
+) -> Result<Vec<QuantizedBoundaryEdge>, SolverBindingError> {
     use std::collections::HashMap;
 
     let mut edge_counts: HashMap<
@@ -706,8 +710,7 @@ fn collect_boundary_edge_records(candidate: &TriangleMesh) -> Vec<QuantizedBound
             (vertices[1], vertices[2]),
             (vertices[2], vertices[0]),
         ] {
-            let key = BoundaryEdgeKey::new(a, b)
-                .expect("validated TriangleMesh contains finite non-degenerate edge endpoints");
+            let key = BoundaryEdgeKey::new(a, b)?;
             let midpoint = [
                 (a[0] as f64 + b[0] as f64) / 2.0,
                 (a[1] as f64 + b[1] as f64) / 2.0,
@@ -728,7 +731,7 @@ fn collect_boundary_edge_records(candidate: &TriangleMesh) -> Vec<QuantizedBound
         }
     }
 
-    edge_counts
+    Ok(edge_counts
         .into_iter()
         .filter_map(|(key, (count, a_mm, b_mm, midpoint, length_mm))| {
             (count == 1).then_some(QuantizedBoundaryEdge {
@@ -739,8 +742,7 @@ fn collect_boundary_edge_records(candidate: &TriangleMesh) -> Vec<QuantizedBound
                 length_mm,
             })
         })
-        .collect()
-}
+        .collect())
 
 fn edge_matches_interface(
     edge: &QuantizedBoundaryEdge,
@@ -960,7 +962,7 @@ mod tests {
     }
 
     fn boundary_edges(candidate: &TriangleMesh) -> Vec<BoundaryEdgeKey> {
-        collect_boundary_edge_keys(candidate)
+        collect_boundary_edge_keys(candidate).unwrap()
     }
 
     struct FixtureAdapter;
