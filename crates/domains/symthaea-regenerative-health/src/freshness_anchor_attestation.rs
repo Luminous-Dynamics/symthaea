@@ -32,6 +32,36 @@ pub struct FreshnessAnchorVerifierAttestation {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FreshnessAnchorVerifierTrustPolicy {
+    pub expected_verifier_reference: String,
+    pub expected_key_fingerprint: String,
+    pub expected_trust_anchor_set_digest: String,
+}
+
+impl FreshnessAnchorVerifierTrustPolicy {
+    pub fn new(
+        expected_verifier_reference: impl Into<String>,
+        expected_key_fingerprint: impl Into<String>,
+        expected_trust_anchor_set_digest: impl Into<String>,
+    ) -> Self {
+        Self {
+            expected_verifier_reference: expected_verifier_reference.into(),
+            expected_key_fingerprint: expected_key_fingerprint.into(),
+            expected_trust_anchor_set_digest: expected_trust_anchor_set_digest.into(),
+        }
+    }
+
+    fn validate(&self, receipt: &FreshnessAnchorVerificationReceipt, attestation: &FreshnessAnchorVerifierAttestation) -> bool {
+        !self.expected_verifier_reference.trim().is_empty()
+            && !self.expected_key_fingerprint.trim().is_empty()
+            && !self.expected_trust_anchor_set_digest.trim().is_empty()
+            && receipt.verifier_reference == self.expected_verifier_reference
+            && attestation.verifier_reference == self.expected_verifier_reference
+            && receipt.trust_anchor_set_digest == self.expected_trust_anchor_set_digest
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FreshnessAnchorAttestationVerificationError {
     InvalidEnvelope,
     VerifierReferenceMismatch,
@@ -40,6 +70,7 @@ pub enum FreshnessAnchorAttestationVerificationError {
     InvalidSignature,
     SignatureVerificationFailed,
     AnchorVerificationFailed(FreshnessAnchorAssuranceError),
+    VerifierTrustPolicyMismatch,
 }
 
 fn signed_message(statement_digest: &str) -> Vec<u8> {
@@ -149,6 +180,67 @@ pub fn verify_attested_anchor(
     VerifiedFreshnessAnchor::verify(profile, receipt, &AttestationVerifier { attestation })
         .map_err(FreshnessAnchorAttestationVerificationError::AnchorVerificationFailed)
 }
+
+pub fn verify_attested_anchor_with_trust_policy(
+    profile: FreshnessAnchorProfile,
+    receipt: FreshnessAnchorVerificationReceipt,
+    attestation: &FreshnessAnchorVerifierAttestation,
+    trust_policy: &FreshnessAnchorVerifierTrustPolicy,
+) -> Result<VerifiedFreshnessAnchor, FreshnessAnchorAttestationVerificationError> {
+    attestation.verify(&receipt)?;
+    if !trust_policy.validate(&receipt, attestation)
+        || attestation.verifying_key_fingerprint()? != trust_policy.expected_key_fingerprint
+    {
+        return Err(FreshnessAnchorAttestationVerificationError::VerifierTrustPolicyMismatch);
+    }
+
+    VerifiedFreshnessAnchor::verify(profile, receipt, &AttestationVerifier { attestation })
+        .map_err(FreshnessAnchorAttestationVerificationError::AnchorVerificationFailed)
+}
+
+    #[test]
+    fn trust_policy_rejects_unexpected_verifier_key() {
+        let signing_key = key(7);
+        let r = receipt();
+        let attestation =
+            FreshnessAnchorVerifierAttestation::sign(r.verifier_reference.clone(), &r, &signing_key);
+        let policy = FreshnessAnchorVerifierTrustPolicy::new(
+            "verifier-1",
+            FreshnessAnchorVerifierAttestation::sign(
+                "verifier-1",
+                &r,
+                &key(8),
+            )
+            .verifying_key_fingerprint()
+            .unwrap(),
+            "trust-anchors-1",
+        );
+
+        assert_eq!(
+            verify_attested_anchor_with_trust_policy(profile(), r, &attestation, &policy)
+                .unwrap_err(),
+            FreshnessAnchorAttestationVerificationError::VerifierTrustPolicyMismatch
+        );
+    }
+
+    #[test]
+    fn trust_policy_binds_trust_anchor_set() {
+        let signing_key = key(7);
+        let r = receipt();
+        let attestation =
+            FreshnessAnchorVerifierAttestation::sign(r.verifier_reference.clone(), &r, &signing_key);
+        let policy = FreshnessAnchorVerifierTrustPolicy::new(
+            "verifier-1",
+            attestation.verifying_key_fingerprint().unwrap(),
+            "different-trust-anchor-set",
+        );
+
+        assert_eq!(
+            verify_attested_anchor_with_trust_policy(profile(), r, &attestation, &policy)
+                .unwrap_err(),
+            FreshnessAnchorAttestationVerificationError::VerifierTrustPolicyMismatch
+        );
+    }
 
 #[cfg(test)]
 mod tests {
