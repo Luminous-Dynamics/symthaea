@@ -77,9 +77,14 @@ pub fn compare_graphs(
     let observed_edges = canonical_edges(observed);
 
     let node_intersection = expected_nodes
-        .keys()
-        .filter(|key| observed_nodes.contains_key(*key))
-        .count();
+        .iter()
+        .map(|(key, expected_confidences)| {
+            observed_nodes
+                .get(key)
+                .map(|observed_confidences| expected_confidences.len().min(observed_confidences.len()))
+                .unwrap_or(0)
+        })
+        .sum();
     let edge_intersection = expected_edges
         .iter()
         .filter(|key| observed_edges.binary_search(key).is_ok())
@@ -163,6 +168,14 @@ pub fn drop_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
     let mut reduced = graph.clone();
     reduced.edges.pop();
     reduced
+}
+
+pub fn duplicate_last_node(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
+    let mut duplicated = graph.clone();
+    if let Some(node) = duplicated.nodes.last().cloned() {
+        duplicated.nodes.push(node);
+    }
+    duplicated
 }
 
 pub fn duplicate_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
@@ -323,6 +336,15 @@ mod tests {
         let metrics = compare_graphs(&expected, &observed).unwrap();
         assert!(!metrics.structural_equivalence);
         assert!(metrics.edge_recall < 1.0);
+    }
+
+    #[test]
+    fn duplicate_node_does_not_hide_precision_loss() {
+        let expected = fixture();
+        let observed = duplicate_last_node(&expected);
+        let metrics = compare_graphs(&expected, &observed).unwrap();
+        assert!(!metrics.structural_equivalence);
+        assert!(metrics.node_precision < 1.0);
     }
 
     #[test]
