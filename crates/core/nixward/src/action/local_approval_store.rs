@@ -9,8 +9,8 @@
 //! - at most one request for one exact action-intent digest is pending at a time;
 //! - replacement/supersession and consumption occur under one mutex;
 //! - a successful consume combines the exact pending request, an identity-free
-//!   client submission, and a kernel-verified local peer, then removes that
-//!   request before returning a live consumed-decision token.
+//!   client submission, and a kernel-verified local peer, constructs the
+//!   consumed-decision token, and only then removes the request before returning it.
 //!
 //! A consumed decision is still not Nix execution authority. A later authority
 //! layer must consume that live token under the applicable policy/state checks.
@@ -117,8 +117,9 @@ impl LocalApprovalRequestStoreV1 {
 
     /// Atomically admit and consume one exact V2 local approval request.
     ///
-    /// Projection-digest comparison, temporal admission, and request removal all
-    /// occur while the same pending-state mutex is held.
+    /// Projection-digest comparison, consumed-token construction, temporal
+    /// admission, and request removal all occur while the same pending-state
+    /// mutex is held.
     pub(crate) fn consume_verified_submission_v2(
         &self,
         submission: &LocalApprovalSubmissionV2,
@@ -143,6 +144,23 @@ impl LocalApprovalRequestStoreV1 {
             )?
         };
 
+        // Build the live consumed token before mutating pending state. This keeps
+        // the consume boundary fail-closed even if a future provenance invariant
+        // is added to `from_admitted_parts`: an internal construction error must
+        // not erase an otherwise valid pending request.
+        let consumed = {
+            let record = pending
+                .get(&submission.request_id)
+                .ok_or(LocalApprovalRequestStoreErrorV1::RequestDisappearedDuringConsume)?;
+            ConsumedLocalApprovalDecisionV1::from_admitted_parts(
+                &record.request,
+                decision,
+                record.projection_digest.clone(),
+                verified_peer,
+                evaluation,
+            )?
+        };
+
         let removed = pending
             .remove(&submission.request_id)
             .ok_or(LocalApprovalRequestStoreErrorV1::RequestDisappearedDuringConsume)?;
@@ -151,13 +169,7 @@ impl LocalApprovalRequestStoreV1 {
             Some(submission.request_id.as_str())
         );
 
-        ConsumedLocalApprovalDecisionV1::from_admitted_parts(
-            &removed.request,
-            decision,
-            removed.projection_digest,
-            verified_peer,
-            evaluation,
-        )
+        Ok(consumed)
     }
 
     /// Test-only legacy V1 admission, isolated from production callers.
