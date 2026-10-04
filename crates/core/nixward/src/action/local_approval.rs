@@ -80,6 +80,27 @@ fn operator_display_args(args: &[String]) -> String {
         .join(" ")
 }
 
+fn operator_display_rebuild(
+    mode: &str,
+    flake: Option<&str>,
+    extra_args: &[String],
+) -> String {
+    let flake_text = flake
+        .map(operator_display_arg)
+        .unwrap_or_else(|| "<none>".to_string());
+    let mut parts = vec![
+        format!("nixos-rebuild {mode}"),
+        format!("flake={flake_text}"),
+    ];
+    if !extra_args.is_empty() {
+        parts.push(format!(
+            "extra-args=[{}]",
+            operator_display_args(extra_args)
+        ));
+    }
+    parts.join(" ")
+}
+
 /// Canonical operator-facing rendering for a typed Nixward command.
 ///
 /// This is presentation data, not execution authority. The renderer lives in
@@ -89,6 +110,18 @@ pub fn operator_visible_action_for_command(
     command: &crate::action::executor::NixOSCommand,
 ) -> String {
     match command {
+        crate::action::executor::NixOSCommand::RebuildSwitch {
+            flake,
+            extra_args,
+        } => operator_display_rebuild("switch", flake.as_deref(), extra_args),
+        crate::action::executor::NixOSCommand::RebuildTest {
+            flake,
+            extra_args,
+        } => operator_display_rebuild("test", flake.as_deref(), extra_args),
+        crate::action::executor::NixOSCommand::RebuildBoot {
+            flake,
+            extra_args,
+        } => operator_display_rebuild("boot", flake.as_deref(), extra_args),
         crate::action::executor::NixOSCommand::ConfigPatch {
             option_path,
             value,
@@ -477,6 +510,36 @@ mod tests {
         assert_eq!(
             two,
             "nixos-rebuild switch profile with spaces"
+        );
+    }
+
+    #[test]
+    fn rebuild_display_distinguishes_structured_flake_from_extra_args() {
+        use crate::action::executor::NixOSCommand;
+
+        let flake_field = NixOSCommand::RebuildSwitch {
+            flake: Some(".#workstation".to_string()),
+            extra_args: vec![],
+        };
+        let equivalent_argv_shape = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec![
+                "--flake".to_string(),
+                ".#workstation".to_string(),
+            ],
+        };
+
+        let a = operator_visible_action_for_command(&flake_field);
+        let b = operator_visible_action_for_command(&equivalent_argv_shape);
+
+        assert_ne!(
+            a, b,
+            "structured rebuild semantics must not collapse to identical approval text"
+        );
+        assert_eq!(a, "nixos-rebuild switch flake=.#workstation");
+        assert_eq!(
+            b,
+            "nixos-rebuild switch flake=<none> extra-args=[--flake .#workstation]"
         );
     }
 
