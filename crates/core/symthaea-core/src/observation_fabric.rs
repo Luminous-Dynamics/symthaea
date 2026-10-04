@@ -1818,6 +1818,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn receipt_attestation_temporal_status_is_deterministic() {
         let receipt = fixture_receipt();
         let mut envelope =
