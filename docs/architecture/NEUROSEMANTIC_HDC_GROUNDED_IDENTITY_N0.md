@@ -223,12 +223,16 @@ and calibration/test protocol without changing the current fail-closed baseline.
 
 ## Reconstruction resource boundary
 
-The identity-aware decoder has an explicit N0 resource ceiling independent of
+The identity-aware decoder has explicit N0 resource ceilings independent of
 the 1 MiB transport payload bound. A representation may request at most 256
-decoded nodes and 2048 decoded edges. Before allocating edge candidates, the
-decoder also checks the Cartesian candidate budget and fails closed above
-1,000,000 candidates. This prevents a small authenticated frame from inducing
-unbounded receiver-side combinatorial work.
+decoded nodes and 2048 decoded edges. Identity manifests are capped at 4096
+concept bindings and 4096 relation bindings, while a frozen codebook is capped
+at 4096 concept candidates and 4096 relation candidates. Before allocating edge
+candidates, the decoder also checks the Cartesian candidate budget and fails
+closed above 1,000,000 candidates. These bounds address both the serialized
+graph shape and the receiver-side candidate universe: a small authenticated
+frame must not be able to induce unbounded ranking work by pairing with an
+unbounded local ontology.
 
 These are implementation safety bounds, not evidence of scalability. Raising
 them should require a new benchmark tranche that measures runtime, memory, and
