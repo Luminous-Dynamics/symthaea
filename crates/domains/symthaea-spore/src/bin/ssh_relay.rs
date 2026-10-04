@@ -339,7 +339,20 @@ if [ ! -e /dev/tpmrm0 ]; then
   echo "WARNING: TPM 2.0 not detected. Skipping auto-unlock enrollment."
   echo "You will need to enter your passphrase at every boot."
 else
-  # Find the LUKS device
+  # A TPM resource-manager node is only a capability signal. Confirm the
+  # observed TCG specification major before issuing a TPM2 enrollment request.
+  TPM2_SPEC_MAJOR=""
+  for version_path in /sys/class/tpm/tpm*/tpm_version_major; do
+    if [ -r "$version_path" ]; then
+      TPM2_SPEC_MAJOR=$(cat "$version_path")
+      break
+    fi
+  done
+  if [ "$TPM2_SPEC_MAJOR" != "2" ]; then
+    echo "WARNING: TPM specification major is not confirmed as 2. Skipping TPM2 enrollment."
+    echo "A passphrase remains the recovery path; retry after first boot when TPM2 is confirmed."
+  else
+    # Find the LUKS device
   LUKS_DEV=$(blkid -t TYPE=crypto_LUKS -o device 2>/dev/null | head -1)
   if [ -n "$LUKS_DEV" ]; then
     # PCR 0+7 is retained for compatibility with the existing installer policy.
@@ -370,8 +383,9 @@ else
       echo "You can retry after first boot with: sudo systemd-cryptenroll $LUKS_DEV --tpm2-device=auto --tpm2-pcrs=$TPM2_PCRS"
       echo "A passphrase remains the recovery path."
     fi
-  else
-    echo "WARNING: No LUKS device found. TPM2 enrollment skipped."
+    else
+      echo "WARNING: No LUKS device found. TPM2 enrollment skipped."
+    fi
   fi
 fi
 "#
@@ -5534,7 +5548,7 @@ mod tests {
         assert!(script.contains("echo \"  TPM2 enrollment command succeeded.\""));
         assert!(script.contains("echo \"WARNING: TPM2 enrollment failed. Installed configuration was not modified.\""));
         assert!(script.contains("if grep -q 'boot.initrd.luks.devices.\\"cryptroot\\"'"));
-        assert!(script.contains("TPM2_PCRS=\"0+7\""));
+        assert!(script.contains("TPM2_SPEC_MAJOR"));\n        assert!(script.contains("TPM specification major is not confirmed as 2"));\n        assert!(script.contains("TPM2_PCRS=\"0+7\""));
         assert!(script.contains("This is LUKS key-release policy, not regenerative-health attestation."));
     }
 
