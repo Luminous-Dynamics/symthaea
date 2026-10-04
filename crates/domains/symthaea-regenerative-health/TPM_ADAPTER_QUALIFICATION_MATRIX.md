@@ -27,14 +27,15 @@ Every emulator campaign must demonstrate:
 - the counter advances after restart;
 - a post-restart attestation key is used only after recreating its transient handle;
 - full NV certification covers offset 0 and size 8;
-- the TPM is capable of certifying a weaker partial range, and that weaker proof is explicitly treated as non-authoritative by the domain contract.
+- the TPM is capable of certifying a weaker partial range, and that weaker proof is explicitly treated as non-authoritative by the domain contract;
+- a separate decoy NV index can produce a valid full certification with the same signer/challenge, and the domain boundary treats that certificate as non-authoritative unless its signed NV Index Name matches the configured trusted NV identity.
 
 ## Q3 hardware gates
 
 A real-hardware run may not claim Q3 until the adapter captures, validates, and records:
 
 - exact TPM device identity and TCTI configuration;
-- exact NV public area and canonical NV Index Name;
+- exact NV public area and canonical NV Index Name, independently derived from the trusted NV public profile rather than copied from the attestation itself;
 - exact NV attributes, name algorithm, authorization policy, and data size;
 - exact attestation-key identity and its deployment authorization chain;
 - fresh Quote and NV certification with the same challenge;
