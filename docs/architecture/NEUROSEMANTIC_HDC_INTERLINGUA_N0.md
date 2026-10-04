@@ -36,7 +36,9 @@ The resulting node vectors are bundled in continuous space and then passed throu
 
 Each directed edge is encoded compositionally as:
 
-`ROLE_SOURCE ⊗ SOURCE_ATOM ⊗ ROLE_RELATION ⊗ RELATION_ATOM ⊗ ROLE_TARGET ⊗ TARGET_ATOM`
+`ROLE_SOURCE ⊗ SOURCE_ATOM ⊗ ROLE_RELATION ⊗ RELATION_ATOM ⊗ ROLE_TARGET ⊗ ρ(TARGET_ATOM)`
+
+where `ρ` is the fixed one-position circular permutation `HDC_EDGE_TARGET_PERMUTATION = 1`. This is required because continuous Hadamard binding is commutative; role labels alone would not distinguish `(source, target)` from `(target, source)`.
 
 The edge vectors are bundled in continuous space and then quantized by the same codec.
 
@@ -89,8 +91,12 @@ The benchmark also verifies that reordering graph collections produces an identi
 The benchmark includes:
 
 1. an unrelated random HDC query against the node and edge candidate spaces;
-2. a directed-edge role-swap control;
-3. a codebook mismatch control using a different deterministic seed.
+2. a directed-edge role-swap control that must distinguish forward and reversed endpoints;
+3. lexical-label and transport-identifier invariance controls;
+4. deterministic 0%, 0.1%, 1%, 5%, and 10% binary transport-corruption observations;
+5. a codebook mismatch control using a different deterministic seed;
+
+
 
 The first two quantify accidental retrieval. The third checks that provenance mismatch is rejected before interpretation rather than producing plausible-looking output in the wrong semantic coordinate system.
 
