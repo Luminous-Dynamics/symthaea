@@ -905,7 +905,6 @@ fn validate_resource_binding(plan: &DeploymentPlan) -> Result<(), PlanValidation
             Capability::InstallApplication,
             Capability::RemoveApplication,
             Capability::ReplaceOs,
-            Capability::ModifyBootChain,
             Capability::ConfigureSecureBoot,
             Capability::EncryptStorage,
         ] {
@@ -1280,6 +1279,30 @@ mod tests {
             plan.authorize(auth, 150),
             Err(PlanValidationError::AuthorizationTargetDigestMismatch)
         );
+    }
+
+    #[test]
+    fn boot_chain_capability_can_be_target_scoped_without_resource_binding() {
+        let mut plan = sample_plan();
+        plan.intent.required_resources.clear();
+        plan.intent.required_capabilities.remove(&Capability::Rollback);
+        plan.intent
+            .required_capabilities
+            .insert(Capability::ModifyBootChain);
+        plan.target_snapshot
+            .profile
+            .capabilities
+            .insert(Capability::ModifyBootChain);
+        plan.steps[0].required_capabilities.clear();
+        plan.steps[0]
+            .required_capabilities
+            .insert(Capability::ObserveState);
+        plan.steps[1].required_capabilities.clear();
+        plan.steps[1]
+            .required_capabilities
+            .insert(Capability::ModifyBootChain);
+
+        assert!(plan.validate().is_ok());
     }
 
     #[test]
