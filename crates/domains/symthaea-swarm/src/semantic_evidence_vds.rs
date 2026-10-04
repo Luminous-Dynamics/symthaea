@@ -3626,6 +3626,7 @@ mod tests {
             .expect("an indefinite protected-header map is valid COSE/CBOR");
         assert_eq!(decoded.to_cbor(),bytes);
         assert!(decoded.protected_receipts().is_some());
+        assert_eq!(decoded.protected_algorithm_id().unwrap(), COSE_ES256_ALGORITHM_ID);
     }
 
     #[test]
