@@ -18,7 +18,7 @@
 //! The result is still approval evidence only. This module owns no Nix execution
 //! authority, generic grant accounting, `DispatchPermitV2`, or privileged broker.
 
-use super::authorization::{NixActionDescriptorV1, NixActionIntentV1};
+use super::authorization::NixActionIntentV1;
 use super::approver_evidence::RequiredApprovalProfileV1;
 use super::executor::NixOSCommand;
 use super::daemon_incarnation::{DaemonApprovalContextErrorV1, LiveDaemonIncarnationV1};
@@ -165,8 +165,12 @@ impl LocalApprovalRuntimeV1 {
         created_at: UnixMillisV1,
         expires_at: UnixMillisV1,
     ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
-        let expected_action = NixActionDescriptorV1::try_from(command)?;
-        if intent.action != expected_action {
+        let expected_intent = NixActionIntentV1::from_command(
+            intent.subject_identity.clone(),
+            intent.pre_state_identity.clone(),
+            command,
+        )?;
+        if intent != &expected_intent {
             return Err(LocalApprovalRuntimeErrorV1::IntentCommandMismatch);
         }
         let displayed_action = operator_visible_action_for_command(command);
@@ -361,6 +365,51 @@ mod tests {
                 .create_pending_request(
                     &intent("nginx.service"),
                     &stop_command,
+                    RequiredApprovalProfileV1::SameUidProcessV1,
+                    UnixMillisV1::new(now.saturating_sub(1_000)),
+                    UnixMillisV1::new(now + 60_000),
+                )
+                .unwrap_err()
+                .to_string(),
+            "approval intent action does not match the typed command"
+        );
+        assert_eq!(runtime.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn request_creation_rejects_intent_scope_or_condition_substitution() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let command = restart_command("nginx.service");
+
+        let mut widened = intent("nginx.service");
+        widened.maximum_scope = crate::action::NixActionScopeV1::Destructive;
+
+        assert_eq!(
+            runtime
+                .create_pending_request(
+                    &widened,
+                    &command,
+                    RequiredApprovalProfileV1::SameUidProcessV1,
+                    UnixMillisV1::new(now.saturating_sub(1_000)),
+                    UnixMillisV1::new(now + 60_000),
+                )
+                .unwrap_err()
+                .to_string(),
+            "approval intent action does not match the typed command"
+        );
+
+        let mut conditioned = intent("nginx.service");
+        conditioned
+            .preconditions
+            .push("unit state must be active".to_string());
+
+        assert_eq!(
+            runtime
+                .create_pending_request(
+                    &conditioned,
+                    &command,
                     RequiredApprovalProfileV1::SameUidProcessV1,
                     UnixMillisV1::new(now.saturating_sub(1_000)),
                     UnixMillisV1::new(now + 60_000),
