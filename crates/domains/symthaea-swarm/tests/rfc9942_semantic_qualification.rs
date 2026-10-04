@@ -937,3 +937,39 @@ fn rfc9942_verified_state_records_selected_proof_index() {
     assert_eq!(state.proof().proof_index(), 1);
     assert_eq!(state.proof().inclusion_head(), Some(head));
 }
+
+#[test]
+fn rfc9942_es256_binds_external_aad() {
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+    let payload_root = [0x22; 32];
+
+    let unsigned = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp.clone(),
+        Rfc9942ReceiptPayload::Attached(payload_root),
+        vec![0u8; 64],
+    )
+    .unwrap();
+
+    let rng = SystemRandom::new();
+    let signer = rfc8392_signing_key(&rng);
+    let aad = b"qualification-aad";
+    let tbs = unsigned.signature1_tbs(aad, None).unwrap();
+    let signature = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
+
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Attached(payload_root),
+        signature,
+    )
+    .unwrap();
+    let key = rfc8392_public_key();
+
+    receipt.verify_es256(&key, aad, None).unwrap();
+    assert_eq!(
+        receipt.verify_es256(&key, b"wrong-aad", None),
+        Err(Rfc9942VdpError::InvalidEs256Signature)
+    );
+}
