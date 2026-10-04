@@ -477,21 +477,11 @@ mod tests {
             SpeechPlanError::QuestionRequiresQuestionIntonation
         );
 
-        let readout = decoder.decode(&{
-            let mut c = channels.clone();
-            c.set_intent(7);
-            c.set_epistemic(3.0);
-            c
-        });
-        let mut abstention = SpeechPlan::from_readout(
-            &{
-                let mut c = channels.clone();
-                c.set_intent(7);
-                c.set_epistemic(3.0);
-                c
-            },
-            &readout,
-        );
+        let mut abstention_channels = ThoughtChannels::with_intent(7);
+        abstention_channels.set_epistemic(3.0);
+        let abstention_readout = decoder.decode(&abstention_channels);
+        let mut abstention =
+            SpeechPlan::from_readout(&abstention_channels, &abstention_readout);
         abstention.epistemic_delivery = EpistemicDelivery::Assertive;
         assert_eq!(
             abstention.validate().expect_err("abstention delivery mismatch"),
