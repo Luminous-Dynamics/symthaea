@@ -94,7 +94,7 @@ pub fn quantize_continuous(
         .count() as f64
         / continuous.values.len() as f64;
 
-    let cosine_similarity = continuous.similarity(&reconstructed) as f64;
+    let cosine_similarity = full_cosine_similarity(continuous, &reconstructed);
     let continuous_bytes = continuous.values.len() * std::mem::size_of::<f32>();
     let binary_bytes = BinaryHV::BYTES;
     let compression_ratio = continuous_bytes as f64 / binary_bytes as f64;
@@ -119,6 +119,27 @@ pub fn quantize_continuous(
 pub fn roundtrip_continuous(continuous: &ContinuousHV) -> Result<ContinuousHV, String> {
     let (binary, _) = quantize_continuous(continuous)?;
     Ok(binary.to_continuous())
+}
+
+fn full_cosine_similarity(a: &ContinuousHV, b: &ContinuousHV) -> f64 {
+    let mut dot = 0.0_f64;
+    let mut norm_a_sq = 0.0_f64;
+    let mut norm_b_sq = 0.0_f64;
+
+    for (x, y) in a.values.iter().zip(&b.values) {
+        let x = *x as f64;
+        let y = *y as f64;
+        dot += x * y;
+        norm_a_sq += x * x;
+        norm_b_sq += y * y;
+    }
+
+    let denominator = norm_a_sq.sqrt() * norm_b_sq.sqrt();
+    if denominator == 0.0 {
+        0.0
+    } else {
+        dot / denominator
+    }
 }
 
 fn validate_continuous(continuous: &ContinuousHV) -> Result<(), String> {
