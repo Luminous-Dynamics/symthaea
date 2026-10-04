@@ -1790,10 +1790,10 @@ mod tests {
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
             final_target_snapshot_digest: ContentDigest {
-            final_target_snapshot_observed_at_ms: 160,
                 algorithm: String::new(),
                 value: String::new(),
             },
+            final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
             started_at_ms: 151,
             finished_at_ms: 160,
@@ -1807,6 +1807,62 @@ mod tests {
             receipt.validate_for(&authorized),
             Err(ReceiptValidationError::MissingFinalSnapshotEvidence)
         );
+    }
+
+    #[test]
+    fn rejects_execution_with_stale_target_snapshot() {
+        let mut plan = sample_plan();
+        plan.max_target_snapshot_age_ms = Some(50);
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 151,
+            observed_disposition: authorized.plan.verification.disposition,
+            started_at_ms: 150,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Unproven,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::TargetSnapshotStaleAtExecution {
+                age_ms: 60,
+                max_age_ms: 50,
+            })
+        );
+    }
+
+    #[test]
+    fn accepts_execution_at_target_snapshot_age_limit() {
+        let mut plan = sample_plan();
+        plan.max_target_snapshot_age_ms = Some(60);
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
+            observed_disposition: authorized.plan.verification.disposition,
+            started_at_ms: 150,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Unproven,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert!(receipt.validate_for(&authorized).is_ok());
     }
 
     #[test]
