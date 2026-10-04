@@ -182,6 +182,30 @@ mod tests {
     }
 
     #[test]
+    fn receipt_lineage_matches_exact_plan() {
+        let plan = plan();
+        let receipt = SpeechDeliveryReceipt::new(&plan, SpeechDeliveryObservation::default());
+        assert!(receipt.validate_against_plan(&plan).is_ok());
+    }
+
+    #[test]
+    fn receipt_lineage_rejects_different_plan() {
+        let plan = plan();
+        let other = {
+            let genesis = GenesisSeed::from_phrase("broca-delivery-feedback-other");
+            let decoder = StructuredDecoder::new(&genesis);
+            let channels = ThoughtChannels::with_intent(4);
+            let readout = decoder.decode(&channels);
+            SpeechPlan::from_readout(&channels, &readout)
+        };
+        let receipt = SpeechDeliveryReceipt::new(&plan, SpeechDeliveryObservation::default());
+        assert_eq!(
+            receipt.validate_against_plan(&other).expect_err("wrong upstream plan"),
+            SpeechDeliveryReceiptError::PlanMismatch
+        );
+    }
+
+    #[test]
     fn exact_observation_passes() {
         let plan = plan();
         let observation = SpeechDeliveryObservation {
