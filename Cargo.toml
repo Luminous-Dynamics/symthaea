@@ -9,16 +9,16 @@ members = [
 # NOTE: the root package ("symthaea") is automatically a workspace member
 # because this manifest has both [package] and [workspace] — it does NOT
 # need (and must NOT have) an explicit "." entry here. Verified 2026-07-03:
-# with cargo 1.95.0, an explicit "." in members silently disables
-# exclude for every glob-matched member (spark-engine, symthaea-lab, and
+# with cargo 1.95.0, an explicit "." in `members` silently disables
+# `exclude` for every glob-matched member (spark-engine, symthaea-lab, and
 # the old symthaea-muse-wasm path were all being compiled as full workspace
-# members despite being listed below, because of this). default-members
-# below may still reference "." — only the members array triggers the bug.
+# members despite being listed below, because of this). `default-members`
+# below may still reference "." — only the `members` array triggers the bug.
 exclude = [
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
-    # nixward path dependency. Keep it out of the workspace and build it
-    # standalone (cargo build -p nixward-web from its own directory).
+    # `nixward` path dependency. Keep it out of the workspace and build it
+    # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
@@ -28,7 +28,7 @@ exclude = [
     "crates/domains/symthaea-lab",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
     # stack, but zero consumers — its only reference is foveation's non-default
-    # perception feature nothing enables, and it duplicates src/perception/'s
+    # `perception` feature nothing enables, and it duplicates src/perception/'s
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
@@ -140,3 +140,2407 @@ symthaea-memetics = { path = "crates/domains/symthaea-memetics" }
 symthaea-earth-system = { path = "crates/domains/symthaea-earth-system" }
 symthaea-thermofluids = { path = "crates/domains/symthaea-thermofluids" }
 symthaea-organic-chemistry = { path = "crates/domains/symthaea-organic-chemistry" }
+# Symthaea Futures Laboratory workspace-inherited deps (fixes a workspace-wide
+# manifest parse failure, 2026-07-25: symthaea-futures-analysis/-calibration/
+# -ensemble/-symtropy all declare these via `{ workspace = true }`, but only
+# symthaea-fep/symthaea-alife's OWN entries existed here — futures-core and
+# futures-state were never added, breaking `cargo` for the whole workspace
+# regardless of -p scoping, since workspace member enumeration happens before
+# package-specific resolution. Extended 2026-07-26 to cover the remaining 5
+# futures-* crates for the same reason (symthaea-futures-ensemble started
+# depending on -symtropy and, as a dev-dependency, -calibration via
+# `{ workspace = true }`, neither of which existed here yet — same failure
+# mode, same fix). Additive only — not touching the in-progress Futures
+# Laboratory feature itself, see SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md).
+symthaea-futures-core = { path = "crates/domains/symthaea-futures-core" }
+symthaea-futures-state = { path = "crates/domains/symthaea-futures-state" }
+symthaea-futures-ensemble = { path = "crates/domains/symthaea-futures-ensemble" }
+symthaea-futures-calibration = { path = "crates/domains/symthaea-futures-calibration" }
+symthaea-futures-ledger = { path = "crates/domains/symthaea-futures-ledger" }
+symthaea-futures-symtropy = { path = "crates/domains/symthaea-futures-symtropy" }
+symthaea-futures-analysis = { path = "crates/domains/symthaea-futures-analysis" }
+symthaea-alife = { path = "crates/domains/symthaea-alife" }
+
+[package]
+name = "symthaea"
+version = "2.0.0"
+edition = "2024"
+autoexamples = false
+autotests = false
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Symthaea: Holographic Liquid Brain lineage - Consciousness-first AI in Rust"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+readme = "README.md"
+homepage = "https://luminousdynamics.org"
+documentation = "https://docs.rs/symthaea"
+keywords = ["consciousness", "ai", "hdc", "integrated-information", "neuroscience"]
+categories = ["science", "algorithms", "data-structures"]
+
+
+[dependencies]
+axum = { workspace = true }
+serde_json = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+mycelix-zkp-core = { workspace = true, features = ["dilithium"] }
+# Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
+symthaea-core = { path = "crates/core/symthaea-core" }
+# Shared evidence contract (Phase 1/2 of SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md)
+symthaea-evidence-plane = { path = "crates/core/symthaea-evidence-plane" }
+# Shared epistemic types (E/N/M, Prismatic context, provenance)
+symthaea-communication = { workspace = true }
+symthaea-epistemic-types = { path = "crates/domains/symthaea-epistemic-types" }
+
+# Symthaea Consciousness Equation - Master Consciousness Equation C(t)
+symthaea-consciousness-equation = { path = "crates/domains/symthaea-consciousness-equation" }
+
+# Symthaea Neuromodulators - DA/NE/5-HT/ACh/GABA/Oxytocin/Glutamate/Adenosine bath
+symthaea-neuromodulators = { path = "crates/domains/symthaea-neuromodulators" }
+symthaea-memory = { path = "crates/domains/symthaea-memory" }
+symthaea-organic-chemistry = { path = "crates/domains/symthaea-organic-chemistry" }
+symthaea-physiology = { path = "crates/domains/symthaea-physiology" }
+symthaea-economics = { path = "crates/domains/symthaea-economics" }
+symthaea-geodesy = { path = "crates/domains/symthaea-geodesy" }
+symthaea-epidemiology = { path = "crates/domains/symthaea-epidemiology" }
+symthaea-astronomy = { path = "crates/domains/symthaea-astronomy" }
+symthaea-thermofluids = { path = "crates/domains/symthaea-thermofluids" }
+symthaea-optics = { path = "crates/domains/symthaea-optics" }
+symthaea-earth-system = { path = "crates/domains/symthaea-earth-system" }
+symthaea-circuits = { path = "crates/domains/symthaea-circuits" }
+symthaea-control-theory = { path = "crates/domains/symthaea-control-theory" }
+symthaea-acoustics = { path = "crates/domains/symthaea-acoustics" }
+symthaea-dsp = { path = "crates/domains/symthaea-dsp" }
+symthaea-operations-research = { path = "crates/domains/symthaea-operations-research" }
+symthaea-modal = { path = "crates/domains/symthaea-modal" }
+symthaea-chronicle = { path = "crates/domains/symthaea-chronicle" }
+symthaea-statistics = { path = "crates/domains/symthaea-statistics" }
+symthaea-social-choice = { path = "crates/domains/symthaea-social-choice" }
+symthaea-formal-language = { path = "crates/domains/symthaea-formal-language" }
+symthaea-structural = { path = "crates/domains/symthaea-structural" }
+symthaea-grid-physics = { path = "crates/domains/symthaea-grid-physics" }
+symthaea-pragmatics = { path = "crates/domains/symthaea-pragmatics" }
+symthaea-information-theory = { path = "crates/domains/symthaea-information-theory" }
+symthaea-alife = { path = "crates/domains/symthaea-alife" }
+
+# Symthaea Futures Laboratory — calibrated, auditable forecasting of possible futures,
+# scored against ground truth. See SYMTHAEA_FUTURES_LABORATORY_PLAN_2026-07-25.md.
+symthaea-futures-core = { path = "crates/domains/symthaea-futures-core" }
+symthaea-futures-state = { path = "crates/domains/symthaea-futures-state" }
+symthaea-futures-ensemble = { path = "crates/domains/symthaea-futures-ensemble" }
+symthaea-futures-calibration = { path = "crates/domains/symthaea-futures-calibration" }
+symthaea-futures-ledger = { path = "crates/domains/symthaea-futures-ledger" }
+symthaea-futures-symtropy = { path = "crates/domains/symthaea-futures-symtropy" }
+symthaea-futures-analysis = { path = "crates/domains/symthaea-futures-analysis" }
+symthaea-memetics = { path = "crates/domains/symthaea-memetics", optional = true }
+
+# Symthaea Causal Reasoning - Pearl's do-calculus, counterfactual reasoning, causal emergence
+symthaea-causal-reasoning = { path = "crates/core/symthaea-causal-reasoning", default-features = false }
+
+# Symthaea FEP - Free Energy Principle active inference (always enabled)
+symthaea-fep = { path = "crates/core/symthaea-fep" }
+
+# Shared positioning and peer-fusion primitives
+positioning = { path = "stubs/positioning" }
+
+# Symthaea Dream - Counterfactual Dream Engine (always enabled)
+symthaea-dream = { path = "crates/domains/symthaea-dream" }
+
+# Symthaea Phi Search - Phi-guided architecture search (always enabled)
+symthaea-phi-search = { path = "crates/domains/symthaea-phi-search" }
+sha2 = { version = "0.10", optional = true }
+hmac = { version = "0.12", optional = true }
+
+# Symthaea Narrative Self - Narrative self-model (always enabled)
+symthaea-narrative-self = { path = "crates/domains/symthaea-narrative-self" }
+
+# Symthaea Field Dynamics - Consciousness field wave equations (optional)
+symthaea-field-dynamics = { path = "crates/domains/symthaea-field-dynamics", optional = true }
+
+# Symthaea Hodge - Hodge Laplacian for simplicial complexes (always enabled)
+symthaea-hodge = { path = "crates/domains/symthaea-hodge" }
+
+# Symthaea Factor Graph - Belief propagation inference (always enabled)
+symthaea-factor-graph = { path = "crates/domains/symthaea-factor-graph" }
+
+# Symthaea Enactive - Enactive cognition paradigm (always enabled)
+symthaea-enactive = { path = "crates/domains/symthaea-enactive" }
+
+symthaea-consciousness-topology = { path = "crates/domains/symthaea-consciousness-topology" }
+symthaea-exploration = { path = "crates/domains/symthaea-exploration" }
+symthaea-wisdom = { path = "crates/domains/symthaea-wisdom" }
+symthaea-types = { path = "crates/core/symthaea-types" }
+symthaea-cognitive-types = { path = "crates/core/symthaea-cognitive-types" }
+symthaea-harmonies = { path = "crates/domains/symthaea-harmonies" }
+symthaea-consciousness-resonance = { path = "crates/domains/symthaea-consciousness-resonance" }
+symthaea-embeddings = { path = "crates/domains/symthaea-embeddings" }
+symthaea-ssm = { path = "crates/domains/symthaea-ssm", optional = true }
+
+linux-embedded-hal = { version = "0.4", optional = true, default-features = false, features = ["i2c"] }
+symthaea-observability = { path = "crates/domains/symthaea-observability", optional = true }
+symthaea-support = { path = "crates/domains/symthaea-support", optional = true }
+
+# Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
+mycelix-fl-core = { path = "stubs/mycelix-fl-core", optional = true }
+
+# Mycelix Conductor bridge - governance dispatch to Holochain conductor
+symthaea-mycelix-conductor = { path = "crates/bridges/symthaea-mycelix-conductor", optional = true }
+
+# Mycelix Crypto - Post-quantum cryptography (ML-KEM-768, ML-DSA-65, SPHINCS+)
+mycelix-crypto = { path = "stubs/mycelix-crypto", optional = true, features = ["native"] }
+
+# Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
+symthaea-stt = { path = "crates/core/symthaea-stt", optional = true }
+# Symthaea Swarm - P2P collective consciousness
+symthaea_swarm = { path = "crates/domains/symthaea-swarm", optional = true, package = "symthaea-swarm" }
+symtropy-robotics-bridge-core = { workspace = true, optional = true }
+
+# Symthaea Sentinel - Zero-shot temporal audio pattern recognition
+symthaea-sentinel = { path = "crates/core/symthaea-sentinel", optional = true }
+
+# Symthaea Multirotor - HDC-LTC + FEP Active Inference multirotor flight control
+symthaea-multirotor = { path = "crates/domains/symthaea-multirotor", optional = true }
+
+# Symthaea Helicopter - HDC-LTC + FEP Active Inference SAR helicopter control
+symthaea-helicopter = { path = "crates/domains/symthaea-helicopter", optional = true }
+
+# Symthaea Humanoid - HDC-LTC + FEP Active Inference DMC Humanoid bipedal control
+symthaea-humanoid = { path = "crates/domains/symthaea-humanoid", optional = true }
+
+# Symthaea Vehicle - HDC-LTC + FEP Active Inference autonomous vehicle control
+symthaea-vehicle = { path = "crates/domains/symthaea-vehicle", optional = true }
+
+# Symthaea Browser - Consciousness-driven browser agent via CDP
+symthaea-browser = { path = "crates/domains/symthaea-browser", optional = true }
+
+# Symthaea AUV - HDC-LTC + FEP Active Inference autonomous underwater vehicle control
+symthaea-auv = { path = "crates/domains/symthaea-auv", optional = true }
+
+# Symthaea Manipulator - HDC-LTC consciousness-coupled industrial arm control
+symthaea-manipulator = { path = "crates/domains/symthaea-manipulator", optional = true }
+# New platforms (uncomment after creating crates with scripts/new-platform.sh):
+symthaea-exoskeleton = { path = "crates/domains/symthaea-exoskeleton", optional = true }
+symthaea-surgical = { path = "crates/domains/symthaea-surgical", optional = true }
+symthaea-orbital = { path = "crates/domains/symthaea-orbital", optional = true }
+symthaea-quadruped = { path = "crates/domains/symthaea-quadruped", optional = true }
+symthaea-subterranean = { path = "crates/domains/symthaea-subterranean", optional = true }
+symthaea-infrastructure = { path = "crates/core/symthaea-infrastructure", optional = true }
+symthaea-scavenger = { path = "crates/domains/symthaea-scavenger", optional = true }
+symthaea-agribot = { path = "crates/domains/symthaea-agribot", optional = true }
+symthaea-biota = { path = "crates/domains/symthaea-biota", optional = true }
+symthaea-clime = { path = "crates/domains/symthaea-clime", optional = true }
+
+# Symthaea HAL - Hardware abstraction layer (PCA9685 servo, I2C sensors, safety)
+symthaea-hal = { path = "crates/domains/symthaea-hal", optional = true }
+
+# Symthaea Vocal Tract - LTC-driven articulatory synthesis (encoder, controller, FEP, pipeline, metrics)
+symthaea-vocal-tract = { path = "crates/domains/symthaea-vocal-tract", default-features = false }
+
+# Symthaea Physics - Tokamak plasma HDC encoding, C-Mod adapter, Phi-based control
+symthaea-physics = { path = "crates/domains/symthaea-physics", optional = true }
+
+# Symthaea Physics Bridge - HDC semantic search for mathematical physics analogies
+symthaea-physics-bridge = { path = "crates/bridges/symthaea-physics-bridge", optional = true }
+
+# Symthaea Engineering - simulation dispatch, digital twins, and safety cases
+symthaea-sim-bridge = { path = "crates/bridges/symthaea-sim-bridge", optional = true }
+symthaea-digital-twin = { path = "crates/domains/symthaea-digital-twin", optional = true }
+symthaea-formal-safety = { path = "crates/domains/symthaea-formal-safety", optional = true }
+# Z3 formal verification bridge, used by school::code_learning's symbolic safety gate
+symthaea-runtime = { path = "crates/core/symthaea-runtime", optional = true }
+symthaea-engineering = { path = "crates/domains/symthaea-engineering", optional = true }
+symthaea-mujoco-bridge = { path = "crates/bridges/symthaea-mujoco-bridge", optional = true }
+symthaea-opensees-bridge = { path = "crates/bridges/symthaea-opensees-bridge", optional = true }
+symthaea-ngspice-bridge = { path = "crates/bridges/symthaea-ngspice-bridge", optional = true }
+symthaea-openfoam-bridge = { path = "crates/bridges/symthaea-openfoam-bridge", optional = true }
+
+# Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
+symthaea-broca = { path = "crates/domains/symthaea-broca", optional = true }
+
+# Symthaea Coding Feedback - lightweight semantic failure taxonomy and repair hints
+symthaea-coding-feedback = { path = "crates/domains/symthaea-coding-feedback" }
+
+# Symthaea Spore - WASM consciousness kernel (BrocaLite fallback for always-on language)
+symthaea-spore = { path = "crates/domains/symthaea-spore", optional = true, default-features = false }
+
+# Symthaea Muse - Consciousness-driven music synthesis (streaming PCM for cognitive loop)
+symthaea-muse = { path = "crates/domains/symthaea-muse", optional = true }
+
+# Symthaea Geodesic - Topology-aware code verification (PDG, Betti numbers, execution oracle)
+symthaea-geodesic = { path = "crates/domains/symthaea-geodesic", optional = true }
+
+# Symthaea Canvas - Living topology UI: cognitive geometry → SVG
+symthaea-canvas = { path = "crates/domains/symthaea-canvas", optional = true }
+
+# Symthaea Aesthetic - Aesthetic evaluation and feedback
+symthaea-aesthetic = { path = "crates/domains/symthaea-aesthetic", optional = true }
+
+# Symthaea Atelier - Generative art studio
+symthaea-atelier = { path = "crates/domains/symthaea-atelier", optional = true }
+
+# Symthaea Art Eye - rasterize generated SVG art + extract real pixel percepts
+# (the perception half of the creative loop; see art-eye feature)
+symthaea-art-eye = { path = "crates/bridges/symthaea-art-eye", optional = true }
+
+# Symthaea Gallery - self-curating persistent artwork store + style identity
+symthaea-gallery = { path = "crates/bridges/symthaea-gallery", optional = true }
+
+# Symthaea Clinical - Clinical assessment and therapeutic reasoning
+symthaea-clinical = { path = "crates/domains/symthaea-clinical", optional = true }
+symthaea-therapeutic = { path = "crates/domains/symthaea-therapeutic", optional = true }
+
+# Symthaea Nix - Conscious NixOS mind (HDC + active inference)
+nixward = { path = "crates/core/nixward", optional = true }
+
+# Genesis Pipeline - DNA-to-Human species stewardship
+symthaea-genomics = { path = "crates/domains/symthaea-genomics", optional = true }
+symthaea-cell-foundry = { path = "crates/domains/symthaea-cell-foundry", optional = true }
+symthaea-ectogenesis = { path = "crates/domains/symthaea-ectogenesis", optional = true }
+symthaea-nurture = { path = "crates/domains/symthaea-nurture", optional = true }
+symthaea-population = { path = "crates/domains/symthaea-population", optional = true }
+symthaea-neuroevolution = { path = "crates/domains/symthaea-neuroevolution", optional = true }
+symthaea-jepa = { path = "crates/domains/symthaea-jepa", optional = true }
+symthaea-materials = { path = "crates/domains/symthaea-materials", optional = true }
+symthaea-nuclear = { path = "crates/domains/symthaea-nuclear", optional = true }
+symthaea-nuclear-forensics = { path = "crates/domains/symthaea-nuclear-forensics", optional = true }
+symthaea-quantum-chemistry = { path = "crates/domains/symthaea-quantum-chemistry", optional = true }
+symthaea-fabrication-kernel = { path = "crates/domains/symthaea-fabrication-kernel", optional = true }
+
+# Symthaea Vision Manifold - Patch-based HDC video encoding with CfC temporal dynamics
+symthaea-vision-manifold = { path = "crates/domains/symthaea-vision-manifold", optional = true }
+symthaea-phone-embodiment = { path = "crates/domains/symthaea-phone-embodiment", optional = true }
+
+# Symthaea Foveation Bridge - Dorsal surprise → ventral recognition dispatch
+symthaea-foveation = { path = "crates/domains/symthaea-foveation", optional = true }
+
+# Symthaea HDC Store - Zero-copy mmap'd BinaryHV storage with persistent LSH
+symthaea-hdc-store = { path = "crates/domains/symthaea-hdc-store", optional = true }
+
+# HDC / Vector Symbolic Architectures
+# hypervector = "0.1"  # Using custom HDC implementation instead
+
+# Neural networks (for LTC implementation)
+ndarray = { workspace = true }
+
+# Linear algebra (pure Rust, validated eigenvalue calculations)
+nalgebra = { workspace = true }
+
+# ndarray-linalg = "0.16"  # Removed to avoid external BLAS dependency during tests
+
+# Graph structures (for autopoietic consciousness)
+petgraph = { workspace = true }
+
+# Phase 11: Semantic Ear - Now Active with Qwen3-Embedding
+tokenizers = { version = "0.21", optional = true }  # Tokenization for Qwen3/BGE
+# safetensors removed: referenced in neural-bridge feature but never imported in source
+
+# Neural Bridge v2: BGE-M3 via Candle (pure Rust ML)
+candle-core = { workspace = true, optional = true }
+candle-nn = { workspace = true, optional = true }
+candle-transformers = { version = "0.8", optional = true }
+# half removed: referenced in neural-bridge feature but never imported in source
+
+# Phase 11: Database Trinity (Deferred to Week 11+)
+# - cozo: graph_builder 0.4.1 rayon compat
+# DuckDB is the active database backend (unconditional dep below)
+
+# Phase 11: Swarm Intelligence - Hybrid Iroh + Holochain Architecture
+# REMOVED: libp2p (declared but never used - 0 integration lines)
+# Architecture: Cortex (Holochain) for trust + Synapse (Iroh) for real-time
+# Iroh 0.95+ has unified the crates - iroh-net is deprecated
+iroh = { version = "0.97", optional = true }
+
+# LanceDB: Columnar vector storage backend (optional)
+# Implementation: src/databases/lance_client.rs
+lancedb = { version = "0.30", optional = true }
+
+# DuckDB: Epistemic Auditor analytics backend (optional, bundled for reproducibility)
+# Note: does NOT conflict with rusqlite (libduckdb-sys has no links="sqlite3")
+duckdb = { version = "1.1", features = ["bundled"], optional = true }
+arrow-array = { workspace = true, optional = true }
+arrow-schema = { workspace = true, optional = true }
+futures = { version = "0.3", optional = true }
+
+# Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
+mycelix-sdk = { path = "stubs/mycelix-sdk", optional = true, default-features = false, features = ["standalone"] }
+sha3 = { version = "0.10", optional = true }  # For gradient hashing
+
+# Prism epistemic search (local, offline, 16,384-bit BinaryHV)
+# [standalone-stripped] prism-common = { path = "../mycelix-workspace/mycelix-prism/prism-common", optional = true }
+# [standalone-stripped] prism-search = { path = "../mycelix-workspace/mycelix-prism/prism-search", optional = true }
+
+# Web Research & Epistemic Verification (Track 6)
+reqwest = { version = "0.13", features = ["json", "multipart", "rustls", "blocking"], default-features = false }
+scraper = "0.25"
+log = "0.4"
+hound = { workspace = true, optional = true }
+# html2text removed: scraper is used for HTML parsing, html2text never imported
+
+# API server (optional)
+tower-http = { version = "0.5", features = ["cors", "fs"], optional = true }
+# ws-live projection exits: mental-movie frames are base64'd on the wire
+base64 = { version = "0.22", optional = true }
+
+# Core async utilities
+async-trait = "0.1"
+
+# Filesystem utilities
+dirs = "5.0"
+
+# Phase 12: Resonator Networks (FFT for morphogenetic field)
+rustfft = { workspace = true }
+# num-complex removed: codebase uses custom Complex struct in spectral_analysis.rs
+
+# Async runtime
+tokio = { workspace = true }
+rayon = { workspace = true }
+
+# Serialization (for consciousness persistence)
+serde = { workspace = true }
+bincode = { workspace = true }
+csv = { workspace = true }
+
+# Observability
+tracing = { workspace = true }
+# Week 0: Defer Prometheus metrics (needs OpenSSL via hyper)
+# metrics = "0.22"
+# metrics-exporter-prometheus = "0.13"
+
+# Utilities
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
+rusqlite = { workspace = true }
+once_cell = { workspace = true }
+dashmap = { workspace = true }
+lru = { workspace = true }
+rand = { workspace = true }
+rand_chacha = "0.3"  # Deterministic RNG for reproducible JL projections
+blake3 = { workspace = true }
+hex = "0.4"     # Hex encoding for node IDs in federated network
+ed25519-dalek = { workspace = true, optional = true }  # MFDI identity signatures
+# MFDI credential hashing (already consolidated at line 281)
+chrono = { workspace = true }
+regex = { workspace = true }
+# WASM sandboxing support. Keep on a RustSec-clean branch; older 29.x releases
+# carry multiple 2026 sandbox advisories.
+wasmtime = { version = "44.0.1", optional = true }
+
+# bumpalo removed from main crate: only used in symthaea-core
+
+# Week 2: Cerebellum - Procedural Memory
+# qp-trie removed: planned for skill lookup but never imported
+strsim = { workspace = true }
+
+# Week 12: Perception & Tool Creation
+image = "0.24"       # Image loading and processing
+# imageproc removed: only image crate is used, imageproc never imported
+tree-sitter = { workspace = true }
+syn = { version = "2.0", features = ["full", "visit", "visit-mut"] }  # Rust syntax parsing (self-analysis)
+quote = "1.0"        # Emitting AST-grafted Rust during analogy synthesis
+ignore = "0.4"       # .gitignore-aware file walking
+urlencoding = "2.1"
+shlex = "1.3"
+
+# Week 12 Phase 2a: Voice Output (Larynx) - Kokoro TTS (optional)
+# Also used for Qwen3-Embedding and SigLIP vision models
+ort = { version = "=2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # ONNX Runtime (pinned RC; upgrade to 2.0.0 stable when released)
+# futures removed: voice-tts-async feature never implemented in source
+rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
+cpal = { version = "0.17", optional = true }      # Low-level audio I/O (live-voice)
+ringbuf = { version = "0.4", optional = true }    # Lock-free ring buffer (live-voice)
+rubato = { workspace = true }
+lz4_flex = { version = "0.11", default-features = false, optional = true }
+chacha20poly1305 = { version = "0.10", optional = true }
+zeroize = { version = "1.8", features = ["derive"], optional = true }
+x25519-dalek = { version = "2.0", features = ["static_secrets"], optional = true }
+hkdf = { version = "0.12", optional = true }
+hf-hub = { version = "0.4", optional = true }       # HuggingFace Hub for model download
+espeak-rs = { version = "0.1", optional = true }    # espeak-ng bindings for proper G2P
+
+# Enhancement #8 Week 4: PyPhi Integration (IIT 3.0 exact Φ calculation)
+# pyo3 removed: pyphi feature was never implemented (no cfg gates, no code using pyo3)
+
+# nix (unix syscall crate) removed: no nix:: imports in source (NixOS integration uses CLI commands)
+
+# CLI argument parsing (optional - for service binary)
+clap = { workspace = true, optional = true }
+ctrlc = { version = "3.4", optional = true }  # Ctrl+C signal handling
+
+# Shell Sidecar TUI dependencies (optional)
+crossterm = { version = "0.27", optional = true }
+ratatui = { version = "0.29", optional = true }
+
+# GUI dependencies (optional) - for symthaea-gui
+eframe = { version = "0.33", optional = true }
+egui = { version = "0.33", optional = true }
+
+# WebSocket client dependencies (optional) - for holon_rdp_viewer (Phase I.A.2)
+# tokio-tungstenite: same version as symthaea-scan workspace member.
+# The holon-viewer feature pulls egui + eframe + tokio-tungstenite together
+# so the viewer example can compile as a single feature-gated unit.
+tokio-tungstenite = { version = "0.24", optional = true }
+futures-util = { version = "0.3", optional = true }  # SinkExt/StreamExt for tokio-tungstenite split()
+bytes = { version = "1", optional = true }
+quinn = { version = "0.11", optional = true }
+rustls = { version = "0.23", optional = true }
+rcgen = { version = "0.13", optional = true }
+
+# IPC Protocol Enhancements
+rmp-serde = { workspace = true }  # MessagePack binary protocol (A1)
+
+# Syntax Highlighting (B4)
+tree-sitter-nix = { workspace = true }
+# syntect = "5.2"            # Alternative: regex-based highlighting
+
+# Code Understanding & Generation (Consciousness-Aware Code)
+tree-sitter-rust = { version = "0.23", optional = true }    # Rust grammar for code understanding
+tree-sitter-python = { version = "0.23", optional = true }  # Python grammar for code understanding
+rnix = { version = "0.11", optional = true }                # Structural Nix AST walk for nix_scorer
+serde_yaml = { version = "0.9", optional = true }           # YAML parser for Docker Compose scorer (Phase 3 substrate-independence)
+hcl-rs = { version = "0.18", optional = true }              # HCL parser for Terraform scorer (Phase 3 substrate-independence)
+
+# Desktop Notifications (E1)
+zbus = { version = "4.0", optional = true }  # D-Bus for notifications
+
+# Sandbox command timeouts
+wait-timeout = "0.2"
+
+# libsystemd removed: systemd feature was never implemented (no cfg gates, no code using libsystemd)
+
+[features]
+default = ["default-mind"]
+parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
+turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
+swarm = ["iroh", "dep:symthaea_swarm", "dep:symtropy-robotics-bridge-core"]  # P2P collective consciousness
+
+
+# ── Binary build gates ──────────────────────────────────────────────
+# These enable optional dependencies for specific binaries.
+service = ["clap"]                          # symthaea service daemon binary
+shell = ["crossterm", "ratatui"]            # symthaea-shell TUI binary
+gui = ["eframe", "egui"]                    # symthaea-gui binary
+demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal handling)
+full = ["service", "shell", "gui", "demo"]  # All binaries
+api_module = ["tower-http", "dep:base64"]         # HTTP API binary + module
+holon-quic = ["api_module", "mesh-encryption", "dep:bytes", "dep:quinn", "dep:rustls", "dep:rcgen"]  # Phase I.C QUIC transport for Holon RDP
+holon-viewer = ["eframe", "egui", "dep:tokio-tungstenite", "dep:futures-util", "mesh-encryption", "holon-quic"]  # Phase I.A.2 viewer + Phase I.C transport A/B
+
+# ── Sovereign RDP ──────────────────────────────────────────────────
+rdp = []                                   # Core RDP protocol + codec + session
+rdp-server = ["rdp"]                       # RDP server with screen capture
+rdp-x11 = ["rdp-server"]                   # X11 SHM capture + XTest injection (x11rb TODO)
+
+# ── Voice & Audio ───────────────────────────────────────────────────
+# Voice Pipeline (hierarchy):
+#   voice-tts       → base TTS with Kokoro ONNX + espeak-ng G2P
+#   audio           → voice-tts + rodio playback
+#   vocal-tract     → articulatory synthesis (LTC-driven, independent of TTS)
+#   neural-vocoder  → vocal-tract + BigVGAN ONNX (Path A waveform generation)
+#   live-voice      → real-time cpal output + vocal-tract (UNTESTED in CI)
+#   liquid-mamba    → SSM language center + pre-trained Mamba fusion (CPU; see ssm_language)
+voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
+voice-tts-gpu = ["voice-tts"]                         # GPU-accelerated Kokoro synthesis (CUDA execution provider) -- VERIFIED LIVE 2026-07-18 on an RTX 2070: RTF ~0.22 vs CPU's ~1.42 (~6x speedup, comfortably real-time), see kokoro_realtime_factor.rs. Requires ORT_DYLIB_PATH pointing at a CUDA-enabled onnxruntime build + KokoroConfig::use_gpu (or VoiceOutputConfig::use_gpu)
+voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
+voice-stt-live = ["voice-stt", "cpal", "ringbuf"]     # Live microphone capture → STT → perception HV (cpal input + ring buffer)
+
+# ── Sensor Fusion (real sensors → perception HV) ────────────────────
+# Bridges physical/simulated sensor readings into the cognitive loop's
+# perception phase. Each sensor is independently gated so a platform
+# only pulls in the code for sensors it actually has.
+sensor-fusion = []        # Core SensorFusion trait + ContinuousHV bundler
+sensor-imu    = ["sensor-fusion"]  # 6-axis accel + gyro role-filler fusion
+audio = ["voice-tts", "rodio"]                        # Full audio including playback
+vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory synthesis pipeline + WAV output
+neural-vocoder = ["ort", "vocal-tract", "symthaea-vocal-tract/mel-conversion"]  # BigVGAN ONNX neural vocoder (Path A)
+neural-vocoder-gpu = ["neural-vocoder"]                  # UNTESTED: not in CI matrix; GPU-accelerated neural vocoder (CUDA/CoreML execution providers)
+live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
+muse = ["dep:symthaea-muse"]                             # Consciousness-driven music synthesis in cognitive loop (streaming PCM)
+muse-live = ["muse", "symthaea-muse/muse-live"]          # Real-time speaker output for muse streaming (cpal + ringbuf); gates MuseManager::live_output. NOTE: cpal needs ALSA — build inside `nix develop` (same constraint as live-voice)
+singing = ["muse", "vocal-tract", "symthaea-muse/voice", "symthaea-muse/theory"]  # Bridges symthaea-muse::singing_bridge (lyrics + melody -> FormantFrame) into the root crate's FormantVocoder — Phase 3.1 of ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md. `theory` added 2026-07-18 (SYMTHAEA_SINGING_PLAN Phase 1) so /sing can call compose_and_perform_melody instead of a hardcoded arc.
+
+# ── Perception & Embeddings ─────────────────────────────────────────
+embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
+# REMOVED: embeddings-gpu (0 cfg gates; pure dependency passthrough, never tested in CI)
+# REMOVED 2026-07-16 (vision review P2.2): `vision` and `perception` features. Their only
+# cfg users were src/perception/{model_hub,model_loader_actor}.rs — orphan files never
+# declared in any mod.rs (uncompiled since extraction), deleted along with the bit-rotted
+# examples/multimodal_io_test.rs + tests/perception_integration.rs, which imported symbols
+# from the non-dependency symthaea-perception island crate: `--features perception` builds
+# were broken by construction. The SigLIP/ONNX stack lives on in
+# crates/domains/symthaea-perception (currently unconsumed — adopt or archive, review P2.2).
+webcam = []                                           # Live webcam capture (gates cfg blocks in source)
+vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
+phone = ["dep:symthaea-phone-embodiment", "vision-manifold"]  # ADB phone screen embodiment
+phone-scrcpy = ["phone", "symthaea-phone-embodiment/scrcpy"]  # Phase I.B persistent HEVC capture via scrcpy-server
+phase-2a-lz4 = ["phone-scrcpy", "holon-viewer", "dep:lz4_flex"]  # Phase II.A LZ4 compression measurement gate
+# REMOVED: vision-manifold-camera (0 cfg gates; requires V4L2 hardware, never tested)
+foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
+# REMOVED: foveation-perception (0 cfg gates; requires GPU models, never tested)
+integrity = []  # Hardware integrity / tamper detection framework (attestation, temporal checks, canaries)
+glyph_codex = []  # Glyph Codex: symbolic consciousness field (70 glyphs, 11 Field Modality basis vectors)
+semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
+# Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
+neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub", "dep:sha2"]
+neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+
+# ── Motor / Embodiment ─────────────────────────────────────────────
+cpg = []                                    # Central Pattern Generator (Kuramoto coupled oscillators)
+creative = ["dep:symthaea-muse", "dep:symthaea-canvas", "dep:symthaea-aesthetic", "dep:symthaea-atelier"]  # Creative agency: motor rendering bridge, artistic expression
+art-eye = ["creative", "dep:symthaea-art-eye"]  # The artist's eye: rasterize generated SVG (resvg) → real pixel percepts → SelfCritic inside the iterate loop. Adds a resvg/tiny-skia dep tree, hence its own gate on top of `creative`.
+gallery = ["creative", "dep:symthaea-gallery"]  # Persistent self-curating gallery: CreativeManager writes accepted visual works to the flat-file store, and the gallery's 16D StyleEmbedding conditions future generation (artistic identity). Was a fully-tested island before 2026-07-10.
+art-observer = ["art-eye", "vision-manifold"]  # Observer-ΔΨ: after generating an artwork, Symthaea LOOKS at it — the render is injected as vision frames for a viewing window and the change in her own consciousness level while perceiving it becomes an aesthetic signal (consciousness-coupled taste, not formula-based). Assumes no concurrent external camera feed (single shared vision buffer).
+complex_cfc = ["symthaea-core/complex_cfc"] # Complex-valued CfC neuron with native oscillation
+spectral_state = []                         # Spectral twin: frequency-domain CfC state analysis
+
+# ── Defense / Immune System ────────────────────────────────────────
+sentinel = []                                # Distributed immune system: governance anomaly detection, threat memory, collective immunity
+audio-sentinel = ["dep:symthaea-sentinel"]   # Zero-shot temporal audio pattern recognition (HDC+LTC+CfC)
+hypervisor = []                              # Hierarchical consciousness supervision
+
+# ── Consciousness Deepening ───────────────────────────────────────
+provenance = []                              # Source tracking on StructuredThought (Goldman 1986: reliabilism)
+self_schema = []                             # Autobiographical self-model in knowledge graph (Northoff 2011)
+digital_metabolism = []                      # Real hardware constraints as embodiment (Sterling 2012: allostasis)
+
+# ── Distributed / Network ──────────────────────────────────────────
+mesh = ["dep:hmac", "dep:sha2"]            # Physical mesh radio with HMAC-SHA-256 packet authentication
+lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
+holon-lz4 = ["mesh-encryption", "dep:lz4_flex"]  # Phase II.A: LZ4-before-seal for holon RDP wire
+mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
+mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha2"]  # X25519 Diffie-Hellman per-peer key agreement
+# REMOVED: secure-mesh (0 cfg gates; pure convenience bundle — enable identity + mesh-key-exchange + swarm directly)
+pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybrid Ed25519 + ML-KEM-768 post-quantum handshake
+mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor", "dep:tokio-tungstenite", "dep:futures-util"]       # Mycelix FL algorithms + hashing + conductor bridge
+mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
+# Compile the legacy bridge-common integration test only from the isolated
+# Mycelix/Holochain workspace. This feature intentionally has no dependencies
+# in Symthaea's main graph, preserving the serde boundary.
+external-mycelix-bridge-tests = []
+epistemic = ["symthaea-cognitive-types/epistemic"]             # Epistemic integration: immune threats, thermodynamic cost, provenance tags, collective health
+neural_validation = ["symthaea-core/neural_validation"]        # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
+
+# ── Sovereign Inoculation ──────────────────────────────────────────
+mesh-trust = ["mesh", "identity"]              # Post-quantum web-of-trust over mesh
+social-fabric = ["mesh", "dep:symthaea-memetics"]  # Resonance-based content routing (sovereign social) + memetic immune screening
+survival = ["mesh"]                            # Infrastructure monitoring + demand forecasting
+
+# ── Desktop & System Integration ────────────────────────────────────
+notifications = ["zbus"]                    # D-Bus desktop notifications
+nixward = ["dep:nixward"]                 # Nixward: causal NixOS diagnosis with HDC world model + active inference
+# Note: nix-cli/nix-tui/nix-daemon removed — use `cargo build -p nixward --features cli/tui/daemon` directly
+identity = ["ed25519-dalek", "dep:sha2"]        # Ed25519 signatures, capability gating
+physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod adapter
+multirotor = ["dep:symthaea-multirotor"]   # HDC-LTC multirotor control via FEP Active Inference
+multirotor-mujoco = ["multirotor", "symthaea-multirotor/mujoco"]   # Multirotor control with MuJoCo physics
+multirotor-mujoco-renderer = ["multirotor-mujoco", "symthaea-multirotor/mujoco-renderer"]  # Offscreen MuJoCo rendering for video capture
+multirotor-swarm = ["multirotor", "symthaea-multirotor/swarm"]     # Parallel swarm training via MuJoCo + rayon
+flight = ["multirotor"]                     # Backward-compatible alias for multirotor
+flight-mujoco = ["multirotor-mujoco"]       # Backward-compatible alias
+flight-mujoco-renderer = ["multirotor-mujoco-renderer"]  # Backward-compatible alias
+flight-swarm = ["multirotor-swarm"]         # Backward-compatible alias
+helicopter = ["dep:symthaea-helicopter"]    # HDC-LTC SAR helicopter control via FEP Active Inference
+humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
+vehicle = ["dep:symthaea-vehicle"]         # HDC-LTC autonomous vehicle control via FEP Active Inference
+browser-agent = ["dep:symthaea-browser"]  # Consciousness-driven browser agent via CDP + HDC encoding
+auv = ["dep:symthaea-auv"]                 # HDC-LTC autonomous underwater vehicle control
+manipulator = ["dep:symthaea-manipulator"] # HDC-LTC consciousness-coupled industrial arm control
+# New platforms (uncomment after creating crates):
+exoskeleton = ["dep:symthaea-exoskeleton"]
+surgical = ["dep:symthaea-surgical"]
+orbital = ["dep:symthaea-orbital"]
+quadruped = ["dep:symthaea-quadruped"]
+subterranean = ["dep:symthaea-subterranean"]   # Mole / boring scout: digging, spoil, heat, intermittent comms
+infrastructure = ["dep:symthaea-infrastructure"] # Stationary hub / microgrid / routing agent
+infrastructure-grid-physics = ["infrastructure", "symthaea-infrastructure/grid_physics"] # Real battery/feeder/droop/islanding backend (default is a fast heuristic sim)
+scavenger = ["dep:symthaea-scavenger"]         # Disassembly / recycling / salvage platform
+agribot = ["dep:symthaea-agribot"]             # Ecological stewardship platform: soil / water / light
+biota = ["dep:symthaea-biota"]                 # Interspecies bridge: sanctuary, right-of-way, distress sensing
+clime = ["dep:symthaea-clime"]                 # Habitat homeostasis: air quality, thermal comfort, circadian support
+hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
+ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
+ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
+broca_lite = ["dep:symthaea-spore"]             # Lightweight always-on language generation (512 tokens, 1024D, ~2MB)
+ssm_language = ["dep:symthaea-broca"]          # Native CfC-HDC language center (SSM Broca's area)
+canvas = ["dep:symthaea-canvas", "dep:symthaea-aesthetic"]  # Living topology UI: cognitive geometry → animated SVG. Includes symthaea-aesthetic so the canvas Birkhoff score can close the loop into the neuromod bath (AestheticFeedback) without requiring the full `creative` tier.
+neuroevolution = ["dep:symthaea-neuroevolution"]  # CfC-HDC neuroevolution: evolve neural organisms via Free Energy minimization
+jepa = ["dep:symthaea-jepa"]                         # JEPA: latent-space prediction for thermodynamically efficient FEP
+therapeutic = ["dep:symthaea-clinical", "dep:symthaea-therapeutic", "ssm_language", "symthaea-broca/therapeutic", "symthaea-cognitive-types/therapeutic"]
+liquid-mamba = ["ssm_language", "symthaea-broca/mamba-cpu"]  # Liquid-Mamba fusion: pre-trained Mamba SSM + HDC consciousness gating (CPU; use symthaea-broca/mamba for GPU)
+humanoid-mujoco = ["humanoid", "symthaea-humanoid/mujoco"]  # Humanoid with MuJoCo physics
+humanoid-viewer = ["humanoid-mujoco", "symthaea-humanoid/viewer"]  # Humanoid with MuJoCo viewer
+
+# ── Storage ────────────────────────────────────────────────────────
+hdc-store = ["dep:symthaea-hdc-store"]  # Zero-copy mmap'd BinaryHV storage with persistent LSH
+fhe-wisdom = []                        # QUARANTINED legacy shared-mask algebra demo; not FHE or privacy preserving
+insecure-experimental-crypto = []      # Explicit opt-in for forgeable legacy HDC compatibility APIs
+space-alerts = []                      # Space situational awareness alerts from mycelix-space
+circular = []                          # Waste/circular economy tracking (SwarmEvent + telemetry)
+field-dynamics = ["dep:symthaea-field-dynamics"]   # Consciousness field wave equations
+# REMOVED 2026-07-16: `sensorimotor` feature + symthaea-sensorimotor crate (vision review
+# P2.1) — zero-consumer drifted duplicate of symthaea-core's hdc::sensorimotor_contingencies.
+
+# ── Database backends ───────────────────────────────────────────────
+# DuckDB is an unconditional dep. Others deferred:
+# - cozo: graph_builder 0.4.1 rayon compat
+lancedb-backend = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:futures"]
+# Note: duckdb optional dep declared in [dependencies] as duckdb = { optional = true }
+epistemic_auditor = ["symthaea-core/duck", "dep:duckdb"]  # DuckDB-backed consciousness telemetry audit trail
+
+# ── Consciousness & Reasoning (code-level cfg gates) ────────────────
+multi_agent = ["full_consciousness"]        # Multi-agent trust scoring (byzantine, causal consensus)
+structured_bottleneck = []                  # Structured consciousness equation: necessary {Phi,B,W} + amplifiers {A,R,E,K} (Michel 2023)
+continuous_hot = []                         # Continuous HOT depth: sub-level resolution + self-Phi + attention schema (Brown et al. 2019)
+ctc_wiring = ["symthaea-core/ctc_wiring"]    # Communication Through Coherence: binding gates GWT entry (Fries 2015)
+unified_precision = []                      # Dynamic precision = IIT-Phi × interoception × blanket (Parr & Friston 2019)
+interoceptive_inference = []                # Interoceptive prediction error in FEP hierarchy (Seth 2021)
+england_dissipation = []                    # England's dissipation-driven adaptation + Prigogine regime gating (England 2013)
+iit4 = ["symthaea-core/iit4"]              # IIT 4.0: concept structures, cause-effect power (Albantakis 2023)
+full_consciousness = []                     # Extended consciousness submodules
+# REMOVED 2026-07-16 (vision review P2.3): `full_perception` — gated only the deleted
+# byte-hash stratum (visual_cortex/semantic_vision/multi_modal + conscious_perception/
+# resilience), which fabricated captions and confidences from hash noise and had no
+# consumers. Real vision: visual_features.rs, vision-manifold, art-eye.
+full_language = ["neural-bridge"]                          # Advanced language features (grammar, parsers) — candle deps via neural-bridge
+magi_loop = []                              # MAGI Loop world-grounded prediction
+# Unified reasoning engine: epistemic conflict, tool gating, temporal planning, counterfactual.
+# Subsumes former epistemic_conflict, conscious_tool_gate, temporal_planning, counterfactual features.
+reasoning_engine = ["magi_loop", "symthaea-causal-reasoning/counterfactual"]
+
+# ── Code Understanding & Generation ─────────────────────────────────
+# Subsumes former code_understanding feature (tree-sitter parsers + code generation).
+code_generation = ["tree-sitter-rust", "tree-sitter-python", "rnix", "serde_yaml", "hcl-rs", "symthaea-core/synthesis-trait", "dep:sha2", "reasoning_engine"]
+geodesic_synthesis = ["dep:symthaea-geodesic"]  # GCS verification gate for CodingAgent (PDG topology + execution oracle)
+wasm-sandbox = ["dep:wasmtime"]
+
+# ── Example & module build gates ───────────────────────────────────
+# These gate cfg blocks in src/ code and/or examples.
+school_learning = ["code_generation", "dep:symthaea-runtime"]  # Anticipatory curriculum learning (CfC lookahead, mastery tracking)
+mathematics = []                       # MathService cognitive loop dispatcher + scientific method engine
+scientific_method = ["mathematics"]    # Hypothesis-test-update scientific reasoning cycle
+benchmarks = []                 # Causal validation benchmarks (used by examples/)
+integration_module = []         # Integration module (cfg-gated in lib.rs)
+observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
+support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
+web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
+prism_search = []  # [standalone-neutered] deps stripped, kept declared for check-cfg
+unstable-examples = []          # UNTESTED: quarantine gate for examples with stale APIs (never enabled by default, gates test files only)
+
+# ── Genesis Pipeline (DNA-to-Human species stewardship) ───────────
+genomics = ["dep:symthaea-genomics"]                    # DNA assembly, damage modeling, repair
+cell-foundry = ["dep:symthaea-cell-foundry"]            # iPSC, IVG, SCNT, multi-scale prediction
+ectogenesis = ["dep:symthaea-ectogenesis"]              # Artificial womb, consent proxy escalation
+nurture = ["dep:symthaea-nurture"]                      # Bowlby attachment, co-regulation, milestones
+population = ["dep:symthaea-population"]                # Population genetics, breeding strategy, governance
+genesis = ["genomics", "cell-foundry", "ectogenesis", "nurture", "population"]  # Full DNA-to-human pipeline
+
+# ── Genesis Mission Challenges (DOE 2026) ─────────────────────────
+# Safety-agents is required for all mission features to ensure safety checks
+# are never silently compiled away (see src/safety/mod.rs cfg gates).
+fusion-twin = ["physics", "safety-agents"]
+safety-agents = []
+materials = ["dep:symthaea-materials", "safety-agents"]
+nuclear = ["dep:symthaea-nuclear", "safety-agents"]     # Computational nuclear structure: mass formula, shell model, island of stability
+nuclear-forensics = ["dep:symthaea-nuclear-forensics", "safety-agents"]
+quantum-consciousness = ["dep:symthaea-quantum-chemistry"]  # Ground consciousness in Schrödinger equation (10 theories × molecular wavefunction)
+water-prediction = ["cell-foundry", "safety-agents"]
+physics-bridge = ["physics", "dep:symthaea-physics-bridge"]  # HDC semantic physics bridge + guided design exploration
+engineering = ["dep:symthaea-engineering"]  # Lightweight engineering facade: requirements, simulation requests, twins, safety cases
+engineering-foundations = [
+    "engineering",
+    "dep:symthaea-sim-bridge",
+    "dep:symthaea-digital-twin",
+    "dep:symthaea-formal-safety",
+]
+engineering-full = [
+    "engineering-foundations",
+    "engineering-adapters",
+    "geodesic_synthesis",
+    "physics-bridge",
+    "materials",
+    "advanced-manufacturing",
+    "infrastructure",
+]
+engineering-adapters = [
+    "engineering-foundations",
+    "dep:symthaea-mujoco-bridge",
+    "dep:symthaea-opensees-bridge",
+    "dep:symthaea-ngspice-bridge",
+    "dep:symthaea-openfoam-bridge",
+]
+analogy-engine = []   # Cross-domain analogy detection in cognitive loop (AnalogyEngine from symthaea-core)
+ucl-frames = []       # UCL cross-domain semantic frame detection in cognitive loop
+grid-scaling = ["physics", "safety-agents"]
+fission-reactor = ["physics", "safety-agents"]
+accelerator = ["physics", "safety-agents"]
+threat-assessment = ["physics", "safety-agents"]
+datacenter = ["physics", "safety-agents"]
+experiment-planner = ["cell-foundry", "safety-agents"]
+strategic-materials = ["materials"]
+critical-minerals = ["materials"]
+advanced-manufacturing = ["dep:symthaea-fabrication-kernel", "safety-agents"]
+proliferation-safeguards = ["nuclear-forensics"]
+
+
+# ── Convenience bundles ───────────────────────────────────────────
+# Group related features that users commonly enable together.
+# REMOVED: consciousness_full (0 cfg gates; pure bundle — enable reasoning_engine + identity directly)
+# REMOVED: candle_stack (was alias for neural-bridge) — use neural-bridge directly
+# REMOVED: nix_full (was alias for nixward) — use nixward directly
+all_benchmarks = ["benchmarks", "physics"]              # All benchmarking features (causal validation + tokamak plasma)
+
+# ── Tested profiles — CI-validated feature combinations ──────────
+# Each profile bundles logically related features that are tested together.
+# Run: ./scripts/test-feature-profiles.sh to validate all profiles compile.
+
+# Deep consciousness stack: IIT 4.0 + structured bottleneck + reasoning + provenance + self-schema
+profile-consciousness = [
+    "full_consciousness",
+    "provenance",
+    "self_schema",
+    "structured_bottleneck",
+    "continuous_hot",
+    "ctc_wiring",
+    "unified_precision",
+    "interoceptive_inference",
+    "england_dissipation",
+    "iit4",
+    "reasoning_engine",
+    "epistemic",
+]
+
+# Voice pipeline: vocal-tract articulatory synthesis + SSM language center (no ONNX runtime needed)
+profile-voice = [
+    "vocal-tract",
+    "ssm_language",
+    "muse",
+]
+
+# Creative tier: full generative-art stack (music + SVG art + aesthetic feedback
+# + topology canvas). This is the documented way to compile Symthaea with her
+# art capabilities — none of these are in default-mind (measure cycle-time
+# against the 20Hz budget before considering that). Additive to the default
+# build: deliberately does NOT include ssm_language (default-mind's broca_lite
+# is mutually exclusive with it), so the Poetry creative modality stays
+# compiled out here; for poetry use `--no-default-features --features
+# profile-voice,creative`, which brings ssm_language without broca_lite.
+# See ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md Phase 1.
+profile-creative = [
+    "creative",
+    "muse",
+    "canvas",
+]
+
+# Culture layer (ART_CULTURE_REVIEW_AND_PLAN_2026-07-06.md Phase 4): adds
+# self-authored artifact publishing + imitation-of-self on top of
+# profile-creative, via `cognitive_loop::cultural_memory` +
+# `SocialFabricManager`'s resonance graph. Still single-node — no live
+# mesh-send is wired (see cultural_memory.rs module docs for exactly what's
+# missing before this becomes real cross-agent culture).
+profile-culture = [
+    "profile-creative",
+    "social-fabric",
+]
+
+# Embodiment: all robotics platforms with CPG motor control
+profile-embodiment = [
+    "cpg",
+    "humanoid",
+    "flight",
+    "helicopter",
+    "vehicle",
+    "auv",
+    "manipulator",
+]
+
+# Distributed networking: mesh radio + P2P swarm + identity + encryption
+profile-distributed = [
+    "mesh",
+    "mesh-encryption",
+    "mesh-key-exchange",
+    "swarm",
+    "identity",
+    "pqc-handshake",
+]
+
+# Reasoning + code understanding + scientific method
+profile-reasoning = [
+    "reasoning_engine",
+    "code_generation",
+    "school_learning",
+    "scientific_method",
+    "mathematics",
+    "geodesic_synthesis",
+]
+
+# Genesis: full DNA-to-human species stewardship pipeline
+profile-genesis = [
+    "genesis",
+    "safety-agents",
+    "sentinel",
+]
+
+# ── Mind bundles (graduated consciousness stacks) ─────────────────
+default-mind = [
+    "broca_lite",
+    "reasoning_engine",
+    "integrity",
+    "glyph_codex",
+    "sentinel",
+    "safety-agents",
+    "cpg",
+    "spectral_state",
+    "structured_bottleneck",  # Benchmark-validated: composite 0.636→0.877 (+38%)
+    "ctc_wiring",             # GWT entry gated by binding coherence (Fries 2015)
+    "continuous_hot",         # Sub-level HOT depth: accuracy + self-Phi + attention
+    "unified_precision",      # Dynamic HFE precision (Parr 2019). Fixed: 46 Hz (was 1.1 Hz)
+    "england_dissipation",    # England exploration + Prigogine-England tension resolution
+    "interoceptive_inference", # Body-state prediction modulates precision + blanket (Seth 2021)
+    "observability_module",   # Prometheus metrics + GWT integration telemetry
+]
+
+
+[dev-dependencies]
+symthaea-cell-foundry = { path = "crates/domains/symthaea-cell-foundry" }
+symthaea-formal-safety = { path = "crates/domains/symthaea-formal-safety" }
+
+criterion = "0.5"
+proptest = "1.4"
+serial_test = "3.2"
+symthaea-broca = { path = "crates/domains/symthaea-broca", default-features = false }
+symthaea-engineering = { path = "crates/domains/symthaea-engineering" }
+symthaea-sim-bridge = { path = "crates/bridges/symthaea-sim-bridge" }
+symthaea-mujoco-bridge = { path = "crates/bridges/symthaea-mujoco-bridge" }
+symthaea-openfoam-bridge = { path = "crates/bridges/symthaea-openfoam-bridge" }
+symthaea-fabrication-kernel = { path = "crates/domains/symthaea-fabrication-kernel" }
+symthaea-materials = { path = "crates/domains/symthaea-materials" }
+symthaea-crucible = { path = "crates/domains/symthaea-crucible" }
+symthaea-psych-bench = { path = "crates/domains/symthaea-psych-bench" }
+symthaea-humanoid = { path = "crates/domains/symthaea-humanoid" }
+symthaea-mycelix-conductor = { path = "crates/bridges/symthaea-mycelix-conductor" }
+symthaea-epistemic-types = { path = "crates/domains/symthaea-epistemic-types" }
+tempfile = "3.8"  # For perception tests
+tower = { version = "0.5", features = ["util"] }  # Router oneshot helpers in integration tests
+
+# Binaries
+# Note: Some binaries require specific features or external crates
+
+[[bin]]
+name = "athena-runtime"
+path = "src/bin/athena-runtime.rs"
+
+[[bin]]
+name = "symthaea"
+path = "src/bin/symthaea.rs"
+required-features = ["service"]
+
+[[bin]]
+name = "symthaea-shell"
+path = "src/bin/symthaea-shell.rs"
+required-features = ["shell"]
+
+[[bin]]
+name = "symthaea-gui"
+path = "src/bin/symthaea-gui.rs"
+required-features = ["gui"]
+
+[[bin]]
+name = "symthaea-api"
+path = "src/bin/symthaea-api.rs"
+required-features = ["api_module"]
+
+# Demo binaries (no required features)
+[[bin]]
+name = "demo-sentinel"
+path = "src/bin/demo_sentinel.rs"
+required-features = ["demo"]
+
+[[bin]]
+name = "symthaea-mind"
+path = "src/bin/symthaea-mind.rs"
+required-features = ["demo"]
+
+[[bin]]
+name = "symthaea-repl"
+path = "src/bin/symthaea-repl.rs"
+required-features = ["demo"]
+
+[[bin]]
+name = "symthaea-demo"
+path = "src/bin/symthaea-demo.rs"
+required-features = ["api_module"]
+
+[[bin]]
+name = "symthaea-watch"
+path = "src/bin/symthaea-watch.rs"
+required-features = ["api_module", "service"]
+
+[[bin]]
+name = "symthaea-multi-embodiment-demo"
+path = "src/bin/symthaea-multi-embodiment-demo.rs"
+required-features = ["humanoid"]
+
+[[bin]]
+name = "symthaea-story"
+path = "src/bin/symthaea-story.rs"
+
+[[bin]]
+name = "code-gen-smoke"
+path = "src/bin/code_gen_smoke.rs"
+required-features = ["code_generation"]
+
+[[bin]]
+name = "broca-curriculum-sync"
+path = "src/bin/broca_curriculum_sync.rs"
+required-features = ["ssm_language"]
+
+[[bin]]
+name = "symthaea-holon"
+path = "src/bin/symthaea-holon.rs"
+required-features = ["api_module"]
+
+[[bin]]
+name = "imagination_smoke_test"
+path = "src/bin/imagination_smoke_test.rs"
+required-features = ["vision-manifold"]
+
+[[bin]]
+name = "swarm_imagination_test"
+path = "src/bin/swarm_imagination_test.rs"
+required-features = ["vision-manifold", "swarm"]
+
+[[bin]]
+name = "dump_dream"
+path = "src/bin/dump_dream.rs"
+required-features = ["vision-manifold", "swarm"]
+
+# Examples
+# Examples that need cfg-gated modules are marked with required-features
+# They won't be built by default until the required modules are fixed
+
+# Integration tests needing cfg-gated modules
+[[test]]
+name = "defense_cascade_integration"
+required-features = ["safety-agents", "sentinel"]
+
+[[test]]
+name = "flight_integration"
+required-features = ["multirotor"]
+
+# autotests = false makes undeclared files in tests/ silently dead — these two
+# had 24+22 tests that never ran anywhere until registered (found 2026-07-15,
+# vision/projection review P0 pass).
+[[test]]
+name = "vision_manifold_integration"
+required-features = ["vision-manifold"]
+
+[[test]]
+name = "foveal_bridge_integration"
+required-features = ["foveation"]
+
+# A1.1 readiness gate for the Phase 4 characterization protocol: demonstrates the
+# produced/consumed join for the robotics safety gate on a real EmbodimentBridge
+# implementor. Not merely a compile check -- the protocol states the gate closes on a
+# demonstrated join. See SYMTHAEA_PHASE4_CHARACTERIZATION_PROTOCOL_2026-07-29.md A1.1.
+[[test]]
+name = "safety_gate_produced_consumed_join"
+required-features = ["humanoid"]
+
+# Same dead-target class as above: tests/binary_service.rs (#![cfg(feature =
+# "service")]) was never registered under autotests = false, so "Hardened
+# Daemon Regressions" CI's `cargo test --test binary_service --features
+# service` failed with "no test target named `binary_service`" (found
+# 2026-07-26 triaging standalone CI).
+[[test]]
+name = "binary_service"
+required-features = ["service"]
+
+# CROSS-PLATFORM SAFETY CONTRACT — registered 2026-07-31, having never once run.
+#
+# Verifies that every concrete EmbodimentBridge honours apply_moral_gate: ahimsa
+# violation forces Red, consent violation forces Orange, reset() clears moral state.
+# It exists precisely to catch a platform silently inheriting the trait's no-op
+# default and passing its own tests anyway. That is not hypothetical -- exactly that
+# class of gap was found by hand in symthaea-gravcraft on 2026-07-29 (missing
+# safety_override/moral composition), which this test would have caught years of
+# CI runs earlier had it been a target.
+#
+# No required-features: each platform's tests are individually #[cfg(feature)]-gated
+# and simply skip when their feature is off, so the target must build with any subset.
+# Run the full contract with:
+#   cargo test --features humanoid,flight,vehicle,auv,helicopter,manipulator,\
+#     surgical,orbital,quadruped,exoskeleton --test embodiment_moral_contract
+#
+# COVERAGE GAP, measured 2026-07-31 rather than estimated. An earlier version of this
+# comment said "15 types implement EmbodimentBridge" (the figure in CLAUDE.md) and named
+# gravcraft as the notable omission. Both were wrong:
+#
+#   * The real count is 21 impls / 20 non-mock. The undercount came from grepping
+#     `impl EmbodimentBridge for`, which misses every platform crate -- they all write
+#     `impl symthaea_core::embodiment::EmbodimentBridge for X` fully-qualified.
+#   * gravcraft is NOT an implementor at all. It is a duck-typed lookalike that reuses
+#     MotorSafetyLevel; its own module doc says so explicitly (corrected 2026-07-29).
+#     So it is not an omission from this test -- it is out of scope by construction.
+#
+# This test covers 10: humanoid, flight/multirotor, vehicle, auv, helicopter,
+# manipulator, surgical, orbital, quadruped, exoskeleton.
+#
+# CORRECTION (same day): an earlier version of this comment said MotorBridge was the
+# most important UNCOVERED implementor. Wrong -- it was covered all along, by the test
+# named `moral_contract_humanoid`, which constructed `MotorBridge` rather than the
+# humanoid platform type. The name asserted coverage the test did not provide and hid
+# the inverse gap: `HumanoidEmbodiment` was the one going untested. Both are now
+# separate, honestly-named cases.
+#
+# That was found by simulating the regression this file exists to catch (neutering
+# MotorBridge's apply_moral_gate override): the "humanoid" test failed alongside the
+# motor-bridge one, which is only possible if they exercise the same type.
+#
+# NOT covered (9 real implementors):
+#   agribot, biota, clime, infrastructure, phone-embodiment, scavenger, subterranean,
+#   detritivore_bridge, helios_bridge.
+#
+# Extending it is bounded work: each addition is a #[cfg(feature)]-gated fn calling the
+# existing assert_moral_contract helper. Left undone deliberately rather than bundled
+# into a test-registration commit.
+[[test]]
+name = "embodiment_moral_contract"
+
+# Examples needing cfg-gated modules
+[[example]]
+name = "benchmark_mental_rotation_rendered"
+required-features = ["art-eye", "vision-manifold"]
+
+# MNIST HDC benchmark — file predates autotests/autoexamples=false and was
+# never declared, making the documented 88.49% result unrunnable (same
+# dead-target class as the vision integration tests; found 2026-07-16 when
+# scripts/fetch-mnist.sh restored the data and the run command failed).
+[[example]]
+name = "benchmark_mnist_hdc"
+
+[[example]]
+name = "check_prediction_error_degeneracy"
+
+# Direct on/off counterfactual for the e1-rerun load-dependent consciousness_level finding
+# (memory/symthaea_e1_consciousness_level_load_dependent_jul28.md)
+[[example]]
+name = "consciousness_level_wall_clock_probe"
+
+# Phase 4 characterization of the Φ/Ψ composite that gates robotics motor safety:
+# component attribution + tier occupancy. Measurement only, no production path touched.
+# See SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md Phase 4.
+[[example]]
+name = "safety_signal_characterization"
+
+[[example]]
+name = "quadrotor_hover"
+required-features = ["multirotor"]
+
+[[example]]
+name = "quadrotor_formation"
+required-features = ["multirotor"]
+
+[[example]]
+name = "mujoco_vs_simple_benchmark"
+required-features = ["multirotor-mujoco"]
+
+[[example]]
+name = "agw_ethics_holdout"
+path = "examples/agw_ethics_holdout.rs"
+
+[[example]]
+name = "engineering_school_benchmarks"
+path = "examples/engineering_school_benchmarks.rs"
+
+[[example]]
+name = "sovereign_design_loop"
+path = "examples/sovereign_design_loop.rs"
+
+[[example]]
+name = "demo_proof_caching"
+path = "examples/demo_proof_caching.rs"
+required-features = ["code_generation"]
+
+[[example]]
+name = "mujoco_flight_viewer"
+required-features = ["multirotor-mujoco"]
+
+[[example]]
+name = "mujoco_swarm_training"
+required-features = ["multirotor-swarm"]
+
+[[example]]
+name = "moral_drone_video"
+required-features = ["multirotor-mujoco-renderer"]
+
+[[example]]
+name = "kinetic_sacrifice"
+required-features = ["multirotor-mujoco"]
+
+[[test]]
+name = "causal_consciousness_experiments"
+required-features = ["humanoid"]
+
+[[test]]
+name = "breaking_points_embodied"
+required-features = ["humanoid"]
+
+[[test]]
+name = "kessler_cascade_scenario"
+required-features = ["humanoid", "manipulator"]
+
+[[test]]
+name = "robotics_scenarios"
+required-features = ["humanoid"]
+
+[[test]]
+name = "consciousness_transfer"
+required-features = ["humanoid"]
+
+[[test]]
+name = "infrastructure_embodiment_integration"
+required-features = ["infrastructure"]
+
+[[test]]
+name = "substrate_embodiment_integration"
+required-features = ["humanoid"]
+
+[[test]]
+name = "humanoid_integration"
+required-features = ["humanoid"]
+
+[[test]]
+name = "embodiment_integration"
+required-features = ["humanoid"]
+
+[[test]]
+name = "robotics_integration"
+required-features = ["humanoid"]
+
+[[test]]
+name = "consciousness_ablation"
+required-features = ["humanoid"]
+
+[[test]]
+name = "safe_fallback_scorecard"
+required-features = [
+    "vehicle", "helicopter", "flight", "surgical",
+    "exoskeleton", "auv", "quadruped", "manipulator", "orbital",
+]
+
+[[test]]
+name = "coding_honesty"
+required-features = ["school_learning"]
+
+[[test]]
+name = "verified_generation_honesty"
+required-features = ["code_generation"]
+
+[[test]]
+name = "polyglot_executor_honesty"
+required-features = ["code_generation"]
+
+[[test]]
+name = "code_generation_benchmark"
+required-features = ["code_generation"]
+
+[[example]]
+name = "rust_orchestrator_benchmark"
+required-features = ["code_generation"]
+
+[[test]]
+name = "hardware_stress"
+required-features = ["code_generation"]
+
+[[test]]
+name = "time_waterfall_regression"
+
+[[test]]
+name = "core_facade_boundary"
+
+# Added 2026-07-03: found orphaned during a Phi/Psi audit. Validates the production
+# SpectralMIPFinder (the engine that actually drives consciousness_level -> robot
+# motor safety) against exhaustive-search Φ on synthetic covariance matrices. This
+# file existed since March 2026 but was never added to this explicit test list
+# (autotests = false above), so it had never once run under `cargo test` or CI.
+[[test]]
+name = "test_spectral_mip_validation"
+
+# Tier 1.2 (DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md): end-to-end proof
+# of the CLS threshold-phenotype promotion path (evolve -> gate -> promote ->
+# construct a live CognitiveLoopService). See cls_evolution_harness.rs.
+[[test]]
+name = "cls_threshold_promotion_e2e"
+required-features = ["neuroevolution"]
+
+[[test]]
+name = "genesis_feedback_telemetry"
+
+# The following 11 test files existed on disk but were never registered under
+# autotests = false, so `cargo test --test <name>` (used throughout ci.yml)
+# failed with "no test target named X in default-run packages" -- found
+# 2026-07-28 triaging PR #31's CI failures; this single registration gap was
+# the root cause behind several failing jobs (Compliance, Hardened API/Nix
+# Regressions, science-infra, symthaea-broca test-helpers, others).
+[[test]]
+name = "adversarial_moral_algebra"
+
+[[test]]
+name = "api_integration"
+
+[[test]]
+name = "calibration_e2e"
+
+[[test]]
+name = "pathology_resilience"
+
+[[test]]
+name = "proptest_cognitive_loop"
+
+[[test]]
+name = "proptest_feedback_stability"
+
+[[test]]
+name = "proptest_threshold_sensitivity"
+
+[[test]]
+name = "safety_agent_escalation_soak"
+
+[[test]]
+name = "substrate_simulation"
+
+# Step 0 properties for the recurrent-dimension masking lever (flag isolation,
+# fixed-fraction override, provenance, instrumentation). Must be declared here —
+# autotests = false (line 184) makes undeclared files in tests/ silently dead.
+[[test]]
+name = "substrate_dim_masking_isolation"
+
+[[test]]
+name = "voice_integration"
+
+[[test]]
+name = "voice_pipeline_integration"
+
+[[example]]
+name = "helicopter_phi_benchmark"
+required-features = ["helicopter"]
+
+[[example]]
+name = "dmc_humanoid_stand"
+required-features = ["humanoid"]
+
+[[example]]
+name = "robotics_benchmark_suite"
+# No required-features: gracefully degrades based on enabled platforms
+
+[[example]]
+name = "gravity_assist_demo"
+required-features = ["orbital"]
+
+[[example]]
+name = "flight_integration"
+required-features = ["multirotor"]
+
+[[example]]
+name = "cross_platform_coherence"
+required-features = ["manipulator", "helicopter", "vehicle", "auv"]
+
+[[example]]
+name = "transfer_flight_to_humanoid"
+required-features = ["multirotor", "humanoid"]
+
+[[example]]
+name = "humanoid_paper_figures"
+required-features = ["multirotor", "humanoid"]
+
+[[example]]
+name = "humanoid_100ep_telemetry"
+required-features = ["humanoid"]
+
+[[example]]
+name = "hal_demo"
+required-features = ["hal"]
+
+[[example]]
+name = "humanoid_training_curves"
+
+[[example]]
+name = "demo_self_analysis"
+required-features = ["code_generation"]
+
+[[example]]
+name = "coding_agent_demo"
+required-features = ["code_generation"]
+
+[[example]]
+name = "benchmark_code_primitives"
+required-features = ["code_generation"]
+
+[[example]]
+name = "train_code_sequencer"
+required-features = ["code_generation"]
+
+[[example]]
+name = "run_code_benchmark"
+required-features = ["code_generation"]
+
+[[example]]
+name = "benchmark_humaneval_verified"
+required-features = ["code_generation"]
+
+[[example]]
+name = "humaneval_benchmark"
+required-features = ["code_generation"]
+
+[[example]]
+name = "humaneval_class_classification"
+required-features = ["code_generation"]
+
+[[example]]
+name = "brain_codegen"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_codegen"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_eval_benchmark"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_scorer_diagnose"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_scorer_sample"
+required-features = ["code_generation"]
+
+[[example]]
+name = "harvest_nix_distillation"
+required-features = ["code_generation"]
+
+[[example]]
+name = "harvest_distillation"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_holdout_score"
+required-features = ["code_generation"]
+
+[[example]]
+name = "compose_eval_benchmark"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_prefix_parse_probe"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_corpus_scrape"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_corpus_accept"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_best_of_n"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_rag_holdout_baseline"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_rag_grounded"
+required-features = ["code_generation"]
+
+
+[[example]]
+name = "nix_codegen_api"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_self_improve_bench"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_eval_benchmark_rag"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_kg_override_demo"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_kg_learn_from_config"
+required-features = ["code_generation"]
+
+[[example]]
+name = "benchmark_exercism"
+required-features = ["code_generation"]
+
+[[example]]
+name = "causal_tower_test"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "conscious_ollama_demo"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "core_minimal_consciousness_loop"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "cycle_aware_pattern_recognition"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "first_breath"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "hippocampus_integration"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "multi_day_narrative"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "nixos_assistant_demo"
+
+[[example]]
+name = "evaluate_consciousness_runtime"
+
+[[example]]
+name = "school_o1_benchmark"
+required-features = ["school_learning"]
+
+[[example]]
+name = "semantic_consciousness"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "conscious_nixos_assistant"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "quick_primitives"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "meta_conscious_ollama_demo"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "school_coherence_integration"
+required-features = ["school_learning"]
+
+[[example]]
+name = "cfc_learning_lookahead_prototype"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "error_analysis"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "dual_metric_comparison"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "meta_consciousness_conversation"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "conscious_learning_demo"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "embodied_consciousness_learning"
+required-features = ["school_learning"]
+
+[[example]]
+name = "primitive_decomposition_test"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "minimal_ai_assistant"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "phi_dyad_demo"
+
+[[example]]
+name = "primitive_learning_experiment"
+required-features = ["benchmarks"]
+
+[[example]]
+name = "toddler_test"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "phi_crossvalidation"
+
+[[example]]
+name = "symthaea_life_simulation"
+
+[[example]]
+name = "llm_integration_test"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "primitive_grounded_crystallization"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "cognitive_loop_validation"
+required-features = ["benchmarks"]
+
+[[example]]
+name = "prefrontal_integration"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "reproduce_all_benchmarks"
+required-features = ["benchmarks"]
+
+[[example]]
+name = "symthaea_awakens_demo"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "cfc_lookahead_stress_test"
+# Requires pub(crate) CfCNetwork to be exported — disabled until API stabilizes
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "pattern_differentiation"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "unified_causal_test"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "hdc_ltc_primitives_demo"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "magi_simulation"
+required-features = ["magi_loop"]
+
+[[example]]
+name = "magi_cli"
+required-features = ["magi_loop"]
+
+[[example]]
+name = "dream_feedback_experiment"
+required-features = ["magi_loop"]
+
+[[example]]
+name = "dream_feedback_scaled"
+required-features = ["magi_loop"]
+
+# Modern embeddings demo (unified interface for BGE-M3/ModernBERT)
+[[example]]
+name = "modern_embeddings_demo"
+required-features = ["neural-bridge"]
+
+# Reasoning Engine examples
+[[example]]
+name = "conscious_reasoning_demo"
+required-features = ["reasoning_engine"]
+
+[[example]]
+name = "counterfactual_planning"
+required-features = ["reasoning_engine"]
+
+# Observer-ΔΨ A/B experiment: does her consciousness respond to the artwork's
+# COMPOSITION or to any bright frame? (visual-art plan Option 2 follow-up)
+[[example]]
+name = "art_observer_ab"
+required-features = ["art-observer"]
+
+# End-to-end pipeline demo (no required features)
+[[example]]
+name = "full_pipeline"
+
+# Neuroscience validation examples (no required features)
+[[example]]
+name = "comparative_scaling_benchmark"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "consciousness_advantage_benchmark"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "market_benchmark"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "ablation_baselines"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "market_scenarios"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "meditation_phi_analysis"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "paper_topology_table"
+required-features = ["unstable-examples"]
+
+# Neural-bridge examples (require candle/BGE-M3 layer extraction)
+[[example]]
+name = "bert_layer_extraction"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "bert_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "binding_associative_memory"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "binding_betti_analysis"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "binding_compositionality"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "binding_layer_sweep"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "binding_layer21_integration"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "causal_ablation_lobotomy"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "cross_architecture_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "cross_model_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "gpt2_layer_topology"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "gpt2_layerwise_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "l22_mechanistic_analysis"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer21_analysis"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer21_causal_intervention"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer_specific_probes"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer_topology_analysis"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer_topology_expanded"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer_topology_full_corpus"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "oil_water_investigation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "phi_extraction_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "phenomenal_corridor_finegrained"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "phenomenality_index_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "robustness_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "train_probe"
+required-features = ["neural-bridge"]
+
+# Perception examples (require embeddings/ONNX models)
+[[example]]
+name = "check_model_inputs"
+required-features = ["embeddings"]
+
+[[example]]
+name = "embedding_verification"
+required-features = ["embeddings"]
+
+[[example]]
+name = "phenomenal_detector_cli"
+required-features = ["embeddings"]
+
+[[example]]
+name = "robustness_adversarial"
+required-features = ["embeddings"]
+
+[[example]]
+name = "embeddings_benchmark"
+required-features = ["embeddings"]
+
+# Voice examples (require voice-tts feature)
+[[example]]
+name = "hdc_coarticulation_benchmark"
+required-features = ["voice-tts"]
+
+[[example]]
+name = "test_tts_pipeline"
+required-features = ["voice-tts"]
+
+[[example]]
+name = "voice_demo"
+required-features = ["voice-tts"]
+
+# Round-trip intelligibility: formant voice -> Whisper worker -> WER.
+# The voice quality regression gate (voice plan LF2, 2026-07-15).
+[[example]]
+name = "voice_roundtrip_wer"
+required-features = ["voice-tts"]
+
+# Oracle test: Kokoro reference audio -> extracted formant tracks ->
+# FormantVocoder -> Whisper. Measures the vocoder's intelligibility CEILING
+# (voice plan, 2026-07-16) — decides whether distillation targets the
+# controller or the renderer.
+[[example]]
+name = "voice_oracle_wer"
+required-features = ["voice-tts"]
+
+# Generate the Kokoro-teacher distillation corpus (60 training sentences,
+# disjoint from the evaluation gate).
+[[example]]
+name = "voice_distill_corpus"
+required-features = ["voice-tts"]
+
+[[example]]
+name = "voice_diagnostic"
+required-features = ["voice-tts"]
+
+# Dose-response affect gate: does consciousness-modulated pacing reach the
+# acoustic signal in a detectable, direction-sensible way (2026-07-17,
+# "make TTS better" follow-on). See module doc for why this is scoped to
+# the external half only (no live audio->arousal/valence perception path
+# exists yet to close a self-hearing loop against).
+[[example]]
+name = "voice_affect_gate"
+required-features = ["vocal-tract"]
+
+# P2.3 release gate: commits a real Whisper transcription-quality bundle
+# against 200 real FLEURS en/af samples (2026-07-17), closing the gap the
+# voice plan flagged since 2026-07-15.
+[[example]]
+name = "fleurs_release_gate"
+required-features = ["voice-tts"]
+
+# Self-consistency quality gate for the singing path (sing -> transcribe ->
+# compare back to the original lyrics) — SYMTHAEA_SINGING_PLAN_2026-07-18.md
+# Phase 3, closing the "no committed singing quality number" gap.
+[[example]]
+name = "singing_intelligibility_gate"
+required-features = ["singing", "voice-tts"]
+
+# Same self-consistency intelligibility gate as singing_intelligibility_gate,
+# but pointed at the newer Kokoro-based singing engine (src/voice/kokoro_singing.rs,
+# real STFT phase vocoder + acoustic-boundary alignment) instead of FormantVocoder —
+# that engine's word intelligibility had never been measured.
+# Registered as [[bin]] (see compression_bits above): [[example]] targets need
+# [dev-dependencies], and symthaea-humanoid (unconditional dev-dep) is broken
+# at HEAD, which would otherwise block this unrelated gate from building.
+[[bin]]
+name = "kokoro_singing_intelligibility_gate"
+path = "examples/kokoro_singing_intelligibility_gate.rs"
+required-features = ["singing", "voice-tts"]
+
+# Root-cause tool for the human listening report on kokoro_singing_intelligibility_gate's
+# output ("random fart noises") -- objective render-cleanliness (via singing_quality.rs's
+# analyze_render_cleanliness) + pitch-track diagnostics on the actual generated WAVs.
+[[bin]]
+name = "kokoro_singing_diagnose"
+path = "examples/kokoro_singing_diagnose.rs"
+required-features = ["singing", "voice-tts"]
+
+# Fast (no Kokoro synthesis) syllable/note timing inspection -- chases the
+# "most of the audio is silent" report after the phase-vocoder norm-floor
+# hypothesis was empirically ruled out.
+[[bin]]
+name = "kokoro_singing_timing_probe"
+path = "examples/kokoro_singing_timing_probe.rs"
+required-features = ["singing", "voice-tts"]
+
+# Same phrase set/render path as kokoro_singing_intelligibility_gate but
+# skips the (slow, ASR-worker-dependent) Whisper transcription step --
+# for fast render-side iteration.
+[[bin]]
+name = "kokoro_singing_render_only"
+path = "examples/kokoro_singing_render_only.rs"
+required-features = ["singing", "voice-tts"]
+
+# Ground-truth singing quality judge: compares actual sung pitch/timing
+# against the intended melody (singing_quality::analyze_vocal_stem), not
+# just generic audio cleanliness or Whisper intelligibility.
+[[bin]]
+name = "kokoro_singing_quality_judge"
+path = "examples/kokoro_singing_quality_judge.rs"
+required-features = ["singing", "voice-tts"]
+
+# Backend-comparative objective + blind-human Muse vocal release gate.
+[[example]]
+name = "muse_vocal_release_gate"
+required-features = ["singing", "voice-tts"]
+
+# Quick spike: does pitch-shifted Kokoro sound better as a singing voice than
+# the formant vocoder (rejected by the user after listening to it)? —
+# SYMTHAEA_SINGING_PLAN_2026-07-18.md post-Phase-6 pivot.
+[[example]]
+name = "kokoro_singing_spike"
+required-features = ["voice-tts"]
+
+# Synthesizes the same phrase with a spread of Kokoro's built-in voices so a
+# human can pick one — the user asked for something "sexy silk to the ears"
+# after rejecting the formant vocoder outright.
+[[example]]
+name = "kokoro_voice_gallery"
+required-features = ["voice-tts"]
+
+# Isolates synthesis-only speed (engine loaded once) from kokoro_voice_gallery's
+# per-voice full reload cost, to answer whether CPU-only Kokoro can keep pace
+# with live conversation (real-time factor).
+[[example]]
+name = "kokoro_realtime_factor"
+required-features = ["voice-tts"]
+
+[[example]]
+name = "guided_design_sweep"
+required-features = ["physics-bridge"]
+
+[[example]]
+name = "plasma_disruption_benchmark"
+required-features = ["physics"]
+
+[[example]]
+name = "plasma_threshold_optimizer"
+required-features = ["physics"]
+
+[[example]]
+name = "vocal_tract_demo"
+required-features = ["vocal-tract"]
+
+[[example]]
+name = "vocal_tract_benchmark"
+required-features = ["vocal-tract"]
+
+[[example]]
+name = "neural_vocoder_benchmark"
+required-features = ["neural-vocoder"]
+
+[[example]]
+name = "awakening_demo"
+
+[[example]]
+name = "real_world_test"
+
+[[example]]
+name = "meta_study"
+required-features = ["web_research_module", "school_learning"]
+
+[[example]]
+name = "power_ssm_demo"
+required-features = ["ssm-power"]
+
+[[example]]
+name = "evolutionary_audit"
+
+[[example]]
+name = "curriculum_research_bench"
+required-features = ["web_research_module", "school_learning"]
+
+[[example]]
+name = "swarm_immune_system_demo"
+
+[[example]]
+name = "benchmark_genesis_fusion"
+required-features = ["fusion-twin", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_safety"
+required-features = ["safety-agents", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_lab"
+required-features = ["cell-foundry", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_materials"
+required-features = ["materials", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_nuclear"
+required-features = ["nuclear-forensics", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_water"
+required-features = ["water-prediction", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_multiscale"
+required-features = ["physics", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_temporal_unified"
+# Spans every Genesis temporal domain, so it needs every optional domain dep it
+# names. `symthaea-cell-foundry` / `symthaea-materials` are unconditional
+# dev-dependencies (see [dev-dependencies]) so they need no feature; the other
+# two are optional [dependencies] and DO. `safety-agents` is implied by
+# `nuclear-forensics` but is listed explicitly so this stays correct if that
+# feature's definition changes. Keep in sync with the `temporal_unified` row of
+# the `genesis-benchmarks` matrix in .github/workflows/ci.yml.
+required-features = [
+    "physics",
+    "nuclear-forensics",
+    "safety-agents",
+    "unstable-examples",
+]
+
+[[example]]
+name = "benchmark_genesis_grid"
+required-features = ["grid-scaling", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_fission"
+required-features = ["fission-reactor", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_accelerator"
+required-features = ["accelerator", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_threat"
+required-features = ["threat-assessment", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_datacenter"
+required-features = ["datacenter", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_experiment"
+required-features = ["experiment-planner", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_strategic_materials"
+required-features = ["strategic-materials", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_mining"
+required-features = ["critical-minerals", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_manufacturing"
+required-features = ["advanced-manufacturing", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_building"
+required-features = ["advanced-manufacturing", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_design_loop"
+required-features = ["advanced-manufacturing", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_safeguards"
+required-features = ["proliferation-safeguards", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_suite"
+required-features = ["safety-agents", "unstable-examples"]
+
+[[example]]
+name = "benchmark_genesis_safety_dashboard"
+required-features = ["safety-agents", "unstable-examples"]
+
+[[example]]
+name = "six_watt_benchmark"
+
+[[example]]
+name = "biological_homeostasis_demo"
+
+[[example]]
+name = "precognition_demo"
+
+[[example]]
+name = "autonomous_forge_demo"
+
+# Genesis paper / physics demos (require genesis sub-crates)
+[[example]]
+name = "genesis_paper_data"
+required-features = ["genesis"]
+
+[[example]]
+name = "genesis_physics_demo"
+required-features = ["physics"]
+
+# Soak tests (long-running validation)
+[[example]]
+name = "soak_discovery_pipeline"
+
+[[example]]
+name = "soak_moral_anomaly"
+
+# Benchmarks
+# Quick suite for CI (~5 min)
+# Standard suite (~30 min)
+# Full consciousness suite (~1 hr)
+# Ethics suite (~45 min)
+
+[[bench]]
+name = "quick"
+harness = false
+
+[[bench]]
+name = "e2e"
+harness = false
+
+[[bench]]
+name = "stress"
+harness = false
+
+[[bench]]
+name = "consciousness"
+harness = false
+
+[[bench]]
+name = "standard"
+harness = false
+
+[[bench]]
+name = "ethics"
+harness = false
+
+[[bench]]
+name = "stability_regime"
+harness = false
+
+[[bench]]
+name = "neural_bridge"
+harness = false
+required-features = ["neural-bridge"]
+
+[[bench]]
+name = "vision_manifold"
+harness = false
+required-features = ["vision-manifold"]
+
+[[bench]]
+name = "hdc_benchmarks"
+harness = false
+
+[[bench]]
+name = "reasoning_engine"
+harness = false
+required-features = ["reasoning_engine"]
+
+[[bench]]
+name = "verified_performance"
+harness = false
+
+[[bench]]
+name = "cfc_gpu"
+harness = false
+
+[[bench]]
+name = "streaming"
+harness = false
+
+[[bench]]
+name = "database_benchmark"
+harness = false
+
+[[bench]]
+name = "cognitive_cycle"
+harness = false
+
+[[bench]]
+name = "embodied_cycle"
+harness = false
+required-features = ["humanoid"]
+
+[[bench]]
+name = "dynamics_ode"
+harness = false
+
+[[bench]]
+name = "dynamics_cfc"
+harness = false
+
+[[bench]]
+name = "dynamics_stability"
+harness = false
+
+[[bench]]
+name = "dynamics_temporal"
+harness = false
+
+[profile.dev]
+codegen-units = 16  # Same fix as [profile.test] below, extended here since it
+                    # was never applied to dev (cargo build/check default of
+                    # 256 codegen-units) -- only test inherited it explicitly.
+                    # 16 CUs: good parallelism + sccache hits (was 256 -> 2%
+                    # cache hit rate, per the test-profile fix this mirrors).
+
+[profile.test]
+inherits = "dev"
+opt-level = 1  # HV16 array ops are 10-100x slower at opt-level=0
+codegen-units = 16  # 16 CUs: good parallelism + sccache hits (was 256 → 2% cache hit rate)
+
+[profile.release]
+opt-level = 3
+lto = "thin"         # 5x faster release builds vs "fat", <5% perf difference
+codegen-units = 1
+strip = true
+
+[patch.crates-io]
+std_msgs = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/std_msgs" }
+sensor_msgs = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/sensor_msgs" }
+trajectory_msgs = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/trajectory_msgs" }
+builtin_interfaces = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/builtin_interfaces" }
+geometry_msgs = { path = "crates/bridges/symthaea-ros-bridge/ros_msgs/geometry_msgs" }
+curve25519-dalek-derive = { path = "patches/ed25519-dalek/curve25519-dalek-derive" }
+curve25519-dalek = { path = "patches/ed25519-dalek/curve25519-dalek" }
+ed25519-dalek = { path = "patches/ed25519-dalek/ed25519-dalek" }
+iroh = { path = "patches/iroh/iroh" }
+iroh-base = { path = "patches/iroh/iroh-base" }
+iroh-relay = { path = "patches/iroh/iroh-relay" }
+# cudarc 0.13.9 does not ship CUDA 12.9 bindings. The vendored copy
+# aliases CUDA 12.9 to its CUDA 12.8 bindings for local Broca GPU builds.
+cudarc = { path = "vendor/cudarc-0.13.9-cuda129" }
+
+[profile.release.package.symthaea-physics-catalog]
+opt-level = "z"
+codegen-units = 1
+
+[profile.bench]
+inherits = "release"
+
+[[example]]
+name = "debug_exercism"
+required-features = ["code_generation"]
+
+[[example]]
+name = "benchmark_coding_backends"
+required-features = ["code_generation"]
+
+[[example]]
+name = "forecastbench_eval"
+
+[[example]]
+name = "engineering_bridge_review"
+required-features = ["engineering-foundations"]
+
+[[example]]
+name = "engineering_mechanism_review"
+required-features = ["engineering-foundations"]
+
+[[example]]
+name = "consciousness_demo"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "arc_agi_benchmark"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "harvest_synthetic_nix"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "benchmark_jepa_thermodynamic"
+required-features = ["unstable-examples"]
+
+# Tier 1.2 (DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md): CLS
+# threshold-phenotype promotion path. evolve_cls writes a candidate;
+# cls_promotion_gate re-evaluates it on fresh seeds before it can be promoted
+# via scripts/cls_promote_candidate.sh. See cls_evolution_harness.rs.
+[[example]]
+name = "evolve_cls"
+required-features = ["neuroevolution"]
+
+[[example]]
+name = "cls_promotion_gate"
+required-features = ["neuroevolution"]
+
+# Architecture experiments 2026-07-08 (SYMTHAEA_EXPERIMENTS_2026-07-08.md):
+# E1 subsystem ablation + E2 Φ/Ψ dynamic range + E3 tick-rate ablation;
+# E4b epistemic red-team + E5 calibration mining; E6 facade↔loop divergence.
+# All default-features.
+[[example]]
+name = "exp_loop_ablation"
+
+[[example]]
+name = "exp_epistemic_redteam"
+
+[[example]]
+name = "exp_facade_loop_divergence"
+
+# Vision-tier validation examples (2026-07-15): these existed in examples/ but were
+# never declared after autoexamples=false, so the documented reproduction commands
+# (docs/BUTLIN_VALIDATION_RESULTS.md, VISION.md ETHICS figures) could not actually run.
+# Both compile with default features.
+[[example]]
+name = "butlin_validation"
+
+[[example]]
+name = "benchmark_ethics_moral_algebra"
+
+# Empty-input hang diagnostic (docs/PHI_SIGNAL_TRACE_2026-07-15.md follow-up 6)
+[[example]]
+name = "probe_empty_hang"
+
+# Keystone consciousness-on/off A/B (docs/KEYSTONE_AB_PROTOCOL_2026-07-17.md)
+[[example]]
+name = "keystone_ab"
+
+# HDC-LTC coupling ablation bounded pilot (SYMTHAEA_HDC_LTC_COUPLING_ABLATION_PLAN.md)
+[[example]]
+name = "hdc_ltc_coupling_ablation"
+
+# Signal-scale diagnostic (PHI_SIGNAL_TRACE follow-up 1: output norm ~3e-8)
+[[example]]
+name = "probe_signal_scale"
+
+# CL/safety-tier calibration probe (post-scale-fix saturation, 2026-07-18)
+[[example]]
+name = "probe_cl_calibration"
+
+# Earn-or-demote: moral/safety discrimination A/B (docs/EARN_OR_DEMOTE_PROTOCOL_2026-07-18.md)
+[[example]]
+name = "earn_or_demote"
+
+# MoralParser category discrimination probe (acceptance gate for the ethical_text_alarm
+# telemetry channel — see SYMTHAEA_COGNITION_IMPROVEMENT_PLAN follow-up, PR1)
+[[example]]
+name = "probe_moral_parser_categories"
+
+# Predictive Compression C1 bits-saved A/B
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md)
+[[example]]
+name = "compression_bits"
+
+# Predictive Compression C3 -- episodic recall -> prediction
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md section 7)
+[[example]]
+name = "episodic_recall_probe"
+
+# Predictive Compression C3b -- similarity-gradient probe
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3b)
+[[example]]
+name = "episodic_recall_gradient_probe"
+
+# Predictive Compression C3c -- recall provenance diagnostic
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3c)
+[[example]]
+name = "episodic_recall_provenance_probe"
+
+# Predictive Compression C3d -- frequency-equalization test
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3d)
+[[example]]
+name = "episodic_recall_frequency_probe"
+
+# Predictive Compression C3e -- content-difficulty test
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3e)
+[[example]]
+name = "episodic_recall_difficulty_probe"
+
+# Predictive Compression -- within-tier homogeneity diagnostic
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Diagnostic)
+[[example]]
+name = "episodic_recall_homogeneity_probe"
+
+# Predictive Compression C3f -- homogeneity x difficulty factorial
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C3f)
+[[example]]
+name = "episodic_recall_factorial_probe"
+
+# Predictive Compression C2 -- compression-gated Chronicle
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C2)
+[[example]]
+name = "compression_gated_chronicle_probe"
+
+# Predictive Compression C4 -- calibrated surprise (intent classifier confidence)
+# (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md, Experiment C4)
+[[example]]
+name = "calibrated_intent_confidence"
+
+# Step 1 characterization of the recurrent-dimension masking lever made reachable
+# by Step 0 (132b919be1): reachability, suffix-vs-random dependence, state
+# redistribution, run-to-run stability, and load-robust overhead. Must be declared
+# here -- autoexamples = false (line 183) makes undeclared files in examples/ dead.
+# TEMPORARILY DISABLED 2026-07-30 — this declaration breaks the entire workspace.
+#
+# `examples/recurrent_mask_characterization.rs` is UNTRACKED, so on every fresh
+# checkout, worktree, and CI run cargo cannot PARSE this manifest and *every*
+# cargo command in the workspace fails. It is green only in the working tree that
+# still holds the untracked file.
+#
+# The file was not simply staged, because it does not compile: `libc` is only in
+# [workspace.dependencies] (a version table), not a dependency of the `symthaea`
+# package, plus 5 further type errors (E0277, E0599). Committing it would have
+# traded a manifest break for an --all-targets break.
+#
+# TO RE-ENABLE: `git add symthaea/examples/recurrent_mask_characterization.rs`,
+# add `libc = { workspace = true }` to [dev-dependencies], fix the remaining
+# errors, then uncomment. `scripts/check-workspace-targets.sh` now fails on this
+# class, so it cannot silently recur.
+[[example]]
+name = "recurrent_mask_characterization"
+
+# Step 1.5 actuator-bandwidth measurement: how long previously-masked dimensions
+# take to be repopulated after expansion, which bounds the usable bandwidth of any
+# controller built on this lever. Carries a preregistered decision rule.
+[[example]]
+name = "recurrent_mask_recovery"
+
+# Step 3: action semantics and perception-to-action sensitivity in the main loop.
+# Two-level probe (actuator vs channel) so a null is attributable rather than merely
+# observed. Must be declared here -- autoexamples = false.
+[[example]]
+name = "action_semantics_probe"
