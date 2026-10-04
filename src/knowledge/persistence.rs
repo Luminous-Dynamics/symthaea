@@ -1515,6 +1515,7 @@ impl KnowledgePersistence {
             verify_schema_user_version(conn)?;
             let tx = rusqlite::Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
                 .map_err(|e| format!("Begin schema attestation transaction: {e}"))?;
+            verify_schema_user_version(&conn)?;
             verify_initialized_schema_integrity(conn)?;
             tx.commit()
                 .map_err(|e| format!("Commit schema attestation transaction: {e}"))?;
@@ -1530,6 +1531,7 @@ impl KnowledgePersistence {
         if user_version == CURRENT_SCHEMA_USER_VERSION {
             let tx = rusqlite::Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
                 .map_err(|e| format!("Begin schema attestation transaction: {e}"))?;
+            verify_schema_user_version(conn)?;
             verify_initialized_schema_integrity(conn)?;
             tx.commit()
                 .map_err(|e| format!("Commit schema attestation transaction: {e}"))?;
@@ -4533,6 +4535,40 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM knowledge_facts", [], |row| row.get(0))
             .unwrap();
         assert_eq!(fact_count, 1);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_schema_attestation_rechecks_version_under_lock() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_attestation_version_race_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "attestation-version-race".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x96; BinaryHV::BYTES],
+            source_text: "attestation version race".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        let conn = p.open_connection().unwrap();
+        conn.execute_batch("PRAGMA user_version = 999;").unwrap();
+
+        let mut restarted = KnowledgePersistence::new(&db_path);
+        let restarted_conn = restarted.open_connection().unwrap();
+        let err = restarted.ensure_schema(&restarted_conn).unwrap_err();
+        assert!(err.contains("Unsupported knowledge SQLite schema user_version 999"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
