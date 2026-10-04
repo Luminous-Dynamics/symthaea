@@ -77,6 +77,7 @@ The codebook descriptor binds:
 - deterministic seed;
 - HDC dimension;
 - identity scheme;
+- identity-mapping authority provenance hash;
 - stable concept manifest hash;
 - stable predicate manifest hash;
 - training graph structural manifest hash.
@@ -90,6 +91,9 @@ These are deliberately different:
 A new observation can therefore use the same HDC coordinate system while carrying a different provenance manifest.
 
 The authenticated transport boundary must protect both the representation and any sidecar manifest referenced by `source_manifest_hash`. The HDC adapter does not substitute for packet authentication, confidentiality, signatures, or revocation.
+
+A codebook is therefore tied not just to a scheme label but to the versioned identity-mapping authority that supplied that scheme. A manifest carrying the same scheme ID but a different mapping-authority provenance hash is rejected before encoding or decoding.
+
 
 ## Open-world boundary
 
