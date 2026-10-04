@@ -2359,8 +2359,8 @@ impl<'a> CborReader<'a> {
     ) -> Result<(), Rfc9162ProofDecodeError> {
         let limit_end = self
             .offset
-            .checked_add(max_value_bytes)
-            .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+            .saturating_add(max_value_bytes)
+            .min(self.bytes.len());
         self.skip_value_inner(depth, max_bstr_len, max_array_items, limit_end)?;
         if self.offset > limit_end {
             return Err(Rfc9162ProofDecodeError::InvalidStructure);
