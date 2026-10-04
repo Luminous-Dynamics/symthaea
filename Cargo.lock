@@ -18109,6 +18109,7 @@ dependencies = [
  "ed25519-dalek 2.1.0",
  "serde",
  "symthaea-core",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
