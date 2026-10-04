@@ -160,7 +160,7 @@ impl VerifierEnvironmentIdentity {
 }
 
 const REPORT_DOMAIN_SEPARATOR_V3: &[u8] = b"symthaea:observation-attestation-report:v3\n";
-const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v4\n";
+const REPORT_DOMAIN_SEPARATOR: &[u8] = b"symthaea:observation-attestation-report:v5\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReceiptAttestationVerificationOutcome {
@@ -596,7 +596,7 @@ impl EvaluationTrace {
 
     /// Verify that this trace is the report's captured execution evidence.
     ///
-    /// Current v4 reports carry the authoritative trace directly. Legacy reports
+    /// Current v5 reports carry the authoritative trace directly. Legacy reports
     /// without that field use the compatibility stage projection.
     pub fn matches_report(&self, report: &ReceiptAttestationVerificationReport) -> bool {
         if self.procedure_fingerprint != report.procedure_fingerprint {
@@ -812,7 +812,7 @@ impl ReceiptAttestationVerificationReport {
     ///
     /// Legacy v3 reports are validated against their historical stage projection
     /// because first-class execution traces were not part of the v3 evidence identity.
-    /// Current v4 reports must validate their captured execution trace directly.
+    /// Current v5 reports must validate their captured execution trace directly.
     pub fn is_well_formed(&self) -> bool {
         if !self.has_consistent_identity_bindings()
             || !self.has_consistent_resolution_metadata()
@@ -3946,7 +3946,7 @@ mod tests {
     }
 
     #[test]
-    fn current_v4_malformed_trace_is_not_reconstructed_from_stages() {
+    fn current_v5_malformed_trace_is_not_reconstructed_from_stages() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let mut report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
