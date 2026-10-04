@@ -2269,7 +2269,10 @@ mod tests {
         let mut store = InMemoryStore::default();
         let consumed =
             consume_authorized_once(&mut store, &authorized, 151).expect("consumption");
-        assert_eq!(consumed.authorization_digest().expect("digest"), auth.digest().expect("digest"));
+        assert_eq!(
+            consumed.authorization_digest().expect("digest"),
+            auth.digest().expect("digest")
+        );
         assert_eq!(consumed.authority_id(), "owner");
         assert_eq!(consumed.nonce(), "nonce-1");
         assert_eq!(consumed.consumed_at_ms(), 151);
