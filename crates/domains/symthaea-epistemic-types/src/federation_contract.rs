@@ -1507,7 +1507,7 @@ mod adversarial_contract_tests {
         // structurally valid. The substrate-neutral layer must reject malformed state
         // rather than silently accepting a different envelope.
         let valid: &[(&str, fn(&mut FederatedClaim))] = &[
-            ("author", |c| c.author.push_str(":changed")),
+            ("author", |c| c.author = ClaimAuthorIdentity::new("author:changed").unwrap()),
             ("source_event", |c| c.source_event = Some("event:changed".into())),
             ("epistemic_state", |c| c.epistemic_state = Some("Observed".into())),
             ("claim_ceiling", |c| c.claim_ceiling = Some("source-scoped".into())),
