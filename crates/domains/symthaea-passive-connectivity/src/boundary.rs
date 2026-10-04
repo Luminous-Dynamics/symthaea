@@ -24,11 +24,13 @@ pub enum BoundaryValidationStatus {
     UnexpectedOpenings,
     MissingPortAnchor(PortId),
     AmbiguousOpening,
+    MissingPortOpening(PortId),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PortBoundaryPolicy {
     allowed_open_ports: BTreeSet<PortId>,
+    required_open_ports: BTreeSet<PortId>,
     tolerance_micrometers: u64,
 }
 
@@ -36,6 +38,7 @@ impl Default for PortBoundaryPolicy {
     fn default() -> Self {
         Self {
             allowed_open_ports: BTreeSet::new(),
+            required_open_ports: BTreeSet::new(),
             tolerance_micrometers: 50_000,
         }
     }
@@ -49,6 +52,16 @@ impl PortBoundaryPolicy {
     pub fn with_allowed_open_port(mut self, port: PortId) -> Self {
         self.allowed_open_ports.insert(port);
         self
+    }
+
+    pub fn with_required_open_port(mut self, port: PortId) -> Self {
+        self.allowed_open_ports.insert(port);
+        self.required_open_ports.insert(port);
+        self
+    }
+
+    pub fn required_open_ports(&self) -> impl Iterator<Item = PortId> + '_ {
+        self.required_open_ports.iter().copied()
     }
 
     pub fn tolerance_mm(mut self, tolerance_mm: f32) -> Option<Self> {
@@ -152,6 +165,7 @@ impl PortBoundaryEvidence {
         let mut matched = 0usize;
         let mut unexpected = 0usize;
         let mut ambiguous = 0usize;
+        let mut matched_by_port = BTreeSet::new();
         let tolerance_mm = policy.tolerance_micrometers as f64 / 1_000.0;
 
         for (_, _, midpoint) in boundary_edges {
@@ -166,8 +180,8 @@ impl PortBoundaryEvidence {
             match matches.as_slice() {
                 [] => unexpected += 1,
                 [port] => {
-                    let _ = port;
                     matched += 1;
+                    matched_by_port.insert(*port);
                 }
                 ports => {
                     ambiguous += 1;
@@ -176,6 +190,23 @@ impl PortBoundaryEvidence {
                     }
                 }
             }
+        }
+
+        if let Some(port) = policy
+            .required_open_ports
+            .iter()
+            .find(|port| !matched_by_port.contains(port))
+            .copied()
+        {
+            return Self {
+                status: BoundaryValidationStatus::MissingPortOpening(port),
+                boundary_edges: matched + unexpected + ambiguous,
+                matched_boundary_edges: matched,
+                unexpected_boundary_edges: unexpected,
+                ambiguous_boundary_edges: ambiguous,
+                missing_port_anchors,
+                physical_transport_unproven: true,
+            };
         }
 
         let status = if ambiguous > 0 {
