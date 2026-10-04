@@ -432,6 +432,74 @@ mod tests {
     use symthaea_core::genesis::GenesisSeed;
 
     #[test]
+    fn generated_plans_validate() {
+        let genesis = GenesisSeed::from_phrase("broca-speech-plan-validation");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(4);
+        let readout = decoder.decode(&channels);
+        let plan = SpeechPlan::from_readout(&channels, &readout);
+        assert!(plan.validate().is_ok());
+    }
+
+    #[test]
+    fn persisted_cross_field_corruption_fails_closed() {
+        let genesis = GenesisSeed::from_phrase("broca-speech-plan-corruption");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(3);
+        let readout = decoder.decode(&channels);
+        let mut plan = SpeechPlan::from_readout(&channels, &readout);
+
+        plan.focus_role = Some("NOT_PRESENT".to_string());
+        assert_eq!(
+            plan.validate().expect_err("orphan focus"),
+            SpeechPlanError::FocusRoleNotRepresented
+        );
+
+        plan = SpeechPlan::from_readout(&channels, &readout);
+        plan.prosody.rate = f32::NAN;
+        assert_eq!(
+            plan.validate().expect_err("non-finite rate"),
+            SpeechPlanError::NonFiniteValue("rate")
+        );
+    }
+
+    #[test]
+    fn question_and_abstention_invariants_are_explicit() {
+        let genesis = GenesisSeed::from_phrase("broca-speech-plan-relations");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(3);
+        let readout = decoder.decode(&channels);
+        let mut question = SpeechPlan::from_readout(&channels, &readout);
+
+        question.prosody.intonation = IntonationIntent::Statement;
+        assert_eq!(
+            question.validate().expect_err("question intonation mismatch"),
+            SpeechPlanError::QuestionRequiresQuestionIntonation
+        );
+
+        let readout = decoder.decode(&{
+            let mut c = channels.clone();
+            c.set_intent(7);
+            c.set_epistemic(3.0);
+            c
+        });
+        let mut abstention = SpeechPlan::from_readout(
+            &{
+                let mut c = channels.clone();
+                c.set_intent(7);
+                c.set_epistemic(3.0);
+                c
+            },
+            &readout,
+        );
+        abstention.epistemic_delivery = EpistemicDelivery::Assertive;
+        assert_eq!(
+            abstention.validate().expect_err("abstention delivery mismatch"),
+            SpeechPlanError::AbstentionRequiresNonAssertive
+        );
+    }
+
+    #[test]
     fn answer_produces_assertive_statement_plan() {
         let genesis = GenesisSeed::from_phrase("broca-speech-plan-answer");
         let decoder = StructuredDecoder::new(&genesis);
