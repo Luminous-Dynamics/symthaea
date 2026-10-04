@@ -26,7 +26,7 @@ limits. The current RFC 9942 qualification envelope is:
 
 - up to 16 receipts per `receipts` collection;
 - 4 MiB per encoded Receipt value;
-- 32 MiB aggregate Receipt payload bytes, with a 33 MiB encoded collection scan budget;
+- 32 MiB total encoded Receipt bytes, with a 33 MiB encoded collection scan budget;
 - up to 256 VDP proof bstr members, with an 8 KiB per-proof limit and a 4 MiB encoded VDP scan budget;
 - 8 MiB for an outer application payload;
 - 4096 chunks for an indefinite-length bstr or tstr;
