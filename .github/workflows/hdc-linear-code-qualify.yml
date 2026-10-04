@@ -55,6 +55,14 @@ jobs:
           toolchain: 1.96.1
           components: rustfmt,clippy
 
+      - name: Verify pinned Rust toolchain
+        id: toolchain
+        run: |
+          RUSTC_VERSION="$(rustc --version | awk '{print $2}')"
+          CARGO_VERSION="$(cargo --version | awk '{print $2}')"
+          test "$RUSTC_VERSION" = "1.96.1"
+          test "$CARGO_VERSION" = "1.96.1"
+
       - name: Capture runner provenance
         id: runner
         run: |
@@ -312,6 +320,7 @@ jobs:
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
           rust_toolchain=1.96.1
+          rust_toolchain_verification_status=${{ steps.toolchain.outcome }}
           source_sha256=${{ steps.provenance.outputs.source_sha256 }}
           integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
           qualification_workflow_sha256=${{ steps.provenance.outputs.workflow_sha256 }}
@@ -376,7 +385,7 @@ jobs:
           decoder_oracle=exhaustive-bounded-distance
           decoder_oracle_is_production=false
           production_default_changed=false
-          qualification_status=${{ steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.format.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           focused_formatting=${{ steps.format.outcome }}
           isolated_harness=${{ steps.harness.outcome }}
           linear_code_unit_tests=${{ steps.unit_tests.outcome }}
