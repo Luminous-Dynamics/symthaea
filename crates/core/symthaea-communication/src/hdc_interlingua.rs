@@ -367,7 +367,7 @@ impl HdcSemanticCodebook {
         }
 
         let canonical_edges = canonical_edge_atoms(graph)?;
-        for (_, relation) in &canonical_edges {
+        for (_, relation, _) in &canonical_edges {
             if !self.relations.contains_key(relation) {
                 return Err(format!(
                     "graph contains relation absent from the fixed training codebook: {relation}"
@@ -548,19 +548,15 @@ impl HdcSemanticCodebook {
                 .fold(f64::NEG_INFINITY, f64::max);
             unrelated_node_max_similarity = unrelated_node_max_similarity.max(node_max);
 
-            let edge_max = expected_node_keys
-                .iter()
-                .flat_map(|source| {
-                    expected_node_keys.iter().flat_map(move |target| {
-                        self.relations.keys().map(move |relation| {
-                            self.edge_vector(source, relation, target)
-                                .map(|candidate| full_cosine_similarity(&unrelated, &candidate))
-                        })
-                    })
-                })
-                .collect::<Result<Vec<_>, String>>()?
-                .into_iter()
-                .fold(f64::NEG_INFINITY, f64::max);
+            let mut edge_max = f64::NEG_INFINITY;
+            for source in &expected_node_keys {
+                for target in &expected_node_keys {
+                    for relation in self.relations.keys() {
+                        let candidate = self.edge_vector(source, relation, target)?;
+                        edge_max = edge_max.max(full_cosine_similarity(&unrelated, &candidate));
+                    }
+                }
+            }
             unrelated_edge_max_similarity = unrelated_edge_max_similarity.max(edge_max);
         }
 
