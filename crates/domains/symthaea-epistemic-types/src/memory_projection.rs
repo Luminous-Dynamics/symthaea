@@ -219,22 +219,40 @@ impl CanonicalAdmissionReceipt {
         validator_version: impl Into<String>,
         snapshot_schema_version: u16,
     ) -> Result<Self, &'static str> {
+        let subject = CanonicalAdmissionSubject::new(
+            canonical_identity,
+            provenance_family,
+        )?;
+        Self::from_subject(
+            admission_event,
+            frontier_ref,
+            subject,
+            provenance_snapshot_digest,
+            validator_version,
+            snapshot_schema_version,
+        )
+    }
+
+    /// Construct a receipt from the exact typed subject whose admission is being bound.
+    ///
+    /// This keeps receipt construction on the same identity boundary as canonical
+    /// admission rather than accepting independently-typed subject components.
+    pub fn from_subject(
+        admission_event: impl Into<String>,
+        frontier_ref: Option<String>,
+        subject: CanonicalAdmissionSubject,
+        provenance_snapshot_digest: impl Into<String>,
+        validator_version: impl Into<String>,
+        snapshot_schema_version: u16,
+    ) -> Result<Self, &'static str> {
         let admission_event = admission_event.into();
-        let canonical_identity = canonical_identity.into();
         let provenance_snapshot_digest = provenance_snapshot_digest.into();
         let validator_version = validator_version.into();
         if admission_event.trim().is_empty() {
-
             return Err("admission event must be non-empty");
         }
         if frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
             return Err("frontier reference must be non-empty when present");
-        }
-        if canonical_identity.trim().is_empty() {
-            return Err("canonical identity must be non-empty");
-        }
-        if provenance_family.as_deref().is_some_and(|v| v.trim().is_empty()) {
-            return Err("provenance family must be non-empty when present");
         }
         if !is_hex_digest(&provenance_snapshot_digest) {
             return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
@@ -248,20 +266,11 @@ impl CanonicalAdmissionReceipt {
         Ok(Self {
             admission_event,
             frontier_ref,
-            admitted_subject_digest: Self::subject_digest_for(
-                &canonical_identity,
-                provenance_family.as_deref(),
-            ),
+            admitted_subject_digest: subject.digest(),
             provenance_snapshot_digest,
             validator_version,
             snapshot_schema_version,
         })
-    }
-
-    fn subject_digest_for(canonical_identity: &str, provenance_family: Option<&str>) -> String {
-        CanonicalAdmissionSubject::new(canonical_identity.to_owned(), provenance_family.map(str::to_owned))
-            .expect("receipt subject must be structurally valid")
-            .digest()
     }
 
     /// Returns true when the receipt is bound to the exact canonical subject envelope.
@@ -855,6 +864,47 @@ mod tests {
         assert_eq!(subject.provenance_family(), Some("family:1"));
         assert_eq!(claim.as_str(), "claim:1");
         assert_ne!(subject.digest(), sha256_hex(claim.as_str().as_bytes()));
+    }
+
+    #[test]
+    fn admission_receipt_from_typed_subject_preserves_exact_subject_binding() {
+        let subject = CanonicalAdmissionSubject::new(
+            "canonical:1",
+            Some("family:1".into()),
+        )
+        .unwrap();
+        let validation = ProvenanceValidationReport::from_relations(&[]);
+        let receipt = CanonicalAdmissionReceipt::from_subject(
+            "admission:event-1",
+            Some("frontier:1".into()),
+            subject.clone(),
+            validation.snapshot_digest.clone(),
+            validation.validator_version.clone(),
+            validation.snapshot_schema_version,
+        )
+        .unwrap();
+
+        assert!(receipt.binds_subject("canonical:1", Some("family:1")));
+        assert!(!receipt.binds_subject("canonical:1", Some("family:other")));
+        assert_eq!(receipt.admitted_subject_digest, subject.digest());
+    }
+
+    #[test]
+    fn admission_receipt_new_routes_through_typed_subject_validation() {
+        let validation = ProvenanceValidationReport::from_relations(&[]);
+        let receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            None,
+            "canonical:1",
+            Some("   ".into()),
+            validation.snapshot_digest.clone(),
+            validation.validator_version.clone(),
+            validation.snapshot_schema_version,
+        );
+        assert_eq!(
+            receipt.unwrap_err(),
+            "provenance family must be non-empty when present"
+        );
     }
 
     #[test]
