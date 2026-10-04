@@ -69,10 +69,7 @@ mycelix-zkp-core = { path = "stubs/mycelix-zkp-core", features = ["dilithium"] }
 
 # Mycelix Shared Deps (Bundled Standalone)
 sha2 = { version = "0.10", features = ["oid"] }
-# GIS provenance alias: member crates inherit this exact sha2 package under the
-# `sha2-gis` dependency key so Cargo can resolve the hardened provenance digest
-# implementation workspace-wide without a package-local version fork.
-# GIS provenance uses the shared sha2 dependency directly; keeping one Cargo package name avoids duplicate-crate resolution.
+# GIS provenance uses the canonical shared sha2 dependency directly.
 pqcrypto-traits = "0.3"
 pqcrypto-dilithium = "0.5"
 subtle = "2.5"
@@ -252,7 +249,6 @@ symthaea-dream = { path = "crates/domains/symthaea-dream" }
 # Symthaea Phi Search - Phi-guided architecture search (always enabled)
 symthaea-phi-search = { path = "crates/domains/symthaea-phi-search" }
 sha2 = { version = "0.10", optional = true }
-sha2-gis = { package = "sha2", workspace = true }
 url = { workspace = true }
 hmac = { version = "0.12", optional = true }
 
