@@ -18102,6 +18102,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-observation-attestation"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "serde",
+ "symthaea-core",
+]
+
+[[package]]
 name = "symthaea-acoustics"
 version = "0.1.0"
 
