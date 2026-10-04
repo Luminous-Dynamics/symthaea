@@ -91,6 +91,8 @@ pub struct MemoryProvenance {
 pub struct CanonicalAdmissionReceipt {
     pub admission_event: String,
     pub frontier_ref: Option<String>,
+    /// Deterministic binding to the canonical subject and provenance family admitted.
+    pub admitted_subject_digest: String,
     pub provenance_snapshot_digest: String,
     pub validator_version: String,
     pub snapshot_schema_version: u16,
@@ -100,18 +102,28 @@ impl CanonicalAdmissionReceipt {
     pub fn new(
         admission_event: impl Into<String>,
         frontier_ref: Option<String>,
+        canonical_identity: impl Into<String>,
+        provenance_family: Option<String>,
         provenance_snapshot_digest: impl Into<String>,
         validator_version: impl Into<String>,
         snapshot_schema_version: u16,
     ) -> Result<Self, &'static str> {
         let admission_event = admission_event.into();
+        let canonical_identity = canonical_identity.into();
         let provenance_snapshot_digest = provenance_snapshot_digest.into();
         let validator_version = validator_version.into();
         if admission_event.trim().is_empty() {
+
             return Err("admission event must be non-empty");
         }
         if frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
             return Err("frontier reference must be non-empty when present");
+        }
+        if canonical_identity.trim().is_empty() {
+            return Err("canonical identity must be non-empty");
+        }
+        if provenance_family.as_deref().is_some_and(|v| v.trim().is_empty()) {
+            return Err("provenance family must be non-empty when present");
         }
         if !is_hex_digest(&provenance_snapshot_digest) {
             return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
@@ -125,10 +137,37 @@ impl CanonicalAdmissionReceipt {
         Ok(Self {
             admission_event,
             frontier_ref,
+            admitted_subject_digest: Self::subject_digest_for(
+                &canonical_identity,
+                provenance_family.as_deref(),
+            ),
             provenance_snapshot_digest,
             validator_version,
             snapshot_schema_version,
         })
+    }
+
+    fn subject_digest_for(canonical_identity: &str, provenance_family: Option<&str>) -> String {
+        let subject = (
+            "symthaea:canonical-admission-subject:v1",
+            canonical_identity,
+            provenance_family,
+        );
+        let bytes = serde_json::to_vec(&subject)
+            .expect("canonical admission subject is serializable");
+        sha256_hex(&bytes)
+    }
+
+    /// Returns true when the receipt is bound to the exact canonical subject envelope.
+    pub fn binds_subject(
+        &self,
+        canonical_identity: &str,
+        provenance_family: Option<&str>,
+    ) -> bool {
+        !canonical_identity.trim().is_empty()
+            && provenance_family.map_or(true, |family| !family.trim().is_empty())
+            && self.admitted_subject_digest
+                == Self::subject_digest_for(canonical_identity, provenance_family)
     }
 
     /// Validate the receipt fields before they are used as an admission binding.
@@ -141,6 +180,9 @@ impl CanonicalAdmissionReceipt {
         }
         if self.frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
             return Err("frontier reference must be non-empty when present");
+        }
+        if !is_hex_digest(&self.admitted_subject_digest) {
+            return Err("admitted subject digest must be a 64-character hexadecimal digest");
         }
         if !is_hex_digest(&self.provenance_snapshot_digest) {
             return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
