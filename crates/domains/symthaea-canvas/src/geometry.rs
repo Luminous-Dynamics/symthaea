@@ -745,7 +745,7 @@ mod tests {
         let low_scene = build_scene(&low);
         let high_scene = build_scene(&high);
 
-        let group = |scene: &SceneNode, wanted: &str| {
+        fn group<'a>(scene: &'a SceneNode, wanted: &str) -> &'a SceneNode {
             scene
                 .children
                 .iter()
@@ -755,8 +755,8 @@ mod tests {
                         NodeKind::Group { id } if id.as_deref() == Some(wanted)
                     )
                 })
-                .unwrap_or_else(move || panic!("missing group {wanted}"))
-        };
+                .unwrap_or_else(|| panic!("missing group {wanted}"))
+        }
 
         assert!(
             group(&high_scene, "complexity").children.len()
