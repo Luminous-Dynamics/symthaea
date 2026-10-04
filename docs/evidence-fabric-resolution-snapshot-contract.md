@@ -144,6 +144,9 @@ Receipt integrity, attestation verification, and current graph correspondence ar
 ### Consumer rule
 
 Consumers that make a **current graph-state decision** MUST obtain the authoritative observation graph and perform `verify_against_graph_detailed()` (or an equivalent explicitly recorded graph-relative verification). A historical `Verified` attestation or a well-formed `EvidenceEvaluation` MUST NOT be promoted into a claim that the same result still holds in the current graph.
+Before making that decision, consumers SHOULD record the `ObservationGraph::independence_verification_scope_fingerprint()` value produced from the authoritative graph. This is the reproducible identity of the **verifier-relevant provenance scope**, not a full-graph digest.
+
+That distinction is intentional: the bounded independence procedure does not inspect every observation field or relation semantic. An unchanged scope fingerprint therefore means the fields relevant to this particular verifier are unchanged; it does not mean every graph property is unchanged or freshly trusted.
 
 When the authoritative graph is unavailable, the current-graph correspondence state MUST remain explicitly unestablished or indeterminate. Consumers SHOULD retain the graph-relative verification outcome, verifier version, and scope evidence needed to audit why a current-state decision was accepted.
 
