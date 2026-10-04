@@ -176,8 +176,8 @@ impl ClaimAuthorship {
         verification_method: Option<ClaimVerificationMethod>,
     ) -> Result<Self, &'static str> {
         if verification_method
-            .as_deref()
-            .is_some_and(|value| value.trim().is_empty())
+            .as_ref()
+            .is_some_and(|value| value.as_str().trim().is_empty())
         {
             return Err("claim verification method must be non-empty when present");
         }
@@ -394,6 +394,14 @@ impl FederatedClaim {
                 .as_ref()
                 .and_then(|authorship| authorship.verification_method())
                 .map(ClaimVerificationMethod::as_str),
+        );
+        field(
+            &mut bytes,
+            "verification_controller",
+            self.authorship
+                .as_ref()
+                .and_then(|authorship| authorship.verification_controller())
+                .map(ClaimControllerIdentity::as_str),
         );
         field(&mut bytes, "statement_ref", Some(&self.statement_ref));
         field(&mut bytes, "source_event", self.source_event.as_deref());
@@ -1020,6 +1028,15 @@ mod tests {
         authorship.verification_method =
             Some(ClaimVerificationMethod::new("https://example.test/key/1").unwrap());
         assert!(authorship.validate_structure().is_ok());
+
+        let blank_controller: ClaimControllerIdentity = serde_json::from_str(
+            r#""   ""#,
+        )
+        .unwrap();
+        assert_eq!(
+            blank_controller.validate_structure().unwrap_err(),
+            "claim controller identity must be non-empty"
+        );
     }
 
     #[test]
@@ -1824,6 +1841,22 @@ mod adversarial_contract_tests {
             ("provenance_family", |c| c.provenance_family.push_str(":changed")),
             ("author", |c| c.author = ClaimAuthorIdentity::new("author:changed").unwrap()),
             ("statement_ref", |c| c.statement_ref.push_str(":changed")),
+            ("verification_controller", |c| {
+                c.authorship = Some(
+                    ClaimAuthorship::new(
+                        c.author.clone(),
+                        ClaimProofPurpose::new("assertionMethod").unwrap(),
+                        Some(
+                            ClaimVerificationMethod::new("https://example.test/key/1").unwrap(),
+                        ),
+                    )
+                    .unwrap()
+                    .with_verification_controller(
+                        ClaimControllerIdentity::new("did:example:changed").unwrap(),
+                    )
+                    .unwrap(),
+                )
+            }),
             ("source_event", |c| c.source_event = Some("event:changed".into())),
             ("frontier_ref", |c| c.frontier_ref = Some("frontier:changed".into())),
             ("provenance_snapshot_digest", |c| c.provenance_snapshot_digest.push('x')),
