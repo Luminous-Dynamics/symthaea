@@ -190,7 +190,7 @@ impl SolverBoundaryBinding {
     /// Stable identity of the complete binding statement.
     pub fn digest(&self) -> [u8; 32] {
         let mut hasher = Hasher::new();
-        hasher.update(b"passive-solver-boundary-binding:v2");
+        hasher.update(b"passive-solver-boundary-binding:v3");
         hasher.update(&self.port.0.to_le_bytes());
         hasher.update(&self.interface_digest);
         hasher.update(&[domain_byte(self.solver_boundary.domain)]);
