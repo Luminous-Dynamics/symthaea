@@ -189,6 +189,10 @@ Neurosemantic payloads are bounded to 1 MiB before hashing. Derived neural featu
 finite. These limits are defensive defaults, not claims about the maximum useful payload for
 future hardware.
 
-The replay tracker is bounded to 4096 active sender/recipient/lease/consent-epoch keys.
+The replay tracker is bounded to 4096 active sender/recipient/lease/consent-epoch keys. The
+public `observe_authorized` path validates the consent lease before consuming replay-tracker
+state; the lower-level `observe` function is intended for callers that already performed
+authorization.
+
 Authentication, confidentiality, lease signing, revocation distribution, and durable audit
 remain deployment responsibilities for the outer identity/transport layers.
