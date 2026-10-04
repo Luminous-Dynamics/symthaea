@@ -1821,6 +1821,29 @@ mod tests {
             .edges
             .iter()
             .all(|edge| edge.relation == "commence" || edge.relation == "cible"));
+
+        let mut receiver_manifest = multilingual_manifest.clone();
+        receiver_manifest.relations[0].local_relation = "initiates-local".into();
+        let expected_concepts = BTreeMap::from([
+            ("agent-fr".into(), "concept:agent/alice".into()),
+            ("event-fr".into(), "concept:event/approach".into()),
+            ("object-fr".into(), "concept:object/target".into()),
+        ]);
+        let metrics = codebook
+            .measure_roundtrip(
+                &multilingual,
+                &representation,
+                &multilingual_manifest,
+                &receiver_manifest,
+                &expected_concepts,
+                &["relation:initiates".into(), "relation:targets".into()],
+                HdcOntologyDecodePolicy::conservative_default(),
+            )
+            .unwrap();
+        assert!(metrics.structural_equivalence);
+        assert!(metrics.relation_identity_exact);
+        assert_eq!(metrics.node_precision, 1.0);
+        assert_eq!(metrics.edge_recall, 1.0);
     }
 
     #[test]
