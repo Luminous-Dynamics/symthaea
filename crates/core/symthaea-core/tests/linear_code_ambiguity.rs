@@ -379,6 +379,35 @@ fn dependency_witness_ledger_is_canonical_and_verifiable() {
         ),
         repeated_algebra.kernel_dimension
     );
+    let repeated_basis = repeated_factors
+        .iter()
+        .flat_map(|factor| factor.basis().iter().cloned())
+        .collect::<Vec<_>>();
+    let repeated_target = repeated.encode(&[true, false]);
+    let base_coefficients =
+        solve_linear_combination(&repeated_target, &repeated_basis).expect("base coefficients");
+    let expected_fiber_size = 1usize << repeated_algebra.kernel_dimension;
+    let mut fiber_coefficients = Vec::with_capacity(expected_fiber_size);
+    for mask in 0..expected_fiber_size {
+        let mut coefficients = base_coefficients.clone();
+        for (kernel_index, witness) in repeated_kernel.iter().enumerate() {
+            if (mask >> kernel_index) & 1 == 1 {
+                for (index, coefficient) in witness.generator_coefficients.iter().enumerate() {
+                    coefficients[index] ^= *coefficient;
+                }
+            }
+        }
+        assert!(!fiber_coefficients.contains(&coefficients));
+        let mut reconstructed = BinaryCodeword::zero(4);
+        for (coefficient, generator) in coefficients.iter().zip(&repeated_basis) {
+            if *coefficient {
+                reconstructed.xor_assign(generator);
+            }
+        }
+        assert_eq!(reconstructed, repeated_target);
+        fiber_coefficients.push(coefficients);
+    }
+    assert_eq!(fiber_coefficients.len(), expected_fiber_size);
     assert!(!repeated_algebra.factorization_count_per_target.is_one());
     assert_eq!(
         factorization_count_for_target(&repeated.encode(&[true, false]), &repeated_factors)
