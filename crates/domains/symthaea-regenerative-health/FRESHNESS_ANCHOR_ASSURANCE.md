@@ -51,8 +51,19 @@ A FreshnessAnchorVerificationReceipt additionally binds:
 - recovery generation;
 - recovery-state fingerprint;
 - verifier identity;
-- evidence reference; and
-- evidence digest.
+- verifier appraisal-policy digest;
+- reference-values digest;
+- evidence reference;
+- evidence digest; and
+- a typed evidence mechanism.
+
+The typed evidence mechanism records one of:
+
+- a hardware monotonic counter with backend and counter-namespace identities;
+- a remote monotonic sequence with authority and namespace identities; or
+- a quorum monotonic sequence with quorum policy, member-set, threshold, sequence, and certificate identities.
+
+The mechanism type must match the declared backing category before the evidence verifier is invoked. This prevents a proof envelope from silently changing mechanism class.
 
 VerifiedFreshnessAnchor is deliberately non-serializable and can only be minted after a verifier accepts that exact profile/receipt pair.
 
@@ -135,8 +146,10 @@ Implemented:
 
 - exact capability model;
 - fail-closed software-only default;
-- domain-separated deterministic profile commitment;
+- domain-separated deterministic profile commitment with explicit field framing;
 - evidence-bound verification receipt;
+- typed hardware/remote/quorum evidence envelope;
+- verifier-policy and reference-value binding;
 - opaque verified-anchor capability;
 - exact receiver, generation, and state binding;
 - authoritative commit gate;
