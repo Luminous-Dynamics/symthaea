@@ -38,6 +38,202 @@ use super::{
 };
 
 // ============================================================================
+// Frame revision serialization
+// ============================================================================
+
+const FRAME_REVISION_FORMAT_VERSION: &str = "v2";
+
+fn push_len_prefixed(output: &mut String, value: &str) {
+    use std::fmt::Write as _;
+    write!(output, "{}:", value.len()).expect("writing to String cannot fail");
+    output.push_str(value);
+}
+
+fn take_len_prefixed(input: &str, cursor: &mut usize) -> Result<String, PersistenceError> {
+    let bytes = input.as_bytes();
+    let colon = bytes
+        .get(*cursor..)
+        .and_then(|tail| tail.iter().position(|byte| *byte == b':'))
+        .map(|offset| *cursor + offset)
+        .ok_or_else(|| PersistenceError::Deserialization(
+            "frame revision is missing a length delimiter".into(),
+        ))?;
+
+    let len = std::str::from_utf8(&bytes[*cursor..colon])
+        .map_err(|_| PersistenceError::Deserialization(
+            "frame revision length is not valid UTF-8".into(),
+        ))?
+        .parse::<usize>()
+        .map_err(|_| PersistenceError::Deserialization(
+            "frame revision length is not numeric".into(),
+        ))?;
+
+    let start = colon + 1;
+    let end = start
+        .checked_add(len)
+        .ok_or_else(|| PersistenceError::Deserialization(
+            "frame revision length overflow".into(),
+        ))?;
+    if end > bytes.len() {
+        return Err(PersistenceError::Deserialization(
+            "frame revision length exceeds payload".into(),
+        ));
+    }
+
+    let value = std::str::from_utf8(&bytes[start..end])
+        .map_err(|_| PersistenceError::Deserialization(
+            "frame revision payload is not valid UTF-8".into(),
+        ))?
+        .to_owned();
+    *cursor = end;
+    Ok(value)
+}
+
+fn serialize_frame_revision(revision: &EpistemicFrameRevision) -> String {
+    let mut output = String::from(FRAME_REVISION_FORMAT_VERSION);
+    output.push('|');
+    for value in [
+        revision.prior_frame.as_str(),
+        revision.revised_frame.as_str(),
+        revision.trigger.as_str(),
+        revision.newly_represented.as_deref().unwrap_or(""),
+        revision.scope_change.as_str(),
+    ] {
+        push_len_prefixed(&mut output, value);
+    }
+
+    push_len_prefixed(&mut output, &revision.affected_conclusions.len().to_string());
+    for conclusion in &revision.affected_conclusions {
+        push_len_prefixed(&mut output, conclusion);
+    }
+
+    for value in [
+        revision.impact.evidence_boundary,
+        revision.impact.ontology,
+        revision.impact.causal_model,
+        revision.impact.exclusions,
+        revision.impact.blind_spots,
+    ] {
+        push_len_prefixed(&mut output, if value { "1" } else { "0" });
+    }
+    output
+}
+
+fn parse_frame_revision_v2(encoded: &str) -> Result<EpistemicFrameRevision, PersistenceError> {
+    let payload = encoded
+        .strip_prefix("v2|")
+        .ok_or_else(|| PersistenceError::Deserialization(
+            "frame revision has an unsupported format version".into(),
+        ))?;
+    let mut cursor = 0usize;
+
+    let prior_frame = take_len_prefixed(payload, &mut cursor)?;
+    let revised_frame = take_len_prefixed(payload, &mut cursor)?;
+    let trigger = take_len_prefixed(payload, &mut cursor)?;
+    let newly_represented_raw = take_len_prefixed(payload, &mut cursor)?;
+    let scope_change = take_len_prefixed(payload, &mut cursor)?;
+    let affected_count = take_len_prefixed(payload, &mut cursor)?
+        .parse::<usize>()
+        .map_err(|_| PersistenceError::Deserialization(
+            "frame revision affected-conclusion count is not numeric".into(),
+        ))?;
+
+    let mut affected_conclusions = Vec::with_capacity(affected_count);
+    for _ in 0..affected_count {
+        affected_conclusions.push(take_len_prefixed(payload, &mut cursor)?);
+    }
+
+    let mut flags = [false; 5];
+    for flag in &mut flags {
+        *flag = match take_len_prefixed(payload, &mut cursor)?.as_str() {
+            "0" => false,
+            "1" => true,
+            _ => {
+                return Err(PersistenceError::Deserialization(
+                    "frame revision impact flag is not boolean".into(),
+                ))
+            }
+        };
+    }
+
+    if cursor != payload.len() {
+        return Err(PersistenceError::Deserialization(
+            "frame revision contains trailing bytes".into(),
+        ));
+    }
+
+    Ok(EpistemicFrameRevision {
+        prior_frame,
+        revised_frame,
+        trigger,
+        newly_represented: if newly_represented_raw.is_empty() {
+            None
+        } else {
+            Some(newly_represented_raw)
+        },
+        scope_change,
+        affected_conclusions,
+        impact: EpistemicFrameImpact {
+            evidence_boundary: flags[0],
+            ontology: flags[1],
+            causal_model: flags[2],
+            exclusions: flags[3],
+            blind_spots: flags[4],
+        },
+    })
+}
+
+fn deserialize_frame_revision(encoded: &str) -> Result<EpistemicFrameRevision, PersistenceError> {
+    if encoded.starts_with("v2|") {
+        return parse_frame_revision_v2(encoded);
+    }
+
+    // Legacy six-field format retained for existing persisted records written by
+    // earlier revisions of this branch. Legacy data remains best-effort; new data
+    // is always emitted in the lossless v2 format above.
+    let parts: Vec<&str> = encoded.split(';').collect();
+    if parts.len() < 6 {
+        return Err(PersistenceError::Deserialization(
+            "legacy frame revision has too few fields".into(),
+        ));
+    }
+
+    let impact = parts.get(6)
+        .and_then(|encoded| {
+            let flags: Vec<&str> = encoded.split(',').collect();
+            if flags.len() != 5 {
+                return None;
+            }
+            Some(EpistemicFrameImpact {
+                evidence_boundary: flags[0].parse().ok()?,
+                ontology: flags[1].parse().ok()?,
+                causal_model: flags[2].parse().ok()?,
+                exclusions: flags[3].parse().ok()?,
+                blind_spots: flags[4].parse().ok()?,
+            })
+        })
+        .unwrap_or_else(EpistemicFrameImpact::broad);
+
+    Ok(EpistemicFrameRevision {
+        prior_frame: parts[0].to_string(),
+        revised_frame: parts[1].to_string(),
+        trigger: parts[2].to_string(),
+        newly_represented: if parts[3].is_empty() {
+            None
+        } else {
+            Some(parts[3].to_string())
+        },
+        scope_change: parts[4].to_string(),
+        affected_conclusions: parts[5]
+            .split(',')
+            .filter(|v| !v.is_empty())
+            .map(str::to_owned)
+            .collect(),
+        impact,
+    })
+}
+
+// ============================================================================
 // Persistence Error Types
 // ============================================================================
 
@@ -151,24 +347,11 @@ impl StoredIgnoranceRecord {
             frame_causal_model_id: record.detection.frame.causal_model_id.clone(),
             frame_excluded_variables: record.detection.frame.excluded_variables.clone(),
             frame_known_blind_spots: record.detection.frame.known_blind_spots.clone(),
-            frame_revisions_serialized: record.frame_revisions.iter().map(|r| {
-                [
-                    r.prior_frame.clone(),
-                    r.revised_frame.clone(),
-                    r.trigger.clone(),
-                    r.newly_represented.clone().unwrap_or_default(),
-                    r.scope_change.clone(),
-                    r.affected_conclusions.join(","),
-                    format!(
-                        "{},{},{},{},{}",
-                        r.impact.evidence_boundary,
-                        r.impact.ontology,
-                        r.impact.causal_model,
-                        r.impact.exclusions,
-                        r.impact.blind_spots,
-                    ),
-                ].join(";")
-            }).collect(),
+            frame_revisions_serialized: record
+                .frame_revisions
+                .iter()
+                .map(serialize_frame_revision)
+                .collect(),
             created_at,
             updated_at,
         }
@@ -231,37 +414,11 @@ impl StoredIgnoranceRecord {
             },
         };
 
-        let frame_revisions = self.frame_revisions_serialized.iter().filter_map(|s| {
-            let p: Vec<&str> = s.split(';').collect();
-            if p.len() < 6 { return None; }
-            Some(EpistemicFrameRevision {
-                prior_frame: p[0].to_string(),
-                revised_frame: p[1].to_string(),
-                trigger: p[2].to_string(),
-                newly_represented: if p[3].is_empty() { None } else { Some(p[3].to_string()) },
-                scope_change: p[4].to_string(),
-                affected_conclusions: p[5]
-                    .split(',')
-                    .filter(|v| !v.is_empty())
-                    .map(|v| v.to_string())
-                    .collect(),
-                impact: p.get(6)
-                    .and_then(|encoded| {
-                        let flags: Vec<&str> = encoded.split(',').collect();
-                        if flags.len() != 5 {
-                            return None;
-                        }
-                        Some(EpistemicFrameImpact {
-                            evidence_boundary: flags[0].parse().ok()?,
-                            ontology: flags[1].parse().ok()?,
-                            causal_model: flags[2].parse().ok()?,
-                            exclusions: flags[3].parse().ok()?,
-                            blind_spots: flags[4].parse().ok()?,
-                        })
-                    })
-                    .unwrap_or_else(EpistemicFrameImpact::broad),
-            })
-        }).collect();
+        let frame_revisions = self
+            .frame_revisions_serialized
+            .iter()
+            .map(deserialize_frame_revision)
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(IgnoranceRecord {
             id: self.id.clone(),
@@ -946,6 +1103,51 @@ mod tests {
         assert!(!impact.causal_model);
         assert!(impact.exclusions);
         assert!(impact.blind_spots);
+    }
+
+    #[test]
+    fn test_frame_revision_serialization_is_lossless_for_delimiters() {
+        let mut record = create_test_record("delimiter_lineage", "Delimited", 0.4);
+        let prior = record.detection.frame.clone();
+        let revised = EpistemicFrame {
+            id: prior.id.clone(),
+            version: prior.version + 1,
+            ..prior.clone()
+        };
+        record.append_frame_revision(EpistemicFrameRevision {
+            prior_frame: prior.identity(),
+            revised_frame: revised.identity(),
+            trigger: "trigger;with;semicolons,commas".to_string(),
+            newly_represented: Some("entity;with,delimiters".to_string()),
+            scope_change: "scope;change,with:punctuation".to_string(),
+            affected_conclusions: vec![
+                "conclusion;one".to_string(),
+                "conclusion,two".to_string(),
+                "conclusion:three".to_string(),
+            ],
+            impact: EpistemicFrameImpact {
+                evidence_boundary: true,
+                ontology: false,
+                causal_model: true,
+                exclusions: false,
+                blind_spots: true,
+            },
+        });
+
+        let stored = StoredIgnoranceRecord::from_record(&record);
+        assert!(stored.frame_revisions_serialized[0].starts_with("v2|"));
+
+        let restored = stored.to_record().unwrap();
+        assert_eq!(restored.frame_revisions, record.frame_revisions);
+    }
+
+    #[test]
+    fn test_corrupt_v2_frame_revision_fails_closed() {
+        let mut record = create_test_record("corrupt_lineage", "Corrupt", 0.4);
+        record.frame_revisions_serialized = vec!["v2|4:gis-default".to_string()];
+
+        let error = record.to_record().unwrap_err();
+        assert!(matches!(error, PersistenceError::Deserialization(_)));
     }
 
     #[test]
