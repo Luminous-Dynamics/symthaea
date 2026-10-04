@@ -151,6 +151,17 @@ fn cose_key_rejects_wrong_coordinate_length() {
     bytes.remove(pos + 4);
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&bytes),
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+    );
+}
+
+#[test]
+fn cose_key_rejects_truncated_coordinate_bstr() {
+    let mut bytes = valid_key();
+    let pos = bytes.windows(3).position(|w| w == [0x21, 0x58, 0x20]).unwrap();
+    bytes.truncate(pos + 3 + 10);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&bytes),
         Err(Rfc9942VdpError::InvalidEncoding)
     );
 }
