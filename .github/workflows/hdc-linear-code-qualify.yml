@@ -271,6 +271,15 @@ jobs:
           HIGHER_ORDER_SWEEP="$(printf '%s\n' "$OUTPUT" | sed -n 's/^HIGHER_ORDER_SWEEP=//p')"
           test -n "$HIGHER_ORDER_SWEEP"
           printf 'higher_order_sweep=%s\n' "$HIGHER_ORDER_SWEEP" >> "$GITHUB_OUTPUT"
+      - name: Capture dependency witness evidence
+        id: witness
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity dependency_witness_ledger_is_canonical_and_verifiable -- --nocapture 2>&1)"
+          WITNESS_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^DEPENDENCY_WITNESS=')"
+          test "$WITNESS_COUNT" -eq 1
+          DEPENDENCY_WITNESS="$(printf '%s\n' "$OUTPUT" | sed -n 's/^DEPENDENCY_WITNESS=//p')"
+          test -n "$DEPENDENCY_WITNESS"
+          printf 'dependency_witness=%s\n' "$DEPENDENCY_WITNESS" >> "$GITHUB_OUTPUT"
       - name: Strict Clippy
         id: clippy
         run: |
@@ -338,6 +347,9 @@ jobs:
           higher_order_dependency_schema=linear-code-higher-order-v1
           higher_order_dependency_status=${{ steps.higher_order.outcome }}
           higher_order_dependency=${{ steps.higher_order.outputs.higher_order_sweep }}
+          dependency_witness_schema=linear-code-dependency-witness-v1
+          dependency_witness_status=${{ steps.witness.outcome }}
+          dependency_witness=${{ steps.witness.outputs.dependency_witness }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
@@ -349,7 +361,7 @@ jobs:
           decoder_oracle=exhaustive-bounded-distance
           decoder_oracle_is_production=false
           production_default_changed=false
-          qualification_status=${{ steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           focused_formatting=${{ steps.format.outcome }}
           isolated_harness=${{ steps.harness.outcome }}
           linear_code_unit_tests=${{ steps.unit_tests.outcome }}
@@ -357,6 +369,7 @@ jobs:
           strict_clippy=${{ steps.clippy.outcome }}
           algebraic_multiplicity_qualification=${{ steps.algebraic.outcome }}
           higher_order_dependency_qualification=${{ steps.higher_order.outcome }}
+          dependency_witness_qualification=${{ steps.witness.outcome }}
           receipt_semantics=descriptive-only
           EOF
           if [ "${{ steps.harness.outcome }}" = "success" ] && [ -f "${{ steps.harness.outputs.path }}/Cargo.lock" ]; then
