@@ -32,6 +32,7 @@ struct AuditReport {
     corpus_cases: usize,
     positive_passes: usize,
     negative_passes: usize,
+    all_negative_cases_pass: bool,
     semantic_coverage_pass: bool,
     provenance_pass: bool,
     grammar_pass: bool,
@@ -290,8 +291,8 @@ fn run_negative(
             expected_failure: Some(expected_failure),
             observed_error: None,
             provenance_token: None,
-            semantic_items: 0,
-            inserted_function_words: 0,
+            semantic_items: bindings.iter().filter(|item| item.semantic_payload).count(),
+            inserted_function_words: bindings.iter().filter(|item| !item.semantic_payload).count(),
         },
         Err(error) => AuditCase {
             name,
@@ -300,8 +301,8 @@ fn run_negative(
             expected_failure: Some(expected_failure),
             observed_error: Some(error.to_string()),
             provenance_token: None,
-            semantic_items: 0,
-            inserted_function_words: 0,
+            semantic_items: bindings.iter().filter(|item| item.semantic_payload).count(),
+            inserted_function_words: bindings.iter().filter(|item| !item.semantic_payload).count(),
         },
     }
 }
@@ -369,6 +370,53 @@ fn main() -> Result<()> {
         |error| matches!(error, LexicalBindingError::MissingSemanticCoverage { .. }),
     ));
 
+    let mut duplicate_source = statement_bindings.clone();
+    duplicate_source.push(duplicate_source[0].clone());
+    for (position, item) in duplicate_source.iter_mut().enumerate() {
+        item.position = position;
+    }
+    cases.push(run_negative(
+        "duplicate-semantic-source",
+        &statement,
+        explicit_language(LanguageRuleStatus::Bound),
+        duplicate_source,
+        "semantic source is bound more than once",
+        |error| matches!(error, LexicalBindingError::DuplicateSemanticSource { .. }),
+    ));
+
+    let mut semantic_function_mismatch = statement_bindings.clone();
+    semantic_function_mismatch[0].grammatical_function = GrammaticalFunction::FunctionWord;
+    cases.push(run_negative(
+        "semantic-function-word-mismatch",
+        &statement,
+        explicit_language(LanguageRuleStatus::Bound),
+        semantic_function_mismatch,
+        "semantic payload cannot be classified as a function word",
+        |error| matches!(error, LexicalBindingError::SemanticFunctionMismatch { .. }),
+    ));
+
+    let mut unbound_with_id = explicit_language(LanguageRuleStatus::Unbound);
+    unbound_with_id.rule_id = Some("audit-invalid-rule-id".into());
+    cases.push(run_negative(
+        "unbound-rule-carries-id",
+        &statement,
+        unbound_with_id,
+        statement_bindings.clone(),
+        "unbound language rules must not carry a rule id or provenance",
+        |error| matches!(error, LexicalBindingError::UnboundRuleCarriesBinding),
+    ));
+
+    let mut bound_without_provenance = explicit_language(LanguageRuleStatus::Bound);
+    bound_without_provenance.provenance = None;
+    cases.push(run_negative(
+        "bound-rule-missing-provenance",
+        &statement,
+        bound_without_provenance,
+        statement_bindings.clone(),
+        "bound language rules require provenance",
+        |error| matches!(error, LexicalBindingError::BoundRuleMissingProvenance),
+    ));
+
     let mut agreement_gap = statement_bindings.clone();
     if let Some(action) = agreement_gap.iter_mut().find(|item| {
         matches!(&item.source, LexicalSource::SemanticConstituent { role, .. } if role == "ACTION")
@@ -432,6 +480,37 @@ fn main() -> Result<()> {
             semantic_items: statement_bindings.len(),
             inserted_function_words: 0,
         },
+    });
+
+    cases.push({
+        let result = LexicalMorphosyntacticBinding::new(
+            &statement,
+            explicit_language(LanguageRuleStatus::Bound),
+            statement_bindings.clone(),
+            vec![ConstituentDependency {
+                governor_position: usize::MAX,
+                dependent_position: 0,
+                relation: "invalid".into(),
+            }],
+            Vec::new(),
+        );
+        let (passed, error) = match result {
+            Err(error) => (
+                matches!(error, LexicalBindingError::DependencyPositionOutOfRange),
+                Some(error.to_string()),
+            ),
+            Ok(_) => (false, None),
+        };
+        AuditCase {
+            name: "dependency-position-out-of-range",
+            polarity: "negative",
+            passed,
+            expected_failure: Some("dependency references an out-of-range constituent position"),
+            observed_error: error,
+            provenance_token: None,
+            semantic_items: statement_bindings.len(),
+            inserted_function_words: 0,
+        }
     });
 
     let abstention = {
@@ -621,6 +700,20 @@ fn main() -> Result<()> {
         .find(|case| case.name == "question-rule-unbound")
         .is_some_and(|case| case.passed);
 
+    let all_negative_cases_pass = cases
+        .iter()
+        .filter(|case| case.polarity == "negative")
+        .all(|case| case.passed);
+
+    let phonological_handoff_pass = cases
+        .iter()
+        .find(|case| case.name == "lexical-to-phonological-handoff")
+        .is_some_and(|case| case.passed)
+        && cases
+            .iter()
+            .find(|case| case.name == "phonological-rejects-tampered-lexical-lineage")
+            .is_some_and(|case| case.passed);
+
     let report = AuditReport {
         schema_version: SCHEMA_VERSION,
         evidence_level: "deterministic-lexical-morphosyntactic-corpus-v1",
@@ -628,6 +721,7 @@ fn main() -> Result<()> {
         corpus_cases: cases.len(),
         positive_passes,
         negative_passes,
+        all_negative_cases_pass,
         semantic_coverage_pass,
         provenance_pass,
         grammar_pass,
@@ -640,22 +734,14 @@ fn main() -> Result<()> {
 
     write_report(parse_json_out().as_deref(), &report)?;
 
-    let phonological_handoff_pass = cases
-        .iter()
-        .find(|case| case.name == "lexical-to-phonological-handoff")
-        .is_some_and(|case| case.passed)
-        && cases
-            .iter()
-            .find(|case| case.name == "phonological-rejects-tampered-lexical-lineage")
-            .is_some_and(|case| case.passed);
-
     let all_pass = report.semantic_coverage_pass
         && report.provenance_pass
         && report.grammar_pass
         && report.no_invention_pass
         && report.unsupported_rule_unbound_pass
         && report.stable_repeat_pass
-        && phonological_handoff_pass;
+        && report.all_negative_cases_pass
+        && report.phonological_handoff_pass;
 
     println!("{}", serde_json::to_string_pretty(&report)?);
 
