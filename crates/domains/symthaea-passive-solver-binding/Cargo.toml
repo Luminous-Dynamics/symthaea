@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-passive-solver-binding"
+version = "0.1.0"
+edition = "2024"
+description = "Solver-neutral binding contracts for typed passive device interfaces"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+blake3 = { workspace = true }
+symthaea-passive-void-compiler = { path = "../symthaea-passive-void-compiler" }
+symthaea-passive-void-graph = { path = "../symthaea-passive-void-graph" }
