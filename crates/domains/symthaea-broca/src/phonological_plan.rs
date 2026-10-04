@@ -37,15 +37,15 @@ impl SyllableStress {
     pub fn ordinal(self) -> u8 {
         match self {
             Self::None => 0,
-            Self::Primary => 1,
-            Self::Secondary => 2,
+            Self::Primary => 2,
+            Self::Secondary => 1,
         }
     }
 
     pub fn from_ordinal(value: u8) -> Self {
         match value {
-            1 => Self::Primary,
-            2 => Self::Secondary,
+            1 => Self::Secondary,
+            2 => Self::Primary,
             _ => Self::None,
         }
     }
@@ -193,6 +193,7 @@ pub enum PhonologicalPlanError {
     NonContiguousSyllableIndex { expected: usize, found: usize },
     LexicalBindingWithoutSegments,
     PhonologicalBindingWithoutSegments,
+    RoleOnlyWithSegments,
 }
 
 impl std::fmt::Display for PhonologicalPlanError {
@@ -213,6 +214,9 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::PhonologicalBindingWithoutSegments => {
                 write!(f, "phonologically bound plans require explicit phonological segments")
             }
+            Self::RoleOnlyWithSegments => {
+                write!(f, "role-only plans cannot carry phonological segments")
+            }
         }
     }
 }
@@ -223,6 +227,10 @@ fn validate_binding_status(
     segments: &[PhonemeSlot],
     status: ContentBindingStatus,
 ) -> Result<(), PhonologicalPlanError> {
+    if matches!(status, ContentBindingStatus::RoleStructureOnly) && !segments.is_empty() {
+        return Err(PhonologicalPlanError::RoleOnlyWithSegments);
+    }
+
     if segments.is_empty() {
         match status {
             ContentBindingStatus::LexicallyBound => {
