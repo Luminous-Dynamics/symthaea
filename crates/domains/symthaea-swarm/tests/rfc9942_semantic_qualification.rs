@@ -496,7 +496,8 @@ fn rfc9942_es256_cose_key_inclusion_uses_detached_proof_derived_root() {
         &rng,
     )
     .unwrap();
-    let tbs = unsigned.signature1_tbs(&[], Some(head.root())).unwrap();
+    let root = head.root();
+    let tbs = unsigned.signature1_tbs(&[], Some(&root)).unwrap();
     let signature = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
 
     let receipt = Rfc9942ReceiptEnvelope::new(
@@ -637,7 +638,11 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
     }
 
     fn signed_receipt(candidate: &[u8]) -> Rfc9942ReceiptEnvelope {
-        let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
+        signed_receipt_with_other(candidate, b"other-entry")
+    }
+
+    fn signed_receipt_with_other(candidate: &[u8], other: &[u8]) -> Rfc9942ReceiptEnvelope {
+        let leaves = vec![candidate.to_vec(), other.to_vec()];
         let vds = Rfc9162Sha256Vds;
         let head = vds.tree_head(&leaves);
         let proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
@@ -735,7 +740,7 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
     // Sign the outer object over different payload bytes while retaining the
     // same valid inner Receipt. The outer signature is valid, but the Receipt
     // no longer proves the exact outer payload. The combined verifier must fail.
-    let mismatched_outer = signed_outer(&receipt, b"different");
+    let mismatched_outer = signed_outer(&receipt, b"different", false);
     mismatched_outer
         .verify_es256(&key, &[], None)
         .expect("outer signature over the mismatched payload is still valid");
@@ -760,7 +765,7 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Protected
     );
 
-    let alternate_receipt = signed_receipt(b"candidate", b"alternate-tree-entry");
+    let alternate_receipt = signed_receipt_with_other(b"candidate", b"alternate-tree-entry");
     let replaced_protected = Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(
         &alternate_receipt,
         b"candidate",
