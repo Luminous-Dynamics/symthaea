@@ -462,6 +462,33 @@ fn rfc9942_consistency_state_binds_signature_to_detached_root() {
 
 
 
+
+#[test]
+fn rfc9942_ed25519_consistency_preserves_signature_first_order() {
+    let proof =
+        Rfc9162ConsistencyProof::new(1, 2, vec![[0x33; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Consistency, vec![proof]).unwrap();
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        -8,
+        vdp,
+        Rfc9942ReceiptPayload::Detached,
+        vec![0xBB; 63],
+    )
+    .unwrap();
+
+    // Both the detached signature and consistency proof are invalid. The
+    // semantic verifier must report signature failure before proof failure.
+    assert_eq!(
+        receipt.verify_ed25519_consistency(
+            symthaea_swarm::semantic_evidence_vds::VdsTreeHead::new(1, [0x55; 32]),
+            &[0u8; 32],
+            &[],
+            Some(&[0x44; 32]),
+        ),
+        Err(Rfc9942VdpError::InvalidEd25519Signature)
+    );
+}
+
 #[test]
 fn rfc9942_consistency_semantic_paths_reject_attached_payloads() {
     let proof =
