@@ -281,7 +281,8 @@ impl SolverBoundaryBinding {
         hasher.update(&[u8::from(self.physical_transport_unproven)]);
         hasher.update(&[match self.evidence_level {
             SolverBoundaryEvidenceLevel::AdapterAttested => 0,
-            SolverBoundaryEvidenceLevel::SolverEntityAttested => 1,
+            SolverBoundaryEvidenceLevel::SolverInputEntityAttested => 1,
+            SolverBoundaryEvidenceLevel::SolverEntityAttested => 2,
         }]);
         hasher.update(&self.solver_entity_fingerprint.unwrap_or([0; 32]));
         if let Some(kind) = &self.solver_entity_observation_kind {
@@ -360,22 +361,35 @@ impl SolverBoundaryBindingDraft {
 pub enum SolverBoundaryEvidenceLevel {
     /// Core accepted the adapter's mapping draft after independent candidate checks.
     AdapterAttested,
-    /// The adapter additionally reported a concrete solver-side entity fingerprint
-    /// and a digest binding that fingerprint to this exact candidate/interface rim.
+    /// The adapter additionally established a concrete entity in the rendered
+    /// solver input artifact, without claiming live solver state.
+    SolverInputEntityAttested,
+    /// A live-capable adapter additionally inspected a concrete solver-side entity.
     SolverEntityAttested,
 }
 
 impl SolverBoundaryEvidenceLevel {
     pub fn is_verified(self) -> bool {
-        matches!(self, Self::AdapterAttested | Self::SolverEntityAttested)
+        matches!(
+            self,
+            Self::AdapterAttested
+                | Self::SolverInputEntityAttested
+                | Self::SolverEntityAttested
+        )
     }
 
     /// Whether this evidence level satisfies a caller's minimum requirement.
     pub fn satisfies(self, minimum: Self) -> bool {
         match (self, minimum) {
             (_, Self::AdapterAttested) => true,
+            (
+                Self::SolverInputEntityAttested | Self::SolverEntityAttested,
+                Self::SolverInputEntityAttested,
+            ) => true,
             (Self::SolverEntityAttested, Self::SolverEntityAttested) => true,
-            (Self::AdapterAttested, Self::SolverEntityAttested) => false,
+            (Self::AdapterAttested, Self::SolverInputEntityAttested)
+            | (Self::AdapterAttested, Self::SolverEntityAttested)
+            | (Self::SolverInputEntityAttested, Self::SolverEntityAttested) => false,
         }
     }
 }
@@ -516,9 +530,8 @@ pub trait SolverBoundaryEntityIntrospector {
     ) -> Result<SolverBoundaryEntityAttestation, SolverBindingError>;
 }
 
-/// Promote an adapter-attested binding only when a solver-entity attestation
-/// matches the exact binding handle and candidate identity.
-pub fn promote_solver_entity_attestation(
+fn promote_entity_attestation(
+    target_level: SolverBoundaryEvidenceLevel,
     mut binding: SolverBoundaryBinding,
     interface: &PortInterface,
     candidate_geometry_digest: [u8; 32],
@@ -548,7 +561,7 @@ pub fn promote_solver_entity_attestation(
         return Err(SolverBindingError::SolverEntityMappingDigestMismatch);
     }
 
-    binding.evidence_level = SolverBoundaryEvidenceLevel::SolverEntityAttested;
+    binding.evidence_level = target_level;
     binding.solver_entity_fingerprint = Some(attestation.solver_entity_fingerprint());
     binding.solver_entity_observation_kind = Some(attestation.observation.entity_kind.clone());
     binding.solver_entity_observation_source_digest = Some(attestation.observation.source_digest);
@@ -556,6 +569,83 @@ pub fn promote_solver_entity_attestation(
     binding.solver_entity_mapping_digest = Some(attestation.solver_entity_mapping_digest);
 
     Ok(binding)
+}
+
+/// Promote an adapter-attested binding when the solver input artifact contains
+/// the claimed concrete boundary entity.
+pub fn promote_solver_input_entity_attestation(
+    binding: SolverBoundaryBinding,
+    interface: &PortInterface,
+    candidate_geometry_digest: [u8; 32],
+    candidate: &TriangleMesh,
+    attestation: SolverBoundaryEntityAttestation,
+) -> Result<SolverBoundaryBinding, SolverBindingError> {
+    promote_entity_attestation(
+        SolverBoundaryEvidenceLevel::SolverInputEntityAttested,
+        binding,
+        interface,
+        candidate_geometry_digest,
+        candidate,
+        attestation,
+    )
+}
+
+/// Promote an adapter-attested binding only when a live solver-entity attestation
+/// matches the exact binding handle and candidate identity.
+pub fn promote_solver_entity_attestation(
+    binding: SolverBoundaryBinding,
+    interface: &PortInterface,
+    candidate_geometry_digest: [u8; 32],
+    candidate: &TriangleMesh,
+    attestation: SolverBoundaryEntityAttestation,
+) -> Result<SolverBoundaryBinding, SolverBindingError> {
+    promote_entity_attestation(
+        SolverBoundaryEvidenceLevel::SolverEntityAttested,
+        binding,
+        interface,
+        candidate_geometry_digest,
+        candidate,
+        attestation,
+    )
+}
+
+/// Optional extension for adapters able to inspect a concrete solver input artifact.
+/// This does not establish that a live solver loaded or accepted that artifact.
+pub trait SolverBoundaryInputEntityObserver {
+    fn observe_input_entity(
+        &self,
+        interface: &PortInterface,
+        candidate: &TriangleMesh,
+        binding: &SolverBoundaryBinding,
+    ) -> Result<SolverBoundaryEntityAttestation, SolverBindingError>;
+}
+
+/// Complete construction path for adapters that can inspect the solver input
+/// entity they resolved, but not necessarily the live solver state.
+pub fn bind_with_adapter_and_input_entity_attestation<
+    A: SolverBoundaryBindingAdapter + SolverBoundaryInputEntityObserver,
+>(
+    adapter: &A,
+    interface: &PortInterface,
+    candidate: &TriangleMesh,
+    candidate_geometry_digest: [u8; 32],
+    tolerance_mm: f64,
+) -> Result<SolverBoundaryBinding, SolverBindingError> {
+    let binding = bind_with_adapter(
+        adapter,
+        interface,
+        candidate,
+        candidate_geometry_digest,
+        tolerance_mm,
+    )?;
+    let attestation = adapter.observe_input_entity(interface, candidate, &binding)?;
+    promote_solver_input_entity_attestation(
+        binding,
+        interface,
+        candidate_geometry_digest,
+        candidate,
+        attestation,
+    )
 }
 
 /// Complete construction path for adapters that can introspect the live solver
@@ -679,7 +769,15 @@ pub fn validate_binding_set(
             binding.solver_entity_mapping_digest,
         ) {
             (SolverBoundaryEvidenceLevel::AdapterAttested, None, None, None, None, None)
-            | (SolverBoundaryEvidenceLevel::SolverEntityAttested, Some(_), Some(_), Some(_), Some(_), Some(_)) => {}
+            | (
+                SolverBoundaryEvidenceLevel::SolverInputEntityAttested
+                    | SolverBoundaryEvidenceLevel::SolverEntityAttested,
+                Some(_),
+                Some(_),
+                Some(_),
+                Some(_),
+                Some(_),
+            ) => {}
             _ => return Err(SolverBindingError::InvalidEvidenceState),
         }
         if let Some(expected) = candidate_geometry_digest {
@@ -1590,6 +1688,14 @@ mod tests {
         );
         assert!(binding.solver_entity_mapping_digest().is_some());
         assert!(binding.validate_against_candidate(&interface, [7; 32], &candidate).is_ok());
+    }
+
+    #[test]
+    fn solver_input_evidence_is_strictly_below_live_entity_evidence() {
+        assert!(SolverBoundaryEvidenceLevel::SolverInputEntityAttested
+            .satisfies(SolverBoundaryEvidenceLevel::SolverInputEntityAttested));
+        assert!(!SolverBoundaryEvidenceLevel::SolverInputEntityAttested
+            .satisfies(SolverBoundaryEvidenceLevel::SolverEntityAttested));
     }
 
     #[test]
