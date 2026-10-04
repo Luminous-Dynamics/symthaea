@@ -52,6 +52,8 @@ pub const COSE_ES256_ALGORITHM_ID: i64 = -7;
 pub const COSE_EDDSA_ALGORITHM_ID: i64 = -8;
 pub const ES256_PUBLIC_KEY_BYTES: usize = 65;
 pub const ES256_SIGNATURE_BYTES: usize = 64;
+/// Defensive bound for indefinite-length CBOR byte-string chunk counts.
+pub const MAX_CBOR_BSTR_CHUNKS: usize = 4096;
 
 /// RFC 9942 receipt payload representation after structural parsing.
 ///
@@ -1987,6 +1989,30 @@ impl<'a> CborReader<'a> {
         self.offset+=1;
         if initial>>5!=2 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
         let ai=initial&0x1f;
+        if ai == 31 {
+            let mut out=Vec::new();
+            let mut chunks=0usize;
+            loop {
+                if chunks >= MAX_CBOR_BSTR_CHUNKS {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                match self.bytes.get(self.offset).copied() {
+                    Some(0xff) => {
+                        self.offset += 1;
+                        return Ok(out);
+                    }
+                    Some(byte) if byte >> 5 == 2 && (byte & 0x1f) != 31 => {
+                        let chunk=self.read_bstr_bounded(max_len.saturating_sub(out.len()))?;
+                        if out.len().checked_add(chunk.len()).is_none_or(|n| n > max_len) {
+                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                        }
+                        out.extend_from_slice(&chunk);
+                        chunks += 1;
+                    }
+                    _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                }
+            }
+        }
         let n=match ai {
             0..=23=>ai as u64,
             24=>self.read_uint(1,24)?,
@@ -1995,7 +2021,7 @@ impl<'a> CborReader<'a> {
             27=>self.read_uint(8,4_294_967_296)?,
             _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
         };
-        let n=usize::try_from(n).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
+        let n=usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?;
         if n > max_len {
             return Err(Rfc9162ProofDecodeError::InvalidStructure);
         }
@@ -2005,7 +2031,6 @@ impl<'a> CborReader<'a> {
         self.offset=end;
         Ok(bytes)
     }
-
     fn read_array_len(&mut self)->Result<usize,Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure) }
     fn read_bstr32(&mut self)->Result<[u8;32],Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=2{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; if n!=32{return Err(Rfc9162ProofDecodeError::InvalidHashLength)} let end=self.offset.checked_add(32).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?; if end>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)} let mut out=[0u8;32]; out.copy_from_slice(&self.bytes[self.offset..end]); self.offset=end; Ok(out) }
     fn peek_major_type(&self) -> Result<u8, Rfc9162ProofDecodeError> {
