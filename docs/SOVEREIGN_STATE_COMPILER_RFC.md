@@ -514,6 +514,13 @@ identity. In particular, a generation rollback must still resolve to the exact
 generation-plus-realization resource that was authorized. Missing or drifted
 resources fail closed before execution.
 
+The bridge also exposes one canonical read-only handoff:
+`NixSystemObservation::target_adapter(...)` validates the observation, constructs
+the exact `TargetSnapshot`, and passes that snapshot through the Nix adapter's
+capability ceiling. There is therefore one typed observation-to-adapter seam;
+callers do not need to reconstruct the Nix adapter from independently assembled
+identity/capability fields.
+
 The prototype `applications.install` and `applications.remove` properties are
 adapter-local vocabulary. They are currently rejected by the Nix adapter rather
 than compiled into an executable plan, because the existing `nix-env` path targets
