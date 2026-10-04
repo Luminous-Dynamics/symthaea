@@ -286,4 +286,4 @@ Each neurosemantic packet carries a versioned data policy. A policy must explici
 
 Consent leases separately authorize data classes and inference classes for read and write directions. Legacy leases deserialize those permissions as empty sets, so they cannot silently acquire access to newly introduced cognitive data or inference classes.
 
-Recent iBCI governance work likewise distinguishes raw recordings, processed features, decoded inferences, and personalized model parameters, while identifying conflated consent and weak misuse guardrails as important gaps. citeturn230238search0turn230238search1
+Recent iBCI governance work likewise distinguishes raw recordings, processed features, decoded inferences, and personalized model parameters, while identifying conflated consent and weak misuse guardrails as important gaps. (see Sandbrink & Young, *Communications Medicine*, 27 July 2026, DOI 10.1038/s43856-026-01797-y; Young et al., *Device*, available 11 August 2026, DOI 10.1016/j.device.2026.101271).
