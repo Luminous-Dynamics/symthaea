@@ -18,7 +18,8 @@
 //! The result is still approval evidence only. This module owns no Nix execution
 //! authority, generic grant accounting, `DispatchPermitV2`, or privileged broker.
 
-use super::authorization::NixActionIntentV1;
+use super::authorization::{NixActionDescriptorV1, NixActionIntentV1};
+use super::executor::NixOSCommand;
 use super::daemon_incarnation::{DaemonApprovalContextErrorV1, LiveDaemonIncarnationV1};
 use super::local_approval::PendingNixApprovalRequestV1;
 use super::local_approval_projection::PendingNixApprovalProjectionV1;
@@ -147,11 +148,21 @@ impl LocalApprovalRuntimeV1 {
     pub fn create_pending_request(
         &self,
         intent: &NixActionIntentV1,
+        command: &NixOSCommand,
         displayed_action: &str,
         authority_profile_ref: impl Into<String>,
         created_at: UnixMillisV1,
         expires_at: UnixMillisV1,
     ) -> Result<InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1> {
+        let expected_action = NixActionDescriptorV1::try_from(command)?;
+        if intent.action != expected_action {
+            return Err(LocalApprovalRuntimeErrorV1::IntentCommandMismatch);
+        }
+        let expected_displayed_action = operator_visible_action_for_command(command);
+        if displayed_action != expected_displayed_action {
+            return Err(LocalApprovalRuntimeErrorV1::DisplayedActionMismatch);
+        }
+
         let request = self.daemon_incarnation.create_approval_request(
             intent,
             displayed_action,
@@ -260,10 +271,32 @@ impl std::fmt::Debug for LocalApprovalRuntimeV1 {
     }
 }
 
+fn operator_visible_action_for_command(command: &NixOSCommand) -> String {
+    match command {
+        NixOSCommand::ConfigPatch {
+            option_path, value, ..
+        } => format!("PATCH /etc/nixos/configuration.nix: {option_path} = {value}"),
+        _ => {
+            let (bin, args) = command.to_command();
+            if args.is_empty() {
+                bin
+            } else {
+                format!("{} {}", bin, args.join(" "))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum LocalApprovalRuntimeErrorV1 {
     #[error(transparent)]
     DaemonContext(#[from] DaemonApprovalContextErrorV1),
+    #[error(transparent)]
+    Authorization(#[from] super::authorization::NixAuthorizationErrorV1),
+    #[error("approval intent action does not match the typed command")]
+    IntentCommandMismatch,
+    #[error("operator-visible approval text does not match the typed command rendering")]
+    DisplayedActionMismatch,
     #[error(transparent)]
     Socket(#[from] LocalApprovalSocketErrorV1),
     #[error(transparent)]
@@ -293,6 +326,13 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    fn restart_command(service: &str) -> NixOSCommand {
+        NixOSCommand::Service {
+            operation: crate::action::NixServiceOperationKindV1::Restart,
+            unit: service.to_string(),
+        }
     }
 
     fn submission_for(
@@ -327,6 +367,7 @@ mod tests {
         let installed = runtime
             .create_pending_request(
                 &intent("nginx.service"),
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -353,6 +394,7 @@ mod tests {
         let first = runtime
             .create_pending_request(
                 &action,
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -363,6 +405,7 @@ mod tests {
         let second = runtime
             .create_pending_request(
                 &action,
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
@@ -395,6 +438,7 @@ mod tests {
         let installed = first
             .create_pending_request(
                 &intent("nginx.service"),
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -422,6 +466,7 @@ mod tests {
         let installed = runtime
             .create_pending_request(
                 &intent("nginx.service"),
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -466,6 +511,7 @@ mod tests {
         let first = runtime
             .create_pending_request(
                 &action,
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -477,6 +523,7 @@ mod tests {
         let second = runtime
             .create_pending_request(
                 &action,
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
@@ -529,6 +576,7 @@ mod tests {
         let installed = runtime
             .create_pending_request(
                 &intent("nginx.service"),
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -558,6 +606,7 @@ mod tests {
         let installed = runtime
             .create_pending_request(
                 &intent("nginx.service"),
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -584,6 +633,7 @@ mod tests {
         let installed = runtime
             .create_pending_request(
                 &intent("nginx.service"),
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -612,6 +662,7 @@ mod tests {
         let first = runtime
             .create_pending_request(
                 &action,
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -623,6 +674,7 @@ mod tests {
         let second = runtime
             .create_pending_request(
                 &action,
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
@@ -659,6 +711,7 @@ mod tests {
         let installed = runtime
             .create_pending_request(
                 &intent("nginx.service"),
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -691,6 +744,7 @@ mod tests {
         let installed = first
             .create_pending_request(
                 &intent("nginx.service"),
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -736,6 +790,7 @@ mod tests {
         let first = runtime
             .create_pending_request(
                 &action,
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
@@ -747,6 +802,7 @@ mod tests {
         let second = runtime
             .create_pending_request(
                 &action,
+                &restart_command("nginx.service"),
                 "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
