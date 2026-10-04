@@ -134,6 +134,19 @@ impl ActionAuthorizationWitness {
             && self.policy == expected_policy
             && !self.issued_at.is_empty()
     }
+
+    /// Check optional operation metadata for consistency with the operation
+    /// frozen by the executor-owned durable lifecycle. `None` is intentionally
+    /// compatible with legacy witnesses; a supplied value is never an ownership
+    /// proof and MUST exactly match the caller's already-frozen operation.
+    pub fn is_operation_consistent_with(&self, expected_operation_id: &str) -> bool {
+        match self.operation_id.as_deref() {
+            None => true,
+            Some(operation_id) => {
+                !operation_id.is_empty() && operation_id == expected_operation_id
+            }
+        }
+    }
 }
 
 
