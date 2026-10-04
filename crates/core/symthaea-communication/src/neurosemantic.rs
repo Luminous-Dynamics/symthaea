@@ -577,6 +577,38 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn authorized_replay_path_requires_active_consent() {
+        let base = lease();
+        let packet = NeurosemanticPacket::new(
+            14,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: base.consent_epoch,
+            lease_id: base.lease_id.clone(),
+        };
+        let mut tracker = NeurosemanticReplayTracker::default();
+        assert_eq!(
+            tracker.observe_authorized(&message, &base, 150).unwrap(),
+            ReplayDecision::Accept
+        );
+        let mut revoked = base.clone();
+        revoked.revoked = true;
+        assert!(tracker.observe_authorized(&message, &revoked, 150).is_err());
+    }
+
+    #[test]
     fn raw_neural_samples_are_not_a_payload_variant() {
         let encoded = serde_json::to_string(
             &NeurosemanticPayload::DerivedNeuralFeature(vec![0.1, 0.2]),
