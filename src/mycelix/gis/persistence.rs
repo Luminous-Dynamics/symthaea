@@ -420,6 +420,16 @@ impl StoredIgnoranceRecord {
             .map(deserialize_frame_revision)
             .collect::<Result<Vec<_>, _>>()?;
 
+        let mut expected_frame = detection.frame.identity();
+        for revision in &frame_revisions {
+            if !revision.follows_frame(&expected_frame) || !revision.changes_frame() {
+                return Err(PersistenceError::Deserialization(
+                    "frame revision lineage is discontinuous or contains a no-op".into(),
+                ));
+            }
+            expected_frame = revision.revised_frame.clone();
+        }
+
         Ok(IgnoranceRecord {
             id: self.id.clone(),
             detection,
@@ -1177,6 +1187,37 @@ mod tests {
 
         let restored = stored.to_record().unwrap();
         assert_eq!(restored.frame_revisions, record.frame_revisions);
+    }
+
+    #[test]
+    fn test_discontinuous_frame_revision_lineage_fails_closed() {
+        let mut record = create_test_record("discontinuous_lineage", "Discontinuous", 0.4);
+        let prior = record.detection.frame.clone();
+        let revised = EpistemicFrame { version: prior.version + 1, ..prior.clone() };
+
+        record.frame_revisions = vec![
+            EpistemicFrameRevision::new(
+                &prior,
+                &revised,
+                "first revision",
+                None,
+                "first scope change",
+                vec!["c1".to_string()],
+            ),
+            EpistemicFrameRevision {
+                prior_frame: "foreign-frame@9".to_string(),
+                revised_frame: "foreign-frame@10".to_string(),
+                trigger: "spliced".to_string(),
+                newly_represented: None,
+                scope_change: "foreign jump".to_string(),
+                affected_conclusions: vec!["c2".to_string()],
+                impact: EpistemicFrameImpact::broad(),
+            },
+        ];
+
+        let stored = StoredIgnoranceRecord::from_record(&record);
+        let error = stored.to_record().unwrap_err();
+        assert!(matches!(error, PersistenceError::Deserialization(_)));
     }
 
     #[test]
