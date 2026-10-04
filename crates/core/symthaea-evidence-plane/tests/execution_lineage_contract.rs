@@ -334,7 +334,6 @@ fn drift_report_rejects_invalid_lineage() {
     );
 }
 
-
 #[test]
 fn invalid_post_commit_lineage_cannot_bypass_committed_guard_state() {
     let base = fixture();
