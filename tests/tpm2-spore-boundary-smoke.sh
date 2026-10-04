@@ -12,6 +12,7 @@ TPM_STATE="$ROOT/tpm-state"
 CTRL_PORT=2322
 TPM_PORT=2321
 NV_INDEX=0x1500016
+DECOY_NV_INDEX=0x1500017
 NV_AUTH=index
 CHALLENGE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
 CHALLENGE_DIGEST=$(printf '%s' "$CHALLENGE" | sha256sum | cut -d' ' -f1)
@@ -158,6 +159,29 @@ test -s "$ROOT/nv-partial.sig"
 tpm2_verifysignature -Q -c "$ROOT/ak-after-restart.ctx" -g sha256 -m "$ROOT/nv-partial.attest" -s "$ROOT/nv-partial.sig" -f rsassa
 printf 'partial_nv_certification_accepted_by_tpm=true_domain_should_reject=true\n' >> "$EVIDENCE_FILE"
 
+# A different NV index can also produce a structurally valid, fully signed
+# certification with the same challenge and generation. A real verifier must
+# compare the signed indexName against the configured trusted NV identity; it
+# must not accept mere self-consistency between the attestation and its signer.
+tpm2_nvdefine -Q -C o -s 8 -a 'ownerread|authread|authwrite|nt=counter' "$DECOY_NV_INDEX" -p "$NV_AUTH"
+tpm2_nvincrement -Q -C "$DECOY_NV_INDEX" "$DECOY_NV_INDEX" -P "$NV_AUTH"
+tpm2_nvincrement -Q -C "$DECOY_NV_INDEX" "$DECOY_NV_INDEX" -P "$NV_AUTH"
+tpm2_nvcertify -Q -C "$ROOT/ak-after-restart.ctx" -c "$DECOY_NV_INDEX" -p "$NV_AUTH" -g sha256 -f plain -s rsassa -o "$ROOT/nv-decoy.sig" --attestation "$ROOT/nv-decoy.attest" --size 8 --offset 0 -q "$POST_RESTART_CHALLENGE" "$DECOY_NV_INDEX"
+test -s "$ROOT/nv-decoy.attest"
+test -s "$ROOT/nv-decoy.sig"
+tpm2_verifysignature -Q -c "$ROOT/ak-after-restart.ctx" -g sha256 -m "$ROOT/nv-decoy.attest" -s "$ROOT/nv-decoy.sig" -f rsassa
+tpm2_print -Q -t TPMS_ATTEST "$ROOT/nv-decoy.attest" > "$ROOT/nv-decoy.yaml"
+grep -Fq "type: 8014" "$ROOT/nv-decoy.yaml"
+grep -Fq "indexName:" "$ROOT/nv-decoy.yaml"
+grep -Fq "offset: 0" "$ROOT/nv-decoy.yaml"
+DECoy_CONTENTS=$(grep -m1 '^      nvContents:' "$ROOT/nv-decoy.yaml" | sed 's/^ *nvContents:[[:space:]]*//')
+[ "$DECoy_CONTENTS" = "0000000000000002" ] || {
+  echo "ERROR: decoy NV certification did not certify its generation-2 counter" >&2
+  exit 1
+}
+printf 'decoy_nv_certification_valid_under_tpm=true_domain_must_reject_untrusted_index=true\n' >> "$EVIDENCE_FILE"
+
+tpm2_nvundefine -Q -C o "$DECOY_NV_INDEX"
 tpm2_nvundefine -Q -C o "$NV_INDEX"
 
 echo 'TPM2 Spore boundary smoke test: PASS'
