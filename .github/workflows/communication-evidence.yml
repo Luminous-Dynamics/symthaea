@@ -91,8 +91,11 @@ jobs:
           # remains below human neural-decoding claims.
           assert hdc_interlingua["claim_boundary"] == "held_out_synthetic_graph_retrieval_and_reconstruction_only"
 
+          assert hdc_interlingua["negative_controls"]["null_sample_count"] == 256
           assert hdc_interlingua["negative_controls"]["unrelated_node_max_similarity"] < 0.2
           assert hdc_interlingua["negative_controls"]["unrelated_edge_max_similarity"] < 0.2
+          assert hdc_interlingua["negative_controls"]["true_edge_similarity"] > hdc_interlingua["negative_controls"]["unrelated_node_max_similarity"]
+          assert hdc_interlingua["negative_controls"]["true_edge_similarity"] > hdc_interlingua["negative_controls"]["unrelated_edge_max_similarity"]
           assert hdc_interlingua["negative_controls"]["true_edge_similarity"] > hdc_interlingua["negative_controls"]["swapped_edge_similarity"]
           assert [obs["flip_probability"] for obs in hdc_interlingua["transport_corruption"]] == [0.0, 0.001, 0.01, 0.05, 0.10]
           assert hdc_interlingua["transport_corruption"][0]["metrics"]["structural_equivalence"] is True
