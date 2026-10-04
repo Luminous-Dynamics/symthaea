@@ -34,18 +34,28 @@ pub enum SyllableStress {
 }
 
 impl SyllableStress {
+    /// Stable wire encoding shared with the realization layer: 0=none, 1=primary, 2=secondary.
     pub fn ordinal(self) -> u8 {
         match self {
             Self::None => 0,
-            Self::Primary => 2,
+            Self::Primary => 1,
+            Self::Secondary => 2,
+        }
+    }
+
+    /// Semantic precedence for choosing one stress when multiple slot annotations agree.
+    pub fn strength(self) -> u8 {
+        match self {
+            Self::None => 0,
             Self::Secondary => 1,
+            Self::Primary => 2,
         }
     }
 
     pub fn from_ordinal(value: u8) -> Self {
         match value {
-            1 => Self::Secondary,
-            2 => Self::Primary,
+            1 => Self::Primary,
+            2 => Self::Secondary,
             _ => Self::None,
         }
     }
@@ -285,7 +295,7 @@ fn derive_syllables(segments: &[PhonemeSlot]) -> Vec<SyllableSlot> {
 
         let syllable = &mut syllables[segment.syllable_index];
         syllable.index = segment.syllable_index;
-        if segment.stress.ordinal() > syllable.stress.ordinal() {
+        if segment.stress.strength() > syllable.stress.strength() {
             syllable.stress = segment.stress;
         }
         syllable.is_focus |= segment.is_focus;
@@ -372,6 +382,15 @@ mod tests {
                 found: 2
             }
         ));
+    }
+
+    #[test]
+    fn stress_wire_encoding_matches_realization_convention() {
+        assert_eq!(SyllableStress::None.ordinal(), 0);
+        assert_eq!(SyllableStress::Primary.ordinal(), 1);
+        assert_eq!(SyllableStress::Secondary.ordinal(), 2);
+        assert_eq!(SyllableStress::from_ordinal(1), SyllableStress::Primary);
+        assert_eq!(SyllableStress::from_ordinal(2), SyllableStress::Secondary);
     }
 
     #[test]
