@@ -736,10 +736,11 @@ pub struct ReceiptAttestationVerificationReport {
     pub outcome: ReceiptAttestationVerificationOutcome,
     pub verifier_version: &'static str,
     pub receipt_fingerprint: String,
-    /// Fingerprint of the exact attestation payload whose detached proof was evaluated.
+    /// Fingerprint of the exact attestation payload submitted to this verification run.
     ///
-    /// This binds the appraisal result to the complete attestation envelope payload,
-    /// not merely to the underlying receipt. Legacy v3 reports did not carry this field.
+    /// A terminal failure may occur before detached proof evaluation, but payload identity
+    /// remains useful for binding the resulting report to the exact input envelope. Legacy
+    /// v3 reports did not carry this field.
     #[serde(default)]
     pub attestation_payload_fingerprint: String,
     pub evaluated_at_unix_ns: i128,
@@ -1083,7 +1084,10 @@ impl ReceiptAttestationVerificationReport {
 }
 
 pub const VERIFICATION_CONTEXT_VERSION: &str = "symthaea-observation-verification-context-v4";
-pub const EVIDENCE_EVALUATION_VERSION: &str = "symthaea-observation-evaluation-v7";
+/// Historical evaluation identity retained so serialized v7 evidence remains reconstructable.
+pub const LEGACY_EVIDENCE_EVALUATION_VERSION: &str = "symthaea-observation-evaluation-v7";
+/// Current evaluation identity. v8 separates receipt commitment from intrinsic receipt integrity.
+pub const EVIDENCE_EVALUATION_VERSION: &str = "symthaea-observation-evaluation-v8";
 pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str = "receipt-attestation-verification";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1233,7 +1237,13 @@ impl VerificationContext {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum EvaluationClaim {
+    /// Intrinsic integrity of the receipt's own assessment fingerprint.
+    ///
+    /// This is stronger than the receipt-to-envelope commitment and is not established
+    /// by the current attestation procedure, which does not call receipt.verify_integrity().
     ReceiptIntegrity,
+    /// Identity binding between the attestation envelope and its receipt.
+    ReceiptCommitment,
     AttestationAuthenticity,
     TemporalValidity,
     CryptosuiteConformance,
@@ -1256,6 +1266,7 @@ impl EvaluationClaim {
     /// A well-formed boundary must classify every known claim exactly once.
     pub const ALL: &'static [Self] = &[
         Self::ReceiptIntegrity,
+        Self::ReceiptCommitment,
         Self::AttestationAuthenticity,
         Self::TemporalValidity,
         Self::CryptosuiteConformance,
@@ -1291,6 +1302,8 @@ fn evaluation_claim_tag(claim: EvaluationClaim) -> u8 {
         EvaluationClaim::EvaluatorIndependence => 13,
         // Append-only: never renumber existing canonical claim tags.
         EvaluationClaim::EnvelopeStructuralValidity => 14,
+        // Append-only: v8 introduces this claim without renumbering v7 tags.
+        EvaluationClaim::ReceiptCommitment => 15,
     }
 }
 
@@ -1303,6 +1316,10 @@ pub struct EvaluationBoundary {
 
 impl EvaluationBoundary {
     pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
+        if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
+            return Self::from_execution_trace_v7(&EvaluationTrace::from_report_legacy(report));
+        }
+
         fn classify(
             stage: VerificationStage,
             claim: EvaluationClaim,
@@ -1330,7 +1347,7 @@ impl EvaluationBoundary {
         );
         classify(
             report.receipt_commitment,
-            EvaluationClaim::ReceiptIntegrity,
+            EvaluationClaim::ReceiptCommitment,
             &mut established,
             &mut not_established,
             &mut indeterminate,
@@ -1412,6 +1429,8 @@ impl EvaluationBoundary {
             EvaluationClaim::AttesterIntent,
             EvaluationClaim::EvaluatorIndependence,
         ]);
+        // The stronger receipt.verify_integrity() check is not part of this procedure.
+        indeterminate.push(EvaluationClaim::ReceiptIntegrity);
 
         Self {
             established,
@@ -1459,7 +1478,7 @@ impl EvaluationBoundary {
             ),
             (
                 EvaluationCheck::ReceiptCommitment,
-                EvaluationClaim::ReceiptIntegrity,
+                EvaluationClaim::ReceiptCommitment,
             ),
             (
                 EvaluationCheck::TemporalValidity,
@@ -1522,12 +1541,43 @@ impl EvaluationBoundary {
             EvaluationClaim::AttesterIntent,
             EvaluationClaim::EvaluatorIndependence,
         ]);
+        // The stronger receipt.verify_integrity() check is not part of this procedure.
+        indeterminate.push(EvaluationClaim::ReceiptIntegrity);
 
         Self {
             established,
             not_established,
             indeterminate,
         }
+    }
+
+    /// Reconstruct historical v7 semantics for stored v7 evaluations.
+    ///
+    /// v7 used ReceiptIntegrity for the envelope↔receipt commitment. v8 keeps
+    /// that historical representation intact while reserving ReceiptIntegrity
+    /// for the stronger intrinsic receipt-integrity check.
+    fn from_execution_trace_v7(trace: &EvaluationTrace) -> Self {
+        let mut boundary = Self::from_execution_trace(trace);
+        for claims in [
+            &mut boundary.established,
+            &mut boundary.not_established,
+            &mut boundary.indeterminate,
+        ] {
+            claims.retain(|claim| *claim != EvaluationClaim::ReceiptCommitment);
+            claims.retain(|claim| *claim != EvaluationClaim::ReceiptIntegrity);
+        }
+        let receipt_stage = trace
+            .results
+            .iter()
+            .find(|result| result.check == EvaluationCheck::ReceiptCommitment)
+            .map(|result| result.stage)
+            .unwrap_or(VerificationStage::NotEvaluated);
+        match receipt_stage {
+            VerificationStage::Passed => boundary.established.push(EvaluationClaim::ReceiptIntegrity),
+            VerificationStage::Failed(_) => boundary.not_established.push(EvaluationClaim::ReceiptIntegrity),
+            VerificationStage::NotEvaluated => boundary.indeterminate.push(EvaluationClaim::ReceiptIntegrity),
+        }
+        boundary
     }
 
     /// Validate the epistemic partition: every known claim occupies exactly one bucket.
@@ -1659,7 +1709,8 @@ impl EvidenceEvaluation {
     /// evaluation is internally coherent, not that it still matches the exact
     /// report from which it was materialized.
     pub fn is_well_formed(&self) -> bool {
-        self.evaluation_version == EVIDENCE_EVALUATION_VERSION
+        (self.evaluation_version == EVIDENCE_EVALUATION_VERSION
+            || self.evaluation_version == LEGACY_EVIDENCE_EVALUATION_VERSION)
             && self.evaluation_type == ATTESTATION_VERIFICATION_EVALUATION_TYPE
             && is_blake3_fingerprint(&self.subject_fingerprint)
             && is_blake3_fingerprint(&self.verification_report_fingerprint)
@@ -1668,7 +1719,11 @@ impl EvidenceEvaluation {
             && self.execution_trace.is_well_formed()
             && self.execution_trace.terminal_outcome() == Some(self.outcome)
             && self.boundary.is_well_formed()
-            && self.boundary == EvaluationBoundary::from_execution_trace(&self.execution_trace)
+            && self.boundary == if self.evaluation_version == LEGACY_EVIDENCE_EVALUATION_VERSION {
+                EvaluationBoundary::from_execution_trace_v7(&self.execution_trace)
+            } else {
+                EvaluationBoundary::from_execution_trace(&self.execution_trace)
+            }
     }
 
     /// Validate that this evaluation remains consistent with the report that
@@ -1688,7 +1743,11 @@ impl EvidenceEvaluation {
             && self.execution_trace.matches_report(report)
             && self.execution_trace.terminal_outcome() == Some(self.outcome)
             && self.execution_trace.is_well_formed()
-            && self.boundary == EvaluationBoundary::from_report(report)
+            && self.boundary == if self.evaluation_version == LEGACY_EVIDENCE_EVALUATION_VERSION {
+                EvaluationBoundary::from_execution_trace_v7(&self.execution_trace)
+            } else {
+                EvaluationBoundary::from_report(report)
+            }
             && self.boundary.is_well_formed()
     }
 
@@ -1699,7 +1758,11 @@ impl EvidenceEvaluation {
         }
 
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:evidence-evaluation:v7\n");
+        bytes.extend_from_slice(if self.evaluation_version == LEGACY_EVIDENCE_EVALUATION_VERSION {
+            b"symthaea:evidence-evaluation:v7\n"
+        } else {
+            b"symthaea:evidence-evaluation:v8\n"
+        });
         write_string(&mut bytes, self.evaluation_version);
         write_string(&mut bytes, &self.subject_fingerprint);
         write_string(&mut bytes, self.evaluation_type);
@@ -1720,7 +1783,11 @@ impl EvidenceEvaluation {
 
     pub fn fingerprint(&self) -> String {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea:evidence-evaluation:v7\n");
+        hasher.update(if self.evaluation_version == LEGACY_EVIDENCE_EVALUATION_VERSION {
+            b"symthaea:evidence-evaluation:v7\n"
+        } else {
+            b"symthaea:evidence-evaluation:v8\n"
+        });
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
@@ -3633,8 +3700,9 @@ mod tests {
             evaluation
                 .boundary
                 .established
-                .contains(&EvaluationClaim::ReceiptIntegrity)
+                .contains(&EvaluationClaim::ReceiptCommitment)
         );
+        assert!(!evaluation.boundary.established.contains(&EvaluationClaim::ReceiptIntegrity));
         assert!(
             evaluation
                 .boundary
@@ -3653,7 +3721,12 @@ mod tests {
                 .not_established
                 .contains(&EvaluationClaim::SemanticValidity)
         );
-        assert!(evaluation.boundary.indeterminate.is_empty());
+        assert!(
+            evaluation
+                .boundary
+                .indeterminate
+                .contains(&EvaluationClaim::ReceiptIntegrity)
+        );
     }
 
     #[test]
@@ -3725,7 +3798,7 @@ mod tests {
     }
 
     #[test]
-    fn evidence_evaluation_uses_v7_fingerprint_domain() {
+    fn evidence_evaluation_uses_v8_fingerprint_domain() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
@@ -3737,8 +3810,56 @@ mod tests {
         assert!(
             evaluation
                 .canonical_bytes()
-                .starts_with(b"symthaea:evidence-evaluation:v7\n")
+                .starts_with(b"symthaea:evidence-evaluation:v8\n")
         );
+    }
+
+    #[test]
+    fn historical_v7_evidence_remains_self_validating() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = resolved_report(&verifier, &envelope, &receipt);
+        let mut legacy = report.to_evidence_evaluation();
+        legacy.evaluation_version = LEGACY_EVIDENCE_EVALUATION_VERSION;
+        legacy.boundary = EvaluationBoundary::from_execution_trace_v7(&legacy.execution_trace);
+
+        assert!(legacy.is_well_formed());
+        assert!(legacy.canonical_bytes().starts_with(b"symthaea:evidence-evaluation:v7\n"));
+        assert_ne!(legacy.fingerprint(), report.to_evidence_evaluation().fingerprint());
+    }
+
+    #[test]
+    fn receipt_commitment_does_not_establish_intrinsic_receipt_integrity() {
+        let (_, signing_key, mut receipt) = envelope_and_key();
+        receipt.source_observation_id = "tampered-source".into();
+        assert!(!receipt.verify_integrity());
+
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(
+            &receipt,
+            "attester-a",
+            "observation-independence",
+            100,
+        );
+        envelope.expires_at_unix_ns = Some(200);
+        sign_envelope(&mut envelope, &signing_key, "did:example:attester-a#key-1")
+            .expect("sign tampered receipt commitment");
+
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = resolved_report(&verifier, &envelope, &receipt);
+        assert_eq!(report.outcome, ReceiptAttestationVerificationOutcome::Verified);
+
+        let evaluation = report.to_evidence_evaluation();
+        assert!(evaluation.boundary.established.contains(&EvaluationClaim::ReceiptCommitment));
+        assert!(evaluation.boundary.indeterminate.contains(&EvaluationClaim::ReceiptIntegrity));
+        assert!(evaluation.is_well_formed());
     }
 
     #[test]
