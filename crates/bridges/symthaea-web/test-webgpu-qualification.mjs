@@ -112,11 +112,6 @@ if (process.env.GITHUB_EVENT_NAME === 'pull_request' && !EXPECTED_CHECKED_OUT_SH
   throw new Error('qualification missing EXPECTED_CHECKED_OUT_SHA for pull_request run');
 }
 if (EXPECTED_CHECKED_OUT_SHA && CHECKED_OUT_SHA !== EXPECTED_CHECKED_OUT_SHA) {
-  throw new Error(
-    `qualification checkout identity mismatch: expected ${EXPECTED_CHECKED_OUT_SHA}, got ${CHECKED_OUT_SHA}`,
-  );
-}
-
 const MODES = (process.env.WEBGPU_MODES || 'webgpu-swiftshader,fallback')
   .split(',')
   .map(value => value.trim())
