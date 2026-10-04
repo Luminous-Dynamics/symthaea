@@ -533,7 +533,14 @@ impl TargetAdapter for NixOSTargetAdapter {
             _ => false,
         });
 
-        let rollback_allowed = has_mutation
+        // Rollback authority is only enabled when the plan contains a
+        // genuinely rollback-eligible forward mutation. A reboot-only plan
+        // has no prior deployment state to compensate, and a rollback plan
+        // must not self-authorize an additional rollback capability.
+        let rollback_eligible = !rollback_requested
+            && (activation_mode.is_some_and(NixActivationMode::mutates_target_state)
+                || home_manager);
+        let rollback_allowed = rollback_eligible
             && self
                 .snapshot
                 .profile
@@ -1221,6 +1228,58 @@ mod tests {
         assert!(plan.digest().is_ok());
     }
 
+    #[test]
+    fn reboot_only_does_not_enable_rollback_authority() {
+        let mut intent = DeploymentIntent::new("reboot-only-rollback", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(REBOOT_KEY.into(), StateValue::Bool(true));
+
+        let plan = adapter().compile(&intent).expect("compile");
+        assert!(!plan.rollback.allowed);
+        assert_eq!(plan.rollback.max_attempts, 0);
+    }
+
+    #[test]
+    fn rollback_target_does_not_enable_a_second_rollback_authority() {
+        let mut intent = DeploymentIntent::new("rollback-no-nested", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_KEY.into(), StateValue::Bool(true));
+        intent
+            .desired_state
+            .properties
+            .insert(ROLLBACK_GENERATION_KEY.into(), StateValue::Integer(7));
+        intent.desired_state.properties.insert(
+            ROLLBACK_REALIZATION_KEY.into(),
+            StateValue::String("/nix/store/aaa-nixos-system-host".into()),
+        );
+        intent.required_resources.insert(
+            nixos_generation_resource(7, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource"),
+        );
+
+        let plan = rollback_adapter(7, "/nix/store/aaa-nixos-system-host")
+            .compile(&intent)
+            .expect("compile");
+        assert!(!plan.rollback.allowed);
+        assert_eq!(plan.rollback.max_attempts, 0);
+    }
+
+    #[test]
+    fn switch_enables_rollback_authority_for_compensation() {
+        let mut intent = DeploymentIntent::new("switch-rollback", "host-01");
+        intent.desired_state.properties.insert(
+            REBUILD_KEY.into(),
+            StateValue::String("switch".into()),
+        );
+
+        let plan = adapter().compile(&intent).expect("compile");
+        assert!(plan.rollback.allowed);
+        assert_eq!(plan.rollback.max_attempts, 1);
+    }
     #[test]
     fn dry_activate_is_not_marked_as_mutating_for_rollback_policy() {
         let mut intent = DeploymentIntent::new("dry-1", "host-01");
