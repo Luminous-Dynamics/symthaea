@@ -1616,20 +1616,8 @@ pub struct ResolvedVerificationMethodSnapshot {
     pub snapshot_fingerprint: Option<String>,
 }
 
-/// Application-supplied verification-method resolver.
-///
-/// Resolution, controller authorization, key lifecycle, and status are deliberately
-/// injected rather than performed through network access in this crate.
+/// Internal fail-closed resolver used by the resolver-free compatibility entry point.
 struct UnresolvedVerificationMethodResolver;
-
-impl VerificationMethodResolver for UnresolvedVerificationMethodResolver {
-    fn resolve(
-        &self,
-        _verification_method: &str,
-    ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
-        Err(VerificationMethodResolutionError::Unavailable)
-    }
-}
 
 pub trait VerificationMethodResolver {
     fn resolve(
@@ -1665,12 +1653,26 @@ pub trait VerificationMethodResolver {
 
     /// Return a fingerprint scoped to the verification-method resolution being performed.
     ///
-    /// The default preserves compatibility with existing resolvers by reusing the resolver
-    /// state fingerprint. Mutable or remote implementations should override this when they
-    /// can produce a fingerprint of the exact durable view used to resolve this method.
+    /// This accessor is independent from resolve_with_snapshot(): calling it does not
+    /// establish that its value was observed in the same state as a prior resolve().
+    /// Mutable or remote implementations should override resolve_with_snapshot() when they
+    /// can prove that the resolved method and snapshot came from one consistency-preserving view.
     fn snapshot_fingerprint_for(&self, verification_method: &str) -> Option<String> {
         let _ = verification_method;
         self.snapshot_fingerprint()
+    }
+}
+
+/// Application-supplied verification-method resolver.
+///
+/// Resolution, controller authorization, key lifecycle, and status are deliberately
+/// injected rather than performed through network access in this crate.
+impl VerificationMethodResolver for UnresolvedVerificationMethodResolver {
+    fn resolve(
+        &self,
+        _verification_method: &str,
+    ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
+        Err(VerificationMethodResolutionError::Unavailable)
     }
 }
 
