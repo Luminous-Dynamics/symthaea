@@ -401,7 +401,7 @@ fn is_valid_closed_polygon(points: &[[f32; 2]]) -> bool {
         normalized.pop();
     }
     if normalized.len() < 3 {
-        return true;
+        return false;
     }
     let area2 = normalized
         .iter()
@@ -799,6 +799,25 @@ mod tests {
             },
         };
         assert!(!scene.is_supported());
+    }
+
+    #[test]
+    fn externally_constructed_closed_polygon_rejects_collapsed_distinct_vertices() {
+        for points in [
+            vec![[0.0, 0.0], [10.0, 10.0], [0.0, 0.0]],
+            vec![[5.0, 5.0], [5.0, 5.0], [5.0, 5.0]],
+        ] {
+            let scene = RemoteScene {
+                version: RemoteScene::VERSION,
+                root: WireNode {
+                    primitive: WirePrimitive::Polygon { points, closed: true },
+                    transform: WireTransform::default(),
+                    style: WireStyle::default(),
+                    children: vec![],
+                },
+            };
+            assert!(!scene.is_supported());
+        }
     }
 
     #[test]
