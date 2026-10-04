@@ -991,7 +991,8 @@ mod tests {
             claim_identity: "claim:cycle".into(),
             canonical_identity: "canonical:cycle".into(),
             provenance_family: "family:cycle".into(),
-            author: "author:1".into(),
+            author: ClaimAuthorIdentity::new("author:1").unwrap(),
+            authorship: None,
             statement_ref: "statement:cycle".into(),
             source_event: None,
             frontier_ref: Some("frontier:cycle".into()),
@@ -1069,7 +1070,8 @@ mod tests {
             claim_identity: "claim:duplicate".into(),
             canonical_identity: "canonical:duplicate".into(),
             provenance_family: "family:1".into(),
-            author: "author:1".into(),
+            author: ClaimAuthorIdentity::new("author:1").unwrap(),
+            authorship: None,
             statement_ref: "statement:1".into(),
             source_event: None,
             frontier_ref: Some("frontier:1".into()),
@@ -1261,7 +1263,7 @@ mod digest_tests {
     fn canonical_digest_changes_when_claim_content_changes() {
         let a = base_claim();
         let mut b = a.clone();
-        b.author = "author:2".into();
+        b.author = ClaimAuthorIdentity::new("author:2").unwrap();
         assert_ne!(a.canonical_digest(), b.canonical_digest());
     }
 
@@ -1419,7 +1421,7 @@ mod adversarial_contract_tests {
             ("claim_identity", |c| c.claim_identity.push_str(":changed")),
             ("canonical_identity", |c| c.canonical_identity.push_str(":changed")),
             ("provenance_family", |c| c.provenance_family.push_str(":changed")),
-            ("author", |c| c.author.push_str(":changed")),
+            ("author", |c| c.author = ClaimAuthorIdentity::new("author:changed").unwrap()),
             ("statement_ref", |c| c.statement_ref.push_str(":changed")),
             ("source_event", |c| c.source_event = Some("event:changed".into())),
             ("frontier_ref", |c| c.frontier_ref = Some("frontier:changed".into())),
