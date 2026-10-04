@@ -757,6 +757,7 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                     for coefficient in &affine_fiber.representative_coefficients {
                         result_digest.update(&[*coefficient as u8]);
                     }
+                    result_digest.update(&affine_fiber.fingerprint());
 
                     let jointly_independent = algebra.unique_factorization;
                     let kernel_basis = if jointly_independent {
@@ -1696,6 +1697,49 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
             .coefficients_for_mask(&[false, false, false, false])
             .is_none()
     );
+
+    let mut semantically_invalid = fiber.clone();
+    semantically_invalid.kernel_basis[0].generator_coefficients[1] ^= true;
+    assert!(
+        semantically_invalid.kernel_basis[0].generator_coefficients
+            [semantically_invalid.kernel_basis[0].dependent_generator_index]
+    );
+    assert!(
+        !semantically_invalid.kernel_basis[0].verifies_against(&factors)
+    );
+
+    let invalid_coefficient_basis = semantically_invalid
+        .kernel_basis
+        .iter()
+        .map(|witness| {
+            let mut vector =
+                BinaryCodeword::zero(semantically_invalid.representative_coefficients.len());
+            for (index, coefficient) in witness.generator_coefficients.iter().enumerate() {
+                vector.set_bit(index, *coefficient);
+            }
+            vector
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        basis_rank(
+            &invalid_coefficient_basis,
+            semantically_invalid.representative_coefficients.len()
+        ),
+        algebra.kernel_dimension
+    );
+    assert_ne!(
+        semantically_invalid.fingerprint(),
+        fiber.fingerprint(),
+        "tampering must alter the recomputed certificate fingerprint"
+    );
+    assert!(semantically_invalid.iter_bounded(expected).is_none());
+    assert!(
+        semantically_invalid
+            .coefficients_for_mask(&[true, false, false, false])
+            .is_none()
+    );
+    assert!(!semantically_invalid.verifies_against(&target, &factors));
+
     assert!(
         fiber
             .coefficients_for_mask(&[false, false, false])
