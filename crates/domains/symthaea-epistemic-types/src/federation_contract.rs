@@ -467,7 +467,6 @@ mod tests {
 
     #[test]
     fn federated_claim_rejects_lineage_cycle() {
-        let (r, validation) = receipt();
         let relations = vec![
             ProvenanceRelation {
                 source_memory_id: "b".into(),
@@ -482,6 +481,7 @@ mod tests {
                 created_at: "cycle:3".into(),
             },
         ];
+        let validation = ProvenanceValidationReport::from_relations(&relations);
         let view = ProvenanceView::from_relations(&relations, validation).unwrap();
         let receipt = CanonicalAdmissionReceipt::new(
             "admission:event-cycle",
@@ -541,8 +541,9 @@ mod tests {
             "claim snapshot digest must match validation report"
         );
 
-        // Rebuild the validation snapshot around the duplicated relation so the
-        // duplicate itself, rather than a stale count/digest, is the rejected condition.
+        // Rebuild the validation snapshot around the duplicated relation. The
+        // read-only view correctly rejects duplicates before a claim can cross it,
+        // so the claim-level regression constructs the deserialized envelope directly.
         let duplicate_relations = vec![
             ProvenanceRelation {
                 source_memory_id: "derived".into(),
@@ -558,14 +559,12 @@ mod tests {
             },
         ];
         let duplicate_validation = ProvenanceValidationReport::from_relations(&duplicate_relations);
-        let duplicate_view =
-            ProvenanceView::from_relations(&duplicate_relations, duplicate_validation).unwrap();
         let duplicate_receipt = CanonicalAdmissionReceipt::new(
             "admission:event-1",
             Some("frontier:1".into()),
-            duplicate_view.snapshot_digest.clone(),
-            duplicate_view.validation.validator_version.clone(),
-            duplicate_view.validation.snapshot_schema_version,
+            duplicate_validation.snapshot_digest.clone(),
+            duplicate_validation.validator_version.clone(),
+            duplicate_validation.snapshot_schema_version,
         )
         .unwrap();
         let duplicate_claim = FederatedClaim {
@@ -577,8 +576,8 @@ mod tests {
             statement_ref: "statement:1".into(),
             source_event: None,
             frontier_ref: Some("frontier:1".into()),
-            provenance_snapshot_digest: duplicate_view.snapshot_digest.clone(),
-            provenance_validation: duplicate_view.validation.clone(),
+            provenance_snapshot_digest: duplicate_validation.snapshot_digest.clone(),
+            provenance_validation: duplicate_validation,
             admission_receipt: duplicate_receipt,
             epistemic_state: None,
             claim_ceiling: None,
@@ -588,7 +587,7 @@ mod tests {
         };
         assert_eq!(
             duplicate_claim.validate_structure().unwrap_err(),
-            "provenance relations must be unique"
+            "claim relations must match validation snapshot"
         );
     }
 
