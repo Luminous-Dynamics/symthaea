@@ -255,6 +255,56 @@ fn rfc9162_inclusion_and_consistency_path_bounds_are_tree_size_derived() {
 
 
 #[test]
+fn rfc9942_crit_rejects_unknown_critical_header() {
+    // Protected = {2: [999], 999: {bstr(0): 0}}.
+    // The extension itself is understood as opaque, but a critical extension
+    // must be understood by this processing layer.
+    let protected = [
+        0xa2, 0x02, 0x81, 0x19, 0x03, 0xe7,
+        0x19, 0x03, 0xe7, 0xa1, 0x41, 0x00, 0x00,
+    ];
+    let mut wire = vec![0xd2, 0x84, 0x4f];
+    wire.extend_from_slice(&protected);
+    wire.extend_from_slice(&[0xa0, 0xf6, 0x40, 0x40]);
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&wire),
+        Err(Rfc9942VdpError::CriticalHeaderNotUnderstood)
+    );
+}
+
+#[test]
+fn rfc9942_crit_rejects_unprotected_critical_header() {
+    // Unprotected = {2: [999], 999: null}; crit may not be unprotected.
+    let protected = [0xa0];
+    let unprotected = [0xa2, 0x02, 0x81, 0x19, 0x03, 0xe7, 0x19, 0x03, 0xe7, 0xf6];
+
+    let mut wire = vec![0xd2, 0x84, 0x41, 0xa0];
+    wire.extend_from_slice(&unprotected);
+    wire.push(0xf6);
+    wire.extend_from_slice(&[0x40, 0x40]);
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&wire),
+        Err(Rfc9942VdpError::CriticalHeaderNotProtected)
+    );
+}
+
+#[test]
+fn rfc9942_crit_rejects_duplicate_critical_labels() {
+    // Protected = {2: [1, 1], 1: -7}.
+    let protected = [0xa2, 0x02, 0x82, 0x01, 0x01, 0x01, 0x26];
+    let mut wire = vec![0xd2, 0x84, 0x49];
+    wire.extend_from_slice(&protected);
+    wire.extend_from_slice(&[0xa0, 0xf6, 0x40, 0x40]);
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&wire),
+        Err(Rfc9942VdpError::InvalidStructure)
+    );
+}
+
+#[test]
 fn cose_extension_values_accept_well_formed_simple_items_and_round_trip_exactly() {
     for value in [&[0xe0][..], &[0xf3][..], &[0xf8, 0x20][..]] {
         let mut protected = Vec::new();
