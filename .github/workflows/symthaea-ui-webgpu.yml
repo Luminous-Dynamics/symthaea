@@ -35,7 +35,7 @@ jobs:
           actual="$(git rev-parse HEAD)"
           expected="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
-          echo "EXPECTED_PR_HEAD_SHA=$actual" >> "$GITHUB_ENV"
+          echo "EXPECTED_CHECKED_OUT_SHA=$actual" >> "$GITHUB_ENV"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58
