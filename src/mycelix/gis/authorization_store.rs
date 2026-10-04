@@ -6543,7 +6543,7 @@ mod tests {
         }
 
         let err=store.commit_bound_verified(
-            &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&WrongConfigVerifier
+            &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifierForRp { relying_party_id: "wrong-rp".into() }
         ).unwrap_err();
         assert!(matches!(
             err,
