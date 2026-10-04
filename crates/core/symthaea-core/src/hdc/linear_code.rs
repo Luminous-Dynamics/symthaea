@@ -832,6 +832,17 @@ impl LinearCodeFactorizationFiber {
             return false;
         }
 
+        let mut dependent_indices = self
+            .kernel_basis
+            .iter()
+            .map(|witness| witness.dependent_generator_index)
+            .collect::<Vec<_>>();
+        dependent_indices.sort_unstable();
+        dependent_indices.dedup();
+        if dependent_indices.len() != self.kernel_basis.len() {
+            return false;
+        }
+
         let combined_basis = concatenate_factor_bases(factors, algebra.factor_dimension_sum);
         let mut reconstructed = BinaryCodeword::zero(target.dimension());
         for (&coefficient, generator) in self
