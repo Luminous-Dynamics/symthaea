@@ -51,6 +51,7 @@ pub struct ConstituentSlot {
 pub struct LinguisticFrame {
     pub version: String,
     pub binding_status: LinguisticBindingStatus,
+    pub lexical_provenance: Option<String>,
     pub strategy: FormulationStrategy,
     pub epistemic_delivery: EpistemicDelivery,
     pub focus_role: Option<String>,
@@ -106,11 +107,29 @@ impl LinguisticFrame {
         }
 
         self.binding_status = LinguisticBindingStatus::LexicallyBound;
+        self.lexical_provenance = Some(provenance);
         Ok(())
     }
 
     /// Validate persisted/deserialized cross-field invariants.
     pub fn validate(&self) -> Result<(), LinguisticFrameError> {
+        match self.binding_status {
+            LinguisticBindingStatus::RoleStructureOnly => {
+                if self.lexical_provenance.is_some() {
+                    return Err(LinguisticFrameError::NonLexicalProvenance);
+                }
+            }
+            LinguisticBindingStatus::LexicallyBound => {
+                let provenance = self
+                    .lexical_provenance
+                    .as_deref()
+                    .ok_or(LinguisticFrameError::MissingLexicalProvenance)?;
+                if provenance.trim().is_empty() {
+                    return Err(LinguisticFrameError::EmptyLexicalProvenance);
+                }
+            }
+        }
+
         if self
             .constituents
             .iter()
@@ -168,9 +187,10 @@ impl LinguisticFrame {
             .join("|");
 
         format!(
-            "{};binding={:?};strategy={:?};epistemic={:?};focus={};constituents={}",
+            "{};binding={:?};lexical_provenance={};strategy={:?};epistemic={:?};focus={};constituents={}",
             self.version,
             self.binding_status,
+            self.lexical_provenance.is_some(),
             self.strategy,
             self.epistemic_delivery,
             self.focus_role.as_deref().unwrap_or("NONE"),
@@ -182,6 +202,8 @@ impl LinguisticFrame {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LinguisticFrameError {
     EmptyLexicalProvenance,
+    MissingLexicalProvenance,
+    NonLexicalProvenance,
     NonContiguousPositions,
     MultipleFocusRoles,
     FocusRoleNotRepresented,
@@ -193,6 +215,12 @@ impl std::fmt::Display for LinguisticFrameError {
         match self {
             Self::EmptyLexicalProvenance => {
                 write!(f, "lexical binding requires non-empty provenance")
+            }
+            Self::MissingLexicalProvenance => {
+                write!(f, "lexically bound frames require lexical provenance")
+            }
+            Self::NonLexicalProvenance => {
+                write!(f, "role-only frames must not carry lexical provenance")
             }
             Self::NonContiguousPositions => {
                 write!(f, "constituent positions must be contiguous from zero")
@@ -311,6 +339,24 @@ mod tests {
         let mut frame = LinguisticFrame::from_speech_plan(&plan_for(4, 0.0));
         frame.bind_lexical_provenance("lexicalizer:v1").unwrap();
         assert_eq!(frame.binding_status, LinguisticBindingStatus::LexicallyBound);
+        assert_eq!(frame.lexical_provenance.as_deref(), Some("lexicalizer:v1"));
+        assert!(frame.validate().is_ok());
+    }
+
+    #[test]
+    fn persisted_lexical_state_requires_provenance() {
+        let mut frame = LinguisticFrame::from_speech_plan(&plan_for(4, 0.0));
+        frame.binding_status = LinguisticBindingStatus::LexicallyBound;
+        let error = frame.validate().expect_err("missing provenance must fail closed");
+        assert_eq!(error, LinguisticFrameError::MissingLexicalProvenance);
+    }
+
+    #[test]
+    fn role_only_state_rejects_stale_provenance() {
+        let mut frame = LinguisticFrame::from_speech_plan(&plan_for(4, 0.0));
+        frame.lexical_provenance = Some("stale".to_string());
+        let error = frame.validate().expect_err("stale provenance must fail closed");
+        assert_eq!(error, LinguisticFrameError::NonLexicalProvenance);
     }
 
     #[test]
