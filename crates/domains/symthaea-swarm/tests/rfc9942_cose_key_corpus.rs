@@ -83,7 +83,12 @@ fn cose_key_with_indefinite_root(extra_fields: usize, include_break: bool) -> Ve
     let mut fields = valid_fields();
     for label in 0..extra_fields {
         let label = 5u8.checked_add(label as u8).expect("test label must fit");
-        fields.push(vec![label, 0x00]);
+        let mut key = match label {
+            0..=23 => vec![label],
+            _ => vec![0x18, label],
+        };
+        key.push(0x00);
+        fields.push(key);
     }
     indefinite_map(&fields, include_break)
 }
