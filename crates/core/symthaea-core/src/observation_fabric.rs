@@ -3081,6 +3081,52 @@ mod tests {
         );
     }
     #[test]
+    fn independence_scope_canonical_bytes_are_the_fingerprint_preimage() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let bytes = graph
+            .independence_verification_scope_canonical_bytes()
+            .expect("scope bytes");
+        let fingerprint = graph
+            .independence_verification_scope_fingerprint()
+            .expect("scope fingerprint");
+
+        assert!(bytes.starts_with(b"symthaea:observation-independence-scope:v1\n"));
+        assert_eq!(bytes.len(), bytes.len());
+        assert_eq!(blake3::hash(&bytes).to_hex().to_string(), fingerprint);
+    }
+
+    #[test]
+    fn independence_scope_identity_fails_closed_for_invalid_graphs() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let relation = ObservationRelation {
+            source_observation_id: "obs-001".into(),
+            target_observation_id: "obs-002".into(),
+            kind: ObservationRelationKind::Supports,
+            independence: EvidenceIndependence::Unknown,
+        };
+        let invalid = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![relation.clone(), relation],
+        };
+
+        assert_eq!(
+            invalid.independence_verification_scope_canonical_bytes(),
+            Err(ObservationValidationError::DuplicateObservationRelation)
+        );
+        assert_eq!(
+            invalid.independence_verification_scope_fingerprint(),
+            Err(ObservationValidationError::DuplicateObservationRelation)
+        );
+    }
+    #[test]
     fn independence_receipt_is_attestation_ready() {
         let mut second = fixture();
         second.id = "obs-002".into();
