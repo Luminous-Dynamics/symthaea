@@ -34,6 +34,13 @@ pub const POLICY_VERSION: &str = "symthaea-observation-verification-policy-v1";
 pub const VERIFIER_IMPLEMENTATION_ID: &str = "symthaea-observation-attestation-ed25519-v1";
 pub const ENVIRONMENT_IDENTITY_VERSION: &str = "symthaea-verifier-environment-v1";
 
+fn is_blake3_fingerprint(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationPolicyInputs {
     pub policy_version: &'static str,
@@ -59,7 +66,10 @@ impl VerificationPolicyInputs {
             && self.require_active_verification_method
             && optional_nonempty(&self.expected_proof_purpose)
             && optional_nonempty(&self.expected_domain)
-            && optional_nonempty(&self.expected_challenge_fingerprint)
+            && self
+                .expected_challenge_fingerprint
+                .as_deref()
+                .is_none_or(is_blake3_fingerprint)
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -743,7 +753,7 @@ impl ReceiptAttestationVerificationReport {
         };
 
         supported_version
-            && !self.receipt_fingerprint.is_empty()
+            && is_blake3_fingerprint(&self.receipt_fingerprint)
             && self.policy_inputs.is_well_formed()
             && self.environment_identity.is_well_formed()
             && self.policy_fingerprint == self.policy_inputs.fingerprint()
@@ -1479,8 +1489,8 @@ impl EvidenceEvaluation {
     pub fn is_well_formed(&self) -> bool {
         self.evaluation_version == EVIDENCE_EVALUATION_VERSION
             && self.evaluation_type == ATTESTATION_VERIFICATION_EVALUATION_TYPE
-            && !self.subject_fingerprint.is_empty()
-            && !self.verification_report_fingerprint.is_empty()
+            && is_blake3_fingerprint(&self.subject_fingerprint)
+            && is_blake3_fingerprint(&self.verification_report_fingerprint)
             && self.context.is_well_formed()
             && self.context_fingerprint == self.context.fingerprint()
             && self.execution_trace.is_well_formed()
@@ -2504,6 +2514,34 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn fingerprint_shape_validation_rejects_noncanonical_digests() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let mut report = verifier.verify_report(&envelope, &receipt);
+
+        assert!(is_blake3_fingerprint(&report.receipt_fingerprint));
+        assert!(report.is_well_formed());
+
+        report.receipt_fingerprint = "not-a-fingerprint".into();
+        assert!(!report.is_well_formed());
+
+        let report = verifier.verify_report(&envelope, &receipt);
+        let mut evaluation = report.to_evidence_evaluation();
+        assert!(evaluation.is_well_formed());
+
+        evaluation.subject_fingerprint = "not-a-fingerprint".into();
+        assert!(!evaluation.is_well_formed());
+
+        let mut evaluation = report.to_evidence_evaluation();
+        evaluation.verification_report_fingerprint = "not-a-fingerprint".into();
+        assert!(!evaluation.is_well_formed());
+    }
 
     #[test]
     fn policy_self_validation_rejects_unsupported_lifecycle_mode() {
