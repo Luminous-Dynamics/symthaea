@@ -1392,7 +1392,11 @@ impl Rfc9942ReceiptCollection {
     }
 
     fn from_reader(reader: &mut CborReader<'_>) -> Result<Self, Rfc9942VdpError> {
-        let items=reader.read_array_items_bounded(MAX_RFC9942_RECEIPTS).map_err(|error|match error {
+        let items=reader.read_bstr_items_bounded(
+            MAX_RFC9942_RECEIPTS,
+            MAX_RFC9942_RECEIPT_BYTES,
+            MAX_RFC9942_RECEIPTS_BYTES_TOTAL,
+        ).map_err(|error|match error {
             Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded,
             _=>Rfc9942VdpError::InvalidEncoding,
         })?;
@@ -1401,20 +1405,7 @@ impl Rfc9942ReceiptCollection {
         }
 
         let mut receipts = Vec::with_capacity(items.len());
-        let mut total_bytes = 0usize;
-        for item in items {
-            let mut item_reader=CborReader::new(&item);
-            let encoded = item_reader.read_bstr_bounded(MAX_RFC9942_RECEIPT_BYTES)
-                .map_err(|error|match error {
-                    Rfc9162ProofDecodeError::InvalidStructure => Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded,
-                    _ => Rfc9942VdpError::InvalidEncoding,
-                })?;
-            item_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-            total_bytes = total_bytes.checked_add(encoded.len())
-                .ok_or(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded)?;
-            if total_bytes > MAX_RFC9942_RECEIPTS_BYTES_TOTAL {
-                return Err(Rfc9942VdpError::ReceiptCollectionResourceLimitExceeded);
-            }
+        for encoded in items {
             let receipt = Rfc9942ReceiptEnvelope::from_cbor(&encoded)
                 .map_err(|_|Rfc9942VdpError::InvalidReceiptStructure)?;
             receipts.push(receipt);
@@ -1802,24 +1793,16 @@ impl Rfc9942Vdp {
         let kind=Rfc9942ProofKind::from_label(label).ok_or(Rfc9942VdpError::InvalidStructure)?;
 
         let mut value_reader=CborReader::new(value_bytes);
-        let items=value_reader.read_array_items_bounded(MAX_RFC9942_PROOFS)
-            .map_err(|error|match error {
-                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
-                _=>Rfc9942VdpError::InvalidEncoding,
-            })?;
+        let proofs=value_reader.read_bstr_items_bounded(
+            MAX_RFC9942_PROOFS,
+            MAX_RFC9942_PROOF_BYTES,
+            MAX_RFC9942_PROOFS*MAX_RFC9942_PROOF_BYTES,
+        ).map_err(|error|match error {
+            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+            _=>Rfc9942VdpError::InvalidEncoding,
+        })?;
         value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-        if items.is_empty(){return Err(Rfc9942VdpError::EmptyProofCollection);}
-
-        let mut proofs=Vec::with_capacity(items.len());
-        for item in items{
-            let mut item_reader=CborReader::new(&item);
-            let proof=item_reader.read_bstr_bounded(MAX_RFC9942_PROOF_BYTES).map_err(|e|match e{
-                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
-                _=>Rfc9942VdpError::InvalidEncoding,
-            })?;
-            item_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-            proofs.push(proof);
-        }
+        if proofs.is_empty(){return Err(Rfc9942VdpError::EmptyProofCollection);}
         Self::new(kind,proofs)
     }
 
@@ -2492,6 +2475,71 @@ impl<'a> CborReader<'a> {
         }
         Ok(items)
     }
+
+    /// Decode a bounded array whose members are bstr values.
+    ///
+    /// This is used where the surrounding RFC 9942 profile gives the bstr
+    /// members a larger limit than the generic opaque-value scanner. Returning
+    /// the decoded bstr payloads directly avoids first passing them through the
+    /// generic 4 KiB skip_value bstr cap.
+    fn read_bstr_items_bounded(
+        &mut self,
+        max_items: usize,
+        max_item_len: usize,
+        max_total_len: usize,
+    ) -> Result<Vec<Vec<u8>>, Rfc9162ProofDecodeError> {
+        let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        self.offset+=1;
+        if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
+        let ai=initial&0x1f;
+        let count=if ai==31 {
+            None
+        } else {
+            let count=match ai{
+                0..=23=>ai as u64,
+                24=>self.read_uint(1,24)?,
+                25=>self.read_uint(2,256)?,
+                26=>self.read_uint(4,65_536)?,
+                27=>self.read_uint(8,4_294_967_296)?,
+                _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+            };
+            Some(usize::try_from(count).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?)
+        };
+        if count.is_some_and(|count| count>max_items) {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+
+        let mut items=Vec::new();
+        if let Some(count)=count {
+            items.reserve(count);
+            for _ in 0..count {
+                let item=self.read_bstr_bounded(max_item_len)?;
+                let total=items.iter().map(Vec::len).sum::<usize>();
+                if total>max_total_len.saturating_sub(item.len()) {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                items.push(item);
+            }
+            return Ok(items);
+        }
+
+        loop {
+            if self.bytes.get(self.offset).copied()==Some(0xff) {
+                self.offset+=1;
+                return Ok(items);
+            }
+            if items.len()>=max_items {
+                return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            }
+            let item=self.read_bstr_bounded(max_item_len)?;
+            let total=items.iter().map(Vec::len).sum::<usize>();
+            if total>max_total_len.saturating_sub(item.len()) {
+                return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            }
+            items.push(item);
+        }
+    }
+
 }
 
 fn rfc9162_ceil_log2(n: u64) -> usize {
