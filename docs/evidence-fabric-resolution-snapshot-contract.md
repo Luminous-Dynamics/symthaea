@@ -23,7 +23,9 @@ from one atomic or otherwise consistency-preserving view.
 
 A caller MUST NOT assume that calling `resolve()` and then `snapshot_fingerprint_for()` is atomic.
 
-The default trait implementation intentionally exists for source compatibility with existing resolvers. It is a compatibility fallback, not an atomicity guarantee.
+The compatibility default for `resolve_with_snapshot` performs only the resolution and returns `snapshot_fingerprint: None`. It intentionally does not combine two independently observed states and therefore does not make an atomicity claim.
+
+Resolvers that can provide a consistency-preserving or atomic view MUST override `resolve_with_snapshot` before returning a snapshot identifier. The in-memory resolver does so by deriving its method-scoped snapshot from the exact resolved method value it returns.
 
 ### 2. Snapshot identifiers are opaque
 
@@ -100,4 +102,4 @@ The primary failure this contract prevents is state skew:
 
 That evidence is internally coherent only at the serialization layer; it does not prove that B produced the key actually used for verification.
 
-The atomic `resolve_with_snapshot` contract removes this ambiguity for resolvers that can provide a consistency-preserving view.
+The atomic `resolve_with_snapshot` contract removes this ambiguity for resolvers that can provide a consistency-preserving view. The compatibility default no longer pretends to provide that guarantee.
