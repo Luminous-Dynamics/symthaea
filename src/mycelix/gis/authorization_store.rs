@@ -4940,7 +4940,16 @@ mod tests {
     };
 
     fn fixture(path: &Path) -> (SqliteAuthorizationStore, EpistemicAction, ActionAuthorizationWitness) {
-        let store = SqliteAuthorizationStore::open(path).unwrap();
+        let fixed_now = "2026-10-03T12:00:00Z".parse::<DateTime<Utc>>().unwrap();
+        let store = SqliteAuthorizationStore::open_with_relying_party_clock_and_policy(
+            path,
+            "legacy-local",
+            Arc::new(FixedClock {
+                now: fixed_now,
+                source_id: AuthorizationClockPolicy::CLOCK_SOURCE_ID,
+            }),
+            AuthorizationClockPolicy::default(),
+        ).unwrap();
         let action = EpistemicAction::new("durable-action","intervention",super::super::ActionRisk::Critical);
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
