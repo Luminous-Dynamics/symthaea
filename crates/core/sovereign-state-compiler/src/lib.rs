@@ -877,18 +877,46 @@ fn validate_artifacts(artifacts: &[ArtifactRef]) -> Result<(), PlanValidationErr
 }
 
 fn validate_step_capability_semantics(step: &PlanStep) -> Result<(), PlanValidationError> {
-    let required = match step.kind {
-        PlanStepKind::Observe | PlanStepKind::Verify => Capability::ObserveState,
-        PlanStepKind::Reboot => Capability::Reboot,
-        PlanStepKind::Rollback => Capability::Rollback,
-        PlanStepKind::StageArtifacts | PlanStepKind::ApplyDesiredState => return Ok(()),
-    };
-
-    if !step.required_capabilities.contains(&required) {
-        return Err(PlanValidationError::StepMissingSemanticCapability {
-            kind: step.kind.clone(),
-            capability: required,
-        });
+    match step.kind {
+        PlanStepKind::Observe | PlanStepKind::Verify => {
+            if !step.required_capabilities.contains(&Capability::ObserveState) {
+                return Err(PlanValidationError::StepMissingSemanticCapability {
+                    kind: step.kind.clone(),
+                    capability: Capability::ObserveState,
+                });
+            }
+        }
+        PlanStepKind::Reboot => {
+            if !step.required_capabilities.contains(&Capability::Reboot) {
+                return Err(PlanValidationError::StepMissingSemanticCapability {
+                    kind: step.kind.clone(),
+                    capability: Capability::Reboot,
+                });
+            }
+        }
+        PlanStepKind::Rollback => {
+            if !step.required_capabilities.contains(&Capability::Rollback) {
+                return Err(PlanValidationError::StepMissingSemanticCapability {
+                    kind: step.kind.clone(),
+                    capability: Capability::Rollback,
+                });
+            }
+        }
+        PlanStepKind::StageArtifacts | PlanStepKind::ApplyDesiredState => {
+            let has_effect_capability = step.required_capabilities.iter().any(|capability| {
+                !matches!(
+                    capability,
+                    Capability::ObserveState
+                        | Capability::ObserveHardware
+                        | Capability::AttestState
+                )
+            });
+            if !has_effect_capability {
+                return Err(PlanValidationError::StepMissingMutationCapability(
+                    step.kind.clone(),
+                ));
+            }
+        }
     }
 
     Ok(())
@@ -998,6 +1026,8 @@ pub enum PlanValidationError {
         kind: PlanStepKind,
         capability: Capability,
     },
+    #[error("mutating plan step {0:?} must explicitly require at least one effect capability")]
+    StepMissingMutationCapability(PlanStepKind),
     #[error("plan step sequence overflowed")]
     SequenceOverflow,
     #[error("rollback attempts are configured without rollback permission")]
@@ -1667,6 +1697,39 @@ mod tests {
             plan.validate(),
             Err(PlanValidationError::NonContiguousPlanSequence)
         );
+    }
+
+    #[test]
+    fn rejects_mutating_step_without_effect_capability() {
+        let mut plan = sample_plan();
+        plan.steps[1].required_capabilities.clear();
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::StepMissingMutationCapability(
+                PlanStepKind::ApplyDesiredState
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_mutating_step_with_observation_only_capabilities() {
+        let mut plan = sample_plan();
+        plan.steps[1].required_capabilities =
+            [Capability::ObserveState, Capability::AttestState].into_iter().collect();
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::StepMissingMutationCapability(
+                PlanStepKind::ApplyDesiredState
+            ))
+        );
+    }
+
+    #[test]
+    fn accepts_mutating_step_with_effect_capability() {
+        let plan = sample_plan();
+        assert!(plan.validate().is_ok());
     }
 
     #[test]
