@@ -284,6 +284,9 @@ pub struct HdcOntologyConformalCalibration {
     pub threshold: f64,
     pub calibration_case_count: usize,
     pub codebook_hash: String,
+    /// Canonical hash of the complete candidate universe used for calibration.
+    pub candidate_universe_hash: String,
+    pub candidate_universe_size: usize,
     /// Exact nonconformity definition used to produce `threshold`.
     pub score_revision: String,
 }
@@ -291,10 +294,12 @@ pub struct HdcOntologyConformalCalibration {
 impl HdcOntologyConformalCalibration {
     pub fn from_nonconformity_scores(
         codebook_hash: impl Into<String>,
+        candidate_universe: &[String],
         calibration_scores: &[f64],
         alpha: f64,
     ) -> Result<Self, String> {
         let codebook_hash = codebook_hash.into();
+        let candidate_universe_hash = candidate_universe_hash(candidate_universe)?;
         if codebook_hash.trim().is_empty() {
             return Err("conformal calibration requires a codebook hash".into());
         }
@@ -329,6 +334,8 @@ impl HdcOntologyConformalCalibration {
             threshold: sorted[rank - 1],
             calibration_case_count: n,
             codebook_hash,
+            candidate_universe_hash,
+            candidate_universe_size: candidate_universe.len(),
             score_revision: HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION.into(),
         })
     }
@@ -351,6 +358,15 @@ impl HdcOntologyConformalCalibration {
     ) -> Result<Vec<String>, String> {
         if !self.validates() {
             return Err("invalid HDC ontology conformal calibration".into());
+        }
+        let candidate_ids = candidates
+            .iter()
+            .map(|candidate| candidate.stable_id.clone())
+            .collect::<Vec<_>>();
+        if candidate_universe_hash(&candidate_ids)? != self.candidate_universe_hash
+            || candidate_ids.len() != self.candidate_universe_size
+        {
+            return Err("conformal candidate universe does not match calibration scope".into());
         }
         let mut ids = BTreeSet::new();
         let mut selected = Vec::new();
@@ -389,6 +405,8 @@ impl HdcOntologyConformalCalibration {
             && (0.0..=1.0).contains(&self.threshold)
             && self.calibration_case_count > 0
             && !self.codebook_hash.trim().is_empty()
+            && !self.candidate_universe_hash.trim().is_empty()
+            && self.candidate_universe_size > 0
             && self.score_revision == HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION
     }
 }
@@ -1371,6 +1389,19 @@ fn selection_stats(
     Ok((min_selected, min_selected - max_unselected))
 }
 
+fn candidate_universe_hash(stable_ids: &[String]) -> Result<String, String> {
+    if stable_ids.is_empty() {
+        return Err("conformal candidate universe cannot be empty".into());
+    }
+    let mut ids = BTreeSet::new();
+    for stable_id in stable_ids {
+        if stable_id.trim().is_empty() || !ids.insert(stable_id.clone()) {
+            return Err("conformal candidate universe IDs must be unique and non-empty".into());
+        }
+    }
+    hash_json(&ids.into_iter().collect::<Vec<_>>())
+}
+
 fn edge_candidate_count(node_count: usize, relation_count: usize) -> Result<usize, String> {
     node_count
         .checked_mul(relation_count)
@@ -1530,6 +1561,7 @@ mod tests {
     fn conformal_rank_is_finite_sample_conservative() {
         let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
             "codebook",
+            &["a".into(), "b".into(), "c".into()],
             &[0.10, 0.20, 0.30],
             0.10,
         )
@@ -1577,6 +1609,7 @@ mod tests {
     fn conformal_prediction_set_is_thresholded_and_deterministic() {
         let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
             "codebook",
+            &["a".into(), "m".into(), "q".into(), "z".into()],
             &[0.0, 0.05, 0.1, 0.2],
             0.50,
         )
@@ -1590,12 +1623,27 @@ mod tests {
             HdcOntologyRetrievalCandidate { stable_id: "q".into(), score: -1.0 },
         ];
         assert_eq!(calibration.prediction_set(&candidates).unwrap(), vec!["a", "z"]);
+        let reordered = vec![
+            HdcOntologyRetrievalCandidate { stable_id: "q".into(), score: -1.0 },
+            HdcOntologyRetrievalCandidate { stable_id: "z".into(), score: 0.8 },
+            HdcOntologyRetrievalCandidate { stable_id: "a".into(), score: 1.0 },
+            HdcOntologyRetrievalCandidate { stable_id: "m".into(), score: 0.6 },
+        ];
+        assert_eq!(calibration.prediction_set(&reordered).unwrap(), vec!["a", "z"]);
+        let wrong_universe = vec![
+            HdcOntologyRetrievalCandidate { stable_id: "a".into(), score: 1.0 },
+            HdcOntologyRetrievalCandidate { stable_id: "m".into(), score: 0.6 },
+            HdcOntologyRetrievalCandidate { stable_id: "x".into(), score: 0.8 },
+            HdcOntologyRetrievalCandidate { stable_id: "z".into(), score: 0.8 },
+        ];
+        assert!(calibration.prediction_set(&wrong_universe).is_err());
     }
 
     #[test]
     fn conformal_prediction_set_rejects_ambiguous_candidates() {
         let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
             "codebook",
+            &["x".into(), "y".into(), "z".into()],
             &[0.1, 0.2, 0.3],
             0.10,
         )
@@ -1616,12 +1664,14 @@ mod tests {
     fn conformal_calibration_rejects_invalid_scores_and_alpha() {
         assert!(HdcOntologyConformalCalibration::from_nonconformity_scores(
             "codebook",
+            &["a".into(), "b".into()],
             &[0.1, f64::NAN],
             0.10,
         )
         .is_err());
         assert!(HdcOntologyConformalCalibration::from_nonconformity_scores(
             "codebook",
+            &["a".into(), "b".into()],
             &[0.1, 0.2],
             1.0,
         )
