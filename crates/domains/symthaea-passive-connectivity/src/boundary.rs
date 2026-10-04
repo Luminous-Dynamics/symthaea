@@ -16,6 +16,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use symthaea_fabrication_kernel::mesh::TriangleMesh;
+use symthaea_passive_solver_binding::{select_boundary_patch, BoundaryEdgeKey};
 use symthaea_fabrication_kernel::validate::validate_mesh;
 use symthaea_passive_void_compiler::{GeometryEmbedding, PortInterface};
 use symthaea_passive_void_graph::PortId;
@@ -159,7 +160,9 @@ impl PortBoundaryEvidence {
 
         let boundary_edges = collect_boundary_edges(candidate);
         let mut missing_port_anchors = Vec::new();
-        let mut valid_ports = Vec::new();
+        let mut legacy_ports = Vec::new();
+        let mut typed_edge_owners: BTreeMap<BoundaryEdgeKey, BTreeSet<PortId>> = BTreeMap::new();
+        let tolerance_mm = policy.tolerance_micrometers as f64 / 1_000.0;
 
         for port in &policy.allowed_open_ports {
             match policy
@@ -169,7 +172,16 @@ impl PortBoundaryEvidence {
             {
                 Some(interface) => match interface.validate(0.001) {
                     Ok(()) => {
-                        valid_ports.push(PortBoundaryGeometry::Typed(*interface));
+                        if let Ok(selection) =
+                            select_boundary_patch(interface, candidate, tolerance_mm)
+                        {
+                            for edge in selection.edges() {
+                                typed_edge_owners
+                                    .entry(*edge)
+                                    .or_default()
+                                    .insert(*port);
+                            }
+                        }
                     }
                     Err(_) => missing_port_anchors.push(*port),
                 },
@@ -179,7 +191,7 @@ impl PortBoundaryEvidence {
                             && anchor.radius_mm.is_finite()
                             && anchor.radius_mm > 0.0 =>
                     {
-                        valid_ports.push(PortBoundaryGeometry::Legacy {
+                        legacy_ports.push(PortBoundaryGeometry::Legacy {
                             port: *port,
                             center_mm: anchor.center_mm,
                             radius_mm: anchor.radius_mm,
@@ -207,21 +219,23 @@ impl PortBoundaryEvidence {
         let mut unexpected = 0usize;
         let mut ambiguous = 0usize;
         let mut matched_by_port = BTreeSet::new();
-        let tolerance_mm = policy.tolerance_micrometers as f64 / 1_000.0;
 
-        for (a, b, midpoint) in boundary_edges {
-            let mut matches = Vec::new();
-            for port_geometry in &valid_ports {
-                if port_geometry.matches(a, b, midpoint, tolerance_mm) {
-                    matches.push(port_geometry.port());
+        for (edge_key, midpoint) in boundary_edges {
+            let mut matches = typed_edge_owners
+                .get(&edge_key)
+                .cloned()
+                .unwrap_or_default();
+            for port_geometry in &legacy_ports {
+                if port_geometry.matches(midpoint, tolerance_mm) {
+                    matches.insert(port_geometry.port());
                 }
             }
 
-            match matches.as_slice() {
-                [] => unexpected += 1,
-                [port] => {
+            match matches.len() {
+                0 => unexpected += 1,
+                1 => {
                     matched += 1;
-                    matched_by_port.insert(*port);
+                    matched_by_port.extend(matches);
                 }
                 _ => ambiguous += 1,
             }
@@ -273,7 +287,6 @@ impl PortBoundaryEvidence {
 
 #[derive(Debug, Clone, Copy)]
 enum PortBoundaryGeometry {
-    Typed(PortInterface),
     Legacy {
         port: PortId,
         center_mm: [f32; 3],
@@ -284,31 +297,17 @@ enum PortBoundaryGeometry {
 impl PortBoundaryGeometry {
     fn port(self) -> PortId {
         match self {
-            Self::Typed(interface) => interface.port,
             Self::Legacy { port, .. } => port,
         }
     }
 
-    fn matches(
-        self,
-        a: QuantizedPoint,
-        b: QuantizedPoint,
-        midpoint: [f64; 3],
-        tolerance_mm: f64,
-    ) -> bool {
+    fn matches(self, midpoint: [f64; 3], tolerance_mm: f64) -> bool {
         match self {
             Self::Legacy {
                 center_mm,
                 radius_mm,
                 ..
             } => distance_mm(midpoint, center_mm) <= radius_mm as f64 + tolerance_mm,
-            Self::Typed(interface) => typed_interface_matches(
-                a,
-                b,
-                midpoint,
-                interface,
-                tolerance_mm,
-            ),
         }
     }
 }
@@ -316,82 +315,7 @@ impl PortBoundaryGeometry {
 type QuantizedPoint = [i64; 3];
 type QuantizedEdge = (QuantizedPoint, QuantizedPoint);
 
-fn typed_interface_matches(
-    a: QuantizedPoint,
-    b: QuantizedPoint,
-    midpoint: [f64; 3],
-    interface: PortInterface,
-    tolerance_mm: f64,
-) -> bool {
-    let plane_origin = interface.interface_plane.origin_mm;
-    let plane_normal = interface.interface_plane.normal_unit;
-    let center = interface.position_mm;
-    let radius = interface.radius_mm() as f64;
-
-    let a_mm = dequantize(a);
-    let b_mm = dequantize(b);
-    let endpoints = [a_mm, b_mm, midpoint];
-
-    if endpoints
-        .iter()
-        .any(|point| plane_distance(*point, plane_origin, plane_normal).abs() > tolerance_mm)
-    {
-        return false;
-    }
-
-    let edge_delta = [
-        b_mm[0] - a_mm[0],
-        b_mm[1] - a_mm[1],
-        b_mm[2] - a_mm[2],
-    ];
-    let edge_length =
-        (edge_delta[0] * edge_delta[0] + edge_delta[1] * edge_delta[1] + edge_delta[2] * edge_delta[2])
-            .sqrt();
-    if !edge_length.is_finite() || edge_length <= 1.0e-9 {
-        return false;
-    }
-
-    // For a circular aperture, the open-boundary rim is near the declared
-    // aperture circumference. The edge-length allowance accounts for polygonal
-    // chord approximation without permitting an arbitrary interior hole.
-    let radial_tolerance = tolerance_mm;
-    let endpoint_radii = [
-        radial_distance_from_plane(a_mm, center, plane_normal),
-        radial_distance_from_plane(b_mm, center, plane_normal),
-    ];
-
-    endpoint_radii
-        .iter()
-        .all(|distance| (distance - radius).abs() <= radial_tolerance)
-}
-
-fn quantize(point: [f32; 3]) -> QuantizedPoint {
-    [
-        (point[0] as f64 * 1_000_000.0).round() as i64,
-        (point[1] as f64 * 1_000_000.0).round() as i64,
-        (point[2] as f64 * 1_000_000.0).round() as i64,
-    ]
-}
-
-fn dequantize(point: QuantizedPoint) -> [f64; 3] {
-    [
-        point[0] as f64 / 1_000_000.0,
-        point[1] as f64 / 1_000_000.0,
-        point[2] as f64 / 1_000_000.0,
-    ]
-}
-
-fn edge_key(a: QuantizedPoint, b: QuantizedPoint) -> QuantizedEdge {
-    if a <= b {
-        (a, b)
-    } else {
-        (b, a)
-    }
-}
-
-fn collect_boundary_edges(
-    mesh: &TriangleMesh,
-) -> Vec<(QuantizedPoint, QuantizedPoint, [f64; 3])> {
+fn collect_boundary_edges(mesh: &TriangleMesh) -> Vec<(BoundaryEdgeKey, [f64; 3])> {
     let mut edges: HashMap<QuantizedEdge, [f64; 3]> = HashMap::new();
     let mut counts: HashMap<QuantizedEdge, usize> = HashMap::new();
 
@@ -425,7 +349,7 @@ fn collect_boundary_edges(
     let mut boundary = Vec::new();
     for ((a, b), center) in edges {
         if counts.get(&(a, b)).copied().unwrap_or(0) == 1 {
-            boundary.push((a, b, center));
+            boundary.push((BoundaryEdgeKey { a, b }, center));
         }
     }
     boundary
@@ -437,45 +361,6 @@ fn midpoint(a: [f32; 3], b: [f32; 3]) -> [f64; 3] {
         (a[1] as f64 + b[1] as f64) / 2.0,
         (a[2] as f64 + b[2] as f64) / 2.0,
     ]
-}
-
-fn plane_distance(
-    point: [f64; 3],
-    origin: [f32; 3],
-    normal: [f32; 3],
-) -> f64 {
-    let dx = point[0] - origin[0] as f64;
-    let dy = point[1] - origin[1] as f64;
-    let dz = point[2] - origin[2] as f64;
-    dx * normal[0] as f64 + dy * normal[1] as f64 + dz * normal[2] as f64
-}
-
-fn radial_distance_from_plane(
-    point: [f64; 3],
-    center: [f32; 3],
-    normal: [f32; 3],
-) -> f64 {
-    let delta = [
-        point[0] - center[0] as f64,
-        point[1] - center[1] as f64,
-        point[2] - center[2] as f64,
-    ];
-    let axial = delta[0] * normal[0] as f64
-        + delta[1] * normal[1] as f64
-        + delta[2] * normal[2] as f64;
-    let radial = [
-        delta[0] - axial * normal[0] as f64,
-        delta[1] - axial * normal[1] as f64,
-        delta[2] - axial * normal[2] as f64,
-    ];
-    (radial[0] * radial[0] + radial[1] * radial[1] + radial[2] * radial[2]).sqrt()
-}
-
-fn distance_mm(a: [f64; 3], b: [f32; 3]) -> f64 {
-    let dx = a[0] - b[0] as f64;
-    let dy = a[1] - b[1] as f64;
-    let dz = a[2] - b[2] as f64;
-    (dx * dx + dy * dy + dz * dz).sqrt()
 }
 
 #[cfg(test)]
