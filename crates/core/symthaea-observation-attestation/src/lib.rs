@@ -411,6 +411,22 @@ impl EvaluationCheck {
     }
 }
 
+/// Frozen check sequence for the historical v1 attestation procedure.
+///
+/// Never append, remove, reorder, or reinterpret entries in this table. A future
+/// procedure evolution must change EvaluationCheck::ALL and leave this table
+/// untouched unless the historical v1 identity is intentionally retired.
+const LEGACY_EVALUATION_CHECKS_V1: &[EvaluationCheck] = &[
+    EvaluationCheck::EnvelopeStructuralValidation,
+    EvaluationCheck::ReceiptCommitment,
+    EvaluationCheck::TemporalValidity,
+    EvaluationCheck::CryptosuiteConformance,
+    EvaluationCheck::VerificationMethodResolution,
+    EvaluationCheck::VerificationMethodLifecycle,
+    EvaluationCheck::ProofPurposeAuthorization,
+    EvaluationCheck::ProofPolicyConformance,
+    EvaluationCheck::CryptographicProof,
+];
 /// Structured stage-by-stage verification evidence. This deliberately does not
 /// collapse evidence into an aggregate trust score.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -434,7 +450,7 @@ impl EvaluationProcedure {
         Self {
             procedure_version: "symthaea-observation-evaluation-procedure-v1",
             procedure_id: EVALUATION_PROCEDURE_ID,
-            checks: EvaluationCheck::ALL,
+            checks: LEGACY_EVALUATION_CHECKS_V1,
         }
     }
 
@@ -2547,6 +2563,31 @@ mod tests {
         assert!(!policy.is_well_formed());
     }
 
+    #[test]
+    fn legacy_procedure_uses_frozen_check_sequence() {
+        let procedure = EvaluationProcedure::attestation_ed25519_v1();
+
+        assert_eq!(procedure.checks, LEGACY_EVALUATION_CHECKS_V1);
+        assert_eq!(procedure.checks.len(), 9);
+        assert_eq!(
+            procedure
+                .checks
+                .iter()
+                .map(|check| check.id())
+                .collect::<Vec<_>>(),
+            vec![
+                "envelope-structural-validation",
+                "receipt-commitment",
+                "temporal-validity",
+                "cryptosuite-conformance",
+                "verification-method-resolution",
+                "verification-method-lifecycle",
+                "proof-purpose-authorization",
+                "proof-policy-conformance",
+                "cryptographic-proof",
+            ]
+        );
+    }
     #[test]
     fn policy_self_validation_rejects_unsupported_lifecycle_mode() {
         let (envelope, signing_key, receipt) = envelope_and_key();
