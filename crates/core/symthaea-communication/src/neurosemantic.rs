@@ -655,6 +655,55 @@ mod tests {
         assert_eq!(decoded, policy);
     }
     #[test]
+    fn legacy_packet_data_policy_defaults_to_unknown_and_cannot_authorize() {
+        let packet = NeurosemanticPacket::new(
+            1,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        assert_eq!(packet.data_policy.data_class, NeurosemanticDataClass::Unknown);
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: 7,
+            lease_id: "lease-1".into(),
+        };
+        assert!(message.validate(&lease(), 150).is_err());
+    }
+
+    #[test]
+    fn packet_policy_purpose_must_match_packet_purpose() {
+        let mut policy = semantic_policy();
+        policy.permitted_purposes = BTreeSet::from([CommunicationPurpose::Research]);
+        let packet = NeurosemanticPacket::new_with_policy(
+            2,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            policy,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        let message = AuthorizedNeurosemanticMessage {
+            packet,
+            consent_epoch: 7,
+            lease_id: "lease-1".into(),
+        };
+        assert!(message.validate(&lease(), 150).is_err());
+    }
+    #[test]
     fn consent_is_deny_by_default() {
         let l = lease();
         assert!(!l.authorizes(
