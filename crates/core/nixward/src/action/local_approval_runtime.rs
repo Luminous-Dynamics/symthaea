@@ -274,7 +274,12 @@ impl std::fmt::Debug for LocalApprovalRuntimeV1 {
     }
 }
 
-fn operator_visible_action_for_command(command: &NixOSCommand) -> String {
+/// Canonical operator-facing rendering for a typed Nixward command.
+///
+/// This is presentation data, not execution authority. Keeping the renderer in
+/// the approval runtime prevents the daemon and approval ceremony from silently
+/// developing different textual representations of the same typed command.
+pub fn operator_visible_action_for_command(command: &NixOSCommand) -> String {
     match command {
         NixOSCommand::ConfigPatch {
             option_path, value, ..
