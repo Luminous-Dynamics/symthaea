@@ -1486,7 +1486,9 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Test evidence-plane contract
-        run: cargo test -p symthaea-evidence-plane --locked
+        env:
+          CARGO_LOG: cargo::core::resolver=trace
+        run: cargo test -p symthaea-evidence-plane --locked -vv
 
   genesis-benchmarks:
     name: Genesis Mission Benchmarks
