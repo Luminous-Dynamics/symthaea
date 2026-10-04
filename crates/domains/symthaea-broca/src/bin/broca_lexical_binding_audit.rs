@@ -16,8 +16,8 @@ use std::path::{Path, PathBuf};
 use symthaea_broca::{
     AgreementConstraint, ConstituentDependency, GrammaticalFunction, LanguageRuleBinding,
     LanguageRuleStatus, LexemeBinding, LexicalBindingError, LexicalMorphosyntacticBinding,
-    LexicalSource, LinguisticFrame, MorphologicalFeature, SpeechPlan, StructuredDecoder,
-    ThoughtChannels,
+    LexicalSource, LinguisticFrame, MorphologicalFeature, PhonemeSlot, PhonologicalPlan,
+    SpeechPlan, StructuredDecoder, SyllableStress, ThoughtChannels,
 };
 use symthaea_core::genesis::GenesisSeed;
 
@@ -38,6 +38,7 @@ struct AuditReport {
     no_invention_pass: bool,
     unsupported_rule_unbound_pass: bool,
     stable_repeat_pass: bool,
+    phonological_handoff_pass: bool,
     cases: Vec<AuditCase>,
 }
 
@@ -279,6 +280,7 @@ fn run_negative(
     language: LanguageRuleBinding,
     bindings: Vec<LexemeBinding>,
     expected_failure: &'static str,
+    matches_expected: fn(&LexicalBindingError) -> bool,
 ) -> AuditCase {
     match bind(frame, language, bindings) {
         Ok(_) => AuditCase {
@@ -294,7 +296,7 @@ fn run_negative(
         Err(error) => AuditCase {
             name,
             polarity: "negative",
-            passed: error.to_string().contains(expected_failure),
+            passed: matches_expected(&error),
             expected_failure: Some(expected_failure),
             observed_error: Some(error.to_string()),
             provenance_token: None,
@@ -364,6 +366,7 @@ fn main() -> Result<()> {
         explicit_language(LanguageRuleStatus::Bound),
         missing,
         "not lexically covered",
+        |error| matches!(error, LexicalBindingError::MissingSemanticCoverage { .. }),
     ));
 
     let mut agreement_gap = statement_bindings.clone();
@@ -381,7 +384,10 @@ fn main() -> Result<()> {
             agreement(&statement_bindings),
         );
         let (passed, error) = match result {
-            Err(error) => (error.to_string().contains("agreement feature"), Some(error.to_string())),
+            Err(error) => (
+                matches!(error, LexicalBindingError::AgreementFeatureMismatch),
+                Some(error.to_string()),
+            ),
             Ok(_) => (false, None),
         };
         AuditCase {
@@ -459,8 +465,8 @@ fn main() -> Result<()> {
         Err(error) => AuditCase {
             name: "abstention-cannot-bind",
             polarity: "negative",
-            passed: true,
-            expected_failure: Some("linguistic"),
+            passed: matches!(error, LexicalBindingError::AbstentionCannotBind),
+            expected_failure: Some("abstention linguistic frames cannot be lexically bound"),
             observed_error: Some(error.to_string()),
             provenance_token: None,
             semantic_items: 1,
@@ -470,10 +476,87 @@ fn main() -> Result<()> {
             name: "abstention-cannot-bind",
             polarity: "negative",
             passed: false,
-            expected_failure: Some("linguistic"),
+            expected_failure: Some("abstention linguistic frames cannot be lexically bound"),
             observed_error: None,
             provenance_token: None,
             semantic_items: 1,
+            inserted_function_words: 0,
+        },
+    });
+
+    let handoff_binding = LexicalMorphosyntacticBinding::new(
+        &statement,
+        explicit_language(LanguageRuleStatus::Bound),
+        statement_bindings.clone(),
+        dependencies(&statement_bindings),
+        agreement(&statement_bindings),
+    )
+    .expect("base lexical fixture must bind");
+
+    let mut phonological_plan = PhonologicalPlan::from_linguistic_frame(&statement);
+    let focus = statement.focus_role.is_some();
+    let handoff_result = phonological_plan.bind_lexical_segments_from_binding(
+        &statement,
+        &handoff_binding,
+        vec![PhonemeSlot::new(
+            "AH",
+            0,
+            SyllableStress::Primary,
+            true,
+            focus,
+            true,
+        )],
+    );
+    cases.push(match handoff_result {
+        Ok(()) => AuditCase {
+            name: "lexical-to-phonological-handoff",
+            polarity: "positive",
+            passed: phonological_plan
+                .validate_against_lexical_binding(&statement, &handoff_binding)
+                .is_ok(),
+            expected_failure: None,
+            observed_error: None,
+            provenance_token: phonological_plan.lexical_provenance.clone(),
+            semantic_items: statement_bindings.len(),
+            inserted_function_words: 0,
+        },
+        Err(error) => AuditCase {
+            name: "lexical-to-phonological-handoff",
+            polarity: "positive",
+            passed: false,
+            expected_failure: None,
+            observed_error: Some(error.to_string()),
+            provenance_token: None,
+            semantic_items: statement_bindings.len(),
+            inserted_function_words: 0,
+        },
+    });
+
+    let mut tampered_handoff = handoff_binding.clone();
+    if let Some(first) = tampered_handoff.constituents.first_mut() {
+        first.lemma.push_str("-tampered");
+    }
+    let tampered_result = phonological_plan
+        .validate_against_lexical_binding(&statement, &tampered_handoff);
+    cases.push(match tampered_result {
+        Err(error) => AuditCase {
+            name: "phonological-rejects-tampered-lexical-lineage",
+            polarity: "negative",
+            passed: matches!(error, symthaea_broca::PhonologicalPlanError::LexicalBindingMismatch),
+            expected_failure: Some("phonological plan lexical provenance does not match the supplied lexical binding"),
+            observed_error: Some(error.to_string()),
+            provenance_token: None,
+            semantic_items: statement_bindings.len(),
+            inserted_function_words: 0,
+        },
+        Ok(()) => AuditCase {
+            name: "phonological-rejects-tampered-lexical-lineage",
+            polarity: "negative",
+            passed: false,
+            expected_failure: Some("phonological plan lexical provenance does not match the supplied lexical binding"),
+            observed_error: None,
+            provenance_token: None,
+            semantic_items: statement_bindings.len(),
             inserted_function_words: 0,
         },
     });
@@ -551,17 +634,28 @@ fn main() -> Result<()> {
         no_invention_pass,
         unsupported_rule_unbound_pass,
         stable_repeat_pass,
+        phonological_handoff_pass,
         cases,
     };
 
     write_report(parse_json_out().as_deref(), &report)?;
+
+    let phonological_handoff_pass = cases
+        .iter()
+        .find(|case| case.name == "lexical-to-phonological-handoff")
+        .is_some_and(|case| case.passed)
+        && cases
+            .iter()
+            .find(|case| case.name == "phonological-rejects-tampered-lexical-lineage")
+            .is_some_and(|case| case.passed);
 
     let all_pass = report.semantic_coverage_pass
         && report.provenance_pass
         && report.grammar_pass
         && report.no_invention_pass
         && report.unsupported_rule_unbound_pass
-        && report.stable_repeat_pass;
+        && report.stable_repeat_pass
+        && phonological_handoff_pass;
 
     println!("{}", serde_json::to_string_pretty(&report)?);
 
