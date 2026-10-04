@@ -12,7 +12,9 @@ use sovereign_state_compiler::{
     AuthorizedDeploymentPlan, Capability, ContentDigest, ResourceRef, TargetId, TargetProfile,
     TargetSnapshot,
 };
-use sovereign_state_compiler_nix::{default_nixos_capabilities, nixos_generation_resource};
+use sovereign_state_compiler_nix::{
+    default_nixos_capabilities, nixos_generation_resource, NixOSTargetAdapter,
+};
 use thiserror::Error;
 
 pub const NIXOS_SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
@@ -64,6 +66,8 @@ pub enum SscObservationError {
     SystemProfileRealizationMismatch,
     #[error("authorized deployment requires an unobserved NixOS resource")]
     AuthorizedResourceMissing(ResourceRef),
+    #[error("NixOS observation could not construct the canonical target adapter: {0}")]
+    AdapterConstruction(String),
 }
 
 impl From<std::io::Error> for SscObservationError {
@@ -185,6 +189,19 @@ impl NixSystemObservation {
         }
 
         Ok(())
+    }
+
+    /// Construct the canonical NixOS SSC adapter from this validated observation.
+    /// This remains read-only: adapter creation captures the exact observation
+    /// snapshot but does not authorize or execute any deployment.
+    pub fn target_adapter(
+        &self,
+        target: impl Into<TargetId>,
+        observed_at_ms: u64,
+    ) -> Result<NixOSTargetAdapter, SscObservationError> {
+        let snapshot = self.target_snapshot(target, observed_at_ms)?;
+        NixOSTargetAdapter::from_snapshot(snapshot)
+            .map_err(|error| SscObservationError::AdapterConstruction(error.to_string()))
     }
 
     pub fn target_snapshot(
@@ -687,6 +704,32 @@ mod tests {
             observation.validate().expect_err("profile mismatch"),
             SscObservationError::SystemProfileRealizationMismatch
         );
+    }
+
+    #[test]
+    fn target_adapter_preserves_exact_observed_snapshot() {
+        let observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+        let adapter = observation.target_adapter("host-01", 123).expect("adapter");
+        let snapshot = adapter.describe_target().expect("snapshot");
+
+        assert_eq!(snapshot.profile.platform, "nixos");
+        assert_eq!(snapshot.profile.identity, TargetId::from("host-01"));
+        assert_eq!(snapshot.observed_at_ms, 123);
+        assert_eq!(snapshot.observation_digest, observation.observation_digest().expect("digest"));
+        assert!(snapshot.resources.contains(
+            &nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                .expect("generation resource")
+        ));
     }
 
     #[test]
