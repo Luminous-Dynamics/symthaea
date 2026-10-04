@@ -2157,8 +2157,49 @@ impl<'a> CborReader<'a> {
             0 | 1 => { self.skip_integer().map(|_|()) }
             2 => { self.read_bstr_bounded(4096).map(|_|()) }
             3 => { self.read_text_bounded(4096).map(|_|()) }
-            4 => { let n=self.read_array_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_value(depth+1)?;} Ok(()) },
-            5 => { let n=self.read_map_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_label()?;self.skip_value(depth+1)?;} Ok(()) },
+            4 => {
+                if self.bytes.get(self.offset).copied().is_some_and(|byte| byte & 0x1f == 31) {
+                    self.offset += 1;
+                    let mut items = 0usize;
+                    loop {
+                        if self.bytes.get(self.offset).copied() == Some(0xff) {
+                            self.offset += 1;
+                            return Ok(());
+                        }
+                        if items >= 64 {
+                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                        }
+                        self.skip_value(depth + 1)?;
+                        items += 1;
+                    }
+                }
+                let n=self.read_array_len()?;
+                if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+                for _ in 0..n{self.skip_value(depth+1)?;}
+                Ok(())
+            },
+            5 => {
+                if self.bytes.get(self.offset).copied().is_some_and(|byte| byte & 0x1f == 31) {
+                    self.offset += 1;
+                    let mut entries = 0usize;
+                    loop {
+                        if self.bytes.get(self.offset).copied() == Some(0xff) {
+                            self.offset += 1;
+                            return Ok(());
+                        }
+                        if entries >= 64 {
+                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                        }
+                        self.skip_label()?;
+                        self.skip_value(depth + 1)?;
+                        entries += 1;
+                    }
+                }
+                let n=self.read_map_len()?;
+                if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+                for _ in 0..n{self.skip_label()?;self.skip_value(depth+1)?;}
+                Ok(())
+            },
             6 => { self.read_tag()?; self.skip_value(depth+1) },
             7 => {
                 let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
@@ -3177,6 +3218,43 @@ mod tests {
         assert_eq!(encoded[vdp_key+3]>>5,5);
         assert_eq!(Rfc9942ReceiptEnvelope::from_cbor(&encoded).unwrap(),receipt);
     }
+    #[test]
+    fn rfc9942_receipt_envelope_accepts_indefinite_extension_containers() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,4);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected,-7);
+        cbor_int(&mut protected,RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected,1);
+        cbor_int(&mut protected,7);
+        protected.push(0x9f);
+        cbor_int(&mut protected,1);
+        cbor_int(&mut protected,2);
+        protected.push(0xff);
+        cbor_int(&mut protected,8);
+        protected.push(0xbf);
+        cbor_text(&mut protected,b"foo");
+        cbor_uint(&mut protected,1);
+        protected.push(0xff);
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,1);
+        cbor_int(&mut bytes,RFC9942_VDP_HEADER_LABEL);
+        bytes.extend_from_slice(&vdp.to_cbor());
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes,&[0xAA;64]);
+
+        let decoded=Rfc9942ReceiptEnvelope::from_cbor(&bytes)
+            .expect("unknown protected extension containers may use valid indefinite CBOR forms");
+        assert_eq!(decoded.to_cbor(),bytes);
+    }
+
     #[test]
     fn rfc9942_receipt_envelope_accepts_standard_extension_labels() {
         let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
