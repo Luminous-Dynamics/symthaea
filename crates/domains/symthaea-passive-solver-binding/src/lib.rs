@@ -219,7 +219,15 @@ impl SolverBoundaryBinding {
             self.solver_entity_mapping_digest,
         ) {
             (SolverBoundaryEvidenceLevel::AdapterAttested, None, None, None, None, None)
-            | (SolverBoundaryEvidenceLevel::SolverEntityAttested, Some(_), Some(_), Some(_), Some(_), Some(_)) => {}
+            | (
+                SolverBoundaryEvidenceLevel::SolverInputEntityAttested
+                    | SolverBoundaryEvidenceLevel::SolverEntityAttested,
+                Some(_),
+                Some(_),
+                Some(_),
+                Some(_),
+                Some(_),
+            ) => {}
             _ => return Err(SolverBindingError::InvalidEvidenceState),
         }
         if self.port != interface.port {
