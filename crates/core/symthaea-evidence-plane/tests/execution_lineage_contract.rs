@@ -61,6 +61,20 @@ fn public_execution_lineage_namespace_exposes_checked_admission_paths() {
 }
 
 #[test]
+fn public_perturbation_classifier_covers_both_invariant_outcomes() {
+    let base = fixture();
+
+    assert_eq!(
+        qualify_lineage_perturbation(&base, &base, false),
+        LineagePerturbationResult::InvariantPreserved
+    );
+    assert_eq!(
+        qualify_lineage_perturbation(&base, &base, true),
+        LineagePerturbationResult::UnexpectedInvariance
+    );
+}
+
+#[test]
 fn workload_identity_is_stable_across_environment_only_changes() {
     let base = fixture();
     let workload = base.workload_digest().unwrap();
