@@ -44,13 +44,139 @@ pub enum FederationValidationOutcome {
     Unresolved(Vec<FederationDependency>),
 }
 
+/// Typed identity of the entity that authored a federated claim.
+///
+/// This remains an identifier only. It does not prove control of keys or authenticity.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ClaimAuthorIdentity(String);
+
+impl ClaimAuthorIdentity {
+    pub fn new(value: impl Into<String>) -> Result<Self, &'static str> {
+        let value = value.into();
+        if value.trim().is_empty() {
+            return Err("claim author identity must be non-empty");
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        if self.0.trim().is_empty() {
+            Err("claim author identity must be non-empty")
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Typed purpose for an authorship proof.
+///
+/// The value is intentionally extensible and substrate-neutral. Deployments may use
+/// standards-defined identifiers such as the W3C assertionMethod URI.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ClaimProofPurpose(String);
+
+impl ClaimProofPurpose {
+    pub fn new(value: impl Into<String>) -> Result<Self, &'static str> {
+        let value = value.into();
+        if value.trim().is_empty() {
+            return Err("claim proof purpose must be non-empty");
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        if self.0.trim().is_empty() {
+            Err("claim proof purpose must be non-empty")
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Typed authorship context for a claim.
+///
+/// Structural validation binds the declared author to the proof context but does not
+/// perform cryptographic verification. That belongs to the eventual adapter/cryptosuite.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ClaimAuthorship {
+    author: ClaimAuthorIdentity,
+    proof_purpose: ClaimProofPurpose,
+    verification_method: Option<String>,
+}
+
+impl ClaimAuthorship {
+    pub fn new(
+        author: ClaimAuthorIdentity,
+        proof_purpose: ClaimProofPurpose,
+        verification_method: Option<String>,
+    ) -> Result<Self, &'static str> {
+        if verification_method
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err("claim verification method must be non-empty when present");
+        }
+        Ok(Self {
+            author,
+            proof_purpose,
+            verification_method,
+        })
+    }
+
+    pub fn author(&self) -> &ClaimAuthorIdentity {
+        &self.author
+    }
+
+    pub fn proof_purpose(&self) -> &ClaimProofPurpose {
+        &self.proof_purpose
+    }
+
+    pub fn verification_method(&self) -> Option<&str> {
+        self.verification_method.as_deref()
+    }
+
+    pub fn digest(&self) -> String {
+        let encoded = (
+            "symthaea:claim-authorship:v1",
+            self.author.as_str(),
+            self.proof_purpose.as_str(),
+            &self.verification_method,
+        );
+        let bytes = serde_json::to_vec(&encoded)
+            .expect("claim authorship is serializable");
+        crate::sha256_hex(&bytes)
+    }
+
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        self.author.validate_structure()?;
+        self.proof_purpose.validate_structure()?;
+        if self
+            .verification_method
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err("claim verification method must be non-empty when present");
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FederatedClaim {
     pub schema_version: u16,
     pub claim_identity: String,
     pub canonical_identity: String,
     pub provenance_family: String,
-    pub author: String,
+    pub author: ClaimAuthorIdentity,
+    pub authorship: Option<ClaimAuthorship>,
     pub statement_ref: String,
     pub source_event: Option<String>,
     pub frontier_ref: Option<String>,
@@ -89,6 +215,7 @@ impl FederatedClaim {
         admission_receipt: CanonicalAdmissionReceipt,
     ) -> Result<Self, &'static str> {
         let representation = ClaimRepresentationIdentity::new(claim_identity)?;
+        let author = ClaimAuthorIdentity::new(author)?;
         let subject = CanonicalAdmissionSubject::new(
             canonical_identity,
             Some(provenance_family.into()),
@@ -99,7 +226,8 @@ impl FederatedClaim {
             claim_identity: representation.as_str().to_owned(),
             canonical_identity: subject.canonical_identity().to_owned(),
             provenance_family: subject.provenance_family().expect("claim subject family").to_owned(),
-            author: author.into(),
+            author: author.clone(),
+            authorship: None,
             statement_ref: statement.statement_ref().to_owned(),
             source_event: None,
             frontier_ref: admission_receipt.frontier_ref.clone(),
@@ -145,7 +273,21 @@ impl FederatedClaim {
         field(&mut bytes, "claim_identity", Some(&self.claim_identity));
         field(&mut bytes, "canonical_identity", Some(&self.canonical_identity));
         field(&mut bytes, "provenance_family", Some(&self.provenance_family));
-        field(&mut bytes, "author", Some(&self.author));
+        field(&mut bytes, "author", Some(self.author.as_str()));
+        field(
+            &mut bytes,
+            "proof_purpose",
+            self.authorship
+                .as_ref()
+                .map(|authorship| authorship.proof_purpose().as_str()),
+        );
+        field(
+            &mut bytes,
+            "verification_method",
+            self.authorship
+                .as_ref()
+                .and_then(|authorship| authorship.verification_method()),
+        );
         field(&mut bytes, "statement_ref", Some(&self.statement_ref));
         field(&mut bytes, "source_event", self.source_event.as_deref());
         field(&mut bytes, "frontier_ref", self.frontier_ref.as_deref());
@@ -274,6 +416,13 @@ impl FederatedClaim {
             Some(&self.provenance_family),
         ) {
             return Err("admission receipt must bind claim canonical subject");
+        }
+        self.author.validate_structure()?;
+        if let Some(authorship) = &self.authorship {
+            authorship.validate_structure()?;
+            if authorship.author() != &self.author {
+                return Err("claim authorship author must match declared claim author");
+            }
         }
         if self.admission_receipt.frontier_ref != self.frontier_ref {
             return Err("claim frontier must match admission receipt");
@@ -446,6 +595,33 @@ impl FederatedClaim {
         }
     }
 
+    /// Attach explicit authorship context to this claim.
+    ///
+    /// The author in the context must match the claim's declared author. Cryptographic
+    /// verification remains outside this substrate-neutral structural type.
+    pub fn with_authorship(mut self, authorship: ClaimAuthorship) -> Result<Self, &'static str> {
+        authorship.validate_structure()?;
+        if authorship.author() != &self.author {
+            return Err("claim authorship author must match declared claim author");
+        }
+        self.authorship = Some(authorship);
+        self.validate_structure()?;
+        Ok(self)
+    }
+
+    pub fn authorship_binding(&self) -> Option<&ClaimAuthorship> {
+        self.authorship.as_ref()
+    }
+
+    pub fn authorship_binding_is_valid(&self) -> bool {
+        self.authorship
+            .map(|authorship| {
+                authorship.validate_structure().is_ok()
+                    && authorship.author() == &self.author
+            })
+            .unwrap_or(false)
+    }
+
     /// Typed proposition identity: this is distinct from both the representation
     /// identity and the subject-level admission identity.
     pub fn statement_identity(&self) -> Result<CanonicalStatementIdentity, &'static str> {
@@ -578,6 +754,108 @@ mod tests {
         // The existing receipt remains a subject-level admission, not admission
         // of whichever proposition happens to be placed in statement_ref.
         assert!(claim.is_subject_admission_bound(&claim.provenance_validation));
+    }
+
+    #[test]
+    fn typed_authorship_binds_author_purpose_and_optional_verification_method() {
+        let author = ClaimAuthorIdentity::new("author:1").unwrap();
+        let purpose = ClaimProofPurpose::new("assertionMethod").unwrap();
+        let authorship =
+            ClaimAuthorship::new(author.clone(), purpose, Some("https://example.test/key/1".into()))
+                .unwrap();
+
+        assert_eq!(authorship.author(), &author);
+        assert_eq!(authorship.proof_purpose().as_str(), "assertionMethod");
+        assert_eq!(
+            authorship.verification_method(),
+            Some("https://example.test/key/1")
+        );
+        assert!(!authorship.digest().is_empty());
+        assert!(authorship.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn authorship_cannot_be_attached_to_a_different_declared_author() {
+        let (receipt, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view =
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            view,
+            receipt,
+        )
+        .unwrap();
+
+        let other = ClaimAuthorIdentity::new("author:2").unwrap();
+        let authorship = ClaimAuthorship::new(
+            other,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            claim.with_authorship(authorship).unwrap_err(),
+            "claim authorship author must match declared claim author"
+        );
+    }
+
+    #[test]
+    fn authorship_changes_representation_digest_but_not_subject_identity() {
+        let (receipt, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view =
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let base = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            view,
+            receipt,
+        )
+        .unwrap();
+
+        let authorship = ClaimAuthorship::new(
+            base.author.clone(),
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            Some("https://example.test/key/1".into()),
+        )
+        .unwrap();
+        let with_authorship = base.clone().with_authorship(authorship).unwrap();
+
+        assert_ne!(base.canonical_digest(), with_authorship.canonical_digest());
+        assert_eq!(
+            base.admission_subject().unwrap(),
+            with_authorship.admission_subject().unwrap()
+        );
+        assert!(with_authorship.authorship_binding_is_valid());
+    }
+
+    #[test]
+    fn claim_authorship_rejects_blank_verification_method() {
+        let author = ClaimAuthorIdentity::new("author:1").unwrap();
+        let purpose = ClaimProofPurpose::new("assertionMethod").unwrap();
+        assert_eq!(
+            ClaimAuthorship::new(author, purpose, Some("   ".into())).unwrap_err(),
+            "claim verification method must be non-empty when present"
+        );
     }
 
     #[test]
@@ -950,7 +1228,7 @@ mod digest_tests {
         let claim = base_claim();
         assert_eq!(
             claim.canonical_digest(),
-            "3943e1ff0b82f7d759befff2923dcb1e2a98863bf356c76b2f17f64f31381edf"
+            "99ce0d23b4db8dba9fc0c31d7f7d47a01dbaff803c024c278691897685a7b124"
         );
     }
 
