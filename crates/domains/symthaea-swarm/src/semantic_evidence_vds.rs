@@ -961,10 +961,14 @@ impl Rfc9942SignatureWithReceipts {
         reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
 
         let mut algorithm=None;
+        let mut seen_labels=std::collections::HashSet::new();
         for (raw_key,raw_value) in entries {
             let mut key_reader=CborReader::new(&raw_key);
             let label=key_reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             key_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            if !seen_labels.insert(label.clone()) {
+                return Err(Rfc9942VdpError::InvalidStructure);
+            }
             let mut value_reader=CborReader::new(&raw_value);
             match label {
                 CborLabelKey::Integer(COSE_ALG_HEADER_LABEL) => {
