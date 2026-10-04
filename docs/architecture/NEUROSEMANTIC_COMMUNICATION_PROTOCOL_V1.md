@@ -91,8 +91,6 @@ presented as evidence that a system can read thoughts.
 
 N1: silent-speech bridge
 
-N1: silent-speech bridge
-
 A validated speech BCI feeds a semantic adapter. Evidence should include participant
 holdouts, utterance holdouts, calibration, error characterization, and preregistered
 criteria.
