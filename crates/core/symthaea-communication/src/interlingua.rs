@@ -27,6 +27,8 @@ pub struct InterlinguaMetrics {
     pub schema_version: u32,
     pub expected_graph_hash: String,
     pub observed_graph_hash: String,
+    pub expected_structural_hash: String,
+    pub observed_structural_hash: String,
     pub node_precision: f64,
     pub node_recall: f64,
     pub edge_precision: f64,
@@ -66,6 +68,21 @@ pub fn graph_hash(graph: &GroundedConceptGraph) -> Result<String, String> {
     Ok(content_hash(&bytes))
 }
 
+/// Content hash of the canonical grounded structure. Collection ordering,
+/// transport-local identifiers, and lexical labels do not affect this value.
+/// Confidence is intentionally excluded because it is measured separately.
+pub fn structural_hash(graph: &GroundedConceptGraph) -> Result<String, String> {
+    let canonical = (
+        canonical_nodes(graph)
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>(),
+        canonical_edges(graph),
+    );
+    let bytes = serde_json::to_vec(&canonical).map_err(|error| error.to_string())?;
+    Ok(content_hash(&bytes))
+}
+
 /// Compare graphs by grounded structure, not collection order or lexical labels.
 /// Node identifiers are treated as transport-local names.
 pub fn compare_graphs(
@@ -96,6 +113,8 @@ pub fn compare_graphs(
         schema_version: INTERLINGUA_BENCHMARK_SCHEMA_VERSION,
         expected_graph_hash: graph_hash(expected)?,
         observed_graph_hash: graph_hash(observed)?,
+        expected_structural_hash: structural_hash(expected)?,
+        observed_structural_hash: structural_hash(observed)?,
         node_precision: ratio(node_intersection, observed.nodes.len()),
         node_recall: ratio(node_intersection, expected.nodes.len()),
         edge_precision: ratio(edge_intersection, observed_edges.len()),
