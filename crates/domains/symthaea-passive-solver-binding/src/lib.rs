@@ -275,6 +275,7 @@ pub fn validate_binding_set(
 
     let mut interface_digests = std::collections::BTreeSet::new();
     let mut interface_ports = std::collections::BTreeSet::new();
+    let mut solver_boundary_ids = std::collections::BTreeSet::new();
     let mut binding_digests = std::collections::BTreeSet::new();
     let mut binding_ports = std::collections::BTreeSet::new();
     let mut handles = std::collections::BTreeSet::new();
@@ -282,6 +283,14 @@ pub fn validate_binding_set(
     for interface in interfaces {
         if !interface_ports.insert(interface.port) {
             return Err(SolverBindingError::DuplicateInterfacePort(interface.port));
+        }
+        if !solver_boundary_ids.insert((
+            domain_byte(interface.solver_boundary.domain),
+            interface.solver_boundary.id,
+        )) {
+            return Err(SolverBindingError::DuplicateSolverBoundaryIdentity(
+                interface.solver_boundary,
+            ));
         }
         if !interface_digests.insert(interface.digest()) {
             return Err(SolverBindingError::DuplicateInterface(interface.port));
@@ -342,6 +351,7 @@ pub enum SolverBindingError {
     BindingCountMismatch,
     DuplicateInterface(PortId),
     DuplicateInterfacePort(PortId),
+    DuplicateSolverBoundaryIdentity(SolverBoundaryIdentity),
     DuplicateBinding(PortId),
     DuplicateBindingPort(PortId),
     DuplicateExternalBoundaryHandle(String),
@@ -1067,6 +1077,42 @@ mod tests {
         assert_eq!(
             validate_binding_set(&[a, b], &bindings),
             Err(SolverBindingError::DuplicateInterfacePort(PortId(10)))
+        );
+    }
+
+    #[test]
+    fn binding_set_rejects_duplicate_solver_boundary_identity() {
+        let a = interface(PortId(10), 7);
+        let b = interface(PortId(20), 7);
+        let candidate = candidate();
+        let bindings = vec![
+            SolverBoundaryBinding::verified(
+                &a,
+                "test-adapter/v1",
+                "patch:a",
+                [3; 32],
+                &candidate,
+                select_boundary_patch(&a, &candidate, 0.05).unwrap(),
+                0.05,
+            )
+            .unwrap(),
+            SolverBoundaryBinding::verified(
+                &b,
+                "test-adapter/v1",
+                "patch:b",
+                [4; 32],
+                &candidate,
+                select_boundary_patch(&b, &candidate, 0.05).unwrap(),
+                0.05,
+            )
+            .unwrap(),
+        ];
+
+        assert_eq!(
+            validate_binding_set(&[a, b], &bindings),
+            Err(SolverBindingError::DuplicateSolverBoundaryIdentity(
+                a.solver_boundary
+            ))
         );
     }
 
