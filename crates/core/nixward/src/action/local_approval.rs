@@ -46,6 +46,33 @@ pub struct PendingNixApprovalRequestV1 {
     pub request_nonce: [u8; 32],
 }
 
+/// Canonical operator-facing rendering for a typed Nixward command.
+///
+/// This is presentation data, not execution authority. The renderer lives in
+/// the platform-neutral approval layer so daemon and approval-runtime code use
+/// exactly one semantic presentation rule on every supported target.
+pub fn operator_visible_action_for_command(
+    command: &crate::action::executor::NixOSCommand,
+) -> String {
+    match command {
+        crate::action::executor::NixOSCommand::ConfigPatch {
+            option_path,
+            value,
+            expected_config_digest,
+        } => format!(
+            "PATCH /etc/nixos/configuration.nix: {option_path} = {value} [expected-config-digest={expected_config_digest}]"
+        ),
+        _ => {
+            let (bin, args) = command.to_command();
+            if args.is_empty() {
+                bin
+            } else {
+                format!("{} {}", bin, args.join(" "))
+            }
+        }
+    }
+}
+
 impl PendingNixApprovalRequestV1 {
     pub fn from_intent(
         intent: &NixActionIntentV1,
