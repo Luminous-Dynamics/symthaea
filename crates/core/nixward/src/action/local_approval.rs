@@ -487,7 +487,7 @@ mod tests {
         let command = NixOSCommand::RebuildSwitch {
             flake: None,
             extra_args: vec![
-                "a"b".to_string(),
+                "a\"b".to_string(),
                 "a\\b".to_string(),
                 "".to_string(),
             ],
@@ -495,7 +495,7 @@ mod tests {
 
         assert_eq!(
             operator_visible_action_for_command(&command),
-            r#"nixos-rebuild switch "a"b" "a\b" """#
+            r#"nixos-rebuild switch "a\"b" "a\\b" """#
         );
     }
 
