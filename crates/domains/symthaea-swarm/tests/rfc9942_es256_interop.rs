@@ -112,7 +112,7 @@ fn cose_sign1_accepts_empty_protected_bstr_and_empty_map() {
     let mut zero_length = RFC8392_SIGNED_CWT.to_vec();
     // Replace protected bstr 43 a10126 with zero-length bstr 40. This is
     // structurally valid but cannot be verified as ES256 because alg is absent.
-    zero_length.splice(4..6, [0x40]);
+    zero_length.splice(2..6, [0x40]);
     let parsed = Rfc9942SignatureWithReceipts::from_cbor(&zero_length)
         .expect("zero-length protected bstr must parse");
     assert_eq!(parsed.protected_header_bytes(), &[]);
@@ -122,7 +122,7 @@ fn cose_sign1_accepts_empty_protected_bstr_and_empty_map() {
     );
 
     let mut empty_map = RFC8392_SIGNED_CWT.to_vec();
-    empty_map.splice(4..6, [0x41, 0xa0]);
+    empty_map.splice(2..6, [0x41, 0xa0]);
     let parsed = Rfc9942SignatureWithReceipts::from_cbor(&empty_map)
         .expect("empty-map protected bstr must parse");
     assert_eq!(parsed.protected_header_bytes(), &[0xa0]);
