@@ -256,16 +256,18 @@ impl SovereignConfigGenerator {
         // ── Step 9: Preserve the TPM trust boundary ──
         if choices.tpm2_unlock {
             if hardware.has_tpm {
-                warnings.push(
-                    "TPM2 is available for LUKS key protection, but TPM presence/enrollment is not an attestation or freshness proof; authoritative recovery trust requires separately verified evidence."
-                        .into(),
-                );
-                if let Some(version) = hardware.tpm2_spec_major {
-                    if version != 2 {
-                        warnings.push(format!(
-                            "Observed TPM specification major version {version}; TPM2 unlock policy expects major version 2."
-                        ));
-                    }
+                match hardware.tpm2_spec_major {
+                    Some(2) => warnings.push(
+                        "TPM 2.0 is confirmed for LUKS key protection, but TPM presence/enrollment is not an attestation or freshness proof; authoritative recovery trust requires separately verified evidence."
+                            .into(),
+                    ),
+                    Some(version) => warnings.push(format!(
+                        "A TPM device is present but the observed TCG specification major is {version}; TPM2 unlock policy is not eligible until major version 2 is confirmed."
+                    )),
+                    None => warnings.push(
+                        "A TPM device is present but its TCG specification major is unconfirmed; TPM2 unlock policy is not eligible until the target is re-probed."
+                            .into(),
+                    ),
                 }
                 if hardware.measured_uki {
                     warnings.push(
