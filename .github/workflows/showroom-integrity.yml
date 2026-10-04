@@ -35,6 +35,11 @@ jobs:
           # Pull requests run evidence against the immutable PR head, not GitHub's synthetic merge ref.
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
+      - name: Verify exact checked-out revision
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${PR_HEAD_SHA}"
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
