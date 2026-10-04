@@ -275,6 +275,106 @@ pub struct PassiveValidationReport {
     pub violations: Vec<PassiveViolation>,
 }
 
+/// Weights for combining passive compliance with other engineering objectives.
+///
+/// The weights are deliberately caller-configurable. There is no universally
+/// correct scalarization across engineering domains, and the frontier should
+/// remain recoverable from the underlying objective observations.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PassiveObjectiveWeights {
+    /// Weight for passivity.
+    pub passivity: f64,
+    /// Weight for functional/physical performance.
+    pub performance: f64,
+    /// Weight for manufacturing feasibility.
+    pub manufacturability: f64,
+    /// Weight for material efficiency.
+    pub material_efficiency: f64,
+}
+
+impl Default for PassiveObjectiveWeights {
+    fn default() -> Self {
+        Self {
+            passivity: 0.35,
+            performance: 0.35,
+            manufacturability: 0.20,
+            material_efficiency: 0.10,
+        }
+    }
+}
+
+impl PassiveObjectiveWeights {
+    /// Return true when all weights are finite, non-negative, and sum to > 0.
+    pub fn is_valid(&self) -> bool {
+        let values = [
+            self.passivity,
+            self.performance,
+            self.manufacturability,
+            self.material_efficiency,
+        ];
+        values.iter().all(|value| value.is_finite() && *value >= 0.0)
+            && values.iter().sum::<f64>() > 0.0
+    }
+
+    /// Normalize the weights to unit sum.
+    pub fn normalized(self) -> Option<Self> {
+        if !self.is_valid() {
+            return None;
+        }
+        let total = self.passivity
+            + self.performance
+            + self.manufacturability
+            + self.material_efficiency;
+        Some(Self {
+            passivity: self.passivity / total,
+            performance: self.performance / total,
+            manufacturability: self.manufacturability / total,
+            material_efficiency: self.material_efficiency / total,
+        })
+    }
+}
+
+/// Objective observations supplied by domain-specific evaluators.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PassiveObjectiveObservation {
+    /// Continuous passive-design score in [0, 1].
+    pub passivity: f64,
+    /// Functional/physical performance score in [0, 1].
+    pub performance: f64,
+    /// Manufacturing feasibility score in [0, 1].
+    pub manufacturability: f64,
+    /// Material-efficiency score in [0, 1].
+    pub material_efficiency: f64,
+}
+
+impl PassiveObjectiveObservation {
+    /// Combine normalized observations with configurable weights.
+    ///
+    /// Invalid observations or invalid weights return 0.0 so a malformed
+    /// candidate cannot accidentally receive a positive optimization score.
+    pub fn weighted_score(&self, weights: PassiveObjectiveWeights) -> f64 {
+        let normalized = match weights.normalized() {
+            Some(weights) => weights,
+            None => return 0.0,
+        };
+        let values = [
+            self.passivity,
+            self.performance,
+            self.manufacturability,
+            self.material_efficiency,
+        ];
+        if values.iter().any(|value| !value.is_finite() || !(0.0..=1.0).contains(value)) {
+            return 0.0;
+        }
+
+        (self.passivity * normalized.passivity
+            + self.performance * normalized.performance
+            + self.manufacturability * normalized.manufacturability
+            + self.material_efficiency * normalized.material_efficiency)
+            .clamp(0.0, 1.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,6 +483,44 @@ mod tests {
         let report = contract.validate(evidence);
         assert!(report.compliant);
         assert_eq!(report.score, 1.0);
+    }
+
+    #[test]
+    fn default_objective_weights_normalize() {
+        let weights = PassiveObjectiveWeights::default();
+        let normalized = weights.normalized().expect("default weights are valid");
+        let total = normalized.passivity
+            + normalized.performance
+            + normalized.manufacturability
+            + normalized.material_efficiency;
+        assert!((total - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn invalid_objective_observation_scores_zero() {
+        let observation = PassiveObjectiveObservation {
+            passivity: f64::NAN,
+            performance: 0.9,
+            manufacturability: 0.9,
+            material_efficiency: 0.9,
+        };
+        assert_eq!(
+            observation.weighted_score(PassiveObjectiveWeights::default()),
+            0.0
+        );
+    }
+
+    #[test]
+    fn objective_score_is_bounded_and_weighted() {
+        let observation = PassiveObjectiveObservation {
+            passivity: 1.0,
+            performance: 0.5,
+            manufacturability: 0.5,
+            material_efficiency: 0.0,
+        };
+        let score = observation.weighted_score(PassiveObjectiveWeights::default());
+        assert!((0.0..=1.0).contains(&score));
+        assert!((score - 0.7).abs() < 1.0e-12);
     }
 
     #[test]
