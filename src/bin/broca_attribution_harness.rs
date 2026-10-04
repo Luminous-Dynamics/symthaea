@@ -358,13 +358,22 @@ fn neutral_context(
     syllable_progress: f32,
     is_syllable_onset: bool,
 ) -> ProsodyContext {
-    legacy_context(
+    ProsodyContext {
         utterance_progress,
         phoneme_progress,
-        stress,
-        syllable_progress,
+        stress: 0,
+        base_f0: 120.0,
+        arousal: 0.5,
+        intonation: Intonation::Statement,
+        phrase_index: 0,
+        phrase_progress: utterance_progress,
+        is_focus: false,
+        pitch_accent: PitchAccent::None,
         is_syllable_onset,
-    )
+        syllable_progress,
+        prev_source_type: None,
+        next_source_type: None,
+    }
 }
 
 fn legacy_context(
