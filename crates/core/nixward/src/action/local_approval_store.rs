@@ -20,6 +20,7 @@ use super::local_approval::{
     LocalApprovalDecisionKindV1, LocalApprovalErrorV1, LocalNixApprovalDecisionV1,
     PendingNixApprovalRequestV1,
 };
+use super::local_approval_projection::{LocalApprovalProjectionErrorV1, PendingNixApprovalProjectionV1};
 use super::local_approval_submission::{
     LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1, LocalApprovalSubmissionV2,
     admit_verified_local_submission_v2,
@@ -232,6 +233,40 @@ impl LocalApprovalRequestStoreV1 {
             .lock()
             .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?
             .contains_key(request_id))
+    }
+
+    /// Observe one projection against the exact live pending request it names.
+    ///
+    /// This is still non-authoritative, but unlike request-ID-only currentness it
+    /// verifies the complete projection against the request retained by this store.
+    pub(crate) fn observe_projection_currentness(
+        &self,
+        projection: &PendingNixApprovalProjectionV1,
+        now: UnixMillisV1,
+    ) -> Result<PendingRequestCurrentnessV1, LocalApprovalRequestStoreErrorV1> {
+        projection.validate()?;
+        if projection.daemon_incarnation_ref != self.daemon_incarnation_ref {
+            return Ok(PendingRequestCurrentnessV1::NotPending);
+        }
+
+        let pending = self
+            .pending
+            .lock()
+            .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?;
+        let record = match pending.get(&projection.request_id) {
+            Some(record) => record,
+            None => return Ok(PendingRequestCurrentnessV1::NotPending),
+        };
+
+        if !projection.matches_request(&record.request, &projection.operator_visible_action)? {
+            return Ok(PendingRequestCurrentnessV1::NotPending);
+        }
+
+        if now.as_u64() >= record.request.expires_at_unix_ms {
+            Ok(PendingRequestCurrentnessV1::Expired)
+        } else {
+            Ok(PendingRequestCurrentnessV1::Current)
+        }
     }
 
     /// Observe whether a request is pending and unexpired at one instant.
@@ -459,6 +494,8 @@ pub enum LocalApprovalRequestStoreErrorV1 {
     ConsumedProvenanceMismatch(&'static str),
     #[error("invalid projection digest")]
     InvalidProjectionDigest,
+    #[error("approval projection validation failed: {0}")]
+    Projection(#[from] LocalApprovalProjectionErrorV1),
 }
 
 #[cfg(test)]
@@ -621,6 +658,37 @@ mod tests {
         );
         assert!(store.is_pending(&new_id).unwrap());
     }
+    #[test]
+    fn projection_currentness_rejects_same_id_with_tampered_semantics() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let request_id = request.request_id().unwrap();
+        let mut projection = PendingNixApprovalProjectionV1::from_request(
+            &request,
+            "nixos-rebuild switch --flake .#workstation",
+        )
+        .unwrap();
+        store
+            .install_pending_with_projection(request, projection.projection_digest.clone())
+            .unwrap();
+
+        projection.machine_target_ref = "machine:tampered".to_string();
+        projection.projection_digest = "11".repeat(32);
+
+        assert_eq!(
+            store
+                .observe_projection_currentness(&projection, ms(1_500))
+                .unwrap_err(),
+            LocalApprovalRequestStoreErrorV1::Admission(
+                LocalApprovalAdmissionErrorV1::Projection(
+                    LocalApprovalProjectionErrorV1::ProjectionDigestMismatch
+                )
+            )
+        );
+        assert!(store.is_pending(&request_id).unwrap());
+    }
+
     #[test]
     fn currentness_observation_distinguishes_current_expired_and_not_pending() {
         let daemon = LiveDaemonIncarnationV1::generate().unwrap();
