@@ -18,6 +18,7 @@ pub mod checkpoint;
 #[cfg(feature = "code-sheaf-eval")]
 pub mod code_analysis;
 pub mod cognitive_loop;
+pub mod linguistic_frame;
 pub mod compiler_trainer;
 pub mod consensus_engine;
 pub mod controller;
@@ -130,6 +131,10 @@ pub use secure_dreaming::{SecureDreamResult, SecureDreamingEngine};
 pub use self_actualization::ReflectionEngine;
 pub use self_optimization::SelfOptimizationEngine;
 pub use species_learning::MemoryConsolidator;
+pub use linguistic_frame::{
+    ConstituentSlot, FormulationStrategy, LinguisticBindingStatus, LinguisticFrame,
+    LinguisticFrameError, LINGUISTIC_FRAME_VERSION,
+};
 pub use phonological_plan::{
     ContentBindingStatus, PhonemeSlot, PhonologicalPlan, PhonologicalPlanError, SyllableSlot,
     SyllableStress, PHONOLOGICAL_PLAN_VERSION,
