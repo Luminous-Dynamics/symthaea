@@ -359,16 +359,33 @@ else
     if systemd-cryptenroll "$LUKS_DEV" --tpm2-device=auto --tpm2-pcrs="$TPM2_PCRS" 2>&1; then
       echo "  TPM2 enrollment command succeeded."
       if [ -f /mnt/etc/nixos/configuration.nix ]; then
-        # Only change boot configuration after enrollment succeeds.
-        if grep -q 'boot.initrd.luks.devices."cryptroot"' /mnt/etc/nixos/configuration.nix; then
-          if ! grep -q 'tpm2-device=auto' /mnt/etc/nixos/configuration.nix; then
-            sed -i '/boot.initrd.luks.devices."cryptroot"/a\    cryptTabExtraOpts = [ "tpm2-device=auto" ];' /mnt/etc/nixos/configuration.nix
+        # Apply boot-configuration changes to a temporary copy, then replace the
+        # original only after every edit succeeds. Enrollment success must never
+        # leave a half-patched configuration behind.
+        CONFIG_FILE="/mnt/etc/nixos/configuration.nix"
+        if grep -q 'boot.initrd.luks.devices."cryptroot"' "$CONFIG_FILE"; then
+          CONFIG_TMP=$(mktemp "${CONFIG_FILE}.tpm2.XXXXXX")
+          if cp "$CONFIG_FILE" "$CONFIG_TMP" \
+            && {
+              if ! grep -q 'tpm2-device=auto' "$CONFIG_TMP"; then
+                sed -i '/boot.initrd.luks.devices."cryptroot"/a\    cryptTabExtraOpts = [ "tpm2-device=auto" ];' "$CONFIG_TMP"
+              fi
+              if ! grep -q 'boot.initrd.systemd.enable = true' "$CONFIG_TMP"; then
+                sed -i '/imports = /a\  boot.initrd.systemd.enable = true;' "$CONFIG_TMP"
+              fi
+              test -s "$CONFIG_TMP"
+            }; then
+            if mv -f "$CONFIG_TMP" "$CONFIG_FILE"; then
+              echo "  TPM2 enrollment complete. Disk will auto-unlock at boot."
+              echo "  Passphrase is kept as fallback (firmware updates may require it)."
+            else
+              rm -f "$CONFIG_TMP"
+              echo "WARNING: TPM2 enrollment succeeded, but atomic boot-configuration replacement failed. Original configuration was preserved."
+            fi
+          else
+            rm -f "$CONFIG_TMP"
+            echo "WARNING: TPM2 enrollment succeeded, but boot-configuration staging failed. Original configuration was preserved."
           fi
-          if ! grep -q 'boot.initrd.systemd.enable = true' /mnt/etc/nixos/configuration.nix; then
-            sed -i '/imports = /a\  boot.initrd.systemd.enable = true;' /mnt/etc/nixos/configuration.nix
-          fi
-          echo "  TPM2 enrollment complete. Disk will auto-unlock at boot."
-          echo "  Passphrase is kept as fallback (firmware updates may require it)."
         else
           echo "WARNING: cryptroot configuration was not found. TPM2 enrollment succeeded, but boot configuration was not modified."
         fi
@@ -5542,6 +5559,8 @@ mod tests {
         assert!(script.contains("if systemd-cryptenroll"));
         assert!(script.contains("echo \"  TPM2 enrollment command succeeded.\""));
         assert!(script.contains("echo \"WARNING: TPM2 enrollment failed. Installed configuration was not modified.\""));
+        assert!(script.contains("CONFIG_TMP=$(mktemp"));
+        assert!(script.contains("atomic boot-configuration replacement failed"));
         assert!(script.contains("if grep -q 'boot.initrd.luks.devices.\\"cryptroot\\"'"));
         assert!(script.contains("TPM2_SPEC_MAJOR"));
         assert!(script.contains("/sys/class/tpm/tpm0/tpm_version_major"));
