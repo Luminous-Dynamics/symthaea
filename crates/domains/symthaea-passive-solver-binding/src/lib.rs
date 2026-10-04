@@ -438,8 +438,8 @@ impl BoundaryEdgeKey {
         if a_mm.iter().chain(b_mm.iter()).any(|v| !v.is_finite()) {
             return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
         }
-        let a = quantize_point(a_mm);
-        let b = quantize_point(b_mm);
+        let a = quantize_point(a_mm)?;
+        let b = quantize_point(b_mm)?;
         if a == b {
             return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
         }
@@ -751,12 +751,16 @@ fn micrometers_from_mm(tolerance_mm: f64) -> Result<u64, SolverBindingError> {
     Ok(micrometers.round() as u64)
 }
 
-fn quantize_point(point: [f32; 3]) -> [i64; 3] {
-    [
-        (point[0] as f64 * 1_000_000.0).round() as i64,
-        (point[1] as f64 * 1_000_000.0).round() as i64,
-        (point[2] as f64 * 1_000_000.0).round() as i64,
-    ]
+fn quantize_point(point: [f32; 3]) -> Result<[i64; 3], SolverBindingError> {
+    let mut quantized = [0i64; 3];
+    for (index, value) in point.iter().copied().enumerate() {
+        let rounded = (value as f64 * 1_000_000.0).round();
+        if !rounded.is_finite() || rounded < i64::MIN as f64 || rounded >= i64::MAX as f64 {
+            return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
+        }
+        quantized[index] = rounded as i64;
+    }
+    Ok(quantized)
 }
 
 fn plane_distance(point: [f64; 3], origin: [f32; 3], normal: [f32; 3]) -> f64 {
@@ -1112,6 +1116,14 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn boundary_edge_key_rejects_out_of_range_coordinates() {
+        assert_eq!(
+            BoundaryEdgeKey::new([f32::MAX, 0.0, 0.0], [0.0, 0.0, 0.0]),
+            Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface)
+        );
+    }
 
     #[test]
     fn boundary_edge_key_canonicalizes_reversed_endpoints() {
