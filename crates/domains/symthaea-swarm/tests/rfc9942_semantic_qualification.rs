@@ -461,6 +461,40 @@ fn rfc9942_consistency_state_binds_signature_to_detached_root() {
 
 
 
+
+#[test]
+fn rfc9942_consistency_semantic_paths_reject_attached_payloads() {
+    let proof =
+        Rfc9162ConsistencyProof::new(1, 2, vec![[0x33; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Consistency, vec![proof]).unwrap();
+    let older =
+        symthaea_swarm::semantic_evidence_vds::VdsTreeHead::new(1, [0x55; 32]);
+
+    let es256 = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp.clone(),
+        Rfc9942ReceiptPayload::Attached([0x44; 32]),
+        vec![0xBB; 64],
+    )
+    .unwrap();
+    assert_eq!(
+        es256.verify_es256_consistency_state(older, &[0x04; 65], &[], None),
+        Err(Rfc9942VdpError::InvalidStructure)
+    );
+
+    let ed25519 = Rfc9942ReceiptEnvelope::new(
+        -8,
+        vdp,
+        Rfc9942ReceiptPayload::Attached([0x44; 32]),
+        vec![0xBB; 64],
+    )
+    .unwrap();
+    assert_eq!(
+        ed25519.verify_ed25519_consistency(older, &[0u8; 32], &[], None),
+        Err(Rfc9942VdpError::InvalidStructure)
+    );
+}
+
 #[test]
 fn rfc9942_es256_cose_key_inclusion_uses_detached_proof_derived_root() {
     let candidate = b"candidate";
