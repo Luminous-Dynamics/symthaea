@@ -50,6 +50,10 @@ A FreshnessAnchorVerificationReceipt additionally binds:
 - receiver identity;
 - recovery generation;
 - recovery-state fingerprint;
+- recovery policy fingerprint;
+- recovery authority reference;
+- recovery authority statement digest;
+- recovery authentication binding;
 - verifier identity;
 - verifier appraisal-policy digest;
 - reference-values digest;
@@ -66,6 +70,10 @@ The typed evidence mechanism records one of:
 The mechanism type must match the declared backing category before the evidence verifier is invoked. This prevents a proof envelope from silently changing mechanism class.
 
 The Handle, verifier policy, reference values, and verifier trust-anchor set are also explicit inputs to the evidence appraisal boundary. They are not treated as decorative metadata.
+
+The receipt exposes a domain-separated `binding_digest()` over every security-relevant receipt field, including the typed evidence mechanism. A concrete verifier can bind its signed Attestation Result to this exact digest instead of signing an implicitly reconstructed subset of fields.
+
+The authoritative recovery commit additionally requires the verified receipt to match the recovery record's policy fingerprint, authority reference, authority statement digest, and authentication binding. A receipt for one recovery authorization context cannot be spliced onto another record that happens to share the same receiver, generation, and state fingerprint.
 
 VerifiedFreshnessAnchor is deliberately non-serializable and can only be minted after a verifier accepts that exact profile/receipt pair.
 
@@ -150,6 +158,8 @@ Implemented:
 - fail-closed software-only default;
 - domain-separated deterministic profile commitment with explicit field framing;
 - evidence-bound verification receipt;
+- deterministic, domain-separated verification-receipt statement commitment;
+- explicit recovery-policy and authority binding;
 - typed hardware/remote/quorum evidence envelope;
 - verifier-policy and reference-value binding;
 - opaque verified-anchor capability;
