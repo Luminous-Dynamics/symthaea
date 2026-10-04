@@ -388,6 +388,10 @@ pub fn App() -> impl IntoView {
             };
             *started.borrow_mut() = true;
             let renderer = Rc::clone(&renderer);
+            #[cfg(feature = "browser-qualification")]
+            let init_count = Rc::clone(&init_count);
+            #[cfg(feature = "browser-qualification")]
+            let loss_requested = Rc::clone(&loss_requested);
             spawn_local(async move {
                 match WebGpuRenderer::new(canvas).await {
                     Ok(gpu) => {
@@ -462,6 +466,10 @@ pub fn App() -> impl IntoView {
             };
             *started.borrow_mut() = true;
             let renderer = Rc::clone(&renderer);
+            #[cfg(feature = "browser-qualification")]
+            let init_count = Rc::clone(&init_count);
+            #[cfg(feature = "browser-qualification")]
+            let loss_requested = Rc::clone(&loss_requested);
             spawn_local(async move {
                 match WebGpuMovieRenderer::new(canvas).await {
                     Ok(gpu) => {
@@ -557,6 +565,7 @@ pub fn App() -> impl IntoView {
             return;
         }
         let renderer = Rc::clone(&webgpu_renderer);
+        let init_started = Rc::clone(&webgpu_init_started);
         spawn_local(async move {
             loop {
                 if !webgpu_ready.get_untracked() {
@@ -572,7 +581,7 @@ pub fn App() -> impl IntoView {
                     .is_some_and(WebGpuRenderer::is_device_lost);
                 if lost {
                     *renderer.borrow_mut() = None;
-                    *webgpu_init_started.borrow_mut() = false;
+                    *init_started.borrow_mut() = false;
                     webgpu_ready.set(false);
                     break;
                 }
@@ -588,6 +597,7 @@ pub fn App() -> impl IntoView {
                 return;
             }
             let renderer = Rc::clone(&renderer);
+            let init_started = Rc::clone(&movie_webgpu_init_started);
             spawn_local(async move {
                 loop {
                     if !movie_webgpu_ready.get_untracked() {
@@ -603,7 +613,7 @@ pub fn App() -> impl IntoView {
                         .is_some_and(WebGpuMovieRenderer::is_device_lost);
                     if lost {
                         *renderer.borrow_mut() = None;
-                        *movie_webgpu_init_started.borrow_mut() = false;
+                        *init_started.borrow_mut() = false;
                         movie_webgpu_ready.set(false);
                         break;
                     }
