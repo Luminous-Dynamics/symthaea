@@ -1252,7 +1252,7 @@ impl Rfc9942SignatureWithReceipts {
         }
 
         let unprotected_start=reader.offset;
-        let unprotected_entries=reader.read_map_entries_bounded_with_limits_and_bytes(32, MAX_RFC9942_RECEIPT_BYTES, 64, MAX_RFC9942_RECEIPT_ENCODED_BYTES)
+        let unprotected_entries=reader.read_map_entries_bounded_with_limits_and_bytes(32, MAX_RFC9942_RECEIPT_BYTES, 64, MAX_RFC9942_RECEIPTS_ENCODED_BYTES_TOTAL)
             .map_err(|error|match error {
                 Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
                 _=>Rfc9942VdpError::InvalidEncoding,
@@ -2113,6 +2113,7 @@ impl<'a> CborReader<'a> {
         max_array_items: usize,
         max_total_bytes: usize,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Rfc9162ProofDecodeError> {
+        let map_start = self.offset;
         let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
         self.offset+=1;
         if initial>>5!=5 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
@@ -2132,7 +2133,6 @@ impl<'a> CborReader<'a> {
         }
 
         let mut entries=Vec::with_capacity(count.unwrap_or(max_entries.min(8)));
-        let map_start = self.offset.saturating_sub(1);
         loop {
             if let Some(remaining)=count {
                 if entries.len()==remaining {
