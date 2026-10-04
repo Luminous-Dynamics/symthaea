@@ -144,6 +144,9 @@ impl RemoteScene {
 
     /// Reconstruct a native SceneNode from the bounded wire representation.
     pub fn to_scene_node(&self) -> SceneNode {
+        if !self.is_supported() {
+            return SceneNode::group(None);
+        }
         wire_to_scene_node(&self.root)
     }
 
@@ -716,6 +719,30 @@ mod tests {
             }
             _ => panic!("unexpected primitive"),
         }
+    }
+
+    #[test]
+    fn untrusted_scene_reconstruction_fails_closed() {
+        let root = WireNode {
+            primitive: WirePrimitive::Group,
+            transform: WireTransform::default(),
+            style: WireStyle::default(),
+            children: (0..300)
+                .map(|_| WireNode {
+                    primitive: WirePrimitive::Group,
+                    transform: WireTransform::default(),
+                    style: WireStyle::default(),
+                    children: vec![],
+                })
+                .collect(),
+        };
+        let scene = RemoteScene {
+            version: RemoteScene::VERSION,
+            root,
+        };
+        let reconstructed = scene.to_scene_node();
+        assert!(matches!(reconstructed.kind, NodeKind::Group { .. }));
+        assert!(reconstructed.children.is_empty());
     }
 
     #[test]
