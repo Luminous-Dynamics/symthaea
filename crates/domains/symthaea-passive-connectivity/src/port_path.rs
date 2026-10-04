@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use super::boundary::{PortBoundaryEvidence, PortBoundaryPolicy};
 use symthaea_fabrication_kernel::mesh::TriangleMesh;
 use symthaea_fabrication_kernel::validate::validate_mesh;
 use symthaea_passive_void_compiler::GeometryEmbedding;
@@ -9,6 +10,7 @@ use symthaea_passive_void_graph::{FunctionalVoidGraph, PortId};
 pub enum PortPathStatus {
     InvalidGraph,
     InvalidMesh,
+    BoundaryPolicyRejected,
     UndeclaredPath,
     AnchorNotRepresented(PortId),
     AmbiguousAnchor(PortId),
@@ -32,31 +34,53 @@ pub fn evaluate_port_path(
     from: PortId,
     to: PortId,
 ) -> PortPathEvidence {
+    evaluate_port_path_inner(graph, embedding, candidate, from, to, None)
+}
+
+/// Evaluate a declared flow path with an explicit boundary policy.
+pub fn evaluate_port_path_with_boundary_policy(
+    graph: &FunctionalVoidGraph,
+    embedding: &GeometryEmbedding,
+    candidate: &TriangleMesh,
+    from: PortId,
+    to: PortId,
+    boundary_policy: &PortBoundaryPolicy,
+) -> PortPathEvidence {
+    evaluate_port_path_inner(
+        graph,
+        embedding,
+        candidate,
+        from,
+        to,
+        Some(boundary_policy),
+    )
+}
+
+fn evaluate_port_path_inner(
+    graph: &FunctionalVoidGraph,
+    embedding: &GeometryEmbedding,
+    candidate: &TriangleMesh,
+    from: PortId,
+    to: PortId,
+    boundary_policy: Option<&PortBoundaryPolicy>,
+) -> PortPathEvidence {
     if graph.validate().is_err() {
-        return PortPathEvidence {
-            status: PortPathStatus::InvalidGraph,
-            from_component: None,
-            to_component: None,
-            physical_transport_unproven: true,
-        };
+        return PortPathEvidence { status: PortPathStatus::InvalidGraph, from_component: None, to_component: None, physical_transport_unproven: true };
     }
     if !graph.declares_path(from, to, symthaea_passive_void_graph::VoidRelation::FlowPath) {
-        return PortPathEvidence {
-            status: PortPathStatus::UndeclaredPath,
-            from_component: None,
-            to_component: None,
-            physical_transport_unproven: true,
-        };
+        return PortPathEvidence { status: PortPathStatus::UndeclaredPath, from_component: None, to_component: None, physical_transport_unproven: true };
     }
-
     let report = validate_mesh(candidate);
-    if !report.is_valid() || !report.is_watertight {
-        return PortPathEvidence {
-            status: PortPathStatus::InvalidMesh,
-            from_component: None,
-            to_component: None,
-            physical_transport_unproven: true,
-        };
+    if !report.is_valid() {
+        return PortPathEvidence { status: PortPathStatus::InvalidMesh, from_component: None, to_component: None, physical_transport_unproven: true };
+    }
+    if let Some(policy) = boundary_policy {
+        let boundary = PortBoundaryEvidence::evaluate(candidate, embedding, policy);
+        if !boundary.is_admissible() {
+            return PortPathEvidence { status: PortPathStatus::BoundaryPolicyRejected, from_component: None, to_component: None, physical_transport_unproven: true };
+        }
+    } else if !report.is_watertight {
+        return PortPathEvidence { status: PortPathStatus::InvalidMesh, from_component: None, to_component: None, physical_transport_unproven: true };
     }
     let (from_point, to_point) = match (embedding.ports.get(&from), embedding.ports.get(&to)) {
         (Some(a), Some(b)) => (a.center_mm, b.center_mm),
@@ -68,51 +92,19 @@ pub fn evaluate_port_path(
     let to_radius = embedding.ports.get(&to).map(|port| port.radius_mm).unwrap_or(0.0);
     let from_component = nearest_component(candidate, &labels, from_point, from_radius);
     let to_component = nearest_component(candidate, &labels, to_point, to_radius);
-
     if matches!(from_component, AnchorResolution::Ambiguous) {
-        return PortPathEvidence {
-            status: PortPathStatus::AmbiguousAnchor(from),
-            from_component: None,
-            to_component: component_value(to_component),
-            physical_transport_unproven: true,
-        };
+        return PortPathEvidence { status: PortPathStatus::AmbiguousAnchor(from), from_component: None, to_component: component_value(to_component), physical_transport_unproven: true };
     }
     if matches!(to_component, AnchorResolution::Ambiguous) {
-        return PortPathEvidence {
-            status: PortPathStatus::AmbiguousAnchor(to),
-            from_component: component_value(from_component),
-            to_component: None,
-            physical_transport_unproven: true,
-        };
+        return PortPathEvidence { status: PortPathStatus::AmbiguousAnchor(to), from_component: component_value(from_component), to_component: None, physical_transport_unproven: true };
     }
-
     let from_component = component_value(from_component);
     let to_component = component_value(to_component);
     match (from_component, to_component) {
-        (Some(a), Some(b)) if a == b => PortPathEvidence {
-            status: PortPathStatus::Connected,
-            from_component: Some(a),
-            to_component: Some(b),
-            physical_transport_unproven: true,
-        },
-        (Some(a), Some(b)) => PortPathEvidence {
-            status: PortPathStatus::Disconnected,
-            from_component: Some(a),
-            to_component: Some(b),
-            physical_transport_unproven: true,
-        },
-        (None, _) => PortPathEvidence {
-            status: PortPathStatus::AnchorNotRepresented(from),
-            from_component,
-            to_component,
-            physical_transport_unproven: true,
-        },
-        (_, None) => PortPathEvidence {
-            status: PortPathStatus::AnchorNotRepresented(to),
-            from_component,
-            to_component,
-            physical_transport_unproven: true,
-        },
+        (Some(a), Some(b)) if a == b => PortPathEvidence { status: PortPathStatus::Connected, from_component: Some(a), to_component: Some(b), physical_transport_unproven: true },
+        (Some(a), Some(b)) => PortPathEvidence { status: PortPathStatus::Disconnected, from_component: Some(a), to_component: Some(b), physical_transport_unproven: true },
+        (None, _) => PortPathEvidence { status: PortPathStatus::AnchorNotRepresented(from), from_component, to_component, physical_transport_unproven: true },
+        (_, None) => PortPathEvidence { status: PortPathStatus::AnchorNotRepresented(to), from_component, to_component, physical_transport_unproven: true },
     }
 }
 
