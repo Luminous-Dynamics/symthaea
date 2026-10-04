@@ -538,16 +538,21 @@ pub fn App() -> impl IntoView {
             };
             let native = scene.to_scene_node();
             let gpu = GpuScene::from_scene(&native);
-            let mut renderer_ref = renderer.borrow_mut();
-            let Some(renderer) = renderer_ref.as_mut() else {
-                return;
-            };
             #[cfg(feature = "browser-qualification")]
             if let Some(canvas) = webgpu_canvas.get_untracked() {
                 let _ = canvas.set_attribute("data-qualification-ready", "false");
             }
-            if let Err(error) = renderer.render(&gpu) {
+            let render_result = {
+                let mut renderer_ref = renderer.borrow_mut();
+                let Some(renderer) = renderer_ref.as_mut() else {
+                    return;
+                };
+                renderer.render(&gpu)
+            };
+            if let Err(error) = render_result {
                 leptos::logging::warn!("WebGPU cognitive canvas render failed: {error}");
+                *renderer.borrow_mut() = None;
+                *webgpu_init_started.borrow_mut() = false;
                 webgpu_ready.set(false);
             } else {
                 #[cfg(feature = "browser-qualification")]
@@ -662,17 +667,22 @@ pub fn App() -> impl IntoView {
         let Some(movie) = movie.get() else {
             return;
         };
-        let mut renderer_ref = movie_webgpu_renderer.borrow_mut();
-        let Some(renderer) = renderer_ref.as_mut() else {
-            return;
-        };
         #[cfg(feature = "browser-qualification")]
         if let Some(canvas) = movie_webgpu_canvas.get_untracked() {
             let _ = canvas.set_attribute("data-qualification-ready", "false");
         }
         let frame = &movie.frames_rgba[idx % movie.frames_rgba.len()];
-        if let Err(error) = renderer.render(movie.width, movie.height, frame) {
+        let render_result = {
+            let mut renderer_ref = movie_webgpu_renderer.borrow_mut();
+            let Some(renderer) = renderer_ref.as_mut() else {
+                return;
+            };
+            renderer.render(movie.width, movie.height, frame)
+        };
+        if let Err(error) = render_result {
             leptos::logging::warn!("WebGPU movie render failed: {error}");
+            *movie_webgpu_renderer.borrow_mut() = None;
+            *movie_webgpu_init_started.borrow_mut() = false;
             movie_webgpu_ready.set(false);
         } else {
             #[cfg(feature = "browser-qualification")]
