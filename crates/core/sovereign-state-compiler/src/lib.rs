@@ -13,8 +13,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
-pub const SCHEMA_VERSION: &str = "ssc/v0.4";
+pub const SCHEMA_VERSION: &str = "ssc/v0.5";
 const INTENT_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/INTENT-DIGEST/v1\0";
+const AUTHORIZATION_DIGEST_DOMAIN: &[u8] =
+    b"LUMINOUS-DYNAMICS/SSC/AUTHORIZATION-DIGEST/v1\0";
 const TARGET_PROFILE_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/TARGET-PROFILE-DIGEST/v1\0";
 const TARGET_SNAPSHOT_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/TARGET-SNAPSHOT-DIGEST/v1\0";
 const PLAN_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/PLAN-DIGEST/v1\0";
@@ -478,6 +480,8 @@ pub struct ExecutionReceipt {
     pub schema_version: String,
     pub plan_digest: ContentDigest,
     pub target_snapshot_digest: ContentDigest,
+    /// Digest of the exact authorization envelope consumed for this execution.
+    pub authorization_digest: ContentDigest,
     /// Digest of the target observation captured after execution.
     ///
     /// This may legitimately differ from the pre-execution snapshot digest
@@ -524,6 +528,14 @@ impl ExecutionReceipt {
 
         if self.target_snapshot_digest != plan.authorization.target_snapshot_digest {
             return Err(ReceiptValidationError::TargetSnapshotDigestMismatch);
+        }
+
+        let authorization_digest = plan
+            .authorization
+            .digest()
+            .map_err(ReceiptValidationError::Serialization)?;
+        if self.authorization_digest != authorization_digest {
+            return Err(ReceiptValidationError::AuthorizationDigestMismatch);
         }
 
         if self.observed_disposition != plan.plan.verification.disposition {
@@ -649,6 +661,8 @@ pub enum ReceiptValidationError {
     PlanDigestMismatch,
     #[error("execution receipt target snapshot digest does not match authorization")]
     TargetSnapshotDigestMismatch,
+    #[error("execution receipt authorization digest does not match the exact authorization envelope")]
+    AuthorizationDigestMismatch,
     #[error("execution receipt observed disposition does not match the authorized plan")]
     ObservedDispositionMismatch,
     #[error("execution receipt carries no concrete final target snapshot digest")]
@@ -689,6 +703,10 @@ impl AuthorizedDeploymentPlan {
 }
 
 impl AuthorizationEvidence {
+    pub fn digest(&self) -> Result<ContentDigest, serde_json::Error> {
+        canonical_digest(self, AUTHORIZATION_DIGEST_DOMAIN)
+    }
+
     pub fn validate_for(
         &self,
         plan: &DeploymentPlan,
@@ -1459,6 +1477,7 @@ mod tests {
             schema_version: "ssc/v0.3".into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
@@ -1710,6 +1729,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 150,
             observed_disposition: authorized.plan.verification.disposition,
@@ -1743,6 +1763,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 200,
             observed_disposition: authorized.plan.verification.disposition,
@@ -1768,6 +1789,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-recovery"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
@@ -1794,6 +1816,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
@@ -1819,6 +1842,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest {
                 algorithm: String::new(),
                 value: String::new(),
@@ -1853,6 +1877,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
@@ -1914,6 +1939,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 151,
             observed_disposition: authorized.plan.verification.disposition,
@@ -1945,6 +1971,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
@@ -1969,6 +1996,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
@@ -2002,6 +2030,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
@@ -2034,6 +2063,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
@@ -2062,6 +2092,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
@@ -2093,6 +2124,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: authorized.plan.verification.disposition,
@@ -2118,6 +2150,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 160,
             observed_disposition: DeploymentDisposition::NotActivated,
@@ -2145,6 +2178,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: ContentDigest::blake3(b"wrong-plan"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 200,
             observed_disposition: authorized.plan.verification.disposition,
@@ -2173,6 +2207,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 199,
             observed_disposition: authorized.plan.verification.disposition,
@@ -2200,6 +2235,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 150,
             observed_disposition: authorized.plan.verification.disposition,
@@ -2228,6 +2264,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 150,
             observed_disposition: authorized.plan.verification.disposition,
@@ -2255,6 +2292,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
             final_target_snapshot_observed_at_ms: 201,
             observed_disposition: authorized.plan.verification.disposition,
@@ -2283,6 +2321,7 @@ mod tests {
             schema_version: SCHEMA_VERSION.into(),
             plan_digest: authorized.plan.digest().expect("plan digest"),
             target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            authorization_digest: authorized.authorization.digest().expect("authorization digest"),
             final_target_snapshot_digest: ContentDigest::blake3(b"changed-state"),
             final_target_snapshot_observed_at_ms: 199,
             observed_disposition: authorized.plan.verification.disposition,
