@@ -496,46 +496,42 @@ impl AuthorizationConsumption {
 }
 
 /// Opaque handoff proving that a durable authorization-consumption operation
-/// has successfully completed in the current authority/executor path.
+/// has successfully completed for one exact authorized plan.
 ///
-/// This handle is deliberately non-cloneable and non-serializable. It is not a
+/// The handle borrows the authorized plan that was consumed. This prevents an
+/// executor from accidentally pairing a valid consumption record with a
+/// different authorized plan object.
+///
+/// It is deliberately non-cloneable and non-serializable. It is not a
 /// cryptographic credential; it is a type-level sequencing token produced only
 /// by `consume_authorized_once`.
 #[derive(Debug)]
-pub struct ConsumedAuthorization {
-    authorization_digest: ContentDigest,
-    authority_id: String,
-    nonce: String,
+pub struct ConsumedAuthorization<'a> {
+    authorized: &'a AuthorizedDeploymentPlan,
     consumed_at_ms: u64,
 }
 
-impl ConsumedAuthorization {
-    pub fn authorization_digest(&self) -> &ContentDigest {
-        &self.authorization_digest
+impl<'a> ConsumedAuthorization<'a> {
+    pub fn authorized_plan(&self) -> &'a AuthorizedDeploymentPlan {
+        self.authorized
+    }
+
+    pub fn authorization_digest(&self) -> Result<ContentDigest, serde_json::Error> {
+        self.authorized.authorization.digest()
     }
 
     pub fn authority_id(&self) -> &str {
-        &self.authority_id
+        &self.authorized.authorization.authority_id
     }
 
     pub fn nonce(&self) -> &str {
-        &self.nonce
+        &self.authorized.authorization.nonce
     }
 
     pub fn consumed_at_ms(&self) -> u64 {
         self.consumed_at_ms
     }
-
-    fn from_consumption(consumption: &AuthorizationConsumption) -> Self {
-        Self {
-            authorization_digest: consumption.authorization_digest.clone(),
-            authority_id: consumption.authority_id.clone(),
-            nonce: consumption.nonce.clone(),
-            consumed_at_ms: consumption.consumed_at_ms,
-        }
-    }
 }
-
 /// Persistence/transaction boundary for one-shot authorization.
 ///
 /// Implementations MUST make the check-and-record operation atomic with
@@ -563,18 +559,21 @@ pub enum AuthorizationConsumptionError<E: std::error::Error + Send + Sync + 'sta
 /// The store is the durable replay boundary. SSC remains stateless: this helper
 /// performs no implicit persistence beyond the store implementation supplied by
 /// the caller.
-pub fn consume_authorized_once<S: AuthorizationConsumptionStore>(
+pub fn consume_authorized_once<'a, S: AuthorizationConsumptionStore>(
     store: &mut S,
-    authorized: &AuthorizedDeploymentPlan,
+    authorized: &'a AuthorizedDeploymentPlan,
     consumed_at_ms: u64,
-) -> Result<ConsumedAuthorization, AuthorizationConsumptionError<S::Error>> {
+) -> Result<ConsumedAuthorization<'a>, AuthorizationConsumptionError<S::Error>> {
     authorized.validate(consumed_at_ms)?;
     let consumption =
         AuthorizationConsumption::for_authorized_plan(authorized, consumed_at_ms)?;
     store
         .consume_once(&consumption)
         .map_err(AuthorizationConsumptionError::Store)?;
-    Ok(ConsumedAuthorization::from_consumption(&consumption))
+    Ok(ConsumedAuthorization {
+        authorized,
+        consumed_at_ms,
+    })
 }
 
 /// Result of applying an authorized deployment plan.
@@ -779,16 +778,16 @@ impl ExecutionReceipt {
 pub trait DeploymentExecutor {
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Execute an authorized plan only after the adjacent authority/executor
-    /// boundary has atomically consumed its authorization nonce.
+    /// Execute the exact authorized plan whose nonce was atomically consumed.
     ///
+    /// The consumed handoff owns a borrow of that exact plan, so an executor
+    /// cannot accidentally pair a consumption proof with another plan object.
     /// The neutral SSC core intentionally does not provide the persistence
     /// implementation: a process-local flag is insufficient across retries,
     /// restarts, or concurrent executors.
     fn execute(
         &mut self,
-        plan: &AuthorizedDeploymentPlan,
-        consumed_authorization: ConsumedAuthorization,
+        consumed_authorization: ConsumedAuthorization<'_>,
         now_ms: u64,
     ) -> Result<ExecutionReceipt, Self::Error>;
 }
@@ -2270,10 +2269,11 @@ mod tests {
         let mut store = InMemoryStore::default();
         let consumed =
             consume_authorized_once(&mut store, &authorized, 151).expect("consumption");
-        assert_eq!(consumed.authorization_digest(), &auth.digest().expect("digest"));
+        assert_eq!(consumed.authorization_digest().expect("digest"), auth.digest().expect("digest"));
         assert_eq!(consumed.authority_id(), "owner");
         assert_eq!(consumed.nonce(), "nonce-1");
         assert_eq!(consumed.consumed_at_ms(), 151);
+        assert!(std::ptr::eq(consumed.authorized_plan(), &authorized));
 
         assert_eq!(
             consume_authorized_once(&mut store, &authorized, 152)
