@@ -143,8 +143,10 @@ impl LocalApprovalRuntimeV1 {
 
     /// Mint and atomically install one exact local approval request.
     ///
-    /// The caller supplies semantic intent/review/profile/time only. Incarnation
-    /// identity and request nonce are owned by the live daemon context.
+    /// The caller supplies the exact typed command, semantic intent, display,
+    /// profile, and time window. The runtime verifies that the command's semantic
+    /// descriptor and canonical operator display agree before installation.
+    /// Incarnation identity and request nonce remain owned by the live daemon context.
     pub fn create_pending_request(
         &self,
         intent: &NixActionIntentV1,
