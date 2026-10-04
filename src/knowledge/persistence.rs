@@ -2372,19 +2372,27 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
                 row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
             ))
         })
         .map_err(|e| format!("Schema integrity foreign-key query: {e}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Schema integrity foreign-key row: {e}"))?
     };
-    if !foreign_keys.iter().any(|(parent, child_col, parent_col)| {
-        parent == "knowledge_snapshot_receipts"
-            && child_col == "generation"
-            && parent_col == "generation"
-    }) {
+    if !foreign_keys.iter().any(
+        |(parent, child_col, parent_col, on_update, on_delete, match_kind)| {
+            parent == "knowledge_snapshot_receipts"
+                && child_col == "generation"
+                && parent_col == "generation"
+                && on_update.eq_ignore_ascii_case("NO ACTION")
+                && on_delete.eq_ignore_ascii_case("NO ACTION")
+                && match_kind.eq_ignore_ascii_case("NONE")
+        },
+    ) {
         return Err(
-            "Schema integrity check failed: missing validation receipt generation foreign key"
+            "Schema integrity check failed: validation receipt generation foreign key has the wrong action or match semantics"
                 .into(),
         );
     }
@@ -4258,6 +4266,30 @@ mod tests {
         assert!(err.contains("referencing knowledge_snapshot_receipts"));
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_initialized_schema_rejects_cascading_validation_receipt_foreign_key() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE knowledge_snapshot_receipts (
+                generation INTEGER PRIMARY KEY
+            );
+            CREATE TABLE knowledge_snapshot_validation_receipts (
+                validation_event TEXT PRIMARY KEY,
+                generation INTEGER NOT NULL,
+                FOREIGN KEY (generation)
+                    REFERENCES knowledge_snapshot_receipts(generation)
+                    ON UPDATE CASCADE
+                    ON DELETE CASCADE
+            );",
+        )
+        .unwrap();
+
+        let err = verify_initialized_schema_integrity(&conn).unwrap_err();
+        assert!(err.contains(
+            "validation receipt generation foreign key has the wrong action or match semantics"
+        ));
     }
 
     #[test]
