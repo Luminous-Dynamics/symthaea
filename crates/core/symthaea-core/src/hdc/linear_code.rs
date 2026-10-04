@@ -848,7 +848,14 @@ impl LinearCodeFactorizationFiber {
             .collect::<Vec<_>>();
         dependent_indices.sort_unstable();
         dependent_indices.dedup();
-        if dependent_indices.len() != self.kernel_basis.len() {
+        if dependent_indices.len() != self.kernel_basis.len()
+            || dependent_indices
+                .iter()
+                .any(|&index| index >= self.representative_coefficients.len())
+            || self.kernel_basis.iter().any(|witness| {
+                !witness.generator_coefficients[witness.dependent_generator_index]
+            })
+        {
             return false;
         }
 
