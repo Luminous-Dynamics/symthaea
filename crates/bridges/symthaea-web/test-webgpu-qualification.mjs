@@ -330,6 +330,7 @@ async function waitForQualificationRecovery(page, selector) {
         );
         return canvas.getAttribute('data-qualification-recovery-requested') === 'true'
           && canvas.getAttribute('data-qualification-loss-observed') === 'true'
+          && canvas.getAttribute('data-qualification-loss-reason') === 'destroyed'
           && canvas.getAttribute('data-qualification-recovered') === 'true'
           && Number.isInteger(initCount)
           && initCount >= 2;
