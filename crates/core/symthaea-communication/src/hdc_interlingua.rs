@@ -518,7 +518,10 @@ impl HdcSemanticCodebook {
 
         let source_bound = self.role_source.bind(&source_hv);
         let relation_bound = self.role_relation.bind(&relation_hv);
-        let target_bound = self.role_target.bind(&target_hv);
+        // ContinuousHV::bind is commutative, so role labels alone cannot encode
+        // source/target direction. A fixed permutation makes the target position
+        // algebraically distinguishable from the source position.
+        let target_bound = self.role_target.bind(&target_hv.permute(1));
 
         Ok(source_bound
             .bind(&relation_bound)
@@ -972,6 +975,16 @@ mod tests {
             .measure_negative_controls(&representation, &training[0], 1_000_003)
             .unwrap();
 
+        let source_key = node_key_for_id(&training[0], &training[0].edges[0].source).unwrap();
+        let target_key = node_key_for_id(&training[0], &training[0].edges[0].target).unwrap();
+        let forward = codebook
+            .edge_vector(&source_key, &training[0].edges[0].relation, &target_key)
+            .unwrap();
+        let reverse = codebook
+            .edge_vector(&target_key, &training[0].edges[0].relation, &source_key)
+            .unwrap();
+
+        assert_ne!(forward, reverse);
         assert!(controls.true_edge_similarity > controls.swapped_edge_similarity);
         assert!(controls.validates());
     }
