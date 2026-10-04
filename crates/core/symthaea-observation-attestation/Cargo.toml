@@ -10,3 +10,4 @@ blake3 = { workspace = true }
 ed25519-dalek = { workspace = true }
 serde = { workspace = true }
 symthaea-core = { workspace = true }
+thiserror = { workspace = true }
