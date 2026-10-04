@@ -231,7 +231,7 @@ fn capture(
 ) -> Result<(Vec<FrameCapture>, FepTelemetry)> {
     let mut pipeline = VocalTractPipeline::new(genesis);
     let cognitive_state = VoiceCognitiveState::default();
-    let adapter = BrocaProsodyAdapter::new(*plan);
+    let adapter = BrocaProsodyAdapter::new(plan.clone());
     let mut frames = Vec::with_capacity(PHONEMES.len() * FRAMES_PER_PHONEME);
     let mut prediction_errors = Vec::new();
     let mut selected_actions = Vec::new();
