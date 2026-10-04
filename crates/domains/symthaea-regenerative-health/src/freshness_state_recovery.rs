@@ -270,8 +270,7 @@ pub fn commit_authoritative_anchor<S: FreshnessRecoveryAnchorStore>(
     let verified_profile = verified_anchor.profile();
 
     if store_profile.schema_version != verified_profile.schema_version
-        || store_profile.fingerprint().map_err(|_| FreshnessAnchorAssuranceError::InvalidProfile)?
-            != verified_profile.fingerprint().map_err(|_| FreshnessAnchorAssuranceError::InvalidProfile)?
+        || store_profile.fingerprint() != verified_profile.fingerprint()
     {
         return Err(FreshnessAnchorAssuranceError::ProfileBindingMismatch);
     }
@@ -414,7 +413,7 @@ mod tests {
         let profile = SoftwareStore.profile();
         let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
             schema_version: "0.1".into(),
-            profile_fingerprint: profile.fingerprint().unwrap(),
+            profile_fingerprint: profile.fingerprint(),
             receiver_id: "receiver-1".into(),
             generation: 0,
             state_fingerprint: r.state_fingerprint.clone(),
@@ -477,7 +476,7 @@ mod tests {
         let profile = AuthoritativeStore.profile();
         let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
             schema_version: "0.1".into(),
-            profile_fingerprint: profile.fingerprint().unwrap(),
+            profile_fingerprint: profile.fingerprint(),
             receiver_id: "receiver-1".into(),
             generation: 0,
             state_fingerprint: "different-state".into(),
@@ -524,7 +523,7 @@ mod tests {
         let profile = AuthoritativeStore.profile();
         let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
             schema_version: "0.1".into(),
-            profile_fingerprint: profile.fingerprint().unwrap(),
+            profile_fingerprint: profile.fingerprint(),
             verifier_reference: "verifier-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
