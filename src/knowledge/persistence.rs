@@ -4050,6 +4050,76 @@ mod tests {
     }
 
     #[test]
+    fn test_schema_initialization_is_idempotent_across_reopens() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_idempotence_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let fact = FactRecord {
+            memory_id: "idempotent-schema".into(),
+            canonical_identity: None,
+            provenance_family: Some("epf-011".into()),
+            vector_bytes: vec![0x73; BinaryHV::BYTES],
+            source_text: "schema idempotence".into(),
+            confidence: 0.75,
+            domain: Some("test".into()),
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+
+        let conn = p.open_connection().unwrap();
+        p.ensure_schema(&conn).unwrap();
+        let before_receipts: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_snapshot_receipts",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let before_facts: i64 = conn
+            .query_row("SELECT COUNT(*) FROM knowledge_facts", [], |row| row.get(0))
+            .unwrap();
+
+        let mut reopened = KnowledgePersistence::new(&db_path);
+        let reopened_conn = reopened.open_connection().unwrap();
+        reopened.ensure_schema(&reopened_conn).unwrap();
+
+        let after_receipts: i64 = reopened_conn
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_snapshot_receipts",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let after_facts: i64 = reopened_conn
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_facts",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(after_receipts, before_receipts);
+        assert_eq!(after_facts, before_facts);
+
+        let stored_memory_id: String = reopened_conn
+            .query_row(
+                "SELECT memory_id FROM knowledge_facts WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored_memory_id, "idempotent-schema");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_initialized_schema_rejects_partial_identity_index() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_schema_partial_identity_index_test_{}",
