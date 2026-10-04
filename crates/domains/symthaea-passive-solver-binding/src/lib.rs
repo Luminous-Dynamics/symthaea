@@ -635,7 +635,7 @@ fn edge_matches_interface(
         return false;
     }
 
-    let radial_tolerance = tolerance_mm + edge.length_mm * 0.25;
+    let radial_tolerance = tolerance_mm;
     [a, b].iter().all(|point| {
         (radial_distance(*point, interface) - interface.radius_mm() as f64).abs()
             <= radial_tolerance
@@ -983,6 +983,32 @@ mod tests {
                 0.05,
             ),
             Err(SolverBindingError::BoundaryPatchSelectionIncomplete)
+        );
+    }
+
+    #[test]
+    fn near_size_reduction_is_rejected() {
+        let interface = interface(PortId(10), 7);
+        let candidate = TriangleMesh {
+            vertices: vec![
+                [0.0, 0.0, 0.0],
+                [0.85, 0.0, 0.0],
+                [0.0, 0.85, 0.0],
+                [-0.85, 0.0, 0.0],
+                [0.0, -0.85, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 5],
+            indices: vec![
+                [0, 1, 2],
+                [0, 2, 3],
+                [0, 3, 4],
+                [0, 4, 1],
+            ],
+        };
+        let result = select_boundary_patch(&interface, &candidate, 0.05);
+        assert_eq!(
+            result,
+            Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface)
         );
     }
 
