@@ -5,7 +5,7 @@
 //! without rewriting the historical record of an action that already happened.
 
 use super::ignorance_types::{ConclusionDependencyGraph, EpistemicFrameImpact, EpistemicFrameRevision};
-use sha2_gis::{Digest, Sha256};
+use sha2::{Digest, Sha256};
 
 fn append_len_prefixed<H: Digest>(hasher: &mut H, value: &[u8]) {
     hasher.update((value.len() as u64).to_be_bytes());
