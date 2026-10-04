@@ -74,7 +74,15 @@ const QUALIFICATION_ENVIRONMENT = {
   node: process.version,
   chromium: commandVersion(CHROMIUM, ['--version']),
   chromium_binary_sha256: sha256File(CHROMIUM),
-  chromium_package: commandVersion('dpkg-query', ['-W', '-f=' + '
+  chromium_package: commandVersion('dpkg-query', ['-W', 'chromium']),
+  rustc: commandVersion('rustc', ['--version']),
+  cargo: commandVersion('cargo', ['--version']),
+  trunk: commandVersion('trunk', ['--version']),
+  wasm_bindgen: commandVersion('wasm-bindgen', ['--version']),
+  runner_os: process.env.RUNNER_OS || null,
+  runner_arch: process.env.RUNNER_ARCH || null,
+  runner_name: process.env.RUNNER_NAME || null,
+};
 if (process.env.GITHUB_EVENT_NAME === 'pull_request' && !EXPECTED_CHECKED_OUT_SHA) {
   throw new Error('qualification missing EXPECTED_CHECKED_OUT_SHA for pull_request run');
 }
