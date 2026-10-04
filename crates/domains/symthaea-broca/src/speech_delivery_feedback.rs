@@ -101,11 +101,18 @@ impl SpeechDeliveryError {
         self.compared_features == 0
     }
 
-    /// A strict delivery gate: all observed semantic features must match.
+    /// True when every observed semantic feature matches the target.
     ///
-    /// With no observations this returns false rather than granting an evidentiary pass.
-    pub fn passes(&self) -> bool {
+    /// This is an observation-consistency check and permits partial observations.
+    pub fn is_consistent(&self) -> bool {
         self.compared_features > 0 && self.mismatched_features == 0
+    }
+
+    /// A strict delivery gate requiring complete observation of all four semantic features.
+    ///
+    /// Missing observations therefore cannot silently become a promotion/evidence pass.
+    pub fn passes(&self) -> bool {
+        self.compared_features == 4 && self.mismatched_features == 0
     }
 }
 
@@ -221,8 +228,26 @@ mod tests {
 
         assert_eq!(explicit_none.focus_match, Some(true));
         assert!(missing.focus_match.is_none());
-        assert!(explicit_none.passes());
+        assert!(explicit_none.is_consistent());
+        assert!(!explicit_none.passes());
+        assert!(!missing.is_consistent());
         assert!(!missing.passes());
+    }
+
+    #[test]
+    fn partial_matching_cannot_pass_the_complete_delivery_gate() {
+        let plan = plan();
+        let error = SpeechDeliveryError::compare(
+            SpeechDeliveryTarget::from_plan(&plan),
+            SpeechDeliveryObservation {
+                intent: Some(plan.intent.clone()),
+                ..Default::default()
+            },
+        );
+
+        assert!(error.is_consistent());
+        assert!(!error.passes());
+        assert_eq!(error.compared_features, 1);
     }
 
     #[test]
