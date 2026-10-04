@@ -79,8 +79,8 @@ pub fn compare_graphs(
         .filter(|key| observed_nodes.contains_key(*key))
         .count();
     let edge_intersection = expected_edges
-        .keys()
-        .filter(|key| observed_edges.contains(*key))
+        .iter()
+        .filter(|key| observed_edges.binary_search(key).is_ok())
         .count();
 
     let node_precision = ratio(node_intersection, observed_nodes.len());
@@ -181,35 +181,27 @@ fn canonical_nodes(graph: &GroundedConceptGraph) -> BTreeMap<String, (ConceptKin
 }
 
 fn canonical_edges(graph: &GroundedConceptGraph) -> Vec<(String, String, String)> {
-    graph
+    let mut edges = graph
         .edges
         .iter()
         .map(|edge| {
-            (
-                edge.source.clone(),
-                edge.relation.clone(),
-                edge.target.clone(),
-            )
-        })
-        .map(|(source, relation, target)| {
             let source_key = graph
                 .nodes
                 .iter()
-                .find(|node| node.id == source)
+                .find(|node| node.id == edge.source)
                 .map(canonical_node_key)
-                .unwrap_or(source);
+                .unwrap_or_else(|| edge.source.clone());
             let target_key = graph
                 .nodes
                 .iter()
-                .find(|node| node.id == target)
+                .find(|node| node.id == edge.target)
                 .map(canonical_node_key)
-                .unwrap_or(target);
-            (source_key, relation, target_key)
+                .unwrap_or_else(|| edge.target.clone());
+            (source_key, edge.relation.clone(), target_key)
         })
-        .fold(Vec::new(), |mut edges, edge| {
-            edges.push(edge);
-            edges
-        })
+        .collect::<Vec<_>>();
+    edges.sort();
+    edges
 }
 
 fn canonical_node_key(node: &ConceptNode) -> String {
