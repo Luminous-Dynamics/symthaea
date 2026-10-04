@@ -105,7 +105,7 @@ A concrete TPM backend may use protected NV state such as an NV Counter as the r
 
 The adjacent `freshness_anchor_tpm` module provides a deployment-neutral contract for TPM NV-counter evidence. It explicitly binds TPM identity, NV Index Name/public-area, authorization policy, attestation key, quote Handle, quote, PCR binding, and counter value. The structural gate requires the counter to equal the recovery generation and the quote Handle to equal the receipt Handle; cryptographic quote verification remains platform-specific.
 
-The TCG TPM 2.0 architecture specifies that an NV Counter is modified through increment semantics, cannot move backward when read, and cannot be rolled back by deleting and recreating the counter at a lower lifetime value.
+TCG TPM 2.0 defines `TPM_NT_COUNTER` as an 8-octet counter whose value is modified with `TPM2_NV_Increment()`. The deployment must separately establish the required persistence and lifecycle properties of the selected NV index; those properties are not inferred merely from the fact that the object is an NV counter.
 
 A real adapter must still independently verify:
 
