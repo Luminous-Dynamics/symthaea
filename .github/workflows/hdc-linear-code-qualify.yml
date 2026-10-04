@@ -314,7 +314,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-qualification.txt <<EOF
           HDC Linear-Code Recovery Qualification
           ======================================
-          receipt_schema=hdc-linear-code-qualification-v2
+          receipt_schema=hdc-linear-code-qualification-v3
           exact_head=${{ steps.head.outputs.sha }}
           runner_os=${{ steps.runner.outputs.runner_os }}
           runner_arch=${{ steps.runner.outputs.runner_arch }}
@@ -373,7 +373,9 @@ jobs:
           dependency_witness_status=${{ steps.witness.outcome }}
           dependency_witness=${{ steps.witness.outputs.dependency_witness }}
           kernel_basis_schema=linear-code-kernel-basis-v1
-          affine_fiber_schema=linear-code-affine-fiber-v2
+          affine_fiber_schema=linear-code-affine-fiber-v3
+          affine_fiber_source_binding_schema=linear-code-affine-source-v1
+          affine_fiber_integrity_schema=linear-code-affine-integrity-v1
           affine_fiber_enumeration_schema=linear-code-affine-fiber-enumeration-v1
           affine_fiber_enumeration_status=${{ steps.affine_fiber.outcome }}
           affine_fiber_enumeration=${{ steps.affine_fiber.outputs.affine_fiber_enumeration }}
