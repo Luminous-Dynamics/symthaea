@@ -346,6 +346,13 @@ Lifecycle state is deliberately excluded from the commitment because state trans
 
 This is an implementation-level provenance commitment rather than a new AEB standard requirement; it strengthens the AEB-07 rule that an operation record must bind the native replay identity and action key to the executor-owned action and operation identifier, and that reconciliation must remain attached to the original attempt. citeturn914749search0turn914749search1
 
+### Authoritative pin revalidation at admission and provider entry
+
+The effect boundary now treats relying-party-selected mutable metadata as a two-stage trust input rather than trusting a configuration read performed before a durable transaction. At `DispatchPending` creation, the authoritative SQLite `IMMEDIATE` transaction revalidates all pin material that participates in constructing the frozen dispatch record: the provider-status verifier configuration, status-source digest, native issuer→authority-namespace binding, and adapter revision/implementation digest. If any selected pin has been deleted or changed after the caller-facing lookup or verifier execution, admission fails closed and no new dispatch record is created.
+
+Immediately before provider entry, the boundary performs the same class of revalidation for the frozen attempt. The current status-source pin is compared inside the authoritative transaction, the verifier pin is rechecked there, and the complete durable dispatch record is revalidated (including adapter and native replay provenance) before `Invoked` can be recorded. Deterministic tamper tests exercise pin mutation during verifier execution, so the lookup/verification→commit window cannot silently turn stale relying-party configuration into provider-entry authority.
+
+This is an implementation hardening of AEB-07's pinned-input requirement: the draft requires relying-party-selected status sources, verifiers, adapters, and other trust inputs, and requires immediate pre-entry time/status checks. It does not prescribe SQLite or this exact transaction-level construction. citeturn196478search0turn196478search2
 ### Adapter revision and implementation pin
 
 Strict effectful admission now requires the adapter identifier named by the frozen effect to resolve to a relying-party-pinned adapter revision and implementation digest. The pin is durable and write-once. The dispatch record and terminal evidence carry the exact selected revision and implementation digest, and the attempt provenance commitment covers both values.
