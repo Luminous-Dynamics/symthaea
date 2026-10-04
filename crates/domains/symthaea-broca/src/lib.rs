@@ -134,6 +134,10 @@ pub use phonological_plan::{
     ContentBindingStatus, PhonemeSlot, PhonologicalPlan, PhonologicalPlanError, SyllableSlot,
     SyllableStress, PHONOLOGICAL_PLAN_VERSION,
 };
+pub use speech_delivery_feedback::{
+    ObservedFocus, SpeechDeliveryError, SpeechDeliveryObservation, SpeechDeliveryReceipt,
+    SpeechDeliveryTarget, SPEECH_DELIVERY_FEEDBACK_VERSION,
+};
 pub use speech_feedback::{
     SpeechFeedbackError, SpeechFeedbackReceipt, SpeechSensoryObservation, SpeechSensoryTarget,
     SPEECH_FEEDBACK_VERSION,
