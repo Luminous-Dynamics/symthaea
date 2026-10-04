@@ -259,7 +259,9 @@ impl NixOSTargetAdapter {
                 return Err(NixOSAdapterError::InvalidResourceIdentity);
             }
             if resource.kind != NIXOS_GENERATION_RESOURCE_KIND {
-                return Err(NixOSAdapterError::UnsupportedResourceKind(resource.kind.clone()));
+                return Err(NixOSAdapterError::UnsupportedResourceKind(
+                    resource.kind.clone(),
+                ));
             }
             if resource.identity.algorithm.is_empty() || resource.identity.value.is_empty() {
                 return Err(NixOSAdapterError::InvalidResourceIdentity);
@@ -664,10 +666,12 @@ mod tests {
     #[test]
     fn from_snapshot_rejects_unknown_resource_kind() {
         let mut snapshot = adapter().describe_target().expect("snapshot");
-        snapshot.resources.insert(sovereign_state_compiler::ResourceRef {
-            kind: "arbitrary-resource".into(),
-            identity: ContentDigest::blake3(b"resource"),
-        });
+        snapshot
+            .resources
+            .insert(sovereign_state_compiler::ResourceRef {
+                kind: "arbitrary-resource".into(),
+                identity: ContentDigest::blake3(b"resource"),
+            });
 
         assert_eq!(
             NixOSTargetAdapter::from_snapshot(snapshot),
@@ -680,13 +684,15 @@ mod tests {
     #[test]
     fn from_snapshot_rejects_incomplete_resource_identity() {
         let mut snapshot = adapter().describe_target().expect("snapshot");
-        snapshot.resources.insert(sovereign_state_compiler::ResourceRef {
-            kind: NIXOS_GENERATION_RESOURCE_KIND.into(),
-            identity: ContentDigest {
-                algorithm: String::new(),
-                value: String::new(),
-            },
-        });
+        snapshot
+            .resources
+            .insert(sovereign_state_compiler::ResourceRef {
+                kind: NIXOS_GENERATION_RESOURCE_KIND.into(),
+                identity: ContentDigest {
+                    algorithm: String::new(),
+                    value: String::new(),
+                },
+            });
 
         assert_eq!(
             NixOSTargetAdapter::from_snapshot(snapshot),
@@ -722,7 +728,9 @@ mod tests {
 
         assert_eq!(
             result,
-            Err(NixOSAdapterError::UnsupportedCapability(Capability::ReplaceOs))
+            Err(NixOSAdapterError::UnsupportedCapability(
+                Capability::ReplaceOs
+            ))
         );
     }
 
@@ -1005,8 +1013,7 @@ mod tests {
             NixOSAdapterError::InvalidGenerationRealizationPath
         );
         assert_eq!(
-            nixos_generation_resource(42, "/nix/store/foo/bar")
-                .expect_err("nested realization"),
+            nixos_generation_resource(42, "/nix/store/foo/bar").expect_err("nested realization"),
             NixOSAdapterError::InvalidGenerationRealizationPath
         );
     }
@@ -1275,10 +1282,10 @@ mod tests {
     #[test]
     fn switch_enables_rollback_authority_for_compensation() {
         let mut intent = DeploymentIntent::new("switch-rollback", "host-01");
-        intent.desired_state.properties.insert(
-            REBUILD_KEY.into(),
-            StateValue::String("switch".into()),
-        );
+        intent
+            .desired_state
+            .properties
+            .insert(REBUILD_KEY.into(), StateValue::String("switch".into()));
 
         let plan = adapter().compile(&intent).expect("compile");
         assert!(plan.rollback.allowed);
