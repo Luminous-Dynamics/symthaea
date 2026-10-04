@@ -1635,6 +1635,58 @@ fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
     assert!(recover_independent_bound(&target, &[&left, &overlapping]).is_none());
 }
 
+
+#[test]
+fn affine_fiber_certificate_matches_exact_kernel_geometry_across_all_targets() {
+    let parent = RandomLinearCode::generate(8, 4, 0xF1BE2);
+    let left =
+        RandomLinearCode::from_basis(parent.basis()[..3].to_vec()).expect("left subcode");
+    let right =
+        RandomLinearCode::from_basis(parent.basis()[2..].to_vec()).expect("overlapping subcode");
+    let factors = [&left, &right];
+    let algebra = factorization_algebra(&factors).expect("overlapping algebra");
+
+    assert_eq!(algebra.factor_dimension_sum, 5);
+    assert_eq!(algebra.union_generator_rank, 4);
+    assert_eq!(algebra.kernel_dimension, 1);
+
+    for target in parent.enumerate() {
+        let fiber = factorization_affine_fiber(&target, &factors).expect("target fiber");
+        assert!(fiber.verifies_against(&target, &factors));
+        assert_eq!(
+            fiber.cardinality.exponent(),
+            algebra.factorization_count_per_target.exponent()
+        );
+        let coefficients = fiber
+            .iter_bounded(2)
+            .expect("single-kernel-dimensional fiber")
+            .collect::<Vec<_>>();
+        assert_eq!(coefficients.len(), 2);
+        for coefficient_tuple in &coefficients {
+            let mut reconstructed = BinaryCodeword::zero(target.dimension());
+            for (coefficient, generator) in coefficient_tuple
+                .iter()
+                .zip(factors.iter().flat_map(|factor| factor.basis().iter()))
+            {
+                if *coefficient {
+                    reconstructed.xor_assign(generator);
+                }
+            }
+            assert_eq!(&reconstructed, &target);
+        }
+    }
+
+    let outsider = (0..parent.dimension())
+        .map(|index| {
+            let mut candidate = BinaryCodeword::zero(parent.dimension());
+            candidate.set_bit(index, true);
+            candidate
+        })
+        .find(|candidate| !parent.contains(candidate))
+        .expect("an outsider basis vector");
+    assert!(factorization_affine_fiber(&outsider, &factors).is_none());
+}
+
 #[test]
 fn exact_factorization_neighborhood_identity_holds_under_hamming_noise() {
     // For a linear factor-to-bound map, every reachable target has exactly
