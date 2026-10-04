@@ -32,8 +32,9 @@ use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::{
-    Domain, IgnoranceDetection, IgnoranceRecord, IgnoranceResolution, IgnoranceStatus,
-    IgnoranceType, ResolutionMethod, Uncertainty3D, ZKIgnoranceSignature,
+    Domain, EpistemicFrame, EpistemicFrameImpact, EpistemicFrameRevision, IgnoranceDetection, IgnoranceRecord,
+    IgnoranceResolution, IgnoranceStatus, IgnoranceType, ResolutionMethod, Uncertainty3D,
+    ZKIgnoranceSignature,
 };
 
 // ============================================================================
@@ -90,6 +91,16 @@ pub struct StoredIgnoranceRecord {
     pub status: String,
     /// Serialized resolution: "method|answer|confidence|source|timestamp"
     pub resolution_serialized: Option<String>,
+    /// Stable frame identity and revision used to qualify the detection.
+    pub frame_id: String,
+    pub frame_version: u32,
+    pub frame_evidence_boundary: String,
+    pub frame_ontology_id: String,
+    pub frame_causal_model_id: String,
+    pub frame_excluded_variables: Vec<String>,
+    pub frame_known_blind_spots: Vec<String>,
+    /// Append-only serialized frame revision lineage.
+    pub frame_revisions_serialized: Vec<String>,
     pub created_at: u64,
     pub updated_at: u64,
 }
@@ -133,6 +144,31 @@ impl StoredIgnoranceRecord {
             eig: record.detection.eig,
             status: format!("{:?}", record.status),
             resolution_serialized,
+            frame_id: record.detection.frame.id.clone(),
+            frame_version: record.detection.frame.version,
+            frame_evidence_boundary: record.detection.frame.evidence_boundary.clone(),
+            frame_ontology_id: record.detection.frame.ontology_id.clone(),
+            frame_causal_model_id: record.detection.frame.causal_model_id.clone(),
+            frame_excluded_variables: record.detection.frame.excluded_variables.clone(),
+            frame_known_blind_spots: record.detection.frame.known_blind_spots.clone(),
+            frame_revisions_serialized: record.frame_revisions.iter().map(|r| {
+                [
+                    r.prior_frame.clone(),
+                    r.revised_frame.clone(),
+                    r.trigger.clone(),
+                    r.newly_represented.clone().unwrap_or_default(),
+                    r.scope_change.clone(),
+                    r.affected_conclusions.join(","),
+                    format!(
+                        "{},{},{},{},{}",
+                        r.impact.evidence_boundary,
+                        r.impact.ontology,
+                        r.impact.causal_model,
+                        r.impact.exclusions,
+                        r.impact.blind_spots,
+                    ),
+                ].join(";")
+            }).collect(),
             created_at,
             updated_at,
         }
@@ -184,13 +220,55 @@ impl StoredIgnoranceRecord {
             domain,
             eig: self.eig,
             detected_at,
+            frame: EpistemicFrame {
+                id: if self.frame_id.is_empty() { "gis-default".to_string() } else { self.frame_id.clone() },
+                version: if self.frame_version == 0 { 1 } else { self.frame_version },
+                evidence_boundary: if self.frame_evidence_boundary.is_empty() { "local-query-context".to_string() } else { self.frame_evidence_boundary.clone() },
+                ontology_id: if self.frame_ontology_id.is_empty() { "general-v1".to_string() } else { self.frame_ontology_id.clone() },
+                causal_model_id: if self.frame_causal_model_id.is_empty() { "unspecified".to_string() } else { self.frame_causal_model_id.clone() },
+                excluded_variables: self.frame_excluded_variables.clone(),
+                known_blind_spots: if self.frame_known_blind_spots.is_empty() { vec!["unrepresented variables and categories".to_string()] } else { self.frame_known_blind_spots.clone() },
+            },
         };
+
+        let frame_revisions = self.frame_revisions_serialized.iter().filter_map(|s| {
+            let p: Vec<&str> = s.split(';').collect();
+            if p.len() < 6 { return None; }
+            Some(EpistemicFrameRevision {
+                prior_frame: p[0].to_string(),
+                revised_frame: p[1].to_string(),
+                trigger: p[2].to_string(),
+                newly_represented: if p[3].is_empty() { None } else { Some(p[3].to_string()) },
+                scope_change: p[4].to_string(),
+                affected_conclusions: p[5]
+                    .split(',')
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string())
+                    .collect(),
+                impact: p.get(6)
+                    .and_then(|encoded| {
+                        let flags: Vec<&str> = encoded.split(',').collect();
+                        if flags.len() != 5 {
+                            return None;
+                        }
+                        Some(EpistemicFrameImpact {
+                            evidence_boundary: flags[0].parse().ok()?,
+                            ontology: flags[1].parse().ok()?,
+                            causal_model: flags[2].parse().ok()?,
+                            exclusions: flags[3].parse().ok()?,
+                            blind_spots: flags[4].parse().ok()?,
+                        })
+                    })
+                    .unwrap_or_else(EpistemicFrameImpact::broad),
+            })
+        }).collect();
 
         Ok(IgnoranceRecord {
             id: self.id.clone(),
             detection,
             status,
             resolution,
+            frame_revisions,
             created_at,
             updated_at,
         })
@@ -692,9 +770,11 @@ mod tests {
                 domain: Domain::Physics,
                 eig,
                 detected_at: SystemTime::now(),
+                frame: EpistemicFrame::default(),
             },
             status: IgnoranceStatus::Active,
             resolution: None,
+            frame_revisions: Vec::new(),
             created_at: SystemTime::now(),
             updated_at: SystemTime::now(),
         }
@@ -805,7 +885,16 @@ mod tests {
 
     #[test]
     fn test_stored_record_serialization() {
-        let record = create_test_record("ser_test", "Serialization test", 0.65);
+        let mut record = create_test_record("ser_test", "Serialization test", 0.65);
+        record.detection.frame = EpistemicFrame {
+            id: "social-system".to_string(),
+            version: 3,
+            evidence_boundary: "institutional-records".to_string(),
+            ontology_id: "collective-agents-v2".to_string(),
+            causal_model_id: "institutional-feedback-v4".to_string(),
+            excluded_variables: vec!["informal-practices".to_string()],
+            known_blind_spots: vec!["unobserved local norms".to_string()],
+        };
 
         let stored = StoredIgnoranceRecord::from_record(&record);
         assert_eq!(stored.id, "ser_test");
@@ -814,5 +903,74 @@ mod tests {
         let restored = stored.to_record().unwrap();
         assert_eq!(restored.id, record.id);
         assert!((restored.detection.eig - record.detection.eig).abs() < 0.001);
+        assert_eq!(restored.detection.frame.identity(), "social-system@3");
+        assert_eq!(restored.detection.frame.ontology_id, "collective-agents-v2");
+        assert_eq!(restored.detection.frame.causal_model_id, "institutional-feedback-v4");
+        assert_eq!(restored.detection.frame.excluded_variables, vec!["informal-practices"]);
+        assert_eq!(restored.detection.frame.known_blind_spots, vec!["unobserved local norms"]);
+    }
+
+    #[test]
+    fn test_frame_revision_lineage_round_trip() {
+        let mut record = create_test_record("lineage_test", "What changed?", 0.8);
+        let prior = record.detection.frame.clone();
+        let revised = EpistemicFrame {
+            id: prior.id.clone(),
+            version: prior.version + 1,
+            evidence_boundary: "institutional-records".to_string(),
+            ontology_id: "collective-agents-v2".to_string(),
+            causal_model_id: prior.causal_model_id.clone(),
+            excluded_variables: vec!["informal-practices".to_string()],
+            known_blind_spots: vec!["unobserved local norms".to_string()],
+        };
+        record.append_frame_revision(EpistemicFrameRevision::new(
+            &prior,
+            &revised,
+            "new institutional evidence",
+            Some("informal-practices".to_string()),
+            "expanded scope to include informal practices",
+            vec!["conclusion-17".to_string(), "conclusion-23".to_string()],
+        ));
+
+        let stored = StoredIgnoranceRecord::from_record(&record);
+        let restored = stored.to_record().unwrap();
+
+        assert_eq!(restored.frame_revisions, record.frame_revisions);
+        assert_eq!(
+            restored.latest_frame_revision().unwrap().affected_conclusions,
+            vec!["conclusion-17", "conclusion-23"]
+        );
+        let impact = restored.latest_frame_revision().unwrap().impact;
+        assert!(impact.evidence_boundary);
+        assert!(impact.ontology);
+        assert!(!impact.causal_model);
+        assert!(impact.exclusions);
+        assert!(impact.blind_spots);
+    }
+
+    #[test]
+    fn test_legacy_frame_revision_without_impact_is_conservative() {
+        let record = create_test_record("legacy_lineage", "Legacy", 0.4);
+        let prior = record.detection.frame.clone();
+        let revised = EpistemicFrame { version: 2, ..prior.clone() };
+        let revision = EpistemicFrameRevision::new(
+            &prior, &revised, "legacy", None, "version bump", vec!["c1".to_string()],
+        );
+
+        let mut stored = StoredIgnoranceRecord::from_record(&record);
+        stored.frame_revisions_serialized = vec![format!(
+            "{};{};{};;{};{}",
+            revision.prior_frame,
+            revision.revised_frame,
+            revision.trigger,
+            revision.scope_change,
+            revision.affected_conclusions.join(",")
+        )];
+
+        let restored = stored.to_record().unwrap();
+        assert_eq!(
+            restored.latest_frame_revision().unwrap().impact,
+            EpistemicFrameImpact::broad()
+        );
     }
 }
