@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 
-use symthaea_communication::hdc_codec::HdcBinaryFrame;
+use symthaea_communication::hdc_codec::{quantize_continuous, HdcBinaryFrame};
 use symthaea_communication::hdc_ontology::{
     HdcConceptIdentityBinding, HdcOntologyCodebook, HdcOntologyDecodePolicy,
     HdcOntologyManifest, HdcRelationIdentityBinding, HDC_ONTOLOGY_ADAPTER_ID,
     HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
 };
 use symthaea_communication::{ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph};
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 fn node(id: &str, kind: ConceptKind, label: &str, grounding: &str) -> ConceptNode {
     ConceptNode {
@@ -157,6 +158,23 @@ fn verify_result(
     observed_edges.sort();
     expected_edges.sort();
     observed_edges == expected_edges
+}
+
+fn interpolate_frame(
+    clean: &HdcBinaryFrame,
+    null_seed: u64,
+    clean_weight: f32,
+) -> Result<HdcBinaryFrame, String> {
+    if !clean_weight.is_finite() || !(0.0..=1.0).contains(&clean_weight) {
+        return Err("clean interpolation weight must be finite and within [0, 1]".into());
+    }
+    let mut mixed = clean.to_binary()?.to_continuous();
+    let null = BinaryHV::random(null_seed).to_continuous();
+    for (value, null_value) in mixed.values.iter_mut().zip(&null.values) {
+        *value = clean_weight * *value + (1.0 - clean_weight) * *null_value;
+    }
+    let (binary, _) = quantize_continuous(&mixed)?;
+    Ok(HdcBinaryFrame::from_binary(&binary))
 }
 
 fn execution_revision() -> String {
@@ -329,6 +347,59 @@ fn main() -> Result<(), String> {
         return Err("clean/noise sweep never produced a correct accepted decode".into());
     }
 
+    // Boundary-focused red-team sweep: linearly interpolate the clean binary
+    // representation toward deterministic null vectors, then requantize. An
+    // accepted decode is only valid when stable identities remain exact.
+    let interpolation_weights = [1.0_f32, 0.95, 0.90, 0.80, 0.70, 0.60, 0.40, 0.30, 0.20, 0.10, 0.05, 0.0];
+    let mut interpolation_node_correct = 0_u32;
+    let mut interpolation_node_abstentions = 0_u32;
+    let mut interpolation_edge_correct = 0_u32;
+    let mut interpolation_edge_abstentions = 0_u32;
+
+    for (index, weight) in interpolation_weights.iter().copied().enumerate() {
+        let mut representation = clean.clone();
+        representation.node_frame =
+            interpolate_frame(&clean.node_frame, 0xC0DE_0000 + index as u64, weight)?;
+        match codebook.decode_graph_with_policy(
+            &representation,
+            &source_manifest,
+            &receiver_manifest,
+            policy,
+        ) {
+            Ok(decoded) => {
+                if !verify_result(&decoded, &expected_nodes, &expected_edges) {
+                    return Err(format!(
+                        "node interpolation produced accepted but incorrect identity at clean_weight={weight}"
+                    ));
+                }
+                interpolation_node_correct += 1;
+            }
+            Err(_) => interpolation_node_abstentions += 1,
+        }
+    }
+
+    for (index, weight) in interpolation_weights.iter().copied().enumerate() {
+        let mut representation = clean.clone();
+        representation.edge_frame =
+            interpolate_frame(&clean.edge_frame, 0xD0ED_0000 + index as u64, weight)?;
+        match codebook.decode_graph_with_policy(
+            &representation,
+            &source_manifest,
+            &receiver_manifest,
+            policy,
+        ) {
+            Ok(decoded) => {
+                if !verify_result(&decoded, &expected_nodes, &expected_edges) {
+                    return Err(format!(
+                        "edge interpolation produced accepted but incorrect identity at clean_weight={weight}"
+                    ));
+                }
+                interpolation_edge_correct += 1;
+            }
+            Err(_) => interpolation_edge_abstentions += 1,
+        }
+    }
+
     let output = serde_json::json!({
         "benchmark": "neurosemantic-hdc-grounded-identity-adversarial-n0",
         "benchmark_schema_version": HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
@@ -346,6 +417,14 @@ fn main() -> Result<(), String> {
             "edge_correct_accepts": edge_correct_accepts,
             "edge_abstentions": edge_abstentions,
             "confident_wrong_accepts": 0,
+            "boundary_interpolation": {
+                "weights": interpolation_weights,
+                "node_correct_accepts": interpolation_node_correct,
+                "node_abstentions": interpolation_node_abstentions,
+                "edge_correct_accepts": interpolation_edge_correct,
+                "edge_abstentions": interpolation_edge_abstentions,
+                "confident_wrong_accepts": 0,
+            },
             "max_flip_probability_tested": 0.50,
         },
         "node_cases": node_cases,
