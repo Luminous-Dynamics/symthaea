@@ -154,16 +154,29 @@ fn cose_key_accepts_unknown_label_with_nested_opaque_cbor_value() {
 }
 
 fn receipt_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
-    let protected = if protected_extension {
-        vec![0xa3, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01, 0x18, 0x1e, 0xa1, 0x41, 0x00]
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof])
+        .expect("fixture VDP must be valid")
+        .to_cbor();
+
+    let mut protected = if protected_extension {
+        vec![0xa3, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01]
     } else {
         vec![0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01]
     };
-    let unprotected = if protected_extension {
-        vec![0xa1, 0x19, 0x01, 0x8c, 0xa1, 0x20, 0x81, 0x41, 0x00]
+    if protected_extension {
+        protected.extend_from_slice(&[0x18, 0x1e, 0xa1, 0x41, 0x00]);
+    }
+
+    let mut unprotected = if protected_extension {
+        vec![0xa1, 0x19, 0x01, 0x8c]
     } else {
-        vec![0xa2, 0x19, 0x01, 0x8c, 0xa1, 0x20, 0x81, 0x41, 0x00, 0x18, 0x1e, 0xa1, 0x41, 0x00]
+        vec![0xa2, 0x19, 0x01, 0x8c]
     };
+    unprotected.extend_from_slice(&vdp);
+    if !protected_extension {
+        unprotected.extend_from_slice(&[0x18, 0x1e, 0xa1, 0x41, 0x00]);
+    }
 
     let mut out = vec![0xd2, 0x84];
     out.extend_from_slice(&bstr(&protected));
