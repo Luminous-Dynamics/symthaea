@@ -693,7 +693,7 @@ fn finite(value: f32, fallback: f32) -> f32 {
 use std::borrow::Cow;
 #[cfg(target_arch = "wasm32")]
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU8, Ordering},
     Arc,
 };
 
@@ -719,6 +719,8 @@ pub struct WebGpuRenderer {
     /// Latched when the underlying WebGPU device is lost. The next render
     /// returns an error so the caller can activate its compatibility path.
     device_lost: Arc<AtomicBool>,
+    #[cfg(feature = "browser-qualification")]
+    device_loss_reason: Arc<AtomicU8>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -757,24 +759,21 @@ impl WebGpuRenderer {
 
         let device_lost = Arc::new(AtomicBool::new(false));
         #[cfg(feature = "browser-qualification")]
-        let qualification_canvas = canvas.clone();
+        let device_loss_reason = Arc::new(AtomicU8::new(0));
         {
             let device_lost = Arc::clone(&device_lost);
             #[cfg(feature = "browser-qualification")]
-            let qualification_canvas = qualification_canvas.clone();
+            let device_loss_reason = Arc::clone(&device_loss_reason);
             device.set_device_lost_callback(move |reason, message| {
                 device_lost.store(true, Ordering::Release);
                 #[cfg(feature = "browser-qualification")]
-                {
-                    let reason = match reason {
-                        wgpu::DeviceLostReason::Destroyed => "destroyed",
-                        wgpu::DeviceLostReason::Unknown => "unknown",
-                    };
-                    let _ = qualification_canvas.set_attribute(
-                        "data-qualification-loss-reason",
-                        reason,
-                    );
-                }
+                device_loss_reason.store(
+                    match reason {
+                        wgpu::DeviceLostReason::Destroyed => 1,
+                        wgpu::DeviceLostReason::Unknown => 2,
+                    },
+                    Ordering::Release,
+                );
                 web_sys::console::warn_2(
                     &format!("Symthaea WebGPU cognitive device lost ({reason:?})").into(),
                     &message.into(),
@@ -881,6 +880,8 @@ impl WebGpuRenderer {
             config,
             upload_bytes: Vec::new(),
             device_lost,
+            #[cfg(feature = "browser-qualification")]
+            device_loss_reason,
         })
     }
 
@@ -896,6 +897,15 @@ impl WebGpuRenderer {
     /// Returns whether the device-lost callback has fired.
     pub fn is_device_lost(&self) -> bool {
         self.device_lost.load(Ordering::Acquire)
+    }
+
+    #[cfg(feature = "browser-qualification")]
+    pub fn qualification_loss_reason(&self) -> Option<&'static str> {
+        match self.device_loss_reason.load(Ordering::Acquire) {
+            1 => Some("destroyed"),
+            2 => Some("unknown"),
+            _ => None,
+        }
     }
 
     #[cfg(feature = "browser-qualification")]
@@ -1023,6 +1033,8 @@ pub struct WebGpuMovieRenderer {
     /// Latched when the underlying WebGPU device is lost. The next render
     /// returns an error so the caller can activate its compatibility path.
     device_lost: Arc<AtomicBool>,
+    #[cfg(feature = "browser-qualification")]
+    device_loss_reason: Arc<AtomicU8>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -1057,24 +1069,21 @@ impl WebGpuMovieRenderer {
 
         let device_lost = Arc::new(AtomicBool::new(false));
         #[cfg(feature = "browser-qualification")]
-        let qualification_canvas = canvas.clone();
+        let device_loss_reason = Arc::new(AtomicU8::new(0));
         {
             let device_lost = Arc::clone(&device_lost);
             #[cfg(feature = "browser-qualification")]
-            let qualification_canvas = qualification_canvas.clone();
+            let device_loss_reason = Arc::clone(&device_loss_reason);
             device.set_device_lost_callback(move |reason, message| {
                 device_lost.store(true, Ordering::Release);
                 #[cfg(feature = "browser-qualification")]
-                {
-                    let reason = match reason {
-                        wgpu::DeviceLostReason::Destroyed => "destroyed",
-                        wgpu::DeviceLostReason::Unknown => "unknown",
-                    };
-                    let _ = qualification_canvas.set_attribute(
-                        "data-qualification-loss-reason",
-                        reason,
-                    );
-                }
+                device_loss_reason.store(
+                    match reason {
+                        wgpu::DeviceLostReason::Destroyed => 1,
+                        wgpu::DeviceLostReason::Unknown => 2,
+                    },
+                    Ordering::Release,
+                );
                 web_sys::console::warn_2(
                     &format!("Symthaea WebGPU movie device lost ({reason:?})").into(),
                     &message.into(),
@@ -1194,12 +1203,23 @@ impl WebGpuMovieRenderer {
             frame_width: 0,
             frame_height: 0,
             device_lost,
+            #[cfg(feature = "browser-qualification")]
+            device_loss_reason,
         })
     }
 
     /// Returns whether the device-lost callback has fired.
     pub fn is_device_lost(&self) -> bool {
         self.device_lost.load(Ordering::Acquire)
+    }
+
+    #[cfg(feature = "browser-qualification")]
+    pub fn qualification_loss_reason(&self) -> Option<&'static str> {
+        match self.device_loss_reason.load(Ordering::Acquire) {
+            1 => Some("destroyed"),
+            2 => Some("unknown"),
+            _ => None,
+        }
     }
 
     #[cfg(feature = "browser-qualification")]
