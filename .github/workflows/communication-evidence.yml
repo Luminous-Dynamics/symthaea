@@ -36,7 +36,7 @@ jobs:
           report = json.loads(Path("target/communication-evidence/neurosemantic_interlingua_n0.json").read_text())
           assert report["protocol_version"] == 1
           assert report["benchmark_schema_version"] == 1
-          assert report["summary"]["cases"] == 7
+          assert report["summary"]["cases"] == 8
           assert report["summary"]["structurally_equivalent_cases"] == 5
           assert report["execution_revision"] != ""
           for case in report["cases"]:
