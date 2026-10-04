@@ -233,6 +233,18 @@ mod tests {
     }
 
     #[test]
+    fn adapter_contract_binds_against_the_actual_candidate_mesh() {
+        let interface = interface(PortId(10), 7);
+        let binding = FixtureAdapter
+            .bind(&interface, &candidate(), [7; 32])
+            .unwrap();
+
+        assert_eq!(binding.port, PortId(10));
+        assert_eq!(binding.external_boundary_handle, "fixture:boundary-7");
+        assert_eq!(binding.realized_boundary.candidate_geometry_digest, [7; 32]);
+    }
+
+    #[test]
     fn verified_binding_carries_exact_interface_identity() {
         let interface = interface(PortId(10), 7);
         let binding =
