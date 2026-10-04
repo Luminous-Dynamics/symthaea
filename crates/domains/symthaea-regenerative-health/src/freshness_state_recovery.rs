@@ -582,6 +582,13 @@ mod tests {
             commit_authoritative_anchor(&AuthoritativeStore, &verified, None, &altered).unwrap_err(),
             FreshnessAnchorAssuranceError::SubjectBindingMismatch
         );
+
+        altered = record.clone();
+        altered.policy_fingerprint = "different-policy".into();
+        assert_eq!(
+            commit_authoritative_anchor(&AuthoritativeStore, &verified, None, &altered).unwrap_err(),
+            FreshnessAnchorAssuranceError::SubjectBindingMismatch
+        );
     }
 
     #[test]
@@ -620,10 +627,6 @@ mod tests {
             receiver_id: r.receiver_id.clone(),
             generation: r.generation,
             state_fingerprint: r.state_fingerprint.clone(),
-            recovery_policy_fingerprint: r.policy_fingerprint.clone(),
-            authority_reference: r.authority_reference.clone(),
-            authority_statement_digest: r.authority_statement_digest.clone(),
-            authentication_binding: r.authentication_binding.clone(),
             recovery_policy_fingerprint: r.policy_fingerprint.clone(),
             authority_reference: r.authority_reference.clone(),
             authority_statement_digest: r.authority_statement_digest.clone(),
