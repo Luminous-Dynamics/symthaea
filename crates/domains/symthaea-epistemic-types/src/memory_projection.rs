@@ -129,6 +129,52 @@ impl CanonicalAdmissionSubject {
     }
 }
 
+/// Typed identity for one canonical proposition about a canonical admission subject.
+///
+/// The proposition reference is intentionally coupled to the exact subject type.
+/// This prevents downstream adapters from treating a subject-level admission as
+/// though it were admission of an arbitrary proposition about that subject.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CanonicalStatementIdentity {
+    subject: CanonicalAdmissionSubject,
+    statement_ref: String,
+}
+
+impl CanonicalStatementIdentity {
+    pub fn new(
+        subject: CanonicalAdmissionSubject,
+        statement_ref: impl Into<String>,
+    ) -> Result<Self, &'static str> {
+        let statement_ref = statement_ref.into();
+        if statement_ref.trim().is_empty() {
+            return Err("statement reference must be non-empty");
+        }
+        Ok(Self {
+            subject,
+            statement_ref,
+        })
+    }
+
+    pub fn subject(&self) -> &CanonicalAdmissionSubject {
+        &self.subject
+    }
+
+    pub fn statement_ref(&self) -> &str {
+        &self.statement_ref
+    }
+
+    pub fn digest(&self) -> String {
+        let encoded = (
+            "symthaea:canonical-statement-identity:v1",
+            self.subject.digest(),
+            &self.statement_ref,
+        );
+        let bytes = serde_json::to_vec(&encoded)
+            .expect("canonical statement identity is serializable");
+        sha256_hex(&bytes)
+    }
+}
+
 /// Typed identity for one exported claim/representation.
 ///
 /// This must not be used as the canonical admission subject identifier.
@@ -673,6 +719,57 @@ mod tests {
     }
 
     #[test]
+    fn statement_identity_binds_proposition_to_exact_subject() {
+        let subject = CanonicalAdmissionSubject::new(
+            "canonical:1",
+            Some("family:1".into()),
+        ).unwrap();
+        let statement = CanonicalStatementIdentity::new(
+            subject.clone(),
+            "statement:1",
+        ).unwrap();
+
+        assert_eq!(statement.subject(), &subject);
+        assert_eq!(statement.statement_ref(), "statement:1");
+        assert_eq!(
+            statement.digest(),
+            CanonicalStatementIdentity::new(subject, "statement:1")
+                .unwrap()
+                .digest()
+        );
+    }
+
+    #[test]
+    fn statement_identity_digest_changes_when_subject_or_proposition_changes() {
+        let subject_a = CanonicalAdmissionSubject::new(
+            "canonical:1",
+            Some("family:1".into()),
+        ).unwrap();
+        let subject_b = CanonicalAdmissionSubject::new(
+            "canonical:2",
+            Some("family:1".into()),
+        ).unwrap();
+
+        let a = CanonicalStatementIdentity::new(subject_a.clone(), "statement:1").unwrap();
+        let subject_changed =
+            CanonicalStatementIdentity::new(subject_b, "statement:1").unwrap();
+        let statement_changed =
+            CanonicalStatementIdentity::new(subject_a, "statement:2").unwrap();
+
+        assert_ne!(a.digest(), subject_changed.digest());
+        assert_ne!(a.digest(), statement_changed.digest());
+    }
+
+    #[test]
+    fn statement_identity_rejects_blank_proposition_reference() {
+        let subject = CanonicalAdmissionSubject::new("canonical:1", None).unwrap();
+        assert_eq!(
+            CanonicalStatementIdentity::new(subject, "   ").unwrap_err(),
+            "statement reference must be non-empty"
+        );
+    }
+
+    #[test]
     fn typed_identity_namespaces_remain_distinct() {
         let subject = CanonicalAdmissionSubject::new(
             "canonical:1",
@@ -686,7 +783,6 @@ mod tests {
         assert_ne!(subject.digest(), sha256_hex(claim.as_str().as_bytes()));
     }
 
-    #[test]
     #[test]
     fn admission_receipt_binds_exact_validation_snapshot() {
         let relation = ProvenanceRelation {
