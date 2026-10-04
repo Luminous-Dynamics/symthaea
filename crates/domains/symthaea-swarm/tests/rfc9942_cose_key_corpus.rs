@@ -132,6 +132,15 @@ fn cose_key_rejects_key_without_verify_operation() {
 }
 
 #[test]
+fn cose_key_accepts_unknown_textual_key_ops_alongside_verify() {
+    let mut fields = valid_fields();
+    fields[3] = vec![0x04, 0x82, 0x02, 0x63, b'f', b'o', b'o'];
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
+        .expect("unknown textual key operation is extensible when verify is present");
+    assert_eq!(parsed.public_key_sec1()[0], 0x04);
+}
+
+#[test]
 fn cose_key_rejects_private_d_material() {
     let mut bytes = valid_key();
     bytes[0] = 0xa8;
