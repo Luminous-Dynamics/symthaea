@@ -774,14 +774,15 @@ pub fn factorization_algebra(factors: &[&RandomLinearCode]) -> Option<LinearCode
     })
 }
 
-/// Return a deterministic non-zero dependency witness when the factor spaces are globally dependent.
+/// Return a deterministic basis of the kernel of the factor-to-bound map.
 ///
-/// The returned witness is a coefficient vector in the concatenated generator presentation whose
-/// XOR evaluates to zero. It is not claimed to have minimum generator weight; its canonicality is
-/// defined by the ordered maximal-independent-prefix construction described on the type.
-pub fn factorization_dependency_witness(
+/// One witness is emitted for every generator that fails the maximal-independent-prefix
+/// construction. Each witness therefore has a distinct dependent-generator coordinate, so the
+/// witnesses are linearly independent and span the complete kernel. The basis is canonical relative
+/// to the ordered factor-generator presentation. It is not a minimum-weight dependency basis.
+pub fn factorization_kernel_basis(
     factors: &[&RandomLinearCode],
-) -> Option<LinearCodeDependencyWitness> {
+) -> Option<Vec<LinearCodeDependencyWitness>> {
     if factors.is_empty() {
         return None;
     }
@@ -794,11 +795,13 @@ pub fn factorization_dependency_witness(
     let total_rank = factors
         .iter()
         .try_fold(0usize, |sum, factor| sum.checked_add(factor.rank()))?;
+    let factor_offsets = factor_offsets(factors);
     let mut independent_basis = Vec::with_capacity(total_rank);
     let mut independent_indices = Vec::with_capacity(total_rank);
+    let mut kernel_basis = Vec::new();
     let mut current_index = 0usize;
 
-    for factor in factors.iter() {
+    for factor in factors {
         for generator in factor.basis() {
             if extends_span(&independent_basis, generator) {
                 independent_indices.push(current_index);
@@ -813,7 +816,6 @@ pub fn factorization_dependency_witness(
                 }
                 coefficients[current_index] = true;
 
-                let factor_offsets = factor_offsets(factors);
                 let factor_support = factors
                     .iter()
                     .enumerate()
@@ -824,34 +826,28 @@ pub fn factorization_dependency_witness(
                     })
                     .collect::<Vec<_>>();
 
-                if coefficients.iter().all(|bit| !*bit) || factor_support.len() < 2 {
-                    return None;
-                }
-
-                let mut witness_sum = BinaryCodeword::zero(dimension);
-                for (&coefficient, generator) in coefficients.iter().zip(
-                    factors.iter().flat_map(|factor| factor.basis().iter()),
-                ) {
-                    if coefficient {
-                        witness_sum.xor_assign(generator);
-                    }
-                }
-                if witness_sum != BinaryCodeword::zero(dimension) {
-                    return None;
-                }
-
-                return Some(LinearCodeDependencyWitness {
+                let witness = LinearCodeDependencyWitness {
                     generator_coefficients: coefficients,
                     factor_support,
-                });
+                };
+                if !witness.verifies_against(factors) {
+                    return None;
+                }
+                kernel_basis.push(witness);
             }
             current_index += 1;
         }
     }
 
-    None
+    Some(kernel_basis)
 }
 
+/// Return the first canonical non-zero kernel witness, when the factor spaces are dependent.
+pub fn factorization_dependency_witness(
+    factors: &[&RandomLinearCode],
+) -> Option<LinearCodeDependencyWitness> {
+    factorization_kernel_basis(factors)?.into_iter().next()
+}
 fn factor_offsets(factors: &[&RandomLinearCode]) -> Vec<usize> {
     let mut offsets = Vec::with_capacity(factors.len() + 1);
     offsets.push(0);
@@ -936,7 +932,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dependency_witness_is_deterministic_and_zero_sum() {
+    fn dependency_kernel_basis_is_deterministic_and_complete() {
         let c1 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b01])])
             .expect("c1");
         let c2 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b10])])
@@ -945,25 +941,44 @@ mod tests {
             .expect("c3");
         let factors = [&c1, &c2, &c3];
 
-        let first = factorization_dependency_witness(&factors).expect("dependency exists");
-        let second = factorization_dependency_witness(&factors).expect("dependency exists");
+        let algebra = factorization_algebra(&factors).expect("algebra");
+        let first = factorization_kernel_basis(&factors).expect("kernel basis");
+        let second = factorization_kernel_basis(&factors).expect("kernel basis");
         assert_eq!(first, second);
-        assert_eq!(first.generator_coefficients, vec![true, true, true]);
-        assert_eq!(first.factor_support, vec![0, 1, 2]);
-        assert_eq!(first.generator_support_size(), 3);
-        assert_eq!(first.factor_support_size(), 3);
+        assert_eq!(first.len(), algebra.kernel_dimension);
+        assert_eq!(first.len(), 1);
 
-        let mut sum = BinaryCodeword::zero(2);
-        for (&coefficient, generator) in first.generator_coefficients.iter().zip(
-            factors.iter().flat_map(|factor| factor.basis().iter()),
-        ) {
-            if coefficient {
-                sum.xor_assign(generator);
+        let witness = &first[0];
+        assert_eq!(witness.generator_coefficients, vec![true, true, true]);
+        assert_eq!(witness.factor_support, vec![0, 1, 2]);
+        assert_eq!(witness.generator_support_size(), 3);
+        assert_eq!(witness.factor_support_size(), 3);
+        assert!(witness.verifies_against(&factors));
+
+        let mut coefficient_basis = Vec::new();
+        for witness in &first {
+            let mut vector = BinaryCodeword::zero(witness.generator_coefficients.len());
+            for (index, coefficient) in witness.generator_coefficients.iter().enumerate() {
+                vector.set_bit(index, *coefficient);
             }
+            coefficient_basis.push(vector);
         }
-        assert_eq!(sum, BinaryCodeword::zero(2));
-    }
+        assert_eq!(
+            basis_rank(
+                &coefficient_basis,
+                witness.generator_coefficients.len(),
+            ),
+            algebra.kernel_dimension,
+        );
 
+        println!(
+            "DEPENDENCY_KERNEL_BASIS=fixture=three-way;kernel_dimension={};witness_count={};witness_generator_support_size={};witness_factor_support_size={};verified=true",
+            algebra.kernel_dimension,
+            first.len(),
+            witness.generator_support_size(),
+            witness.factor_support_size(),
+        );
+    }
     #[test]
     fn independent_factors_have_no_dependency_witness() {
         let (_, left, right) =
