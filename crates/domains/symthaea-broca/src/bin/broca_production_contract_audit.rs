@@ -28,6 +28,7 @@ struct AuditReport {
     evidence_level: &'static str,
     matrix_cases: usize,
     passed_cases: usize,
+    speech_plan_validation_checks: usize,
     linguistic_frame_checks: usize,
     phonological_binding_checks: usize,
     semantic_delivery_checks: usize,
@@ -47,6 +48,7 @@ struct AuditFailure {
 #[derive(Debug, Serialize)]
 struct AuditCase {
     case_id: String,
+    speech_plan_valid: bool,
     intent: String,
     epistemic_input: f32,
     plan_epistemic: String,
@@ -84,6 +86,7 @@ fn run() -> Result<()> {
         evidence_level: "deterministic-contract-audit",
         matrix_cases: 0,
         passed_cases: 0,
+        speech_plan_validation_checks: 0,
         linguistic_frame_checks: 0,
         phonological_binding_checks: 0,
         semantic_delivery_checks: 0,
@@ -112,6 +115,16 @@ fn run() -> Result<()> {
             }
 
             let speech_plan = SpeechPlan::from_readout(&channels, &readout);
+            let speech_plan_valid = speech_plan.validate().is_ok();
+            report.speech_plan_validation_checks += 1;
+            if !speech_plan_valid {
+                fail(
+                    &mut report,
+                    &case_id,
+                    "speech_plan_validation",
+                    "generated speech plan failed persisted-state validation".to_string(),
+                );
+            }
             let linguistic = LinguisticFrame::from_speech_plan(&speech_plan);
             let linguistic_ready = linguistic.ready_for_phonology();
             let linguistic_valid = linguistic.validate().is_ok();
@@ -286,7 +299,8 @@ fn run() -> Result<()> {
                 );
             }
 
-            let case_ok = linguistic_valid
+            let case_ok = speech_plan_valid
+                && linguistic_valid
                 && linguistic_to_phonological_preserved_intent
                 && linguistic_lexical_binding_valid
                 && role_only_rejected
@@ -305,6 +319,7 @@ fn run() -> Result<()> {
 
             report.cases.push(AuditCase {
                 case_id,
+                speech_plan_valid,
                 intent: (*intent_name).to_string(),
                 epistemic_input: epistemic,
                 plan_epistemic: format!("{:?}", speech_plan.epistemic_delivery),
