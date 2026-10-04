@@ -253,6 +253,9 @@ pub struct AuthorizationLease {
     /// distinct from the canonical action identity so a later explicit
     /// authorization can exist without making the old authority replayable.
     pub authorization_instance: String,
+    /// Logical operation identity frozen when this lease enters a boundary-owned attempt.
+    /// This remains separate from the native replay identity and provider idempotency key.
+    pub operation_id: Option<String>,
     pub action_digest: String,
     pub support_digest: String,
     pub policy: String,
