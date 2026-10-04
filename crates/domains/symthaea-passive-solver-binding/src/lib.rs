@@ -821,6 +821,7 @@ pub enum SolverBindingError {
     InvalidInterface,
     EmptyAdapterId,
     EmptyExternalBoundaryHandle,
+    ExternalObservation(String),
     UnverifiedBinding,
     InvalidEvidenceState,
     EmptyCandidateGeometryDigest,
