@@ -1136,7 +1136,7 @@ mod tests {
         let b = interface(PortId(20), 8);
         let candidate = candidate();
         let mut changed = candidate.clone();
-        changed.vertices[1][0] += 0.125;
+        changed.vertices[0][2] += 0.125;
         let first = SolverBoundaryBinding::verified(
             &a,
             "test-adapter/v1",
