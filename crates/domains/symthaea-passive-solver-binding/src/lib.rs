@@ -31,6 +31,7 @@ pub struct RealizedBoundaryIdentity {
     boundary_perimeter_micrometers: u64,
     max_plane_residual_micrometers: u64,
     max_radial_residual_micrometers: u64,
+    boundary_matching_tolerance_micrometers: u64,
 }
 
 impl RealizedBoundaryIdentity {
@@ -56,6 +57,7 @@ impl RealizedBoundaryIdentity {
             boundary_perimeter_micrometers: certificate.boundary_perimeter_micrometers,
             max_plane_residual_micrometers: certificate.max_plane_residual_micrometers,
             max_radial_residual_micrometers: certificate.max_radial_residual_micrometers,
+            boundary_matching_tolerance_micrometers: micrometers_from_mm(tolerance_mm)?,
         })
     }
 
@@ -85,6 +87,10 @@ impl RealizedBoundaryIdentity {
 
     pub fn max_radial_residual_micrometers(&self) -> u64 {
         self.max_radial_residual_micrometers
+    }
+
+    pub fn boundary_matching_tolerance_micrometers(&self) -> u64 {
+        self.boundary_matching_tolerance_micrometers
     }
 }
 
@@ -206,6 +212,12 @@ impl SolverBoundaryBinding {
         hasher.update(&self.realized_boundary.boundary_perimeter_micrometers().to_le_bytes());
         hasher.update(&self.realized_boundary.max_plane_residual_micrometers().to_le_bytes());
         hasher.update(&self.realized_boundary.max_radial_residual_micrometers().to_le_bytes());
+        hasher.update(
+            &self
+                .realized_boundary
+                .boundary_matching_tolerance_micrometers()
+                .to_le_bytes(),
+        );
         hasher.update(&[u8::from(self.solver_binding_verified)]);
         hasher.update(&[u8::from(self.physical_transport_unproven)]);
         *hasher.finalize().as_bytes()
@@ -718,6 +730,17 @@ fn validate_closed_single_loop(edges: &[BoundaryEdgeKey]) -> Result<(), SolverBi
     }
 
     Ok(())
+}
+
+fn micrometers_from_mm(tolerance_mm: f64) -> Result<u64, SolverBindingError> {
+    if !tolerance_mm.is_finite() || tolerance_mm < 0.0 {
+        return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
+    }
+    let micrometers = tolerance_mm * 1_000.0;
+    if micrometers > u64::MAX as f64 {
+        return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
+    }
+    Ok(micrometers.round() as u64)
 }
 
 fn quantize_point(point: [f32; 3]) -> [i64; 3] {
