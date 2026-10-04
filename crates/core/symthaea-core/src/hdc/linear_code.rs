@@ -1281,9 +1281,10 @@ fn has_dependent_factor_subset(
     chosen: &mut Vec<usize>,
 ) -> bool {
     if chosen.len() == subset_size {
-        let Some(rank_sum) = chosen.iter().try_fold(0usize, |sum, &index| {
-            sum.checked_add(factors[index].rank())
-        }) else {
+        let Some(rank_sum) = chosen
+            .iter()
+            .try_fold(0usize, |sum, &index| sum.checked_add(factors[index].rank()))
+        else {
             return false;
         };
         let mut basis = Vec::new();
