@@ -457,6 +457,61 @@ pub struct AuthorizedDeploymentPlan {
     pub authorization: AuthorizationEvidence,
 }
 
+/// Durable record of a successful one-shot authorization consumption.
+///
+/// SSC does not own the persistence or transaction boundary. A target executor
+/// (or authority service immediately adjacent to it) must atomically reject a
+/// previously consumed `(authority_id, nonce)` pair and record the exact
+/// authorization digest that was consumed before performing any mutation.
+///
+/// A fresh authorization for the same plan is therefore distinguishable only
+/// by a fresh authorization identity/nonce under the authority's policy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthorizationConsumption {
+    pub authorization_digest: ContentDigest,
+    pub authority_id: String,
+    pub nonce: String,
+    pub consumed_at_ms: u64,
+}
+
+impl AuthorizationConsumption {
+    /// Derive the exact consumption record from validated authorization
+    /// evidence. This constructor performs no persistence and consumes nothing.
+    pub fn for_authorization(
+        authorization: &AuthorizationEvidence,
+        consumed_at_ms: u64,
+    ) -> Result<Self, PlanValidationError> {
+        if authorization.authority_id.is_empty() {
+            return Err(PlanValidationError::EmptyAuthority);
+        }
+        if authorization.nonce.is_empty() {
+            return Err(PlanValidationError::EmptyNonce);
+        }
+
+        Ok(Self {
+            authorization_digest: authorization
+                .digest()
+                .map_err(PlanValidationError::Serialization)?,
+            authority_id: authorization.authority_id.clone(),
+            nonce: authorization.nonce.clone(),
+            consumed_at_ms,
+        })
+    }
+}
+
+/// Persistence/transaction boundary for one-shot authorization.
+///
+/// Implementations MUST make the check-and-record operation atomic with
+/// respect to concurrent consumers. The uniqueness key is the authority's
+/// nonce identity; the stored value must remain bound to the exact
+/// authorization digest. An already-consumed nonce MUST never be silently
+/// accepted, even when the presented authorization digest differs.
+pub trait AuthorizationConsumptionStore {
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    fn consume_once(&mut self, consumption: &AuthorizationConsumption) -> Result<(), Self::Error>;
+}
+
 /// Result of applying an authorized deployment plan.
 ///
 /// The executor/adapter may attach platform-specific evidence separately;
@@ -659,6 +714,12 @@ impl ExecutionReceipt {
 pub trait DeploymentExecutor {
     type Error: std::error::Error + Send + Sync + 'static;
 
+    /// Execute an authorized plan only after the adjacent authority/executor
+    /// boundary has atomically consumed its authorization nonce.
+    ///
+    /// The neutral SSC core intentionally does not provide the persistence
+    /// implementation: a process-local flag is insufficient across retries,
+    /// restarts, or concurrent executors.
     fn execute(
         &mut self,
         plan: &AuthorizedDeploymentPlan,
@@ -2103,6 +2164,102 @@ mod tests {
         assert_eq!(
             receipt.validate_for(&authorized),
             Err(ReceiptValidationError::AuthorizationMissingExpiry)
+        );
+    }
+
+    #[test]
+    fn authorization_consumption_binds_exact_digest_and_nonce() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let consumption =
+            AuthorizationConsumption::for_authorization(&auth, 151).expect("consumption");
+        assert_eq!(consumption.authority_id, auth.authority_id);
+        assert_eq!(consumption.nonce, auth.nonce);
+        assert_eq!(consumption.authorization_digest, auth.digest().expect("auth digest"));
+        assert_eq!(consumption.consumed_at_ms, 151);
+    }
+
+    #[test]
+    fn authorization_consumption_rejects_empty_identity() {
+        let plan = sample_plan();
+        let mut auth = authorization_for(&plan);
+        auth.nonce.clear();
+        assert_eq!(
+            AuthorizationConsumption::for_authorization(&auth, 151),
+            Err(PlanValidationError::EmptyNonce)
+        );
+
+        auth.nonce = "nonce-1".into();
+        auth.authority_id.clear();
+        assert_eq!(
+            AuthorizationConsumption::for_authorization(&auth, 151),
+            Err(PlanValidationError::EmptyAuthority)
+        );
+    }
+
+    #[test]
+    fn authorization_consumption_store_contract_rejects_replay_and_nonce_reuse() {
+        #[derive(Default)]
+        struct InMemoryStore {
+            consumed: BTreeMap<(String, String), ContentDigest>,
+        }
+
+        #[derive(Debug, Error, PartialEq, Eq)]
+        enum StoreError {
+            #[error("authorization already consumed")]
+            AlreadyConsumed,
+            #[error("authorization nonce was previously consumed for a different authorization")]
+            NonceReused,
+        }
+
+        impl AuthorizationConsumptionStore for InMemoryStore {
+            type Error = StoreError;
+
+            fn consume_once(
+                &mut self,
+                consumption: &AuthorizationConsumption,
+            ) -> Result<(), Self::Error> {
+                let key = (consumption.authority_id.clone(), consumption.nonce.clone());
+                match self.consumed.entry(key) {
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(consumption.authorization_digest.clone());
+                        Ok(())
+                    }
+                    std::collections::btree_map::Entry::Occupied(entry)
+                        if entry.get() == &consumption.authorization_digest =>
+                    {
+                        Err(StoreError::AlreadyConsumed)
+                    }
+                    std::collections::btree_map::Entry::Occupied(_) => {
+                        Err(StoreError::NonceReused)
+                    }
+                }
+            }
+        }
+
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let consumption =
+            AuthorizationConsumption::for_authorization(&auth, 151).expect("consumption");
+
+        let mut store = InMemoryStore::default();
+        assert!(store.consume_once(&consumption).is_ok());
+        assert_eq!(
+            store.consume_once(&consumption),
+            Err(StoreError::AlreadyConsumed)
+        );
+
+        let mut altered = auth.clone();
+        altered.valid_from_ms = Some(149);
+        let altered_consumption =
+            AuthorizationConsumption::for_authorization(&altered, 151).expect("altered");
+        assert_ne!(
+            altered_consumption.authorization_digest,
+            consumption.authorization_digest
+        );
+        assert_eq!(
+            store.consume_once(&altered_consumption),
+            Err(StoreError::NonceReused)
         );
     }
 
