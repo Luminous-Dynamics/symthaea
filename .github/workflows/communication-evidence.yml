@@ -71,6 +71,8 @@ jobs:
 
           hdc_interlingua = json.loads(Path("target/communication-evidence/neurosemantic_hdc_interlingua_n0.json").read_text())
           assert hdc_interlingua["benchmark_schema_version"] == 1
+          assert hdc_interlingua["execution_revision"] != ""
+          assert hdc_interlingua["adapter_id"] == "symthaea.hdc.semantic-interlingua-v1"
           assert hdc_interlingua["claim_boundary"] == "held_out_synthetic_graph_retrieval_and_reconstruction_only"
           assert hdc_interlingua["codec_id"] == "symthaea.hdc.continuous-sign-v1"
           assert hdc_interlingua["summary"]["training_graphs"] == 4
