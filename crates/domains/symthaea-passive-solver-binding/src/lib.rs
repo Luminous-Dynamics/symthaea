@@ -1014,6 +1014,15 @@ mod tests {
     }
 
     #[test]
+    fn adapter_draft_rejects_empty_handle() {
+        let selection = BoundaryPatchSelection::from_edges(boundary_edges(&candidate())).unwrap();
+        assert_eq!(
+            SolverBoundaryBindingDraft::new("", selection),
+            Err(SolverBindingError::EmptyExternalBoundaryHandle)
+        );
+    }
+
+    #[test]
     fn verified_binding_carries_exact_interface_identity() {
         let interface = interface(PortId(10), 7);
         let candidate = candidate();
