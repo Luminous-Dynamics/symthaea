@@ -196,6 +196,7 @@ impl TpmNvCounterEvidence {
             && receipt.generation == self.counter_value
             && receipt.freshness_handle_digest == self.quote_nonce_digest
             && self.nv_certify_index_name_digest == self.nv_index_name_digest
+            && self.nv_certify_attestation_key_id_digest == self.attestation_key_id_digest
             && receipt.evidence_digest == self.binding_digest()
     }
 
@@ -714,6 +715,14 @@ mod tests {
             verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
             TpmNvCounterVerificationError::NvCertificationBindingMismatch
         );
+    }
+
+    #[test]
+    fn structural_validator_rejects_nv_certification_signer_splice() {
+        let mut evidence = evidence(7);
+        evidence.nv_certify_attestation_key_id_digest = "different-key".into();
+        let receipt = receipt(7);
+        assert!(!evidence.validate_against_receipt(&profile(), &receipt));
     }
 
     #[test]
