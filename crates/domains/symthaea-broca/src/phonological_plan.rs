@@ -208,7 +208,14 @@ impl PhonologicalPlan {
             }
         }
 
-        validate_segment_sequence(&self.segments)
+        validate_segment_sequence(&self.segments)?;
+
+        let expected_syllables = derive_syllables(&self.segments);
+        if expected_syllables != self.syllables {
+            return Err(PhonologicalPlanError::SyllableSummaryMismatch);
+        }
+
+        Ok(())
     }
 
     /// Whether enough valid phonological content exists for segment-level realization.
@@ -259,6 +266,7 @@ pub enum PhonologicalPlanError {
     LexicalBindingWithoutProvenance,
     EmptyLexicalProvenance,
     NonLexicalProvenance,
+    SyllableSummaryMismatch,
     PhonologicalBindingWithoutSegments,
     RoleOnlyWithSegments,
 }
@@ -286,6 +294,9 @@ impl std::fmt::Display for PhonologicalPlanError {
             }
             Self::NonLexicalProvenance => {
                 write!(f, "non-lexical plans must not carry lexical provenance")
+            }
+            Self::SyllableSummaryMismatch => {
+                write!(f, "cached syllable summary does not match phoneme slots")
             }
             Self::PhonologicalBindingWithoutSegments => {
                 write!(f, "phonologically bound plans require explicit phonological segments")
@@ -577,6 +588,30 @@ mod tests {
             .expect_err("lexical binding without provenance must fail closed");
 
         assert_eq!(error, PhonologicalPlanError::LexicalBindingWithoutProvenance);
+    }
+
+    #[test]
+    fn persisted_syllable_summary_must_match_segments() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.bind_segments(
+            vec![PhonemeSlot::new(
+                "AE",
+                0,
+                SyllableStress::Primary,
+                true,
+                false,
+                true,
+            )],
+            ContentBindingStatus::PhonologicallyBound,
+        )
+        .unwrap();
+        plan.syllables[0].stress = SyllableStress::None;
+
+        let error = plan
+            .validate()
+            .expect_err("stale derived syllable data must fail validation");
+
+        assert_eq!(error, PhonologicalPlanError::SyllableSummaryMismatch);
     }
 
     #[test]
