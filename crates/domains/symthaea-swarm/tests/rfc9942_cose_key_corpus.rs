@@ -74,8 +74,11 @@ fn indefinite_bstr_with_exact_chunk_cap(bytes: &[u8]) -> Vec<u8> {
     for _ in 0..MAX_CBOR_BSTR_CHUNKS - 1 {
         out.push(0x40);
     }
-    assert!(bytes.len() <= 23);
-    out.push(0x40 + bytes.len() as u8);
+    match bytes.len() {
+        0..=23 => out.push(0x40 + bytes.len() as u8),
+        24..=255 => out.extend_from_slice(&[0x58, bytes.len() as u8]),
+        _ => panic!("test bstr too large"),
+    }
     out.extend_from_slice(bytes);
     out.push(0xff);
     out
@@ -118,6 +121,36 @@ fn cose_key_accepts_exact_indefinite_tstr_chunk_cap_before_break() {
     let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
         .expect("the break after exactly MAX_CBOR_TSTR_CHUNKS chunks is valid");
     assert_eq!(&parsed.public_key_sec1()[1..33], &X);
+}
+
+#[test]
+fn cose_key_rejects_bstr_chunk_count_above_exact_cap() {
+    let mut fields = valid_fields();
+    let mut encoded = vec![0x21, 0x5f];
+    for _ in 0..=MAX_CBOR_BSTR_CHUNKS {
+        encoded.push(0x40);
+    }
+    encoded.push(0xff);
+    fields[5] = encoded;
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&key(&fields)),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
+}
+
+#[test]
+fn cose_key_rejects_tstr_chunk_count_above_exact_cap() {
+    let mut fields = valid_fields();
+    let mut encoded = vec![0x01, 0x7f];
+    for _ in 0..=MAX_CBOR_TSTR_CHUNKS {
+        encoded.push(0x60);
+    }
+    encoded.push(0xff);
+    fields[0] = encoded;
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&key(&fields)),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
 }
 
 #[test]
