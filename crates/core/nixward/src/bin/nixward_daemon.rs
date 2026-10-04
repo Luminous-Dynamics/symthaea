@@ -997,8 +997,7 @@ impl DaemonState {
                     })
                     .collect();
 
-                AlertEntry {
-                    metric: p.metric.to_string(),
+                AlertEntry {                    metric: p.metric.to_string(),
                     current_value: p.current_value,
                     predicted_value: p.predicted_value,
                     hours_ahead: p.hours_ahead,
@@ -1997,8 +1996,7 @@ equivalents of what this daemon does continuously."
     std::process::exit(0);
 }
 
-fn main() -> ! {
-    // A real gap found while smoke-testing the symthaea-nix -> nixward
+fn main() -> ! {    // A real gap found while smoke-testing the symthaea-nix -> nixward
     // rename: this binary had no arg handling whatsoever, so `--help`
     // silently started the real daemon instead of printing usage.
     for arg in std::env::args().skip(1) {
@@ -2997,7 +2995,6 @@ mod tests {
         let config = test_config();
         let mut state = DaemonState::new(&config);
         assert_eq!(state.maintenance_plan_count, 0);
-
         // Formulate a recovery goal for postgresql service failure
         let goal_description = "Resolve service failure in 'postgresql' (reason: FATAL error)";
         let plan = state.active_inference.process_input(goal_description);
@@ -3437,23 +3434,18 @@ mod tests {
     }
 
     #[test]
-    fn test_custom_user_goal_and_watchdog_veto() {
+    fn test_custom_user_goal_ignores_legacy_watchdog_verdict() {
         let config = test_config();
         let mut state = DaemonState::new(&config);
 
-        // Verify initial custom goal and pending action is None
+        // Custom user goals should still produce a dry-run recommendation first.
         assert!(state.custom_user_goal.is_none());
         assert!(state.pending_action.is_none());
-
-        // Set custom user goal: keep disk below 75%
         state.custom_user_goal = Some((
             "keep disk below 75".to_string(),
             "disk_used_pct".to_string(),
             75.0,
         ));
-
-        // When we run planning, the daemon should formulate a plan for the custom user goal
-        // Because active_healing = false in test_config(), it shouldn't execute or gate, but should plan it as dry-run
         state.run_active_inference_plans(&[]);
         assert!(
             state.last_recommended_action.is_some(),
@@ -3462,37 +3454,49 @@ mod tests {
         let planned = state.last_recommended_action.as_ref().unwrap();
         assert_eq!(planned.0, "disk_used_pct");
 
-        // Now, enable active healing
+        // Active healing must gate the modifying action behind the live local
+        // approval runtime, not the legacy watchdog verdict file.
         state.active_healing = true;
-        // Re-inject custom goal
         state.custom_user_goal = Some((
             "keep disk below 75".to_string(),
             "disk_used_pct".to_string(),
             75.0,
         ));
-
-        // When we run planning with active_healing = true and watchdog_status = None,
-        // it should GATE the action and set pending_action!
         state.run_active_inference_plans(&[]);
         assert!(
             state.pending_action.is_some(),
-            "Expected action to be gated behind watchdog approval"
+            "Expected modifying action to be gated behind local approval"
         );
+        assert!(state.pending_action_intent_digest.is_some());
         assert!(
-            state.pending_action.as_ref().unwrap().contains("systemctl")
-                || state.pending_action.as_ref().unwrap().contains("nix-store")
-                || state.pending_action.as_ref().unwrap().contains("PATCH"),
-            "Expected pending command to be a PATCH, systemctl, or nix-store command"
+            state
+                .pending_action
+                .as_ref()
+                .unwrap()
+                .contains("PATCH"),
+            "Expected pending command to be the typed configuration patch"
         );
 
-        // Approve it!
+        // A legacy persisted watchdog verdict is not execution authority and must
+        // not consume, clear, or promote the live pending local-approval request.
         state.watchdog_status = Some("Approved".to_string());
         state.run_active_inference_plans(&[]);
-
-        // It should clear pending action on approval
         assert!(
-            state.pending_action.is_none(),
-            "Expected pending action to be cleared on approval"
+            state.pending_action.is_some(),
+            "Legacy watchdog approval must not clear the governed pending action"
+        );
+        assert!(
+            state.pending_action_intent_digest.is_some(),
+            "Legacy watchdog approval must not clear the governed intent digest"
+        );
+        assert_eq!(
+            state.watchdog_status, None,
+            "Legacy watchdog verdict should be cleared rather than treated as authority"
+        );
+        #[cfg(target_os = "linux")]
+        assert!(
+            state.pending_local_approval.is_some(),
+            "Exact live local approval request must remain pending"
         );
     }
 
