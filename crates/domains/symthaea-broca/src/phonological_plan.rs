@@ -120,6 +120,8 @@ pub struct PhonologicalPlan {
     /// Optional provenance token supplied by the lexical formatter when lexical content is bound.
     pub lexical_provenance: Option<String>,
     pub source_intent: String,
+    /// Whether the upstream linguistic stage explicitly authorizes realization.
+    pub realization_authorized: bool,
     pub focus_role: Option<String>,
     pub intonation: IntonationIntent,
     pub rate: f32,
@@ -137,6 +139,7 @@ impl PhonologicalPlan {
             content_binding: ContentBindingStatus::RoleStructureOnly,
             lexical_provenance: None,
             source_intent: frame.source_intent.clone(),
+            realization_authorized: frame.ready_for_phonology(),
             focus_role: frame.focus_role.clone(),
             intonation: frame.prosody.intonation,
             rate: sanitize_rate(frame.prosody.rate),
@@ -162,7 +165,8 @@ impl PhonologicalPlan {
                 || self.focus_role != frame.focus_role
                 || self.intonation != frame.prosody.intonation
                 || self.rate != sanitize_rate(frame.prosody.rate)
-                || self.pause_weight != sanitize_unit(frame.prosody.pause_weight))
+                || self.pause_weight != sanitize_unit(frame.prosody.pause_weight)
+            || self.realization_authorized != frame.ready_for_phonology())
         {
             return Err(PhonologicalPlanError::UpstreamMismatch);
         }
@@ -184,6 +188,9 @@ impl PhonologicalPlan {
         segments: Vec<PhonemeSlot>,
         status: ContentBindingStatus,
     ) -> Result<(), PhonologicalPlanError> {
+        if !self.realization_authorized && !segments.is_empty() {
+            return Err(PhonologicalPlanError::RealizationNotAuthorized);
+        }
         if matches!(status, ContentBindingStatus::LexicallyBound) {
             return Err(PhonologicalPlanError::LexicalBindingWithoutProvenance);
         }
@@ -204,6 +211,9 @@ impl PhonologicalPlan {
         provenance: impl Into<String>,
     ) -> Result<(), PhonologicalPlanError> {
         let provenance = provenance.into();
+        if !self.realization_authorized {
+            return Err(PhonologicalPlanError::RealizationNotAuthorized);
+        }
         if provenance.trim().is_empty() {
             return Err(PhonologicalPlanError::EmptyLexicalProvenance);
         }
@@ -321,6 +331,7 @@ pub enum PhonologicalPlanError {
     InvalidPauseWeight,
     FocusRoleWithoutSegments,
     FocusSegmentsWithoutRole,
+    RealizationNotAuthorized,
     UpstreamMismatch,
     ConflictingSyllableStress { syllable_index: usize },
     MixedSyllableFocus { syllable_index: usize },
@@ -346,6 +357,7 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::InvalidPauseWeight => write!(f, "phonological plan pause weight is outside [0, 1]"),
             Self::FocusRoleWithoutSegments => write!(f, "a focus role requires focused phonemes"),
             Self::FocusSegmentsWithoutRole => write!(f, "focused phonemes require a focus role"),
+            Self::RealizationNotAuthorized => write!(f, "upstream linguistic state does not authorize speech realization"),
             Self::UpstreamMismatch => write!(f, "phonological plan no longer matches its upstream linguistic frame"),
             Self::ConflictingSyllableStress { syllable_index } => write!(f, "syllable {syllable_index} contains conflicting stress annotations"),
             Self::MixedSyllableFocus { syllable_index } => write!(f, "syllable {syllable_index} contains mixed focus annotations"),
