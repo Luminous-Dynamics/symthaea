@@ -108,7 +108,7 @@ The adapter is intentionally outside the domain crate's current dependency graph
 
     Call the challenge-and-policy-aware verification path only after all raw TPM evidence has been collected.
 
-    The authoritative entry point is `verify_tpm_nv_counter_with_challenge_and_trust_policy()`. Its challenge must be fresh verifier-generated input, and its trust policy is pre-authorized configuration: it must be constructed independently of the incoming attestation and must contain the expected TPM identity, NV Index Name, NV public-area digest, authorization-policy digest, attestation-key identity, and PCR-policy binding.
+    The authoritative entry point is `verify_tpm_nv_counter_with_challenge_and_trust_policy()`. Its challenge must be fresh verifier-generated input, and its trust policy is pre-authorized configuration: it must be constructed independently of the incoming attestation and must contain the exact `FreshnessAnchorProfile` fingerprint plus the expected TPM identity, NV Index Name, NV public-area digest, authorization-policy digest, attestation-key identity, and PCR-policy binding. The verifier must reject a policy whose profile fingerprint does not equal the profile supplied to the same verification call.
 
     The older structural `verify_tpm_nv_counter()` and challenge-only `verify_tpm_nv_counter_with_challenge()` helpers remain useful for adapter/qualification tests but must not be used by themselves to mint authoritative freshness. A successful adapter call is not itself sufficient authority; the resulting evidence must still pass the generic freshness-anchor verification and authoritative commit gates.
 
