@@ -735,3 +735,77 @@ provides context that modulates translation warmth, formality, and engagement
 depth. The partnership model tracks relationship stage and trust across
 interactions, producing responses that evolve with the relationship rather than
 treating every interaction as stateless.
+
+
+---
+
+## Typed Phonological Planning
+
+The speech-production boundary is now explicitly split into:
+
+    StructuredReadout + ThoughtChannels
+            |
+            v
+        SpeechPlan
+            |
+            v
+    PhonologicalPlan
+            |
+            v
+    phoneme/syllable slots
+            |
+            v
+    vocal-tract realization
+            |
+            v
+    sensory observation -> SpeechFeedbackReceipt
+
+PhonologicalPlan exists specifically to prevent the realization layer from having to
+re-infer linguistic structure from acoustic state. It carries intonation, rate, pause
+pressure, focus provenance, syllable stress, syllable boundaries, and explicit phoneme
+slots when an upstream linguistic formatter provides them.
+
+### Content-binding states
+
+Three states make absence of linguistic content explicit:
+
+- RoleStructureOnly: semantic roles and prosodic intent exist, but no word/phoneme
+  sequence is available. The plan is not ready for segment-level realization.
+- PhonologicallyBound: an explicit phoneme sequence and syllable structure have been
+  supplied without asserting lexical provenance.
+- LexicallyBound: the caller has both lexical provenance and an explicit phonological
+  sequence. The plan itself does not invent or synthesize lexical strings.
+
+This is intentionally loss-aware. A role-only readout such as PATIENT:SOMETHING does
+not become a guessed word merely because a voice subsystem needs segments.
+
+### Validation invariants
+
+The phonological contract fails closed on:
+
+- empty phoneme symbols;
+- non-contiguous syllable indices;
+- lexical binding without explicit segments;
+- phonological binding without explicit segments;
+- role-only status carrying segment data.
+
+Stress ordering is represented as Primary > Secondary > None, matching the realization
+layer's existing 0/1/2 stress convention after the bridge conversion.
+
+### Realization boundary
+
+BrocaFramePosition::from_phoneme_slot() copies only phonological ownership into the
+voice frame: stress, syllable onset, and information-structural focus. Timing, phrase
+progress, and neighboring source types remain scheduler-owned. This keeps the semantic,
+phonological, and biomechanical responsibilities separable and makes ablation possible.
+
+### Research correspondence and non-claims
+
+This split corresponds to computational speech-production models that distinguish
+higher-level phonological sequencing from lower-level articulatory control and combine
+feedforward production with auditory/somatosensory feedback. DIVA/GODIVA explicitly
+bridges linguistic/phonological sequencing into speech-sound planning and then into
+articulatory control; sensory targets and prediction errors are used for feedback-based
+correction. This repository's implementation is an engineering correspondence, not a
+claim of anatomical identity with human Broca's area or of human-level speech
+naturalness.
