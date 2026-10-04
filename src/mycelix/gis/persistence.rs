@@ -97,6 +97,12 @@ fn serialize_resolution(resolution: &IgnoranceResolution) -> String {
     let answer = resolution.answer.as_deref().unwrap_or("");
     let confidence = resolution.confidence.to_string();
     let source = resolution.source.as_str();
+    let resolved_at = resolution
+        .resolved_at
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        .to_string();
     push_len_prefixed(&mut output, method.as_str());
     push_len_prefixed(&mut output, answer);
     push_len_prefixed(&mut output, confidence.as_str());
