@@ -121,6 +121,13 @@ impl LinguisticFrame {
 
     /// Validate persisted/deserialized cross-field invariants.
     pub fn validate(&self) -> Result<(), LinguisticFrameError> {
+        if self.version != LINGUISTIC_FRAME_VERSION {
+            return Err(LinguisticFrameError::InvalidVersion);
+        }
+        if self.source_intent.trim().is_empty() {
+            return Err(LinguisticFrameError::EmptySourceIntent);
+        }
+
         match self.binding_status {
             LinguisticBindingStatus::RoleStructureOnly => {
                 if self.lexical_provenance.is_some() {
@@ -211,6 +218,8 @@ impl LinguisticFrame {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LinguisticFrameError {
+    InvalidVersion,
+    EmptySourceIntent,
     EmptyLexicalProvenance,
     MissingLexicalProvenance,
     NonLexicalProvenance,
@@ -224,6 +233,8 @@ pub enum LinguisticFrameError {
 impl std::fmt::Display for LinguisticFrameError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::InvalidVersion => write!(f, "linguistic frame version is unsupported"),
+            Self::EmptySourceIntent => write!(f, "linguistic frame source intent must be non-empty"),
             Self::EmptyLexicalProvenance => {
                 write!(f, "lexical binding requires non-empty provenance")
             }
