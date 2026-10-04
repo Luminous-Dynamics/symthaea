@@ -104,7 +104,7 @@ pub fn compare_graphs(
         edge_precision: ratio(edge_intersection, observed_edges.len()),
         edge_recall: ratio(edge_intersection, expected_edges.len()),
         confidence_mae: confidence_mae(&expected_nodes, &observed_nodes),
-        structural_equivalence: expected_nodes.keys().eq(observed_nodes.keys())
+        structural_equivalence: node_multisets_equal(&expected_nodes, &observed_nodes)
             && multiset_edges_equal(&expected_edges, &observed_edges),
         expected_bytes: serde_json::to_vec(expected)
             .map_err(|error| error.to_string())?
@@ -227,6 +227,21 @@ fn canonical_edges(graph: &GroundedConceptGraph) -> Vec<(String, String, String)
         .collect::<Vec<_>>();
     edges.sort();
     edges
+}
+
+fn node_multisets_equal(
+    expected: &BTreeMap<String, Vec<f32>>,
+    observed: &BTreeMap<String, Vec<f32>>,
+) -> bool {
+    expected
+        .iter()
+        .all(|(key, expected_confidences)| {
+            observed
+                .get(key)
+                .map(|observed_confidences| observed_confidences.len() == expected_confidences.len())
+                .unwrap_or(false)
+        })
+        && expected.len() == observed.len()
 }
 
 fn multiset_edges_equal(
