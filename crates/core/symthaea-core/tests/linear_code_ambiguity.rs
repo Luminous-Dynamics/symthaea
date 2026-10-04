@@ -1,6 +1,6 @@
 use blake3::Hasher;
 use symthaea_core::hdc::linear_code::{
-    BinaryCodeword, LinearCodeWork, RandomLinearCode, basis_rank,
+    BinaryCodeword, ExactPowerOfTwo, LinearCodeWork, RandomLinearCode, basis_rank,
     factorization_affine_fiber, factorization_algebra, factorization_count_for_target,
     factorization_dependency_witness, factorization_kernel_basis, recover_direct_sum_bound,
     recover_independent_bound,
@@ -1675,12 +1675,14 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
 
     assert!(fiber.iter_bounded(expected - 1).is_none());
     assert_eq!(fiber.iter_bounded(0), None);
-    assert_eq!(
-        fiber
-            .coefficients_for_mask(&[false, false, false])
-            .is_none(),
-        true
-    );
+
+    let mut tampered = fiber.clone();
+    tampered.cardinality = ExactPowerOfTwo::new(algebra.kernel_dimension - 1);
+    assert!(tampered.iter_bounded(expected).is_none());
+    assert!(tampered.coefficients_for_mask(&[false, false, false, false]).is_none());
+    assert!(fiber
+        .coefficients_for_mask(&[false, false, false])
+        .is_none());
 
     println!(
         "AFFINE_FIBER_ENUMERATION=kernel_dimension={};expected_fibers={};enumerated_fibers={};all_targets_match=true;all_coefficients_unique=true;bounded=true",
