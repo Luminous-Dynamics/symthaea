@@ -499,6 +499,43 @@ mod tests {
     }
 
     #[test]
+    fn runtime_refuses_to_install_dangerous_operator_display_formatting() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let command = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec!["safe\u{202E}argument".to_string()],
+        };
+        let intent = NixActionIntentV1::from_command(
+            "machine:workstation",
+            Some("generation:42".to_string()),
+            &command,
+        )
+        .unwrap();
+
+        let result = runtime.create_pending_request(
+            &intent,
+            &command,
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            UnixMillisV1::new(now.saturating_sub(1_000)),
+            UnixMillisV1::new(now + 60_000),
+        );
+
+        assert!(matches!(
+            result,
+            Err(LocalApprovalRuntimeErrorV1::Projection(
+                LocalApprovalProjectionErrorV1::DangerousDisplayFormatCharacterInOperatorVisibleAction
+            ))
+        ));
+        assert_eq!(
+            runtime.pending_count().unwrap(),
+            0,
+            "dangerous presentation data must fail before live request installation"
+        );
+    }
+
+    #[test]
     fn projection_currentness_is_live_observation_not_authority() {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
