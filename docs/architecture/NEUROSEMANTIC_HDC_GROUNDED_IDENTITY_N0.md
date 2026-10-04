@@ -125,6 +125,8 @@ The accompanying executable N0 lab demonstrates:
 - unchanged HDC frames when only local grounding changes;
 - deterministic rejection of an OOV stable identity;
 - deterministic rejection of an incompatible identity scheme;
+- deterministic rejection of an incompatible identity-authority revision;
+- deterministic rejection of a tampered source manifest hash;
 - deterministic rejection of an ambiguous receiver manifest.
 
 The benchmark remains below neural decoding and semantic-understanding claims:
