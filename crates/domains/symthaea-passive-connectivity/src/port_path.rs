@@ -228,12 +228,6 @@ fn quantize(point: [f32;3]) -> [i64;3] {
         (point[2] as f64 * 1_000_000.0).round() as i64,
     ]
 }
-
-pub(crate) fn embedding_port(_embedding: &GeometryEmbedding, _port: PortId) -> Option<PortAnchor> { None }
-
-#[allow(dead_code)]
-fn _keep_report_type(_: &ValidationReport, _: &ConnectivityStatus) {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
