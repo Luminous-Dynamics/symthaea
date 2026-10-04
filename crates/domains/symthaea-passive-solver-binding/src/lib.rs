@@ -634,6 +634,7 @@ pub enum SolverBindingError {
     DuplicateBinding(PortId),
     DuplicateBindingPort(PortId),
     DuplicateExternalBoundaryHandle(String),
+    BoundaryEdgeIdentityCollision,
 }
 
 const fn domain_byte(domain: BoundaryConditionDomain) -> u8 {
@@ -699,6 +700,22 @@ impl BoundaryEdgeKey {
             Ok(Self { a, b })
         } else {
             Ok(Self { a: b, b: a })
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct MeshEdgeKey {
+    a: u32,
+    b: u32,
+}
+
+impl MeshEdgeKey {
+    fn new(a: u32, b: u32) -> Self {
+        if a <= b {
+            Self { a, b }
+        } else {
+            Self { a: b, b: a }
         }
     }
 }
@@ -875,10 +892,10 @@ fn collect_boundary_edge_keys(
 fn collect_boundary_edge_records(
     candidate: &TriangleMesh,
 ) -> Result<Vec<QuantizedBoundaryEdge>, SolverBindingError> {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     let mut edge_counts: HashMap<
-        BoundaryEdgeKey,
+        MeshEdgeKey,
         (usize, [f64; 3], [f64; 3], [f64; 3], f64),
     > = HashMap::new();
     for triangle in &candidate.indices {
@@ -893,12 +910,12 @@ fn collect_boundary_edge_records(
             candidate.vertices[triangle[1] as usize],
             candidate.vertices[triangle[2] as usize],
         ];
-        for (a, b) in [
-            (vertices[0], vertices[1]),
-            (vertices[1], vertices[2]),
-            (vertices[2], vertices[0]),
+        for (a_index, b_index, a, b) in [
+            (triangle[0], triangle[1], vertices[0], vertices[1]),
+            (triangle[1], triangle[2], vertices[1], vertices[2]),
+            (triangle[2], triangle[0], vertices[2], vertices[0]),
         ] {
-            let key = BoundaryEdgeKey::new(a, b)?;
+            let key = MeshEdgeKey::new(a_index, b_index);
             let midpoint = [
                 (a[0] as f64 + b[0] as f64) / 2.0,
                 (a[1] as f64 + b[1] as f64) / 2.0,
@@ -919,18 +936,31 @@ fn collect_boundary_edge_records(
         }
     }
 
-    Ok(edge_counts
-        .into_iter()
-        .filter_map(|(key, (count, a_mm, b_mm, midpoint, length_mm))| {
-            (count == 1).then_some(QuantizedBoundaryEdge {
-                key,
-                a_mm,
-                b_mm,
-                midpoint,
-                length_mm,
-            })
-        })
-        .collect())
+    let mut portable_identity_sources = BTreeMap::<BoundaryEdgeKey, MeshEdgeKey>::new();
+    let mut records = Vec::new();
+    for (mesh_edge, (count, a_mm, b_mm, midpoint, length_mm)) in edge_counts {
+        if count != 1 {
+            continue;
+        }
+        let key = BoundaryEdgeKey::new(
+            [a_mm[0] as f32, a_mm[1] as f32, a_mm[2] as f32],
+            [b_mm[0] as f32, b_mm[1] as f32, b_mm[2] as f32],
+        )?;
+        if let Some(existing) = portable_identity_sources.insert(key, mesh_edge) {
+            if existing != mesh_edge {
+                return Err(SolverBindingError::BoundaryEdgeIdentityCollision);
+            }
+        }
+        records.push(QuantizedBoundaryEdge {
+            key,
+            a_mm,
+            b_mm,
+            midpoint,
+            length_mm,
+        });
+    }
+
+    Ok(records)
 }
 
 fn edge_matches_interface(
@@ -1471,6 +1501,30 @@ mod tests {
                 attestation,
             ),
             Err(SolverBindingError::SolverEntityMappingDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn distinct_boundary_edges_cannot_collapse_to_one_portable_identity() {
+        let mesh = TriangleMesh {
+            vertices: vec![
+                [0.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [0.0, 2.0, 0.0],
+                [0.0000004, 0.0000004, 0.0],
+                [2.0000004, 0.0000004, 0.0],
+                [0.0000004, 2.0000004, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 6],
+            indices: vec![
+                [0, 1, 2],
+                [3, 4, 5],
+            ],
+        };
+
+        assert_eq!(
+            collect_boundary_edge_records(&mesh),
+            Err(SolverBindingError::BoundaryEdgeIdentityCollision)
         );
     }
 
