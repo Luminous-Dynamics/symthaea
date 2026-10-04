@@ -135,6 +135,15 @@ impl PendingNixApprovalProjectionV1 {
         if self.operator_visible_action.chars().any(char::is_control) {
             return Err(LocalApprovalProjectionErrorV1::ControlCharacterInOperatorVisibleAction);
         }
+        if self
+            .operator_visible_action
+            .chars()
+            .any(is_dangerous_display_format_character)
+        {
+            return Err(
+                LocalApprovalProjectionErrorV1::DangerousDisplayFormatCharacterInOperatorVisibleAction,
+            );
+        }
         validate_digest(
             &self.operator_visible_action_digest,
             "operator visible action digest",
@@ -159,6 +168,8 @@ pub enum LocalApprovalProjectionErrorV1 {
     OversizedOperatorVisibleAction,
     #[error("operator-visible action contains a control character")]
     ControlCharacterInOperatorVisibleAction,
+    #[error("operator-visible action contains a dangerous invisible or bidirectional formatting character")]
+    DangerousDisplayFormatCharacterInOperatorVisibleAction,
     #[error("operator-visible action does not match the request display digest")]
     DisplayedActionDigestMismatch,
     #[error("unsupported approval projection schema version")]
@@ -171,6 +182,27 @@ pub enum LocalApprovalProjectionErrorV1 {
     ProjectionDigestMismatch,
     #[error("approval request expires before it is created")]
     InvalidRequestWindow,
+}
+
+fn is_dangerous_display_format_character(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{00AD}'
+            | '\u{200B}'
+            | '\u{200C}'
+            | '\u{200D}'
+            | '\u{202A}'
+            | '\u{202B}'
+            | '\u{202C}'
+            | '\u{202D}'
+            | '\u{202E}'
+            | '\u{2060}'
+            | '\u{2066}'
+            | '\u{2067}'
+            | '\u{2068}'
+            | '\u{2069}'
+            | '\u{FEFF}'
+    )
 }
 
 fn validate_identifier(value: &str, field: &'static str) -> Result<(), LocalApprovalProjectionErrorV1> {
