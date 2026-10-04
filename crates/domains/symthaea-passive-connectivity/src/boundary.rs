@@ -354,7 +354,7 @@ fn typed_interface_matches(
     // For a circular aperture, the open-boundary rim is near the declared
     // aperture circumference. The edge-length allowance accounts for polygonal
     // chord approximation without permitting an arbitrary interior hole.
-    let radial_tolerance = tolerance_mm + edge_length * 0.25;
+    let radial_tolerance = tolerance_mm;
     let endpoint_radii = [
         radial_distance_from_plane(a_mm, center, plane_normal),
         radial_distance_from_plane(b_mm, center, plane_normal),
@@ -559,6 +559,40 @@ mod tests {
         );
         assert_eq!(evidence.status, BoundaryValidationStatus::ExpectedOpeningsOnly);
         assert!(evidence.is_admissible());
+    }
+
+    #[test]
+    fn typed_interface_rejects_near_size_hole_inside_declared_aperture() {
+        let mesh = TriangleMesh {
+            vertices: vec![
+                [0.85, 0.0, 0.0],
+                [0.0, 0.85, 0.0],
+                [-0.85, 0.0, 0.0],
+                [0.0, -0.85, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 4],
+            indices: vec![
+                [0, 1, 2],
+                [0, 2, 3],
+            ],
+        };
+        let interface = typed_interface(
+            PortId(10),
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            1.0,
+        );
+        let policy = PortBoundaryPolicy::closed()
+            .with_required_port_interface(interface)
+            .tolerance_mm(0.05)
+            .unwrap();
+        let evidence = PortBoundaryEvidence::evaluate(
+            &mesh,
+            &GeometryEmbedding::default().with_port_interface(interface),
+            &policy,
+        );
+        assert_eq!(evidence.status, BoundaryValidationStatus::UnexpectedOpenings);
+        assert!(!evidence.is_admissible());
     }
 
     #[test]
