@@ -794,13 +794,14 @@ mod digest_tests {
             "admission receipt validator version must be non-empty"
         );
 
-        for mutation in [
-            |c: &mut FederatedClaim| c.source_event = Some("   ".into()),
-            |c: &mut FederatedClaim| c.frontier_ref = Some("   ".into()),
-            |c: &mut FederatedClaim| c.epistemic_state = Some("   ".into()),
-            |c: &mut FederatedClaim| c.claim_ceiling = Some("   ".into()),
-            |c: &mut FederatedClaim| c.model_ref = Some("   ".into()),
-        ] {
+        let mutations: &[fn(&mut FederatedClaim)] = &[
+            |c| c.source_event = Some("   ".into()),
+            |c| c.frontier_ref = Some("   ".into()),
+            |c| c.epistemic_state = Some("   ".into()),
+            |c| c.claim_ceiling = Some("   ".into()),
+            |c| c.model_ref = Some("   ".into()),
+        ];
+        for mutation in mutations {
             claim = base_claim();
             mutation(&mut claim);
             assert_eq!(
