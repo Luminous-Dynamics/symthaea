@@ -103,7 +103,7 @@ Epoch freshness remains a separate receiver state machine. An unavailable or sta
 
 A concrete TPM backend may use protected NV state such as an NV Counter as the rollback-resistant primitive.
 
-The adjacent `freshness_anchor_tpm` module provides a deployment-neutral contract for TPM NV-counter evidence. It explicitly binds TPM identity, NV Index Name/public-area, authorization policy, attestation key, quote Handle, quote, PCR binding, and counter value. The structural gate requires the counter to equal the recovery generation, the typed TPM identity/NV-name fields to equal the generic evidence identity fields, and the quote Handle to equal the receipt Handle; cryptographic quote verification remains platform-specific.
+The adjacent `freshness_anchor_tpm` module provides a deployment-neutral contract for TPM NV-counter evidence. It explicitly binds TPM identity, NV Index Name/public-area, authorization policy, attestation key, quote Handle, quote, PCR binding, and counter value. The structural gate requires the counter to equal the recovery generation, the typed TPM identity/NV-name fields to equal the generic evidence identity fields, the quote Handle to equal the receipt Handle, and `receipt.evidence_digest` to equal the canonical digest of the exact TPM evidence envelope; cryptographic quote verification remains platform-specific.
 
 The adjacent TPM contract also provides a typed 256-bit quote challenge with canonical digesting and OS randomness. The challenge gate runs before the platform verifier, so an outdated or mis-bound quote cannot reach cryptographic appraisal under the wrong freshness context.
 
