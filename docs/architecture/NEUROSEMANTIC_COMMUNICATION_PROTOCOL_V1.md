@@ -200,3 +200,26 @@ authorization.
 
 Authentication, confidentiality, lease signing, revocation distribution, and durable audit
 remain deployment responsibilities for the outer identity/transport layers.
+
+## HDC integration boundary
+
+The current Symthaea HDC stack has separate continuous and binary representations.
+The semantic encoder produces a 16,384-dimensional `ContinuousHV`, while the current
+semantic decoder consumes `BinaryHV`. A `BinaryHV::from_bipolar` conversion exists, but
+this is a quantization boundary and must be measured independently from semantic decoding.
+
+Therefore a future HDC neurosemantic adapter must report at least:
+- encoder configuration and seed;
+- continuous representation fidelity;
+- continuous -> binary quantization loss;
+- decoder reconstruction fidelity;
+- codebook/prototype hash;
+- structural interlingua metrics;
+- corruption robustness.
+
+No one of these layers, alone, constitutes evidence of human thought decoding.
+
+The N0 graph has two distinct hashes:
+- the ordinary graph hash, which is serialization/content addressing;
+- the structural hash, which is canonicalized across collection order and transport-local
+  identifiers while excluding confidence, because confidence is reported separately.
