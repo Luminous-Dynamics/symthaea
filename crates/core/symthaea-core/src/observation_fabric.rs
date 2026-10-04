@@ -3097,7 +3097,7 @@ mod tests {
             .expect("scope fingerprint");
 
         assert!(bytes.starts_with(b"symthaea:observation-independence-scope:v1\n"));
-        assert_eq!(bytes.len(), bytes.len());
+        assert!(bytes.len() > b"symthaea:observation-independence-scope:v1\n".len());
         assert_eq!(blake3::hash(&bytes).to_hex().to_string(), fingerprint);
     }
 
