@@ -125,7 +125,7 @@ fn missing_anchor(port: PortId) -> PortPathEvidence {
     }
 }
 
-fn triangle_components(mesh: &TriangleMesh) -> Vec<usize> {
+pub(crate) fn triangle_components(mesh: &TriangleMesh) -> Vec<usize> {
     let valid: Vec<usize> = mesh
         .indices
         .iter()
