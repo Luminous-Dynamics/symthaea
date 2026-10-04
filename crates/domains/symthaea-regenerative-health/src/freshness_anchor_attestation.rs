@@ -12,7 +12,7 @@ use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 
 use crate::freshness_anchor_assurance::{
-    FreshnessAnchorEvidenceVerifier, FreshnessAnchorProfile,
+    FreshnessAnchorAssuranceError, FreshnessAnchorEvidenceVerifier, FreshnessAnchorProfile,
     FreshnessAnchorVerificationReceipt, VerifiedFreshnessAnchor,
 };
 
@@ -39,6 +39,7 @@ pub enum FreshnessAnchorAttestationVerificationError {
     InvalidVerificationKey,
     InvalidSignature,
     SignatureVerificationFailed,
+    AnchorVerificationFailed(FreshnessAnchorAssuranceError),
 }
 
 fn signed_message(statement_digest: &str) -> Vec<u8> {
@@ -146,7 +147,7 @@ pub fn verify_attested_anchor(
 ) -> Result<VerifiedFreshnessAnchor, FreshnessAnchorAttestationVerificationError> {
     attestation.verify(&receipt)?;
     VerifiedFreshnessAnchor::verify(profile, receipt, &AttestationVerifier { attestation })
-        .map_err(|_| FreshnessAnchorAttestationVerificationError::SignatureVerificationFailed)
+        .map_err(FreshnessAnchorAttestationVerificationError::AnchorVerificationFailed)
 }
 
 #[cfg(test)]
