@@ -122,6 +122,7 @@ struct AttributionReport {
     frames_per_phoneme: usize,
     semantic_stage: &'static str,
     semantic_stage_note: &'static str,
+    attribution_note: &'static str,
     conditions: Vec<ConditionResult>,
     deltas_from_neutral: BTreeMap<String, FrameProxyDelta>,
     composition_policy: &'static str,
@@ -206,6 +207,8 @@ fn run() -> Result<()> {
         semantic_stage: "SpeechPlan",
         semantic_stage_note:
             "This harness preserves the exact SpeechPlan surface but does not claim semantic-delivery success from frame metrics.",
+        attribution_note:
+            "Observed frame differences are attributable to experimental conditions only under the declared fixed-seed, fixed-schedule design; causal claims beyond those controls require separate perturbation evidence.",
         conditions: results,
         deltas_from_neutral,
         composition_policy:
