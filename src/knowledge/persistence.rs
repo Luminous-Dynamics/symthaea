@@ -2048,6 +2048,7 @@ impl KnowledgePersistence {
                   OR trim(NEW.validator_version) = ''
                   OR NEW.validation_profile IS NULL
                   OR trim(NEW.validation_profile) = ''
+                  OR NEW.conforms IS NULL
                   OR NEW.conforms NOT IN (0, 1)
                   OR NEW.receipt_digest_hex IS NULL
                   OR length(NEW.receipt_digest_hex) <> 64
@@ -2272,6 +2273,7 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
                 "new.validator_ref is null",
                 "new.validator_version is null",
                 "new.validation_profile is null",
+                "new.conforms is null",
                 "new.conforms not in (0, 1)",
                 "new.receipt_digest_hex is null",
                 "length(new.receipt_digest_hex) <> 64",
@@ -3590,6 +3592,41 @@ mod tests {
         let err = p.ensure_schema(&conn).unwrap_err();
         assert!(err.contains("Schema integrity check failed"));
         assert!(err.contains("trg_knowledge_snapshot_receipts_no_update"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_receipt_insert_boundary_rejects_null_conforms() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_receipt_null_conforms_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        p.save_snapshot(&[], &[], &[], &[]).unwrap();
+        let conn = p.open_connection().unwrap();
+
+        let err = conn
+            .execute(
+                "INSERT INTO knowledge_snapshot_validation_receipts
+                 (validation_event, validation_sequence, generation, snapshot_digest_hex,
+                  validator_ref, validator_version, validation_profile, conforms,
+                  report_digest_hex, receipt_digest_hex)
+                 VALUES ('null-conforms', 1, 1,
+                         (SELECT canonical_digest_hex
+                          FROM knowledge_snapshot_receipts
+                          WHERE generation = 1),
+                         'validator', 'v1', 'profile', NULL, NULL,
+                         '0000000000000000000000000000000000000000000000000000000000000000')",
+                [],
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains(
+            "knowledge_snapshot_validation_receipts requires valid identity, digest, validator, outcome, and positive sequence"
+        ));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
