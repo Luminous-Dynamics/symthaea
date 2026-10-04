@@ -997,8 +997,7 @@ impl DaemonState {
                     })
                     .collect();
 
-                AlertEntry {                    metric: p.metric.to_string(),
-                    current_value: p.current_value,
+                AlertEntry {                    metric: p.metric.to_string(),                    current_value: p.current_value,
                     predicted_value: p.predicted_value,
                     hours_ahead: p.hours_ahead,
                     threshold: p.threshold,
@@ -1143,6 +1142,21 @@ impl DaemonState {
                     ));
                 }
             }
+        }
+
+        // A consumed local approval is single-use, but it must also be short-lived
+        // with respect to the daemon's current plan. If no candidate remains, revoke
+        // any pending/consumed governed action instead of carrying that authority into
+        // a later, unrelated planning cycle.
+        if candidates.is_empty() {
+            self.pending_action = None;
+            self.pending_action_intent_digest = None;
+            #[cfg(target_os = "linux")]
+            {
+                self.pending_local_approval = None;
+                self.local_approval_consumed = None;
+            }
+            return (dynamic_threshold, None);
         }
 
         // 3. Evaluate and prioritize candidate plans
@@ -1997,8 +2011,7 @@ equivalents of what this daemon does continuously."
 }
 
 fn main() -> ! {    // A real gap found while smoke-testing the symthaea-nix -> nixward
-    // rename: this binary had no arg handling whatsoever, so `--help`
-    // silently started the real daemon instead of printing usage.
+    // rename: this binary had no arg handling whatsoever, so `--help`    // silently started the real daemon instead of printing usage.
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "--help" | "-h" => print_help_and_exit(),
@@ -2998,7 +3011,6 @@ mod tests {
         // Formulate a recovery goal for postgresql service failure
         let goal_description = "Resolve service failure in 'postgresql' (reason: FATAL error)";
         let plan = state.active_inference.process_input(goal_description);
-
         assert!(
             !plan.actions.is_empty(),
             "Active inference should generate a plan to resolve service failure"
@@ -3498,6 +3510,56 @@ mod tests {
             state.pending_local_approval.is_some(),
             "Exact live local approval request must remain pending"
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_consumed_local_approval_is_revoked_when_plan_disappears() {
+        use nixward::action::{LocalApprovalSubmissionV2, submit_local_approval_v2};
+
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+        let runtime_dir = tempfile::tempdir().unwrap();
+        state.local_approval_runtime = Some(
+            LocalApprovalRuntimeV1::bind_in(runtime_dir.path()).unwrap(),
+        );
+
+        state.active_healing = true;
+        state.custom_user_goal = Some((
+            "keep disk below 75".to_string(),
+            "disk_used_pct".to_string(),
+            75.0,
+        ));
+
+        // First cycle creates the exact live request but does not execute.
+        state.run_active_inference_plans(&[]);
+        let pending = state.pending_local_approval.clone().unwrap();
+        assert!(state.pending_action.is_some());
+
+        let submission = LocalApprovalSubmissionV2 {
+            request_id: pending.request_id,
+            daemon_incarnation_id: pending.daemon_incarnation_ref,
+            action_intent_digest: pending.action_intent_digest,
+            projection_digest: pending.projection_digest,
+            decision: LocalApprovalDecisionKindV1::Approved,
+            decided_at_unix_ms: now_secs().saturating_mul(1_000),
+        };
+        submit_local_approval_v2(
+            state.local_approval_runtime.as_ref().unwrap().socket_path(),
+            &submission,
+        )
+        .unwrap();
+
+        // Remove the planning candidate before the next daemon cycle. The socket
+        // approval may be valid and consumed, but it must not survive as authority
+        // for a future reappearance of an unrelated plan.
+        state.custom_user_goal = None;
+        state.run_active_inference_plans(&[]);
+
+        assert!(state.local_approval_consumed.is_none());
+        assert!(state.pending_local_approval.is_none());
+        assert!(state.pending_action.is_none());
+        assert!(state.pending_action_intent_digest.is_none());
     }
 
     #[test]
