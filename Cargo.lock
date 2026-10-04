@@ -18580,6 +18580,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-observation-attestation"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek",
+ "serde",
+ "symthaea-core",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "symthaea-crucible"
 version = "0.1.0"
 dependencies = [
