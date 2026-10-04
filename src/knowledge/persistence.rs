@@ -7708,6 +7708,74 @@ mod tests {
         validation.report_digest_hex = Some("d".repeat(64));
         assert!(validation.validate_input().is_ok());
 
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_validation_report_digest_boundary_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+        let fact = FactRecord {
+            memory_id: "report-digest-boundary".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x88; BinaryHV::BYTES],
+            source_text: "report digest boundary".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        let snapshot = p.latest_snapshot_receipt().unwrap().unwrap();
+        p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:report-digest-boundary".into(),
+            generation: snapshot.generation,
+            snapshot_digest_hex: snapshot.canonical_digest_hex,
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: Some("e".repeat(64)),
+        })
+        .unwrap();
+
+        let conn = p.open_connection().unwrap();
+        conn.execute_batch(
+            "DROP TRIGGER trg_knowledge_snapshot_validation_receipts_no_update;
+             UPDATE knowledge_snapshot_validation_receipts
+             SET report_digest_hex = 'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg'
+             WHERE validation_event = 'validation:report-digest-boundary';",
+        )
+        .unwrap();
+
+        // Recompute the v2 receipt digest so the mutation is self-consistent; verification
+        // must still reject the semantic digest shape rather than relying on hash mismatch.
+        let mutated = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:report-digest-boundary".into(),
+            generation: snapshot.generation,
+            snapshot_digest_hex: p.latest_snapshot_receipt().unwrap().unwrap().canonical_digest_hex,
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: Some("g".repeat(64)),
+        };
+        conn.execute(
+            "UPDATE knowledge_snapshot_validation_receipts
+             SET receipt_digest_hex = ?1
+             WHERE validation_event = 'validation:report-digest-boundary'",
+            [mutated.canonical_digest_hex_for_sequence(1)],
+        )
+        .unwrap();
+
+        let err = p.verify_snapshot_validation_receipts().unwrap_err();
+        assert!(err.contains(
+            "Snapshot validation report digest must be a 64-character hexadecimal digest when present"
+        ));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
