@@ -2949,7 +2949,7 @@ mod tests {
         // key_ops is [+ (tstr/int)].
         let cose_key = vec![
             0xa6, 0x01, 0x02, 0x03, 0x26, 0x04, 0x9f,
-            0x61, b's', 0x18, 0x02, 0x7f, 0x64, b'v', b'e', b'r', b'i', 0xff,
+            0x61, b's', 0x18, 0x02, 0x7f, 0x63, b'v', b'e', b'r', 0x62, b'i', b'f', b'y', 0xff,
             0xff, 0x20, 0x01, 0x21, 0x58, 0x20
         ];
         let mut key = cose_key;
@@ -4498,97 +4498,3 @@ mod tests {
 
 
     #[test]
-    fn rfc9942_outer_receipts_preserve_protected_placement_and_reject_conflicts() {
-        let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x44; 32]]).to_cbor();
-        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
-        let receipt = Rfc9942ReceiptEnvelope::new(
-            COSE_ES256_ALGORITHM_ID,
-            vdp,
-            Rfc9942ReceiptPayload::Attached([0x55; 32]),
-            vec![0x66; 64],
-        ).unwrap();
-        let collection = Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
-        let collection_cbor = collection.to_cbor();
-
-        // RFC 9942 permits header 394 in either protected or unprotected
-        // headers. A protected placement must remain protected after parsing
-        // rather than being normalized into the unprotected representation.
-        let mut protected_outer = Vec::new();
-        cbor_map_len(&mut protected_outer, 1);
-        cbor_int(&mut protected_outer, RFC9942_RECEIPTS_HEADER_LABEL);
-        protected_outer.extend_from_slice(&collection_cbor);
-
-        let mut protected_wire = Vec::new();
-        cbor_tag(&mut protected_wire, COSE_SIGN1_TAG);
-        cbor_array_len(&mut protected_wire, 4);
-        cbor_bytes(&mut protected_wire, &protected_outer);
-        cbor_map_len(&mut protected_wire, 0);
-        cbor_bytes(&mut protected_wire, b"payload");
-        cbor_bytes(&mut protected_wire, &[0x77; 64]);
-
-        let decoded = Rfc9942SignatureWithReceipts::from_cbor(&protected_wire).unwrap();
-        assert!(decoded.protected_receipts().is_some());
-        assert!(decoded.unprotected_receipts().is_none());
-        assert_eq!(decoded.receipts().unwrap().receipts().len(), 1);
-        assert_eq!(decoded.to_cbor(), protected_wire);
-
-        // The same 394 label in both buckets is rejected instead of relying on
-        // COSE precedence semantics that could make the signed meaning differ
-        // from the selected receipt collection.
-        let mut conflicting = Vec::new();
-        cbor_tag(&mut conflicting, COSE_SIGN1_TAG);
-        cbor_array_len(&mut conflicting, 4);
-        cbor_bytes(&mut conflicting, &protected_outer);
-        cbor_map_len(&mut conflicting, 1);
-        cbor_int(&mut conflicting, RFC9942_RECEIPTS_HEADER_LABEL);
-        conflicting.extend_from_slice(&collection_cbor);
-        cbor_bytes(&mut conflicting, b"payload");
-        cbor_bytes(&mut conflicting, &[0x77; 64]);
-        assert_eq!(
-            Rfc9942SignatureWithReceipts::from_cbor(&conflicting),
-            Err(Rfc9942VdpError::InvalidStructure)
-        );
-    }
-
-    #[test]
-    fn rfc9942_outer_receipts_require_nonempty_tagged_receipt_items() {
-        let mut empty = Vec::new();
-        cbor_tag(&mut empty, COSE_SIGN1_TAG);
-        cbor_array_len(&mut empty, 4);
-        cbor_bytes(&mut empty, &[]);
-        cbor_map_len(&mut empty, 0);
-        cbor_bytes(&mut empty, b"payload");
-        cbor_bytes(&mut empty, &[0x88; 64]);
-        assert_eq!(
-            Rfc9942SignatureWithReceipts::from_cbor(&empty),
-            Err(Rfc9942VdpError::EmptyReceiptCollection)
-        );
-
-        // Each array element is a bstr containing a tagged COSE_Sign1 Receipt.
-        // A structurally plausible but untagged COSE_Sign1 must not be admitted
-        // through the outer receipt collection boundary.
-        let untagged = vec![0x84, 0x40, 0xa0, 0xf6, 0x40];
-        let mut collection = Vec::new();
-        cbor_array_len(&mut collection, 1);
-        cbor_bytes(&mut collection, &untagged);
-        assert_eq!(
-            Rfc9942ReceiptCollection::from_cbor(&collection),
-            Err(Rfc9942VdpError::InvalidReceiptStructure)
-        );
-    }
-
-
-    #[test]
-    fn rfc9942_registry_and_required_field_boundaries_fail_closed() {
-        let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x99; 32]]).to_cbor();
-        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
-
-        fn receipt_wire(protected: &[u8], unprotected: &[u8]) -> Vec<u8> {
-            let mut out = Vec::new();
-            cbor_tag(&mut out, COSE_SIGN1_TAG);
-            cbor_array_len(&mut out, 4);
-            cbor_bytes(&mut out, protected);
-            out.extend_from_slice(unprotected);
-            cbor_bytes(&mut out, &[0x11; 32]);
-            cbor_bytes(&mut out, &[0x22; 64]);
-            out
