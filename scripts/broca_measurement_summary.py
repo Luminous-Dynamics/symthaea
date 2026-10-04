@@ -123,6 +123,7 @@ def main() -> int:
         lines.append(f"- No-invention gate: {fmt(lexical_binding.get('no_invention_pass'))}")
         lines.append(f"- Unsupported-rule gate: {fmt(lexical_binding.get('unsupported_rule_unbound_pass'))}")
         lines.append(f"- Stable repeat: {fmt(lexical_binding.get('stable_repeat_pass'))}")
+        lines.append(f"- Lexical → phonological handoff: {fmt(lexical_binding.get('phonological_handoff_pass'))}")
         for case in lexical_binding.get("cases") or []:
             lines.append(
                 f"- `{case.get('name')}`: {fmt(case.get('passed'))}"
