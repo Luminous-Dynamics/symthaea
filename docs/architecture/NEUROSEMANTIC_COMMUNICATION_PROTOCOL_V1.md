@@ -156,3 +156,39 @@ unrestricted private-thought decoding.
 Accordingly, telepathy is best treated as a user-facing metaphor for a future mediated
 communication experience. The engineering target is content-addressed, consent-bound
 transmission and reconstruction of structured cognitive representations.
+
+
+## N0 interlingua benchmark
+
+The standalone crate also exposes a deterministic interlingua benchmark at
+`crates/core/symthaea-communication/examples/neurosemantic_interlingua_n0.rs`.
+
+It compares a fixed grounded concept graph against controlled transformations:
+- exact round trip;
+- collection reordering;
+- transport-local identifier renaming;
+- edge deletion;
+- edge duplication.
+
+The benchmark reports node/edge precision and recall, confidence mean absolute error,
+content hashes, and serialized sizes. Structural equivalence deliberately ignores
+collection ordering, lexical labels, and transport-local node identifiers while retaining
+grounding, node kind, and relation structure.
+
+This is a **protocol/interlingua preservation benchmark**, not a semantic-understanding
+benchmark. In particular, N0 does not establish that an HDC, BCI, neural decoder, or any
+other future adapter preserved a person's intended meaning. A future representation adapter
+must provide its own encoder/decoder evidence and can then reuse this benchmark contract.
+
+## Resource and version boundaries
+
+Protocol v1 is pinned by `NEUROSEMANTIC_PROTOCOL_VERSION = 1`. Unknown protocol versions are
+rejected rather than silently interpreted.
+
+Neurosemantic payloads are bounded to 1 MiB before hashing. Derived neural features must be
+finite. These limits are defensive defaults, not claims about the maximum useful payload for
+future hardware.
+
+The replay tracker is bounded to 4096 active sender/recipient/lease/consent-epoch keys.
+Authentication, confidentiality, lease signing, revocation distribution, and durable audit
+remain deployment responsibilities for the outer identity/transport layers.
