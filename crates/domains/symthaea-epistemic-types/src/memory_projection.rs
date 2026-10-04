@@ -142,8 +142,8 @@ impl CanonicalAdmissionReceipt {
         if !is_hex_digest(&self.provenance_snapshot_digest) {
             return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
         }
-        if self.validator_version.trim().is_empty() {
-            return Err("validator version must be non-empty");
+        if self.validator_version != PROVENANCE_VALIDATOR_VERSION {
+            return Err("admission receipt validator version mismatch");
         }
         if self.snapshot_schema_version != PROVENANCE_SNAPSHOT_SCHEMA_VERSION {
             return Err("admission receipt snapshot schema version mismatch");
@@ -351,8 +351,8 @@ impl ProvenanceValidationReport {
     /// report, such as an admission receipt, while leaving relation binding to
     /// validate_against_relations.
     pub fn validate_metadata(&self) -> Result<(), &'static str> {
-        if self.validator_version.trim().is_empty() {
-            return Err("provenance validator version must be non-empty");
+        if self.validator_version != PROVENANCE_VALIDATOR_VERSION {
+            return Err("provenance validator version mismatch");
         }
         if self.snapshot_schema_version != PROVENANCE_SNAPSHOT_SCHEMA_VERSION {
             return Err("provenance validation schema version mismatch");
@@ -604,6 +604,22 @@ mod tests {
         let mut changed = validation.clone();
         changed.snapshot_schema_version += 1;
         assert!(!receipt.binds_validation(&changed));
+
+        let mut forged_validator = validation.clone();
+        forged_validator.validator_version = "attacker-defined-v999".into();
+        assert_eq!(
+            forged_validator.validate_metadata(),
+            Err("provenance validator version mismatch")
+        );
+        assert!(!receipt.binds_validation(&forged_validator));
+
+        let mut forged_receipt = receipt.clone();
+        forged_receipt.validator_version = "attacker-defined-v999".into();
+        assert_eq!(
+            forged_receipt.validate_structure(),
+            Err("admission receipt validator version mismatch")
+        );
+        assert!(!forged_receipt.binds_validation(&validation));
     }
 
     #[test]
