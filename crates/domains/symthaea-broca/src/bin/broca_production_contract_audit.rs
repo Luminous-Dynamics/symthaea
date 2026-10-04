@@ -63,6 +63,7 @@ struct AuditCase {
     semantic_exact_passed: bool,
     semantic_mismatch_rejected: bool,
     semantic_partial_gate_rejected: bool,
+    linguistic_to_phonological_preserved_intent: bool,
     grounding_deterministic: bool,
 }
 
@@ -149,7 +150,9 @@ fn run() -> Result<()> {
                 }
             }
 
-            let mut phonological = PhonologicalPlan::from_speech_plan(&speech_plan);
+            let mut phonological = PhonologicalPlan::from_linguistic_frame(&linguistic);
+            let linguistic_to_phonological_preserved_intent =
+                phonological.source_intent == linguistic.source_intent;
 
             let role_only_error = phonological
                 .bind_segments(
@@ -284,6 +287,7 @@ fn run() -> Result<()> {
             }
 
             let case_ok = linguistic_valid
+                && linguistic_to_phonological_preserved_intent
                 && linguistic_lexical_binding_valid
                 && role_only_rejected
                 && phonological_binding_succeeded
@@ -317,6 +321,7 @@ fn run() -> Result<()> {
                 semantic_exact_passed,
                 semantic_mismatch_rejected,
                 semantic_partial_gate_rejected,
+                linguistic_to_phonological_preserved_intent,
                 grounding_deterministic,
             });
         }
