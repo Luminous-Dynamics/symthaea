@@ -44,9 +44,13 @@ impl TpmQuoteChallenge {
     }
 
     pub fn generate() -> Result<Self, getrandom::Error> {
-        let mut nonce = [0u8; TPM_QUOTE_NONCE_BYTES];
-        getrandom::getrandom(&mut nonce)?;
-        Self::new(nonce).ok_or(getrandom::Error::UNSUPPORTED)
+        loop {
+            let mut nonce = [0u8; TPM_QUOTE_NONCE_BYTES];
+            getrandom::getrandom(&mut nonce)?;
+            if let Some(challenge) = Self::new(nonce) {
+                return Ok(challenge);
+            }
+        }
     }
 
     pub fn digest(&self) -> String {
@@ -226,11 +230,10 @@ pub fn verify_tpm_nv_counter_with_challenge<V: TpmNvCounterEvidenceVerifier>(
     receipt: &FreshnessAnchorVerificationReceipt,
     verifier: &V,
 ) -> Result<FreshnessAnchorEvidenceKind, TpmNvCounterVerificationError> {
-    let result = verify_tpm_nv_counter(evidence, profile, receipt, verifier)?;
     if !evidence.validate_challenge(challenge, receipt) {
         return Err(TpmNvCounterVerificationError::ChallengeDigestMismatch);
     }
-    Ok(result)
+    verify_tpm_nv_counter(evidence, profile, receipt, verifier)
 }
 
 #[cfg(test)]
