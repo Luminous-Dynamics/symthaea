@@ -2681,6 +2681,21 @@ mod tests {
     }
 
     #[test]
+    fn report_self_validation_rejects_malformed_attestation_payload_fingerprint() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let mut report = resolved_report(&verifier, &envelope, &receipt);
+
+        assert!(report.is_well_formed());
+        report.attestation_payload_fingerprint = "not-a-fingerprint".into();
+        assert!(!report.is_well_formed());
+    }
+
+    #[test]
     fn fingerprint_shape_validation_rejects_noncanonical_digests() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let verifier = Ed25519ReceiptVerifier::new(
