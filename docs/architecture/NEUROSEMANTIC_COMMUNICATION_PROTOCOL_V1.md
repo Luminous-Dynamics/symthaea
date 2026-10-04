@@ -26,10 +26,11 @@ The neurosemantic module defines:
 - explicit time-bounded consent leases;
 - revocation and consent epochs;
 - content-addressed packets;
-- explicit sensitivity labels;
+- explicit sensitivity labels with consent-enforced read/write ceilings;
 - derived-neural-feature payloads without a raw-neural payload type.
 
-The default authority model is deny.
+The default authority model is deny. Legacy/deserialized leases without explicit sensitivity
+ceilings default to **Public**, preventing silent escalation.
 
 ## Why consent is part of the protocol
 
@@ -39,7 +40,7 @@ what that connection is allowed to read or write.
 
 A grant is therefore specific to:
 
-peer + purpose + channel + direction + time + consent epoch
+peer + purpose + channel + direction + sensitivity ceiling + time + consent epoch
 
 Direction is from the **subject's perspective**:
 - **Read** means subject -> peer.
