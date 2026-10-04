@@ -196,6 +196,7 @@ The branch is ready for an evidence-producing benchmark only when:
 - rank/nullity identities are emitted and mechanically checked on clean fixtures, including the exact 2^d fiber cardinality;
 - explicit two-way overlap and three-way dependency fixtures distinguish pairwise independence from global uniqueness;
 - the paper-scale result digest commits to the algebraic geometry fields and representative-selection boundary.
+- dependent fixtures expose and verify a complete kernel basis with exactly `kernel_dimension` witnesses.
 
 ## Why this is the next step
 
@@ -232,6 +233,19 @@ The research API records these quantities as first-class fields:
 
 Cardinalities are stored symbolically as exact powers of two, so large search spaces are never truncated by machine integer overflow. The target-specific multiplicity API returns the same fiber cardinality for every representable target and returns no factorization for a target outside the union span.
 
+### Kernel-basis ambiguity certificate
+
+The comparator now exposes the complete kernel basis of the factor-to-bound map, not only its dimension or a single dependency witness.
+
+During the ordered maximal-independent-subset construction, every generator that fails span extension yields one dependency witness by solving that generator against the already-retained independent basis. Each such witness has a distinct dependent-generator coordinate, so these witnesses are linearly independent. Their count is exactly Delta-r and therefore they form a basis of the full kernel.
+
+This gives a constructive interpretation of the multiplicity theorem: once one valid factor tuple is known, adding any GF(2) combination of the kernel-basis witnesses produces another valid coefficient tuple for the same target. The evidence therefore distinguishes:
+
+- kernel dimension: how many independent ambiguity directions exist;
+- kernel basis: the concrete ambiguity directions in the ordered generator presentation;
+- factorization multiplicity: the exact 2^d number of tuples in every non-empty fiber.
+
+The witness basis is canonical only relative to the declared factor order and generator-basis presentation. It is not a minimum-weight dependency basis, and no permutation-invariance of the representative is claimed.
 ### Adversarial dependency qualification
 
 Pairwise subcode-intersection checks are not sufficient when three or more factors participate. The qualification suite therefore includes both a two-factor overlap fixture and a three-factor fixture
