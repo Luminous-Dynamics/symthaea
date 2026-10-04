@@ -3,8 +3,8 @@ use symthaea_core::hdc::linear_code::{
     BinaryCodeword, ExactPowerOfTwo, LinearCodeWork, RandomLinearCode, basis_rank,
     factorization_affine_fiber, factorization_algebra, factorization_count_for_target,
     factorization_dependency_witness, factorization_kernel_basis, recover_direct_sum_bound,
-    recover_independent_bound,
-    recover_linear_bound, recover_linear_bound_with_work, solve_linear_combination,
+    recover_independent_bound, recover_linear_bound, recover_linear_bound_with_work,
+    solve_linear_combination,
 };
 
 const CANONICAL_FIXTURE_DIMENSION: usize = 96;
@@ -315,12 +315,12 @@ fn published_parameter_search_space_ledger_is_exact() {
 
 #[test]
 fn dependency_witness_ledger_is_canonical_and_verifiable() {
-    let c1 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b001])])
-        .expect("c1");
-    let c2 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b010])])
-        .expect("c2");
-    let c3 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b011])])
-        .expect("c3");
+    let c1 =
+        RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b001])]).expect("c1");
+    let c2 =
+        RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b010])]).expect("c2");
+    let c3 =
+        RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b011])]).expect("c3");
     let factors = [&c1, &c2, &c3];
 
     let algebra = factorization_algebra(&factors).expect("algebra");
@@ -349,8 +349,7 @@ fn dependency_witness_ledger_is_canonical_and_verifiable() {
     ])
     .expect("repeated 2D code");
     let repeated_factors = [&repeated, &repeated, &repeated];
-    let repeated_algebra =
-        factorization_algebra(&repeated_factors).expect("repeated algebra");
+    let repeated_algebra = factorization_algebra(&repeated_factors).expect("repeated algebra");
     assert_eq!(repeated_algebra.factor_dimension_sum, 6);
     assert_eq!(repeated_algebra.union_generator_rank, 2);
     assert_eq!(repeated_algebra.kernel_dimension, 4);
@@ -426,7 +425,11 @@ fn dependency_witness_ledger_is_canonical_and_verifiable() {
             }
         }
     }
-    assert!(target_counts.iter().all(|(_, count)| *count == expected_fiber_size));
+    assert!(
+        target_counts
+            .iter()
+            .all(|(_, count)| *count == expected_fiber_size)
+    );
     assert_eq!(target_counts.len(), 4);
     assert_eq!(fiber_coefficients.len(), expected_fiber_size);
     assert!(!repeated_algebra.factorization_count_per_target.is_one());
@@ -735,14 +738,13 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                         "every representable target must have the algebraic fiber cardinality"
                     );
 
-                    let affine_fiber =
-                        factorization_affine_fiber(&target, &factors)
-                            .expect("representable target must expose an affine fiber");
-                    assert_eq!(affine_fiber.cardinality.exponent(), algebra.kernel_dimension);
+                    let affine_fiber = factorization_affine_fiber(&target, &factors)
+                        .expect("representable target must expose an affine fiber");
                     assert_eq!(
-                        affine_fiber.kernel_basis.len(),
+                        affine_fiber.cardinality.exponent(),
                         algebra.kernel_dimension
                     );
+                    assert_eq!(affine_fiber.kernel_basis.len(), algebra.kernel_dimension);
                     assert_eq!(
                         affine_fiber.representative_coefficients.len(),
                         algebra.factor_dimension_sum
@@ -793,9 +795,8 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                             for coefficient in &witness.generator_coefficients {
                                 result_digest.update(&[*coefficient as u8]);
                             }
-                            result_digest.update(
-                                &(witness.factor_support.len() as u64).to_le_bytes(),
-                            );
+                            result_digest
+                                .update(&(witness.factor_support.len() as u64).to_le_bytes());
                             for factor_index in &witness.factor_support {
                                 result_digest.update(&(*factor_index as u64).to_le_bytes());
                             }
@@ -1656,11 +1657,10 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
 
     for coefficients in &coefficients {
         let mut reconstructed = BinaryCodeword::zero(4);
-        for (coefficient, generator) in coefficients.iter().zip(
-            factors
-                .iter()
-                .flat_map(|factor| factor.basis().iter()),
-        ) {
+        for (coefficient, generator) in coefficients
+            .iter()
+            .zip(factors.iter().flat_map(|factor| factor.basis().iter()))
+        {
             if *coefficient {
                 reconstructed.xor_assign(generator);
             }
@@ -1680,20 +1680,27 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
     let mut tampered = fiber.clone();
     tampered.cardinality = ExactPowerOfTwo::new(algebra.kernel_dimension - 1);
     assert!(tampered.iter_bounded(expected).is_none());
-    assert!(tampered
-        .coefficients_for_mask(&[false, false, false, false])
-        .is_none());
+    assert!(
+        tampered
+            .coefficients_for_mask(&[false, false, false, false])
+            .is_none()
+    );
 
     let mut dependent_kernel = fiber.clone();
-    dependent_kernel.kernel_basis[1].generator_coefficients =
-        dependent_kernel.kernel_basis[0].generator_coefficients.clone();
+    dependent_kernel.kernel_basis[1].generator_coefficients = dependent_kernel.kernel_basis[0]
+        .generator_coefficients
+        .clone();
     assert!(dependent_kernel.iter_bounded(expected).is_none());
-    assert!(dependent_kernel
-        .coefficients_for_mask(&[false, false, false, false])
-        .is_none());
-    assert!(fiber
-        .coefficients_for_mask(&[false, false, false])
-        .is_none());
+    assert!(
+        dependent_kernel
+            .coefficients_for_mask(&[false, false, false, false])
+            .is_none()
+    );
+    assert!(
+        fiber
+            .coefficients_for_mask(&[false, false, false])
+            .is_none()
+    );
 
     println!(
         "AFFINE_FIBER_ENUMERATION=kernel_dimension={};expected_fibers={};enumerated_fibers={};all_targets_match=true;all_coefficients_unique=true;bounded=true",
