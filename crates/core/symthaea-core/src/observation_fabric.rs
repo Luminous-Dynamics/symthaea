@@ -15,15 +15,32 @@ use std::collections::{HashMap, HashSet};
 /// Sensor modality at the observation boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ObservationModality {
-    Optical, Infrared, Multispectral, Hyperspectral, Sar, Radar,
-    RadioFrequency, Acoustic, Inertial, Gnss, Weather, Maritime,
-    Aviation, Document, Web, Human, Other,
+    Optical,
+    Infrared,
+    Multispectral,
+    Hyperspectral,
+    Sar,
+    Radar,
+    RadioFrequency,
+    Acoustic,
+    Inertial,
+    Gnss,
+    Weather,
+    Maritime,
+    Aviation,
+    Document,
+    Web,
+    Human,
+    Other,
 }
 
 /// Coarse disclosure class for privacy-preserving sharing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum DisclosureClass {
-    Public, Restricted, Private, Secret,
+    Public,
+    Restricted,
+    Private,
+    Secret,
 }
 
 /// Verification state of the exact asset bytes referenced by an observation.
@@ -83,7 +100,9 @@ impl DisclosurePolicy {
 }
 
 impl Default for DisclosurePolicy {
-    fn default() -> Self { Self::restricted() }
+    fn default() -> Self {
+        Self::restricted()
+    }
 }
 
 /// Stable sensor/platform identity without embedding private credential material.
@@ -203,7 +222,8 @@ impl ObservationQuality {
     pub fn validate(&self) -> Result<(), ObservationValidationError> {
         if !self.confidence.is_finite()
             || !(0.0..=1.0).contains(&self.confidence)
-            || self.measurement_uncertainty
+            || self
+                .measurement_uncertainty
                 .is_some_and(|v| !v.is_finite() || v < 0.0)
         {
             return Err(ObservationValidationError::InvalidQuality);
@@ -270,10 +290,7 @@ impl ProcessingActivity {
         hasher.update(b"symthaea:observation-processing-activity:v2\n");
         write_canonical_string(&mut hasher, &self.activity_id);
         write_canonical_string(&mut hasher, &self.process_id);
-        write_canonical_string_option(
-            &mut hasher,
-            self.process_definition_fingerprint.as_deref(),
-        );
+        write_canonical_string_option(&mut hasher, self.process_definition_fingerprint.as_deref());
         write_canonical_i128_option(&mut hasher, self.started_at_unix_ns);
         write_canonical_i128_option(&mut hasher, self.ended_at_unix_ns);
         write_canonical_string_option(&mut hasher, self.agent_id.as_deref());
@@ -304,12 +321,28 @@ impl ProcessingActivity {
     }
 
     fn validate_without_execution_fingerprint(&self) -> Result<(), ObservationValidationError> {
-        if self.activity_id.trim().is_empty() || self.process_id.trim().is_empty()
-            || self.agent_id.as_deref().is_some_and(|id| id.trim().is_empty())
-            || self.process_definition_fingerprint.as_deref().is_some_and(|id| id.trim().is_empty())
-            || self.activity_fingerprint.as_deref().is_some_and(|id| id.trim().is_empty())
-            || self.input_observation_ids.iter().any(|id| id.trim().is_empty())
-            || self.output_observation_ids.iter().any(|id| id.trim().is_empty())
+        if self.activity_id.trim().is_empty()
+            || self.process_id.trim().is_empty()
+            || self
+                .agent_id
+                .as_deref()
+                .is_some_and(|id| id.trim().is_empty())
+            || self
+                .process_definition_fingerprint
+                .as_deref()
+                .is_some_and(|id| id.trim().is_empty())
+            || self
+                .activity_fingerprint
+                .as_deref()
+                .is_some_and(|id| id.trim().is_empty())
+            || self
+                .input_observation_ids
+                .iter()
+                .any(|id| id.trim().is_empty())
+            || self
+                .output_observation_ids
+                .iter()
+                .any(|id| id.trim().is_empty())
             || self.derivations.iter().any(|d| {
                 d.input_observation_id.trim().is_empty()
                     || d.output_observation_id.trim().is_empty()
@@ -321,16 +354,24 @@ impl ProcessingActivity {
             return Err(ObservationValidationError::InvalidProcessingActivity);
         }
         let mut input_ids = HashSet::with_capacity(self.input_observation_ids.len());
-        if self.input_observation_ids.iter().any(|id| !input_ids.insert(id)) {
+        if self
+            .input_observation_ids
+            .iter()
+            .any(|id| !input_ids.insert(id))
+        {
             return Err(ObservationValidationError::DuplicateActivityInput);
         }
         let mut output_ids = HashSet::with_capacity(self.output_observation_ids.len());
-        if self.output_observation_ids.iter().any(|id| !output_ids.insert(id)) {
+        if self
+            .output_observation_ids
+            .iter()
+            .any(|id| !output_ids.insert(id))
+        {
             return Err(ObservationValidationError::DuplicateActivityOutput);
         }
         Ok(())
     }
-    
+
     pub fn validate(&self) -> Result<(), ObservationValidationError> {
         self.validate_without_execution_fingerprint()?;
         if let Some(fingerprint) = self.execution_fingerprint.as_deref()
@@ -353,7 +394,9 @@ fn write_canonical_string_bytes(bytes: &mut Vec<u8>, value: &str) {
 
 fn write_canonical_string_vec_bytes(bytes: &mut Vec<u8>, values: &[String]) {
     bytes.extend_from_slice(&(values.len() as u64).to_le_bytes());
-    for value in values { write_canonical_string_bytes(bytes, value); }
+    for value in values {
+        write_canonical_string_bytes(bytes, value);
+    }
 }
 
 fn write_canonical_independence_bytes(bytes: &mut Vec<u8>, value: &EvidenceIndependence) {
@@ -368,12 +411,34 @@ fn write_canonical_independence_bytes(bytes: &mut Vec<u8>, value: &EvidenceIndep
 
 fn write_canonical_independence_basis_bytes(bytes: &mut Vec<u8>, value: &IndependenceBasis) {
     match value {
-        IndependenceBasis::SharedSensor { sensor_id } => { bytes.push(0); write_canonical_string_bytes(bytes, sensor_id); }
-        IndependenceBasis::SharedPlatform { platform_id } => { bytes.push(1); write_canonical_string_bytes(bytes, platform_id); }
-        IndependenceBasis::SharedAncestor { observation_id } => { bytes.push(2); write_canonical_string_bytes(bytes, observation_id); }
-        IndependenceBasis::SharedProcessingActivity { activity_id } => { bytes.push(3); write_canonical_string_bytes(bytes, activity_id); }
-        IndependenceBasis::IdenticalAsset { hash_algorithm, content_hash } => { bytes.push(4); write_canonical_string_bytes(bytes, hash_algorithm); write_canonical_string_bytes(bytes, content_hash); }
-        IndependenceBasis::InsufficientProvenance { coverage } => { bytes.push(5); write_canonical_provenance_coverage_bytes(bytes, coverage); }
+        IndependenceBasis::SharedSensor { sensor_id } => {
+            bytes.push(0);
+            write_canonical_string_bytes(bytes, sensor_id);
+        }
+        IndependenceBasis::SharedPlatform { platform_id } => {
+            bytes.push(1);
+            write_canonical_string_bytes(bytes, platform_id);
+        }
+        IndependenceBasis::SharedAncestor { observation_id } => {
+            bytes.push(2);
+            write_canonical_string_bytes(bytes, observation_id);
+        }
+        IndependenceBasis::SharedProcessingActivity { activity_id } => {
+            bytes.push(3);
+            write_canonical_string_bytes(bytes, activity_id);
+        }
+        IndependenceBasis::IdenticalAsset {
+            hash_algorithm,
+            content_hash,
+        } => {
+            bytes.push(4);
+            write_canonical_string_bytes(bytes, hash_algorithm);
+            write_canonical_string_bytes(bytes, content_hash);
+        }
+        IndependenceBasis::InsufficientProvenance { coverage } => {
+            bytes.push(5);
+            write_canonical_provenance_coverage_bytes(bytes, coverage);
+        }
         IndependenceBasis::NoSharedProvenance => bytes.push(6),
     }
 }
@@ -383,7 +448,10 @@ fn write_canonical_string(hasher: &mut blake3::Hasher, value: &str) {
 }
 fn write_canonical_string_option(hasher: &mut blake3::Hasher, value: Option<&str>) {
     match value {
-        Some(value) => { hasher.update(&[1]); write_canonical_string(hasher, value); }
+        Some(value) => {
+            hasher.update(&[1]);
+            write_canonical_string(hasher, value);
+        }
         None => {
             hasher.update(&[0]);
         }
@@ -391,7 +459,10 @@ fn write_canonical_string_option(hasher: &mut blake3::Hasher, value: Option<&str
 }
 fn write_canonical_i128_option(hasher: &mut blake3::Hasher, value: Option<i128>) {
     match value {
-        Some(value) => { hasher.update(&[1]); hasher.update(&value.to_be_bytes()); }
+        Some(value) => {
+            hasher.update(&[1]);
+            hasher.update(&value.to_be_bytes());
+        }
         None => {
             hasher.update(&[0]);
         }
@@ -399,7 +470,9 @@ fn write_canonical_i128_option(hasher: &mut blake3::Hasher, value: Option<i128>)
 }
 fn write_canonical_string_vec(hasher: &mut blake3::Hasher, values: &[String]) {
     hasher.update(&(values.len() as u64).to_be_bytes());
-    for value in values { write_canonical_string(hasher, value); }
+    for value in values {
+        write_canonical_string(hasher, value);
+    }
 }
 
 fn write_canonical_provenance_coverage_bytes(bytes: &mut Vec<u8>, value: &ProvenanceCoverage) {
@@ -447,7 +520,10 @@ fn write_canonical_independence_basis(hasher: &mut blake3::Hasher, value: &Indep
             hasher.update(&[3]);
             write_canonical_string(hasher, activity_id);
         }
-        IndependenceBasis::IdenticalAsset { hash_algorithm, content_hash } => {
+        IndependenceBasis::IdenticalAsset {
+            hash_algorithm,
+            content_hash,
+        } => {
             hasher.update(&[4]);
             write_canonical_string(hasher, hash_algorithm);
             write_canonical_string(hasher, content_hash);
@@ -530,16 +606,29 @@ impl Observation {
         if let Some(location) = self.location {
             location.validate()?;
         }
-        if self.feature_of_interest_id.as_deref().is_some_and(|id| id.trim().is_empty()) {
+        if self
+            .feature_of_interest_id
+            .as_deref()
+            .is_some_and(|id| id.trim().is_empty())
+        {
             return Err(ObservationValidationError::EmptyFeatureOfInterestId);
         }
         self.quality.validate()?;
         if self.provenance.verification != ProvenanceVerification::Unverified
-            && self.provenance.attestation_id.as_deref().is_none_or(str::is_empty)
+            && self
+                .provenance
+                .attestation_id
+                .as_deref()
+                .is_none_or(str::is_empty)
         {
             return Err(ObservationValidationError::MissingVerificationAttestation);
         }
-        if self.provenance.parent_observation_ids.iter().any(|parent| parent.trim().is_empty() || parent == &self.id) {
+        if self
+            .provenance
+            .parent_observation_ids
+            .iter()
+            .any(|parent| parent.trim().is_empty() || parent == &self.id)
+        {
             return Err(ObservationValidationError::InvalidParentObservation);
         }
         let mut parent_ids = HashSet::with_capacity(self.provenance.parent_observation_ids.len());
@@ -547,7 +636,8 @@ impl Observation {
             .provenance
             .parent_observation_ids
             .iter()
-            .any(|parent| !parent_ids.insert(parent.as_str())) {
+            .any(|parent| !parent_ids.insert(parent.as_str()))
+        {
             return Err(ObservationValidationError::DuplicateParentObservation);
         }
         if let Some(activity) = &self.provenance.processing_activity {
@@ -556,9 +646,7 @@ impl Observation {
         if let Some(asset) = &self.asset {
             asset.validate()?;
         }
-        if self.disclosure.class == DisclosureClass::Secret
-            && self.disclosure.share_raw_asset
-        {
+        if self.disclosure.class == DisclosureClass::Secret && self.disclosure.share_raw_asset {
             return Err(ObservationValidationError::SecretRawAssetExport);
         }
         Ok(())
@@ -629,13 +717,26 @@ impl IndependenceVerifierContract {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IndependenceBasis {
-    SharedSensor { sensor_id: String },
-    SharedPlatform { platform_id: String },
-    SharedAncestor { observation_id: String },
-    SharedProcessingActivity { activity_id: String },
-    IdenticalAsset { hash_algorithm: String, content_hash: String },
+    SharedSensor {
+        sensor_id: String,
+    },
+    SharedPlatform {
+        platform_id: String,
+    },
+    SharedAncestor {
+        observation_id: String,
+    },
+    SharedProcessingActivity {
+        activity_id: String,
+    },
+    IdenticalAsset {
+        hash_algorithm: String,
+        content_hash: String,
+    },
     /// The graph contains an explicit declaration that relevant provenance may be unavailable.
-    InsufficientProvenance { coverage: ProvenanceCoverage },
+    InsufficientProvenance {
+        coverage: ProvenanceCoverage,
+    },
     NoSharedProvenance,
 }
 
@@ -789,7 +890,6 @@ impl IndependenceVerificationReceipt {
     }
 }
 
-
 /// Standards-aware, crypto-agnostic envelope for externally attesting an
 /// independence verification receipt.
 ///
@@ -848,8 +948,7 @@ pub enum ReceiptAttestationTemporalStatus {
 
 impl ReceiptAttestationEnvelope {
     /// Domain separator for the deterministic attestation payload.
-    pub const DOMAIN_SEPARATOR: &'static [u8] =
-        b"symthaea:observation-receipt-attestation:v1\n";
+    pub const DOMAIN_SEPARATOR: &'static [u8] = b"symthaea:observation-receipt-attestation:v1\n";
 
     /// Build an unsigned envelope from an exact receipt.
     ///
@@ -882,10 +981,7 @@ impl ReceiptAttestationEnvelope {
     ///
     /// This is a commitment check only. It does not verify the external proof,
     /// attester identity, or any substantive observation claim.
-    pub fn verify_against_receipt(
-        &self,
-        receipt: &IndependenceVerificationReceipt,
-    ) -> bool {
+    pub fn verify_against_receipt(&self, receipt: &IndependenceVerificationReceipt) -> bool {
         self.receipt_fingerprint == receipt.fingerprint()
             && self.verifier_version == receipt.verifier_version
             && self.examined_scope_fingerprint == receipt.examined_scope_fingerprint
@@ -911,7 +1007,10 @@ impl ReceiptAttestationEnvelope {
     pub fn temporal_status_at(&self, now_unix_ns: i128) -> ReceiptAttestationTemporalStatus {
         if now_unix_ns < self.created_at_unix_ns {
             ReceiptAttestationTemporalStatus::NotYetValid
-        } else if self.expires_at_unix_ns.is_some_and(|expires_at| now_unix_ns >= expires_at) {
+        } else if self
+            .expires_at_unix_ns
+            .is_some_and(|expires_at| now_unix_ns >= expires_at)
+        {
             ReceiptAttestationTemporalStatus::Expired
         } else {
             ReceiptAttestationTemporalStatus::Valid
@@ -920,7 +1019,10 @@ impl ReceiptAttestationEnvelope {
 
     /// Return whether the envelope is expired at an explicit instant.
     pub fn is_expired_at(&self, now_unix_ns: i128) -> bool {
-        matches!(self.temporal_status_at(now_unix_ns), ReceiptAttestationTemporalStatus::Expired)
+        matches!(
+            self.temporal_status_at(now_unix_ns),
+            ReceiptAttestationTemporalStatus::Expired
+        )
     }
 
     /// Validate the envelope's structural commitments.
@@ -933,10 +1035,19 @@ impl ReceiptAttestationEnvelope {
             || self.verifier_version.trim().is_empty()
             || self.attester_id.trim().is_empty()
             || self.proof_purpose.trim().is_empty()
-            || self.verification_method.as_deref().is_some_and(|v| v.trim().is_empty())
-            || self.cryptosuite.as_deref().is_some_and(|v| v.trim().is_empty())
+            || self
+                .verification_method
+                .as_deref()
+                .is_some_and(|v| v.trim().is_empty())
+            || self
+                .cryptosuite
+                .as_deref()
+                .is_some_and(|v| v.trim().is_empty())
             || self.domain.as_deref().is_some_and(|v| v.trim().is_empty())
-            || self.challenge.as_deref().is_some_and(|v| v.trim().is_empty())
+            || self
+                .challenge
+                .as_deref()
+                .is_some_and(|v| v.trim().is_empty())
             || matches!(self.expires_at_unix_ns, Some(expiry) if expiry <= self.created_at_unix_ns)
         {
             return Err(ObservationValidationError::InvalidReceiptAttestationEnvelope);
@@ -968,7 +1079,9 @@ impl ReceiptAttestationEnvelope {
 
     /// BLAKE3 commitment to the detached attestation payload.
     pub fn payload_fingerprint(&self) -> String {
-        blake3::hash(&self.canonical_payload_bytes()).to_hex().to_string()
+        blake3::hash(&self.canonical_payload_bytes())
+            .to_hex()
+            .to_string()
     }
 }
 
@@ -996,7 +1109,6 @@ fn write_canonical_string_option_bytes(bytes: &mut Vec<u8>, value: Option<&str>)
     }
 }
 
-
 impl IndependenceAssessment {
     const VERIFIER_VERSION: &'static str = IndependenceVerifierContract::CURRENT.version;
 
@@ -1012,7 +1124,6 @@ impl IndependenceAssessment {
         write_canonical_independence_basis(&mut hasher, &self.basis);
         hasher.finalize().to_hex().to_string()
     }
-
 
     /// Verify that the stored fingerprint still commits to this assessment.
     ///
@@ -1084,7 +1195,10 @@ impl ObservationRelation {
             return Err(ObservationValidationError::SelfRelation);
         }
         if matches!(self.kind, ObservationRelationKind::DerivedFrom)
-            && !matches!(self.independence, EvidenceIndependence::Derived | EvidenceIndependence::SharedUpstream)
+            && !matches!(
+                self.independence,
+                EvidenceIndependence::Derived | EvidenceIndependence::SharedUpstream
+            )
         {
             return Err(ObservationValidationError::DerivedRelationIndependenceMismatch);
         }
@@ -1127,16 +1241,12 @@ impl ObservationGraph {
             .map(|observation| (observation.id.as_str(), observation))
             .collect::<HashMap<_, _>>();
 
-        let source = by_id
-            .get(source_observation_id)
-            .ok_or_else(|| ObservationValidationError::MissingRelationEndpoint(
-                source_observation_id.to_string(),
-            ))?;
-        let target = by_id
-            .get(target_observation_id)
-            .ok_or_else(|| ObservationValidationError::MissingRelationEndpoint(
-                target_observation_id.to_string(),
-            ))?;
+        let source = by_id.get(source_observation_id).ok_or_else(|| {
+            ObservationValidationError::MissingRelationEndpoint(source_observation_id.to_string())
+        })?;
+        let target = by_id.get(target_observation_id).ok_or_else(|| {
+            ObservationValidationError::MissingRelationEndpoint(target_observation_id.to_string())
+        })?;
 
         let mut examined_observation_ids = self
             .observations
@@ -1144,11 +1254,10 @@ impl ObservationGraph {
             .map(|observation| observation.id.clone())
             .collect::<Vec<_>>();
         examined_observation_ids.sort();
-        let examined_scope_fingerprint = self
-            .compute_independence_scope_fingerprint(&by_id, &examined_observation_ids)?;
+        let examined_scope_fingerprint =
+            self.compute_independence_scope_fingerprint(&by_id, &examined_observation_ids)?;
 
         let assessment = |classification, basis| {
-
             let mut hasher = blake3::Hasher::new();
             hasher.update(b"symthaea:observation-independence-assessment:v2\n");
             write_canonical_string(&mut hasher, source_observation_id);
@@ -1208,10 +1317,7 @@ impl ObservationGraph {
 
         let source_ancestors = Self::ancestor_ids(source_observation_id, &by_id)?;
         let target_ancestors = Self::ancestor_ids(target_observation_id, &by_id)?;
-        if let Some(shared_ancestor) = source_ancestors
-            .intersection(&target_ancestors)
-            .min()
-        {
+        if let Some(shared_ancestor) = source_ancestors.intersection(&target_ancestors).min() {
             return Ok(assessment(
                 EvidenceIndependence::SharedUpstream,
                 IndependenceBasis::SharedAncestor {
@@ -1244,10 +1350,7 @@ impl ObservationGraph {
                     .map(|activity| activity.activity_id.as_str())
             })
             .collect::<HashSet<_>>();
-        if let Some(shared_activity) = source_activities
-            .intersection(&target_activities)
-            .min()
-        {
+        if let Some(shared_activity) = source_activities.intersection(&target_activities).min() {
             return Ok(assessment(
                 EvidenceIndependence::SharedUpstream,
                 IndependenceBasis::SharedProcessingActivity {
@@ -1256,8 +1359,7 @@ impl ObservationGraph {
             ));
         }
 
-        if let Some((source_asset, target_asset)) =
-            source.asset.as_ref().zip(target.asset.as_ref())
+        if let Some((source_asset, target_asset)) = source.asset.as_ref().zip(target.asset.as_ref())
             && source_asset.hash_algorithm == target_asset.hash_algorithm
             && source_asset.content_hash == target_asset.content_hash
         {
@@ -1299,10 +1401,8 @@ impl ObservationGraph {
             .iter()
             .map(|observation| (observation.id.as_str(), observation))
             .collect::<HashMap<_, _>>();
-        let expected = self.compute_independence_scope_fingerprint(
-            &by_id,
-            &assessment.examined_observation_ids,
-        )?;
+        let expected = self
+            .compute_independence_scope_fingerprint(&by_id, &assessment.examined_observation_ids)?;
         Ok(expected == assessment.examined_scope_fingerprint)
     }
 
@@ -1315,12 +1415,15 @@ impl ObservationGraph {
         scope_hasher.update(b"symthaea:observation-independence-scope:v1\n");
         write_canonical_string_vec(&mut scope_hasher, examined_observation_ids);
         for observation_id in examined_observation_ids {
-            let observation = by_id
-                .get(observation_id.as_str())
-                .ok_or_else(|| ObservationValidationError::MissingRelationEndpoint(observation_id.clone()))?;
+            let observation = by_id.get(observation_id.as_str()).ok_or_else(|| {
+                ObservationValidationError::MissingRelationEndpoint(observation_id.clone())
+            })?;
             write_canonical_string(&mut scope_hasher, &observation.id);
             write_canonical_string(&mut scope_hasher, &observation.provenance.source.sensor_id);
-            write_canonical_provenance_coverage(&mut scope_hasher, &observation.provenance.coverage);
+            write_canonical_provenance_coverage(
+                &mut scope_hasher,
+                &observation.provenance.coverage,
+            );
             if let Some(platform_id) = &observation.provenance.source.platform_id {
                 scope_hasher.update(&[1]);
                 write_canonical_string(&mut scope_hasher, platform_id);
@@ -1333,7 +1436,10 @@ impl ObservationGraph {
             if let Some(activity) = &observation.provenance.processing_activity {
                 scope_hasher.update(&[1]);
                 write_canonical_string(&mut scope_hasher, &activity.activity_id);
-                write_canonical_string(&mut scope_hasher, activity.execution_fingerprint.as_deref().unwrap_or(""));
+                write_canonical_string(
+                    &mut scope_hasher,
+                    activity.execution_fingerprint.as_deref().unwrap_or(""),
+                );
             } else {
                 scope_hasher.update(&[0]);
             }
@@ -1369,9 +1475,9 @@ impl ObservationGraph {
         let mut ancestors = HashSet::new();
         let mut pending = vec![observation_id.to_string()];
         while let Some(current) = pending.pop() {
-            let observation = by_id
-                .get(current.as_str())
-                .ok_or_else(|| ObservationValidationError::MissingParentObservation(current.clone()))?;
+            let observation = by_id.get(current.as_str()).ok_or_else(|| {
+                ObservationValidationError::MissingParentObservation(current.clone())
+            })?;
             for parent_id in &observation.provenance.parent_observation_ids {
                 if ancestors.insert(parent_id.clone()) {
                     pending.push(parent_id.clone());
@@ -1423,10 +1529,9 @@ impl ObservationGraph {
                     activity.verify_execution_fingerprint()?;
                 }
                 let computed_fingerprint = activity.compute_execution_fingerprint()?;
-                if let Some(previous) = activity_fingerprints.insert(
-                    activity.activity_id.clone(),
-                    computed_fingerprint.clone(),
-                ) && previous != computed_fingerprint
+                if let Some(previous) = activity_fingerprints
+                    .insert(activity.activity_id.clone(), computed_fingerprint.clone())
+                    && previous != computed_fingerprint
                 {
                     return Err(ObservationValidationError::InconsistentProcessingActivity(
                         activity.activity_id.clone(),
@@ -1434,7 +1539,9 @@ impl ObservationGraph {
                 }
                 for input_id in &activity.input_observation_ids {
                     if !by_id.contains_key(input_id.as_str()) {
-                        return Err(ObservationValidationError::MissingActivityInput(input_id.clone()));
+                        return Err(ObservationValidationError::MissingActivityInput(
+                            input_id.clone(),
+                        ));
                     }
                 }
                 for output_id in &activity.output_observation_ids {
@@ -1454,12 +1561,20 @@ impl ObservationGraph {
                 }
                 let mut derivation_pairs = HashSet::with_capacity(activity.derivations.len());
                 for derivation in &activity.derivations {
-                    if !activity.input_observation_ids.iter().any(|id| id == &derivation.input_observation_id) {
+                    if !activity
+                        .input_observation_ids
+                        .iter()
+                        .any(|id| id == &derivation.input_observation_id)
+                    {
                         return Err(ObservationValidationError::DerivationInputNotDeclared(
                             derivation.input_observation_id.clone(),
                         ));
                     }
-                    if !activity.output_observation_ids.iter().any(|id| id == &derivation.output_observation_id) {
+                    if !activity
+                        .output_observation_ids
+                        .iter()
+                        .any(|id| id == &derivation.output_observation_id)
+                    {
                         return Err(ObservationValidationError::DerivationOutputNotDeclared(
                             derivation.output_observation_id.clone(),
                         ));
@@ -1492,7 +1607,11 @@ impl ObservationGraph {
                         observation.id.clone(),
                     ));
                 }
-                if !activity.output_observation_ids.iter().any(|id| id == &observation.id) {
+                if !activity
+                    .output_observation_ids
+                    .iter()
+                    .any(|id| id == &observation.id)
+                {
                     return Err(ObservationValidationError::ActivityOutputMissingSelf(
                         observation.id.clone(),
                     ));
@@ -1592,7 +1711,9 @@ pub enum ObservationValidationError {
     DuplicateActivityOutput,
     #[error("processing activity execution fingerprint must be 64 hexadecimal characters")]
     InvalidExecutionFingerprint,
-    #[error("processing activity execution fingerprint does not match its canonical execution envelope")]
+    #[error(
+        "processing activity execution fingerprint does not match its canonical execution envelope"
+    )]
     ExecutionFingerprintMismatch,
     #[error("processing activity execution fingerprint is required for verification")]
     MissingExecutionFingerprint,
@@ -1600,7 +1721,9 @@ pub enum ObservationValidationError {
     ActivityOutputMissingProducer(String),
     #[error("processing activity state is inconsistent: {0}")]
     InconsistentProcessingActivity(String),
-    #[error("processing activity input is not represented in the output observation's parent lineage: {0}")]
+    #[error(
+        "processing activity input is not represented in the output observation's parent lineage: {0}"
+    )]
     ActivityInputMissingParent(String),
     #[error("processing activity input observation is not present in the closed graph: {0}")]
     MissingActivityInput(String),
@@ -1670,8 +1793,13 @@ mod tests {
         let mut second = fixture();
         second.id = "obs-002".into();
         second.provenance.source.sensor_id = "camera-2".into();
-        let graph = ObservationGraph { observations: vec![fixture(), second], relations: vec![] };
-        let assessment = graph.assess_independence_detailed("obs-001", "obs-002").expect("assessment");
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
         IndependenceVerificationReceipt::from_assessment(&assessment)
     }
 
@@ -1689,29 +1817,50 @@ mod tests {
 
     fn receipt_attestation_temporal_status_is_deterministic() {
         let receipt = fixture_receipt();
-        let mut envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        let mut envelope =
+            ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
         envelope.expires_at_unix_ns = Some(200);
-        assert_eq!(envelope.temporal_status_at(99), ReceiptAttestationTemporalStatus::NotYetValid);
-        assert_eq!(envelope.temporal_status_at(100), ReceiptAttestationTemporalStatus::Valid);
-        assert_eq!(envelope.temporal_status_at(199), ReceiptAttestationTemporalStatus::Valid);
-        assert_eq!(envelope.temporal_status_at(200), ReceiptAttestationTemporalStatus::Expired);
+        assert_eq!(
+            envelope.temporal_status_at(99),
+            ReceiptAttestationTemporalStatus::NotYetValid
+        );
+        assert_eq!(
+            envelope.temporal_status_at(100),
+            ReceiptAttestationTemporalStatus::Valid
+        );
+        assert_eq!(
+            envelope.temporal_status_at(199),
+            ReceiptAttestationTemporalStatus::Valid
+        );
+        assert_eq!(
+            envelope.temporal_status_at(200),
+            ReceiptAttestationTemporalStatus::Expired
+        );
         assert!(envelope.is_expired_at(200));
         envelope.expires_at_unix_ns = None;
-        assert_eq!(envelope.temporal_status_at(i128::MAX), ReceiptAttestationTemporalStatus::Valid);
+        assert_eq!(
+            envelope.temporal_status_at(i128::MAX),
+            ReceiptAttestationTemporalStatus::Valid
+        );
     }
 
     #[test]
     fn receipt_attestation_rejects_zero_duration_expiry() {
         let receipt = fixture_receipt();
-        let mut envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        let mut envelope =
+            ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
         envelope.expires_at_unix_ns = Some(100);
-        assert_eq!(envelope.validate(), Err(ObservationValidationError::InvalidReceiptAttestationEnvelope));
+        assert_eq!(
+            envelope.validate(),
+            Err(ObservationValidationError::InvalidReceiptAttestationEnvelope)
+        );
     }
 
     #[test]
     fn receipt_attestation_proof_is_detached_from_payload_commitment() {
         let receipt = fixture_receipt();
-        let mut envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        let mut envelope =
+            ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
         let payload = envelope.payload_fingerprint();
         envelope.proof = Some(vec![1, 2, 3, 4]);
         assert_eq!(payload, envelope.payload_fingerprint());
@@ -1720,12 +1869,8 @@ mod tests {
     #[test]
     fn receipt_attestation_payload_binds_attester_identity() {
         let receipt = fixture_receipt();
-        let envelope = ReceiptAttestationEnvelope::from_receipt(
-            &receipt,
-            "attester-1",
-            "assertion",
-            100,
-        );
+        let envelope =
+            ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
         let baseline = envelope.payload_fingerprint();
         let mut changed_attester = envelope;
         changed_attester.attester_id = "attester-2".into();
@@ -1735,12 +1880,8 @@ mod tests {
     #[test]
     fn receipt_attestation_strong_commitment_rejects_invalid_receipt_integrity() {
         let receipt = fixture_receipt();
-        let envelope = ReceiptAttestationEnvelope::from_receipt(
-            &receipt,
-            "attester-1",
-            "assertion",
-            100,
-        );
+        let envelope =
+            ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
         assert!(envelope.verify_against_receipt(&receipt));
         assert!(envelope.verify_against_integral_receipt(&receipt));
 
@@ -1754,7 +1895,8 @@ mod tests {
     #[test]
     fn receipt_attestation_commitment_rejects_scope_and_version_mutation() {
         let receipt = fixture_receipt();
-        let envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        let envelope =
+            ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
         let mut changed_scope = envelope.clone();
         changed_scope.examined_scope_fingerprint = "0".repeat(64);
         assert!(!changed_scope.verify_against_receipt(&receipt));
@@ -1766,12 +1908,8 @@ mod tests {
     #[test]
     fn receipt_attestation_envelope_round_trips_through_serde() {
         let receipt = fixture_receipt();
-        let mut envelope = ReceiptAttestationEnvelope::from_receipt(
-            &receipt,
-            "attester-1",
-            "assertion",
-            100,
-        );
+        let mut envelope =
+            ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
         envelope.expires_at_unix_ns = Some(200);
         envelope.verification_method = Some("key-1".into());
         envelope.cryptosuite = Some("suite-1".into());
@@ -1789,7 +1927,10 @@ mod tests {
             decoded.temporal_status_at(150),
             ReceiptAttestationTemporalStatus::Valid
         );
-        assert_eq!(decoded.payload_fingerprint(), envelope.payload_fingerprint());
+        assert_eq!(
+            decoded.payload_fingerprint(),
+            envelope.payload_fingerprint()
+        );
     }
 
     #[test]
@@ -1817,7 +1958,10 @@ mod tests {
         envelope.receipt_fingerprint = "00".repeat(32);
         assert!(!envelope.verify_against_receipt(&receipt));
         envelope.receipt_fingerprint = receipt.fingerprint();
-        assert_eq!(envelope.examined_scope_fingerprint, receipt.examined_scope_fingerprint);
+        assert_eq!(
+            envelope.examined_scope_fingerprint,
+            receipt.examined_scope_fingerprint
+        );
         assert_eq!(envelope.proof, None);
 
         let payload = envelope.canonical_payload_bytes();
@@ -1937,7 +2081,8 @@ mod tests {
             source_observation_id: "obs-1".into(),
             target_observation_id: "obs-1".into(),
             kind: ObservationRelationKind::Corroborates,
-            independence: EvidenceIndependence::Independent,        };
+            independence: EvidenceIndependence::Independent,
+        };
         assert_eq!(
             relation.validate(),
             Err(ObservationValidationError::SelfRelation)
@@ -1977,16 +2122,28 @@ mod tests {
         let mut observation = fixture();
         observation.provenance.verification = ProvenanceVerification::CredentialVerified;
         observation.provenance.attestation_id = Some("att-001".into());
-        assert_eq!(observation.asset.as_ref().map(|asset| asset.integrity), Some(AssetIntegrity::HashVerified));
-        assert_eq!(observation.provenance.verification, ProvenanceVerification::CredentialVerified);
-        assert_eq!(observation.provenance.attestation_id.as_deref(), Some("att-001"));
+        assert_eq!(
+            observation.asset.as_ref().map(|asset| asset.integrity),
+            Some(AssetIntegrity::HashVerified)
+        );
+        assert_eq!(
+            observation.provenance.verification,
+            ProvenanceVerification::CredentialVerified
+        );
+        assert_eq!(
+            observation.provenance.attestation_id.as_deref(),
+            Some("att-001")
+        );
     }
 
     #[test]
     fn verified_provenance_requires_attestation() {
         let mut observation = fixture();
         observation.provenance.verification = ProvenanceVerification::CredentialVerified;
-        assert_eq!(observation.validate(), Err(ObservationValidationError::MissingVerificationAttestation));
+        assert_eq!(
+            observation.validate(),
+            Err(ObservationValidationError::MissingVerificationAttestation)
+        );
     }
 
     #[test]
@@ -2003,7 +2160,10 @@ mod tests {
     fn parent_cannot_self_reference() {
         let mut observation = fixture();
         observation.provenance.parent_observation_ids = vec!["obs-001".into()];
-        assert_eq!(observation.validate(), Err(ObservationValidationError::InvalidParentObservation));
+        assert_eq!(
+            observation.validate(),
+            Err(ObservationValidationError::InvalidParentObservation)
+        );
     }
 
     #[test]
@@ -2026,7 +2186,12 @@ mod tests {
             observation.validate(),
             Err(ObservationValidationError::InvalidProcessingActivity)
         );
-        observation.provenance.processing_activity.as_mut().unwrap().ended_at_unix_ns = Some(25);
+        observation
+            .provenance
+            .processing_activity
+            .as_mut()
+            .unwrap()
+            .ended_at_unix_ns = Some(25);
         assert!(observation.validate().is_ok());
     }
 
@@ -2035,7 +2200,9 @@ mod tests {
         let mut activity = ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
-            process_definition_fingerprint: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()),
+            process_definition_fingerprint: Some(
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            ),
             started_at_unix_ns: Some(10),
             ended_at_unix_ns: Some(20),
             agent_id: None,
@@ -2103,10 +2270,15 @@ mod tests {
         let mut observation = fixture();
         observation.id = "output".into();
         observation.provenance.processing_activity = Some(activity);
-        let graph = ObservationGraph { observations: vec![observation], relations: vec![] };
+        let graph = ObservationGraph {
+            observations: vec![observation],
+            relations: vec![],
+        };
         assert_eq!(
             graph.validate(),
-            Err(ObservationValidationError::DerivationInputNotDeclared("other-input".into()))
+            Err(ObservationValidationError::DerivationInputNotDeclared(
+                "other-input".into()
+            ))
         );
     }
 
@@ -2160,7 +2332,10 @@ mod tests {
                 output_observation_id: "output".into(),
             }],
         });
-        let graph = ObservationGraph { observations: vec![input, output], relations: vec![] };
+        let graph = ObservationGraph {
+            observations: vec![input, output],
+            relations: vec![],
+        };
         assert!(graph.validate().is_ok());
     }
 
@@ -2193,8 +2368,14 @@ mod tests {
         });
         let mut input = fixture();
         input.id = "input".into();
-        let graph = ObservationGraph { observations: vec![input, output], relations: vec![] };
-        assert_eq!(graph.validate(), Err(ObservationValidationError::DuplicateProcessingDerivation));
+        let graph = ObservationGraph {
+            observations: vec![input, output],
+            relations: vec![],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::DuplicateProcessingDerivation)
+        );
     }
 
     #[test]
@@ -2260,13 +2441,22 @@ mod tests {
             output_observation_ids: vec!["output-a".into()],
             derivations: Vec::new(),
         };
-        let first = activity.compute_execution_fingerprint().expect("fingerprint");
-        let second = activity.compute_execution_fingerprint().expect("fingerprint");
+        let first = activity
+            .compute_execution_fingerprint()
+            .expect("fingerprint");
+        let second = activity
+            .compute_execution_fingerprint()
+            .expect("fingerprint");
         assert_eq!(first, second);
         assert_eq!(first.len(), 64);
         let mut reordered = activity.clone();
         reordered.input_observation_ids.reverse();
-        assert_ne!(first, reordered.compute_execution_fingerprint().expect("fingerprint"));
+        assert_ne!(
+            first,
+            reordered
+                .compute_execution_fingerprint()
+                .expect("fingerprint")
+        );
     }
 
     #[test]
@@ -2284,10 +2474,17 @@ mod tests {
             output_observation_ids: vec!["output-a".into()],
             derivations: Vec::new(),
         };
-        activity.execution_fingerprint = Some(activity.compute_execution_fingerprint().expect("fingerprint"));
+        activity.execution_fingerprint = Some(
+            activity
+                .compute_execution_fingerprint()
+                .expect("fingerprint"),
+        );
         assert_eq!(activity.verify_execution_fingerprint(), Ok(()));
         activity.process_id = "transform-v2".into();
-        assert_eq!(activity.verify_execution_fingerprint(), Err(ObservationValidationError::ExecutionFingerprintMismatch));
+        assert_eq!(
+            activity.verify_execution_fingerprint(),
+            Err(ObservationValidationError::ExecutionFingerprintMismatch)
+        );
     }
 
     #[test]
@@ -2305,7 +2502,10 @@ mod tests {
             output_observation_ids: vec!["obs-001".into()],
             derivations: Vec::new(),
         };
-        assert_eq!(activity.verify_execution_fingerprint(), Err(ObservationValidationError::MissingExecutionFingerprint));
+        assert_eq!(
+            activity.verify_execution_fingerprint(),
+            Err(ObservationValidationError::MissingExecutionFingerprint)
+        );
     }
 
     #[test]
@@ -2323,7 +2523,10 @@ mod tests {
             output_observation_ids: vec!["obs-001".into()],
             derivations: Vec::new(),
         };
-        assert_eq!(activity.validate(), Err(ObservationValidationError::InvalidExecutionFingerprint));
+        assert_eq!(
+            activity.validate(),
+            Err(ObservationValidationError::InvalidExecutionFingerprint)
+        );
     }
 
     #[test]
@@ -2386,7 +2589,8 @@ mod tests {
         assert_eq!(
             activity.validate(),
             Err(ObservationValidationError::InvalidProcessingActivity)
-        );    }
+        );
+    }
 
     #[test]
     fn graph_rejects_missing_parent() {
@@ -2399,7 +2603,9 @@ mod tests {
         };
         assert_eq!(
             graph.validate(),
-            Err(ObservationValidationError::MissingParentObservation("missing".into()))
+            Err(ObservationValidationError::MissingParentObservation(
+                "missing".into()
+            ))
         );
     }
 
@@ -2510,7 +2716,10 @@ mod tests {
         }
         .assess_independence_detailed("obs-001", "obs-002")
         .expect("assessment");
-        assert_eq!(assessment.classification, EvidenceIndependence::SharedUpstream);
+        assert_eq!(
+            assessment.classification,
+            EvidenceIndependence::SharedUpstream
+        );
         assert_eq!(
             assessment.basis,
             IndependenceBasis::SharedSensor {
@@ -2533,15 +2742,32 @@ mod tests {
         .expect("assessment");
         assert_eq!(assessment.source_observation_id, "obs-001");
         assert_eq!(assessment.target_observation_id, "obs-002");
-        assert_eq!(assessment.classification, EvidenceIndependence::VerifiedIndependent);
+        assert_eq!(
+            assessment.classification,
+            EvidenceIndependence::VerifiedIndependent
+        );
         assert_eq!(assessment.basis, IndependenceBasis::NoSharedProvenance);
-        assert_eq!(assessment.examined_observation_ids, vec!["obs-001", "obs-002"]);
-        assert_eq!(assessment.verifier_version, "observation-fabric-independence-v2");
+        assert_eq!(
+            assessment.examined_observation_ids,
+            vec!["obs-001", "obs-002"]
+        );
+        assert_eq!(
+            assessment.verifier_version,
+            "observation-fabric-independence-v2"
+        );
         assert_eq!(assessment.examined_scope_fingerprint.len(), 64);
         assert_eq!(assessment.assessment_fingerprint.len(), 64);
-        assert!(assessment.assessment_fingerprint.bytes().all(|b| b.is_ascii_hexdigit()));
+        assert!(
+            assessment
+                .assessment_fingerprint
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit())
+        );
         assert!(assessment.verify_fingerprint());
-        assert_eq!(IndependenceVerifierContract::CURRENT.version, assessment.verifier_version);
+        assert_eq!(
+            IndependenceVerifierContract::CURRENT.version,
+            assessment.verifier_version
+        );
         assert!(IndependenceVerifierContract::CURRENT.requires_closed_world);
         assert_eq!(
             IndependenceVerifierContract::CURRENT.predicates,
@@ -2567,9 +2793,17 @@ mod tests {
         let assessment = graph
             .assess_independence_detailed("obs-001", "obs-002")
             .expect("assessment");
-        assert!(graph.verify_independence_scope_fingerprint(&assessment).unwrap());
+        assert!(
+            graph
+                .verify_independence_scope_fingerprint(&assessment)
+                .unwrap()
+        );
         graph.observations[0].provenance.source.platform_id = Some("platform-9".into());
-        assert!(!graph.verify_independence_scope_fingerprint(&assessment).unwrap());
+        assert!(
+            !graph
+                .verify_independence_scope_fingerprint(&assessment)
+                .unwrap()
+        );
     }
 
     #[test]
@@ -2587,12 +2821,19 @@ mod tests {
         let mut changed = graph.clone();
         changed.observations[0].time.observed_at_unix_ns += 1;
         changed.observations[0].quality.confidence = 0.1;
-        changed.observations[0].location.as_mut().unwrap().latitude_deg = 11.0;
+        changed.observations[0]
+            .location
+            .as_mut()
+            .unwrap()
+            .latitude_deg = 11.0;
         let updated = changed
             .assess_independence_detailed("obs-001", "obs-002")
             .expect("assessment");
         assert_eq!(baseline.classification, updated.classification);
-        assert_eq!(baseline.examined_scope_fingerprint, updated.examined_scope_fingerprint);
+        assert_eq!(
+            baseline.examined_scope_fingerprint,
+            updated.examined_scope_fingerprint
+        );
     }
 
     #[test]
@@ -2628,7 +2869,10 @@ mod tests {
         assessment.basis = IndependenceBasis::SharedPlatform {
             platform_id: "platform-1".into(),
         };
-        assert_ne!(assessment.assessment_fingerprint, assessment.compute_fingerprint());
+        assert_ne!(
+            assessment.assessment_fingerprint,
+            assessment.compute_fingerprint()
+        );
         assert_ne!(original, assessment.compute_fingerprint());
         assert!(!assessment.verify_fingerprint());
     }
@@ -2697,9 +2941,11 @@ mod tests {
 
         let mut changed = graph.clone();
         changed.observations[0].provenance.coverage = ProvenanceCoverage::Partial;
-        assert!(!changed
-            .verify_independence_scope_fingerprint(&baseline)
-            .expect("scope verification"));
+        assert!(
+            !changed
+                .verify_independence_scope_fingerprint(&baseline)
+                .expect("scope verification")
+        );
     }
 
     #[test]
@@ -2707,18 +2953,38 @@ mod tests {
         let mut second = fixture();
         second.id = "obs-002".into();
         second.provenance.source.sensor_id = "camera-2".into();
-        let graph = ObservationGraph { observations: vec![fixture(), second], relations: vec![] };
-        let assessment = graph.assess_independence_detailed("obs-001", "obs-002").expect("assessment");
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
         let receipt = IndependenceVerificationReceipt::from_assessment(&assessment);
         assert!(receipt.verify_integrity());
         assert_eq!(receipt.verify_against_graph(&graph), Ok(true));
-        assert_eq!(receipt.verify_against_graph_detailed(&graph), Ok(ReceiptVerificationOutcome::VerifiedAgainstGraph));
-        let encoded = serde_json::to_string(&ReceiptVerificationOutcome::VerifiedAgainstGraph).expect("serialize outcome");
-        assert_eq!(serde_json::from_str::<ReceiptVerificationOutcome>(&encoded).expect("deserialize outcome"), ReceiptVerificationOutcome::VerifiedAgainstGraph);
+        assert_eq!(
+            receipt.verify_against_graph_detailed(&graph),
+            Ok(ReceiptVerificationOutcome::VerifiedAgainstGraph)
+        );
+        let encoded = serde_json::to_string(&ReceiptVerificationOutcome::VerifiedAgainstGraph)
+            .expect("serialize outcome");
+        assert_eq!(
+            serde_json::from_str::<ReceiptVerificationOutcome>(&encoded)
+                .expect("deserialize outcome"),
+            ReceiptVerificationOutcome::VerifiedAgainstGraph
+        );
         assert!(!receipt.canonical_bytes().is_empty());
-        assert!(receipt.canonical_bytes().starts_with(IndependenceVerificationReceipt::DOMAIN_SEPARATOR));
+        assert!(
+            receipt
+                .canonical_bytes()
+                .starts_with(IndependenceVerificationReceipt::DOMAIN_SEPARATOR)
+        );
         assert_eq!(receipt.fingerprint().len(), 64);
-        assert_eq!(receipt.fingerprint(), IndependenceVerificationReceipt::from_assessment(&assessment).fingerprint());
+        assert_eq!(
+            receipt.fingerprint(),
+            IndependenceVerificationReceipt::from_assessment(&assessment).fingerprint()
+        );
     }
 
     #[test]
@@ -2726,14 +2992,22 @@ mod tests {
         let mut second = fixture();
         second.id = "obs-002".into();
         second.provenance.source.sensor_id = "camera-2".into();
-        let graph = ObservationGraph { observations: vec![fixture(), second], relations: vec![] };
-        let assessment = graph.assess_independence_detailed("obs-001", "obs-002").expect("assessment");
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
         let receipt = IndependenceVerificationReceipt::from_assessment(&assessment);
 
         let mut changed = graph.clone();
         changed.observations[0].provenance.source.platform_id = Some("platform-9".into());
         assert_eq!(receipt.verify_against_graph(&changed), Ok(false));
-        assert_eq!(receipt.verify_against_graph_detailed(&changed), Ok(ReceiptVerificationOutcome::GraphMismatch));
+        assert_eq!(
+            receipt.verify_against_graph_detailed(&changed),
+            Ok(ReceiptVerificationOutcome::GraphMismatch)
+        );
     }
 
     #[test]
@@ -2741,13 +3015,21 @@ mod tests {
         let mut second = fixture();
         second.id = "obs-002".into();
         second.provenance.source.sensor_id = "camera-2".into();
-        let graph = ObservationGraph { observations: vec![fixture(), second], relations: vec![] };
-        let assessment = graph.assess_independence_detailed("obs-001", "obs-002").expect("assessment");
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
         let mut receipt = IndependenceVerificationReceipt::from_assessment(&assessment);
         receipt.verifier_version = "observation-fabric-independence-v0";
         assert!(!receipt.verify_integrity());
         assert_eq!(receipt.verify_against_graph(&graph), Ok(false));
-        assert_eq!(receipt.verify_against_graph_detailed(&graph), Ok(ReceiptVerificationOutcome::UnsupportedVerifierVersion));
+        assert_eq!(
+            receipt.verify_against_graph_detailed(&graph),
+            Ok(ReceiptVerificationOutcome::UnsupportedVerifierVersion)
+        );
     }
     #[test]
     fn detailed_independence_fingerprint_is_not_debug_format_dependent() {
@@ -2770,7 +3052,10 @@ mod tests {
         write_canonical_string(&mut expected, "observation-fabric-independence-v2");
         write_canonical_independence(&mut expected, &EvidenceIndependence::VerifiedIndependent);
         write_canonical_independence_basis(&mut expected, &IndependenceBasis::NoSharedProvenance);
-        assert_eq!(assessment.assessment_fingerprint, expected.finalize().to_hex().to_string());
+        assert_eq!(
+            assessment.assessment_fingerprint,
+            expected.finalize().to_hex().to_string()
+        );
         assert!(assessment.verify_fingerprint());
     }
 
@@ -2784,10 +3069,11 @@ mod tests {
         };
         assert_eq!(
             graph.assess_independence_detailed("obs-001", "missing"),
-            Err(ObservationValidationError::MissingParentObservation("missing".into()))
+            Err(ObservationValidationError::MissingParentObservation(
+                "missing".into()
+            ))
         );
     }
-
 
     #[test]
     fn graph_assesses_shared_ancestor_as_non_independent() {
@@ -2846,7 +3132,9 @@ mod tests {
         };
         assert_eq!(
             graph.validate(),
-            Err(ObservationValidationError::MissingRelationEndpoint("missing".into()))
+            Err(ObservationValidationError::MissingRelationEndpoint(
+                "missing".into()
+            ))
         );
     }
 
@@ -2870,7 +3158,10 @@ mod tests {
             output_observation_ids: vec!["output".into()],
             derivations: Vec::new(),
         });
-        let graph = ObservationGraph { observations: vec![input, output], relations: vec![] };
+        let graph = ObservationGraph {
+            observations: vec![input, output],
+            relations: vec![],
+        };
         assert!(graph.validate().is_ok());
     }
 
@@ -2947,7 +3238,9 @@ mod tests {
         };
         assert_eq!(
             graph.validate(),
-            Err(ObservationValidationError::InconsistentProcessingActivity("run-001".into()))
+            Err(ObservationValidationError::InconsistentProcessingActivity(
+                "run-001".into()
+            ))
         );
     }
 
@@ -3003,7 +3296,9 @@ mod tests {
                 relations: vec![],
             }
             .validate(),
-            Err(ObservationValidationError::MissingActivityOutput("missing-output".into()))
+            Err(ObservationValidationError::MissingActivityOutput(
+                "missing-output".into()
+            ))
         );
     }
 
@@ -3036,7 +3331,9 @@ mod tests {
         };
         assert_eq!(
             graph.validate(),
-            Err(ObservationValidationError::ActivityOutputMissingProducer("output-b".into()))
+            Err(ObservationValidationError::ActivityOutputMissingProducer(
+                "output-b".into()
+            ))
         );
     }
 
@@ -3057,10 +3354,15 @@ mod tests {
             output_observation_ids: vec!["output".into()],
             derivations: Vec::new(),
         });
-        let graph = ObservationGraph { observations: vec![output], relations: vec![] };
+        let graph = ObservationGraph {
+            observations: vec![output],
+            relations: vec![],
+        };
         assert_eq!(
             graph.validate(),
-            Err(ObservationValidationError::MissingActivityInput("input".into()))
+            Err(ObservationValidationError::MissingActivityInput(
+                "input".into()
+            ))
         );
     }
 
@@ -3086,7 +3388,9 @@ mod tests {
         };
         assert_eq!(
             graph.validate(),
-            Err(ObservationValidationError::MissingActivityInput("missing-input".into()))
+            Err(ObservationValidationError::MissingActivityInput(
+                "missing-input".into()
+            ))
         );
     }
 
@@ -3111,7 +3415,9 @@ mod tests {
         };
         assert_eq!(
             graph.validate(),
-            Err(ObservationValidationError::ActivityOutputMissingSelf("obs-001".into()))
+            Err(ObservationValidationError::ActivityOutputMissingSelf(
+                "obs-001".into()
+            ))
         );
     }
 
@@ -3142,3 +3448,4 @@ mod tests {
         assert_eq!(original, decoded);
     }
 }
+
