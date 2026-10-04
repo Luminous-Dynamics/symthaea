@@ -830,7 +830,15 @@ impl HdcOntologyCodebook {
             receiver_manifest,
             policy,
         )?;
-        let interlingua = compare_graphs(expected, &decoded.graph)?;
+        // The receiver is allowed to render a stable predicate with a different
+        // local/lexical label. Structural metrics at this identity-aware layer
+        // therefore compare the stable ontology identity + topology, not the
+        // receiver's local spelling.
+        let expected_identity_graph =
+            identity_normalized_graph(expected, source_manifest)?;
+        let observed_identity_graph =
+            identity_normalized_graph(&decoded.graph, receiver_manifest)?;
+        let interlingua = compare_graphs(&expected_identity_graph, &observed_identity_graph)?;
         let concept_identity_exact = decoded.concept_ids_by_node == *expected_concept_ids;
         let mut observed_relation_ids = decoded.relation_ids_by_edge.clone();
         observed_relation_ids.sort();
@@ -1059,6 +1067,65 @@ fn stable_graph_signature(
         relation_ids,
         edges,
     })
+}
+
+fn identity_normalized_graph(
+    graph: &GroundedConceptGraph,
+    manifest: &HdcOntologyManifest,
+) -> Result<GroundedConceptGraph, String> {
+    validate_manifest(manifest)?;
+    let mut node_to_concept = BTreeMap::new();
+    let mut nodes = Vec::with_capacity(graph.nodes.len());
+
+    for node in &graph.nodes {
+        let binding = manifest
+            .node_binding(&node.id)
+            .ok_or_else(|| format!("manifest lacks node identity binding: {}", node.id))?;
+        if binding.kind != node.kind {
+            return Err(format!(
+                "manifest kind mismatch for node {}: expected {:?}, got {:?}",
+                node.id, node.kind, binding.kind
+            ));
+        }
+        node_to_concept.insert(node.id.clone(), binding.concept_id.clone());
+        nodes.push(ConceptNode {
+            id: binding.concept_id.clone(),
+            kind: node.kind.clone(),
+            label: None,
+            grounded_by: node.grounded_by.clone(),
+            confidence: node.confidence,
+        });
+    }
+
+    let mut edges = Vec::with_capacity(graph.edges.len());
+    for edge in &graph.edges {
+        let source = node_to_concept
+            .get(&edge.source)
+            .cloned()
+            .ok_or_else(|| format!("missing stable source node: {}", edge.source))?;
+        let target = node_to_concept
+            .get(&edge.target)
+            .cloned()
+            .ok_or_else(|| format!("missing stable target node: {}", edge.target))?;
+        let relation = manifest
+            .relation_id(&edge.relation)
+            .ok_or_else(|| {
+                format!(
+                    "manifest lacks relation identity binding: {}",
+                    edge.relation
+                )
+            })?
+            .to_string();
+        edges.push(ConceptEdge {
+            source,
+            relation,
+            target,
+            evidence_ids: edge.evidence_ids.clone(),
+            confidence: edge.confidence,
+        });
+    }
+
+    Ok(GroundedConceptGraph { nodes, edges })
 }
 
 fn validate_manifest(manifest: &HdcOntologyManifest) -> Result<(), String> {
@@ -1892,4 +1959,36 @@ mod tests {
             )
             .is_err());
     }
+    #[test]
+    fn identity_metrics_ignore_receiver_local_relation_label() {
+        let source = GroundedConceptGraph {
+            nodes: vec![
+                ConceptNode { id: "src-a".into(), kind: ConceptKind::Agent, label: Some("sender".into()), grounded_by: vec!["g-a".into()], confidence: 1.0 },
+                ConceptNode { id: "src-b".into(), kind: ConceptKind::Object, label: Some("target".into()), grounded_by: vec!["g-b".into()], confidence: 1.0 },
+            ],
+            edges: vec![ConceptEdge {
+                source: "src-a".into(), relation: "commence".into(), target: "src-b".into(), evidence_ids: vec![], confidence: 1.0,
+            }],
+        };
+        let receiver = GroundedConceptGraph {
+            nodes: vec![
+                ConceptNode { id: "rx-a".into(), kind: ConceptKind::Agent, label: Some("sender".into()), grounded_by: vec!["g-a".into()], confidence: 1.0 },
+                ConceptNode { id: "rx-b".into(), kind: ConceptKind::Object, label: Some("target".into()), grounded_by: vec!["g-b".into()], confidence: 1.0 },
+            ],
+            edges: vec![ConceptEdge {
+                source: "rx-a".into(), relation: "initiates".into(), target: "rx-b".into(), evidence_ids: vec![], confidence: 1.0,
+            }],
+        };
+        let mut source_manifest = manifest_for_graph(&source, "commence", "relation:initiates");
+        let mut receiver_manifest = manifest_for_graph(&receiver, "initiates", "relation:initiates");
+        source_manifest.relations[0].local_relation = "commence".into();
+        receiver_manifest.relations[0].local_relation = "initiates".into();
+        let normalized_source = identity_normalized_graph(&source, &source_manifest).unwrap();
+        let normalized_receiver = identity_normalized_graph(&receiver, &receiver_manifest).unwrap();
+        let metrics = compare_graphs(&normalized_source, &normalized_receiver).unwrap();
+        assert!(metrics.structural_equivalence);
+        assert_eq!(metrics.node_precision, 1.0);
+        assert_eq!(metrics.edge_recall, 1.0);
+    }
+
 }
