@@ -40,6 +40,8 @@ Consumers MUST NOT assume:
 
 A resolver may instead return a durable database revision, transparency-log position, content-addressed identifier, or another stable identifier whose semantics are documented by that resolver.
 
+An empty or whitespace-only snapshot value is invalid resolver metadata. If no durable snapshot identifier is available, the resolver MUST return `None) rather than an empty identifier.
+
 ### 3. Scope should match the evidence being asserted
 
 Where a resolver can provide it, `snapshot_fingerprint_for(method)` SHOULD identify the state relevant to the requested verification method rather than unrelated registry state.
