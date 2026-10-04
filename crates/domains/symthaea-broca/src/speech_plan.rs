@@ -139,8 +139,8 @@ impl SpeechPlan {
         let confidence = readout.confidence.clamp(0.0, 1.0);
         let warmth = channels.warmth().clamp(0.0, 1.0);
         let arousal = channels.arousal().clamp(0.0, 1.0);
-        let social_context = channels.channels.get(22).copied().unwrap_or(0.5).clamp(0.0, 1.0);
-        let time_pressure = channels.channels.get(20).copied().unwrap_or(0.0).clamp(0.0, 1.0);
+        let social_context = channels.social_context().clamp(0.0, 1.0);
+        let time_pressure = channels.time_pressure().clamp(0.0, 1.0);
 
         let prosody = derive_prosody(
             &intent,
