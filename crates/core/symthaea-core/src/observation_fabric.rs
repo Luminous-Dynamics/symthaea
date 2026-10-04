@@ -1381,17 +1381,17 @@ impl ObservationGraph {
         ))
     }
 
-    /// Compute the deterministic identity of the graph state relevant to the
-    /// current bounded independence verifier.
+    /// Return canonical bytes for the graph state relevant to the current
+    /// bounded independence verifier.
     ///
-    /// This is intentionally a **verification-scope fingerprint**, not a fingerprint
-    /// of every field in the ObservationGraph. It commits exactly the provenance
-    /// projection used by assess_independence_detailed, so callers can record which
-    /// relevant graph state was used without implying that unrelated graph fields were
-    /// evaluated. It is state identity, not freshness or a truth claim.
-    pub fn independence_verification_scope_fingerprint(
+    /// These bytes are the exact preimage used by
+    /// independence_verification_scope_fingerprint. They are intentionally not
+    /// a serialization of the entire ObservationGraph: only the verifier-relevant
+    /// provenance projection is included. The bytes establish state identity for
+    /// this verifier, not freshness or substantive truth.
+    pub fn independence_verification_scope_canonical_bytes(
         &self,
-    ) -> Result<String, ObservationValidationError> {
+    ) -> Result<Vec<u8>, ObservationValidationError> {
         self.validate()?;
         let mut examined_observation_ids = self
             .observations
@@ -1404,7 +1404,22 @@ impl ObservationGraph {
             .iter()
             .map(|observation| (observation.id.as_str(), observation))
             .collect::<HashMap<_, _>>();
-        self.compute_independence_scope_fingerprint(&by_id, &examined_observation_ids)
+        self.compute_independence_scope_canonical_bytes(&by_id, &examined_observation_ids)
+    }
+
+    /// Compute the deterministic identity of the graph state relevant to the
+    /// current bounded independence verifier.
+    ///
+    /// This is intentionally a **verification-scope fingerprint**, not a fingerprint
+    /// of every field in the ObservationGraph. It commits exactly the provenance
+    /// projection used by assess_independence_detailed, so callers can record which
+    /// relevant graph state was used without implying that unrelated graph fields were
+    /// evaluated. It is state identity, not freshness or a truth claim.
+    pub fn independence_verification_scope_fingerprint(
+        &self,
+    ) -> Result<String, ObservationValidationError> {
+        let bytes = self.independence_verification_scope_canonical_bytes()?;
+        Ok(blake3::hash(&bytes).to_hex().to_string())
     }
     /// Recompute the provenance-scope commitment for an existing assessment.
     ///
@@ -1434,54 +1449,63 @@ impl ObservationGraph {
         Ok(expected == assessment.examined_scope_fingerprint)
     }
 
+    fn compute_independence_scope_canonical_bytes(
+        &self,
+        by_id: &HashMap<&str, &Observation>,
+        examined_observation_ids: &[String],
+    ) -> Result<Vec<u8>, ObservationValidationError> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea:observation-independence-scope:v1\n");
+        bytes.extend_from_slice(&(examined_observation_ids.len() as u64).to_be_bytes());
+        for observation_id in examined_observation_ids {
+            write_canonical_string_bytes(&mut bytes, observation_id);
+            let observation = by_id.get(observation_id.as_str()).ok_or_else(|| {
+                ObservationValidationError::MissingRelationEndpoint(observation_id.clone())
+            })?;
+            write_canonical_string_bytes(&mut bytes, &observation.id);
+            write_canonical_string_bytes(&mut bytes, &observation.provenance.source.sensor_id);
+            write_canonical_provenance_coverage_bytes(&mut bytes, &observation.provenance.coverage);
+            if let Some(platform_id) = &observation.provenance.source.platform_id {
+                bytes.push(1);
+                write_canonical_string_bytes(&mut bytes, platform_id);
+            } else {
+                bytes.push(0);
+            }
+            let mut parent_ids = observation.provenance.parent_observation_ids.clone();
+            parent_ids.sort();
+            bytes.extend_from_slice(&(parent_ids.len() as u64).to_be_bytes());
+            for parent_id in parent_ids {
+                write_canonical_string_bytes(&mut bytes, &parent_id);
+            }
+            if let Some(activity) = &observation.provenance.processing_activity {
+                bytes.push(1);
+                write_canonical_string_bytes(&mut bytes, &activity.activity_id);
+                write_canonical_string_bytes(
+                    &mut bytes,
+                    activity.execution_fingerprint.as_deref().unwrap_or(""),
+                );
+            } else {
+                bytes.push(0);
+            }
+            if let Some(asset) = &observation.asset {
+                bytes.push(1);
+                write_canonical_string_bytes(&mut bytes, &asset.hash_algorithm);
+                write_canonical_string_bytes(&mut bytes, &asset.content_hash);
+            } else {
+                bytes.push(0);
+            }
+        }
+        Ok(bytes)
+    }
+
     fn compute_independence_scope_fingerprint(
         &self,
         by_id: &HashMap<&str, &Observation>,
         examined_observation_ids: &[String],
     ) -> Result<String, ObservationValidationError> {
-        let mut scope_hasher = blake3::Hasher::new();
-        scope_hasher.update(b"symthaea:observation-independence-scope:v1\n");
-        write_canonical_string_vec(&mut scope_hasher, examined_observation_ids);
-        for observation_id in examined_observation_ids {
-            let observation = by_id.get(observation_id.as_str()).ok_or_else(|| {
-                ObservationValidationError::MissingRelationEndpoint(observation_id.clone())
-            })?;
-            write_canonical_string(&mut scope_hasher, &observation.id);
-            write_canonical_string(&mut scope_hasher, &observation.provenance.source.sensor_id);
-            write_canonical_provenance_coverage(
-                &mut scope_hasher,
-                &observation.provenance.coverage,
-            );
-            if let Some(platform_id) = &observation.provenance.source.platform_id {
-                scope_hasher.update(&[1]);
-                write_canonical_string(&mut scope_hasher, platform_id);
-            } else {
-                scope_hasher.update(&[0]);
-            }
-            let mut parent_ids = observation.provenance.parent_observation_ids.clone();
-            parent_ids.sort();
-            write_canonical_string_vec(&mut scope_hasher, &parent_ids);
-            if let Some(activity) = &observation.provenance.processing_activity {
-                scope_hasher.update(&[1]);
-                write_canonical_string(&mut scope_hasher, &activity.activity_id);
-                write_canonical_string(
-                    &mut scope_hasher,
-                    activity.execution_fingerprint.as_deref().unwrap_or(""),
-                );
-            } else {
-                scope_hasher.update(&[0]);
-            }
-            if let Some(asset) = &observation.asset {
-                scope_hasher.update(&[1]);
-                write_canonical_string(&mut scope_hasher, &asset.hash_algorithm);
-                write_canonical_string(&mut scope_hasher, &asset.content_hash);
-            } else {
-                scope_hasher.update(&[0]);
-            }
-        }
-        Ok(scope_hasher.finalize().to_hex().to_string())
+        let bytes = self.compute_independence_scope_canonical_bytes(by_id, examined_observation_ids)?;
+        Ok(blake3::hash(&bytes).to_hex().to_string())
     }
-
     /// Assess whether two observations have independent provenance within this
     /// closed-world graph. The returned classification is retained for callers
     /// that only need the legacy enum; use assess_independence_detailed when
