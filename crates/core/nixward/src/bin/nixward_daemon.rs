@@ -946,6 +946,7 @@ impl DaemonState {
         let installed = runtime
             .create_pending_request(
                 intent,
+                command,
                 displayed_action,
                 "same-uid-process-v1",
                 created_at,
