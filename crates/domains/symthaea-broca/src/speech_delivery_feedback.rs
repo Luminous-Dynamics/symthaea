@@ -138,7 +138,19 @@ impl SpeechDeliveryReceipt {
             error,
         }
     }
-}
+
+
+    pub fn validate_against_plan(
+        &self,
+        plan: &SpeechPlan,
+    ) -> Result<(), SpeechDeliveryReceiptError> {
+        self.validate()?;
+        let expected_target = SpeechDeliveryTarget::from_plan(plan);
+        if self.plan_surface != plan.grounding_surface() || self.target != expected_target {
+            return Err(SpeechDeliveryReceiptError::PlanMismatch);
+        }
+        Ok(())
+    }}
 
 impl SpeechDeliveryTarget {
     pub fn from_plan(plan: &SpeechPlan) -> Self {
