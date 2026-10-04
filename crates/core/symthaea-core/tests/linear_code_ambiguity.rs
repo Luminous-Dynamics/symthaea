@@ -1632,6 +1632,7 @@ fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
     // pair as an independent/direct-sum recovery problem.
     assert!(recover_independent_bound(&target, &[&left, &overlapping]).is_none());
 }
+
 #[test]
 fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
     let repeated = RandomLinearCode::from_basis(vec![
@@ -1679,7 +1680,9 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
     let mut tampered = fiber.clone();
     tampered.cardinality = ExactPowerOfTwo::new(algebra.kernel_dimension - 1);
     assert!(tampered.iter_bounded(expected).is_none());
-    assert!(tampered.coefficients_for_mask(&[false, false, false, false]).is_none());
+    assert!(tampered
+        .coefficients_for_mask(&[false, false, false, false])
+        .is_none());
     assert!(fiber
         .coefficients_for_mask(&[false, false, false])
         .is_none());
