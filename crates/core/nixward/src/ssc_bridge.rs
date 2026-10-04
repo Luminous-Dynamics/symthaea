@@ -56,6 +56,8 @@ pub enum SscObservationError {
     InvalidRealizationPath,
     #[error("NixOS generation observation contains a duplicate generation ordinal")]
     DuplicateGenerationNumber,
+    #[error("NixOS generation observations are not in canonical ordinal order")]
+    NonCanonicalGenerationOrder,
     #[error("NixOS generation marked current does not match /run/current-system")]
     CurrentGenerationRealizationMismatch,
     #[error("NixOS system profile does not identify an exact generation")]
@@ -110,6 +112,9 @@ impl NixSystemObservation {
         {
             return Err(SscObservationError::MissingRealization);
         }
+        validate_realization_path(&self.system_profile_realization)?;
+        validate_realization_path(&self.current_system_realization)?;
+        validate_realization_path(&self.booted_system_realization)?;
 
         let mut previous_number = None;
         for entry in &self.generations {
@@ -119,8 +124,14 @@ impl NixSystemObservation {
             if entry.realization.is_empty() {
                 return Err(SscObservationError::MissingRealization);
             }
-            if previous_number == Some(entry.number) {
-                return Err(SscObservationError::DuplicateGenerationNumber);
+            validate_realization_path(&entry.realization)?;
+            if let Some(previous) = previous_number {
+                if entry.number == previous {
+                    return Err(SscObservationError::DuplicateGenerationNumber);
+                }
+                if entry.number < previous {
+                    return Err(SscObservationError::NonCanonicalGenerationOrder);
+                }
             }
             previous_number = Some(entry.number);
         }
@@ -386,6 +397,95 @@ mod tests {
             observation.validate().expect_err("missing realization"),
             SscObservationError::MissingRealization
         );
+    }
+
+    #[test]
+    fn observation_validation_rejects_non_store_realization_fields() {
+        let base = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        for (name, mutate) in [
+            ("system_profile_realization", |observation: &mut NixSystemObservation| {
+                observation.system_profile_realization = "/etc/nixos".into();
+            }),
+            ("current_system_realization", |observation: &mut NixSystemObservation| {
+                observation.current_system_realization = "/etc/nixos".into();
+            }),
+            ("booted_system_realization", |observation: &mut NixSystemObservation| {
+                observation.booted_system_realization = "/etc/nixos".into();
+            }),
+            ("generation_realization", |observation: &mut NixSystemObservation| {
+                observation.generations[0].realization = "/etc/nixos".into();
+            }),
+        ] {
+            let mut observation = base.clone();
+            mutate(&mut observation);
+            assert_eq!(
+                observation.validate().expect_err(name),
+                SscObservationError::InvalidRealizationPath,
+                "{name} must remain a concrete Nix store realization"
+            );
+        }
+    }
+
+    #[test]
+    fn observation_validation_rejects_noncanonical_generation_order() {
+        let observation = NixSystemObservation {
+            generations: vec![
+                NixGenerationObservation {
+                    number: 43,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: true,
+                },
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/bbb-nixos-system-host".into(),
+                    current: false,
+                },
+            ],
+            system_profile_generation: 43,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+
+        assert_eq!(
+            observation.validate().expect_err("noncanonical order"),
+            SscObservationError::NonCanonicalGenerationOrder
+        );
+    }
+
+    #[test]
+    fn observation_validation_accepts_canonical_generation_order() {
+        let observation = NixSystemObservation {
+            generations: vec![
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: false,
+                },
+                NixGenerationObservation {
+                    number: 43,
+                    realization: "/nix/store/bbb-nixos-system-host".into(),
+                    current: true,
+                },
+            ],
+            system_profile_generation: 43,
+            system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
+            current_system_realization: "/nix/store/bbb-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/bbb-nixos-system-host".into(),
+        };
+
+        assert!(observation.validate().is_ok());
     }
 
     #[test]
