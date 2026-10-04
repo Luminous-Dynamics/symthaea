@@ -367,7 +367,8 @@ pub fn App() -> impl IntoView {
         let renderer = Rc::clone(&webgpu_renderer);
         let started = Rc::clone(&webgpu_init_started);
         Effect::new(move |_| {
-            if *started.borrow() {
+            let ready = webgpu_ready.get();
+            if ready || *started.borrow() {
                 return;
             }
             let Some(canvas) = webgpu_canvas.get() else {
@@ -395,7 +396,8 @@ pub fn App() -> impl IntoView {
         let renderer = Rc::clone(&movie_webgpu_renderer);
         let started = Rc::clone(&movie_webgpu_init_started);
         Effect::new(move |_| {
-            if *started.borrow() {
+            let ready = movie_webgpu_ready.get();
+            if ready || *started.borrow() {
                 return;
             }
             let Some(canvas) = movie_webgpu_canvas.get() else {
@@ -465,6 +467,8 @@ pub fn App() -> impl IntoView {
                     .as_ref()
                     .is_some_and(WebGpuRenderer::is_device_lost);
                 if lost {
+                    *renderer.borrow_mut() = None;
+                    *webgpu_init_started.borrow_mut() = false;
                     webgpu_ready.set(false);
                     break;
                 }
@@ -488,6 +492,8 @@ pub fn App() -> impl IntoView {
                         .as_ref()
                         .is_some_and(WebGpuMovieRenderer::is_device_lost);
                     if lost {
+                        *renderer.borrow_mut() = None;
+                        *movie_webgpu_init_started.borrow_mut() = false;
                         movie_webgpu_ready.set(false);
                         break;
                     }
