@@ -941,6 +941,25 @@ mod tests {
     }
 
     #[test]
+    fn sub_micron_boundary_drift_is_not_erased_by_identity_quantization() {
+        let interface = interface(PortId(10), 7);
+        let mesh = TriangleMesh {
+            vertices: vec![
+                [1.0004, 0.0, 0.0],
+                [0.0, 1.0004, 0.0],
+                [-1.0004, 0.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        };
+
+        assert_eq!(
+            select_boundary_patch(&interface, &mesh, 0.0001),
+            Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface)
+        );
+    }
+
+    #[test]
     fn binding_records_boundary_matching_tolerance() {
         let interface = interface(PortId(10), 7);
         let candidate = candidate();
