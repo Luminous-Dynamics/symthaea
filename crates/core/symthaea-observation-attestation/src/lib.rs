@@ -816,6 +816,7 @@ impl ReceiptAttestationVerificationReport {
     /// verification contract.
     pub fn matches_attestation_envelope(&self, envelope: &ReceiptAttestationEnvelope) -> bool {
         self.has_consistent_identity_bindings()
+            && envelope.validate().is_ok()
             && self.verifier_version == VERIFIER_VERSION
             && self.attestation_payload_fingerprint == envelope.payload_fingerprint()
             && self.receipt_fingerprint == envelope.receipt_fingerprint
@@ -2598,6 +2599,12 @@ mod tests {
         inconsistent.policy_inputs.cryptosuite = "attacker-cryptosuite";
         inconsistent.policy_fingerprint = inconsistent.policy_inputs.fingerprint();
         assert!(!inconsistent.matches_attestation_envelope(&envelope));
+
+        let mut invalid_envelope = envelope.clone();
+        invalid_envelope.attester_id.clear();
+        let mut forged_match = report.clone();
+        forged_match.attestation_payload_fingerprint = invalid_envelope.payload_fingerprint();
+        assert!(!forged_match.matches_attestation_envelope(&invalid_envelope));
     }
 
     #[test]
