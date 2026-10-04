@@ -95,21 +95,13 @@ fn serialize_resolution(resolution: &IgnoranceResolution) -> String {
 
     let method = format!("{:?}", resolution.method);
     let answer = resolution.answer.as_deref().unwrap_or("");
-    let resolved_at = resolution
-        .resolved_at
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-        .to_string();
-    for value in [
-        method.as_str(),
-        answer,
-        resolution.confidence.to_string().as_str(),
-        resolution.source.as_str(),
-        resolved_at.as_str(),
-    ] {
-        push_len_prefixed(&mut output, value);
-    }
+    let confidence = resolution.confidence.to_string();
+    let source = resolution.source.as_str();
+    push_len_prefixed(&mut output, method.as_str());
+    push_len_prefixed(&mut output, answer);
+    push_len_prefixed(&mut output, confidence.as_str());
+    push_len_prefixed(&mut output, source);
+    push_len_prefixed(&mut output, resolved_at.as_str());
     output
 }
 
