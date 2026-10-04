@@ -11,8 +11,10 @@ rather than weakening the global closed-solid rule.
 
 closed() accepts only a mesh with zero boundary edges.
 
-with_allowed_open_port(port) permits boundary edges only when every open edge can be
-associated with that port anchor, using the anchor radius plus an explicit tolerance.
+with_allowed_open_port(port) permits a port to explain observed boundary edges.
+with_required_open_port(port) additionally requires at least one observed boundary
+edge to be associated with that port anchor. Both use the anchor radius plus an explicit
+tolerance.
 
 The evaluator reports:
 
