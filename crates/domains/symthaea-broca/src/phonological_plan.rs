@@ -198,6 +198,18 @@ impl PhonologicalPlan {
 
     /// Validate the whole persisted/deserialized object, including cross-field invariants.
     pub fn validate(&self) -> Result<(), PhonologicalPlanError> {
+        if self.version != PHONOLOGICAL_PLAN_VERSION {
+            return Err(PhonologicalPlanError::InvalidVersion);
+        }
+        if self.source_intent.trim().is_empty() {
+            return Err(PhonologicalPlanError::EmptySourceIntent);
+        }
+        if !self.rate.is_finite() || !(0.55..=1.35).contains(&self.rate) {
+            return Err(PhonologicalPlanError::InvalidRate);
+        }
+        if !self.pause_weight.is_finite() || !(0.0..=1.0).contains(&self.pause_weight) {
+            return Err(PhonologicalPlanError::InvalidPauseWeight);
+        }
         validate_binding_status(&self.segments, self.content_binding)?;
 
         match self.content_binding {
@@ -269,6 +281,10 @@ impl PhonologicalPlan {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PhonologicalPlanError {
+    InvalidVersion,
+    EmptySourceIntent,
+    InvalidRate,
+    InvalidPauseWeight,
     EmptySegmentSymbol { index: usize },
     NonContiguousSyllableIndex { expected: usize, found: usize },
     LexicalBindingWithoutSegments,
@@ -283,6 +299,10 @@ pub enum PhonologicalPlanError {
 impl std::fmt::Display for PhonologicalPlanError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::InvalidVersion => write!(f, "phonological plan version is unsupported"),
+            Self::EmptySourceIntent => write!(f, "phonological plan source intent must be non-empty"),
+            Self::InvalidRate => write!(f, "phonological plan rate is outside the supported range"),
+            Self::InvalidPauseWeight => write!(f, "phonological plan pause weight is outside [0, 1]"),
             Self::EmptySegmentSymbol { index } => {
                 write!(f, "phoneme slot {index} has an empty symbol")
             }
