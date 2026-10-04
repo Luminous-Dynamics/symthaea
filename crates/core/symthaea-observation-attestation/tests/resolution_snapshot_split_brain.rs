@@ -84,7 +84,6 @@ fn compatibility_snapshot_accessor_can_remain_a_distinct_later_observation() {
     assert_eq!(resolver.snapshot_reads.get(), 1);
 }
 
-
 /// Exercises the trait's compatibility default rather than an atomic resolver override.
 /// A resolver that implements only the legacy accessors must not have a later snapshot
 /// silently paired with the earlier resolution result.
