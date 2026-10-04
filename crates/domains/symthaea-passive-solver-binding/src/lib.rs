@@ -430,7 +430,11 @@ impl BoundaryEdgeKey {
         if a == b {
             return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
         }
-        Ok(Self { a, b: if a <= b { b } else { a } })
+        if a <= b {
+            Ok(Self { a, b })
+        } else {
+            Ok(Self { a: b, b: a })
+        }
     }
 }
 
@@ -1010,6 +1014,15 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn boundary_edge_key_canonicalizes_reversed_endpoints() {
+        let forward = BoundaryEdgeKey::new([0.0, 0.0, 0.0], [1.0, 0.0, 0.0]).unwrap();
+        let reverse = BoundaryEdgeKey::new([1.0, 0.0, 0.0], [0.0, 0.0, 0.0]).unwrap();
+
+        assert_eq!(forward, reverse);
+        assert!(forward.a < forward.b);
+    }
 
     #[test]
     fn boundary_patch_selection_is_rejected_when_edge_is_not_on_candidate() {
