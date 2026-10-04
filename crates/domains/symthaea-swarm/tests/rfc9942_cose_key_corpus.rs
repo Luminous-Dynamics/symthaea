@@ -271,6 +271,27 @@ fn receipt_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
     out
 }
 
+fn receipt_with_large_unprotected_extension(extension_len: usize) -> Vec<u8> {
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof])
+        .expect("fixture VDP must be valid")
+        .to_cbor();
+    let protected = vec![0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01];
+    let extension = vec![0xaa; extension_len];
+
+    let mut unprotected = vec![0xa2, 0x19, 0x01, 0x8c];
+    unprotected.extend_from_slice(&vdp);
+    unprotected.extend_from_slice(&[0x18, 0x1e]);
+    unprotected.extend_from_slice(&bstr_large(&extension));
+
+    let mut out = vec![0xd2, 0x84];
+    out.extend_from_slice(&bstr(&protected));
+    out.extend_from_slice(&unprotected);
+    out.push(0xf6);
+    out.extend_from_slice(&bstr(&[0u8; 64]));
+    out
+}
+
 fn outer_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
     let protected = if protected_extension {
         vec![0xa1, 0x18, 0x1e, 0xa1, 0x41, 0x00, 0x01]
@@ -289,6 +310,32 @@ fn outer_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
     out.push(0xf6);
     out.extend_from_slice(&bstr(&[0u8; 64]));
     out
+}
+
+#[test]
+fn outer_cose_accepts_receipts_collection_above_single_receipt_map_cap() {
+    let receipt_a = receipt_with_large_unprotected_extension(2_100_000);
+    let receipt_b = receipt_with_large_unprotected_extension(2_100_000);
+    assert!(receipt_a.len() < 4 * 1024 * 1024);
+    assert!(receipt_b.len() < 4 * 1024 * 1024);
+
+    let mut receipts = vec![0x82];
+    receipts.extend_from_slice(&bstr_large(&receipt_a));
+    receipts.extend_from_slice(&bstr_large(&receipt_b));
+    assert!(receipts.len() > 4 * 1024 * 1024);
+    assert!(receipts.len() < 33 * 1024 * 1024);
+
+    let mut bytes = vec![0xd2, 0x84];
+    bytes.extend_from_slice(&bstr(&[0xa0]));
+    bytes.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8a]);
+    bytes.extend_from_slice(&receipts);
+    bytes.push(0xf6);
+    bytes.extend_from_slice(&bstr(&[0u8; 64]));
+
+    let parsed = Rfc9942SignatureWithReceipts::from_cbor(&bytes)
+        .expect("outer receipts collection must use the aggregate 33 MiB defensive bound");
+    assert!(parsed.unprotected_receipts().is_some());
+    assert_eq!(parsed.unprotected_receipts().unwrap().len(), 2);
 }
 
 #[test]
