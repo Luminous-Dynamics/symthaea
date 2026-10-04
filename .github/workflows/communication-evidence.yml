@@ -34,6 +34,7 @@ jobs:
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_interlingua_n0 | tee target/communication-evidence/neurosemantic_interlingua_n0.json
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_codec_n0 | tee target/communication-evidence/neurosemantic_hdc_codec_n0.json
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_interlingua_n0 | tee target/communication-evidence/neurosemantic_hdc_interlingua_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_n0.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -68,6 +69,27 @@ jobs:
               assert 0.0 <= metrics["edge_precision"] <= 1.0
               assert 0.0 <= metrics["edge_recall"] <= 1.0
               assert metrics["confidence_mae"] >= 0.0
+
+          grounded_identity = json.loads(Path("target/communication-evidence/neurosemantic_hdc_grounded_identity_n0.json").read_text())
+          assert grounded_identity["benchmark_schema_version"] == 1
+          assert grounded_identity["execution_revision"] != ""
+          assert grounded_identity["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
+          assert grounded_identity["claim_boundary"] == "held_out_stable_identity_retrieval_and_grounding_provenance_separation_only"
+          assert grounded_identity["training_manifest_hash"] != grounded_identity["held_out_manifest_hash"]
+          assert grounded_identity["summary"]["same_codebook_for_held_out_groundings"] is True
+          assert grounded_identity["summary"]["same_hdc_frames_for_same_stable_structure"] is True
+          assert grounded_identity["summary"]["concept_identity_exact"] is True
+          assert grounded_identity["summary"]["relation_identity_exact"] is True
+          assert grounded_identity["summary"]["structurally_equivalent"] is True
+          assert grounded_identity["summary"]["novel_oov_rejected"] is True
+          assert grounded_identity["summary"]["wrong_scheme_rejected"] is True
+          assert grounded_identity["summary"]["ambiguous_receiver_rejected"] is True
+          assert grounded_identity["metrics"]["node_precision"] == 1.0
+          assert grounded_identity["metrics"]["node_recall"] == 1.0
+          assert grounded_identity["metrics"]["edge_precision"] == 1.0
+          assert grounded_identity["metrics"]["edge_recall"] == 1.0
+          assert grounded_identity["metrics"]["concept_identity_exact"] is True
+          assert grounded_identity["metrics"]["relation_identity_exact"] is True
 
           hdc_interlingua = json.loads(Path("target/communication-evidence/neurosemantic_hdc_interlingua_n0.json").read_text())
           assert hdc_interlingua["benchmark_schema_version"] == 1
