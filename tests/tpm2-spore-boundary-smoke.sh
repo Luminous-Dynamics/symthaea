@@ -83,7 +83,7 @@ tpm2_shutdown -c
 kill "$SWTPM_PID" 2>/dev/null || true
 wait "$SWTPM_PID" 2>/dev/null || true
 unset SWTPM_PID
-swtpm socket --tpm2 --tpmstate "dir=$TPM_STATE,fsync" --ctrl "type=tcp,port=$CTRL_PORT" --server "type=tcp,port=$TPM_PORT" --flags not-need-init >/dev/null 2>&1 &
+swtpm socket --tpm2 --tpmstate "dir=$TPM_STATE,fsync" --ctrl "type=tcp,port=$CTRL_PORT,bindaddr=127.0.0.1" --server "type=tcp,port=$TPM_PORT,bindaddr=127.0.0.1" --flags not-need-init >/dev/null 2>&1 &
 SWTPM_PID=$!
 for _ in $(seq 1 50); do
   if TPM2TOOLS_TCTI="swtpm:host=127.0.0.1,port=$TPM_PORT" tpm2_getcap properties-fixed >/dev/null 2>&1; then break; fi
