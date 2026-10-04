@@ -11,6 +11,42 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 pub const HDC_CODEC_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HdcCodecDescriptor {
+    pub schema_version: u16,
+    pub codec_id: String,
+    pub source_representation: String,
+    pub target_representation: String,
+    pub quantizer: String,
+    pub dimension: usize,
+    pub encoder_revision: Option<String>,
+    pub codebook_hash: Option<String>,
+}
+
+impl HdcCodecDescriptor {
+    pub fn v1() -> Self {
+        Self {
+            schema_version: HDC_CODEC_SCHEMA_VERSION,
+            codec_id: "symthaea.hdc.continuous-sign-v1".into(),
+            source_representation: "ContinuousHV:f32".into(),
+            target_representation: "BinaryHV:bits".into(),
+            quantizer: "sign(value > 0)".into(),
+            dimension: HDC_DIMENSION,
+            encoder_revision: None,
+            codebook_hash: None,
+        }
+    }
+
+    pub fn validates(&self) -> bool {
+        self.schema_version == HDC_CODEC_SCHEMA_VERSION
+            && self.codec_id == "symthaea.hdc.continuous-sign-v1"
+            && self.source_representation == "ContinuousHV:f32"
+            && self.target_representation == "BinaryHV:bits"
+            && self.quantizer == "sign(value > 0)"
+            && self.dimension == HDC_DIMENSION
+    }
+}
+
 pub struct HdcQuantizationMetrics {
     pub schema_version: u16,
     pub dimension: usize,
@@ -74,6 +110,37 @@ impl HdcBinaryFrame {
 
         Ok(BinaryHV(bytes))
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HdcBitCorruptionObservation {
+    pub flip_probability: f32,
+    pub seed: u64,
+    pub binary_similarity: f64,
+    pub cosine_similarity_to_original: f64,
+}
+
+pub fn measure_bit_corruption(
+    continuous: &ContinuousHV,
+    flip_probability: f32,
+    seed: u64,
+) -> Result<HdcBitCorruptionObservation, String> {
+    let (binary, _) = quantize_continuous(continuous)?;
+    if !flip_probability.is_finite() || !(0.0..=1.0).contains(&flip_probability) {
+        return Err("flip probability must be finite and within [0, 1]".into());
+    }
+
+    let corrupted = binary.add_noise(flip_probability, seed);
+    let restored = corrupted.to_continuous();
+    let binary_similarity = binary.similarity(&corrupted) as f64;
+    let cosine_similarity_to_original = full_cosine_similarity(continuous, &restored);
+
+    Ok(HdcBitCorruptionObservation {
+        flip_probability,
+        seed,
+        binary_similarity,
+        cosine_similarity_to_original,
+    })
 }
 
 pub fn quantize_continuous(
@@ -166,6 +233,23 @@ fn validate_continuous(continuous: &ContinuousHV) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn codec_descriptor_is_stable_and_valid() {
+        let descriptor = HdcCodecDescriptor::v1();
+        assert!(descriptor.validates());
+        assert_eq!(descriptor.codec_id, "symthaea.hdc.continuous-sign-v1");
+    }
+
+    #[test]
+    fn bit_corruption_measurement_is_deterministic() {
+        let continuous = ContinuousHV::random(HDC_DIMENSION, 123);
+        let a = measure_bit_corruption(&continuous, 0.01, 77).unwrap();
+        let b = measure_bit_corruption(&continuous, 0.01, 77).unwrap();
+        assert_eq!(a, b);
+        assert!((0.0..=1.0).contains(&a.binary_similarity));
+        assert!((-1.0..=1.0).contains(&a.cosine_similarity_to_original));
+    }
 
     #[test]
     fn deterministic_quantization_is_reproducible() {
