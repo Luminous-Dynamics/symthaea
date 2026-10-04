@@ -2123,52 +2123,70 @@ impl<'a> CborReader<'a> {
         self.offset+=1;
         if initial>>5!=2 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
         let ai=initial&0x1f;
-        if ai == 31 {
-            let mut out=Vec::new();
-            let mut chunks=0usize;
-            loop {
+
+        let mut out=Vec::new();
+        let mut chunks=0usize;
+        let indefinite=ai==31;
+        loop {
+            if indefinite {
                 match self.bytes.get(self.offset).copied() {
                     Some(0xff) => {
-                        self.offset += 1;
+                        self.offset+=1;
                         return Ok(out);
                     }
+                    None => return Err(Rfc9162ProofDecodeError::UnexpectedEof),
                     _ => {}
                 }
-                if chunks >= MAX_CBOR_BSTR_CHUNKS {
+                if chunks>=MAX_CBOR_BSTR_CHUNKS {
                     return Err(Rfc9162ProofDecodeError::InvalidStructure);
                 }
-                match self.bytes.get(self.offset).copied() {
-                    Some(byte) if byte >> 5 == 2 && (byte & 0x1f) != 31 => {
-                        let chunk=self.read_bstr_bounded(max_len.saturating_sub(out.len()))?;
-                        if out.len().checked_add(chunk.len()).is_none_or(|n| n > max_len) {
-                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
-                        }
-                        out.extend_from_slice(&chunk);
-                        chunks += 1;
-                    }
-                    _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                let chunk_initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                if chunk_initial>>5!=2 || (chunk_initial&0x1f)==31 {
+                    return Err(Rfc9162ProofDecodeError::InvalidEncoding);
                 }
+                self.offset+=1;
+                let chunk_ai=chunk_initial&0x1f;
+                let n=match chunk_ai {
+                    0..=23=>chunk_ai as u64,
+                    24=>self.read_uint(1,24)?,
+                    25=>self.read_uint(2,256)?,
+                    26=>self.read_uint(4,65_536)?,
+                    27=>self.read_uint(8,4_294_967_296)?,
+                    _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                };
+                let n=usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?;
+                if n>max_len.saturating_sub(out.len()) {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+                if end>self.bytes.len() {
+                    return Err(Rfc9162ProofDecodeError::UnexpectedEof);
+                }
+                out.extend_from_slice(&self.bytes[self.offset..end]);
+                self.offset=end;
+                chunks+=1;
+                continue;
             }
+
+            let n=match ai {
+                0..=23=>ai as u64,
+                24=>self.read_uint(1,24)?,
+                25=>self.read_uint(2,256)?,
+                26=>self.read_uint(4,65_536)?,
+                27=>self.read_uint(8,4_294_967_296)?,
+                _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+            };
+            let n=usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?;
+            if n>max_len{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+            let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+            if end>self.bytes.len() { return Err(Rfc9162ProofDecodeError::UnexpectedEof); }
+            out.extend_from_slice(&self.bytes[self.offset..end]);
+            self.offset=end;
+            return Ok(out);
         }
-        let n=match ai {
-            0..=23=>ai as u64,
-            24=>self.read_uint(1,24)?,
-            25=>self.read_uint(2,256)?,
-            26=>self.read_uint(4,65_536)?,
-            27=>self.read_uint(8,4_294_967_296)?,
-            _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
-        };
-        let n=usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?;
-        if n > max_len {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
-        }
-        let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
-        if end>self.bytes.len() { return Err(Rfc9162ProofDecodeError::UnexpectedEof); }
-        let bytes=self.bytes[self.offset..end].to_vec();
-        self.offset=end;
-        Ok(bytes)
     }
-    fn read_array_len(&mut self)->Result<usize,Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure) }
+
+    fn read_array_len(&mut self)->Result<usize,Rfc9162ProofDecodeError>{(&mut self)->Result<usize,Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure) }
 
     /// Start a fixed-cardinality CBOR array. Indefinite-length arrays are
     /// accepted when the caller already knows exactly how many elements the
@@ -2350,37 +2368,62 @@ impl<'a> CborReader<'a> {
         self.offset+=1;
         if initial>>5!=3{return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
         let ai=initial&0x1f;
-        if ai==31 {
-            let mut out=Vec::new();
-            let mut chunks=0usize;
-            loop {
+
+        let mut out=Vec::new();
+        let mut chunks=0usize;
+        let indefinite=ai==31;
+        loop {
+            if indefinite {
                 if self.bytes.get(self.offset).copied()==Some(0xff) {
                     self.offset+=1;
                     if std::str::from_utf8(&out).is_err(){return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
                     return Ok(out);
                 }
+                if self.bytes.get(self.offset).is_none() {
+                    return Err(Rfc9162ProofDecodeError::UnexpectedEof);
+                }
                 if chunks>=MAX_CBOR_TSTR_CHUNKS {
                     return Err(Rfc9162ProofDecodeError::InvalidStructure);
                 }
-                match self.bytes.get(self.offset).copied() {
-                    Some(byte) if byte>>5==3 && (byte&0x1f)!=31 => {
-                        let chunk=self.read_text_bounded(max_len.saturating_sub(out.len()))?;
-                        if out.len().checked_add(chunk.len()).is_none_or(|n|n>max_len) {
-                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
-                        }
-                        out.extend_from_slice(&chunk);
-                        chunks+=1;
-                    }
-                    _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                let chunk_initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                if chunk_initial>>5!=3 || (chunk_initial&0x1f)==31 {
+                    return Err(Rfc9162ProofDecodeError::InvalidEncoding);
                 }
+                self.offset+=1;
+                let chunk_ai=chunk_initial&0x1f;
+                let n=match chunk_ai {
+                    0..=23=>chunk_ai as u64,
+                    24=>self.read_uint(1,24)?,
+                    25=>self.read_uint(2,256)?,
+                    26=>self.read_uint(4,65_536)?,
+                    27=>self.read_uint(8,4_294_967_296)?,
+                    _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                };
+                let n=usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?;
+                if n>max_len.saturating_sub(out.len()) {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+                if end>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)}
+                let chunk=&self.bytes[self.offset..end];
+                if std::str::from_utf8(chunk).is_err(){return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
+                out.extend_from_slice(chunk);
+                self.offset=end;
+                chunks+=1;
+                continue;
             }
+
+            let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65_536)?,27=>self.read_uint(8,4_294_967_296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)};
+            let n=usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?;
+            if n>max_len{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+            let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+            if end>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)}
+            let bytes=&self.bytes[self.offset..end];
+            if std::str::from_utf8(bytes).is_err(){return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
+            out.extend_from_slice(bytes);
+            self.offset=end;
+            return Ok(out);
         }
-        let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65_536)?,27=>self.read_uint(8,4_294_967_296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)};
-        let n=usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?;
-        if n>max_len{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-        let bytes=self.take(n)?.to_vec();
-        if std::str::from_utf8(&bytes).is_err(){return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
-        Ok(bytes)
     }
     fn finish(self)->Result<(),Rfc9162ProofDecodeError>{ if self.offset==self.bytes.len(){Ok(())}else{Err(Rfc9162ProofDecodeError::TrailingBytes)} }
 
