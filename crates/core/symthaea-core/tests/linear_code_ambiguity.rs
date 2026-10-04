@@ -1829,10 +1829,8 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
 #[test]
 fn affine_fiber_certificate_is_bound_to_target_factor_order_and_basis_presentation() {
     let parent = RandomLinearCode::generate(8, 3, 0xA11CE);
-    let left =
-        RandomLinearCode::from_basis(parent.basis()[..2].to_vec()).expect("left subcode");
-    let right =
-        RandomLinearCode::from_basis(parent.basis()[1..].to_vec()).expect("right subcode");
+    let left = RandomLinearCode::from_basis(parent.basis()[..2].to_vec()).expect("left subcode");
+    let right = RandomLinearCode::from_basis(parent.basis()[1..].to_vec()).expect("right subcode");
     let factors = [&left, &right];
     let target = parent.basis()[0].clone();
     let fiber = factorization_affine_fiber(&target, &factors).expect("original fiber");
