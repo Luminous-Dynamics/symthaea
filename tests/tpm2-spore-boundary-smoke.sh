@@ -15,9 +15,8 @@ NV_INDEX=0x1500016
 NV_AUTH=index
 CHALLENGE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
 CHALLENGE_DIGEST=$(printf '%s' "$CHALLENGE" | sha256sum | cut -d' ' -f1)
-printf 'initial_challenge_sha256=%s\n' "$CHALLENGE_DIGEST" >> "$EVIDENCE_FILE"
-
 printf 'schema=tpm2-spore-boundary-smoke-v2\n' > "$EVIDENCE_FILE"
+printf 'initial_challenge_sha256=%s\n' "$CHALLENGE_DIGEST" >> "$EVIDENCE_FILE"
 printf 'git_head=%s\n' "$(git rev-parse HEAD 2>/dev/null || echo unavailable)" >> "$EVIDENCE_FILE"
 printf 'swtpm=%s\n' "$(swtpm --version 2>/dev/null | head -1 || echo unavailable)" >> "$EVIDENCE_FILE"
 printf 'tpm2_tools=%s\n' "$(tpm2_getcap --version 2>/dev/null | head -1 || echo unavailable)" >> "$EVIDENCE_FILE"
