@@ -301,6 +301,21 @@ mod tests {
     }
 
     #[test]
+    fn matching_trust_policy_allows_verified_anchor() {
+        let signing_key = key(7);
+        let r = receipt();
+        let attestation =
+            FreshnessAnchorVerifierAttestation::sign(r.verifier_reference.clone(), &r, &signing_key);
+        let policy = FreshnessAnchorVerifierTrustPolicy::new(
+            "verifier-1",
+            attestation.verifying_key_fingerprint().unwrap(),
+            "trust-anchors-1",
+        );
+
+        assert!(verify_attested_anchor_with_trust_policy(profile(), r, &attestation, &policy).is_ok());
+    }
+
+    #[test]
     fn receipt_mutation_invalidates_signed_result() {
         let signing_key = key(7);
         let r = receipt();
