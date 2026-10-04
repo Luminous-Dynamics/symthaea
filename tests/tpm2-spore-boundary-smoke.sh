@@ -154,6 +154,23 @@ printf 'nv_certification_contents_binding=verified\\n' >> "$EVIDENCE_FILE"
 printf 'nv_certification_challenge_binding=verified\\n' >> "$EVIDENCE_FILE"
 tpm2_verifysignature -Q -c "$ROOT/ak-after-restart.ctx" -g sha256 -m "$ROOT/nv.attest" -s "$ROOT/nv.sig" -f rsassa
 
+# A correctly signed NV certification can be generated with the old challenge.
+# It remains cryptographically valid, but the freshness boundary must reject it
+# because its qualifying data no longer matches the current verifier challenge.
+tpm2_nvcertify -Q -C "$ROOT/ak-after-restart.ctx" -c "$NV_INDEX" -p "$NV_AUTH" -g sha256 -f plain -s rsassa -o "$ROOT/nv-stale.sig" --attestation "$ROOT/nv-stale.attest" --size 8 --offset 0 -q "$CHALLENGE" "$NV_INDEX"
+tpm2_verifysignature -Q -c "$ROOT/ak-after-restart.ctx" -g sha256 -m "$ROOT/nv-stale.attest" -s "$ROOT/nv-stale.sig" -f rsassa
+tpm2_print -Q -t TPMS_ATTEST "$ROOT/nv-stale.attest" > "$ROOT/nv-stale.yaml"
+STALE_EXTRA_DATA=$(grep -m1 '^extraData:' "$ROOT/nv-stale.yaml" | sed 's/^extraData:[[:space:]]*//')
+[ "$STALE_EXTRA_DATA" = "$CHALLENGE" ] || {
+  echo "ERROR: stale NV_Certify did not preserve its old challenge" >&2
+  exit 1
+}
+[ "$STALE_EXTRA_DATA" != "$POST_RESTART_CHALLENGE" ] || {
+  echo "ERROR: stale NV_Certify unexpectedly matched the fresh challenge" >&2
+  exit 1
+}
+printf 'stale_nv_certification_signature_valid_domain_must_reject=true\\n' >> "$EVIDENCE_FILE"
+
 # The TPM will also certify a partial range. This is a negative domain fixture:
 # the authoritative contract requires the complete eight-byte counter at offset 0.
 tpm2_nvcertify -Q -C "$ROOT/ak-after-restart.ctx" -c "$NV_INDEX" -p "$NV_AUTH" -g sha256 -f plain -s rsassa -o "$ROOT/nv-partial.sig" --attestation "$ROOT/nv-partial.attest" --size 4 --offset 4 -q "$POST_RESTART_CHALLENGE" "$NV_INDEX"
