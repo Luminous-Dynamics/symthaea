@@ -207,6 +207,8 @@ impl HdcSemanticDecodePolicy {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HdcSemanticNegativeControls {
     pub schema_version: u16,
+    /// Number of independent deterministic null draws used for the maxima.
+    pub null_sample_count: usize,
     pub unrelated_node_max_similarity: f64,
     pub unrelated_edge_max_similarity: f64,
     pub true_edge_similarity: f64,
@@ -216,6 +218,7 @@ pub struct HdcSemanticNegativeControls {
 impl HdcSemanticNegativeControls {
     pub fn validates(&self) -> bool {
         self.schema_version == HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION
+            && self.null_sample_count > 0
             && self.unrelated_node_max_similarity.is_finite()
             && self.unrelated_edge_max_similarity.is_finite()
             && self.true_edge_similarity.is_finite()
@@ -520,29 +523,46 @@ impl HdcSemanticCodebook {
         expected: &GroundedConceptGraph,
         seed: u64,
     ) -> Result<HdcSemanticNegativeControls, String> {
+        const NULL_SAMPLE_COUNT: usize = 256;
+
         let edge_bundle = representation.edge_frame.to_binary()?.to_continuous();
-
-        let unrelated = derive_atom_vector(seed, "negative", "unrelated");
-        let unrelated_node_max_similarity = self
-            .nodes
+        let expected_node_keys = canonical_node_atoms(expected)?
             .keys()
-            .map(|key| full_cosine_similarity(&unrelated, &self.node_vector(key).unwrap()))
-            .fold(f64::NEG_INFINITY, f64::max);
+            .cloned()
+            .collect::<Vec<_>>();
 
-        let expected_node_keys = canonical_node_atoms(expected)?.keys().cloned().collect::<Vec<_>>();
-        let unrelated_edge_max_similarity = expected_node_keys
-            .iter()
-            .flat_map(|source| {
-                expected_node_keys.iter().flat_map(move |target| {
-                    self.relations.keys().map(move |relation| {
-                        self.edge_vector(source, relation, target)
-                            .map(|candidate| full_cosine_similarity(&unrelated, &candidate))
+        let mut unrelated_node_max_similarity = f64::NEG_INFINITY;
+        let mut unrelated_edge_max_similarity = f64::NEG_INFINITY;
+
+        for offset in 0..NULL_SAMPLE_COUNT {
+            let unrelated = derive_atom_vector(
+                seed.wrapping_add(offset as u64),
+                "negative",
+                "unrelated",
+            );
+
+            let node_max = self
+                .nodes
+                .keys()
+                .map(|key| full_cosine_similarity(&unrelated, &self.node_vector(key).unwrap()))
+                .fold(f64::NEG_INFINITY, f64::max);
+            unrelated_node_max_similarity = unrelated_node_max_similarity.max(node_max);
+
+            let edge_max = expected_node_keys
+                .iter()
+                .flat_map(|source| {
+                    expected_node_keys.iter().flat_map(move |target| {
+                        self.relations.keys().map(move |relation| {
+                            self.edge_vector(source, relation, target)
+                                .map(|candidate| full_cosine_similarity(&unrelated, &candidate))
+                        })
                     })
                 })
-            })
-            .collect::<Result<Vec<_>, String>>()?
-            .into_iter()
-            .fold(f64::NEG_INFINITY, f64::max);
+                .collect::<Result<Vec<_>, String>>()?
+                .into_iter()
+                .fold(f64::NEG_INFINITY, f64::max);
+            unrelated_edge_max_similarity = unrelated_edge_max_similarity.max(edge_max);
+        }
 
         let first_edge = expected
             .edges
@@ -555,6 +575,7 @@ impl HdcSemanticCodebook {
 
         let controls = HdcSemanticNegativeControls {
             schema_version: HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
+            null_sample_count: NULL_SAMPLE_COUNT,
             unrelated_node_max_similarity,
             unrelated_edge_max_similarity,
             true_edge_similarity: full_cosine_similarity(&edge_bundle, &true_edge),
