@@ -718,7 +718,9 @@ impl LinearCodeDependencyWitness {
             return false;
         }
 
-        let offsets = factor_offsets(factors);
+        let Some(offsets) = factor_offsets(factors) else {
+            return false;
+        };
         let expected_support = factors
             .iter()
             .enumerate()
@@ -1077,7 +1079,7 @@ pub fn factorization_kernel_basis(
     let total_rank = factors
         .iter()
         .try_fold(0usize, |sum, factor| sum.checked_add(factor.rank()))?;
-    let factor_offsets = factor_offsets(factors);
+    let factor_offsets = factor_offsets(factors)?;
     let mut independent_basis = Vec::with_capacity(total_rank);
     let mut independent_indices = Vec::with_capacity(total_rank);
     let mut kernel_basis = Vec::new();
@@ -1175,14 +1177,13 @@ fn checked_factor_dimension_sum(factors: &[&RandomLinearCode]) -> Option<usize> 
         .try_fold(0usize, |sum, factor| sum.checked_add(factor.rank()))
 }
 
-fn factor_offsets(factors: &[&RandomLinearCode]) -> Vec<usize> {
-    debug_assert!(checked_factor_dimension_sum(factors).is_some());
+fn factor_offsets(factors: &[&RandomLinearCode]) -> Option<Vec<usize>> {
     let mut offsets = Vec::with_capacity(factors.len() + 1);
     offsets.push(0);
     for factor in factors {
-        offsets.push(offsets.last().copied().unwrap_or(0) + factor.rank());
+        offsets.push(offsets.last().copied().unwrap_or(0).checked_add(factor.rank())?);
     }
-    offsets
+    Some(offsets)
 }
 /// Construct the full affine-fiber certificate for one representable target.
 ///
