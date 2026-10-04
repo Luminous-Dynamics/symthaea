@@ -27,6 +27,7 @@ jobs:
         run: |
           cargo test -p symthaea-communication
           cargo run -p symthaea-communication --example neurosemantic_n0
+          cargo run -p symthaea-communication --example neurosemantic_interlingua_n0
       - name: Check locked offline worker and Python syntax
         run: |
           uv lock --check --project communication/worker
