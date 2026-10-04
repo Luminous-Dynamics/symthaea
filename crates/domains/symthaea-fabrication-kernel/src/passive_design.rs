@@ -263,6 +263,8 @@ pub enum PassiveViolation {
     FluidMotionNotAllowed,
     DistributedDeformationNotAllowed,
     PhaseChangeNotAllowed,
+    /// The evidence set contains contradictory declarations.
+    EvidenceConflict,
 }
 
 /// Deterministic verification result for a passive-function candidate.
