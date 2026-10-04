@@ -496,7 +496,6 @@ tokio = { workspace = true }
 rayon = { workspace = true }
 
 # Serialization (for consciousness persistence)
-serde = { workspace = true }
 bincode = { workspace = true }
 csv = { workspace = true }
 
