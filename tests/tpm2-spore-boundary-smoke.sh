@@ -40,7 +40,7 @@ export TPM2TOOLS_TCTI="swtpm:host=127.0.0.1,port=$TPM_PORT"
 
 tpm2_startup -c
 tpm2_getcap properties-fixed > "$ROOT/tpm-properties.txt"
-grep -Eq 'TPM2_PT_FAMILY_INDICATOR:.*2\.0|TPM2_PT_FAMILY_INDICATOR:' "$ROOT/tpm-properties.txt"
+grep -A2 'TPM2_PT_FAMILY_INDICATOR:' "$ROOT/tpm-properties.txt" | grep -Fq 'value: "2.0"'
 
 # Define an eight-byte counter and advance it to generation 1.
 tpm2_nvdefine -Q -C o -s 8 -a 'ownerread|authread|authwrite|nt=counter' "$NV_INDEX" -p "$NV_AUTH"
