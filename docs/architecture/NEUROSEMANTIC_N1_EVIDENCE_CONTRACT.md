@@ -45,3 +45,21 @@ Revocation must have a defined effective time and an auditable downstream behavi
 Recent 2026 work demonstrates noninvasive sentence decoding from MEG/EEG in a 35-person healthy-volunteer cohort, including held-out sentences, which makes an N1-style evidence contract technically relevant while still leaving a substantial gap between bounded sentence decoding and unrestricted thought reading.
 
 An October 2026 Nature Neuroscience ethics perspective argues that ethical clarity must keep pace with expanding implantable BCI capability and emphasizes meaningful clinical purpose and long-term obligations to participants.
+
+## Data and inference authorization
+
+Every N1 pipeline stage must declare its data class and inference classes separately from transport sensitivity.
+
+At minimum, records should distinguish:
+
+- raw neural recordings;
+- derived neural features;
+- semantic representations;
+- decoded/reconstructed claims;
+- personalized decoder/model state.
+
+Inference authorization should independently identify potential disclosures such as signal patterns, linguistic content, semantic content, affective state, intent, and identity.
+
+A communication purpose or transport permission must never imply permission for every inference available from the same artifact. Legacy or unknown classifications must fail closed.
+
+This separation is consistent with recent iBCI governance analyses that distinguish these data products and identify conflated consent and limited misuse guardrails as key privacy gaps. (Sandbrink & Young, Communications Medicine, 27 July 2026, DOI 10.1038/s43856-026-01797-y; Young et al., Device, available 11 August 2026, DOI 10.1016/j.device.2026.101271.)
