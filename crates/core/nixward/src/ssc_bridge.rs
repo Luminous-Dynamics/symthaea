@@ -20,9 +20,11 @@ use thiserror::Error;
 pub const NIXOS_SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
 pub const NIXOS_CURRENT_SYSTEM: &str = "/run/current-system";
 pub const NIXOS_BOOTED_SYSTEM: &str = "/run/booted-system";
+pub const NIXOS_MACHINE_ID: &str = "/etc/machine-id";
 
 const NIXOS_OBSERVATION_DIGEST_DOMAIN: &[u8] =
     b"LUMINOUS-DYNAMICS/SSC/NIXOS-OBSERVATION/v1\0";
+const NIXOS_TARGET_ID_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/NIXOS-TARGET-ID/v1\0";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixGenerationObservation {
@@ -33,6 +35,12 @@ pub struct NixGenerationObservation {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixSystemObservation {
+    /// Privacy-preserving stable identity for this NixOS installation.
+    ///
+    /// The raw /etc/machine-id is never carried in the observation. The
+    /// identity is an application-specific BLAKE3 derivation so callers cannot
+    /// silently relabel a live observation as another target.
+    pub target_identity: TargetId,
     pub generations: Vec<NixGenerationObservation>,
     pub system_profile_generation: u64,
     pub system_profile_realization: String,
@@ -72,6 +80,10 @@ pub enum SscObservationError {
     AuthorizedObservationDigestMismatch,
     #[error("NixOS observation could not construct the canonical target adapter: {0}")]
     AdapterConstruction(String),
+    #[error("NixOS /etc/machine-id is missing or empty")]
+    MissingTargetIdentity,
+    #[error("NixOS /etc/machine-id must be exactly 32 lowercase hexadecimal characters")]
+    InvalidMachineId,
 }
 
 impl From<std::io::Error> for SscObservationError {
@@ -90,8 +102,10 @@ impl NixSystemObservation {
     pub fn observe() -> Result<Self, SscObservationError> {
         let current_system_realization = read_realization(Path::new(NIXOS_CURRENT_SYSTEM))?;
         let generations = observe_generations(&current_system_realization)?;
+        let target_identity = read_target_identity(Path::new(NIXOS_MACHINE_ID))?;
 
         let observation = Self {
+            target_identity,
             generations,
             system_profile_generation: read_profile_generation(Path::new(NIXOS_SYSTEM_PROFILE))?,
             system_profile_realization: read_realization(Path::new(NIXOS_SYSTEM_PROFILE))?,
@@ -103,6 +117,9 @@ impl NixSystemObservation {
     }
 
     pub fn validate(&self) -> Result<(), SscObservationError> {
+        if self.target_identity.0.is_empty() || self.target_identity.0.trim().is_empty() {
+            return Err(SscObservationError::MissingTargetIdentity);
+        }
         if self.system_profile_generation == 0 {
             return Err(SscObservationError::InvalidGenerationNumber);
         }
@@ -215,17 +232,15 @@ impl NixSystemObservation {
     /// snapshot but does not authorize or execute any deployment.
     pub fn target_adapter(
         &self,
-        target: impl Into<TargetId>,
         observed_at_ms: u64,
     ) -> Result<NixOSTargetAdapter, SscObservationError> {
-        let snapshot = self.target_snapshot(target, observed_at_ms)?;
+        let snapshot = self.target_snapshot(observed_at_ms)?;
         NixOSTargetAdapter::from_snapshot(snapshot)
             .map_err(|error| SscObservationError::AdapterConstruction(error.to_string()))
     }
 
     pub fn target_snapshot(
         &self,
-        target: impl Into<TargetId>,
         observed_at_ms: u64,
     ) -> Result<TargetSnapshot, SscObservationError> {
         self.validate()?;
@@ -241,7 +256,7 @@ impl NixSystemObservation {
 
         Ok(TargetSnapshot {
             profile: TargetProfile {
-                identity: target.into(),
+                identity: self.target_identity.clone(),
                 platform: "nixos".into(),
                 capabilities: default_nixos_capabilities(),
             },
@@ -260,6 +275,29 @@ impl NixSystemObservation {
             .iter()
             .find(|entry| entry.number == self.system_profile_generation)
     }
+}
+
+fn read_target_identity(path: &Path) -> Result<TargetId, SscObservationError> {
+    let value = std::fs::read_to_string(path)?;
+    target_identity_from_machine_id(value.trim())
+}
+
+fn target_identity_from_machine_id(machine_id: &str) -> Result<TargetId, SscObservationError> {
+    if machine_id.len() != 32
+        || !machine_id
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        return Err(SscObservationError::InvalidMachineId);
+    }
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(NIXOS_TARGET_ID_DOMAIN);
+    hasher.update(machine_id.as_bytes());
+    Ok(TargetId(format!(
+        "nixos-machine:{}",
+        hasher.finalize().to_hex()
+    )))
 }
 
 fn observe_generations(
@@ -347,6 +385,62 @@ fn read_realization(link: &Path) -> Result<String, SscObservationError> {
 mod tests {
     use super::*;
 
+    fn test_target_id() -> TargetId {
+        target_identity_from_machine_id("0123456789abcdef0123456789abcdef").expect("target id")
+    }
+
+    #[test]
+    fn target_identity_derivation_is_stable_and_domain_separated() {
+        let one = target_identity_from_machine_id("0123456789abcdef0123456789abcdef")
+            .expect("target id");
+        let two = target_identity_from_machine_id("0123456789abcdef0123456789abcdef")
+            .expect("target id");
+        let changed =
+            target_identity_from_machine_id("fedcba9876543210fedcba9876543210").expect("target id");
+
+        assert_eq!(one, two);
+        assert_ne!(one, changed);
+        assert!(one.0.starts_with("nixos-machine:"));
+    }
+
+    #[test]
+    fn target_identity_derivation_rejects_noncanonical_machine_id() {
+        for machine_id in [
+            "",
+            "0123456789abcdef0123456789abcde",
+            "0123456789abcdef0123456789abcdef0",
+            "0123456789ABCDEF0123456789abcdef",
+            "0123456789abcdef0123456789abcdeg",
+        ] {
+            assert_eq!(
+                target_identity_from_machine_id(machine_id).expect_err("invalid machine id"),
+                SscObservationError::InvalidMachineId
+            );
+        }
+    }
+
+    #[test]
+    fn observation_validation_requires_target_identity() {
+        let mut observation = NixSystemObservation {
+            target_identity: test_target_id(),
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+        observation.target_identity = TargetId::from("");
+
+        assert_eq!(
+            observation.validate().expect_err("missing target identity"),
+            SscObservationError::MissingTargetIdentity
+        );
+    }
+
     #[test]
     fn generation_link_parser_is_exact() {
         assert_eq!(
@@ -382,6 +476,7 @@ mod tests {
     #[test]
     fn observation_validation_rejects_missing_generation_realization() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 42,
                 realization: String::new(),
@@ -402,6 +497,7 @@ mod tests {
     #[test]
     fn observation_validation_rejects_non_store_realization_fields() {
         let base = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 42,
                 realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -440,6 +536,7 @@ mod tests {
     #[test]
     fn observation_validation_rejects_noncanonical_generation_order() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![
                 NixGenerationObservation {
                     number: 43,
@@ -467,6 +564,7 @@ mod tests {
     #[test]
     fn observation_validation_accepts_canonical_generation_order() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![
                 NixGenerationObservation {
                     number: 42,
@@ -491,6 +589,7 @@ mod tests {
     #[test]
     fn authorized_preflight_rejects_whole_observation_drift() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![
                 NixGenerationObservation {
                     number: 42,
@@ -521,6 +620,7 @@ mod tests {
     #[test]
     fn authorized_preflight_accepts_exact_observed_generation() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![
                 NixGenerationObservation {
                     number: 42,
@@ -534,10 +634,10 @@ mod tests {
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
         let adapter = sovereign_state_compiler_nix::NixOSTargetAdapter::from_snapshot(
-            observation.target_snapshot("host-01", 100).expect("snapshot"),
+            observation.target_snapshot(100).expect("snapshot"),
         )
         .expect("adapter");
-        let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-1", "host-01");
+        let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-1", test_target_id());
         intent.required_resources.insert(
             nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("resource"),
         );
@@ -566,6 +666,7 @@ mod tests {
     #[test]
     fn authorized_preflight_rejects_generation_realization_drift() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 42,
                 realization: "/nix/store/bbb-nixos-system-host".into(),
@@ -592,6 +693,7 @@ mod tests {
     #[test]
     fn authorized_preflight_rejects_generation_ordinal_drift() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 43,
                 realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -617,6 +719,7 @@ mod tests {
 
     fn rollback_authorized_plan_for_testing() -> AuthorizedDeploymentPlan {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 42,
                 realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -628,10 +731,10 @@ mod tests {
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
         let adapter = sovereign_state_compiler_nix::NixOSTargetAdapter::from_snapshot(
-            observation.target_snapshot("host-01", 100).expect("snapshot"),
+            observation.target_snapshot(100).expect("snapshot"),
         )
         .expect("adapter");
-        let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-test", "host-01");
+        let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-test", test_target_id());
         intent.required_capabilities.insert(Capability::Rollback);
         intent.required_resources.insert(
             nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("resource"),
@@ -682,6 +785,7 @@ mod tests {
     #[test]
     fn observation_validation_rejects_zero_generation_number() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 0,
                 realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -702,6 +806,7 @@ mod tests {
     #[test]
     fn observation_validation_rejects_duplicate_generation_numbers() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![
                 NixGenerationObservation {
                     number: 42,
@@ -737,6 +842,7 @@ mod tests {
     #[test]
     fn observation_digest_is_domain_separated() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 42,
                 realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -756,6 +862,7 @@ mod tests {
     #[test]
     fn observation_digest_changes_when_realization_changes() {
         let mut observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 42,
                 realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -777,6 +884,7 @@ mod tests {
     #[test]
     fn observation_validation_requires_current_realization_match() {
         let mut observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 42,
                 realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -800,6 +908,7 @@ mod tests {
     #[test]
     fn observation_validation_rejects_multiple_current_generations() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![
                 NixGenerationObservation {
                     number: 42,
@@ -827,6 +936,7 @@ mod tests {
     #[test]
     fn observation_validation_requires_profile_realization_match() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 42,
                 realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -847,6 +957,7 @@ mod tests {
     #[test]
     fn target_adapter_preserves_exact_observed_snapshot() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 42,
                 realization: "/nix/store/aaa-nixos-system-host".into(),
@@ -857,11 +968,11 @@ mod tests {
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
-        let adapter = observation.target_adapter("host-01", 123).expect("adapter");
+        let adapter = observation.target_adapter(123).expect("adapter");
         let snapshot = adapter.describe_target().expect("snapshot");
 
         assert_eq!(snapshot.profile.platform, "nixos");
-        assert_eq!(snapshot.profile.identity, TargetId::from("host-01"));
+        assert_eq!(snapshot.profile.identity, test_target_id());
         assert_eq!(snapshot.observed_at_ms, 123);
         assert_eq!(snapshot.observation_digest, observation.observation_digest().expect("digest"));
         assert!(snapshot.resources.contains(
@@ -873,6 +984,7 @@ mod tests {
     #[test]
     fn target_snapshot_contains_exact_generation_resources() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![
                 NixGenerationObservation {
                     number: 42,
@@ -892,9 +1004,9 @@ mod tests {
         };
 
         let snapshot = observation
-            .target_snapshot("host-01", 123)
+            .target_snapshot(123)
             .expect("snapshot");
-        assert_eq!(snapshot.profile.identity, TargetId::from("host-01"));
+        assert_eq!(snapshot.profile.identity, test_target_id());
         assert_eq!(snapshot.profile.platform, "nixos");
         assert!(
             snapshot
@@ -921,6 +1033,7 @@ mod tests {
     #[test]
     fn generation_resource_tracks_exact_observed_realization() {
         let observation = NixSystemObservation {
+            target_identity: test_target_id(),
             generations: vec![
                 NixGenerationObservation {
                     number: 42,
