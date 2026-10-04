@@ -1381,6 +1381,31 @@ impl ObservationGraph {
         ))
     }
 
+    /// Compute the deterministic identity of the graph state relevant to the
+    /// current bounded independence verifier.
+    ///
+    /// This is intentionally a **verification-scope fingerprint**, not a fingerprint
+    /// of every field in the ObservationGraph. It commits exactly the provenance
+    /// projection used by assess_independence_detailed, so callers can record which
+    /// relevant graph state was used without implying that unrelated graph fields were
+    /// evaluated. It is state identity, not freshness or a truth claim.
+    pub fn independence_verification_scope_fingerprint(
+        &self,
+    ) -> Result<String, ObservationValidationError> {
+        self.validate()?;
+        let mut examined_observation_ids = self
+            .observations
+            .iter()
+            .map(|observation| observation.id.clone())
+            .collect::<Vec<_>>();
+        examined_observation_ids.sort();
+        let by_id = self
+            .observations
+            .iter()
+            .map(|observation| (observation.id.as_str(), observation))
+            .collect::<HashMap<_, _>>();
+        self.compute_independence_scope_fingerprint(&by_id, &examined_observation_ids)
+    }
     /// Recompute the provenance-scope commitment for an existing assessment.
     ///
     /// This is stronger than the assessment fingerprint check because it
