@@ -146,8 +146,13 @@ fn main() -> Result<(), String> {
             .count() as u32,
     );
 
+    let execution_revision = std::env::var("GITHUB_SHA").unwrap_or_else(|_| "local".into());
     let output = serde_json::json!({
         "benchmark": "neurosemantic-interlingua-n0",
+        "benchmark_schema_version": symthaea_communication::INTERLINGUA_BENCHMARK_SCHEMA_VERSION,
+        "protocol_version": symthaea_communication::NEUROSEMANTIC_PROTOCOL_VERSION,
+        "crate_version": env!("CARGO_PKG_VERSION"),
+        "execution_revision": execution_revision,
         "claim_boundary": "synthetic_structural_preservation_only",
         "expected_graph_hash": expected_hash,
         "summary": summary,
