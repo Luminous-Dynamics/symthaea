@@ -75,6 +75,27 @@ fn action_intent_digest_for_command(
     intent.digest()
 }
 
+/// Derive the exact operator-facing approval text from the same typed command
+/// that becomes the governed action intent. Callers cannot substitute an unrelated
+/// display string at the daemon approval boundary.
+fn operator_visible_action_for_command(
+    command: &nixward::action::executor::NixOSCommand,
+) -> String {
+    match command {
+        nixward::action::executor::NixOSCommand::ConfigPatch {
+            option_path, value, ..
+        } => format!("PATCH /etc/nixos/configuration.nix: {option_path} = {value}"),
+        _ => {
+            let (bin, args) = command.to_command();
+            if args.is_empty() {
+                bin
+            } else {
+                format!("{} {}", bin, args.join(" "))
+            }
+        }
+    }
+}
+
 /// Mutable daemon state collected across cycles.
 struct DaemonState {
     codebook: NixCodebook,
@@ -894,8 +915,9 @@ impl DaemonState {
     fn ensure_local_approval_request(
         &mut self,
         intent: &NixActionIntentV1,
-        displayed_action: &str,
+        command: &nixward::action::executor::NixOSCommand,
     ) -> Result<(), String> {
+        let displayed_action = operator_visible_action_for_command(command);
         let intent_digest = intent.digest().map_err(|error| error.to_string())?;
         if self
             .pending_local_approval
@@ -947,7 +969,7 @@ impl DaemonState {
     fn ensure_local_approval_request(
         &mut self,
         _intent: &NixActionIntentV1,
-        _displayed_action: &str,
+        _command: &nixward::action::executor::NixOSCommand,
     ) -> Result<(), String> {
         Err("typed local approval runtime is only implemented on Linux".to_string())
     }
@@ -1194,21 +1216,18 @@ impl DaemonState {
                         // Try to generate a NixOS configuration AST hardening patch (Proposal 2)
                         let patch_tweak = self.generate_nixos_hardening_patch(&target_name_clone);
 
-                        let (cmd, cmd_str, _patch_tweak) = if let Some((
+                        let (cmd, _patch_tweak) = if let Some((
                             tweak,
                             option_path,
                             value,
                             expected_config_digest,
                         )) = &patch_tweak {
-                            let command_str =
-                                format!("PATCH /etc/nixos/configuration.nix: {}", tweak);
                             (
                                 NixOSCommand::ConfigPatch {
                                     option_path: option_path.clone(),
                                     value: value.clone(),
                                     expected_config_digest: expected_config_digest.clone(),
                                 },
-                                command_str,
                                 Some((
                                     tweak.clone(),
                                     option_path.clone(),
@@ -1262,9 +1281,10 @@ impl DaemonState {
                             };
                             let (bin, args) = default_cmd.to_command();
                             let command_str = format!("{} {}", bin, args.join(" "));
-                            (default_cmd, command_str, None)
+                            (default_cmd, None)
                         };
 
+                        let cmd_str = operator_visible_action_for_command(&cmd);
                         let safety = cmd.safety_level();
                         let is_modifying = safety != SafetyLevel::ReadOnly;
 
@@ -1347,7 +1367,7 @@ impl DaemonState {
                                     }
                                 };
                                 if let Err(error) =
-                                    self.ensure_local_approval_request(&intent, &cmd_str)
+                                    self.ensure_local_approval_request(&intent, &cmd)
                                 {
                                     eprintln!(
                                         "nixward-daemon: refusing typed action because local approval runtime is unavailable: {error}"
@@ -2452,6 +2472,49 @@ fn main() -> ! {    // A real gap found while smoke-testing the symthaea-nix -> 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn operator_display_is_derived_from_typed_semantics() {
+        use nixward::action::executor::NixOSCommand;
+
+        let restart = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        assert_eq!(
+            operator_visible_action_for_command(&restart),
+            "systemctl restart nginx.service"
+        );
+
+        let patch = NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "ab".repeat(32),
+        };
+        assert_eq!(
+            operator_visible_action_for_command(&patch),
+            "PATCH /etc/nixos/configuration.nix: services.nginx.enable = true"
+        );
+    }
+
+    #[test]
+    fn operator_display_cannot_be_changed_without_changing_the_typed_command() {
+        use nixward::action::executor::NixOSCommand;
+
+        let a = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        let b = NixOSCommand::Service {
+            operation: NixServiceOperationKindV1::Stop,
+            unit: "nginx.service".to_string(),
+        };
+
+        assert_ne!(
+            operator_visible_action_for_command(&a),
+            operator_visible_action_for_command(&b)
+        );
+    }
+
     use super::*;
 
     #[test]
