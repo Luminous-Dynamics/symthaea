@@ -107,7 +107,7 @@ The adjacent `freshness_anchor_tpm` module provides a deployment-neutral contrac
 
 The adjacent TPM contract also provides a typed 256-bit quote challenge with canonical digesting and OS randomness. The challenge gate runs before the platform verifier, so an outdated or mis-bound quote cannot reach cryptographic appraisal under the wrong freshness context.
 
-TCG TPM 2.0 v185 defines `TPM_NT_COUNTER` as an 8-octet counter modified with `TPM2_NV_Increment()`. It also defines `TPMA_NV_ORDERLY` as allowing NV state to be saved only at orderly shutdown, while clearing that attribute requires the NV update to be persistent when the update command completes. Because the freshness anchor declares crash persistence as authoritative, the concrete adapter must reject an orderly counter unless an independent external mechanism supplies the missing crash-rollback guarantee. The TCG structures define `TPMS_NV_DIGEST_CERTIFY_INFO` as carrying the NV Index Name and a hash of the certified NV contents.
+TCG TPM 2.0 v185 defines `TPM_NT_COUNTER` as an 8-octet counter modified with `TPM2_NV_Increment()`. It also defines `TPMA_NV_ORDERLY` as allowing NV state to be saved only at orderly shutdown, while clearing that attribute requires the NV update to be persistent when the update command completes. Because the freshness anchor declares crash persistence as authoritative, the concrete adapter must reject an orderly counter unless an independent external mechanism supplies the missing crash-rollback guarantee. The TCG structures define `TPMS_NV_CERTIFY_INFO` as carrying the NV Index Name, selected offset, and certified NV bytes, while `TPMS_NV_DIGEST_CERTIFY_INFO` carries the NV Index Name and a hash of the certified NV contents. For this eight-octet freshness counter, the contract deliberately requires the full-contents `TPM_ST_ATTEST_NV` form, with `offset = 0` and `size = 8`, so the verifier cannot silently downgrade the proof to a digest-only interpretation.
 
 A real adapter must still independently verify:
 
@@ -115,8 +115,10 @@ A real adapter must still independently verify:
 - counter type and relevant NV attributes;
 - authorization policy;
 - TPM identity/attestation binding;
+- full-contents NV certification mode (`TPM_ST_ATTEST_NV`);
 - NV certification qualifying data matching the verifier challenge;
 - NV certification carrying the same NV Index Name as the selected counter;
+- certification `offset = 0` and `size = 8`;
 - the certified NV contents digest matching the observed counter value;
 - the observed counter value;
 - synchronous persistence (rejecting `TPMA_NV_ORDERLY` for the authoritative path);
