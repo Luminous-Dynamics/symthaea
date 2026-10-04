@@ -28,6 +28,12 @@ jobs:
         with:
           # Pull requests run evidence against the immutable PR head, not GitHub's synthetic merge ref.
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact checked-out revision
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "${PR_HEAD_SHA}"
       - uses: dtolnay/rust-toolchain@1.96.0
       - uses: Swatinem/rust-cache@v2
       - name: Test communication contracts and execute N0 evidence labs
@@ -45,6 +51,11 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
+
+          provenance = json.loads(Path("target/communication-evidence/execution-provenance.json").read_text())
+          expected_revision = provenance["pr_head_sha"] if provenance["event_name"] == "pull_request" else provenance["github_sha"]
+          assert provenance["checked_out_revision"] == expected_revision
+          assert provenance["checked_out_revision"] != ""
 
           codec_report = json.loads(Path("target/communication-evidence/neurosemantic_hdc_codec_n0.json").read_text())
           assert codec_report["binary_frame_roundtrip_exact"] is True
@@ -208,11 +219,37 @@ jobs:
           ]:
               ast.parse(path.read_text(), filename=str(path))
           PY
+      - name: Record evidence execution provenance
+        if: always()
+        env:
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+        run: |
+          mkdir -p target/communication-evidence
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          checked_out = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          provenance = {
+              "event_name": os.environ["GITHUB_EVENT_NAME"],
+              "github_sha": os.environ["GITHUB_SHA"],
+              "checked_out_revision": checked_out,
+              "pr_head_sha": os.environ["PR_HEAD_SHA"],
+          }
+          if provenance["event_name"] == "pull_request":
+              assert provenance["checked_out_revision"] == provenance["pr_head_sha"]
+          Path("target/communication-evidence/execution-provenance.json").write_text(
+              json.dumps(provenance, indent=2) + "\n"
+          )
+          PY
+
       - name: Upload deterministic communication evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: communication-evidence-${{ github.sha }}
+          name: communication-evidence-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           path: target/communication-evidence/
           if-no-files-found: warn
           retention-days: 30
