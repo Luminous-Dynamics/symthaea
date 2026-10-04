@@ -17,8 +17,7 @@
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use symthaea_core::observation_fabric::{
-    EvidenceIndependence, IndependenceVerificationReceipt, ObservationGraph, ObservationRelation,
-    ObservationRelationKind, ReceiptAttestationEnvelope, ReceiptAttestationTemporalStatus,
+    IndependenceVerificationReceipt, ReceiptAttestationEnvelope, ReceiptAttestationTemporalStatus,
 };
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
@@ -2470,9 +2469,10 @@ pub enum SignEnvelopeError {
 mod tests {
     use super::*;
     use symthaea_core::observation_fabric::{
-        AssetRef, DisclosurePolicy, Observation, ObservationGraph, ObservationModality,
-        ObservationProvenance, ObservationQuality, ObservationTime, ProvenanceCoverage,
-        ProvenanceVerification, SensorIdentity,
+        AssetRef, DisclosurePolicy, EvidenceIndependence, IndependenceVerificationReceipt,
+        Observation, ObservationGraph, ObservationModality, ObservationProvenance,
+        ObservationQuality, ObservationRelation, ObservationRelationKind, ObservationTime,
+        ProvenanceCoverage, ProvenanceVerification, SensorIdentity,
     };
 
     fn receipt() -> IndependenceVerificationReceipt {
@@ -2616,7 +2616,9 @@ mod tests {
 
         assert_eq!(
             invalid_graph.independence_verification_scope_fingerprint(),
-            Err(symthaea_core::observation_fabric::ObservationValidationError::DuplicateObservationRelation)
+            Err(
+                symthaea_core::observation_fabric::ObservationValidationError::DuplicateObservationRelation,
+            )
         );
         assert_eq!(
             receipt.verify_against_graph_detailed(&invalid_graph),
