@@ -83,7 +83,9 @@ jobs:
           assert hdc_interlingua["summary"]["lexical_invariance_exact"] is True
           assert hdc_interlingua["summary"]["identifier_invariance_exact"] is True
           assert hdc_interlingua["summary"]["wrong_codebook_rejected"] is True
+          assert hdc_interlingua["summary"]["conservative_clean_decode"] is True
           assert hdc_interlingua["codebook"]["descriptor"]["role_revision"] == "source-relation-target-node-v2"
+
           assert hdc_interlingua["negative_controls"]["unrelated_node_max_similarity"] < 0.2
           assert hdc_interlingua["negative_controls"]["unrelated_edge_max_similarity"] < 0.2
           assert hdc_interlingua["negative_controls"]["true_edge_similarity"] > hdc_interlingua["negative_controls"]["swapped_edge_similarity"]
