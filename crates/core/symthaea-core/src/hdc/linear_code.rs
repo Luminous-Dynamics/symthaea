@@ -791,13 +791,55 @@ pub struct LinearCodeFactorizationFiber {
     pub cardinality: ExactPowerOfTwo,
 }
 
+/// Iterator over a bounded affine factorization fiber.
+#[derive(Debug)]
+pub struct LinearCodeFactorizationFiberIter<'a> {
+    fiber: &'a LinearCodeFactorizationFiber,
+    next_mask: usize,
+    total: usize,
+}
+
+impl Iterator for LinearCodeFactorizationFiberIter<'_> {
+    type Item = Vec<bool>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.next_mask >= self.total {
+            return None;
+        }
+
+        let mask = self.next_mask;
+        self.next_mask += 1;
+        let mut coefficients = self.fiber.representative_coefficients.clone();
+        for (kernel_index, witness) in self.fiber.kernel_basis.iter().enumerate() {
+            if (mask >> kernel_index) & 1 == 1 {
+                for (index, coefficient) in witness.generator_coefficients.iter().enumerate() {
+                    coefficients[index] ^= *coefficient;
+                }
+            }
+        }
+        Some(coefficients)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.total - self.next_mask;
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for LinearCodeFactorizationFiberIter<'_> {}
+
 impl LinearCodeFactorizationFiber {
     /// Return one coefficient tuple selected by a GF(2) mask over the kernel basis.
     ///
     /// The returned tuple is guaranteed to remain in the same affine fiber when the
     /// certificate is valid. A mask length mismatch is rejected.
     pub fn coefficients_for_mask(&self, mask: &[bool]) -> Option<Vec<bool>> {
-        if mask.len() != self.kernel_basis.len() {
+        if mask.len() != self.kernel_basis.len()
+            || self
+                .kernel_basis
+                .iter()
+                .any(|witness| witness.generator_coefficients.len() != self.representative_coefficients.len())
+        {
             return None;
         }
 
@@ -810,6 +852,36 @@ impl LinearCodeFactorizationFiber {
             }
         }
         Some(coefficients)
+    }
+
+    /// Create a bounded iterator over every coefficient tuple in this affine fiber.
+    ///
+    /// Enumeration is deliberately opt-in and fail-closed: the symbolic cardinality must fit
+    /// in the host `usize` and be no larger than `max_fibers`. Paper-scale qualification should
+    /// remain symbolic rather than expanding the fiber.
+    pub fn iter_bounded(
+        &self,
+        max_fibers: usize,
+    ) -> Option<LinearCodeFactorizationFiberIter<'_>> {
+        if self
+            .kernel_basis
+            .iter()
+            .any(|witness| witness.generator_coefficients.len() != self.representative_coefficients.len())
+        {
+            return None;
+        }
+
+        let shift = u32::try_from(self.kernel_basis.len()).ok()?;
+        let total = 1usize.checked_shl(shift)?;
+        if total > max_fibers {
+            return None;
+        }
+
+        Some(LinearCodeFactorizationFiberIter {
+            fiber: self,
+            next_mask: 0,
+            total,
+        })
     }
 
     /// Verify the certificate against the ordered factor presentation and target.
