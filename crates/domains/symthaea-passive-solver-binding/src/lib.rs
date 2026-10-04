@@ -746,6 +746,7 @@ fn collect_boundary_edge_records(
             })
         })
         .collect())
+}
 
 fn edge_matches_interface(
     edge: &QuantizedBoundaryEdge,
