@@ -29,7 +29,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', 'symthaea-ui');
 const DIST = process.env.WEBGPU_DIST
   ? path.resolve(process.env.WEBGPU_DIST)
   : path.join(ROOT, 'dist');
-const URL = process.env.WEBGPU_URL || 'http://127.0.0.1:8402/?symthaea_webgpu_fixture=1';
+const URL = process.env.WEBGPU_URL || 'http://127.0.0.1:8402/?symthaea_webgpu_fixture=1&symthaea_webgpu_recovery=1';
 const ARTIFACT = path.resolve(
   process.env.WEBGPU_ARTIFACT || path.join(ROOT, 'webgpu-qualification.json'),
 );
@@ -323,6 +323,21 @@ async function waitForProjection(page, selector, display, classification = 'rend
   }
 }
 
+async function waitForQualificationRecovery(page, selector) {
+  try {
+    await page.waitForFunction(
+      selector => document.querySelector(selector)?.getAttribute('data-qualification-recovered') === 'true',
+      { timeout: 30_000 },
+      selector,
+    );
+  } catch (error) {
+    throw new QualificationError(
+      `WebGPU renderer ${selector} did not recover after the qualification-only device-loss exercise: ${error instanceof Error ? error.message : String(error)}`,
+      'renderer',
+    );
+  }
+}
+
 async function waitForQualificationReady(page, selector) {
   try {
     await page.waitForFunction(
@@ -477,7 +492,11 @@ async function runMode(mode) {
       await waitForProjection(page, '#webgpu-movie-canvas', 'block');
       await waitForQualificationReady(page, '#webgpu-cognitive-canvas');
       await waitForQualificationReady(page, '#webgpu-movie-canvas');
-      failOnPageErrors('WebGPU first render');
+      await waitForQualificationRecovery(page, '#webgpu-cognitive-canvas');
+      await waitForQualificationRecovery(page, '#webgpu-movie-canvas');
+      await waitForQualificationReady(page, '#webgpu-cognitive-canvas');
+      await waitForQualificationReady(page, '#webgpu-movie-canvas');
+      failOnPageErrors('WebGPU first render after recovery');
 
       const firstSceneHash = await canvasPngHash(page, '#webgpu-cognitive-canvas');
       const firstMovieHash = await canvasPngHash(page, '#webgpu-movie-canvas');
@@ -549,6 +568,12 @@ async function runMode(mode) {
         semantic_movie_samples: semanticMovieSamples,
         deterministic_repeat: true,
         page_errors: pageErrors,
+        device_recovery: await page.evaluate(() => ({
+          cognitive_init_count: document.querySelector('#webgpu-cognitive-canvas')?.getAttribute('data-qualification-init-count') || null,
+          movie_init_count: document.querySelector('#webgpu-movie-canvas')?.getAttribute('data-qualification-init-count') || null,
+          cognitive_recovered: document.querySelector('#webgpu-cognitive-canvas')?.getAttribute('data-qualification-recovered') === 'true',
+          movie_recovered: document.querySelector('#webgpu-movie-canvas')?.getAttribute('data-qualification-recovered') === 'true',
+        })),
       };
     }
 
