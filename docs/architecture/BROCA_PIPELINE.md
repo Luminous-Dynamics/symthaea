@@ -829,3 +829,35 @@ The intended evolution is:
 
 The important invariant is that each newly introduced layer must preserve explicit
 provenance for what is known versus what is merely a realization placeholder.
+
+
+## Semantic Delivery Feedback
+
+Acoustic fidelity is necessary but not sufficient. A realization can hit a pitch/rate target
+while still changing the intended linguistic act—for example, converting a qualified answer
+into an assertive one, or turning a statement into a question.
+
+SpeechDeliveryReceipt therefore compares a downstream observation against four explicit
+semantic targets:
+
+- intent;
+- clause mode;
+- epistemic delivery;
+- information-structural focus.
+
+Each feature is independently optional. Missing observations remain missing evidence, and an
+observation of no focus is distinct from an unobserved focus field.
+
+The semantic and acoustic receipts are intentionally separate:
+
+    SpeechPlan
+       |\\
+       | +--> acoustic sensory target -> observation -> acoustic error
+       |
+       +----> semantic delivery target -> observation -> delivery error
+
+This mirrors a useful systems principle from contemporary speech-prediction research:
+error signals need not live at one level. Recent work reports prediction errors emerging at
+higher linguistic levels while sensory sharpening operates at lower levels, supporting
+hierarchical rather than single-score feedback. The implementation therefore keeps semantic,
+phonological, and acoustic discrepancies separately inspectable.
