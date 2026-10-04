@@ -124,3 +124,7 @@ function
 → solver execution
 → numerical evidence
 → measurement
+
+## Dispatch evidence requirement
+
+`validate_binding_set_against_candidate_with_minimum_evidence` lets a dispatch workflow require `SolverEntityAttested` explicitly. This prevents a caller from accidentally treating ordinary adapter attestation as equivalent to concrete solver-side entity evidence.
