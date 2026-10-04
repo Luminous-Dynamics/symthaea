@@ -375,7 +375,6 @@ impl LinearCodeAlgebra {
     }
 }
 
-
 fn extends_span_with_work(
     basis: &[BinaryCodeword],
     candidate: &BinaryCodeword,
