@@ -117,8 +117,11 @@ tpm2_quote -Q -c "$ROOT/ak-after-restart.ctx" -l sha256:7 -q "$POST_RESTART_CHAL
 tpm2_print -Q -t TPMS_ATTEST "$ROOT/quote-after-restart.attest" > "$ROOT/quote-after-restart.yaml"
 tpm2_checkquote -Q -u "$ROOT/ak-after-restart.pem" -m "$ROOT/quote-after-restart.attest" -s "$ROOT/quote-after-restart.sig" -f "$ROOT/quote-after-restart.pcrs" -g sha256 -q "$POST_RESTART_CHALLENGE" -l sha256:7
 
-QUOTE_SIGNER=$(awk '$1 == "qualifiedSigner:" { print $2; exit }' "$ROOT/quote-after-restart.yaml" 2>/dev/null || true)
-[ -n "$QUOTE_SIGNER" ] || true
+QUOTE_SIGNER=$(awk '$1 == "qualifiedSigner:" { print $2; exit }' "$ROOT/quote-after-restart.yaml")
+[ -n "$QUOTE_SIGNER" ] || {
+  echo "ERROR: post-restart Quote is missing a qualified signer" >&2
+  exit 1
+}
 
 # Certify the complete eight-byte NV counter at generation 2 with that same fresh challenge.
 tpm2_nvcertify -Q -C "$ROOT/ak-after-restart.ctx" -c "$NV_INDEX" -p "$NV_AUTH" -g sha256 -f plain -s rsassa -o "$ROOT/nv.sig" --attestation "$ROOT/nv.attest" --size 8 --offset 0 -q "$POST_RESTART_CHALLENGE" "$NV_INDEX"
@@ -131,6 +134,11 @@ NV_EXTRA_DATA=$(awk '$1 == "extraData:" { print $2; exit }' "$ROOT/nv.yaml")
   exit 1
 }
 grep -Fq "type: 8014" "$ROOT/nv.yaml"
+NV_SIGNER=$(awk '$1 == "qualifiedSigner:" { print $2; exit }' "$ROOT/nv.yaml")
+[ "$NV_SIGNER" = "$QUOTE_SIGNER" ] || {
+  echo "ERROR: NV_Certify was signed by a different qualified signer than the Quote" >&2
+  exit 1
+}
 grep -Fq "indexName:" "$ROOT/nv.yaml"
 grep -Fq "offset: 0" "$ROOT/nv.yaml"
 NV_CONTENTS=$(awk '$1 == "nvContents:" { print $2; exit }' "$ROOT/nv.yaml")
