@@ -2273,6 +2273,12 @@ fn validate_native_authority_pin_set(
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+
+        if let Some(operation_id) = operation_id {
+            if !witness.is_operation_consistent_with(operation_id) {
+                return Err(AuthorizationConsumptionError::InvalidBinding.into());
+            }
+        }
         let (validity_issued_at, validity_expires_at) = self.clock_policy.validate(
             &witness.issued_at,
             witness.expires_at.as_deref(),
@@ -10522,6 +10528,52 @@ mod tests {
         assert_ne!(r1.is_ok(),r2.is_ok());
         let _=std::fs::remove_file(path);
     }
+    #[test]
+    fn bound_preparation_rejects_contradictory_witness_operation_metadata() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-operation-witness-consistency-{}.db",
+            std::process::id()
+        ));
+        let (store, action, witness) = fixture(&path);
+        let mut contradictory = witness.clone();
+        contradictory.operation_id = Some("operation-B".into());
+
+        assert!(matches!(
+            store.prepare_for_execution_bound_with_operation(
+                &contradictory,
+                &action,
+                "frame@1",
+                "attempt-operation",
+                "boundary-A",
+                "operation-A",
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let connection = store.connection().unwrap();
+        let state: String = connection
+            .query_row(
+                "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(state, "ready");
+
+        let operation: Option<String> = connection
+            .query_row(
+                "SELECT operation_id FROM authorization_leases WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(operation.is_none());
+
+        let _ = std::fs::remove_file(path);
+    }
+
     #[test]
     fn bound_dispatch_rejects_operation_identity_substitution() {
         let path = std::env::temp_dir().join(format!(
