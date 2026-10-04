@@ -262,6 +262,15 @@ jobs:
           test -n "$ALGEBRAIC_LEDGER"
           printf 'algebraic_ledger=%s\n' "$ALGEBRAIC_LEDGER" >> "$GITHUB_OUTPUT"
 
+      - name: Capture bounded affine-fiber enumeration
+        id: affine_fiber
+        run: |
+          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity bounded_affine_fiber_iterator_exhausts_declared_multiplicity -- --nocapture 2>&1)"
+          ENUMERATION_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^AFFINE_FIBER_ENUMERATION=')"
+          test "$ENUMERATION_COUNT" -eq 1
+          AFFINE_FIBER_ENUMERATION="$(printf '%s\n' "$OUTPUT" | sed -n 's/^AFFINE_FIBER_ENUMERATION=//p')"
+          test -n "$AFFINE_FIBER_ENUMERATION"
+          printf 'affine_fiber_enumeration=%s\n' "$AFFINE_FIBER_ENUMERATION" >> "$GITHUB_OUTPUT"
       - name: Capture higher-order dependency stress
         id: higher_order
         run: |
@@ -351,7 +360,10 @@ jobs:
           dependency_witness_status=${{ steps.witness.outcome }}
           dependency_witness=${{ steps.witness.outputs.dependency_witness }}
           kernel_basis_schema=linear-code-kernel-basis-v1
-          affine_fiber_schema=linear-code-affine-fiber-v1
+          affine_fiber_schema=linear-code-affine-fiber-v2
+          affine_fiber_enumeration_schema=linear-code-affine-fiber-enumeration-v1
+          affine_fiber_enumeration_status=${{ steps.affine_fiber.outcome }}
+          affine_fiber_enumeration=${{ steps.affine_fiber.outputs.affine_fiber_enumeration }}
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
@@ -363,7 +375,7 @@ jobs:
           decoder_oracle=exhaustive-bounded-distance
           decoder_oracle_is_production=false
           production_default_changed=false
-          qualification_status=${{ steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           focused_formatting=${{ steps.format.outcome }}
           isolated_harness=${{ steps.harness.outcome }}
           linear_code_unit_tests=${{ steps.unit_tests.outcome }}
