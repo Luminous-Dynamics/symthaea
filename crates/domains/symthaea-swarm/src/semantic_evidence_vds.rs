@@ -814,7 +814,8 @@ impl Rfc9942ReceiptEnvelope {
                 vdp=Some(parsed);
             }else{
                 unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
-                value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                value_reader.skip_value_with_bstr_limit(0, MAX_RFC9942_RECEIPT_BYTES)
+                    .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                 value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             }
         }
@@ -1283,7 +1284,8 @@ impl Rfc9942SignatureWithReceipts {
                 unprotected_receipts=Some(Rfc9942ReceiptCollection::from_reader(&mut value_reader)?);
             } else {
                 unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
-                value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                value_reader.skip_value_with_bstr_limit(0, MAX_RFC9942_RECEIPT_BYTES)
+                    .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             }
             value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         }
