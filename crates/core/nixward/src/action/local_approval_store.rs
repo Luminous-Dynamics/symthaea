@@ -583,6 +583,45 @@ mod tests {
     }
 
     #[test]
+    fn superseded_v2_approval_cannot_be_consumed() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let old_request = request_for(&store, 1);
+        let old_id = old_request.request_id().unwrap();
+        let old_projection = "ab".repeat(32);
+        let old_submission = LocalApprovalSubmissionV2 {
+            request_id: old_id.clone(),
+            daemon_incarnation_id: old_request.daemon_incarnation_id.clone(),
+            action_intent_digest: old_request.action_intent_digest.clone(),
+            projection_digest: old_projection.clone(),
+            decision: LocalApprovalDecisionKindV1::Approved,
+            decided_at_unix_ms: 1_200,
+        };
+        store
+            .install_pending_with_projection(old_request, old_projection)
+            .unwrap();
+
+        let new_request = request_for(&store, 2);
+        let new_id = new_request.request_id().unwrap();
+        store
+            .install_pending_with_projection(new_request, "cd".repeat(32))
+            .unwrap();
+
+        assert!(!store.is_pending(&old_id).unwrap());
+        assert!(store.is_pending(&new_id).unwrap());
+        assert_eq!(
+            store
+                .consume_verified_submission_v2(
+                    &old_submission,
+                    &peer(1000, 1),
+                    AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+                )
+                .unwrap_err(),
+            LocalApprovalRequestStoreErrorV1::RequestNotPending
+        );
+        assert!(store.is_pending(&new_id).unwrap());
+    }
+    #[test]
     fn currentness_observation_distinguishes_current_expired_and_not_pending() {
         let daemon = LiveDaemonIncarnationV1::generate().unwrap();
         let store = LocalApprovalRequestStoreV1::new(&daemon);
