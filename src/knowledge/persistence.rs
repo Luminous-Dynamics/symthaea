@@ -247,6 +247,12 @@ impl KnowledgeSnapshotReceiptHistoryCheckpoint {
         if (self.receipt_count == 0) != (self.latest_generation == 0) {
             return Err("Snapshot receipt history checkpoint count/generation mismatch".into());
         }
+        if self.receipt_count > 0 && self.latest_generation != self.receipt_count {
+            return Err(
+                "Snapshot receipt history checkpoint latest generation must equal receipt count"
+                    .into(),
+            );
+        }
         Ok(())
     }
 
@@ -481,6 +487,12 @@ impl KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
             && (self.latest_validation_sequence == 0 || self.latest_generation == 0)
         {
             return Err("Snapshot validation receipt history checkpoint latest position must be positive".into());
+        }
+        if self.receipt_count > 0 && self.latest_validation_sequence != self.receipt_count {
+            return Err(
+                "Snapshot validation receipt history checkpoint latest validation sequence must equal receipt count"
+                    .into(),
+            );
         }
         Ok(())
     }
@@ -7713,6 +7725,9 @@ mod tests {
         let mut malformed_checkpoint = checkpoint.clone();
         malformed_checkpoint.history_digest_hex = "not-a-digest".into();
         assert!(malformed_checkpoint.validate().is_err());
+        malformed_checkpoint = checkpoint.clone();
+        malformed_checkpoint.latest_generation = 999;
+        assert!(malformed_checkpoint.validate().is_err());
         let mut wrong_schema = checkpoint.clone();
         wrong_schema.schema_version = "symthaea.epf-011.unknown.v1".into();
         assert!(!wrong_schema.verify_against_history(&history));
@@ -8095,6 +8110,9 @@ mod tests {
         let mut malformed_checkpoint = checkpoint.clone();
         malformed_checkpoint.receipt_count = 1;
         malformed_checkpoint.latest_validation_sequence = 0;
+        assert!(malformed_checkpoint.validate().is_err());
+        malformed_checkpoint = checkpoint.clone();
+        malformed_checkpoint.latest_validation_sequence = 999;
         assert!(malformed_checkpoint.validate().is_err());
         let mut wrong_schema = checkpoint.clone();
         wrong_schema.schema_version = "symthaea.epf-011.unknown.v1".into();
