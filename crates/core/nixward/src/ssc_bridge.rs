@@ -35,6 +35,9 @@ pub struct NixGenerationObservation {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixSystemObservation {
+    /// Wall-clock capture time of this observation, in milliseconds since
+    /// Unix epoch. This is capture metadata, not trusted time.
+    pub observed_at_ms: u64,
     /// Stable pseudonymous identity for this NixOS installation.
     ///
     /// The raw /etc/machine-id is never carried in the observation. The
@@ -103,6 +106,8 @@ impl From<serde_json::Error> for SscObservationError {
 
 impl NixSystemObservation {
     pub fn observe() -> Result<Self, SscObservationError> {
+        let observed_at_ms = capture_time_ms()?;
+
         // Capture /run/current-system once and reuse the exact value that was
         // used to classify generation.current. Re-reading it later could mix
         // two adjacent atomic NixOS transitions into one observation.
@@ -114,6 +119,7 @@ impl NixSystemObservation {
         let booted_system_realization = read_realization(Path::new(NIXOS_BOOTED_SYSTEM))?;
 
         let observation = Self {
+            observed_at_ms,
             target_identity,
             generations,
             system_profile_generation,
@@ -242,17 +248,13 @@ impl NixSystemObservation {
     /// snapshot but does not authorize or execute any deployment.
     pub fn target_adapter(
         &self,
-        observed_at_ms: u64,
     ) -> Result<NixOSTargetAdapter, SscObservationError> {
-        let snapshot = self.target_snapshot(observed_at_ms)?;
+        let snapshot = self.target_snapshot()?;
         NixOSTargetAdapter::from_snapshot(snapshot)
             .map_err(|error| SscObservationError::AdapterConstruction(error.to_string()))
     }
 
-    pub fn target_snapshot(
-        &self,
-        observed_at_ms: u64,
-    ) -> Result<TargetSnapshot, SscObservationError> {
+    pub fn target_snapshot(&self) -> Result<TargetSnapshot, SscObservationError> {
         self.validate()?;
         let observation_digest = self.observation_digest()?;
         let resources = self
@@ -270,7 +272,7 @@ impl NixSystemObservation {
                 platform: "nixos".into(),
                 capabilities: default_nixos_capabilities(),
             },
-            observed_at_ms,
+            observed_at_ms: self.observed_at_ms,
             observation_digest,
             resources,
         })
@@ -285,6 +287,13 @@ impl NixSystemObservation {
             .iter()
             .find(|entry| entry.number == self.system_profile_generation)
     }
+}
+
+fn capture_time_ms() -> Result<u64, SscObservationError> {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .map_err(|error| SscObservationError::Io(format!("system clock before Unix epoch: {error}")))
 }
 
 fn read_target_identity(path: &Path) -> Result<TargetId, SscObservationError> {
@@ -446,6 +455,7 @@ mod tests {
     #[test]
     fn observation_validation_rejects_forged_target_identity_format() {
         let mut observation = NixSystemObservation {
+            observed_at_ms: 100,
             target_identity: test_target_id(),
             generations: vec![NixGenerationObservation {
                 number: 42,
@@ -680,7 +690,7 @@ mod tests {
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
         let adapter = sovereign_state_compiler_nix::NixOSTargetAdapter::from_snapshot(
-            observation.target_snapshot(100).expect("snapshot"),
+            observation.target_snapshot().expect("snapshot"),
         )
         .expect("adapter");
         let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-1", test_target_id());
@@ -777,7 +787,7 @@ mod tests {
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
         let adapter = sovereign_state_compiler_nix::NixOSTargetAdapter::from_snapshot(
-            observation.target_snapshot(100).expect("snapshot"),
+            observation.target_snapshot().expect("snapshot"),
         )
         .expect("adapter");
         let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-test", test_target_id());
@@ -1014,12 +1024,12 @@ mod tests {
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
-        let adapter = observation.target_adapter(123).expect("adapter");
+        let adapter = observation.target_adapter().expect("adapter");
         let snapshot = adapter.describe_target().expect("snapshot");
 
         assert_eq!(snapshot.profile.platform, "nixos");
         assert_eq!(snapshot.profile.identity, test_target_id());
-        assert_eq!(snapshot.observed_at_ms, 123);
+        assert_eq!(snapshot.observed_at_ms, 100);
         assert_eq!(snapshot.observation_digest, observation.observation_digest().expect("digest"));
         assert!(snapshot.resources.contains(
             &nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
@@ -1050,7 +1060,7 @@ mod tests {
         };
 
         let snapshot = observation
-            .target_snapshot(123)
+            .target_snapshot()
             .expect("snapshot");
         assert_eq!(snapshot.profile.identity, test_target_id());
         assert_eq!(snapshot.profile.platform, "nixos");
@@ -1060,7 +1070,7 @@ mod tests {
                 .capabilities
                 .contains(&sovereign_state_compiler::Capability::ObserveState)
         );
-        assert_eq!(snapshot.observed_at_ms, 123);
+        assert_eq!(snapshot.observed_at_ms, 100);
         assert_eq!(snapshot.resources.len(), 2);
         assert!(
             snapshot.resources.contains(
