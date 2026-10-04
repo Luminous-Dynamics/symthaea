@@ -72,6 +72,34 @@ impl ClaimAuthorIdentity {
     }
 }
 
+/// Typed identity of the controller associated with a verification method.
+///
+/// This remains an identifier only. It does not prove control, delegation, or authorization.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ClaimControllerIdentity(String);
+
+impl ClaimControllerIdentity {
+    pub fn new(value: impl Into<String>) -> Result<Self, &'static str> {
+        let value = value.into();
+        if value.trim().is_empty() {
+            return Err("claim controller identity must be non-empty");
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        if self.0.trim().is_empty() {
+            Err("claim controller identity must be non-empty")
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// Typed purpose for an authorship proof.
 ///
 /// The value is intentionally extensible and substrate-neutral. Deployments may use
@@ -138,6 +166,7 @@ pub struct ClaimAuthorship {
     author: ClaimAuthorIdentity,
     proof_purpose: ClaimProofPurpose,
     verification_method: Option<ClaimVerificationMethod>,
+    verification_controller: Option<ClaimControllerIdentity>,
 }
 
 impl ClaimAuthorship {
@@ -156,6 +185,7 @@ impl ClaimAuthorship {
             author,
             proof_purpose,
             verification_method,
+            verification_controller: None,
         })
     }
 
@@ -176,12 +206,53 @@ impl ClaimAuthorship {
         self.verification_method.as_ref()
     }
 
+    pub fn verification_controller(&self) -> Option<&ClaimControllerIdentity> {
+        self.verification_controller.as_ref()
+    }
+
+    /// Attach the controller declaration for this verification method.
+    ///
+    /// The core only records the claimed relationship. It does not resolve the
+    /// controller document or prove that the controller actually controls the method.
+    pub fn with_verification_controller(
+        mut self,
+        controller: ClaimControllerIdentity,
+    ) -> Result<Self, &'static str> {
+        controller.validate_structure()?;
+        if self.verification_method.is_none() {
+            return Err("verification controller requires a verification method");
+        }
+        self.verification_controller = Some(controller);
+        self.validate_structure()?;
+        Ok(self)
+    }
+
+    /// True only when both verification-method and controller identities are present.
+    ///
+    /// This is a completeness predicate for the exported binding envelope, not proof
+    /// that the external controller actually authorizes the method for this purpose.
+    pub fn verification_binding_is_complete(&self) -> bool {
+        self.verification_method.is_some() && self.verification_controller.is_some()
+    }
+
+    /// True only when a complete local verification binding names the expected controller.
+    pub fn verification_controller_matches(
+        &self,
+        expected: &ClaimControllerIdentity,
+    ) -> bool {
+        self.verification_binding_is_complete()
+            && self.verification_controller.as_ref() == Some(expected)
+    }
+
     pub fn digest(&self) -> String {
         let encoded = (
             "symthaea:claim-authorship:v1",
             self.author.as_str(),
             self.proof_purpose.as_str(),
             self.verification_method.as_ref().map(ClaimVerificationMethod::as_str),
+            self.verification_controller
+                .as_ref()
+                .map(ClaimControllerIdentity::as_str),
         );
         let bytes = serde_json::to_vec(&encoded)
             .expect("claim authorship is serializable");
@@ -193,6 +264,12 @@ impl ClaimAuthorship {
         self.proof_purpose.validate_structure()?;
         if let Some(verification_method) = &self.verification_method {
             verification_method.validate_structure()?;
+        }
+        if let Some(verification_controller) = &self.verification_controller {
+            verification_controller.validate_structure()?;
+            if self.verification_method.is_none() {
+                return Err("verification controller requires a verification method");
+            }
         }
         Ok(())
     }
@@ -668,6 +745,37 @@ impl FederatedClaim {
             .unwrap_or(false)
     }
 
+    /// True when authorship has a complete locally-declared verification-method/controller
+    /// relationship. This still does not prove the relationship against an external
+    /// controlled-identifier document.
+    pub fn authorship_verification_binding_is_complete(&self) -> bool {
+        self.authorship
+            .as_ref()
+            .is_some_and(ClaimAuthorship::verification_binding_is_complete)
+    }
+
+    /// Validate the local authorship envelope against both the expected proof purpose
+    /// and an expected verification-method controller identity.
+    ///
+    /// This is intentionally narrower than cryptographic verification: an adapter must
+    /// still resolve the verification method, confirm its controller, validate the
+    /// permitted verification relationship, and perform cryptographic verification.
+    pub fn authorship_is_bound_for(
+        &self,
+        expected_purpose: &ClaimProofPurpose,
+        expected_controller: &ClaimControllerIdentity,
+    ) -> bool {
+        self.authorship
+            .as_ref()
+            .map(|authorship| {
+                authorship.validate_structure().is_ok()
+                    && authorship.author() == &self.author
+                    && authorship.proof_purpose_matches(expected_purpose)
+                    && authorship.verification_controller_matches(expected_controller)
+            })
+            .unwrap_or(false)
+    }
+
     /// Typed proposition identity: this is distinct from both the representation
     /// identity and the subject-level admission identity.
     pub fn statement_identity(&self) -> Result<CanonicalStatementIdentity, &'static str> {
@@ -853,6 +961,68 @@ mod tests {
     }
 
     #[test]
+    fn verification_controller_is_a_distinct_typed_namespace() {
+        let controller = ClaimControllerIdentity::new("did:example:controller").unwrap();
+        assert_eq!(controller.as_str(), "did:example:controller");
+        assert!(controller.validate_structure().is_ok());
+        assert_eq!(
+            ClaimControllerIdentity::new("   ").unwrap_err(),
+            "claim controller identity must be non-empty"
+        );
+    }
+
+    #[test]
+    fn authorship_controller_binding_is_fail_closed_and_subject_neutral() {
+        let author = ClaimAuthorIdentity::new("author:1").unwrap();
+        let purpose = ClaimProofPurpose::new("assertionMethod").unwrap();
+        let method = ClaimVerificationMethod::new("https://example.test/key/1").unwrap();
+        let controller = ClaimControllerIdentity::new("did:example:controller").unwrap();
+        let other_controller = ClaimControllerIdentity::new("did:example:other").unwrap();
+
+        let authorship = ClaimAuthorship::new(author, purpose, Some(method)).unwrap();
+        assert!(!authorship.verification_binding_is_complete());
+        assert!(!authorship.verification_controller_matches(&controller));
+
+        let bound = authorship
+            .clone()
+            .with_verification_controller(controller.clone())
+            .unwrap();
+        assert!(bound.verification_binding_is_complete());
+        assert!(bound.verification_controller_matches(&controller));
+        assert!(!bound.verification_controller_matches(&other_controller));
+        assert!(bound.validate_structure().is_ok());
+
+        let controller_only = ClaimAuthorship::new(
+            ClaimAuthorIdentity::new("author:1").unwrap(),
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            None,
+        )
+        .unwrap()
+        .with_verification_controller(controller);
+        assert_eq!(
+            controller_only.unwrap_err(),
+            "verification controller requires a verification method"
+        );
+    }
+
+    #[test]
+    fn deserialized_authorship_controller_cannot_bypass_structure() {
+        let mut authorship: ClaimAuthorship = serde_json::from_str(
+            r#"{"author":"author:1","proof_purpose":"assertionMethod","verification_method":null,"verification_controller":"did:example:controller"}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            authorship.validate_structure().unwrap_err(),
+            "verification controller requires a verification method"
+        );
+
+        authorship.verification_method =
+            Some(ClaimVerificationMethod::new("https://example.test/key/1").unwrap());
+        assert!(authorship.validate_structure().is_ok());
+    }
+
+    #[test]
     fn proof_purpose_is_checked_explicitly_for_reuse() {
         let author = ClaimAuthorIdentity::new("author:1").unwrap();
         let assertion = ClaimProofPurpose::new("assertionMethod").unwrap();
@@ -868,6 +1038,57 @@ mod tests {
         let method = ClaimVerificationMethod::new("https://example.test/key/1").unwrap();
         assert_eq!(method.as_str(), "https://example.test/key/1");
         assert!(method.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn claim_authorship_requires_expected_purpose_and_controller() {
+        let (receipt, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view =
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let controller = ClaimControllerIdentity::new("did:example:controller").unwrap();
+        let other_controller = ClaimControllerIdentity::new("did:example:other").unwrap();
+
+        let claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            view,
+            receipt,
+        )
+        .unwrap()
+        .with_authorship(
+            ClaimAuthorship::new(
+                ClaimAuthorIdentity::new("author:1").unwrap(),
+                ClaimProofPurpose::new("assertionMethod").unwrap(),
+                Some(ClaimVerificationMethod::new("https://example.test/key/1").unwrap()),
+            )
+            .unwrap()
+            .with_verification_controller(controller.clone())
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert!(claim.authorship_verification_binding_is_complete());
+        assert!(claim.authorship_is_bound_for(
+            &ClaimProofPurpose::new("assertionMethod").unwrap(),
+            &controller,
+        ));
+        assert!(!claim.authorship_is_bound_for(
+            &ClaimProofPurpose::new("authentication").unwrap(),
+            &controller,
+        ));
+        assert!(!claim.authorship_is_bound_for(
+            &ClaimProofPurpose::new("assertionMethod").unwrap(),
+            &other_controller,
+        ));
     }
 
     #[test]
@@ -1422,6 +1643,21 @@ mod digest_tests {
         let mut b = a.clone();
         b.provenance_validation.violations[0].message = "second".into();
         assert_ne!(a.canonical_digest(), b.canonical_digest());
+    }
+
+    #[test]
+    fn authorship_digest_covers_verification_controller() {
+        let author = ClaimAuthorIdentity::new("author:1").unwrap();
+        let purpose = ClaimProofPurpose::new("assertionMethod").unwrap();
+        let method = ClaimVerificationMethod::new("https://example.test/key/1").unwrap();
+        let controller = ClaimControllerIdentity::new("did:example:controller").unwrap();
+
+        let base = ClaimAuthorship::new(author, purpose, Some(method)).unwrap();
+        let bound = base
+            .clone()
+            .with_verification_controller(controller)
+            .unwrap();
+        assert_ne!(base.digest(), bound.digest());
     }
 
     #[test]
