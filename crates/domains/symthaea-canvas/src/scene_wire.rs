@@ -405,9 +405,10 @@ fn is_valid_closed_polygon(points: &[[f32; 2]]) -> bool {
         .enumerate()
         .map(|(index, &a)| {
             let b = normalized[(index + 1) % normalized.len()];
-            points[a][0] * points[b][1] - points[a][1] * points[b][0]
+            f64::from(points[a][0]) * f64::from(points[b][1])
+                - f64::from(points[a][1]) * f64::from(points[b][0])
         })
-        .sum::<f32>();
+        .sum::<f64>();
     area2.is_finite()
         && area2.abs() > 1e-6
         && is_simple_polygon(points, &normalized)
@@ -442,7 +443,7 @@ fn segments_intersect_or_touch(
     c: [f32; 2],
     d: [f32; 2],
 ) -> bool {
-    const EPSILON: f32 = 1e-6;
+    const EPSILON: f64 = 1e-6;
     let ab_c = cross(a, b, c);
     let ab_d = cross(a, b, d);
     let cd_a = cross(c, d, a);
@@ -463,8 +464,9 @@ fn segments_intersect_or_touch(
         || (cd_b.abs() <= EPSILON && point_on_segment(c, d, b, EPSILON))
 }
 
-fn cross(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
-    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+fn cross(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f64 {
+    (f64::from(b[0]) - f64::from(a[0])) * (f64::from(c[1]) - f64::from(a[1]))
+        - (f64::from(b[1]) - f64::from(a[1])) * (f64::from(c[0]) - f64::from(a[0]))
 }
 
 fn point_on_segment(
@@ -473,10 +475,10 @@ fn point_on_segment(
     point: [f32; 2],
     epsilon: f32,
 ) -> bool {
-    point[0] >= a[0].min(b[0]) - epsilon
-        && point[0] <= a[0].max(b[0]) + epsilon
-        && point[1] >= a[1].min(b[1]) - epsilon
-        && point[1] <= a[1].max(b[1]) + epsilon
+    f64::from(point[0]) >= f64::from(a[0].min(b[0])) - epsilon
+        && f64::from(point[0]) <= f64::from(a[0].max(b[0])) + epsilon
+        && f64::from(point[1]) >= f64::from(a[1].min(b[1])) - epsilon
+        && f64::from(point[1]) <= f64::from(a[1].max(b[1])) + epsilon
 }
 
 fn collect_first_gradient_colors(root: &SceneNode) -> std::collections::HashMap<&str, Color> {
@@ -802,6 +804,26 @@ mod tests {
                     cy: 0.0,
                     r: 1.0,
                 },
+                transform: WireTransform::default(),
+                style: WireStyle::default(),
+                children: vec![],
+            },
+        };
+        assert!(!scene.is_supported());
+    }
+
+    #[test]
+    fn externally_constructed_scene_rejects_large_coordinate_self_intersection() {
+        let points = vec![
+            [900_000.0, 900_000.0],
+            [-900_000.0, -900_000.0],
+            [900_000.0, -900_000.0],
+            [-900_000.0, 900_000.0],
+        ];
+        let scene = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Polygon { points, closed: true },
                 transform: WireTransform::default(),
                 style: WireStyle::default(),
                 children: vec![],
