@@ -13,7 +13,7 @@ use crate::speech_plan::{EpistemicDelivery, ProsodicIntent, SpeechPlan};
 
 pub const SPEECH_FEEDBACK_VERSION: &str = "broca-speech-feedback-v1";
 
-/// Predicted sensory target emitted by Broca for a downstream realization layer.
+/// Desired sensory target emitted by Broca for a downstream realization layer.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SpeechSensoryTarget {
     /// Normalized pitch-range target.
