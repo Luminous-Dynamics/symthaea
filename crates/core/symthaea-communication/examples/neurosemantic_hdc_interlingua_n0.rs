@@ -116,6 +116,8 @@ fn main() -> Result<(), String> {
     let seed = 0x4E53_4D48_4443_5343_u64;
     let codebook = HdcSemanticCodebook::from_training_graphs(seed, &training)?;
     let codebook_hash = codebook.codebook_hash();
+    let execution_revision =
+        std::env::var("GITHUB_SHA").unwrap_or_else(|_| "local".into());
 
     let mut cases = Vec::with_capacity(held_out.len());
     for (index, expected) in held_out.iter().enumerate() {
@@ -198,6 +200,8 @@ fn main() -> Result<(), String> {
     let output = serde_json::json!({
         "benchmark": "neurosemantic-hdc-interlingua-n0",
         "benchmark_schema_version": HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
+        "execution_revision": execution_revision,
+        "adapter_id": "symthaea.hdc.semantic-interlingua-v1",
         "claim_boundary": "held_out_synthetic_graph_retrieval_and_reconstruction_only",
         "codebook": {
             "descriptor": codebook.descriptor(),
