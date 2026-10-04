@@ -594,6 +594,114 @@ fn rfc9942_es256_cose_key_inclusion_uses_detached_proof_derived_root() {
 
 
 #[test]
+fn rfc9942_outer_detached_payload_binds_inner_inclusion_and_outer_signature() {
+    let candidate = b"detached-outer-candidate";
+    let leaves = vec![candidate.to_vec(), b"other-entry".to_vec()];
+    let vds = Rfc9162Sha256Vds;
+    let head = vds.tree_head(&leaves);
+    let proof = vds.inclusion_proof(&leaves, 0).unwrap().to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+    // The inner RFC 9942 Receipt is detached: its signature authenticates the
+    // proof-derived Merkle root, not an in-receipt payload.
+    let unsigned_receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp.clone(),
+        Rfc9942ReceiptPayload::Detached,
+        vec![0u8; 64],
+    )
+    .unwrap();
+    let key = rfc8392_public_key();
+    let rng = SystemRandom::new();
+    let signer = rfc8392_signing_key(&rng);
+    let inner_tbs = unsigned_receipt.signature1_tbs(&[], Some(&head.root())).unwrap();
+    let inner_signature = signer.sign(&rng, &inner_tbs).unwrap().as_ref().to_vec();
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Detached,
+        inner_signature,
+    )
+    .unwrap();
+
+    let collection = Rfc9942ReceiptCollection::new(vec![receipt]).unwrap().to_cbor();
+
+    fn cbor_bstr(bytes: &[u8]) -> Vec<u8> {
+        assert!(bytes.len() < 256);
+        let mut out = if bytes.len() < 24 {
+            vec![0x40 | bytes.len() as u8]
+        } else {
+            vec![0x58, bytes.len() as u8]
+        };
+        out.extend_from_slice(bytes);
+        out
+    }
+
+    fn outer_wire(collection: &[u8], signature: &[u8]) -> Vec<u8> {
+        let protected = [0xa1, 0x01, 0x26]; // { alg: -7 }
+        let mut unprotected = Vec::new();
+        unprotected.push(0xa1);
+        unprotected.extend_from_slice(&[0x19, 0x01, 0x8a]); // receipts: 394
+        unprotected.extend_from_slice(collection);
+
+        let mut out = Vec::new();
+        out.extend_from_slice(&[0xd2, 0x84]);
+        out.extend_from_slice(&cbor_bstr(&protected));
+        out.extend_from_slice(&unprotected);
+        out.push(0xf6); // detached outer application payload
+        out.extend_from_slice(&cbor_bstr(signature));
+        out
+    }
+
+    let unsigned_outer = Rfc9942SignatureWithReceipts::from_cbor(
+        &outer_wire(&collection, &[0u8; 64]),
+    )
+    .unwrap();
+    let outer_tbs = unsigned_outer.signature1_tbs(&[], Some(candidate)).unwrap();
+    let outer_signature = signer.sign(&rng, &outer_tbs).unwrap().as_ref().to_vec();
+    let outer = Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(
+        &collection,
+        &outer_signature,
+    ))
+    .unwrap();
+
+    let state = outer
+        .verify_es256_inclusion_receipt_state(
+            0,
+            &key,
+            &key,
+            &[],
+            &[],
+            Some(candidate),
+        )
+        .unwrap();
+    assert_eq!(state.outer_algorithm_id(), COSE_ES256_ALGORITHM_ID);
+    assert_eq!(
+        state.receipt_placement(),
+        symthaea_swarm::semantic_evidence_vds::Rfc9942ReceiptPlacement::Unprotected
+    );
+    assert_eq!(state.receipt_index(), 0);
+    assert_eq!(
+        state.receipt().proof().inclusion_head(),
+        Some(head)
+    );
+
+    // The inner proof may derive the correct root, but the outer signature must
+    // still authenticate the exact detached application payload.
+    assert_eq!(
+        outer.verify_es256_inclusion_receipt_state(
+            0,
+            &key,
+            &key,
+            &[],
+            &[],
+            Some(b"wrong-application-payload"),
+        ),
+        Err(Rfc9942VdpError::NoMatchingProof)
+    );
+}
+
+#[test]
 fn rfc9942_es256_cose_key_consistency_preserves_signature_first_order() {
     // The COSE_Key convenience helper must delegate to the canonical semantic
     // verifier. Both the signature and consistency proof are deliberately
