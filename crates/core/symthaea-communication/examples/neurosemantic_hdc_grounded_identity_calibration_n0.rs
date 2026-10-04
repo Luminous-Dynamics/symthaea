@@ -1,16 +1,14 @@
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 
-use symthaea_communication::hdc_codec::{
-    quantize_continuous, HdcBinaryFrame,
-};
+use symthaea_communication::hdc_codec::HdcBinaryFrame;
 use symthaea_communication::hdc_ontology::{
     HdcConceptIdentityBinding, HdcOntologyCodebook, HdcOntologyDecodePolicy,
     HdcOntologyEmpiricalCalibration, HdcOntologyManifest, HdcRelationIdentityBinding,
     HDC_ONTOLOGY_ADAPTER_ID, HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
 };
 use symthaea_communication::{ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph};
-use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 const SCHEME: &str = "scheme:empirical-calibration-n0-v1";
 const RELATIONS: usize = 3;
@@ -211,22 +209,24 @@ fn main() -> Result<(), String> {
     }
 
     let mut null_abstentions = 0_u32;
-    const NULL_SAMPLES: u32 = 256;
+    const NULL_SAMPLES: u32 = 4096;
     let null_samples = NULL_SAMPLES;
     for index in 0..null_samples {
         let (graph, manifest) = make_graph("null", &[0, 1, 2], &[(0, 0, 1), (1, 1, 2)]);
         let clean = codebook.encode_graph(&graph, &manifest)?;
 
-        let node_hv = ContinuousHV::random(HDC_DIMENSION, 0xDADA_0000 + index as u64);
-        let edge_hv = ContinuousHV::random(HDC_DIMENSION, 0xEDED_0000 + index as u64);
-        let (node_binary, node_quantization) = quantize_continuous(&node_hv)?;
-        let (edge_binary, edge_quantization) = quantize_continuous(&edge_hv)?;
+        // Draw directly from the binary transport space. This probes the
+        // decoder boundary without spending the null sweep on an unrelated
+        // continuous->binary quantization path.
+        let node_binary = BinaryHV::random(0xDADA_0000 + index as u64);
+        let edge_binary = BinaryHV::random(0xEDED_0000 + index as u64);
 
         let null_representation = symthaea_communication::hdc_ontology::HdcOntologyRepresentation {
             node_frame: HdcBinaryFrame::from_binary(&node_binary),
             edge_frame: HdcBinaryFrame::from_binary(&edge_binary),
-            node_quantization,
-            edge_quantization,
+            // Quantization telemetry is not consulted by the decoder; retain
+            // the validated clean telemetry solely to keep the representation
+            // schema complete for this N0 null-frame experiment.
             ..clean
         };
 
@@ -297,6 +297,9 @@ fn main() -> Result<(), String> {
         },
         "null_test": {
             "samples": null_samples,
+            "generator": "BinaryHV::random",
+            "node_seed_base": 0xDADA_0000_u64,
+            "edge_seed_base": 0xEDED_0000_u64,
             "abstentions": null_abstentions,
             "accepted": 0,
         },
