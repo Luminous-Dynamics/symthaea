@@ -15,6 +15,7 @@ pub mod artifact;
 pub mod benchmark;
 pub mod human;
 pub mod metrics;
+pub mod neurosemantic;
 pub mod pilot;
 pub mod pipeline;
 pub mod provider;
