@@ -1,4 +1,3 @@
-use serde_json::Value;
 use symthaea_communication::hdc_interlingua::{
     HdcSemanticCodebook, HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
 };
