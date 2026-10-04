@@ -821,6 +821,38 @@ mod tests {
     }
 
     #[test]
+    fn deserialized_typed_authorship_identities_still_fail_closed() {
+        let blank_author: ClaimAuthorIdentity =
+            serde_json::from_str(""   "").unwrap();
+        let blank_purpose: ClaimProofPurpose =
+            serde_json::from_str(""   "").unwrap();
+        let blank_method: ClaimVerificationMethod =
+            serde_json::from_str(""   "").unwrap();
+
+        assert_eq!(
+            blank_author.validate_structure().unwrap_err(),
+            "claim author identity must be non-empty"
+        );
+        assert_eq!(
+            blank_purpose.validate_structure().unwrap_err(),
+            "claim proof purpose must be non-empty"
+        );
+        assert_eq!(
+            blank_method.validate_structure().unwrap_err(),
+            "claim verification method must be non-empty"
+        );
+
+        let authorship: ClaimAuthorship = serde_json::from_str(
+            "{"author":"author:1","proof_purpose":"assertionMethod","verification_method":"   "}",
+        )
+        .unwrap();
+        assert_eq!(
+            authorship.validate_structure().unwrap_err(),
+            "claim verification method must be non-empty"
+        );
+    }
+
+    #[test]
     fn proof_purpose_is_checked_explicitly_for_reuse() {
         let author = ClaimAuthorIdentity::new("author:1").unwrap();
         let assertion = ClaimProofPurpose::new("assertionMethod").unwrap();
@@ -957,6 +989,38 @@ mod tests {
             ClaimVerificationMethod::new("   ").unwrap_err(),
             "claim verification method must be non-empty"
         );
+    }
+
+    #[test]
+    fn deserialized_claim_with_blank_author_is_rejected() {
+        let (receipt, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view =
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            view,
+            receipt,
+        )
+        .unwrap();
+        let mut value = serde_json::to_value(&claim).unwrap();
+        value["author"] = serde_json::json!("   ");
+        let decoded: FederatedClaim = serde_json::from_value(value).unwrap();
+
+        assert_eq!(
+            decoded.validate_structure().unwrap_err(),
+            "claim author identity must be non-empty"
+        );
+        assert!(!decoded.is_subject_admission_bound(&decoded.provenance_validation));
     }
 
     #[test]
