@@ -27,6 +27,18 @@ fuzz_target!(|data: &[u8]| {
                         )
                     }
                 };
+
+                // Cross the RFC 9942 proof-first + signature-second semantic
+                // capability path as well, not just its individual primitives.
+                let _ = receipt.verify_es256_inclusion_state(
+                    b"fuzz-candidate",
+                    &[0x04; 65],
+                    &[],
+                    match receipt.payload() {
+                        Rfc9942ReceiptPayload::Attached(_) => None,
+                        Rfc9942ReceiptPayload::Detached => Some(&[0u8; 32]),
+                    },
+                );
             }
             Rfc9942ProofKind::Consistency => {
                 let older = VdsTreeHead::new(1, [0u8; 32]);
@@ -36,6 +48,18 @@ fuzz_target!(|data: &[u8]| {
                         receipt.verify_consistency_with_detached_payload(older, &[0u8; 32])
                     }
                 };
+
+                // Cross the RFC 9942 signature-first + proof-second semantic
+                // capability path with a fixed invalid key.
+                let _ = receipt.verify_es256_consistency_state(
+                    older,
+                    &[0x04; 65],
+                    &[],
+                    match receipt.payload() {
+                        Rfc9942ReceiptPayload::Attached(_) => None,
+                        Rfc9942ReceiptPayload::Detached => Some(&[0u8; 32]),
+                    },
+                );
             }
         }
 
