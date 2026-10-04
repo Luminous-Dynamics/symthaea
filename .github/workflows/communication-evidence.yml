@@ -24,7 +24,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.96.0
       - uses: Swatinem/rust-cache@v2
       - name: Test communication contracts and CLI
-        run: cargo test -p symthaea-communication
+        run: |
+          cargo test -p symthaea-communication
+          cargo run -p symthaea-communication --example neurosemantic_n0
       - name: Check locked offline worker and Python syntax
         run: |
           uv lock --check --project communication/worker
