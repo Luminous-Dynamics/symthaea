@@ -550,6 +550,42 @@ architectural guarantee against hallucination.
 
 ---
 
+## Typed Speech-Production Plan
+
+The Broca domain now exposes an additive `SpeechPlan` boundary between the deterministic
+structured readout and downstream linguistic/voice realization.
+
+```
+StructuredReadout + ThoughtChannels
+              |
+              v
+        SpeechPlan v1
+        /     |      \
+       /      |       \
+ linguistic  prosody  monitoring
+ frame       intent   / repair
+       \      |       /
+        \     |      /
+          realization
+```
+
+The plan preserves the existing role/filler structure instead of asking a downstream
+translator to re-infer it. It also makes three decisions explicit before realization:
+
+1. **Clause mode** — statement, question, directive, reflective, relational, or abstention.
+2. **Epistemic delivery** — assertive, qualified, or non-assertive.
+3. **Prosodic intent + monitoring** — rate, pitch range, prominence, pause pressure,
+   intonation, and whether produced output should be compared against the intended plan.
+
+The implementation is deliberately additive: it does not alter CfC/HDC checkpoints or
+the native decoder path. `grounding_surface()` provides a deterministic compact surface
+for tracing and evidence capture.
+
+The design follows the useful computational distinction in speech-production research
+between conceptual message formation, linguistic formulation, articulation, and
+monitoring, while avoiding the stronger claim that the software reproduces the anatomy
+or exact function of human Broca's area.
+
 ## Translation Engine (Broca's Area)
 
 The `LLMOrgan` (`src/language/llm_organ.rs`) implements the translation interface.
