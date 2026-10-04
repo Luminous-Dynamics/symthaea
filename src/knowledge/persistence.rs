@@ -927,7 +927,7 @@ impl KnowledgePersistence {
     /// Load the latest committed complete-snapshot receipt.
     ///
     /// This receipt is append-only and is only advanced by successful
-    /// save_snapshot transactions. Individual-domain save methods do not
+    /// `save_snapshot` transactions. Individual-domain save methods do not
     /// create receipts because they do not establish a complete snapshot boundary.
     pub fn latest_snapshot_receipt(&mut self) -> Result<Option<KnowledgeSnapshotReceipt>, String> {
         if !self.is_configured() {
