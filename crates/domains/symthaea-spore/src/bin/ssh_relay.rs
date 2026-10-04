@@ -334,7 +334,7 @@ fn tpm2_postinstall() -> &'static str {
 # ── TPM2 Auto-Unlock Enrollment ──
 echo "STAGE: Enrolling TPM2 auto-unlock..."
 
-# Check TPM availability
+# TPM presence is a capability check only; successful LUKS enrollment is not attestation.
 if [ ! -e /dev/tpmrm0 ]; then
   echo "WARNING: TPM 2.0 not detected. Skipping auto-unlock enrollment."
   echo "You will need to enter your passphrase at every boot."
@@ -342,18 +342,33 @@ else
   # Find the LUKS device
   LUKS_DEV=$(blkid -t TYPE=crypto_LUKS -o device 2>/dev/null | head -1)
   if [ -n "$LUKS_DEV" ]; then
-    # Enroll TPM2 with PCR 0 (firmware) and PCR 7 (Secure Boot state)
-    # The passphrase is required to authorize the enrollment
-    echo "Enrolling TPM2 on $LUKS_DEV (PCR 0+7)..."
-    systemd-cryptenroll "$LUKS_DEV" --tpm2-device=auto --tpm2-pcrs=0+7 2>&1 || echo "WARNING: TPM2 enrollment failed. You can retry after first boot with: sudo systemd-cryptenroll $LUKS_DEV --tpm2-device=auto --tpm2-pcrs=0+7"
-
-    # Update NixOS config to use systemd initrd (required for TPM2 unlock)
-    if [ -f /mnt/etc/nixos/configuration.nix ]; then
-      # Add systemd initrd and TPM2 config
-      sed -i '/boot.initrd.luks.devices/a\    cryptTabExtraOpts = [ "tpm2-device=auto" ];' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-      sed -i '/imports = /a\  boot.initrd.systemd.enable = true;' /mnt/etc/nixos/configuration.nix 2>/dev/null || true
-      echo "  TPM2 enrollment complete. Disk will auto-unlock at boot."
-      echo "  Passphrase is kept as fallback (firmware updates will require it)."
+    # PCR 0+7 is retained for compatibility with the existing installer policy.
+    # This is LUKS key-release policy, not regenerative-health attestation.
+    TPM2_PCRS="0+7"
+    echo "Enrolling TPM2 on $LUKS_DEV (PCR $TPM2_PCRS)..."
+    if systemd-cryptenroll "$LUKS_DEV" --tpm2-device=auto --tpm2-pcrs="$TPM2_PCRS" 2>&1; then
+      echo "  TPM2 enrollment command succeeded."
+      if [ -f /mnt/etc/nixos/configuration.nix ]; then
+        # Only change boot configuration after enrollment succeeds.
+        if grep -q 'boot.initrd.luks.devices."cryptroot"' /mnt/etc/nixos/configuration.nix; then
+          if ! grep -q 'tpm2-device=auto' /mnt/etc/nixos/configuration.nix; then
+            sed -i '/boot.initrd.luks.devices."cryptroot"/a\    cryptTabExtraOpts = [ "tpm2-device=auto" ];' /mnt/etc/nixos/configuration.nix
+          fi
+          if ! grep -q 'boot.initrd.systemd.enable = true' /mnt/etc/nixos/configuration.nix; then
+            sed -i '/imports = /a\  boot.initrd.systemd.enable = true;' /mnt/etc/nixos/configuration.nix
+          fi
+          echo "  TPM2 enrollment complete. Disk will auto-unlock at boot."
+          echo "  Passphrase is kept as fallback (firmware updates may require it)."
+        else
+          echo "WARNING: cryptroot configuration was not found. TPM2 enrollment succeeded, but boot configuration was not modified."
+        fi
+      else
+        echo "WARNING: NixOS configuration not found. TPM2 enrollment succeeded, but boot configuration was not modified."
+      fi
+    else
+      echo "WARNING: TPM2 enrollment failed. Installed configuration was not modified."
+      echo "You can retry after first boot with: sudo systemd-cryptenroll $LUKS_DEV --tpm2-device=auto --tpm2-pcrs=$TPM2_PCRS"
+      echo "A passphrase remains the recovery path."
     fi
   else
     echo "WARNING: No LUKS device found. TPM2 enrollment skipped."
