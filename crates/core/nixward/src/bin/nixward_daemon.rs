@@ -75,26 +75,6 @@ fn action_intent_digest_for_command(
     intent.digest()
 }
 
-/// Derive the exact operator-facing approval text from the same typed command
-/// that becomes the governed action intent. Callers cannot substitute an unrelated
-/// display string at the daemon approval boundary.
-fn operator_visible_action_for_command(
-    command: &nixward::action::executor::NixOSCommand,
-) -> String {
-    match command {
-        nixward::action::executor::NixOSCommand::ConfigPatch {
-            option_path, value, ..
-        } => format!("PATCH /etc/nixos/configuration.nix: {option_path} = {value}"),
-        _ => {
-            let (bin, args) = command.to_command();
-            if args.is_empty() {
-                bin
-            } else {
-                format!("{} {}", bin, args.join(" "))
-            }
-        }
-    }
-}
 
 /// Mutable daemon state collected across cycles.
 struct DaemonState {
@@ -917,7 +897,7 @@ impl DaemonState {
         intent: &NixActionIntentV1,
         command: &nixward::action::executor::NixOSCommand,
     ) -> Result<(), String> {
-        let displayed_action = operator_visible_action_for_command(command);
+        let displayed_action = nixward::action::operator_visible_action_for_command(command);
         let intent_digest = intent.digest().map_err(|error| error.to_string())?;
         if self
             .pending_local_approval
@@ -1282,7 +1262,7 @@ impl DaemonState {
                             (default_cmd, None)
                         };
 
-                        let cmd_str = operator_visible_action_for_command(&cmd);
+                        let cmd_str = nixward::action::operator_visible_action_for_command(&cmd);
                         let safety = cmd.safety_level();
                         let is_modifying = safety != SafetyLevel::ReadOnly;
 
@@ -2479,7 +2459,7 @@ mod tests {
             unit: "nginx.service".to_string(),
         };
         assert_eq!(
-            operator_visible_action_for_command(&restart),
+            nixward::action::operator_visible_action_for_command(&restart),
             "systemctl restart nginx.service"
         );
 
@@ -2489,7 +2469,7 @@ mod tests {
             expected_config_digest: "ab".repeat(32),
         };
         assert_eq!(
-            operator_visible_action_for_command(&patch),
+            nixward::action::operator_visible_action_for_command(&patch),
             "PATCH /etc/nixos/configuration.nix: services.nginx.enable = true"
         );
     }
@@ -2508,8 +2488,8 @@ mod tests {
         };
 
         assert_ne!(
-            operator_visible_action_for_command(&a),
-            operator_visible_action_for_command(&b)
+            nixward::action::operator_visible_action_for_command(&a),
+            nixward::action::operator_visible_action_for_command(&b)
         );
     }
 
