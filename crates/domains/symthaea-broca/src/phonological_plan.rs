@@ -10,6 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::linguistic_frame::LinguisticFrame;
+use crate::lexical_binding::LexicalMorphosyntacticBinding;
 use crate::speech_plan::{IntonationIntent, SpeechPlan};
 
 /// Stable identity for the phonological-plan contract.
@@ -179,6 +180,46 @@ impl PhonologicalPlan {
         Self::from_linguistic_frame(&frame)
     }
 
+    /// Bind phonology from an exact lexical/morphosyntactic binding.
+    ///
+    /// This adapter validates the lexical binding against the same linguistic frame, then
+    /// carries its deterministic provenance token into the phonological plan. A caller
+    /// cannot substitute an unrelated provenance string without going through the explicit
+    /// generic binding API.
+    pub fn bind_lexical_segments_from_binding(
+        &mut self,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        segments: Vec<PhonemeSlot>,
+    ) -> Result<(), PhonologicalPlanError> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| PhonologicalPlanError::UpstreamMismatch)?;
+        self.validate_against_frame(frame)?;
+        self.bind_lexical_segments(segments, binding.provenance_token())?;
+        self.validate_against_lexical_binding(frame, binding)
+    }
+
+    /// Validate the exact lexical binding lineage represented by this phonological plan.
+    pub fn validate_against_lexical_binding(
+        &self,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+    ) -> Result<(), PhonologicalPlanError> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| PhonologicalPlanError::UpstreamMismatch)?;
+        self.validate_against_frame(frame)?;
+
+        if self.content_binding != ContentBindingStatus::LexicallyBound
+            || self.lexical_provenance.as_deref() != Some(binding.provenance_token().as_str())
+        {
+            return Err(PhonologicalPlanError::LexicalBindingMismatch);
+        }
+
+        Ok(())
+    }
+
     /// Bind an explicit phoneme sequence without changing the upstream speech plan.
     ///
     /// LexicallyBound is permitted only when the caller has separately retained lexical
@@ -343,6 +384,7 @@ pub enum PhonologicalPlanError {
     LexicalBindingWithoutProvenance,
     EmptyLexicalProvenance,
     NonLexicalProvenance,
+    LexicalBindingMismatch,
     SyllableSummaryMismatch,
     PhonologicalBindingWithoutSegments,
     RoleOnlyWithSegments,
@@ -383,6 +425,9 @@ impl std::fmt::Display for PhonologicalPlanError {
             }
             Self::NonLexicalProvenance => {
                 write!(f, "non-lexical plans must not carry lexical provenance")
+            }
+            Self::LexicalBindingMismatch => {
+                write!(f, "phonological plan lexical provenance does not match the supplied lexical binding")
             }
             Self::SyllableSummaryMismatch => {
                 write!(f, "cached syllable summary does not match phoneme slots")
@@ -644,6 +689,66 @@ mod tests {
         assert_eq!(
             error,
             PhonologicalPlanError::LexicalBindingWithoutProvenance
+        );
+    }
+
+    #[test]
+    fn lexical_binding_handoff_preserves_exact_binding_lineage() {
+        let frame = LinguisticFrame::from_speech_plan(&plan());
+        let bindings = frame
+            .constituents
+            .iter()
+            .enumerate()
+            .map(|(position, slot)| crate::LexemeBinding {
+                position,
+                source: crate::LexicalSource::SemanticConstituent {
+                    role: slot.role.clone(),
+                    prime: slot.prime.clone(),
+                },
+                lemma: slot.prime.to_ascii_lowercase(),
+                lexeme_id: format!("fixture:{}:{}", slot.role, slot.prime),
+                grammatical_function: crate::GrammaticalFunction::Other(slot.role.clone()),
+                morphology: Vec::new(),
+                morphophonological_form: Some(slot.prime.to_ascii_lowercase()),
+                provenance: "fixture:lexicon:v1".into(),
+                semantic_payload: true,
+            })
+            .collect();
+        let binding = crate::LexicalMorphosyntacticBinding::new(
+            &frame,
+            crate::LanguageRuleBinding {
+                language_tag: "en".into(),
+                status: crate::LanguageRuleStatus::Bound,
+                rule_id: Some("fixture:rules:v1".into()),
+                provenance: Some("fixture:rules:v1".into()),
+                unbound_reason: None,
+            },
+            bindings,
+            Vec::new(),
+            Vec::new(),
+        )
+        .expect("fixture lexical binding");
+
+        let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_lexical_segments_from_binding(
+            &frame,
+            &binding,
+            vec![PhonemeSlot::new("AE", 0, SyllableStress::Primary, true, false, true)],
+        )
+        .expect("exact lexical handoff");
+
+        assert_eq!(
+            plan.lexical_provenance.as_deref(),
+            Some(binding.provenance_token().as_str())
+        );
+        assert!(plan.validate_against_lexical_binding(&frame, &binding).is_ok());
+
+        let mut tampered = binding.clone();
+        tampered.constituents[0].lemma.push_str("-tampered");
+        assert_eq!(
+            plan.validate_against_lexical_binding(&frame, &tampered)
+                .expect_err("tampered lexical lineage must fail"),
+            PhonologicalPlanError::LexicalBindingMismatch
         );
     }
 
