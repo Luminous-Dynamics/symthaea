@@ -506,6 +506,7 @@ impl HdcOntologyCodebook {
     pub fn decode_graph_with_policy(
         &self,
         representation: &HdcOntologyRepresentation,
+        source_manifest: &HdcOntologyManifest,
         receiver_manifest: &HdcOntologyManifest,
         policy: HdcOntologyDecodePolicy,
     ) -> Result<HdcOntologyDecodedGraph, String> {
@@ -513,6 +514,10 @@ impl HdcOntologyCodebook {
             return Err("invalid ontology HDC decode policy".into());
         }
         self.validate_representation(representation)?;
+        validate_manifest_compatibility(&self.descriptor, source_manifest)?;
+        if representation.source_manifest_hash != source_manifest.manifest_hash() {
+            return Err("source ontology manifest hash mismatch".into());
+        }
         validate_manifest_compatibility(&self.descriptor, receiver_manifest)?;
 
         let node_bundle = representation.node_frame.to_binary()?.to_continuous();
@@ -541,6 +546,15 @@ impl HdcOntologyCodebook {
             select_with_policy(&node_candidates, representation.node_count, policy)?;
 
         for concept_id in &selected_nodes {
+            if !source_manifest
+                .concepts
+                .iter()
+                .any(|binding| binding.concept_id == *concept_id)
+            {
+                return Err(format!(
+                    "decoded stable concept is absent from source identity manifest: {concept_id}"
+                ));
+            }
             if !receiver_manifest
                 .concepts
                 .iter()
@@ -583,26 +597,45 @@ impl HdcOntologyCodebook {
         .map(|key| parse_edge_candidate(&key))
         .collect::<Result<Vec<_>, _>>()?;
 
-        let mut node_bindings_by_concept = BTreeMap::new();
+        let mut source_bindings_by_concept = BTreeMap::new();
+        let mut receiver_bindings_by_concept = BTreeMap::new();
         for concept_id in &selected_nodes {
-            let bindings = receiver_manifest
+            let source_bindings = source_manifest
                 .concepts
                 .iter()
                 .filter(|binding| binding.concept_id == *concept_id)
                 .collect::<Vec<_>>();
-            if bindings.len() != 1 {
+            if source_bindings.len() != 1 {
                 return Err(format!(
-                    "receiver identity manifest must contain exactly one node binding for stable concept {concept_id}, found {}",
-                    bindings.len()
+                    "source identity manifest must contain exactly one node binding for stable concept {concept_id}, found {}",
+                    source_bindings.len()
                 ));
             }
-            node_bindings_by_concept.insert(concept_id.clone(), bindings[0]);
+
+            let receiver_bindings = receiver_manifest
+                .concepts
+                .iter()
+                .filter(|binding| binding.concept_id == *concept_id)
+                .collect::<Vec<_>>();
+            if receiver_bindings.len() != 1 {
+                return Err(format!(
+                    "receiver identity manifest must contain exactly one node binding for stable concept {concept_id}, found {}",
+                    receiver_bindings.len()
+                ));
+            }
+
+            source_bindings_by_concept.insert(concept_id.clone(), source_bindings[0]);
+            receiver_bindings_by_concept.insert(concept_id.clone(), receiver_bindings[0]);
         }
 
         let mut nodes = Vec::with_capacity(selected_nodes.len());
         let mut concept_ids_by_node = BTreeMap::new();
         for concept_id in &selected_nodes {
-            let binding = node_bindings_by_concept
+            let source_binding = source_bindings_by_concept
+                .get(concept_id)
+                .copied()
+                .ok_or_else(|| format!("missing source binding for concept {concept_id}"))?;
+            let receiver_binding = receiver_bindings_by_concept
                 .get(concept_id)
                 .copied()
                 .ok_or_else(|| format!("missing receiver binding for concept {concept_id}"))?;
@@ -611,23 +644,25 @@ impl HdcOntologyCodebook {
                 .get(concept_id)
                 .ok_or_else(|| format!("missing concept atom {concept_id}"))?;
 
-            if atom.kind != binding.kind {
+            if atom.kind != source_binding.kind || atom.kind != receiver_binding.kind {
                 return Err(format!(
-                    "receiver identity manifest kind mismatch for stable concept {concept_id}"
+                    "identity manifest kind mismatch for stable concept {concept_id}"
                 ));
             }
 
             nodes.push(ConceptNode {
-                id: binding.node_id.clone(),
-                kind: binding.kind.clone(),
+                id: receiver_binding.node_id.clone(),
+                kind: receiver_binding.kind.clone(),
                 label: None,
-                grounded_by: binding.grounding_ids.clone(),
+                // Preserve source provenance; receiver identity only determines
+                // the local graph identifier used for reconstruction.
+                grounded_by: source_binding.grounding_ids.clone(),
                 confidence: 1.0,
             });
-            concept_ids_by_node.insert(binding.node_id.clone(), concept_id.clone());
+            concept_ids_by_node.insert(receiver_binding.node_id.clone(), concept_id.clone());
         }
 
-        let node_ids_by_concept = node_bindings_by_concept
+        let node_ids_by_concept = receiver_bindings_by_concept
             .iter()
             .map(|(concept_id, binding)| (concept_id.clone(), binding.node_id.clone()))
             .collect::<BTreeMap<_, _>>();
@@ -672,13 +707,18 @@ impl HdcOntologyCodebook {
         &self,
         expected: &GroundedConceptGraph,
         representation: &HdcOntologyRepresentation,
+        source_manifest: &HdcOntologyManifest,
         receiver_manifest: &HdcOntologyManifest,
         expected_concept_ids: &BTreeMap<String, String>,
         expected_relation_ids: &[String],
         policy: HdcOntologyDecodePolicy,
     ) -> Result<HdcOntologyRoundtripMetrics, String> {
-        let decoded =
-            self.decode_graph_with_policy(representation, receiver_manifest, policy)?;
+        let decoded = self.decode_graph_with_policy(
+            representation,
+            source_manifest,
+            receiver_manifest,
+            policy,
+        )?;
         let interlingua = compare_graphs(expected, &decoded.graph)?;
         let concept_identity_exact = decoded.concept_ids_by_node == *expected_concept_ids;
         let mut observed_relation_ids = decoded.relation_ids_by_edge.clone();
@@ -1266,6 +1306,7 @@ mod tests {
             .decode_graph_with_policy(
                 &representation,
                 &held_out_manifest,
+                &held_out_manifest,
                 HdcOntologyDecodePolicy::conservative_default(),
             )
             .unwrap();
@@ -1288,6 +1329,7 @@ mod tests {
         let decoded = codebook
             .decode_graph_with_policy(
                 &representation,
+                &training_manifest,
                 &training_manifest,
                 HdcOntologyDecodePolicy::conservative_default(),
             )
@@ -1353,6 +1395,44 @@ mod tests {
     }
 
     #[test]
+    fn source_provenance_is_preserved_when_receiver_grounding_differs() {
+        let (training, training_manifest) = training_graph_and_manifest();
+        let codebook =
+            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
+                .unwrap();
+        let representation = codebook.encode_graph(&training, &training_manifest).unwrap();
+
+        let mut receiver = training_manifest.clone();
+        for binding in &mut receiver.concepts {
+            binding.node_id = format!("receiver-{}", binding.node_id);
+            binding.grounding_ids = vec![format!("receiver-grounding-{}", binding.concept_id)];
+        }
+
+        let decoded = codebook
+            .decode_graph_with_policy(
+                &representation,
+                &training_manifest,
+                &receiver,
+                HdcOntologyDecodePolicy::conservative_default(),
+            )
+            .unwrap();
+
+        assert!(decoded.graph.nodes.iter().all(|node| {
+            !node.id.starts_with("alice")
+                && !node.id.starts_with("event")
+                && !node.id.starts_with("object")
+        }));
+        assert_eq!(
+            decoded.graph.nodes.iter()
+                .map(|node| node.grounded_by.clone())
+                .collect::<Vec<_>>(),
+            training.nodes.iter()
+                .map(|node| node.grounded_by.clone())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn mapping_provenance_mismatch_is_fail_closed() {
         let (training, training_manifest) = training_graph_and_manifest();
         let codebook =
@@ -1402,6 +1482,7 @@ mod tests {
         let decoded = codebook
             .decode_graph_with_policy(
                 &representation,
+                &multilingual_manifest,
                 &multilingual_manifest,
                 HdcOntologyDecodePolicy::conservative_default(),
             )
@@ -1484,6 +1565,7 @@ mod tests {
         assert!(codebook
             .decode_graph_with_policy(
                 &representation,
+                &training_manifest,
                 &ambiguous,
                 HdcOntologyDecodePolicy::conservative_default(),
             )
@@ -1503,6 +1585,7 @@ mod tests {
             .decode_graph_with_policy(
                 &representation,
                 &training_manifest,
+                &training_manifest,
                 HdcOntologyDecodePolicy::conservative_default(),
             )
             .unwrap();
@@ -1515,6 +1598,7 @@ mod tests {
             .measure_roundtrip(
                 &training,
                 &representation,
+                &training_manifest,
                 &training_manifest,
                 &expected_concepts,
                 &relations,
@@ -1545,6 +1629,7 @@ mod tests {
         assert!(codebook
             .decode_graph_with_policy(
                 &representation,
+                &training_manifest,
                 &training_manifest,
                 HdcOntologyDecodePolicy::conservative_default(),
             )
