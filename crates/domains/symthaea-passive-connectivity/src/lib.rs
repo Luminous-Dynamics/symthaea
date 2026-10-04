@@ -106,3 +106,5 @@ mod tests {
 }
 
 pub mod port_path;
+
+pub mod graph_report;
