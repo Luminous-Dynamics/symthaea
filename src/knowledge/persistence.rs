@@ -3961,7 +3961,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = verify_validation_receipt_foreign_key_contract(&conn).unwrap_err();
+        let err = verify_initialized_schema_integrity(&conn).unwrap_err();
         assert_eq!(
             err,
             "Schema integrity check failed: missing column memory_id on knowledge_facts"
@@ -4295,7 +4295,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = verify_initialized_schema_integrity(&conn).unwrap_err();
+        let err = verify_validation_receipt_foreign_key_contract(&conn).unwrap_err();
         assert!(err.contains(
             "validation receipt generation foreign key has the wrong action or match semantics"
         ));
