@@ -347,8 +347,8 @@ mod tests {
             indices: vec![[0, 1, 2]],
         };
         let embedding = GeometryEmbedding::default()
-            .with_port(PortId(10), PortAnchor { center_mm: [-0.5, -0.5, 0.0], radius_mm: 0.75 })
-            .with_port(PortId(20), PortAnchor { center_mm: [0.5, -0.5, 0.0], radius_mm: 0.75 });
+            .with_port(PortId(10), PortAnchor { center_mm: [-0.5, -0.5, 0.0], radius_mm: 2.0 })
+            .with_port(PortId(20), PortAnchor { center_mm: [0.5, -0.5, 0.0], radius_mm: 2.0 });
         let policy = PortBoundaryPolicy::closed()
             .with_allowed_open_port(PortId(10))
             .with_allowed_open_port(PortId(20));
