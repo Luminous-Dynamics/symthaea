@@ -258,6 +258,14 @@ The fabrication kernel now exposes:
 - PassiveFunctionContract
 - PassiveValidationReport
 - PassiveViolation
+- PassiveEvidenceFact
+- PassiveEvidenceSource
+- PassiveEvidenceExtractor
+- PassiveEvidenceConflict
+- PassiveObjectiveObservation
+- PassiveObjectiveWeights
+
+The generative-design path can evaluate a CSG candidate using passive compliance, reduced-order physical performance, manufacturability, and material efficiency. The higher-level engineering facade exposes a separate passive fabrication gate so existing non-passive workflows retain their semantics.
 
 The initial implementation is deterministic and dependency-free.
 
@@ -265,9 +273,9 @@ It intentionally does not claim to infer moving parts from arbitrary CAD. That r
 
 ## Next highest-value implementation
 
-The next concrete step is to add a PassiveEvidenceExtractor that consumes fabrication artifacts and simulation metadata and emits PassiveDesignEvidence.
+The initial PassiveEvidenceExtractor is now present as a conservative structured-fact adapter.
 
-That extractor should start with high-confidence evidence:
+The next step is to connect it to high-confidence artifact sources:
 
 - explicit assembly joints
 - kinematic bodies
@@ -282,4 +290,4 @@ Then later add inferred evidence from:
 - fluid transport
 - phase-change state transitions
 
-This keeps the system honest while allowing progressive automation.
+The extractor treats contradictory declarations as explicit integrity failures rather than resolving them by precedence.
