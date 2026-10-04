@@ -29,7 +29,7 @@ done
 
 mkdir -p "$TPM_STATE"
 swtpm_setup --tpm2 --tpmstate "$TPM_STATE" --overwrite >/dev/null
-swtpm socket --tpm2 --tpmstate "dir=$TPM_STATE" --ctrl "type=tcp,port=$CTRL_PORT" --server "type=tcp,port=$TPM_PORT" --flags not-need-init >/dev/null 2>&1 &
+swtpm socket --tpm2 --tpmstate "dir=$TPM_STATE,fsync" --ctrl "type=tcp,port=$CTRL_PORT" --server "type=tcp,port=$TPM_PORT" --flags not-need-init >/dev/null 2>&1 &
 SWTPM_PID=$!
 
 for _ in $(seq 1 50); do
@@ -61,6 +61,33 @@ tpm2_quote -Q -c "$ROOT/ak.ctx" -l sha256:7 -q "$CHALLENGE" -m "$ROOT/quote.atte
 tpm2_checkquote -Q -u "$ROOT/ak.pem" -m "$ROOT/quote.attest" -s "$ROOT/quote.sig" -f "$ROOT/quote.pcrs" -g sha256 -q "$CHALLENGE" -l sha256:7
 tpm2_print -Q -t TPMS_ATTEST "$ROOT/quote.attest" > "$ROOT/quote.yaml"
 
+# A valid old Quote must not verify for a fresh challenge.
+REPLAY_CHALLENGE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+if tpm2_checkquote -Q -u "$ROOT/ak.pem" -m "$ROOT/quote.attest" -s "$ROOT/quote.sig" -f "$ROOT/quote.pcrs" -g sha256 -q "$REPLAY_CHALLENGE" -l sha256:7 >/dev/null 2>&1; then
+  echo "ERROR: old Quote was accepted for a different challenge" >&2
+  exit 1
+fi
+
+# Restart the emulator against the same persistent state and ensure the counter survives.
+tpm2_shutdown -c
+kill "$SWTPM_PID" 2>/dev/null || true
+wait "$SWTPM_PID" 2>/dev/null || true
+unset SWTPM_PID
+swtpm socket --tpm2 --tpmstate "dir=$TPM_STATE,fsync" --ctrl "type=tcp,port=$CTRL_PORT" --server "type=tcp,port=$TPM_PORT" --flags not-need-init >/dev/null 2>&1 &
+SWTPM_PID=$!
+for _ in $(seq 1 50); do
+  if "$ROOT/../missing" >/dev/null 2>&1; then :; fi
+  if TPM2TOOLS_TCTI="swtpm:host=127.0.0.1,port=$TPM_PORT" tpm2_getcap properties-fixed >/dev/null 2>&1; then break; fi
+  sleep 0.1
+done
+export TPM2TOOLS_TCTI="swtpm:host=127.0.0.1,port=$TPM_PORT"
+tpm2_startup -c
+tpm2_nvread -Q -C "$NV_INDEX" -s 8 -P "$NV_AUTH" -o "$ROOT/counter-after-restart.bin" "$NV_INDEX"
+[ "$(xxd -p "$ROOT/counter-after-restart.bin")" = "0000000000000001" ] || {
+  echo "ERROR: TPM NV counter did not survive restart" >&2
+  exit 1
+}
+
 # Certify the complete eight-byte NV counter with the same challenge.
 tpm2_nvcertify -Q -C "$ROOT/ak.ctx" -c "$NV_INDEX" -p "$NV_AUTH" -g sha256 -f plain -s rsassa -o "$ROOT/nv.sig" --attestation "$ROOT/nv.attest" --size 8 --offset 0 -q "$CHALLENGE" "$NV_INDEX"
 test -s "$ROOT/nv.attest"
@@ -74,6 +101,8 @@ echo 'TPM2 Spore boundary smoke test: PASS'
 echo "challenge=$CHALLENGE"
 echo "nv_index=$NV_INDEX"
 echo 'counter_generation=1'
+echo 'counter_persisted_across_tpm_restart=true'
+echo 'old_quote_replay_with_fresh_challenge=rejected'
 echo 'quote=pcr7+challenge verified'
 echo 'nv_certification=full_contents offset=0 size=8 verified'
 echo 'authority_claim=none (software TPM emulator)'
