@@ -12,6 +12,7 @@ pub mod freshness_reconciliation;
 pub mod topology_resolution_freshness;
 pub mod freshness_state_recovery;
 pub mod freshness_anchor_assurance;
+pub mod freshness_anchor_attestation;
 pub mod freshness_resynchronization;
 pub mod adversarial_crucible;
 pub mod physics_evidence;
