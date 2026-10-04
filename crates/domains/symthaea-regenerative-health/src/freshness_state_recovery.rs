@@ -277,6 +277,12 @@ pub fn commit_authoritative_anchor<S: FreshnessRecoveryAnchorStore>(
     }
 
     verified_profile.require_authoritative()?;
+    if verified_anchor.receiver_id() != record.receiver_id
+        || verified_anchor.generation() != record.generation
+        || verified_anchor.state_fingerprint() != record.state_fingerprint
+    {
+        return Err(FreshnessAnchorAssuranceError::SubjectBindingMismatch);
+    }
     commit_anchor(store, expected, record)
         .map_err(|message| FreshnessAnchorAssuranceError::CommitRejected(message.into()))
 }
@@ -409,6 +415,9 @@ mod tests {
         let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
             schema_version: "0.1".into(),
             profile_fingerprint: profile.fingerprint().unwrap(),
+            receiver_id: "receiver-1".into(),
+            generation: 0,
+            state_fingerprint: r.state_fingerprint.clone(),
             verifier_reference: "verifier-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
