@@ -84,6 +84,15 @@ pub struct TpmNvCounterEvidence {
     pub nv_index_name_digest: String,
     /// Digest of the exact TPMS_NV_PUBLIC used to derive/verify the Index Name.
     pub nv_public_digest: String,
+    /// Data size reported by the selected NV public area. Counter indices must
+    /// be exactly eight octets.
+    pub nv_public_data_size: u16,
+    /// Offset supplied to TPM2_NV_Certify. Authoritative counter certification
+    /// covers the complete counter at offset zero.
+    pub nv_certify_offset: u16,
+    /// Size supplied to TPM2_NV_Certify. Authoritative counter certification
+    /// covers the complete eight-octet counter.
+    pub nv_certify_size: u16,
     /// Digest of the authorization policy required for the counter.
     pub auth_policy_digest: String,
     /// Identifier for the attestation key used to authenticate the evidence.
@@ -127,7 +136,9 @@ impl TpmNvCounterEvidence {
         ]
         .iter()
         .all(|value| !value.trim().is_empty())
-    }
+            && self.nv_public_data_size == 8
+            && self.nv_certify_offset == 0
+            && self.nv_certify_size == 8
 
     /// Validate the evidence envelope against the exact freshness receipt.
     ///
@@ -188,6 +199,9 @@ impl TpmNvCounterEvidence {
         write_string(&mut hasher, &self.tpm_identity_digest);
         write_string(&mut hasher, &self.nv_index_name_digest);
         write_string(&mut hasher, &self.nv_public_digest);
+        hasher.update(&self.nv_public_data_size.to_le_bytes());
+        hasher.update(&self.nv_certify_offset.to_le_bytes());
+        hasher.update(&self.nv_certify_size.to_le_bytes());
         write_string(&mut hasher, &self.auth_policy_digest);
         write_string(&mut hasher, &self.attestation_key_id_digest);
         write_string(&mut hasher, &self.quote_nonce_digest);
@@ -315,6 +329,9 @@ mod tests {
             tpm_identity_digest: "tpm-identity".into(),
             nv_index_name_digest: "nv-name".into(),
             nv_public_digest: "nv-public".into(),
+            nv_public_data_size: 8,
+            nv_certify_offset: 0,
+            nv_certify_size: 8,
             auth_policy_digest: "auth-policy".into(),
             attestation_key_id_digest: "ak-id".into(),
             quote_nonce_digest: "quote-handle".into(),
@@ -592,6 +609,30 @@ mod tests {
         let mut changed = evidence;
         changed.nv_certify_contents_digest = "different-contents".into();
         assert_ne!(original, changed.binding_digest());
+    }
+
+    #[test]
+    fn counter_certification_must_cover_full_eight_octet_counter() {
+        let mut evidence = evidence(7);
+        evidence.nv_public_data_size = 16;
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::InvalidEvidence
+        );
+
+        let mut evidence = evidence(7);
+        evidence.nv_certify_offset = 4;
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::InvalidEvidence
+        );
+
+        let mut evidence = evidence(7);
+        evidence.nv_certify_size = 4;
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::InvalidEvidence
+        );
     }
 
     #[test]
