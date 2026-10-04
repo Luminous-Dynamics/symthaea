@@ -114,6 +114,36 @@ Multiple bindings for one selected concept are rejected rather than choosing an 
 
 A larger corpus may contain many observations of the same concept, but that corpus-level representation should be normalized into a graph-specific or observation-specific sidecar before decoding.
 
+## Composition/generalization matrix
+
+A second executable N0 lab evaluates the frozen identity codebook under increasing
+composition load rather than testing only one held-out graph.
+
+The matrix uses four cases:
+
+| Case | Nodes | Edges | Distractor concepts | Stable edge triples seen during training |
+| --- | ---: | ---: | ---: | ---: |
+| load-3x2 | 3 | 2 | 7 | 0% |
+| load-5x4 | 5 | 4 | 5 | 0% |
+| load-7x6 | 7 | 6 | 3 | 0% |
+| load-9x8 | 9 | 8 | 1 | 0% |
+
+Every atom required by the held-out graphs is known to the frozen codebook, but
+the complete stable source/relation/target edge triples are held out. This
+distinguishes compositional reconstruction from memorizing previously observed
+triples.
+
+The decoder must clear the same conservative score/margin policy at every load
+point. The benchmark therefore reports the worst node and edge selection
+margins in addition to exact identity and structural metrics. A future
+promotion can tighten this matrix further by increasing the number of concepts,
+graph density, predicate inventory, and distractor population rather than
+altering the acceptance rule after seeing outcomes.
+
+The benchmark remains an N0 synthetic representation test. Passing it does not
+demonstrate that an upstream neural decoder has correctly inferred a person's
+meaning.
+
 ## Evidence ladder
 
 The accompanying executable N0 lab demonstrates:
