@@ -70,6 +70,11 @@ impl TpmQuoteChallenge {
 pub enum TpmNvCertificationMode {
     /// TPM_ST_ATTEST_NV: the attestation carries the certified NV bytes.
     FullContents,
+    /// TPM_ST_ATTEST_NV_DIGEST: the attestation carries only a digest of the
+    /// certified NV contents. This is not accepted for the authoritative
+    /// counter path because it leaves the observed counter-to-content relation
+    /// to a separate verifier interpretation.
+    DigestOfContents,
 }
 
 /// Persistence semantics required by an authoritative TPM freshness counter.
@@ -627,11 +632,13 @@ mod tests {
     }
 
     #[test]
-    fn certification_mode_is_part_of_evidence_binding() {
-        let evidence = evidence(7);
-        let original = evidence.binding_digest();
-        assert_eq!(evidence.nv_certify_mode, TpmNvCertificationMode::FullContents);
-        assert_ne!(original, evidence.binding_digest().replace("not-real", "still-not-real"));
+    fn digest_only_nv_certification_cannot_back_authoritative_counter() {
+        let mut evidence = evidence(7);
+        evidence.nv_certify_mode = TpmNvCertificationMode::DigestOfContents;
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::InvalidEvidence
+        );
     }
 
     #[test]
