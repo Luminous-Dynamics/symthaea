@@ -15,10 +15,8 @@ use thiserror::Error;
 
 pub const SCHEMA_VERSION: &str = "ssc/v0.3";
 const INTENT_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/INTENT-DIGEST/v1\0";
-const TARGET_PROFILE_DIGEST_DOMAIN: &[u8] =
-    b"LUMINOUS-DYNAMICS/SSC/TARGET-PROFILE-DIGEST/v1\0";
-const TARGET_SNAPSHOT_DIGEST_DOMAIN: &[u8] =
-    b"LUMINOUS-DYNAMICS/SSC/TARGET-SNAPSHOT-DIGEST/v1\0";
+const TARGET_PROFILE_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/TARGET-PROFILE-DIGEST/v1\0";
+const TARGET_SNAPSHOT_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/TARGET-SNAPSHOT-DIGEST/v1\0";
 const PLAN_DIGEST_DOMAIN: &[u8] = b"LUMINOUS-DYNAMICS/SSC/PLAN-DIGEST/v1\0";
 
 /// A content-addressed digest.
@@ -537,7 +535,12 @@ impl ExecutionReceipt {
         if self.started_at_ms < plan.plan.target_snapshot.observed_at_ms {
             return Err(ReceiptValidationError::StartedBeforeTargetSnapshot);
         }
-        if self.started_at_ms < plan.authorization.valid_from_ms.unwrap_or(self.started_at_ms) {
+        if self.started_at_ms
+            < plan
+                .authorization
+                .valid_from_ms
+                .unwrap_or(self.started_at_ms)
+        {
             return Err(ReceiptValidationError::StartedBeforeAuthorization);
         }
         if let Some(valid_until_ms) = plan.authorization.valid_until_ms
@@ -613,7 +616,9 @@ pub enum ReceiptValidationError {
     StartedBeforeAuthorization,
     #[error("execution finished after authorization expired")]
     FinishedAfterAuthorizationExpiry,
-    #[error("postcondition claims a verified result but carries no concrete verification evidence digest")]
+    #[error(
+        "postcondition claims a verified result but carries no concrete verification evidence digest"
+    )]
     MissingVerificationEvidence,
     #[error("required attestation verification carries no attestation evidence")]
     MissingAttestationEvidence,
@@ -661,10 +666,7 @@ impl AuthorizationEvidence {
         if let Some(max_age_ms) = plan.max_target_snapshot_age_ms {
             let age_ms = now_ms - plan.target_snapshot.observed_at_ms;
             if age_ms > max_age_ms {
-                return Err(PlanValidationError::TargetSnapshotStale {
-                    age_ms,
-                    max_age_ms,
-                });
+                return Err(PlanValidationError::TargetSnapshotStale { age_ms, max_age_ms });
             }
         }
 
@@ -694,7 +696,10 @@ impl AuthorizationEvidence {
             if now_ms > intent_expiry {
                 return Err(PlanValidationError::IntentExpired);
             }
-            if self.valid_until_ms.is_some_and(|until| until > intent_expiry) {
+            if self
+                .valid_until_ms
+                .is_some_and(|until| until > intent_expiry)
+            {
                 return Err(PlanValidationError::AuthorizationExceedsIntentExpiry);
             }
         }
@@ -715,8 +720,15 @@ impl AuthorizationEvidence {
         }
 
         for capability in &self.granted_capabilities {
-            if !plan.target_snapshot.profile.capabilities.contains(capability) {
-                return Err(PlanValidationError::GrantedCapabilityNotSupported(*capability));
+            if !plan
+                .target_snapshot
+                .profile
+                .capabilities
+                .contains(capability)
+            {
+                return Err(PlanValidationError::GrantedCapabilityNotSupported(
+                    *capability,
+                ));
             }
         }
 
@@ -910,7 +922,9 @@ pub enum PlanValidationError {
     AuthorizationPlanDigestMismatch,
     #[error("authorization target-snapshot digest does not match the observed target")]
     AuthorizationTargetSnapshotDigestMismatch,
-    #[error("target snapshot is future-dated: observed at {observed_at_ms} ms but authorization time is {now_ms} ms")]
+    #[error(
+        "target snapshot is future-dated: observed at {observed_at_ms} ms but authorization time is {now_ms} ms"
+    )]
     TargetSnapshotFutureDated { observed_at_ms: u64, now_ms: u64 },
     #[error("target snapshot is stale: age {age_ms} ms exceeds maximum {max_age_ms} ms")]
     TargetSnapshotStale { age_ms: u64, max_age_ms: u64 },
@@ -963,7 +977,9 @@ mod tests {
 
     fn sample_plan() -> DeploymentPlan {
         let mut intent = DeploymentIntent::new("intent-1", "host-01");
-        intent.required_capabilities.insert(Capability::ConfigureSystem);
+        intent
+            .required_capabilities
+            .insert(Capability::ConfigureSystem);
         intent.required_capabilities.insert(Capability::Rollback);
         intent.required_resources.insert(ResourceRef {
             kind: "block-device".into(),
@@ -1512,7 +1528,10 @@ mod tests {
                 description: "verify target state".into(),
             },
         ];
-        plan.target_snapshot.profile.capabilities.insert(Capability::Reboot);
+        plan.target_snapshot
+            .profile
+            .capabilities
+            .insert(Capability::Reboot);
         plan.intent.required_capabilities.insert(Capability::Reboot);
         plan.verification.disposition = DeploymentDisposition::Rebooted;
 
@@ -1540,10 +1559,11 @@ mod tests {
         let before = plan.digest().expect("digest");
 
         let mut changed = plan;
-        changed.intent.desired_state.properties.insert(
-            "hostname".into(),
-            StateValue::String("new-name".into()),
-        );
+        changed
+            .intent
+            .desired_state
+            .properties
+            .insert("hostname".into(), StateValue::String("new-name".into()));
 
         assert_ne!(before, changed.digest().expect("digest"));
     }
@@ -1793,7 +1813,6 @@ mod tests {
         assert!(receipt.validate_for(&authorized).is_ok());
         assert!(!receipt.is_verified_success());
     }
-
 
     #[test]
     fn rejects_receipt_with_wrong_observed_disposition() {
