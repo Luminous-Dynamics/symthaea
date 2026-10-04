@@ -6,6 +6,5 @@ description = "Compile embedded passive void-graph intent into candidate CSG voi
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-serde = { workspace = true }
 symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel" }
 symthaea-passive-void-graph = { path = "../symthaea-passive-void-graph" }
