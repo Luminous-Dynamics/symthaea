@@ -973,6 +973,29 @@ mod tests {
     }
 
     #[test]
+    fn unconfirmed_tpm_version_never_counts_as_tpm2_policy_support() {
+        let mut generator = SovereignConfigGenerator::new();
+        let hardware = HardwareProfile {
+            has_tpm: true,
+            tpm2_spec_major: None,
+            ..Default::default()
+        };
+        let choices = UserChoices {
+            tpm2_unlock: true,
+            encryption: true,
+            ..Default::default()
+        };
+        let result = generator.generate(&hardware, &choices, &MigrationData::default());
+        assert!(result.warnings.iter().any(|warning| {
+            warning.contains("TCG specification major is unconfirmed")
+                && warning.contains("not eligible")
+        }));
+        assert!(!result.warnings.iter().any(|warning| {
+            warning.contains("TPM 2.0 is confirmed for LUKS key protection")
+        }));
+    }
+
+    #[test]
     fn tpm_unlock_warning_does_not_claim_attestation() {
         let mut generator = SovereignConfigGenerator::new();
         let hardware = HardwareProfile {
