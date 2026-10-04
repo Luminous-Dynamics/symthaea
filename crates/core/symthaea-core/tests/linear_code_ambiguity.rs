@@ -1632,3 +1632,60 @@ fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
     // pair as an independent/direct-sum recovery problem.
     assert!(recover_independent_bound(&target, &[&left, &overlapping]).is_none());
 }
+#[test]
+fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
+    let repeated = RandomLinearCode::from_basis(vec![
+        BinaryCodeword::from_words(4, vec![0b0001]),
+        BinaryCodeword::from_words(4, vec![0b0010]),
+    ])
+    .expect("repeated 2D code");
+    let factors = [&repeated, &repeated, &repeated];
+    let target = repeated.encode(&[true, false]);
+
+    let algebra = factorization_algebra(&factors).expect("algebra");
+    assert_eq!(algebra.kernel_dimension, 4);
+    let fiber = factorization_affine_fiber(&target, &factors).expect("affine fiber");
+    let expected = 1usize << algebra.kernel_dimension;
+
+    let mut iterator = fiber.iter_bounded(expected).expect("bounded enumeration");
+    assert_eq!(iterator.len(), expected);
+    let coefficients = iterator.by_ref().collect::<Vec<_>>();
+    assert_eq!(iterator.len(), 0);
+    assert_eq!(coefficients.len(), expected);
+
+    for coefficients in &coefficients {
+        let mut reconstructed = BinaryCodeword::zero(4);
+        for (coefficient, generator) in coefficients.iter().zip(
+            factors
+                .iter()
+                .flat_map(|factor| factor.basis().iter()),
+        ) {
+            if *coefficient {
+                reconstructed.xor_assign(generator);
+            }
+        }
+        assert_eq!(reconstructed, target);
+    }
+
+    for left in 0..coefficients.len() {
+        for right in (left + 1)..coefficients.len() {
+            assert_ne!(coefficients[left], coefficients[right]);
+        }
+    }
+
+    assert!(fiber.iter_bounded(expected - 1).is_none());
+    assert_eq!(fiber.iter_bounded(0), None);
+    assert_eq!(
+        fiber
+            .coefficients_for_mask(&[false, false, false])
+            .is_none(),
+        true
+    );
+
+    println!(
+        "AFFINE_FIBER_ENUMERATION=kernel_dimension={};expected_fibers={};enumerated_fibers={};all_targets_match=true;all_coefficients_unique=true;bounded=true",
+        algebra.kernel_dimension,
+        expected,
+        coefficients.len(),
+    );
+}
