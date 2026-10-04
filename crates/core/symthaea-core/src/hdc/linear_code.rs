@@ -732,6 +732,7 @@ impl LinearCodeDependencyWitness {
         sum == BinaryCodeword::zero(dimension)
     }
 }
+
 /// Compute exact rank/nullity and multiplicity structure for a factor tuple.
 ///
 /// The factor coefficient spaces form a linear domain of dimension Delta = sum(k_i).
@@ -773,8 +774,6 @@ pub fn factorization_algebra(factors: &[&RandomLinearCode]) -> Option<LinearCode
     })
 }
 
-/// Return the exact fiber cardinality for a target in the factor-span.
-/// None means that the target is not representable by the supplied factors.
 /// Return a deterministic non-zero dependency witness when the factor spaces are globally dependent.
 ///
 /// The returned witness is a coefficient vector in the concatenated generator presentation whose
@@ -799,7 +798,7 @@ pub fn factorization_dependency_witness(
     let mut independent_indices = Vec::with_capacity(total_rank);
     let mut current_index = 0usize;
 
-    for (factor_index, factor) in factors.iter().enumerate() {
+    for factor in factors.iter() {
         for generator in factor.basis() {
             if extends_span(&independent_basis, generator) {
                 independent_indices.push(current_index);
@@ -861,6 +860,8 @@ fn factor_offsets(factors: &[&RandomLinearCode]) -> Vec<usize> {
     }
     offsets
 }
+/// Return the exact fiber cardinality for a target in the factor-span.
+/// None means that the target is not representable by the supplied factors.
 pub fn factorization_count_for_target(
     target: &BinaryCodeword,
     factors: &[&RandomLinearCode],
@@ -929,6 +930,7 @@ fn has_dependent_factor_subset(
     }
     false
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
