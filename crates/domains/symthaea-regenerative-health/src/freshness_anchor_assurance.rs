@@ -239,6 +239,22 @@ impl FreshnessAnchorEvidenceKind {
         }
     }
 
+    pub fn matches_backing(&self, backing: FreshnessAnchorBacking) -> bool {
+        matches!(
+            (backing, self),
+            (
+                FreshnessAnchorBacking::HardwareProtected,
+                Self::HardwareMonotonicCounter { .. }
+            ) | (
+                FreshnessAnchorBacking::RemoteAuthority,
+                Self::RemoteMonotonicSequence { .. }
+            ) | (
+                FreshnessAnchorBacking::ReplicatedQuorum,
+                Self::QuorumMonotonicSequence { .. }
+            )
+        )
+    }
+
     pub fn validate(&self) -> bool {
         let nonempty = |value: &str| !value.trim().is_empty();
         match self {
@@ -316,6 +332,7 @@ impl VerifiedFreshnessAnchor {
             || receipt.evidence_reference.trim().is_empty()
             || receipt.evidence_digest.trim().is_empty()
             || !receipt.evidence_kind.validate()
+            || !receipt.evidence_kind.matches_backing(profile.backing)
         {
             return Err(FreshnessAnchorAssuranceError::InvalidReceipt);
         }
