@@ -1485,18 +1485,72 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
-      - name: Test evidence-plane contract
-        run: cargo test -p symthaea-evidence-plane --locked -vv
-
-      - name: Diagnose locked resolver delta
-        if: failure()
+      - name: Test evidence-plane contract in locked isolation
         run: |
-          cp Cargo.lock /tmp/Cargo.lock.before
-          cargo generate-lockfile
-          echo "::group::Cargo.lock resolver delta"
-          git diff --no-ext-diff --unified=3 -- Cargo.lock || true
-          echo "::endgroup::"
-          cp /tmp/Cargo.lock.before Cargo.lock
+          set -euo pipefail
+          contract_root="$(mktemp -d)"
+          mkdir -p "$contract_root/crate"
+          cp -R crates/core/symthaea-evidence-plane/. "$contract_root/crate/"
+          cp Cargo.lock "$contract_root/Cargo.lock"
+
+          python3 - "$contract_root" <<'PY'
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          root = Path(".")
+          contract_root = Path(sys.argv[1])
+          root_manifest = tomllib.loads((root / "Cargo.toml").read_text())
+          lock = tomllib.loads((root / "Cargo.lock").read_text())
+          workspace_deps = root_manifest["workspace"]["dependencies"]
+
+          def locked_version(name: str) -> str:
+              matches = [pkg["version"] for pkg in lock["package"] if pkg["name"] == name]
+              if len(matches) != 1:
+                  raise SystemExit(f"expected exactly one locked {name} package, found {matches!r}")
+              return matches[0]
+
+          serde = workspace_deps["serde"]
+          if not isinstance(serde, dict) or serde.get("features") != ["derive"]:
+              raise SystemExit("serde workspace dependency no longer matches the contract's derive requirement")
+
+          crate_manifest = (contract_root / "crate" / "Cargo.toml").read_text()
+          for dependency in ("blake3", "serde", "serde_json"):
+              marker = f"{dependency} = {{ workspace = true }}"
+              if marker not in crate_manifest:
+                  raise SystemExit(f"{dependency} is no longer a workspace dependency; update this isolated harness")
+
+          isolated = contract_root / "Cargo.toml"
+          isolated.write_text(
+              "[workspace]\n"
+              'resolver = "2"\n'
+              'members = ["crate"]\n\n'
+              "[workspace.dependencies]\n"
+              f'blake3 = "={locked_version("blake3")}"\n'
+              f'serde = {{ version = "={locked_version("serde")}", features = ["derive"] }}\n'
+              f'serde_json = "={locked_version("serde_json")}"\n'
+          )
+          PY
+
+          cargo test --manifest-path "$contract_root/Cargo.toml" --locked
+
+      - name: Verify root lock edges
+        run: |
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          lock = tomllib.loads(Path("Cargo.lock").read_text())
+          packages = {pkg["name"]: pkg for pkg in lock["package"]}
+          evidence = packages["symthaea-evidence-plane"]["dependencies"]
+          expected = {"blake3", "serde", "serde_json"}
+          if not expected.issubset(evidence):
+              raise SystemExit(
+                  f"symthaea-evidence-plane lock dependencies {evidence!r} "
+                  f"do not contain {sorted(expected)!r}"
+              )
+          print("Evidence Plane root lock edges are present.")
+          PY
 
   genesis-benchmarks:
     name: Genesis Mission Benchmarks
