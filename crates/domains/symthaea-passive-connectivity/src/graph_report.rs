@@ -10,8 +10,9 @@
 //! directionality, hydraulic performance, or any other transport property.
 
 use crate::{
-    evaluate_port_path, resolve_port_component, triangle_components, AnchorResolution,
-    PortPathEvidence, PortPathStatus,
+    boundary::{PortBoundaryEvidence, PortBoundaryPolicy},
+    evaluate_port_path, evaluate_port_path_with_boundary_policy, resolve_port_component,
+    triangle_components, AnchorResolution, PortPathEvidence, PortPathStatus,
 };
 use symthaea_fabrication_kernel::mesh::TriangleMesh;
 use symthaea_passive_void_compiler::GeometryEmbedding;
@@ -68,6 +69,26 @@ impl FunctionalGraphRealizationReport {
         embedding: &GeometryEmbedding,
         candidate: &TriangleMesh,
     ) -> Self {
+        Self::evaluate_inner(graph, embedding, candidate, None)
+    }
+
+    /// Evaluate the complete flow graph while permitting only explicitly allowed
+    /// boundary openings.
+    pub fn evaluate_with_boundary_policy(
+        graph: &FunctionalVoidGraph,
+        embedding: &GeometryEmbedding,
+        candidate: &TriangleMesh,
+        boundary_policy: &PortBoundaryPolicy,
+    ) -> Self {
+        Self::evaluate_inner(graph, embedding, candidate, Some(boundary_policy))
+    }
+
+    fn evaluate_inner(
+        graph: &FunctionalVoidGraph,
+        embedding: &GeometryEmbedding,
+        candidate: &TriangleMesh,
+        boundary_policy: Option<&PortBoundaryPolicy>,
+    ) -> Self {
         if graph.validate().is_err() {
             return Self {
                 status: GraphRealizationStatus::InvalidGraph,
@@ -109,13 +130,14 @@ impl FunctionalGraphRealizationReport {
         let mut path_results = Vec::with_capacity(flow_connections.len());
 
         for connection in flow_connections {
-            let evidence = evaluate_port_path(
-                graph,
-                embedding,
-                candidate,
-                connection.from,
-                connection.to,
-            );
+            let evidence = match boundary_policy {
+                Some(policy) => evaluate_port_path_with_boundary_policy(
+                    graph, embedding, candidate, connection.from, connection.to, policy,
+                ),
+                None => evaluate_port_path(
+                    graph, embedding, candidate, connection.from, connection.to,
+                ),
+            };
 
             if matches!(evidence.status, PortPathStatus::Connected) {
                 connected_paths += 1;
@@ -165,7 +187,14 @@ impl FunctionalGraphRealizationReport {
         candidate: &TriangleMesh,
     ) -> Vec<UnexpectedConnectivity> {
         let report = symthaea_fabrication_kernel::validate::validate_mesh(candidate);
-        if !report.is_valid() || !report.is_watertight {
+        if !report.is_valid() {
+            return Vec::new();
+        }
+        if let Some(policy) = boundary_policy {
+            if !PortBoundaryEvidence::evaluate(candidate, embedding, policy).is_admissible() {
+                return Vec::new();
+            }
+        } else if !report.is_watertight {
             return Vec::new();
         }
 
@@ -324,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn realized_mesh_can_expose_unexpected_connectivity() {
+    fn realized_mesh_can_expose_unexpected_flow_connectivity() {
         let mut graph = FunctionalVoidGraph::new();
         graph
             .add_region(VoidRegion {
