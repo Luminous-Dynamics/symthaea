@@ -325,19 +325,20 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
         WirePrimitive::Circle { cx, cy, r } => {
             valid_coordinate(*cx)
                 && valid_coordinate(*cy)
-                && valid_nonnegative(*r)
+                && valid_positive(*r)
         }
         WirePrimitive::Ellipse { cx, cy, rx, ry } => {
             valid_coordinate(*cx)
                 && valid_coordinate(*cy)
-                && valid_nonnegative(*rx)
-                && valid_nonnegative(*ry)
+                && valid_positive(*rx)
+                && valid_positive(*ry)
         }
         WirePrimitive::Line { x1, y1, x2, y2 } => {
             valid_coordinate(*x1)
                 && valid_coordinate(*y1)
                 && valid_coordinate(*x2)
                 && valid_coordinate(*y2)
+                && (*x1 != *x2 || *y1 != *y2)
         }
         WirePrimitive::Polygon { points, closed } => {
             ((!*closed && points.len() >= 2) || (*closed && points.len() >= 3))
@@ -350,8 +351,8 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
         WirePrimitive::Rect { x, y, w, h, rx } => {
             valid_coordinate(*x)
                 && valid_coordinate(*y)
-                && valid_nonnegative(*w)
-                && valid_nonnegative(*h)
+                && valid_positive(*w)
+                && valid_positive(*h)
                 && valid_nonnegative(*rx)
                 && *rx <= w.min(*h) * 0.5
         }
@@ -568,6 +569,10 @@ fn valid_nonnegative(value: f32) -> bool {
     valid_coordinate(value) && !value.is_sign_negative()
 }
 
+fn valid_positive(value: f32) -> bool {
+    valid_nonnegative(value) && value > 0.0
+}
+
 fn valid_color(color: Color) -> bool {
     [color.r, color.g, color.b, color.a]
         .into_iter()
@@ -661,6 +666,79 @@ mod tests {
         let mut scene = RemoteScene::from_scene(&SceneNode::circle(1.0, 1.0, 1.0));
         scene.version = RemoteScene::VERSION + 1;
         assert!(!scene.is_supported());
+    }
+
+    #[test]
+    fn degenerate_primitives_are_rejected() {
+        let zero_circle = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Circle {
+                    cx: 0.0,
+                    cy: 0.0,
+                    r: 0.0,
+                },
+                transform: WireTransform::default(),
+                style: WireStyle {
+                    fill: Some(Color::rgb(1.0, 0.0, 0.0)),
+                    ..WireStyle::default()
+                },
+                children: Vec::new(),
+            },
+        };
+        assert!(!zero_circle.is_supported());
+
+        let zero_ellipse = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Ellipse {
+                    cx: 0.0,
+                    cy: 0.0,
+                    rx: 0.0,
+                    ry: 1.0,
+                },
+                transform: WireTransform::default(),
+                style: WireStyle::default(),
+                children: Vec::new(),
+            },
+        };
+        assert!(!zero_ellipse.is_supported());
+
+        let zero_line = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Line {
+                    x1: 4.0,
+                    y1: 4.0,
+                    x2: 4.0,
+                    y2: 4.0,
+                },
+                transform: WireTransform::default(),
+                style: WireStyle {
+                    stroke: Some(Color::rgb(1.0, 1.0, 1.0)),
+                    ..WireStyle::default()
+                },
+                children: Vec::new(),
+            },
+        };
+        assert!(!zero_line.is_supported());
+
+        let zero_rect = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    w: 0.0,
+                    h: 10.0,
+                    rx: 0.0,
+                },
+                transform: WireTransform::default(),
+                style: WireStyle::default(),
+                children: Vec::new(),
+            },
+        };
+        assert!(!zero_rect.is_supported());
     }
 
     #[test]
