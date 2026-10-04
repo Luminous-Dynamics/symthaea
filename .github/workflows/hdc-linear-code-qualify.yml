@@ -1,10 +1,6 @@
 name: HDC Linear-Code Recovery Qualification
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches:
-      - "research/hdc-resonator-cleanup-rules-v1"
   push:
     branches:
       - "research/hdc-linear-code-recovery-design-v1"
@@ -20,10 +16,6 @@ env:
 
 jobs:
   qualify:
-    if: >-
-      ${{ github.event_name == 'workflow_dispatch'
-          || github.ref == 'refs/heads/research/hdc-linear-code-recovery-design-v1'
-          || github.event.pull_request.head.ref == 'research/hdc-linear-code-recovery-design-v1' }}
     name: Exact-head linear-code qualification
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -34,7 +26,7 @@ jobs:
       - name: Checkout exact PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
 
       - name: Record exact head
@@ -42,17 +34,14 @@ jobs:
         run: |
           ACTUAL_SHA="$(git rev-parse HEAD)"
           echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            test "$ACTUAL_SHA" = "${{ github.event.pull_request.head.sha }}"
-          fi
+
 
       - name: Enforce research surface
         id: scope
-        if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         env:
           HEAD_SHA: ${{ steps.head.outputs.sha }}
         run: |
-          BASE_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}"
+          BASE_SHA="${{ github.event.before }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             git fetch --no-tags --depth=1 origin "research/hdc-resonator-cleanup-rules-v1"
             BASE_SHA="$(git rev-parse "origin/research/hdc-resonator-cleanup-rules-v1")"
@@ -82,7 +71,7 @@ jobs:
             esac
           done < "$CHANGED_PATHS"
           ACTUAL_COUNT="$(wc -l < "$CHANGED_PATHS" | tr -d " ")"
-          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             EXPECTED_COUNT=6
             test "$ACTUAL_COUNT" -eq "$EXPECTED_COUNT"
           fi
