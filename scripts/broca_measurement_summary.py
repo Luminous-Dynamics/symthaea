@@ -117,6 +117,7 @@ def main() -> int:
         lines.append(f"- Corpus cases: {fmt(lexical_binding.get('corpus_cases'))}")
         lines.append(f"- Positive passes: {fmt(lexical_binding.get('positive_passes'))}")
         lines.append(f"- Negative passes: {fmt(lexical_binding.get('negative_passes'))}")
+        lines.append(f"- All negative cases pass: {fmt(lexical_binding.get('all_negative_cases_pass'))}")
         lines.append(f"- Semantic coverage: {fmt(lexical_binding.get('semantic_coverage_pass'))}")
         lines.append(f"- Provenance: {fmt(lexical_binding.get('provenance_pass'))}")
         lines.append(f"- Grammar: {fmt(lexical_binding.get('grammar_pass'))}")
