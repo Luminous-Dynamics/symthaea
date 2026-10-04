@@ -786,11 +786,11 @@ impl ReceiptAttestationVerificationReport {
         let snapshot_is_well_formed = self
             .resolution_snapshot_fingerprint
             .as_deref()
-            .is_none_or(|snapshot| !snapshot.is_empty());
+            .is_none_or(|snapshot| !snapshot.trim().is_empty());
         let resolved_method_is_well_formed = self
             .resolved_verification_method
             .as_deref()
-            .is_none_or(|method| !method.is_empty());
+            .is_none_or(|method| !method.trim().is_empty());
         let resolved_method_is_required =
             matches!(self.verification_method, VerificationStage::Passed);
 
@@ -2024,6 +2024,21 @@ impl Ed25519ReceiptVerifier {
                 );
             }
         };
+        if resolved_snapshot
+            .snapshot_fingerprint
+            .as_deref()
+            .is_some_and(|snapshot| snapshot.trim().is_empty())
+        {
+            return ReceiptAttestationVerificationReport::failed(
+                ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+                EvaluationCheck::VerificationMethodResolution,
+                receipt.fingerprint(),
+                Some(method.to_string()),
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
+            );
+        }
         let resolved = resolved_snapshot.resolved;
         if resolved.verification_method != method {
             return ReceiptAttestationVerificationReport::failed_with_resolution_snapshot(
@@ -4805,6 +4820,58 @@ mod tests {
             Some("identity-mismatch-snapshot")
         );
         assert!(report.execution_trace.is_well_formed());
+    }
+
+    #[test]
+    fn resolver_empty_snapshot_fails_closed_before_lifecycle_or_proof() {
+        struct EmptySnapshotResolver;
+
+        impl VerificationMethodResolver for EmptySnapshotResolver {
+            fn resolve(
+                &self,
+                verification_method: &str,
+            ) -> Result<ResolvedVerificationMethod, VerificationMethodResolutionError> {
+                Ok(ResolvedVerificationMethod {
+                    verification_method: verification_method.to_string(),
+                    verifying_key: SigningKey::from_bytes(&[7u8; 32]).verifying_key(),
+                    status: VerificationMethodStatus::Active,
+                    allowed_proof_purposes: vec!["observation-independence".into()],
+                })
+            }
+
+            fn resolve_with_snapshot(
+                &self,
+                verification_method: &str,
+            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+                Ok(ResolvedVerificationMethodSnapshot {
+                    resolved: self.resolve(verification_method)?,
+                    snapshot_fingerprint: Some(String::new()),
+                })
+            }
+        }
+
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = verifier.verify_with_resolver_report(&envelope, &receipt, &EmptySnapshotResolver);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable
+        );
+        assert_eq!(
+            report.verification_method,
+            VerificationStage::Failed(
+                ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable
+            )
+        );
+        assert_eq!(report.lifecycle, VerificationStage::NotEvaluated);
+        assert_eq!(report.cryptographic_proof, VerificationStage::NotEvaluated);
+        assert!(report.resolution_snapshot_fingerprint.is_none());
+        assert!(report.is_well_formed());
     }
 
     #[test]
