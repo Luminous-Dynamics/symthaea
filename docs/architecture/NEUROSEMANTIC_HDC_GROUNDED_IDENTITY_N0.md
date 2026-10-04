@@ -135,6 +135,10 @@ The matrix uses eight cases:
 | load-5x4 | 5 | 4 | 5 | 0% |
 | load-7x6 | 7 | 6 | 3 | 0% |
 | load-9x8 | 9 | 8 | 1 | 0% |
+| topology-out-star | 7 | 6 | 3 | 0% |
+| topology-in-star | 7 | 6 | 3 | 0% |
+| topology-merge-branch | 7 | 6 | 3 | 0% |
+| topology-cycle | 7 | 6 | 3 | 0% |
 
 Every atom required by the held-out graphs is known to the frozen codebook, but
 the complete stable source/relation/target edge triples are held out. This
