@@ -235,6 +235,8 @@ Cardinalities are stored symbolically as exact powers of two, so large search sp
 
 ### Kernel-basis ambiguity certificate
 ### Affine-fiber certificate
+Factor ordering is deliberately separated from algebraic identity. Reordering the factor list leaves Delta, union rank, kernel dimension, reachable-target count, and fiber cardinality unchanged. It may change the canonical kernel-basis presentation and the deterministic representative, because those are defined relative to the ordered generator presentation. Qualification tests now verify both halves of this statement.
+
 
 For a representable target, `factorization_affine_fiber` now packages one deterministic coefficient representative, the complete kernel basis, and the exact fiber cardinality in one object. Any alternate factorization is obtained by XORing the representative with a GF(2) mask over the kernel basis.
 
