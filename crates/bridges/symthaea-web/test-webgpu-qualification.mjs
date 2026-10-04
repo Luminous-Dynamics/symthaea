@@ -329,6 +329,7 @@ async function waitForQualificationRecovery(page, selector) {
           10,
         );
         return canvas.getAttribute('data-qualification-recovery-requested') === 'true'
+          && canvas.getAttribute('data-qualification-loss-observed') === 'true'
           && canvas.getAttribute('data-qualification-recovered') === 'true'
           && Number.isInteger(initCount)
           && initCount >= 2;
@@ -338,7 +339,7 @@ async function waitForQualificationRecovery(page, selector) {
     );
   } catch (error) {
     throw new QualificationError(
-      `WebGPU renderer ${selector} did not complete the deterministic recovery proof (requested loss + second initialization): ${error instanceof Error ? error.message : String(error)}`,
+      `WebGPU renderer ${selector} did not complete the deterministic recovery proof (requested loss + observed loss + second initialization): ${error instanceof Error ? error.message : String(error)}`,
       'renderer',
     );
   }
@@ -584,6 +585,8 @@ async function runMode(mode) {
             movie_init_count: movie?.getAttribute('data-qualification-init-count') || null,
             cognitive_recovery_requested: cognitive?.getAttribute('data-qualification-recovery-requested') === 'true',
             movie_recovery_requested: movie?.getAttribute('data-qualification-recovery-requested') === 'true',
+            cognitive_loss_observed: cognitive?.getAttribute('data-qualification-loss-observed') === 'true',
+            movie_loss_observed: movie?.getAttribute('data-qualification-loss-observed') === 'true',
             cognitive_recovered: cognitive?.getAttribute('data-qualification-recovered') === 'true',
             movie_recovered: movie?.getAttribute('data-qualification-recovered') === 'true',
           };
