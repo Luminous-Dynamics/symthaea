@@ -136,6 +136,7 @@ fn main() -> Result<(), String> {
         && reordered_ok
         && renamed_ok
         && missing_rejected
+        && duplicate_node_rejected
         && duplicate_rejected
         && relabelled_ok
         && confidence_ok)
