@@ -7598,10 +7598,12 @@ mod tests {
         let mut substituted = history.clone();
         substituted[1].canonical_digest_hex =
             "e000000000000000000000000000000000000000000000000000000000000000".into();
-        substituted[1].receipt_digest_hex = substituted[1].canonical_receipt_digest_hex();
+        let substituted_receipt_digest = substituted[1].canonical_receipt_digest_hex();
+        substituted[1].receipt_digest_hex = substituted_receipt_digest;
         assert!(substituted[1].verify_self_digest());
         assert!(substituted[1].verify_integrity());
-        // A self-consistent same-height substitution is rejected by the externally retained checkpoint.
+        // A self-consistent same-height substitution is rejected by the
+        // externally retained checkpoint.
         assert!(!checkpoint.verify_against_history(&substituted));
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -7938,11 +7940,12 @@ mod tests {
 
         let mut substituted = all.clone();
         substituted[2].receipt.validator_ref = "validator:substituted".into();
-        substituted[2].stored_receipt_digest_hex =
-            substituted[2].recomputed_receipt_digest_hex();
+        let substituted_receipt_digest = substituted[2].recomputed_receipt_digest_hex();
+        substituted[2].stored_receipt_digest_hex = substituted_receipt_digest;
         assert!(substituted[2].verify_self_digest());
         assert!(substituted[2].verify_integrity());
-        // The record remains self-consistent, but the externally retained checkpoint detects substitution.
+        // The record remains self-consistent, but the externally retained checkpoint
+        // detects the substitution.
         assert!(!checkpoint.verify_against_history(&substituted));
 
         let latest = p.latest_snapshot_validation_receipt_records().unwrap();
