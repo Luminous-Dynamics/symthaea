@@ -163,5 +163,5 @@ jobs:
             fuzz_rfc9942_signature_with_receipts \
             fuzz_rfc9942_proofs
           do
-            cargo fuzz run "$target" -- -runs="${FUZZ_RUNS}" -seed="${FUZZ_SEED}" -print_final_stats=1
+            cargo +nightly fuzz run "$target" -- -runs="${FUZZ_RUNS}" -seed="${FUZZ_SEED}" -print_final_stats=1
           done
