@@ -106,9 +106,11 @@ The adapter is intentionally outside the domain crate's current dependency graph
 
 10. **Pass through the fail-closed domain gate.**
 
-    Call the challenge-aware verification path only after all raw TPM evidence has been collected.
+    Call the challenge-aware, policy-bound verification path only after all raw TPM evidence has been collected.
 
-    A successful adapter call is not itself sufficient authority. The resulting evidence must still pass the generic freshness-anchor verification and authoritative commit gates.
+    The authoritative entry point is `verify_tpm_nv_counter_with_trust_policy()`. Its trust policy is pre-authorized configuration: it must be constructed independently of the incoming attestation and must contain the expected TPM identity, NV Index Name, NV public-area digest, authorization-policy digest, attestation-key identity, and PCR-policy binding.
+
+    The older structural `verify_tpm_nv_counter()` helper remains useful for adapter/qualification tests but must not be used by itself to mint authoritative freshness. A successful adapter call is not itself sufficient authority; the resulting evidence must still pass the generic freshness-anchor verification and authoritative commit gates.
 
 ## API mapping for a Linux implementation
 
