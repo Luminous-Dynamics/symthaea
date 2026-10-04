@@ -388,7 +388,7 @@ jobs:
           decoder_oracle=exhaustive-bounded-distance
           decoder_oracle_is_production=false
           production_default_changed=false
-          qualification_status=${{ steps.format.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.format.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.fingerprint.outcome == 'success' && steps.geometry.outcome == 'success' && steps.geometry_sweep.outcome == 'success' && steps.search_space.outcome == 'success' && steps.storage.outcome == 'success' && steps.paper_matrix.outcome == 'success' && steps.work.outcome == 'success' && steps.scaling.outcome == 'success' && steps.packing.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           focused_formatting=${{ steps.format.outcome }}
           isolated_harness=${{ steps.harness.outcome }}
           linear_code_unit_tests=${{ steps.unit_tests.outcome }}
