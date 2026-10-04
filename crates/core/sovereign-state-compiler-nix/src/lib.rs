@@ -46,6 +46,9 @@ pub fn nixos_generation_resource(
     if realization.is_empty() {
         return Err(NixOSAdapterError::InvalidGenerationRealization);
     }
+    if !realization.starts_with("/nix/store/") {
+        return Err(NixOSAdapterError::InvalidGenerationRealizationPath);
+    }
 
     let realization_bytes = realization.as_bytes();
     let mut bytes =
@@ -614,6 +617,8 @@ pub enum NixOSAdapterError {
     InvalidGenerationNumber,
     #[error("rollback target realization identity must not be empty")]
     InvalidGenerationRealization,
+    #[error("NixOS generation realization must be rooted in /nix/store")]
+    InvalidGenerationRealizationPath,
     #[error("nixos.rollback=true requires an exact nixos.rollback-realization")]
     RollbackRealizationRequired,
     #[error("rollback target identity is only valid when rollback is requested")]
@@ -902,6 +907,10 @@ mod tests {
         assert_eq!(
             nixos_generation_resource(42, "").expect_err("empty realization"),
             NixOSAdapterError::InvalidGenerationRealization
+        );
+        assert_eq!(
+            nixos_generation_resource(42, "/etc/nixos").expect_err("non-store realization"),
+            NixOSAdapterError::InvalidGenerationRealizationPath
         );
     }
 
