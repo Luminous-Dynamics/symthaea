@@ -41,6 +41,27 @@ fn rfc8392_public_key() -> [u8; 65] {
     key
 }
 
+const RFC8392_P256_PKCS8: &[u8] = &[
+    0x30,0x81,0x87,0x02,0x01,0x00,0x30,0x13,0x06,0x07,0x2a,0x86,0x48,0xce,0x3d,0x02,0x01,
+    0x06,0x08,0x2a,0x86,0x48,0xce,0x3d,0x03,0x01,0x07,0x04,0x6d,0x30,0x6b,0x02,0x01,0x01,
+    0x04,0x20,0x6c,0x13,0x82,0x76,0x5a,0xec,0x53,0x58,0xf1,0x17,0x73,0x3d,0x28,0x1c,0x1c,
+    0x7b,0xdc,0x39,0x88,0x4d,0x04,0xa4,0x5a,0x1e,0x6c,0x67,0xc8,0x58,0xbc,0x20,0x6c,0x19,
+    0xa1,0x44,0x03,0x42,0x00,0x04,0x14,0x33,0x29,0xcc,0xe7,0x86,0x8e,0x41,0x69,0x27,0x59,
+    0x9c,0xf6,0x5a,0x34,0xf3,0xce,0x2f,0xfd,0xa5,0x5a,0x7a,0xec,0xa6,0x9e,0xd8,0x91,
+    0x9a,0x39,0x4d,0x42,0xf0,0x60,0xf7,0xf1,0xa7,0x80,0xd8,0xa7,0x83,0xbf,0xb7,0xa2,
+    0xdd,0x6b,0x27,0x96,0xe8,0x12,0x8d,0xbc,0xef,0x9d,0x3d,0x16,0x8d,0xb9,0x52,0x99,
+    0x71,0xa3,0x6e,0x7b,0x09,
+];
+
+fn rfc8392_signing_key(rng: &SystemRandom) -> EcdsaKeyPair {
+    EcdsaKeyPair::from_pkcs8(
+        &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+        RFC8392_P256_PKCS8,
+        rng,
+    )
+    .expect("RFC 8392 P-256 PKCS#8 key must parse")
+}
+
 #[test]
 fn rfc9942_inclusion_and_consistency_preserve_required_verification_order() {
     let inclusion_proof =
@@ -310,13 +331,13 @@ fn cose_extension_accepts_full_range_integer_values() {
             0x3b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         ],
     ] {
-        // Protected map = { 999 => value }; total serialized map size is 14 bytes.
+        // Protected map = { 999 => value }; total serialized map size is 13 bytes.
         let mut protected = Vec::with_capacity(14);
         protected.extend_from_slice(&[0xa1, 0x19, 0x03, 0xe7]);
         protected.extend_from_slice(&value);
 
         let mut encoded = Vec::new();
-        encoded.extend_from_slice(&[0xd2, 0x84, 0x4e]);
+        encoded.extend_from_slice(&[0xd2, 0x84, 0x4d]);
         encoded.extend_from_slice(&protected);
         encoded.extend_from_slice(&[0xa0, 0xf6, 0x41, 0xaa]);
 
@@ -344,13 +365,7 @@ fn rfc9942_semantic_state_cannot_confuse_valid_signature_with_wrong_entry() {
         .unwrap();
 
         let rng = SystemRandom::new();
-        let signing_key = EcdsaKeyPair::from_private_key_and_public_key(
-            &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-            &RFC8392_PRIVATE_D,
-            &rfc8392_public_key(),
-            &rng,
-        )
-        .unwrap();
+        let signing_key = rfc8392_signing_key(&rng);
         let tbs = unsigned.signature1_tbs(&[], None).unwrap();
         let signature = signing_key.sign(&rng, &tbs).unwrap().as_ref().to_vec();
 
@@ -419,13 +434,7 @@ fn rfc9942_consistency_state_binds_signature_to_detached_root() {
     .unwrap();
 
     let rng = SystemRandom::new();
-    let signing_key = EcdsaKeyPair::from_private_key_and_public_key(
-        &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-        &RFC8392_PRIVATE_D,
-        &rfc8392_public_key(),
-        &rng,
-    )
-    .unwrap();
+    let signing_key = rfc8392_signing_key(&rng);
     let root = newer.root();
     let tbs = unsigned.signature1_tbs(&[], Some(&root)).unwrap();
     let signature = signing_key.sign(&rng, &tbs).unwrap().as_ref().to_vec();
@@ -550,13 +559,7 @@ fn rfc9942_es256_cose_key_inclusion_uses_detached_proof_derived_root() {
     .unwrap();
 
     let rng = SystemRandom::new();
-    let signer = EcdsaKeyPair::from_private_key_and_public_key(
-        &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-        &RFC8392_PRIVATE_D,
-        &rfc8392_public_key(),
-        &rng,
-    )
-    .unwrap();
+    let signer = rfc8392_signing_key(&rng);
     let root = head.root();
     let tbs = unsigned.signature1_tbs(&[], Some(&root)).unwrap();
     let signature = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
@@ -611,7 +614,7 @@ fn rfc9942_es256_cose_key_consistency_preserves_signature_first_order() {
             symthaea_swarm::semantic_evidence_vds::VdsTreeHead::new(1, [0x55; 32]),
             &cose_key,
             &[],
-            None,
+            Some(&[0x44; 32]),
         ),
         Err(Rfc9942VdpError::InvalidEs256Signature)
     );
@@ -680,13 +683,7 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         let unsigned_wire = outer_wire(receipt, payload, &[0u8; 64], protect_receipts);
         let unsigned = Rfc9942SignatureWithReceipts::from_cbor(&unsigned_wire).unwrap();
         let rng = SystemRandom::new();
-        let signing_key = EcdsaKeyPair::from_private_key_and_public_key(
-            &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-            &RFC8392_PRIVATE_D,
-            &rfc8392_public_key(),
-            &rng,
-        )
-        .unwrap();
+        let signing_key = rfc8392_signing_key(&rng);
         let tbs = unsigned.signature1_tbs(&[], None).unwrap();
         let signature = signing_key.sign(&rng, &tbs).unwrap().as_ref().to_vec();
         Rfc9942SignatureWithReceipts::from_cbor(&outer_wire(
@@ -718,13 +715,7 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
         .unwrap();
 
         let rng = SystemRandom::new();
-        let signing_key = EcdsaKeyPair::from_private_key_and_public_key(
-            &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-            &RFC8392_PRIVATE_D,
-            &rfc8392_public_key(),
-            &rng,
-        )
-        .unwrap();
+        let signing_key = rfc8392_signing_key(&rng);
         let tbs = unsigned.signature1_tbs(&[], None).unwrap();
         let signature = signing_key.sign(&rng, &tbs).unwrap().as_ref().to_vec();
 
@@ -754,12 +745,7 @@ fn rfc9942_outer_verification_binds_exact_payload_to_inner_inclusion() {
             vec![0u8; 64],
         ).unwrap();
         let rng = SystemRandom::new();
-        let signer = EcdsaKeyPair::from_private_key_and_public_key(
-            &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-            &RFC8392_PRIVATE_D,
-            &key,
-            &rng,
-        ).unwrap();
+        let signer = rfc8392_signing_key(&rng);
         let root = head.root();
         let tbs = unsigned.signature1_tbs(&[], Some(&root)).unwrap();
         let signature = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
@@ -882,12 +868,7 @@ fn detached_inclusion_state_derives_and_binds_root() {
 
     let key = rfc8392_public_key();
     let rng = SystemRandom::new();
-    let signer = EcdsaKeyPair::from_private_key_and_public_key(
-        &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-        &RFC8392_PRIVATE_D,
-        &key,
-        &rng,
-    ).unwrap();
+    let signer = rfc8392_signing_key(&rng);
     let root = head.root();
     let tbs = unsigned.signature1_tbs(&[], Some(&root)).unwrap();
     let sig = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
@@ -945,13 +926,7 @@ fn rfc9942_verified_state_records_selected_proof_index() {
 
     let key = rfc8392_public_key();
     let rng = SystemRandom::new();
-    let signer = EcdsaKeyPair::from_private_key_and_public_key(
-        &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-        &RFC8392_PRIVATE_D,
-        &key,
-        &rng,
-    )
-    .unwrap();
+    let signer = rfc8392_signing_key(&rng);
     let tbs = unsigned.signature1_tbs(&[], None).unwrap();
     let signature = signer.sign(&rng, &tbs).unwrap().as_ref().to_vec();
 
