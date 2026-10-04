@@ -106,6 +106,25 @@ fn rfc8392_es256_known_answer_verifies() {
 }
 
 #[test]
+fn rfc8392_es256_accepts_indefinite_signature_bstr() {
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(&RFC8392_SIGNED_CWT[..109]);
+    encoded.push(0x5f);
+    for chunk in RFC8392_SIGNED_CWT[111..].chunks(16) {
+        encoded.push(0x50);
+        encoded.extend_from_slice(chunk);
+    }
+    encoded.push(0xff);
+
+    let message = Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+        .expect("indefinite signature bstr must be accepted");
+    assert_eq!(message.signature(), &RFC8392_SIGNED_CWT[111..]);
+    message
+        .verify_es256(&sec1_public_key(), &[], None)
+        .expect("signature byte-string chunking must preserve authentication");
+}
+
+#[test]
 fn rfc8392_es256_known_answer_rejects_signature_tampering() {
     let mut encoded = RFC8392_SIGNED_CWT.to_vec();
     let last = encoded.len() - 1;
