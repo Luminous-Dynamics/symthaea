@@ -5,7 +5,7 @@
 //! semantics. It describes what a federation adapter must carry and structurally
 //! validate when transporting an explicitly admitted claim.
 
-use crate::{ClaimRepresentationIdentity, CanonicalAdmissionReceipt, CanonicalAdmissionSubject, ProvenanceRelation, ProvenanceRelationKind, ProvenanceValidationReport, ProvenanceView, sha256_hex};
+use crate::{ClaimRepresentationIdentity, CanonicalAdmissionReceipt, CanonicalAdmissionSubject, CanonicalStatementIdentity, ProvenanceRelation, ProvenanceRelationKind, ProvenanceValidationReport, ProvenanceView, sha256_hex};
 
 pub const FEDERATED_CLAIM_SCHEMA_VERSION: u16 = 1;
 /// Version of the canonical federated-envelope digest encoding. Bump whenever
@@ -93,13 +93,14 @@ impl FederatedClaim {
             canonical_identity,
             Some(provenance_family.into()),
         )?;
+        let statement = CanonicalStatementIdentity::new(subject.clone(), statement_ref)?;
         let claim = Self {
             schema_version: FEDERATED_CLAIM_SCHEMA_VERSION,
             claim_identity: representation.as_str().to_owned(),
             canonical_identity: subject.canonical_identity().to_owned(),
             provenance_family: subject.provenance_family().expect("claim subject family").to_owned(),
             author: author.into(),
-            statement_ref: statement_ref.into(),
+            statement_ref: statement.statement_ref().to_owned(),
             source_event: None,
             frontier_ref: admission_receipt.frontier_ref.clone(),
             provenance_snapshot_digest: provenance_view.snapshot_digest.clone(),
@@ -437,15 +438,49 @@ impl FederatedClaim {
         }
     }
 
-    pub fn is_admission_bound(
+    /// Typed proposition identity: this is distinct from both the representation
+    /// identity and the subject-level admission identity.
+    pub fn statement_identity(&self) -> Result<CanonicalStatementIdentity, &'static str> {
+        CanonicalStatementIdentity::new(self.admission_subject()?, self.statement_ref.clone())
+    }
+
+    /// True when the statement reference is coupled to this claim's exact canonical
+    /// subject. This proves identity structure only; it does not assert that the
+    /// proposition itself was separately admitted.
+    pub fn statement_subject_binding_is_valid(&self) -> bool {
+        self.statement_identity()
+            .map(|statement| {
+                self.admission_subject()
+                    .map(|subject| statement.subject() == &subject)
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false)
+    }
+
+    /// Subject-level admission check. This intentionally does not mean that the
+    /// proposition named by statement_ref was itself admitted.
+    pub fn is_subject_admission_bound(
         &self,
         validation: &crate::ProvenanceValidationReport,
     ) -> bool {
         self.validate_structure().is_ok()
+            && self.statement_subject_binding_is_valid()
             && validation.validate_against_relations(&self.relations).is_ok()
             && self.admission_receipt.binds_validation(validation)
             && self.provenance_snapshot_digest == validation.snapshot_digest
             && self.provenance_validation == *validation
+    }
+
+    /// Backwards-compatible alias for the historical subject-level check.
+    ///
+    /// Callers that need proposition semantics must use statement_identity() and
+    /// separately obtain a statement-level admission binding; the subject receipt
+    /// alone is insufficient.
+    pub fn is_admission_bound(
+        &self,
+        validation: &crate::ProvenanceValidationReport,
+    ) -> bool {
+        self.is_subject_admission_bound(validation)
     }
 }
 
@@ -501,6 +536,70 @@ mod tests {
             claim.admission_subject().unwrap().digest(),
             sha256_hex(claim.representation_identity().unwrap().as_str().as_bytes())
         );
+    }
+
+    #[test]
+    fn federated_claim_statement_identity_binds_exact_subject_and_proposition() {
+        let (receipt, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view =
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            view,
+            receipt,
+        )
+        .unwrap();
+
+        let statement = claim.statement_identity().unwrap();
+        assert_eq!(statement.subject(), &claim.admission_subject().unwrap());
+        assert_eq!(statement.statement_ref(), "statement:1");
+        assert!(claim.statement_subject_binding_is_valid());
+    }
+
+    #[test]
+    fn alternate_statement_is_not_the_same_typed_identity_even_for_same_subject() {
+        let (receipt, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view =
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            view,
+            receipt,
+        )
+        .unwrap();
+
+        let a = claim.statement_identity().unwrap();
+        let b = CanonicalStatementIdentity::new(
+            claim.admission_subject().unwrap(),
+            "statement:2",
+        )
+        .unwrap();
+
+        assert_ne!(a.digest(), b.digest());
+        assert!(claim.validate_structure().is_ok());
+        // The receipt proves subject-level admission only; statement identity is a
+        // separate namespace and must not be inferred as separately admitted.
+        assert!(claim.is_subject_admission_bound(&claim.provenance_validation));
     }
 
     #[test]
@@ -876,6 +975,8 @@ mod digest_tests {
         assert_eq!(decoded, claim);
         assert_eq!(decoded.canonical_digest(), digest);
         assert!(decoded.validate_structure().is_ok());
+        assert!(decoded.statement_subject_binding_is_valid());
+        assert!(decoded.is_subject_admission_bound(&decoded.provenance_validation));
         assert!(decoded.is_admission_bound(&decoded.provenance_validation));
     }
 
