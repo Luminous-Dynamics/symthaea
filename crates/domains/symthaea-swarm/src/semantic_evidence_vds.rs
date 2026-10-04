@@ -2296,14 +2296,17 @@ impl<'a> CborReader<'a> {
                         if entries >= 64 {
                             return Err(Rfc9162ProofDecodeError::InvalidStructure);
                         }
-                        self.skip_label()?;
+                        self.skip_value(depth + 1)?;
                         self.skip_value(depth + 1)?;
                         entries += 1;
                     }
                 }
                 let n=self.read_map_len()?;
                 if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-                for _ in 0..n{self.skip_label()?;self.skip_value(depth+1)?;}
+                for _ in 0..n{
+                    self.skip_value(depth+1)?;
+                    self.skip_value(depth+1)?;
+                }
                 Ok(())
             },
             6 => { self.read_tag()?; self.skip_value(depth+1) },
