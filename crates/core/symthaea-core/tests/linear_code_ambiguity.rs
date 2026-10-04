@@ -710,6 +710,7 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                         algebra.kernel_dimension
                     );
                     assert_eq!(algebra.unique_factorization, algebra.kernel_dimension == 0);
+                    assert!(algebra.satisfies_conservation_law_for_factor_count(factor_count));
                     max_kernel_dimension = max_kernel_dimension.max(algebra.kernel_dimension);
                     if let Some(order) = algebra.dependency_order {
                         max_dependency_order = max_dependency_order.max(order);
