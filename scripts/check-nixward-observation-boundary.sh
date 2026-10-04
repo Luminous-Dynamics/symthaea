@@ -46,6 +46,8 @@ IMPLICIT_SERVICE_RESTART_PATTERN='_[[:space:]]*=>[[:space:]]*NixOSCommand::Custo
 VALIDATED_OPERATION_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceOperationV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceOperationV1\b'
 OBSERVED_STATE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceObservedStateV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceObservedStateV1\b'
 OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceObservedStateV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
+CAPABILITIES_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceOperationCapabilitiesV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceOperationCapabilitiesV1\b'
+CAPABILITIES_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceOperationCapabilitiesV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
 ENABLEMENT_EVIDENCE_DESERIALIZATION_PATTERN='(?s)#\[derive\([^]]*Deserialize[^]]*\)]\s*(?:pub[[:space:]]+)?(?:struct|enum)[[:space:]]+NixServiceEnablementEvidenceV1\b|impl[[:space:]]+[^\n{]*Deserialize[^\n{]*\bfor[[:space:]]+NixServiceEnablementEvidenceV1\b'
 ENABLEMENT_EVIDENCE_PUBLIC_CONSTRUCTOR_PATTERN='(?s)impl[[:space:]]+NixServiceEnablementEvidenceV1[[:space:]]*\{.*?pub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+new[[:space:]]*\('
 OBSERVATION_PUBLIC_FACTORY_PATTERN='\bpub[[:space:]]+(?:async[[:space:]]+)?fn[[:space:]]+(parse_systemd_properties|parse_systemd_observation|from_observed_state)[[:space:]]*\('
@@ -160,6 +162,11 @@ run_boundary_check() {
     echo "${matches}" >&2
     failed=1
   fi
+  if matches="$(rg -U -n --pcre2 "${CAPABILITIES_DESERIALIZATION_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
+    echo "ERROR: NixServiceOperationCapabilitiesV1 must not deserialize around its observation boundary" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
   if matches="$(rg -U -n --pcre2 "${ENABLEMENT_EVIDENCE_DESERIALIZATION_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
     echo "ERROR: NixServiceEnablementEvidenceV1 must not deserialize around its observation boundary" >&2
     echo "${matches}" >&2
@@ -167,6 +174,11 @@ run_boundary_check() {
   fi
   if matches="$(rg -U -n --pcre2 "${OBSERVED_STATE_DESERIALIZATION_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
     echo "ERROR: NixServiceObservedStateV1 must not deserialize around its observation boundary" >&2
+    echo "${matches}" >&2
+    failed=1
+  fi
+  if matches="$(rg -U -n --pcre2 "${CAPABILITIES_PUBLIC_CONSTRUCTOR_PATTERN}" "${ROOT}/crates/core/nixward/src/action/service_state.rs")"; then
+    echo "ERROR: NixServiceOperationCapabilitiesV1 constructor must not be public" >&2
     echo "${matches}" >&2
     failed=1
   fi
@@ -317,6 +329,36 @@ run_self_test() {
     ) {}' > "${tmp}/observed-state-public-constructor.rs"
   if rg -U -n --pcre2 "${OBSERVED_STATE_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/observed-state-public-constructor.rs"; then :; else
     echo "ERROR: CROSS-022 self-test failed to detect public observed-state constructor" >&2
+    return 1
+  fi
+
+  printf '%s\n' $'#[derive(\n    Deserialize,\n)]\npub struct NixServiceOperationCapabilitiesV1;' > "${tmp}/capabilities-deserialize.rs"
+  if rg -U -n --pcre2 "${CAPABILITIES_DESERIALIZATION_PATTERN}" "${tmp}/capabilities-deserialize.rs"; then :; else
+    echo "ERROR: CROSS-026 self-test failed to detect multiline capability-evidence deserialization" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'impl Deserialize for NixServiceOperationCapabilitiesV1 { }' > "${tmp}/capabilities-custom-deserialize.rs"
+  if rg -U -n --pcre2 "${CAPABILITIES_DESERIALIZATION_PATTERN}" "${tmp}/capabilities-custom-deserialize.rs"; then :; else
+    echo "ERROR: CROSS-026 self-test failed to detect custom capability-evidence deserialization" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'impl NixServiceOperationCapabilitiesV1 {
+    pub async fn new(
+        unit: String,
+    ) {}' > "${tmp}/capabilities-public-async-constructor.rs"
+  if rg -U -n --pcre2 "${CAPABILITIES_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/capabilities-public-async-constructor.rs"; then :; else
+    echo "ERROR: CROSS-026 self-test failed to detect public async capability-evidence constructor" >&2
+    return 1
+  fi
+
+  printf '%s\n' 'impl NixServiceOperationCapabilitiesV1 {
+    pub fn new(
+        unit: String,
+    ) {}' > "${tmp}/capabilities-public-constructor.rs"
+  if rg -U -n --pcre2 "${CAPABILITIES_PUBLIC_CONSTRUCTOR_PATTERN}" "${tmp}/capabilities-public-constructor.rs"; then :; else
+    echo "ERROR: CROSS-026 self-test failed to detect public capability-evidence constructor" >&2
     return 1
   fi
 
