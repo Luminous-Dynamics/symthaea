@@ -513,9 +513,12 @@ generation-plus-realization resource that was authorized. Missing or drifted
 resources fail closed before execution.
 
 The prototype `applications.install` and `applications.remove` properties are
-adapter-local vocabulary. They MUST be bound to an explicit Nix profile scope
-by the eventual Nixward executor; the neutral SSC contract must not infer that
-they imply system-wide package mutation or unrestricted package authority.
+adapter-local vocabulary. They are currently rejected by the Nix adapter rather
+than compiled into an executable plan, because the existing `nix-env` path targets
+the invoking user's profile implicitly. Admission should resume only after the
+Nixward bridge exposes an exact user-profile resource and the executor binds that
+resource to the authorized plan. The neutral SSC contract must not infer that
+application mutation implies system-wide package authority.
 
 ## Resource binding
 
