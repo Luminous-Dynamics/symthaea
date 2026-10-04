@@ -57,7 +57,8 @@ mesh.
 
 `digest_binding_set` produces a deterministic order-independent identity for the
 validated set, committing to the common candidate identities and every
-per-binding digest.
+per-binding digest. Mycelix records that collection in
+`passive-solver-boundary-binding-set-v1.schema.json`.
 
 `validate_binding_set_against_candidate` is the recommended pre-dispatch gate.
 It validates the set structure and then re-checks every binding against the same
