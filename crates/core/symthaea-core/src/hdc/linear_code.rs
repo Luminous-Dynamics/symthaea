@@ -723,11 +723,11 @@ impl LinearCodeDependencyWitness {
         }
 
         let mut sum = BinaryCodeword::zero(dimension);
-        for (&coefficient, generator) in self.generator_coefficients.iter().zip(
-            factors
-                .iter()
-                .flat_map(|factor| factor.basis().iter()),
-        ) {
+        for (&coefficient, generator) in self
+            .generator_coefficients
+            .iter()
+            .zip(factors.iter().flat_map(|factor| factor.basis().iter()))
+        {
             if coefficient {
                 sum.xor_assign(generator);
             }
@@ -833,21 +833,13 @@ impl LinearCodeFactorizationFiber {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea-hdc-linear-code-affine-integrity-v1\0");
         hasher.update(&self.source_fingerprint);
-        hasher.update(
-            &(self.representative_coefficients.len() as u64)
-                .to_le_bytes(),
-        );
+        hasher.update(&(self.representative_coefficients.len() as u64).to_le_bytes());
         for coefficient in &self.representative_coefficients {
             hasher.update(&[*coefficient as u8]);
         }
-        hasher.update(
-            &(self.kernel_basis.len() as u64).to_le_bytes(),
-        );
+        hasher.update(&(self.kernel_basis.len() as u64).to_le_bytes());
         for witness in &self.kernel_basis {
-            hasher.update(
-                &(witness.generator_coefficients.len() as u64)
-                    .to_le_bytes(),
-            );
+            hasher.update(&(witness.generator_coefficients.len() as u64).to_le_bytes());
             for coefficient in &witness.generator_coefficients {
                 hasher.update(&[*coefficient as u8]);
             }
@@ -918,12 +910,9 @@ impl LinearCodeFactorizationFiber {
             return false;
         }
         if self.cardinality.exponent() != self.kernel_basis.len()
-            || self
-                .kernel_basis
-                .iter()
-                .any(|witness| {
-                    witness.generator_coefficients.len() != self.representative_coefficients.len()
-                })
+            || self.kernel_basis.iter().any(|witness| {
+                witness.generator_coefficients.len() != self.representative_coefficients.len()
+            })
         {
             return false;
         }
@@ -939,9 +928,10 @@ impl LinearCodeFactorizationFiber {
             || dependent_indices
                 .iter()
                 .any(|&index| index >= self.representative_coefficients.len())
-            || self.kernel_basis.iter().any(|witness| {
-                !witness.generator_coefficients[witness.dependent_generator_index]
-            })
+            || self
+                .kernel_basis
+                .iter()
+                .any(|witness| !witness.generator_coefficients[witness.dependent_generator_index])
         {
             return false;
         }
@@ -986,10 +976,7 @@ impl LinearCodeFactorizationFiber {
     /// Enumeration is deliberately opt-in and fail-closed: the symbolic cardinality must fit
     /// in the host `usize` and be no larger than `max_fibers`. Paper-scale qualification should
     /// remain symbolic rather than expanding the fiber.
-    pub fn iter_bounded(
-        &self,
-        max_fibers: usize,
-    ) -> Option<LinearCodeFactorizationFiberIter<'_>> {
+    pub fn iter_bounded(&self, max_fibers: usize) -> Option<LinearCodeFactorizationFiberIter<'_>> {
         if !self.basis_is_well_formed() {
             return None;
         }
@@ -1011,11 +998,7 @@ impl LinearCodeFactorizationFiber {
     ///
     /// This checks the representative, the kernel witness count, every witness itself,
     /// and the exact symbolic cardinality 2^d.
-    pub fn verifies_against(
-        &self,
-        target: &BinaryCodeword,
-        factors: &[&RandomLinearCode],
-    ) -> bool {
+    pub fn verifies_against(&self, target: &BinaryCodeword, factors: &[&RandomLinearCode]) -> bool {
         let Some(algebra) = factorization_algebra(factors) else {
             return false;
         };
@@ -1027,11 +1010,8 @@ impl LinearCodeFactorizationFiber {
             return false;
         }
 
-        let expected_source_fingerprint =
-            factorization_source_fingerprint(target, factors);
-        if self.source_fingerprint != expected_source_fingerprint
-            || !self.integrity_is_valid()
-        {
+        let expected_source_fingerprint = factorization_source_fingerprint(target, factors);
+        if self.source_fingerprint != expected_source_fingerprint || !self.integrity_is_valid() {
             return false;
         }
 
@@ -1048,10 +1028,8 @@ impl LinearCodeFactorizationFiber {
 
         let combined_basis = concatenate_factor_bases(factors, algebra.factor_dimension_sum);
         let mut reconstructed = BinaryCodeword::zero(target.dimension());
-        for (&coefficient, generator) in self
-            .representative_coefficients
-            .iter()
-            .zip(&combined_basis)
+        for (&coefficient, generator) in
+            self.representative_coefficients.iter().zip(&combined_basis)
         {
             if coefficient {
                 reconstructed.xor_assign(generator);
@@ -1113,7 +1091,10 @@ pub fn factorization_kernel_basis(
                     .filter_map(|(index, _)| {
                         let start = factor_offsets[index];
                         let end = factor_offsets[index + 1];
-                        coefficients[start..end].iter().any(|bit| *bit).then_some(index)
+                        coefficients[start..end]
+                            .iter()
+                            .any(|bit| *bit)
+                            .then_some(index)
                     })
                     .collect::<Vec<_>>();
 
@@ -1284,10 +1265,8 @@ mod tests {
 
     #[test]
     fn affine_fiber_certificate_tracks_representative_kernel_and_cardinality() {
-        let code = RandomLinearCode::from_basis(vec![
-            BinaryCodeword::from_words(3, vec![0b001]),
-        ])
-        .expect("code");
+        let code = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b001])])
+            .expect("code");
         let factors = [&code, &code];
         let target = code.encode(&[true]);
         let fiber = factorization_affine_fiber(&target, &factors).expect("affine fiber");
@@ -1304,9 +1283,10 @@ mod tests {
         assert_ne!(alternate, fiber.representative_coefficients);
 
         let mut zero = BinaryCodeword::zero(3);
-        for (coefficient, generator) in alternate.iter().zip(
-            factors.iter().flat_map(|factor| factor.basis().iter()),
-        ) {
+        for (coefficient, generator) in alternate
+            .iter()
+            .zip(factors.iter().flat_map(|factor| factor.basis().iter()))
+        {
             if *coefficient {
                 zero.xor_assign(generator);
             }
@@ -1360,10 +1340,7 @@ mod tests {
             coefficient_basis.push(vector);
         }
         assert_eq!(
-            basis_rank(
-                &coefficient_basis,
-                witness.generator_coefficients.len(),
-            ),
+            basis_rank(&coefficient_basis, witness.generator_coefficients.len(),),
             algebra.kernel_dimension,
         );
 
@@ -1394,15 +1371,26 @@ mod tests {
         assert_eq!(a.kernel_dimension, b.kernel_dimension);
         assert_eq!(a.raw_factor_tuple_count, b.raw_factor_tuple_count);
         assert_eq!(a.reachable_target_count, b.reachable_target_count);
-        assert_eq!(a.factorization_count_per_target, b.factorization_count_per_target);
+        assert_eq!(
+            a.factorization_count_per_target,
+            b.factorization_count_per_target
+        );
         assert_eq!(a.unique_factorization, b.unique_factorization);
         assert_eq!(a.dependency_order, b.dependency_order);
 
         let forward_kernel = factorization_kernel_basis(&forward).expect("forward kernel");
         let reverse_kernel = factorization_kernel_basis(&reverse).expect("reverse kernel");
         assert_eq!(forward_kernel.len(), reverse_kernel.len());
-        assert!(forward_kernel.iter().all(|witness| witness.verifies_against(&forward)));
-        assert!(reverse_kernel.iter().all(|witness| witness.verifies_against(&reverse)));
+        assert!(
+            forward_kernel
+                .iter()
+                .all(|witness| witness.verifies_against(&forward))
+        );
+        assert!(
+            reverse_kernel
+                .iter()
+                .all(|witness| witness.verifies_against(&reverse))
+        );
         assert_ne!(forward_kernel, reverse_kernel);
     }
     #[test]
