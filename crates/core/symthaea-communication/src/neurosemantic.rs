@@ -366,7 +366,7 @@ impl NeurosemanticReplayTracker {
     }
 }
 
-fn validate_payload(payload: &NeurosemanticPayload) -> Result<(), String> {
+fn default_public_sensitivity() -> CognitiveSensitivity {\n    CognitiveSensitivity::Public\n}\n\nfn validate_payload(payload: &NeurosemanticPayload) -> Result<(), String> {
     match payload {
         NeurosemanticPayload::DerivedNeuralFeature(values)
             if values.iter().any(|value| !value.is_finite()) =>
