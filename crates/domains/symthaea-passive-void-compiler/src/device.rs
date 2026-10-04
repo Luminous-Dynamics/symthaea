@@ -265,6 +265,12 @@ mod tests {
         assert!(semantics.output_is_material_candidate);
         assert!(semantics.external_port_tunnels_are_explicit);
         assert!(semantics.transport_remains_unproven);
+
+        let mesh = symthaea_fabrication_kernel::mesh::resolve_to_mesh(&material);
+        let report = symthaea_fabrication_kernel::validate::validate_mesh(&mesh);
+        assert!(report.is_valid());
+        assert!(report.is_watertight);
+        assert!(report.signed_volume > 0.0);
     }
 
     #[test]
