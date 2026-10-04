@@ -10,6 +10,10 @@
 use crate::analytical::{AnalyticalBackend, CrossSection, MaterialProperties};
 use crate::csg::CSGNode;
 use crate::mesh::{TriangleMesh, resolve_to_mesh};
+use crate::passive_design::{
+    PassiveDesignEvidence, PassiveFunctionContract, PassiveObjectiveObservation,
+    PassiveObjectiveWeights, PassiveValidationReport,
+};
 use crate::units::{Meters, Millimeters, Newtons};
 use crate::validate::validate_mesh;
 
@@ -107,6 +111,76 @@ pub fn structural_fitness(node: &CSGNode, target_triangle_count: usize) -> f64 {
 }
 
 /// Like [`structural_fitness`] but with a configurable transverse load (Newtons).
+/// Evaluate a generated candidate as a passive-function design.
+///
+/// The physics score uses the same reduced-order structural analysis as
+/// structural_fitness_with_load. Passivity itself is supplied by explicit
+/// evidence rather than inferred from a triangle mesh, keeping the epistemic
+/// boundary conservative.
+pub fn passive_objective_observation(
+    node: &CSGNode,
+    target_triangle_count: usize,
+    transverse_force: f64,
+    contract: &PassiveFunctionContract,
+    evidence: PassiveDesignEvidence,
+) -> Option<(PassiveObjectiveObservation, PassiveValidationReport)> {
+    if !transverse_force.is_finite() {
+        return None;
+    }
+
+    let mesh = resolve_to_mesh(node);
+    if mesh.vertices.is_empty() || mesh.indices.is_empty() {
+        return None;
+    }
+
+    let report = validate_mesh(&mesh);
+    if !report.is_valid() {
+        return None;
+    }
+
+    let structural = structural_fitness_with_load(node, target_triangle_count, transverse_force);
+
+    let manufacturability = if report.is_printable() {
+        1.0
+    } else if report.is_valid() {
+        0.25
+    } else {
+        0.0
+    };
+
+    let target = target_triangle_count.max(1);
+    let material_efficiency =
+        1.0 - (report.triangle_count as f64 / (target as f64 * 2.0)).min(1.0);
+
+    let passive_report = contract.validate(evidence);
+    let observation = PassiveObjectiveObservation {
+        passivity: passive_report.score,
+        performance: structural,
+        manufacturability,
+        material_efficiency,
+    };
+
+    Some((observation, passive_report))
+}
+
+/// Convenience wrapper for the weighted scalar objective.
+pub fn passive_objective_score(
+    node: &CSGNode,
+    target_triangle_count: usize,
+    transverse_force: f64,
+    contract: &PassiveFunctionContract,
+    evidence: PassiveDesignEvidence,
+    weights: PassiveObjectiveWeights,
+) -> Option<f64> {
+    let (observation, _) = passive_objective_observation(
+        node,
+        target_triangle_count,
+        transverse_force,
+        contract,
+        evidence,
+    )?;
+    Some(observation.weighted_score(weights))
+}
 pub fn structural_fitness_with_load(
     node: &CSGNode,
     target_triangle_count: usize,
@@ -273,6 +347,56 @@ mod tests {
         assert!(fitness.is_finite());
     }
 
+    #[test]
+    fn passive_objective_accepts_explicit_zero_motion_evidence() {
+        let contract = PassiveFunctionContract::strict(
+            crate::passive_design::PassiveInput::Mechanical,
+            crate::passive_design::PassiveOutput::Mechanical,
+            crate::passive_design::PassiveMechanism::Geometry,
+        );
+        let result = passive_objective_observation(
+            &CSGNode::cube(),
+            12,
+            100.0,
+            &contract,
+            PassiveDesignEvidence::default(),
+        )
+        .expect("cube should be evaluable");
+        assert!(result.0.passivity >= 0.99);
+        assert!(result.1.compliant);
+    }
+
+    #[test]
+    fn passive_objective_score_drops_when_actuation_is_declared() {
+        let contract = PassiveFunctionContract::strict(
+            crate::passive_design::PassiveInput::Mechanical,
+            crate::passive_design::PassiveOutput::Mechanical,
+            crate::passive_design::PassiveMechanism::Geometry,
+        );
+        let score_passive = passive_objective_score(
+            &CSGNode::cube(),
+            12,
+            100.0,
+            &contract,
+            PassiveDesignEvidence::default(),
+            PassiveObjectiveWeights::default(),
+        )
+        .expect("passive candidate should be evaluable");
+        let active = PassiveDesignEvidence {
+            commanded_actuators: 1,
+            ..Default::default()
+        };
+        let score_active = passive_objective_score(
+            &CSGNode::cube(),
+            12,
+            100.0,
+            &contract,
+            active,
+            PassiveObjectiveWeights::default(),
+        )
+        .expect("active candidate should still be evaluable");
+        assert!(score_passive > score_active);
+    }
     #[test]
     fn large_target_gives_higher_efficiency() {
         // A cube has 12 triangles. target=12 means ratio=12/24=0.5, efficiency=0.5.
