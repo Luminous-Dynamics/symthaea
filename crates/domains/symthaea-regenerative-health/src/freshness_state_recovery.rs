@@ -11,6 +11,10 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::freshness_anchor_assurance::{
+    FreshnessAnchorAssuranceError, FreshnessAnchorCapabilities, FreshnessAnchorProfile,
+    VerifiedFreshnessAnchor,
+};
 use crate::freshness_reconciliation::{FreshnessAcceptancePolicy, FreshnessAcceptanceState};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -77,6 +81,17 @@ pub trait FreshnessRecoveryAnchorStore {
         expected: Option<&FreshnessRecoveryAnchor>,
         next: &FreshnessRecoveryAnchor,
     ) -> bool;
+
+    /// Existing implementations default to non-authoritative software
+    /// persistence. Backends must opt in by declaring all required properties.
+    fn profile(&self) -> FreshnessAnchorProfile {
+        FreshnessAnchorProfile::new(
+            crate::freshness_anchor_assurance::FreshnessAnchorBacking::SoftwareOnly,
+            FreshnessAnchorCapabilities::software_only(),
+            "software-only"
+        )
+        .expect("static software-only anchor profile must be valid")
+    }
 }
 
 impl FreshnessRecoveryRecord {
@@ -212,6 +227,11 @@ pub fn prepare_record(
     )
 }
 
+/// Commit an anchor using the mechanical store interface only.
+///
+/// This validates the recovery chain but does not establish that the backing
+/// store is rollback-resistant. Use commit_authoritative_anchor when the
+/// anchor is intended to authorize recovery after receiver rollback.
 pub fn commit_anchor<S: FreshnessRecoveryAnchorStore>(
     store: &S,
     expected: Option<&FreshnessRecoveryAnchor>,
@@ -236,6 +256,34 @@ pub fn commit_anchor<S: FreshnessRecoveryAnchorStore>(
     } else {
         Err("recovery anchor compare-and-swap failed")
     }
+}
+
+/// Commit an anchor only when the backing store explicitly satisfies the
+/// authoritative anti-rollback contract.
+pub fn commit_authoritative_anchor<S: FreshnessRecoveryAnchorStore>(
+    store: &S,
+    verified_anchor: &VerifiedFreshnessAnchor,
+    expected: Option<&FreshnessRecoveryAnchor>,
+    record: &FreshnessRecoveryRecord,
+) -> Result<(), FreshnessAnchorAssuranceError> {
+    let store_profile = store.profile();
+    let verified_profile = verified_anchor.profile();
+
+    if store_profile.schema_version != verified_profile.schema_version
+        || store_profile.fingerprint() != verified_profile.fingerprint()
+    {
+        return Err(FreshnessAnchorAssuranceError::ProfileBindingMismatch);
+    }
+
+    verified_profile.require_authoritative()?;
+    if verified_anchor.receiver_id() != record.receiver_id
+        || verified_anchor.generation() != record.generation
+        || verified_anchor.state_fingerprint() != record.state_fingerprint
+    {
+        return Err(FreshnessAnchorAssuranceError::SubjectBindingMismatch);
+    }
+    commit_anchor(store, expected, record)
+        .map_err(|message| FreshnessAnchorAssuranceError::CommitRejected(message.into()))
 }
 
 #[cfg(test)]
@@ -349,4 +397,143 @@ mod tests {
             Err("recovery generation is not strictly monotonic")
         );
     }
+    #[test]
+    fn software_only_store_cannot_make_authoritative_commit() {
+        struct SoftwareStore;
+        impl FreshnessRecoveryAnchorStore for SoftwareStore {
+            fn load(&self) -> Option<FreshnessRecoveryAnchor> { None }
+            fn compare_and_swap(
+                &self,
+                _: Option<&FreshnessRecoveryAnchor>,
+                _: &FreshnessRecoveryAnchor,
+            ) -> bool { true }
+        }
+
+        let r = record(0, state(), None);
+        let profile = SoftwareStore.profile();
+        let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
+            schema_version: "0.1".into(),
+            profile_fingerprint: profile.fingerprint(),
+            receiver_id: "receiver-1".into(),
+            generation: 0,
+            state_fingerprint: r.state_fingerprint.clone(),
+            verifier_reference: "verifier-1".into(),
+            evidence_reference: "evidence-1".into(),
+            evidence_digest: "digest-1".into(),
+        };
+        struct Accept;
+        impl crate::freshness_anchor_assurance::FreshnessAnchorEvidenceVerifier for Accept {
+            fn verify(
+                &self,
+                _: &FreshnessAnchorProfile,
+                _: &crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt,
+            ) -> bool { true }
+        }
+        let err = VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap_err();
+        assert_eq!(
+            err,
+            FreshnessAnchorAssuranceError::InsufficientCapabilities {
+                missing: vec![
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::IntegrityProtection,
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::Authentication,
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::Monotonicity,
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::RollbackResistance,
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::AtomicUpdate,
+                    crate::freshness_anchor_assurance::FreshnessAnchorCapability::CrashPersistence,
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn verified_anchor_cannot_cross_receiver_or_generation() {
+        struct AuthoritativeStore;
+        impl FreshnessRecoveryAnchorStore for AuthoritativeStore {
+            fn load(&self) -> Option<FreshnessRecoveryAnchor> { None }
+            fn compare_and_swap(
+                &self,
+                _: Option<&FreshnessRecoveryAnchor>,
+                _: &FreshnessRecoveryAnchor,
+            ) -> bool { true }
+            fn profile(&self) -> FreshnessAnchorProfile {
+                FreshnessAnchorProfile::new(
+                    crate::freshness_anchor_assurance::FreshnessAnchorBacking::RemoteAuthority,
+                    FreshnessAnchorCapabilities::authoritative(),
+                    "remote://authority-a",
+                ).unwrap()
+            }
+        }
+
+        struct Accept;
+        impl crate::freshness_anchor_assurance::FreshnessAnchorEvidenceVerifier for Accept {
+            fn verify(
+                &self,
+                _: &FreshnessAnchorProfile,
+                _: &crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt,
+            ) -> bool { true }
+        }
+
+        let profile = AuthoritativeStore.profile();
+        let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
+            schema_version: "0.1".into(),
+            profile_fingerprint: profile.fingerprint(),
+            receiver_id: "receiver-1".into(),
+            generation: 0,
+            state_fingerprint: "different-state".into(),
+            verifier_reference: "verifier-1".into(),
+            evidence_reference: "evidence-1".into(),
+            evidence_digest: "digest-1".into(),
+        };
+        let verified = VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap();
+        let r = record(0, state(), None);
+        assert_eq!(
+            commit_authoritative_anchor(&AuthoritativeStore, &verified, None, &r).unwrap_err(),
+            FreshnessAnchorAssuranceError::SubjectBindingMismatch
+        );
+    }
+
+    #[test]
+    fn fully_capable_store_can_make_authoritative_commit() {
+        struct AuthoritativeStore;
+        impl FreshnessRecoveryAnchorStore for AuthoritativeStore {
+            fn load(&self) -> Option<FreshnessRecoveryAnchor> { None }
+            fn compare_and_swap(
+                &self,
+                _: Option<&FreshnessRecoveryAnchor>,
+                _: &FreshnessRecoveryAnchor,
+            ) -> bool { true }
+            fn profile(&self) -> FreshnessAnchorProfile {
+                FreshnessAnchorProfile::new(
+                    crate::freshness_anchor_assurance::FreshnessAnchorBacking::RemoteAuthority,
+                    FreshnessAnchorCapabilities::authoritative(),
+                    "remote://authority-a",
+                ).unwrap()
+            }
+        }
+
+        struct Accept;
+        impl crate::freshness_anchor_assurance::FreshnessAnchorEvidenceVerifier for Accept {
+            fn verify(
+                &self,
+                _: &FreshnessAnchorProfile,
+                _: &crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt,
+            ) -> bool { true }
+        }
+
+        let profile = AuthoritativeStore.profile();
+        let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
+            schema_version: "0.1".into(),
+            profile_fingerprint: profile.fingerprint(),
+            receiver_id: "receiver-1".into(),
+            generation: 0,
+            state_fingerprint: r.state_fingerprint.clone(),
+            verifier_reference: "verifier-1".into(),
+            evidence_reference: "evidence-1".into(),
+            evidence_digest: "digest-1".into(),
+        };
+        let verified = VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap();
+        let r = record(0, state(), None);
+        assert!(commit_authoritative_anchor(&AuthoritativeStore, &verified, None, &r).is_ok());
+    }
+
 }
