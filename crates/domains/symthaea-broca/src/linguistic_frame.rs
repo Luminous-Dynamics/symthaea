@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::speech_plan::{ClauseMode, EpistemicDelivery, SpeechPlan, SpeechPlanRole};
+use crate::speech_plan::{ClauseMode, EpistemicDelivery, ProsodicIntent, SpeechPlan, SpeechPlanRole};
 
 pub const LINGUISTIC_FRAME_VERSION: &str = "broca-linguistic-frame-v1";
 
@@ -54,6 +54,7 @@ pub struct LinguisticFrame {
     pub lexical_provenance: Option<String>,
     pub strategy: FormulationStrategy,
     pub epistemic_delivery: EpistemicDelivery,
+    pub prosody: ProsodicIntent,
     pub focus_role: Option<String>,
     pub constituents: Vec<ConstituentSlot>,
 }
@@ -89,6 +90,7 @@ impl LinguisticFrame {
             binding_status: LinguisticBindingStatus::RoleStructureOnly,
             strategy,
             epistemic_delivery: plan.epistemic_delivery,
+            prosody: plan.prosody,
             focus_role: plan.focus_role.clone(),
             constituents,
         }
@@ -191,12 +193,13 @@ impl LinguisticFrame {
             .join("|");
 
         format!(
-            "{};binding={:?};lexical_provenance={};strategy={:?};epistemic={:?};focus={};constituents={}",
+            "{};binding={:?};lexical_provenance={};strategy={:?};epistemic={:?};intonation={:?};focus={};constituents={}",
             self.version,
             self.binding_status,
             self.lexical_provenance.is_some(),
             self.strategy,
             self.epistemic_delivery,
+            self.prosody.intonation,
             self.focus_role.as_deref().unwrap_or("NONE"),
             constituents,
         )
