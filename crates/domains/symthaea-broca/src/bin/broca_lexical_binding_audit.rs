@@ -283,6 +283,9 @@ fn run_negative(
     expected_failure: &'static str,
     matches_expected: fn(&LexicalBindingError) -> bool,
 ) -> AuditCase {
+    let semantic_items = bindings.iter().filter(|item| item.semantic_payload).count();
+    let inserted_function_words = bindings.iter().filter(|item| !item.semantic_payload).count();
+
     match bind(frame, language, bindings) {
         Ok(_) => AuditCase {
             name,
@@ -291,8 +294,8 @@ fn run_negative(
             expected_failure: Some(expected_failure),
             observed_error: None,
             provenance_token: None,
-            semantic_items: bindings.iter().filter(|item| item.semantic_payload).count(),
-            inserted_function_words: bindings.iter().filter(|item| !item.semantic_payload).count(),
+            semantic_items,
+            inserted_function_words,
         },
         Err(error) => AuditCase {
             name,
@@ -301,8 +304,8 @@ fn run_negative(
             expected_failure: Some(expected_failure),
             observed_error: Some(error.to_string()),
             provenance_token: None,
-            semantic_items: bindings.iter().filter(|item| item.semantic_payload).count(),
-            inserted_function_words: bindings.iter().filter(|item| !item.semantic_payload).count(),
+            semantic_items,
+            inserted_function_words,
         },
     }
 }
