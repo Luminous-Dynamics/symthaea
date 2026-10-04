@@ -66,14 +66,13 @@ fn operator_display_arg(arg: &str) -> String {
     for ch in arg.chars() {
         match ch {
             '\\' => encoded.push_str("\\\\"),
-            '"' => encoded.push_str("\\""),
+            '"' => encoded.push_str("\\\""),
             _ => encoded.push(ch),
         }
     }
     encoded.push('"');
     encoded
 }
-
 fn operator_display_args(args: &[String]) -> String {
     args.iter()
         .map(|arg| operator_display_arg(arg))
