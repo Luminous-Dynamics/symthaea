@@ -58,10 +58,10 @@ impl VerificationPolicyInputs {
     /// deserialize and mutate public fields before recomputing that fingerprint.
     pub fn is_well_formed(&self) -> bool {
         let optional_nonempty = |value: &Option<String>| {
-            value.as_deref().is_none_or(|value| !value.is_empty())
+            value.as_deref().is_none_or(|value| !value.trim().is_empty())
         };
 
-        !self.policy_version.is_empty()
+        !self.policy_version.trim().is_empty()
             && self.cryptosuite == CRYPTOSUITE
             && self.require_active_verification_method
             && optional_nonempty(&self.expected_proof_purpose)
@@ -126,13 +126,13 @@ impl VerifierEnvironmentIdentity {
 
     /// Validate the semantic environment identity before trusting its fingerprint.
     pub fn is_well_formed(&self) -> bool {
-        !self.build_fingerprint.is_empty()
+        !self.build_fingerprint.trim().is_empty()
             && self.identity_version == ENVIRONMENT_IDENTITY_VERSION
             && self.implementation_id == VERIFIER_IMPLEMENTATION_ID
             && self
                 .runtime_profile
                 .as_deref()
-                .is_none_or(|profile| !profile.is_empty())
+                .is_none_or(|profile| !profile.trim().is_empty())
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -1125,7 +1125,7 @@ impl VerificationContext {
         };
 
         let optional_identity_is_well_formed = |value: &Option<String>| {
-            value.as_deref().is_none_or(|identity| !identity.is_empty())
+            value.as_deref().is_none_or(|identity| !identity.trim().is_empty())
         };
 
         self.context_version == VERIFICATION_CONTEXT_VERSION
@@ -3850,6 +3850,50 @@ mod tests {
         ] {
             assert!(!context.is_well_formed());
         }
+    }
+
+    #[test]
+    fn public_identity_validators_reject_whitespace_only_values() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let mut policy = report.policy_inputs.clone();
+        assert!(policy.is_well_formed());
+        policy.policy_version = "   ";
+        assert!(!policy.is_well_formed());
+        policy.policy_version = report.policy_inputs.policy_version;
+        policy.expected_proof_purpose = Some("   ".into());
+        assert!(!policy.is_well_formed());
+        policy.expected_proof_purpose = report.policy_inputs.expected_proof_purpose.clone();
+        policy.expected_domain = Some("   ".into());
+        assert!(!policy.is_well_formed());
+
+        let mut environment = report.environment_identity.clone();
+        assert!(environment.is_well_formed());
+        environment.build_fingerprint = "   ".into();
+        assert!(!environment.is_well_formed());
+        environment.build_fingerprint = report.environment_identity.build_fingerprint.clone();
+        environment.runtime_profile = Some("   ".into());
+        assert!(!environment.is_well_formed());
+
+        let mut context = VerificationContext::from_report(&report);
+        assert!(context.is_well_formed());
+        context.evaluator_identity_fingerprint = Some("   ".into());
+        assert!(!context.is_well_formed());
+        context = VerificationContext::from_report(&report);
+        context.trust_root_fingerprint = Some("   ".into());
+        assert!(!context.is_well_formed());
+        context = VerificationContext::from_report(&report);
+        context.authorization_policy_fingerprint = Some("   ".into());
+        assert!(!context.is_well_formed());
+        context = VerificationContext::from_report(&report);
+        context.resolution_snapshot_fingerprint = Some("   ".into());
+        assert!(!context.is_well_formed());
     }
 
     #[test]
