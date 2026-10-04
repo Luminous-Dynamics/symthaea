@@ -12,6 +12,14 @@ use std::collections::BTreeMap;
 use symthaea_fabrication_kernel::csg::{CSGNode, Transform3D};
 use symthaea_passive_void_graph::{FunctionalVoidGraph, PortId, RegionId, VoidRegionRole, VoidRelation};
 
+pub mod device;
+pub mod interface;
+
+pub use interface::{
+    BoundaryConditionDomain, InterfacePlane, PortAperture, PortInterface, PortInterfaceError,
+    SolverBoundaryIdentity,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RegionAnchor {
     pub center_mm: [f32; 3],
@@ -28,6 +36,9 @@ pub struct PortAnchor {
 pub struct GeometryEmbedding {
     pub regions: BTreeMap<RegionId, RegionAnchor>,
     pub ports: BTreeMap<PortId, PortAnchor>,
+    /// Optional typed external interfaces. Legacy port anchors remain usable for
+    /// compatibility, but new boundary-aware flows should populate this map.
+    pub interfaces: BTreeMap<PortId, PortInterface>,
 }
 
 impl GeometryEmbedding {
@@ -39,6 +50,22 @@ impl GeometryEmbedding {
     pub fn with_port(mut self, id: PortId, anchor: PortAnchor) -> Self {
         self.ports.insert(id, anchor);
         self
+    }
+
+    pub fn with_port_interface(mut self, interface: PortInterface) -> Self {
+        self.ports.insert(
+            interface.port,
+            PortAnchor {
+                center_mm: interface.position_mm,
+                radius_mm: interface.radius_mm(),
+            },
+        );
+        self.interfaces.insert(interface.port, interface);
+        self
+    }
+
+    pub fn port_interface(&self, port: PortId) -> Option<&PortInterface> {
+        self.interfaces.get(&port)
     }
 }
 
@@ -208,5 +235,26 @@ mod tests {
         let gb = compile_flow_void_geometry(&b, &embedding()).unwrap().0;
         assert_eq!(format!("{ga:?}"), format!("{gb:?}"));
     }
+
+    #[test]
+    fn typed_interface_populates_legacy_anchor_consistently() {
+        let interface = PortInterface::new(
+            PortId(10),
+            [1.0, 2.0, 3.0],
+            PortAperture::Circular { radius_mm: 1.5 },
+            [0.0, 0.0, 1.0],
+            InterfacePlane::new([1.0, 2.0, 3.0], [0.0, 0.0, 1.0]).unwrap(),
+            SolverBoundaryIdentity {
+                domain: BoundaryConditionDomain::Fluidic,
+                id: 4,
+            },
+        )
+        .unwrap();
+
+        let embedding = GeometryEmbedding::default().with_port_interface(interface);
+        let anchor = embedding.ports.get(&PortId(10)).unwrap();
+        assert_eq!(anchor.center_mm, [1.0, 2.0, 3.0]);
+        assert_eq!(anchor.radius_mm, 1.5);
+        assert_eq!(embedding.port_interface(PortId(10)), Some(&interface));
+    }
 }
-pub mod device;
