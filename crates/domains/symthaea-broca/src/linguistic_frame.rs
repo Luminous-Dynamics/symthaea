@@ -105,6 +105,10 @@ impl LinguisticFrame {
         if provenance.trim().is_empty() {
             return Err(LinguisticFrameError::EmptyLexicalProvenance);
         }
+        if matches!(self.strategy, FormulationStrategy::Abstain) {
+            return Err(LinguisticFrameError::AbstentionCannotBind);
+        }
+        self.validate()?;
 
         self.binding_status = LinguisticBindingStatus::LexicallyBound;
         self.lexical_provenance = Some(provenance);
@@ -204,6 +208,7 @@ pub enum LinguisticFrameError {
     EmptyLexicalProvenance,
     MissingLexicalProvenance,
     NonLexicalProvenance,
+    AbstentionCannotBind,
     NonContiguousPositions,
     MultipleFocusRoles,
     FocusRoleNotRepresented,
@@ -221,6 +226,9 @@ impl std::fmt::Display for LinguisticFrameError {
             }
             Self::NonLexicalProvenance => {
                 write!(f, "role-only frames must not carry lexical provenance")
+            }
+            Self::AbstentionCannotBind => {
+                write!(f, "abstention frames cannot be lexically bound")
             }
             Self::NonContiguousPositions => {
                 write!(f, "constituent positions must be contiguous from zero")
@@ -341,6 +349,16 @@ mod tests {
         assert_eq!(frame.binding_status, LinguisticBindingStatus::LexicallyBound);
         assert_eq!(frame.lexical_provenance.as_deref(), Some("lexicalizer:v1"));
         assert!(frame.validate().is_ok());
+    }
+
+    #[test]
+    fn abstention_cannot_be_lexically_bound() {
+        let mut frame = LinguisticFrame::from_speech_plan(&plan_for(7, 4.0));
+        let error = frame
+            .bind_lexical_provenance("lexicalizer:v1")
+            .expect_err("abstention must remain non-realizable");
+
+        assert_eq!(error, LinguisticFrameError::AbstentionCannotBind);
     }
 
     #[test]
