@@ -56,6 +56,8 @@ struct AuditCase {
     lexical_missing_provenance_rejected: bool,
     semantic_exact_passed: bool,
     semantic_mismatch_rejected: bool,
+    semantic_partial_gate_rejected: bool,
+    phonological_persistence_validated: bool,
     grounding_deterministic: bool,
 }
 
@@ -127,9 +129,7 @@ fn run() -> Result<()> {
                     ContentBindingStatus::PhonologicallyBound,
                 )
                 .with_context(|| format!("phonological binding failed for {intent_name}/{epistemic}"))?;
-            let phonological_binding_succeeded =
-                phonological.content_binding == ContentBindingStatus::PhonologicallyBound
-                    && phonological.ready_for_realization();
+            let phonological_persistence_validated = phonological.validate().is_ok();
 
             let lexical_missing_provenance = PhonologicalPlan::from_speech_plan(&speech_plan)
                 .bind_segments(
@@ -189,7 +189,15 @@ fn run() -> Result<()> {
             );
             let semantic_mismatch_rejected =
                 mismatch_receipt.error.has_mismatch() && !mismatch_receipt.error.passes();
-            report.semantic_delivery_checks += 2;
+            let partial_receipt = SpeechDeliveryReceipt::new(
+                &speech_plan,
+                SpeechDeliveryObservation {
+                    intent: Some(delivery_target.intent.clone()),
+                    ..Default::default()
+                },
+            );
+            let semantic_partial_gate_rejected = !partial_receipt.error.passes();
+            report.semantic_delivery_checks += 3;
             if !semantic_exact_passed || !semantic_mismatch_rejected {
                 fail(
                     &mut report,
@@ -239,6 +247,8 @@ fn run() -> Result<()> {
                 lexical_missing_provenance_rejected,
                 semantic_exact_passed,
                 semantic_mismatch_rejected,
+                semantic_partial_gate_rejected,
+                phonological_persistence_validated,
                 grounding_deterministic,
             });
         }
