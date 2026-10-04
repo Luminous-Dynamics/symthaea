@@ -177,6 +177,9 @@ impl TpmNvCounterEvidence {
         write_string(&mut hasher, &self.quote_nonce_digest);
         write_string(&mut hasher, &self.quote_digest);
         write_string(&mut hasher, &self.nv_certify_digest);
+        write_string(&mut hasher, &self.nv_certify_nonce_digest);
+        write_string(&mut hasher, &self.nv_certify_index_name_digest);
+        write_string(&mut hasher, &self.nv_certify_contents_digest);
         write_string(&mut hasher, &self.pcr_binding_digest);
         hasher.update(&self.counter_value.to_le_bytes());
         hasher.finalize().to_hex().to_string()
@@ -522,6 +525,24 @@ mod tests {
             verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
             TpmNvCounterVerificationError::InvalidEvidence
         );
+    }
+
+    #[test]
+    fn nv_certification_fields_are_part_of_evidence_binding() {
+        let evidence = evidence(7);
+        let original = evidence.binding_digest();
+
+        let mut changed = evidence.clone();
+        changed.nv_certify_nonce_digest = "different-challenge".into();
+        assert_ne!(original, changed.binding_digest());
+
+        let mut changed = evidence.clone();
+        changed.nv_certify_index_name_digest = "different-index".into();
+        assert_ne!(original, changed.binding_digest());
+
+        let mut changed = evidence;
+        changed.nv_certify_contents_digest = "different-contents".into();
+        assert_ne!(original, changed.binding_digest());
     }
 
     #[test]
