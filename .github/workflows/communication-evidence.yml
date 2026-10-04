@@ -164,6 +164,20 @@ jobs:
           assert grounded_identity["metrics"]["concept_identity_exact"] is True
           assert grounded_identity["metrics"]["relation_identity_exact"] is True
 
+          adversarial = json.loads(Path("target/communication-evidence/neurosemantic_hdc_grounded_identity_adversarial_n0.json").read_text())
+          assert adversarial["benchmark_schema_version"] == 1
+          assert adversarial["execution_revision"] != ""
+          assert adversarial["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
+          assert adversarial["claim_boundary"] == "identity_confusion_red_team_with_random_bit_corruption_only"
+          assert adversarial["summary"]["node_correct_accepts"] >= 1
+          assert adversarial["summary"]["edge_correct_accepts"] >= 1
+          assert adversarial["summary"]["confident_wrong_accepts"] == 0
+          boundary = adversarial["summary"]["boundary_interpolation"]
+          assert boundary["weights"] == [1.0, 0.95, 0.9, 0.8, 0.7, 0.6, 0.4, 0.3, 0.2, 0.1, 0.05, 0.0]
+          assert boundary["node_correct_accepts"] >= 1
+          assert boundary["edge_correct_accepts"] >= 1
+          assert boundary["confident_wrong_accepts"] == 0
+
           hdc_interlingua = json.loads(Path("target/communication-evidence/neurosemantic_hdc_interlingua_n0.json").read_text())
           assert hdc_interlingua["benchmark_schema_version"] == 1
           assert hdc_interlingua["execution_revision"] != ""
