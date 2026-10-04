@@ -9,6 +9,13 @@ on:
       - ".github/workflows/symthaea-ui-webgpu.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   webgpu-qualification:
     runs-on: ubuntu-latest
@@ -17,14 +24,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
-      - name: Assert exact PR head checkout
+      - name: Assert qualification checkout identity
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="${{ github.event.pull_request.head.sha }}"
+          expected="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
           echo "EXPECTED_PR_HEAD_SHA=$actual" >> "$GITHUB_ENV"
 
