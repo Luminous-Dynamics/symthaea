@@ -5507,6 +5507,19 @@ mod tests {
         assert!(validate_hostname_relay(&long).is_err());
     }
 
+    // ── TPM2 enrollment fail-closed contract ──
+
+    #[test]
+    fn tpm2_enrollment_is_transactional() {
+        let script = tpm2_postinstall();
+        assert!(script.contains("if systemd-cryptenroll"));
+        assert!(script.contains("echo \"  TPM2 enrollment command succeeded.\""));
+        assert!(script.contains("echo \"WARNING: TPM2 enrollment failed. Installed configuration was not modified.\""));
+        assert!(script.contains("if grep -q 'boot.initrd.luks.devices.\\"cryptroot\\"'"));
+        assert!(script.contains("TPM2_PCRS=\"0+7\""));
+        assert!(script.contains("This is LUKS key-release policy, not regenerative-health attestation."));
+    }
+
     // ── config_write_commands (heredoc safety) ──
 
     #[test]
