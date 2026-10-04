@@ -168,12 +168,12 @@ pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
 /// A target adapter that lowers a narrow, explicit NixOS state vocabulary into
 /// target-neutral lifecycle steps.
 ///
-/// Supported state properties:
+/// Recognized prototype state properties:
 ///
 /// * `nixos.rebuild`: "switch", "test", "boot", or "dry-activate"
 /// * `nixos.home-manager`: boolean
-/// * `applications.install`: list of logical artifact/package identifiers
-/// * `applications.remove`: list of logical package identifiers
+/// * `applications.install`: currently rejected until an exact user-profile resource is bound
+/// * `applications.remove`: currently rejected until an exact user-profile resource is bound
 /// * `system.reboot`: boolean
 /// * `nixos.rollback`: boolean; `true` requires `nixos.rollback-generation`
 /// * `nixos.rollback-generation`: positive generation number
@@ -543,8 +543,6 @@ pub enum NixOSAdapterError {
         key: &'static str,
         expected: &'static str,
     },
-    #[error("state property {key} contains an empty list item")]
-    EmptyListItem { key: &'static str },
     #[error("unsupported nixos.rebuild mode: {0}")]
     InvalidRebuildMode(String),
     #[error("nixos.rollback=true requires a positive nixos.rollback-generation")]
