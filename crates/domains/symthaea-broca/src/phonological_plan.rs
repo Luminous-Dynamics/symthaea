@@ -116,6 +116,8 @@ pub struct SyllableSlot {
 pub struct PhonologicalPlan {
     pub version: String,
     pub content_binding: ContentBindingStatus,
+    /// Optional provenance token supplied by the lexical formatter when lexical content is bound.
+    pub lexical_provenance: Option<String>,
     pub source_intent: String,
     pub focus_role: Option<String>,
     pub intonation: IntonationIntent,
@@ -130,6 +132,7 @@ impl PhonologicalPlan {
         Self {
             version: PHONOLOGICAL_PLAN_VERSION.to_string(),
             content_binding: ContentBindingStatus::RoleStructureOnly,
+            lexical_provenance: None,
             source_intent: plan.intent.clone(),
             focus_role: plan.focus_role.clone(),
             intonation: plan.prosody.intonation,
@@ -149,10 +152,36 @@ impl PhonologicalPlan {
         segments: Vec<PhonemeSlot>,
         status: ContentBindingStatus,
     ) -> Result<(), PhonologicalPlanError> {
+        if matches!(status, ContentBindingStatus::LexicallyBound) {
+            return Err(PhonologicalPlanError::LexicalBindingWithoutProvenance);
+        }
         validate_binding_status(&segments, status)?;
         validate_segment_sequence(&segments)?;
 
         self.content_binding = status;
+        self.lexical_provenance = None;
+        self.syllables = derive_syllables(&segments);
+        self.segments = segments;
+        Ok(())
+    }
+
+    /// Bind explicitly lexicalized phonology only when provenance is supplied.
+    pub fn bind_lexical_segments(
+        &mut self,
+        segments: Vec<PhonemeSlot>,
+        provenance: impl Into<String>,
+    ) -> Result<(), PhonologicalPlanError> {
+        let provenance = provenance.into();
+        if provenance.trim().is_empty() {
+            return Err(PhonologicalPlanError::EmptyLexicalProvenance);
+        }
+        validate_segment_sequence(&segments)?;
+        if segments.is_empty() {
+            return Err(PhonologicalPlanError::LexicalBindingWithoutSegments);
+        }
+
+        self.content_binding = ContentBindingStatus::LexicallyBound;
+        self.lexical_provenance = Some(provenance);
         self.syllables = derive_syllables(&segments);
         self.segments = segments;
         Ok(())
@@ -202,6 +231,8 @@ pub enum PhonologicalPlanError {
     EmptySegmentSymbol { index: usize },
     NonContiguousSyllableIndex { expected: usize, found: usize },
     LexicalBindingWithoutSegments,
+    LexicalBindingWithoutProvenance,
+    EmptyLexicalProvenance,
     PhonologicalBindingWithoutSegments,
     RoleOnlyWithSegments,
 }
@@ -220,6 +251,12 @@ impl std::fmt::Display for PhonologicalPlanError {
             }
             Self::LexicalBindingWithoutSegments => {
                 write!(f, "lexically bound plans require explicit phonological segments")
+            }
+            Self::LexicalBindingWithoutProvenance => {
+                write!(f, "lexically bound plans require explicit lexical provenance")
+            }
+            Self::EmptyLexicalProvenance => {
+                write!(f, "lexically bound plans require non-empty lexical provenance")
             }
             Self::PhonologicalBindingWithoutSegments => {
                 write!(f, "phonologically bound plans require explicit phonological segments")
@@ -431,7 +468,7 @@ mod tests {
             .bind_segments(Vec::new(), ContentBindingStatus::LexicallyBound)
             .expect_err("lexical binding cannot be asserted without phonology");
 
-        assert_eq!(error, PhonologicalPlanError::LexicalBindingWithoutSegments);
+        assert_eq!(error, PhonologicalPlanError::LexicalBindingWithoutProvenance);
     }
 
     #[test]
@@ -458,3 +495,4 @@ mod tests {
         assert!(first.contains("IY@0"));
     }
 }
+
