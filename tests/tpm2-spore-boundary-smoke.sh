@@ -126,8 +126,15 @@ NV_EXTRA_DATA=$(awk '$1 == "extraData:" { print $2; exit }' "$ROOT/nv.yaml")
   echo "ERROR: NV_Certify attestation did not bind the fresh challenge" >&2
   exit 1
 }
-grep -Fq "index: $NV_INDEX" "$ROOT/nv.yaml"
+grep -Fq "type: 8014" "$ROOT/nv.yaml"
+grep -Fq "indexName:" "$ROOT/nv.yaml"
 grep -Fq "offset: 0" "$ROOT/nv.yaml"
+NV_CONTENTS=$(awk '$1 == "nvContents:" { print $2; exit }' "$ROOT/nv.yaml")
+[ "$NV_CONTENTS" = "0000000000000002" ] || {
+  echo "ERROR: NV_Certify did not certify the expected generation-2 counter contents" >&2
+  exit 1
+}
+printf 'nv_certification_contents_binding=verified\\n' >> "$EVIDENCE_FILE"
 printf 'nv_certification_challenge_binding=verified\\n' >> "$EVIDENCE_FILE"
 tpm2_verifysignature -Q -c "$ROOT/ak-after-restart.ctx" -g sha256 -m "$ROOT/nv.attest" -s "$ROOT/nv.sig" -f rsassa
 
