@@ -312,7 +312,8 @@ Raviv's Remark 6 distinguishes representation size from recovery work: an arbitr
 - no benchmark result in this design note;
 - no composite "best HDC" score;
 - no replacement of the resonator architecture;
-- no production decoder or noise-tolerance claim from the exact span solver alone.
+- no production decoder or noise-tolerance claim from the exact span solver alone;
+- arithmetic aggregation paths fail closed on `usize` overflow rather than wrapping into a fabricated coefficient-space dimension.
 
 
 ## Stage-C algebraic kernel status
@@ -354,6 +355,8 @@ For Symthaea, the next controlled experiment should therefore remain representat
 
 The 2026 histogram-recovery construction should be treated as a separate comparator family unless its encoding and observation model are intentionally adopted; it should not be silently substituted into this experiment.
 
+The coding-theory boundary has also widened beyond ordinary worst-case list decoding. Guruswami, Li, and Singhal (2026) prove an average-radius list-decoding guarantee for random linear codes with the same (O(1/\\varepsilon)) list-size scaling near capacity, while Doron, Mosheiff, Resch, and Ribeiro's small-field list-recovery work distinguishes error-list and erasure-list models from ordinary Hamming-ball decoding. These are useful future comparator dimensions, but neither should be projected onto this Boolean HDC fixture without an explicit observation model. In particular, an HDC system receiving uncertain symbol values or erasures may be a list-recovery problem rather than a plain Hamming-ball problem.
+
 
 ### Noise phase diagram: exact-recovery boundary
 
@@ -383,7 +386,7 @@ The recent Deng–Raviv noisy-VSA construction is a separate comparator family: 
 
 Recent work reinforces the need to keep finite-fixture geometry and noisy decoding explicit. Doron et al. (2026) prove broad discrepancy results for random linear codes and show that, in the relevant asymptotic regime, random linear codes can behave like unstructured random codes for list-decoding above capacity. Kumar and Mon (2026) give improved near-capacity list-decoding bounds for random linear codes over finite fields. Neither result is a guarantee for a particular finite HDC fixture, so this comparator records actual code geometry instead of inferring robustness from the random-linear-code label.
 
-References: https://arxiv.org/abs/2606.24471 ; https://eccc.weizmann.ac.il/report/2026/181/
+References: https://arxiv.org/abs/2606.24471 ; https://eccc.weizmann.ac.il/report/2026/222/ ; https://arxiv.org/abs/2609.17020
 
 
 A September 2026 result by Silas further sharpens the random-linear-code decoding boundary: at rates approaching Hamming list-decoding capacity, the worst-case list size is asymptotically determined for every finite field, with the binary case recovering the previously tight constant-order behavior. This is useful context for future Stage-E experiments, but it is a coding-theoretic asymptotic/list-decoding statement, not a claim about the small deterministic fixtures used here.
@@ -399,6 +402,14 @@ For a future noisy HDC comparator, this suggests recording at least three separa
 - whether factorization itself is uniquely identifiable after mapping candidate codewords back through the affine factorization fiber.
 
 These quantities must remain distinct. A decoder may produce a short list while the factorization fiber still contains multiple valid tuples, and a large factorization fiber can persist even when the target codeword itself is exactly identified. No Stage-E decoder is introduced by this design update.
+
+The Stage-E evidence schema should therefore preserve a three-layer decomposition:
+
+- **channel layer** — corruption radius, corruption distribution, erasures/soft uncertainty, and the exact observation alphabet;
+- **codeword layer** — candidate-list inclusion and size for the chosen decoder;
+- **factor layer** — exact affine-fiber multiplicity and whether the intended factor tuple remains identifiable after candidate generation.
+
+This prevents a decoder improvement from being credited for resolving algebraic ambiguity that the factorization map itself cannot remove. It also leaves room to compare ordinary list decoding, average-radius guarantees, and future list-recovery experiments without changing the meaning of the existing clean-recovery receipt.
 
 Sources:
 - Silas (2026), *The list size of random linear codes at capacity*: https://arxiv.org/abs/2609.06570
@@ -425,3 +436,11 @@ No production integration is proposed by this document.
 - Raviv, N. (2024), Linear Codes for Hyperdimensional Computing, Neural Computation 36(6), 1084–1120. DOI: 10.1162/neco_a_01665; arXiv:2403.03278.
 - Deng, Z. K., & Raviv, N. (2026), Efficient Vector Symbolic Architectures from Histogram Recovery, ISIT 2026, DOI: 10.1109/ISIT62367.2026.11654060.
 - Silas, S. (2026), The list size of random linear codes at capacity, arXiv:2609.06570.
+
+### Implementation hardening note
+
+The research kernel now uses checked factor-rank aggregation in the independent recovery and dependency-verification paths. The affine-fiber and algebra constructors already carried checked aggregation; the remaining public aggregation sites were aligned so arithmetic overflow cannot silently produce a malformed coefficient-space size. This is an implementation invariant, not a practical claim that ordinary HDC fixtures approach machine-size limits.
+
+Additional coding-theory references:
+- Guruswami, Li, and Singhal (2026), *Average-Radius List-Decodability of Random Linear Codes*: https://arxiv.org/abs/2608.22663
+- Doron, Mosheiff, Resch, and Ribeiro (2025/2026), *List-Recovery of Random Linear Codes over Small Fields*: https://arxiv.org/abs/2505.05935
