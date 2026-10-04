@@ -244,6 +244,25 @@ impl NixOSTargetAdapter {
                 snapshot.profile.platform.clone(),
             ));
         }
+        if snapshot.profile.identity.0.is_empty() || snapshot.profile.identity.0.trim().is_empty() {
+            return Err(NixOSAdapterError::InvalidTargetIdentity);
+        }
+        if snapshot.observation_digest.algorithm.is_empty()
+            || snapshot.observation_digest.value.is_empty()
+        {
+            return Err(NixOSAdapterError::InvalidObservationDigest);
+        }
+        for resource in &snapshot.resources {
+            if resource.kind.is_empty() {
+                return Err(NixOSAdapterError::InvalidResourceIdentity);
+            }
+            if resource.kind != NIXOS_GENERATION_RESOURCE_KIND {
+                return Err(NixOSAdapterError::UnsupportedResourceKind(resource.kind.clone()));
+            }
+            if resource.identity.algorithm.is_empty() || resource.identity.value.is_empty() {
+                return Err(NixOSAdapterError::InvalidResourceIdentity);
+            }
+        }
         if let Some(capability) = snapshot
             .profile
             .capabilities
@@ -543,6 +562,14 @@ pub enum NixOSAdapterError {
     TargetMismatch,
     #[error("target platform is not NixOS: {0}")]
     WrongPlatform(String),
+    #[error("NixOS adapter target identity is empty")]
+    InvalidTargetIdentity,
+    #[error("NixOS adapter target snapshot observation digest is incomplete")]
+    InvalidObservationDigest,
+    #[error("NixOS adapter target resource identity is empty or incomplete")]
+    InvalidResourceIdentity,
+    #[error("resource kind is not supported by the canonical NixOS adapter surface: {0}")]
+    UnsupportedResourceKind(String),
     #[error("capability {0:?} is not supported by the canonical NixOS adapter surface")]
     UnsupportedCapability(Capability),
     #[error("unsupported NixOS state property: {0}")]
@@ -597,6 +624,61 @@ mod tests {
             nixos_generation_resource(generation, realization).expect("generation resource"),
         );
         NixOSTargetAdapter::from_snapshot(snapshot).expect("nixos snapshot")
+    }
+
+    #[test]
+    fn from_snapshot_rejects_empty_target_identity() {
+        let mut snapshot = adapter().describe_target().expect("snapshot");
+        snapshot.profile.identity = TargetId::from("");
+
+        assert_eq!(
+            NixOSTargetAdapter::from_snapshot(snapshot),
+            Err(NixOSAdapterError::InvalidTargetIdentity)
+        );
+    }
+
+    #[test]
+    fn from_snapshot_rejects_incomplete_observation_digest() {
+        let mut snapshot = adapter().describe_target().expect("snapshot");
+        snapshot.observation_digest.value.clear();
+
+        assert_eq!(
+            NixOSTargetAdapter::from_snapshot(snapshot),
+            Err(NixOSAdapterError::InvalidObservationDigest)
+        );
+    }
+
+    #[test]
+    fn from_snapshot_rejects_unknown_resource_kind() {
+        let mut snapshot = adapter().describe_target().expect("snapshot");
+        snapshot.resources.insert(sovereign_state_compiler::ResourceRef {
+            kind: "arbitrary-resource".into(),
+            identity: ContentDigest::blake3(b"resource"),
+        });
+
+        assert_eq!(
+            NixOSTargetAdapter::from_snapshot(snapshot),
+            Err(NixOSAdapterError::UnsupportedResourceKind(
+                "arbitrary-resource".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn from_snapshot_rejects_incomplete_resource_identity() {
+        let mut snapshot = adapter().describe_target().expect("snapshot");
+        snapshot.resources.insert(sovereign_state_compiler::ResourceRef {
+            kind: NIXOS_GENERATION_RESOURCE_KIND.into(),
+            identity: ContentDigest {
+                algorithm: String::new(),
+                value: String::new(),
+            },
+        });
+
+        assert_eq!(
+            NixOSTargetAdapter::from_snapshot(snapshot),
+            Err(NixOSAdapterError::InvalidResourceIdentity)
+        );
     }
 
     #[test]
