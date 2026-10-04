@@ -2095,6 +2095,47 @@ impl KnowledgePersistence {
     }
 }
 
+fn verify_validation_receipt_foreign_key_contract(
+    conn: &rusqlite::Connection,
+) -> Result<(), String> {
+    let foreign_keys = {
+        let mut stmt = conn
+            .prepare("PRAGMA foreign_key_list(knowledge_snapshot_validation_receipts)")
+            .map_err(|e| format!("Schema integrity foreign-key prepare: {e}"))?;
+        stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
+            ))
+        })
+        .map_err(|e| format!("Schema integrity foreign-key query: {e}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Schema integrity foreign-key row: {e}"))?
+    };
+
+    if !foreign_keys.iter().any(
+        |(parent, child_col, parent_col, on_update, on_delete, match_kind)| {
+            parent == "knowledge_snapshot_receipts"
+                && child_col == "generation"
+                && parent_col == "generation"
+                && on_update.eq_ignore_ascii_case("NO ACTION")
+                && on_delete.eq_ignore_ascii_case("NO ACTION")
+                && match_kind.eq_ignore_ascii_case("NONE")
+        },
+    ) {
+        return Err(
+            "Schema integrity check failed: validation receipt generation foreign key has the wrong action or match semantics"
+                .into(),
+        );
+    }
+
+    Ok(())
+}
+
 fn verify_table_column_contract(
     conn: &rusqlite::Connection,
     table: &str,
@@ -2363,39 +2404,7 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
 
     // Verify the declared FK itself, not only current row consistency. foreign_key_check
     // cannot prove a REFERENCES clause exists when the schema has drifted.
-    let foreign_keys = {
-        let mut stmt = conn
-            .prepare("PRAGMA foreign_key_list(knowledge_snapshot_validation_receipts)")
-            .map_err(|e| format!("Schema integrity foreign-key prepare: {e}"))?;
-        stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-                row.get::<_, String>(6)?,
-                row.get::<_, String>(7)?,
-            ))
-        })
-        .map_err(|e| format!("Schema integrity foreign-key query: {e}"))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("Schema integrity foreign-key row: {e}"))?
-    };
-    if !foreign_keys.iter().any(
-        |(parent, child_col, parent_col, on_update, on_delete, match_kind)| {
-            parent == "knowledge_snapshot_receipts"
-                && child_col == "generation"
-                && parent_col == "generation"
-                && on_update.eq_ignore_ascii_case("NO ACTION")
-                && on_delete.eq_ignore_ascii_case("NO ACTION")
-                && match_kind.eq_ignore_ascii_case("NONE")
-        },
-    ) {
-        return Err(
-            "Schema integrity check failed: validation receipt generation foreign key has the wrong action or match semantics"
-                .into(),
-        );
-    }
+    verify_validation_receipt_foreign_key_contract(conn)?;
 
     let foreign_key_violations = {
         let mut stmt = conn
@@ -3952,7 +3961,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = verify_initialized_schema_integrity(&conn).unwrap_err();
+        let err = verify_validation_receipt_foreign_key_contract(&conn).unwrap_err();
         assert_eq!(
             err,
             "Schema integrity check failed: missing column memory_id on knowledge_facts"
