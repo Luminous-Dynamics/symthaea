@@ -543,7 +543,7 @@ impl ProvenanceValidationReport {
         &self,
         relations: &[ProvenanceRelation],
     ) -> Result<(), &'static str> {
-        self.validate_metadata()?
+        self.validate_metadata()?;
         if self.relation_count != relations.len() {
             return Err("provenance validation relation count mismatch");
         }
