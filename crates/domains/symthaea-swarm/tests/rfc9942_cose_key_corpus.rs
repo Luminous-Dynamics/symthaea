@@ -8,7 +8,8 @@
 
 use symthaea_swarm::semantic_evidence_vds::{
     Rfc9942Es256CoseKey, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload,
-    Rfc9942Vdp, Rfc9942ProofKind, Rfc9942VdpError, Rfc9162InclusionProof,
+    Rfc9942SignaturePayload, Rfc9942SignatureWithReceipts, Rfc9942Vdp,
+    Rfc9942ProofKind, Rfc9942VdpError, Rfc9162InclusionProof,
     COSE_ES256_ALGORITHM_ID, MAX_CBOR_BSTR_CHUNKS, MAX_CBOR_TSTR_CHUNKS,
 };
 
@@ -150,6 +151,79 @@ fn cose_key_accepts_unknown_label_with_nested_opaque_cbor_value() {
     let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
         .expect("an unknown COSE label must consume its complete arbitrary CBOR value");
     assert_eq!(parsed.kid(), Some(b"rfc9052-c7.1".as_slice()));
+}
+
+fn receipt_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
+    let protected = if protected_extension {
+        vec![0xa3, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01, 0x18, 0x1e, 0xa1, 0x41, 0x00]
+    } else {
+        vec![0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01]
+    };
+    let unprotected = if protected_extension {
+        vec![0xa1, 0x19, 0x01, 0x8c, 0xa1, 0x20, 0x81, 0x41, 0x00]
+    } else {
+        vec![0xa2, 0x19, 0x01, 0x8c, 0xa1, 0x20, 0x81, 0x41, 0x00, 0x18, 0x1e, 0xa1, 0x41, 0x00]
+    };
+
+    let mut out = vec![0xd2, 0x84];
+    out.extend_from_slice(&bstr(&protected));
+    out.extend_from_slice(&unprotected);
+    out.extend_from_slice(&bstr(&[0u8; 32]));
+    out.extend_from_slice(&bstr(&[0u8; 64]));
+    out
+}
+
+fn outer_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
+    let protected = if protected_extension {
+        vec![0xa1, 0x18, 0x1e, 0xa1, 0x41, 0x00]
+    } else {
+        vec![0xa0]
+    };
+    let unprotected = if protected_extension {
+        vec![0xa0]
+    } else {
+        vec![0xa1, 0x18, 0x1e, 0xa1, 0x41, 0x00]
+    };
+
+    let mut out = vec![0xd2, 0x84];
+    out.extend_from_slice(&bstr(&protected));
+    out.extend_from_slice(&unprotected);
+    out.push(0xf6);
+    out.extend_from_slice(&bstr(&[0u8; 64]));
+    out
+}
+
+#[test]
+fn receipt_accepts_unknown_protected_extension_and_round_trips() {
+    let bytes = receipt_with_unknown_extension(true);
+    let parsed = Rfc9942ReceiptEnvelope::from_cbor(&bytes)
+        .expect("unknown protected COSE extension must consume its arbitrary CBOR value");
+    assert_eq!(parsed.to_cbor(), bytes);
+}
+
+#[test]
+fn receipt_accepts_unknown_unprotected_extension_and_round_trips() {
+    let bytes = receipt_with_unknown_extension(false);
+    let parsed = Rfc9942ReceiptEnvelope::from_cbor(&bytes)
+        .expect("unknown unprotected COSE extension must consume its arbitrary CBOR value");
+    assert_eq!(parsed.to_cbor(), bytes);
+}
+
+#[test]
+fn outer_cose_accepts_unknown_protected_extension_and_round_trips() {
+    let bytes = outer_with_unknown_extension(true);
+    let parsed = Rfc9942SignatureWithReceipts::from_cbor(&bytes)
+        .expect("unknown protected outer COSE extension must consume its arbitrary CBOR value");
+    assert_eq!(parsed.to_cbor(), bytes);
+    assert_eq!(parsed.payload(), &Rfc9942SignaturePayload::Detached);
+}
+
+#[test]
+fn outer_cose_accepts_unknown_unprotected_extension_and_round_trips() {
+    let bytes = outer_with_unknown_extension(false);
+    let parsed = Rfc9942SignatureWithReceipts::from_cbor(&bytes)
+        .expect("unknown unprotected outer COSE extension must consume its arbitrary CBOR value");
+    assert_eq!(parsed.to_cbor(), bytes);
 }
 
 #[test]
