@@ -2386,23 +2386,6 @@ mod tests {
         verifier.verify_with_resolver_report(envelope, receipt, &resolver)
     }
 
-    fn resolved_report(
-        verifier: &Ed25519ReceiptVerifier,
-        envelope: &ReceiptAttestationEnvelope,
-        receipt: &IndependenceVerificationReceipt,
-    ) -> ReceiptAttestationVerificationReport {
-        let method = envelope
-            .verification_method
-            .clone()
-            .expect("test envelope has a verification method");
-        let resolver = InMemoryVerificationMethodResolver::new([ResolvedVerificationMethod {
-            verification_method: method,
-            verifying_key: verifier.verifying_key.clone(),
-            status: VerificationMethodStatus::Active,
-            allowed_proof_purposes: vec![envelope.proof_purpose.clone()],
-        }]);
-        verifier.verify_with_resolver_report(envelope, receipt, &resolver)
-    }
 
     fn envelope_and_key() -> (
         ReceiptAttestationEnvelope,
