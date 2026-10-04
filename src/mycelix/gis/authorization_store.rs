@@ -5844,6 +5844,74 @@ mod tests {
     }
 
     #[test]
+    fn terminal_receipt_replay_does_not_reinvoke_external_verifier() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-terminal-replay-no-verifier-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-terminal-replay-no-verifier","prod","adapter-terminal-replay-no-verifier"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"terminal-replay-no-verifier".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:00:00Z".into(),
+            expires_at:Some("2026-10-05T07:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1",
+            "attempt-terminal-replay-no-verifier",
+            "boundary-terminal-replay-no-verifier"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt-terminal-replay-no-verifier",
+            &action,
+            &effect,
+            "boundary-terminal-replay-no-verifier",
+            "operation:terminal-replay-no-verifier",
+            "native-terminal-replay-no-verifier"
+        ).unwrap();
+
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let first=store.commit_bound_verified(&record,&evidence,&TestProviderVerifier).unwrap();
+
+        struct RefusingVerifier;
+        impl ProviderEvidenceVerifier for RefusingVerifier {
+            fn verify(
+                &self,
+                _purpose:ProviderVerificationPurpose,
+                _record:&DurableDispatchRecord,
+                _evidence:&ProviderTerminalEvidence,
+            ) -> Result<VerifiedProviderOutcome,ProviderVerificationError> {
+                Err(ProviderVerificationError::VerificationFailed)
+            }
+        }
+
+        let replay=store.commit_bound_verified(&record,&evidence,&RefusingVerifier).unwrap();
+        assert_eq!(replay,first);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn reconciliation_verifier_pin_drift_after_external_verification_is_rejected() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-reconcile-verifier-external-drift-{}.db",std::process::id()
