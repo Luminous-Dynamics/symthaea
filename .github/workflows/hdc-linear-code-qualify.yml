@@ -49,6 +49,390 @@ jobs:
             test "$ACTUAL_SHA" = "${{ github.event.pull_request.head.sha }}"
           fi
 
+      - name: Enforce research surface
+        id: scope
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          ALLOWED='^(.github/workflows/hdc-linear-code-qualify.yml|crates/core/symthaea-core/Cargo.toml|crates/core/symthaea-core/src/hdc/linear_code.rs|crates/core/symthaea-core/src/hdc/mod.rs|crates/core/symthaea-core/tests/linear_code_ambiguity.rs|docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md)
+        id: toolchain_install
+        run: |
+          rustup toolchain install 1.96.1 --component rustfmt --component clippy --profile minimal --no-self-update
+
+      - name: Verify pinned Rust toolchain
+        id: toolchain
+        run: |
+          RUSTC_VERSION="$(rustc +1.96.1 --version | awk '{print $2}')"
+          CARGO_VERSION="$(cargo +1.96.1 --version | awk '{print $2}')"
+          test "$RUSTC_VERSION" = "1.96.1"
+          test "$CARGO_VERSION" = "1.96.1"
+
+      - name: Capture runner provenance
+        id: runner
+        run: |
+          echo "runner_os=$RUNNER_OS" >> "$GITHUB_OUTPUT"
+          echo "runner_arch=$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+          echo "runner_image=$ImageOS" >> "$GITHUB_OUTPUT"
+          echo "runner_image_version=$ImageVersion" >> "$GITHUB_OUTPUT"
+
+      - name: Capture source provenance
+        id: provenance
+        run: |
+          SOURCE_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/src/hdc/linear_code.rs" | cut -d" " -f1)"
+          TEST_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" | cut -d" " -f1)"
+          WORKFLOW_SHA256="$(sha256sum "$GITHUB_WORKSPACE/.github/workflows/hdc-linear-code-qualify.yml" | cut -d" " -f1)"
+          TOOLCHAIN_FILE_SHA256="$(sha256sum "$GITHUB_WORKSPACE/rust-toolchain.toml" | cut -d" " -f1)"
+          echo "source_sha256=$SOURCE_SHA256" >> "$GITHUB_OUTPUT"
+          echo "test_sha256=$TEST_SHA256" >> "$GITHUB_OUTPUT"
+          echo "workflow_sha256=$WORKFLOW_SHA256" >> "$GITHUB_OUTPUT"
+          echo "toolchain_file_sha256=$TOOLCHAIN_FILE_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Focused formatting
+        id: format
+        run: |
+          rustfmt +1.96.1 --check --edition 2024 \
+            crates/core/symthaea-core/src/hdc/linear_code.rs \
+            crates/core/symthaea-core/tests/linear_code_ambiguity.rs
+
+      - name: Build isolated linear-code qualification harness
+        id: harness
+        run: |
+          HARNESS="$RUNNER_TEMP/hdc-linear-code-qualifier"
+          rm -rf "$HARNESS"
+          mkdir -p "$HARNESS/src" "$HARNESS/tests"
+
+          cat > "$HARNESS/Cargo.toml" <<'EOF'
+          [package]
+          name = "symthaea-core"
+          version = "0.0.0"
+          edition = "2024"
+          publish = false
+
+          [lib]
+          path = "src/lib.rs"
+
+          [dependencies]
+          rand = "=0.8.6"
+          rand_chacha = "=0.3.1"
+          blake3 = "=1.8.2"
+          EOF
+
+          cat > "$HARNESS/src/lib.rs" <<EOF
+          pub mod hdc {
+              #[path = "${GITHUB_WORKSPACE}/crates/core/symthaea-core/src/hdc/linear_code.rs"]
+              pub mod linear_code;
+          }
+          EOF
+
+          cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" \
+            "$HARNESS/tests/linear_code_ambiguity.rs"
+
+          cargo +1.96.1 generate-lockfile --manifest-path "$HARNESS/Cargo.toml"
+          LOCK_SHA256="$(sha256sum "$HARNESS/Cargo.lock" | cut -d" " -f1)"
+          CARGO_VERSION="$(cargo +1.96.1 --version)"
+          RUSTC_VERSION="$(rustc +1.96.1 --version)"
+          UNIT_TEST_COUNT="$(cargo +1.96.1 test --locked --manifest-path "$HARNESS/Cargo.toml" --lib linear_code -- --list | awk '/^[^[:space:]].*: test$/ { count++ } END { print count+0 }')"
+          INTEGRATION_TEST_COUNT="$(cargo +1.96.1 test --locked --manifest-path "$HARNESS/Cargo.toml" --test linear_code_ambiguity -- --list | awk '/^[^[:space:]].*: test$/ { count++ } END { print count+0 }')"
+          echo "path=$HARNESS" >> "$GITHUB_OUTPUT"
+          echo "lock_sha256=$LOCK_SHA256" >> "$GITHUB_OUTPUT"
+          echo "cargo_version=$CARGO_VERSION" >> "$GITHUB_OUTPUT"
+          echo "rustc_version=$RUSTC_VERSION" >> "$GITHUB_OUTPUT"
+          test "$UNIT_TEST_COUNT" -gt 0
+          echo "unit_test_count=$UNIT_TEST_COUNT" >> "$GITHUB_OUTPUT"
+          test "$INTEGRATION_TEST_COUNT" -gt 0
+          echo "integration_test_count=$INTEGRATION_TEST_COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Linear-code unit tests
+        id: unit_tests
+        run: |
+          cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --lib linear_code
+
+      - name: Linear-code ambiguity integration test
+        id: integration_tests
+        run: |
+          cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_ambiguity
+
+      - name: Capture canonical fixture fingerprint
+        id: fingerprint
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_ambiguity canonical_fixture_fingerprint_is_emitted -- --nocapture 2>&1)"
+          FIXTURE_SPEC_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^FIXTURE_SPEC=')"
+          FINGERPRINT_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^FIXTURE_FINGERPRINT=')"
+          FIXTURE_GEOMETRY_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^FIXTURE_GEOMETRY=')"
+          test "$FIXTURE_SPEC_COUNT" -eq 1
+          test "$FINGERPRINT_COUNT" -eq 1
+          test "$FIXTURE_GEOMETRY_COUNT" -eq 1
+          FINGERPRINT="$(printf '%s\n' "$OUTPUT" | sed -n 's/^FIXTURE_FINGERPRINT=//p')"
+          FIXTURE_SPEC="$(printf '%s\n' "$OUTPUT" | sed -n 's/^FIXTURE_SPEC=//p')"
+          test -n "$FIXTURE_SPEC"
+          FIXTURE_GEOMETRY="$(printf '%s\n' "$OUTPUT" | sed -n 's/^FIXTURE_GEOMETRY=//p')"
+          test -n "$FIXTURE_GEOMETRY"
+          test "${#FINGERPRINT}" -eq 64
+          case "$FINGERPRINT" in
+            (*[!0-9a-f]*) exit 1 ;;
+          esac
+          printf 'fingerprint=%s\n' "$FINGERPRINT" >> "$GITHUB_OUTPUT"
+          printf 'fixture_spec=%s\n' "$FIXTURE_SPEC" >> "$GITHUB_OUTPUT"
+          printf 'fixture_geometry=%s\n' "$FIXTURE_GEOMETRY" >> "$GITHUB_OUTPUT"
+
+      - name: Capture deterministic code geometry ledger
+        id: geometry
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity small_code_geometry_ledger_is_exhaustively_self_consistent -- --nocapture 2>&1)"
+          GEOMETRY_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^GEOMETRY_LEDGER=')"
+          test "$GEOMETRY_LEDGER_COUNT" -eq 1
+          GEOMETRY_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^GEOMETRY_LEDGER=//p')"
+          test -n "$GEOMETRY_LEDGER"
+          printf 'geometry_ledger=%s\n' "$GEOMETRY_LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture geometry seed sweep
+        id: geometry_sweep
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity small_code_geometry_seed_sweep_is_exhaustively_self_consistent -- --nocapture 2>&1)"
+          GEOMETRY_SWEEP_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^GEOMETRY_SWEEP=')"
+          test "$GEOMETRY_SWEEP_COUNT" -eq 4
+          GEOMETRY_SWEEP="$(printf '%s\n' "$OUTPUT" | sed -n 's/^GEOMETRY_SWEEP=//p' | paste -sd '|' -)"
+          test -n "$GEOMETRY_SWEEP"
+          printf 'geometry_sweep=%s\n' "$GEOMETRY_SWEEP" >> "$GITHUB_OUTPUT"
+
+      - name: Capture published-grid search-space ledger
+        id: search_space
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity published_parameter_search_space_ledger_is_exact -- --nocapture 2>&1)"
+          SEARCH_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SEARCH_LEDGER=')"
+          test "$SEARCH_LEDGER_COUNT" -eq 1
+          SEARCH_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SEARCH_LEDGER=//p')"
+          test -n "$SEARCH_LEDGER"
+          printf 'search_ledger=%s\n' "$SEARCH_LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture published-parameter storage ledger
+        id: storage
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity published_parameter_storage_ledger_is_exact_and_packed_consistent -- --nocapture 2>&1)"
+          STORAGE_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^STORAGE_LEDGER=')"
+          test "$STORAGE_LEDGER_COUNT" -eq 1
+          STORAGE_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^STORAGE_LEDGER=//p')"
+          test -n "$STORAGE_LEDGER"
+          printf 'storage_ledger=%s\n' "$STORAGE_LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture paper-scale binding recovery matrix
+        id: paper_matrix
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity paper_scale_binding_recovery_smoke_matrix_is_valid -- --nocapture 2>&1)"
+          PAPER_MATRIX_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^PAPER_MATRIX=')"
+          test "$PAPER_MATRIX_COUNT" -eq 1
+          PAPER_MATRIX="$(printf '%s\n' "$OUTPUT" | sed -n 's/^PAPER_MATRIX=//p')"
+          test -n "$PAPER_MATRIX"
+          RESULT_DIGEST="$(printf '%s\n' "$PAPER_MATRIX" | sed -n 's/.*result_digest=\([0-9a-f]\{64\}\);.*/\1/p')"
+          test "${#RESULT_DIGEST}" -eq 64
+          case "$RESULT_DIGEST" in
+            (*[!0-9a-f]*) exit 1 ;;
+          esac
+          printf 'paper_matrix=%s\n' "$PAPER_MATRIX" >> "$GITHUB_OUTPUT"
+          printf 'paper_matrix_result_digest=%s\n' "$RESULT_DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Capture deterministic work ledger
+        id: work
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_work_ledger_is_deterministic_and_semantically_linked -- --nocapture 2>&1)"
+          WORK_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^WORK_LEDGER=')"
+          test "$WORK_LEDGER_COUNT" -eq 1
+          WORK_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^WORK_LEDGER=//p')"
+          test -n "$WORK_LEDGER"
+          printf 'work_ledger=%s\n' "$WORK_LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture small-fixture scaling ledger
+        id: scaling
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_work_scales_over_small_structural_fixtures -- --nocapture 2>&1)"
+          SCALING_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SCALING_LEDGER=')"
+          test "$SCALING_LEDGER_COUNT" -eq 3
+          SCALING_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SCALING_LEDGER=//p' | paste -sd '|' -)"
+          test -n "$SCALING_LEDGER"
+          printf 'scaling_ledger=%s\n' "$SCALING_LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture packing-boundary qualification
+        id: packing
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_crosses_u64_packing_boundaries -- --nocapture 2>&1)"
+          PACKING_BOUNDARY_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^PACKING_BOUNDARY=')"
+          test "$PACKING_BOUNDARY_COUNT" -eq 3
+          PACKING_BOUNDARY="$(printf '%s\n' "$OUTPUT" | sed -n 's/^PACKING_BOUNDARY=//p' | paste -sd '|' -)"
+          test -n "$PACKING_BOUNDARY"
+          printf 'packing_boundary=%s\n' "$PACKING_BOUNDARY" >> "$GITHUB_OUTPUT"
+
+      - name: Capture exact algebraic multiplicity ledger
+        id: algebraic
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity algebraic_multiplicity_ledger_is_exhaustively_self_consistent -- --nocapture 2>&1)"
+          LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^ALGEBRAIC_LEDGER=')"
+          test "$LEDGER_COUNT" -eq 1
+          ALGEBRAIC_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^ALGEBRAIC_LEDGER=//p')"
+          test -n "$ALGEBRAIC_LEDGER"
+          printf 'algebraic_ledger=%s\n' "$ALGEBRAIC_LEDGER" >> "$GITHUB_OUTPUT"
+
+      - name: Capture bounded affine-fiber enumeration
+        id: affine_fiber
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity bounded_affine_fiber_iterator_exhausts_declared_multiplicity -- --nocapture 2>&1)"
+          ENUMERATION_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^AFFINE_FIBER_ENUMERATION=')"
+          test "$ENUMERATION_COUNT" -eq 1
+          AFFINE_FIBER_ENUMERATION="$(printf '%s\n' "$OUTPUT" | sed -n 's/^AFFINE_FIBER_ENUMERATION=//p')"
+          test -n "$AFFINE_FIBER_ENUMERATION"
+          printf 'affine_fiber_enumeration=%s\n' "$AFFINE_FIBER_ENUMERATION" >> "$GITHUB_OUTPUT"
+      - name: Capture higher-order dependency stress
+        id: higher_order
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity higher_order_dependency_stress_has_pairwise_trivial_cases -- --nocapture 2>&1)"
+          SWEEP_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^HIGHER_ORDER_SWEEP=')"
+          test "$SWEEP_COUNT" -eq 1
+          HIGHER_ORDER_SWEEP="$(printf '%s\n' "$OUTPUT" | sed -n 's/^HIGHER_ORDER_SWEEP=//p')"
+          test -n "$HIGHER_ORDER_SWEEP"
+          printf 'higher_order_sweep=%s\n' "$HIGHER_ORDER_SWEEP" >> "$GITHUB_OUTPUT"
+      - name: Capture dependency witness evidence
+        id: witness
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity dependency_witness_ledger_is_canonical_and_verifiable -- --nocapture 2>&1)"
+          WITNESS_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^DEPENDENCY_WITNESS=')"
+          test "$WITNESS_COUNT" -eq 1
+          DEPENDENCY_WITNESS="$(printf '%s\n' "$OUTPUT" | sed -n 's/^DEPENDENCY_WITNESS=//p')"
+          test -n "$DEPENDENCY_WITNESS"
+          printf 'dependency_witness=%s\n' "$DEPENDENCY_WITNESS" >> "$GITHUB_OUTPUT"
+      - name: Strict Clippy
+        id: clippy
+        run: |
+          cargo +1.96.1 clippy --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --all-targets \
+            -- -D warnings
+
+      - name: Emit qualification receipt
+        if: always()
+        run: |
+          mkdir -p hdc-linear-code-evidence
+          cat > hdc-linear-code-evidence/hdc-linear-code-qualification.txt <<EOF
+          HDC Linear-Code Recovery Qualification
+          ======================================
+          receipt_schema=hdc-linear-code-qualification-v3
+          exact_head=${{ steps.head.outputs.sha }}
+          runner_os=${{ steps.runner.outputs.runner_os }}
+          runner_arch=${{ steps.runner.outputs.runner_arch }}
+          runner_image=${{ steps.runner.outputs.runner_image }}
+          runner_image_version=${{ steps.runner.outputs.runner_image_version }}
+          rust_toolchain=1.96.1
+          rust_toolchain_installation_status=${{ steps.toolchain_install.outcome }}
+          rust_toolchain_verification_status=${{ steps.toolchain.outcome }}
+          source_sha256=${{ steps.provenance.outputs.source_sha256 }}
+          integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
+          qualification_workflow_sha256=${{ steps.provenance.outputs.workflow_sha256 }}
+          research_surface_status=${{ github.event_name == 'pull_request' && steps.scope.outcome || 'not-applicable' }}
+          research_surface_paths=${{ steps.scope.outputs.changed_paths }}
+          rust_toolchain_file_sha256=${{ steps.provenance.outputs.toolchain_file_sha256 }}
+          cargo_version=${{ steps.harness.outputs.cargo_version }}
+          rustc_version=${{ steps.harness.outputs.rustc_version }}
+          dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
+          unit_test_inventory=${{ steps.harness.outputs.unit_test_count }}
+          integration_test_inventory=${{ steps.harness.outputs.integration_test_count }}
+          fixture_fingerprint_status=${{ steps.fingerprint.outcome == 'success' && 'captured' || 'not-captured' }}
+          fixture_spec=${{ steps.fingerprint.outputs.fixture_spec }}
+          fixture_fingerprint=${{ steps.fingerprint.outputs.fingerprint }}
+          fixture_fingerprint_schema=blake3-256-symthaea-hdc-linear-code-v1
+          fixture_geometry_schema=linear-code-geometry-v2
+          fixture_geometry=${{ steps.fingerprint.outputs.fixture_geometry }}
+          work_ledger_schema=linear-code-work-v1
+          scaling_ledger_schema=linear-code-scaling-v1
+          scaling_ledger_status=${{ steps.scaling.outcome }}
+          scaling_ledger=${{ steps.scaling.outputs.scaling_ledger }}
+          packing_boundary_schema=linear-code-packing-v1
+          packing_boundary_status=${{ steps.packing.outcome }}
+          packing_boundary=${{ steps.packing.outputs.packing_boundary }}
+          work_ledger_status=${{ steps.work.outcome }}
+          work_ledger=${{ steps.work.outputs.work_ledger }}
+          geometry_ledger_schema=linear-code-geometry-v2
+          geometry_ledger_status=${{ steps.geometry.outcome }}
+          geometry_ledger=${{ steps.geometry.outputs.geometry_ledger }}
+          geometry_sweep_schema=linear-code-geometry-sweep-v2
+          geometry_sweep_status=${{ steps.geometry_sweep.outcome }}
+          geometry_sweep=${{ steps.geometry_sweep.outputs.geometry_sweep }}
+          paper_matrix_schema=linear-code-paper-matrix-v3
+          paper_matrix_status=${{ steps.paper_matrix.outcome }}
+          paper_matrix=${{ steps.paper_matrix.outputs.paper_matrix }}
+          paper_matrix_result_digest=${{ steps.paper_matrix.outputs.paper_matrix_result_digest }}
+          storage_ledger_schema=linear-code-storage-v1
+          storage_ledger_status=${{ steps.storage.outcome }}
+          storage_ledger=${{ steps.storage.outputs.storage_ledger }}
+          search_ledger_schema=linear-code-search-v1
+          search_ledger_status=${{ steps.search_space.outcome }}
+          search_ledger=${{ steps.search_space.outputs.search_ledger }}
+          algebraic_ledger_schema=linear-code-algebra-v1
+          algebraic_ledger_status=${{ steps.algebraic.outcome }}
+          algebraic_ledger=${{ steps.algebraic.outputs.algebraic_ledger }}
+          higher_order_dependency_schema=linear-code-higher-order-v1
+          higher_order_dependency_status=${{ steps.higher_order.outcome }}
+          higher_order_dependency=${{ steps.higher_order.outputs.higher_order_sweep }}
+          dependency_witness_schema=linear-code-dependency-witness-v2
+          dependency_witness_status=${{ steps.witness.outcome }}
+          dependency_witness=${{ steps.witness.outputs.dependency_witness }}
+          kernel_basis_schema=linear-code-kernel-basis-v1
+          affine_fiber_schema=linear-code-affine-fiber-v3
+          affine_fiber_source_binding_schema=linear-code-affine-source-v1
+          affine_fiber_integrity_schema=linear-code-affine-integrity-v1
+          affine_fiber_enumeration_schema=linear-code-affine-fiber-enumeration-v1
+          affine_fiber_enumeration_status=${{ steps.affine_fiber.outcome }}
+          affine_fiber_enumeration=${{ steps.affine_fiber.outputs.affine_fiber_enumeration }}
+          rng_algorithm=rand_chacha::ChaCha12Rng
+          rng_seed_derivation=SeedableRng::seed_from_u64
+          representation=gf2_random_linear_code
+          bipolar_mapping=gf2_0_to_plus1_1_to_minus1
+          binding_equivalence=hadamard_equals_gf2_xor
+          stage=A-C-algebraic-recovery+E-decoder-oracle
+          stage_b_paper_fidelity=not-claimed
+          factor_identifiability=ambiguity-explicit
+          decoder_oracle=exhaustive-bounded-distance
+          decoder_oracle_is_production=false
+          production_default_changed=false
+          qualification_status=${{ (github.event_name != 'pull_request' || steps.scope.outcome == 'success') && steps.format.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.integration_tests.outcome == 'success' && steps.fingerprint.outcome == 'success' && steps.geometry.outcome == 'success' && steps.geometry_sweep.outcome == 'success' && steps.search_space.outcome == 'success' && steps.storage.outcome == 'success' && steps.paper_matrix.outcome == 'success' && steps.work.outcome == 'success' && steps.scaling.outcome == 'success' && steps.packing.outcome == 'success' && steps.algebraic.outcome == 'success' && steps.affine_fiber.outcome == 'success' && steps.higher_order.outcome == 'success' && steps.witness.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          focused_formatting=${{ steps.format.outcome }}
+          isolated_harness=${{ steps.harness.outcome }}
+          linear_code_unit_tests=${{ steps.unit_tests.outcome }}
+          ambiguity_integration_test=${{ steps.integration_tests.outcome }}
+          strict_clippy=${{ steps.clippy.outcome }}
+          algebraic_multiplicity_qualification=${{ steps.algebraic.outcome }}
+          higher_order_dependency_qualification=${{ steps.higher_order.outcome }}
+          dependency_witness_qualification=${{ steps.witness.outcome }}
+          receipt_semantics=descriptive-only
+          EOF
+          if [ "${{ steps.harness.outcome }}" = "success" ] && [ -f "${{ steps.harness.outputs.path }}/Cargo.lock" ]; then
+            cp "${{ steps.harness.outputs.path }}/Cargo.lock" hdc-linear-code-evidence/Cargo.lock
+          fi
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hdc-linear-code-qualification-${{ steps.head.outputs.sha }}
+          path: hdc-linear-code-evidence
+          if-no-files-found: error
+
+          CHANGED="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" | sort -u)"
+          test -n "$CHANGED"
+          if printf '%s\n' "$CHANGED" | grep -Ev "$ALLOWED" | grep -q .; then
+            printf 'Unexpected changed path(s):\n%s\n' "$CHANGED"
+            exit 1
+          fi
+          EXPECTED_COUNT=6
+          ACTUAL_COUNT="$(printf '%s\n' "$CHANGED" | wc -l | tr -d ' ')"
+          test "$ACTUAL_COUNT" -eq "$EXPECTED_COUNT"
+          printf 'changed_paths=%s\n' "$(printf '%s' "$CHANGED" | paste -sd '|')" >> "$GITHUB_OUTPUT"
+
       - name: Install pinned Rust toolchain
         id: toolchain_install
         run: |
