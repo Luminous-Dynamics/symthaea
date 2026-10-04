@@ -930,6 +930,62 @@ mod tests {
     }
 
     #[test]
+    fn binding_records_boundary_matching_tolerance() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let selection = select_boundary_patch(&interface, &candidate, 0.05).unwrap();
+
+        let binding = SolverBoundaryBinding::verified(
+            &interface,
+            "test-adapter/v1",
+            "patch:inlet",
+            [3; 32],
+            &candidate,
+            selection,
+            0.05,
+        )
+        .unwrap();
+
+        assert_eq!(
+            binding
+                .realized_boundary
+                .boundary_matching_tolerance_micrometers(),
+            50
+        );
+    }
+
+    #[test]
+    fn binding_digest_commits_to_boundary_matching_tolerance() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let selection_a = select_boundary_patch(&interface, &candidate, 0.05).unwrap();
+        let selection_b = select_boundary_patch(&interface, &candidate, 0.10).unwrap();
+
+        let a = SolverBoundaryBinding::verified(
+            &interface,
+            "test-adapter/v1",
+            "patch:inlet",
+            [3; 32],
+            &candidate,
+            selection_a,
+            0.05,
+        )
+        .unwrap();
+        let b = SolverBoundaryBinding::verified(
+            &interface,
+            "test-adapter/v1",
+            "patch:inlet",
+            [3; 32],
+            &candidate,
+            selection_b,
+            0.10,
+        )
+        .unwrap();
+
+        assert_ne!(a.digest(), b.digest());
+    }
+
+    #[test]
     fn candidate_mesh_drift_is_rejected() {
         let interface = interface(PortId(10), 7);
         let candidate = candidate();
