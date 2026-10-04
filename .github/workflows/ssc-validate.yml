@@ -3,9 +3,6 @@ name: Sovereign State Compiler Validation
 # inheriting unrelated workspace-member failures.
 
 on:
-  push:
-    branches:
-      - rfc/sovereign-state-compiler
   pull_request:
     paths:
       - "crates/core/sovereign-state-compiler/**"
@@ -15,6 +12,7 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - ".github/workflows/ssc-validate.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -101,6 +99,8 @@ jobs:
           serde = { version = "1.0", features = ["derive"] }
           serde_json = "1.0"
           thiserror = "1.0"
+          EOF
+
           cat > "$tmp/nixward-ssc-bridge/Cargo.toml" <<'EOF'
           [package]
           name = "nixward-ssc-bridge"
