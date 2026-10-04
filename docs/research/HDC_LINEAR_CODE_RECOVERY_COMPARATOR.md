@@ -279,6 +279,11 @@ This gives a constructive interpretation of the multiplicity theorem: once one v
 - factorization multiplicity: the exact 2^d number of tuples in every non-empty fiber.
 
 The witness basis is canonical only relative to the declared factor order and generator-basis presentation. It is not a minimum-weight dependency basis, and no permutation-invariance of the representative is claimed.
+
+The kernel-basis constructor is itself fail-closed: before returning, it requires distinct and in-range dependent-generator pivots, an asserted pivot bit for every witness, full coefficient-space rank equal to Delta-r, and semantic re-verification of every witness. The affine-fiber verifier reuses the complete structural certificate invariant rather than relying on a weaker duplicate subset of those checks.
+
+Qualification also tests certificate non-transplantability. A certificate constructed for one target, ordered factor presentation, or generator-basis ordering must not verify against another of those contexts. The private source and integrity anchors make those rebinding attempts observable even when the resulting factor geometry has the same Delta, union rank, kernel dimension, and reachable-target cardinality.
+
 ### Adversarial dependency qualification
 
 Pairwise subcode-intersection checks are not sufficient when three or more factors participate. The qualification suite therefore includes both a two-factor overlap fixture and a three-factor fixture
