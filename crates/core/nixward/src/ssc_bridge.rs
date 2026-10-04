@@ -52,6 +52,37 @@ pub struct NixSystemObservation {
     pub booted_system_realization: String,
 }
 
+/// Opaque process-local evidence minted only by Nixward's live observer.
+///
+/// This wrapper intentionally does not derive Clone, Serialize, or Deserialize.
+/// Portable NixSystemObservation remains replayable evidence, but it cannot
+/// directly regain the capability-bearing target-adapter handoff.
+#[derive(Debug)]
+pub struct CapturedNixSystemObservation {
+    observation: NixSystemObservation,
+}
+
+impl CapturedNixSystemObservation {
+    pub fn evidence(&self) -> &NixSystemObservation {
+        &self.observation
+    }
+
+    pub fn validate_against_authorized_plan(
+        &self,
+        authorized: &AuthorizedDeploymentPlan,
+    ) -> Result<(), SscObservationError> {
+        self.observation.validate_against_authorized_plan(authorized)
+    }
+
+    pub fn target_adapter(&self) -> Result<NixOSTargetAdapter, SscObservationError> {
+        self.observation.target_adapter()
+    }
+
+    pub fn target_snapshot(&self) -> Result<TargetSnapshot, SscObservationError> {
+        self.observation.target_snapshot()
+    }
+}
+
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum SscObservationError {
     #[error("failed to observe NixOS state: {0}")]
@@ -105,7 +136,7 @@ impl From<serde_json::Error> for SscObservationError {
 }
 
 impl NixSystemObservation {
-    pub fn observe() -> Result<Self, SscObservationError> {
+    pub fn observe() -> Result<CapturedNixSystemObservation, SscObservationError> {
         let observed_at_ms = capture_time_ms()?;
 
         // Capture /run/current-system once and reuse the exact value that was
@@ -128,7 +159,7 @@ impl NixSystemObservation {
             booted_system_realization,
         };
         observation.validate()?;
-        Ok(observation)
+        Ok(CapturedNixSystemObservation { observation })
     }
 
     pub fn validate(&self) -> Result<(), SscObservationError> {
@@ -217,7 +248,7 @@ impl NixSystemObservation {
     /// observation through the live observer immediately before mutation;
     /// this method validates supplied evidence but does not perform a new read.
     /// It does not authorize or execute the plan.
-    pub fn validate_against_authorized_plan(
+    pub(crate) fn validate_against_authorized_plan(
         &self,
         authorized: &AuthorizedDeploymentPlan,
     ) -> Result<(), SscObservationError> {
@@ -246,7 +277,7 @@ impl NixSystemObservation {
     /// Construct the canonical NixOS SSC adapter from this validated observation.
     /// This remains read-only: adapter creation captures the exact observation
     /// snapshot but does not authorize or execute any deployment.
-    pub fn target_adapter(
+    pub(crate) fn target_adapter(
         &self,
     ) -> Result<NixOSTargetAdapter, SscObservationError> {
         let snapshot = self.target_snapshot()?;
@@ -254,7 +285,7 @@ impl NixSystemObservation {
             .map_err(|error| SscObservationError::AdapterConstruction(error.to_string()))
     }
 
-    pub fn target_snapshot(&self) -> Result<TargetSnapshot, SscObservationError> {
+    pub(crate) fn target_snapshot(&self) -> Result<TargetSnapshot, SscObservationError> {
         self.validate()?;
         let observation_digest = self.observation_digest()?;
         let resources = self
@@ -420,6 +451,10 @@ mod tests {
 
     fn test_target_id() -> TargetId {
         target_identity_from_machine_id("0123456789abcdef0123456789abcdef").expect("target id")
+    }
+
+    fn captured(observation: NixSystemObservation) -> CapturedNixSystemObservation {
+        CapturedNixSystemObservation { observation }
     }
 
     #[test]
@@ -666,7 +701,7 @@ mod tests {
         let authorized = rollback_authorized_plan_for_testing();
 
         assert_eq!(
-            observation
+            captured(observation)
                 .validate_against_authorized_plan(&authorized)
                 .expect_err("booted-state drift"),
             SscObservationError::AuthorizedObservationDigestMismatch
@@ -690,7 +725,7 @@ mod tests {
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
         let adapter = sovereign_state_compiler_nix::NixOSTargetAdapter::from_snapshot(
-            observation.target_snapshot().expect("snapshot"),
+            captured(observation.clone()).target_snapshot().expect("snapshot"),
         )
         .expect("adapter");
         let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-1", test_target_id());
@@ -714,7 +749,7 @@ mod tests {
         };
         let authorized = plan.authorize(auth, 100).expect("authorization");
 
-        assert!(observation
+        assert!(captured(observation)
             .validate_against_authorized_plan(&authorized)
             .is_ok());
     }
@@ -787,7 +822,7 @@ mod tests {
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
         let adapter = sovereign_state_compiler_nix::NixOSTargetAdapter::from_snapshot(
-            observation.target_snapshot().expect("snapshot"),
+            captured(observation.clone()).target_snapshot().expect("snapshot"),
         )
         .expect("adapter");
         let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-test", test_target_id());
@@ -1024,7 +1059,7 @@ mod tests {
             current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
             booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
         };
-        let adapter = observation.target_adapter().expect("adapter");
+        let adapter = captured(observation.clone()).target_adapter().expect("adapter");
         let snapshot = adapter.describe_target().expect("snapshot");
 
         assert_eq!(snapshot.profile.platform, "nixos");
