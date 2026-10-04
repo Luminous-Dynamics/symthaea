@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Typed phonological planning between semantic/linguistic intent and speech realization.
+//! Typed phonological planning between linguistic formulation and speech realization.
 //!
 //! This module is intentionally content-safe: it can carry phoneme/syllable structure
 //! only when an upstream linguistic formatter actually supplies it. It never fabricates
@@ -108,7 +108,7 @@ pub struct SyllableSlot {
     pub phrase_boundary_after: bool,
 }
 
-/// Deterministic bridge from a SpeechPlan into phonological planning.
+/// Deterministic bridge from a linguistic formulation frame into phonological planning.
 ///
 /// When lexical/phonological content is unavailable, segments remains empty and the
 /// binding status stays RoleStructureOnly. This is deliberate: absence of content is
