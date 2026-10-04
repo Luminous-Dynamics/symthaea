@@ -207,8 +207,11 @@ pub struct VerificationEvidence {
     pub proof_purpose: ClaimProofPurpose,
     pub verification_method: ClaimVerificationMethod,
     pub controller: ClaimControllerIdentity,
-    /// Controller identity actually read from the resolved controller document.
-    pub controller_document_controller: ClaimControllerIdentity,
+    /// Controller identity actually read from the resolved verification-method definition.
+    ///
+    /// This is intentionally distinct from the identity of the controller document
+    /// itself: a verification method's controller MUST be checked explicitly.
+    pub resolved_verification_method_controller: ClaimControllerIdentity,
     /// Verification-method identity actually read from the resolved controller document.
     pub controller_document_verification_method: ClaimVerificationMethod,
     pub verification_relationship: ClaimVerificationRelationship,
@@ -226,7 +229,7 @@ impl VerificationEvidence {
         request: &VerificationRequest,
         controller_document_ref: impl Into<String>,
         controller_document_digest: impl Into<String>,
-        controller_document_controller: ClaimControllerIdentity,
+        resolved_verification_method_controller: ClaimControllerIdentity,
         controller_document_verification_method: ClaimVerificationMethod,
         verification_relationship: impl Into<String>,
         cryptosuite: impl Into<String>,
@@ -245,12 +248,12 @@ impl VerificationEvidence {
                 actual: verification_relationship,
             });
         }
-        controller_document_controller.validate_structure()?;
+        resolved_verification_method_controller.validate_structure()?;
         controller_document_verification_method.validate_structure()?;
-        if controller_document_controller != request.expected_controller {
+        if resolved_verification_method_controller != request.expected_controller {
             return Err(VerificationFailure::ControllerMismatch {
                 expected: request.expected_controller.clone(),
-                actual: controller_document_controller,
+                actual: resolved_verification_method_controller,
             });
         }
         if controller_document_verification_method != request.verification_method {
@@ -295,7 +298,7 @@ impl VerificationEvidence {
             proof_purpose: request.proof_purpose.clone(),
             verification_method: request.verification_method.clone(),
             controller: request.expected_controller.clone(),
-            controller_document_controller,
+            resolved_verification_method_controller,
             controller_document_verification_method,
             verification_relationship,
             controller_document_ref,
@@ -350,12 +353,12 @@ impl VerificationEvidence {
             expected_verification_relationship: self.verification_relationship.clone(),
         };
         request.validate_structure()?;
-        self.controller_document_controller.validate_structure()?;
+        self.resolved_verification_method_controller.validate_structure()?;
         self.controller_document_verification_method.validate_structure()?;
-        if self.controller_document_controller != self.controller {
+        if self.resolved_verification_method_controller != self.controller {
             return Err(VerificationFailure::ControllerMismatch {
                 expected: self.controller.clone(),
-                actual: self.controller_document_controller.clone(),
+                actual: self.resolved_verification_method_controller.clone(),
             });
         }
         if self.controller_document_verification_method != self.verification_method {
@@ -398,7 +401,7 @@ impl VerificationEvidence {
             && self.proof_purpose == request.proof_purpose
             && self.verification_method == request.verification_method
             && self.controller == request.expected_controller
-            && self.controller_document_controller == request.expected_controller
+            && self.resolved_verification_method_controller == request.expected_controller
             && self.controller_document_verification_method == request.verification_method
             && self.verification_relationship == request.expected_verification_relationship
     }
@@ -639,7 +642,7 @@ mod tests {
     }
 
     #[test]
-    fn evidence_rejects_controller_document_controller_substitution() {
+    fn evidence_rejects_resolved_verification_method_controller_substitution() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
             &claim,
