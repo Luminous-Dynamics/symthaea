@@ -39,6 +39,8 @@ Current systemd guidance describes PCR 7, PCR 11, and PCR 14 as common policy in
 
 The installer must not infer the final installed system's measured-UKI PCR policy from the live installer environment. A future policy-aware enrollment step should inspect the target's finalized boot artifacts and explicitly record the chosen PCR policy before enrollment.
 
+Current systemd guidance treats PCR 7, PCR 11, and in some configurations PCR 14 as common encrypted-volume policy inputs; it also notes that direct firmware measurements such as PCR 0 are more brittle across updates. PCR 11 covers the systemd-stub kernel/UKI measurement path, and signed PCR policies can make software updates less brittle than binding to one fixed PCR value. These are LUKS policy mechanisms, not regenerative-health attestation by themselves. citeturn340529search0turn340529search1
+
 ## Nixward handoff
 
 Nixward currently receives a `HardwareProfile` with `has_tpm`, `has_secure_boot`, and related deployment facts, and can reason about TPM2 configuration.
