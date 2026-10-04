@@ -41,6 +41,11 @@ jobs:
           assert codec_report["binary_frame_roundtrip_exact"] is True
           assert codec_report["deterministic_repeat_exact"] is True
           assert codec_report["semantic_decoder_invoked"] is False
+          assert codec_report["codec_descriptor"]["codec_id"] == "symthaea.hdc.continuous-sign-v1"
+          assert codec_report["codec_descriptor"]["quantizer"] == "sign(value > 0)"
+          assert codec_report["codec_descriptor"]["dimension"] == 16384
+          assert len(codec_report["bit_corruption_observations"]) == 5
+          assert codec_report["bit_corruption_observations"][0]["flip_probability"] == 0.0
           assert codec_report["metrics"]["schema_version"] == 1
           assert codec_report["metrics"]["dimension"] == 16384
           assert codec_report["metrics"]["binary_bytes"] == 2048
