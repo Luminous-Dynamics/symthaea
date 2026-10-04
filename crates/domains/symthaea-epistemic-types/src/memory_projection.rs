@@ -783,10 +783,30 @@ mod tests {
 
         let validation = ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation));
         let mut view = ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        view.validator_version = "attacker-defined-v999".into();
+        assert_eq!(
+            view.validate_structure(),
+            Err("provenance view validator version must match validation report")
+        );
+        assert!(!view.is_structurally_conforming());
+
+        let validation = ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation));
+        let mut view = ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
         view.relations[0].target_memory_id = "tampered".into();
         assert_eq!(
             view.validate_structure(),
             Err("provenance view validation digest mismatch")
+        );
+        assert!(!view.is_structurally_conforming());
+
+        let mut view = ProvenanceView::from_relations(
+            std::slice::from_ref(&relation),
+            ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation)),
+        ).unwrap();
+        view.snapshot_schema_version += 1;
+        assert_eq!(
+            view.validate_structure(),
+            Err("provenance view schema version must match validation report")
         );
         assert!(!view.is_structurally_conforming());
     }
