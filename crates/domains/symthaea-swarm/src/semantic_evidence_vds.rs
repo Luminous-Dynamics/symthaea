@@ -2357,9 +2357,12 @@ impl<'a> CborReader<'a> {
         max_array_items: usize,
         max_value_bytes: usize,
     ) -> Result<(), Rfc9162ProofDecodeError> {
-        let start=self.offset;
-        self.skip_value_inner(depth, max_bstr_len, max_array_items, max_value_bytes)?;
-        if self.offset.saturating_sub(start) > max_value_bytes {
+        let limit_end = self
+            .offset
+            .checked_add(max_value_bytes)
+            .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+        self.skip_value_inner(depth, max_bstr_len, max_array_items, limit_end)?;
+        if self.offset > limit_end {
             return Err(Rfc9162ProofDecodeError::InvalidStructure);
         }
         Ok(())
@@ -2370,19 +2373,33 @@ impl<'a> CborReader<'a> {
         depth: usize,
         max_bstr_len: usize,
         max_array_items: usize,
-        max_value_bytes: usize,
+        limit_end: usize,
     ) -> Result<(), Rfc9162ProofDecodeError> {
-        if depth>16 { return Err(Rfc9162ProofDecodeError::InvalidStructure); }
-        let major=self.peek_major_type()?;
+        if depth > 16 || self.offset >= limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        let major = self.peek_major_type()?;
         match major {
-            0 | 1 => { self.skip_integer().map(|_|()) }
-            2 => { self.read_bstr_bounded(max_bstr_len).map(|_|()) }
-            3 => { self.read_text_bounded(4096).map(|_|()) }
+            0 | 1 => {
+                self.skip_integer()?;
+                if self.offset > limit_end {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                Ok(())
+            }
+            2 => self.skip_bstr_value(max_bstr_len, limit_end),
+            3 => self.skip_text_value(4096, limit_end),
             4 => {
                 if self.bytes.get(self.offset).copied().is_some_and(|byte| byte & 0x1f == 31) {
                     self.offset += 1;
+                    if self.offset > limit_end {
+                        return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    }
                     let mut items = 0usize;
                     loop {
+                        if self.offset >= limit_end {
+                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                        }
                         if self.bytes.get(self.offset).copied() == Some(0xff) {
                             self.offset += 1;
                             return Ok(());
@@ -2390,20 +2407,43 @@ impl<'a> CborReader<'a> {
                         if items >= max_array_items {
                             return Err(Rfc9162ProofDecodeError::InvalidStructure);
                         }
-                        self.skip_value_with_limits(depth + 1, max_bstr_len, max_array_items, max_value_bytes)?;
+                        self.skip_value_inner(
+                            depth + 1,
+                            max_bstr_len,
+                            max_array_items,
+                            limit_end,
+                        )?;
                         items += 1;
                     }
                 }
-                let n=self.read_array_len()?;
-                if n>max_array_items{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-                for _ in 0..n{self.skip_value_with_limits(depth+1, max_bstr_len, max_array_items, max_value_bytes)?;}
+                let n = self.read_array_len()?;
+                if self.offset > limit_end || n > max_array_items {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                for _ in 0..n {
+                    if self.offset >= limit_end {
+                        return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    }
+                    self.skip_value_inner(
+                        depth + 1,
+                        max_bstr_len,
+                        max_array_items,
+                        limit_end,
+                    )?;
+                }
                 Ok(())
-            },
+            }
             5 => {
                 if self.bytes.get(self.offset).copied().is_some_and(|byte| byte & 0x1f == 31) {
                     self.offset += 1;
+                    if self.offset > limit_end {
+                        return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    }
                     let mut entries = 0usize;
                     loop {
+                        if self.offset >= limit_end {
+                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                        }
                         if self.bytes.get(self.offset).copied() == Some(0xff) {
                             self.offset += 1;
                             return Ok(());
@@ -2411,42 +2451,312 @@ impl<'a> CborReader<'a> {
                         if entries >= 64 {
                             return Err(Rfc9162ProofDecodeError::InvalidStructure);
                         }
-                        self.skip_value_with_limits(depth + 1, max_bstr_len, max_array_items, max_value_bytes)?;
-                        self.skip_value_with_limits(depth + 1, max_bstr_len, max_array_items, max_value_bytes)?;
+                        if self.offset >= limit_end {
+                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                        }
+                        self.skip_value_inner(
+                            depth + 1,
+                            max_bstr_len,
+                            max_array_items,
+                            limit_end,
+                        )?;
+                        if self.offset >= limit_end {
+                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                        }
+                        self.skip_value_inner(
+                            depth + 1,
+                            max_bstr_len,
+                            max_array_items,
+                            limit_end,
+                        )?;
                         entries += 1;
                     }
                 }
-                let n=self.read_map_len()?;
-                if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-                for _ in 0..n{
-                    self.skip_value_with_limits(depth+1, max_bstr_len, max_array_items, max_value_bytes)?;
-                    self.skip_value_with_limits(depth+1, max_bstr_len, max_array_items, max_value_bytes)?;
+                let n = self.read_map_len()?;
+                if self.offset > limit_end || n > 64 {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                for _ in 0..n {
+                    if self.offset >= limit_end {
+                        return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    }
+                    self.skip_value_inner(
+                        depth + 1,
+                        max_bstr_len,
+                        max_array_items,
+                        limit_end,
+                    )?;
+                    if self.offset >= limit_end {
+                        return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    }
+                    self.skip_value_inner(
+                        depth + 1,
+                        max_bstr_len,
+                        max_array_items,
+                        limit_end,
+                    )?;
                 }
                 Ok(())
-            },
+            }
             6 => {
                 self.read_tag()?;
-                self.skip_value_with_bstr_and_array_limit(depth+1, max_bstr_len, max_array_items)
-            },
-            7 => {
-                let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
-                match initial {
-                    0xe0..=0xf7 => { self.offset+=1; Ok(()) },
-                    0xf8 => {
-                        self.offset+=1;
-                        let value=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
-                        if value < 0x20 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
-                        self.offset+=1;
-                        Ok(())
-                    },
-                    0xf9 => { self.take(3)?; Ok(()) },
-                    0xfa => { self.take(5)?; Ok(()) },
-                    0xfb => { self.take(9)?; Ok(()) },
-                    _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                if self.offset > limit_end {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
                 }
-            },
+                self.skip_value_inner(
+                    depth + 1,
+                    max_bstr_len,
+                    max_array_items,
+                    limit_end,
+                )
+            }
+            7 => {
+                let initial = *self
+                    .bytes
+                    .get(self.offset)
+                    .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                match initial {
+                    0xe0..=0xf7 => {
+                        self.offset += 1;
+                        Ok(())
+                    }
+                    0xf8 => {
+                        self.offset += 1;
+                        let value = *self
+                            .bytes
+                            .get(self.offset)
+                            .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                        if value < 0x20 {
+                            return Err(Rfc9162ProofDecodeError::InvalidEncoding);
+                        }
+                        self.offset += 1;
+                        Ok(())
+                    }
+                    0xf9 => {
+                        self.take(3)?;
+                        Ok(())
+                    }
+                    0xfa => {
+                        self.take(5)?;
+                        Ok(())
+                    }
+                    0xfb => {
+                        self.take(9)?;
+                        Ok(())
+                    }
+                    _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                }?
+            }
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        };
+        if self.offset > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
         }
+        Ok(())
+    }
+
+    fn skip_bstr_value(
+        &mut self,
+        max_len: usize,
+        limit_end: usize,
+    ) -> Result<(), Rfc9162ProofDecodeError> {
+        let initial = *self
+            .bytes
+            .get(self.offset)
+            .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        self.offset += 1;
+        if initial >> 5 != 2 || self.offset > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        let ai = initial & 0x1f;
+        let mut total_len = 0usize;
+        let mut chunks = 0usize;
+        if ai == 31 {
+            loop {
+                if self.offset >= limit_end {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                if self.bytes.get(self.offset).copied() == Some(0xff) {
+                    self.offset += 1;
+                    return Ok(());
+                }
+                if chunks >= MAX_CBOR_BSTR_CHUNKS {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                let chunk_initial = *self
+                    .bytes
+                    .get(self.offset)
+                    .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                if chunk_initial >> 5 != 2 || (chunk_initial & 0x1f) == 31 {
+                    return Err(Rfc9162ProofDecodeError::InvalidEncoding);
+                }
+                self.offset += 1;
+                let chunk_ai = chunk_initial & 0x1f;
+                let n = match chunk_ai {
+                    0..=23 => chunk_ai as u64,
+                    24 => self.read_uint(1, 24)?,
+                    25 => self.read_uint(2, 256)?,
+                    26 => self.read_uint(4, 65_536)?,
+                    27 => self.read_uint(8, 4_294_967_296)?,
+                    _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                };
+                if self.offset > limit_end {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                let n = usize::try_from(n)
+                    .map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
+                if n > max_len.saturating_sub(total_len) {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                let end = self
+                    .offset
+                    .checked_add(n)
+                    .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+                if end > self.bytes.len() {
+                    return Err(Rfc9162ProofDecodeError::UnexpectedEof);
+                }
+                if end > limit_end {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                self.offset = end;
+                total_len += n;
+                chunks += 1;
+            }
+        }
+
+        let n = match ai {
+            0..=23 => ai as u64,
+            24 => self.read_uint(1, 24)?,
+            25 => self.read_uint(2, 256)?,
+            26 => self.read_uint(4, 65_536)?,
+            27 => self.read_uint(8, 4_294_967_296)?,
+            _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        };
+        if self.offset > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        let n = usize::try_from(n)
+            .map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
+        if n > max_len {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        let end = self
+            .offset
+            .checked_add(n)
+            .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+        if end > self.bytes.len() {
+            return Err(Rfc9162ProofDecodeError::UnexpectedEof);
+        }
+        if end > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        self.offset = end;
+        Ok(())
+    }
+
+    fn skip_text_value(
+        &mut self,
+        max_len: usize,
+        limit_end: usize,
+    ) -> Result<(), Rfc9162ProofDecodeError> {
+        let initial = *self
+            .bytes
+            .get(self.offset)
+            .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        self.offset += 1;
+        if initial >> 5 != 3 || self.offset > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        let ai = initial & 0x1f;
+        let mut total_len = 0usize;
+        let mut chunks = 0usize;
+        if ai == 31 {
+            loop {
+                if self.offset >= limit_end {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                if self.bytes.get(self.offset).copied() == Some(0xff) {
+                    self.offset += 1;
+                    return Ok(());
+                }
+                if chunks >= MAX_CBOR_TSTR_CHUNKS {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                let chunk_initial = *self
+                    .bytes
+                    .get(self.offset)
+                    .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                if chunk_initial >> 5 != 3 || (chunk_initial & 0x1f) == 31 {
+                    return Err(Rfc9162ProofDecodeError::InvalidEncoding);
+                }
+                self.offset += 1;
+                let chunk_ai = chunk_initial & 0x1f;
+                let n = match chunk_ai {
+                    0..=23 => chunk_ai as u64,
+                    24 => self.read_uint(1, 24)?,
+                    25 => self.read_uint(2, 256)?,
+                    26 => self.read_uint(4, 65_536)?,
+                    27 => self.read_uint(8, 4_294_967_296)?,
+                    _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                };
+                if self.offset > limit_end {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                let n = usize::try_from(n)
+                    .map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
+                if n > max_len.saturating_sub(total_len) {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                let end = self
+                    .offset
+                    .checked_add(n)
+                    .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+                if end > self.bytes.len() {
+                    return Err(Rfc9162ProofDecodeError::UnexpectedEof);
+                }
+                if end > limit_end {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
+                if std::str::from_utf8(&self.bytes[self.offset..end]).is_err() {
+                    return Err(Rfc9162ProofDecodeError::InvalidEncoding);
+                }
+                self.offset = end;
+                total_len += n;
+                chunks += 1;
+            }
+        }
+
+        let n = match ai {
+            0..=23 => ai as u64,
+            24 => self.read_uint(1, 24)?,
+            25 => self.read_uint(2, 256)?,
+            26 => self.read_uint(4, 65_536)?,
+            27 => self.read_uint(8, 4_294_967_296)?,
+            _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        };
+        if self.offset > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        let n = usize::try_from(n)
+            .map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
+        if n > max_len {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        let end = self
+            .offset
+            .checked_add(n)
+            .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+        if end > self.bytes.len() {
+            return Err(Rfc9162ProofDecodeError::UnexpectedEof);
+        }
+        if end > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        if std::str::from_utf8(&self.bytes[self.offset..end]).is_err() {
+            return Err(Rfc9162ProofDecodeError::InvalidEncoding);
+        }
+        self.offset = end;
+        Ok(())
     }
 
     fn skip_integer(&mut self) -> Result<(), Rfc9162ProofDecodeError> {
@@ -3512,6 +3822,30 @@ mod tests {
             .chain([0x33; 32])
             .collect::<Vec<_>>();
         assert_eq!(consistency.to_cbor(), expected);
+    }
+
+    #[test]
+    fn cbor_skip_value_enforces_recursive_aggregate_byte_limit() {
+        // The enclosing map allows only 16 encoded bytes. The nested array is
+        // 13 bytes by itself, but its second child crosses the shared ceiling.
+        // The scanner must stop at the boundary instead of consuming the full
+        // nested child and only then noticing the aggregate overflow.
+        let wire = vec![
+            0xa1, 0x19, 0x23, 0x28,
+            0x82,
+            0x45, b'1', b'2', b'3', b'4', b'5',
+            0x45, b'6', b'7', b'8', b'9', b'0',
+        ];
+        let mut reader = CborReader::new(&wire);
+        let error = reader
+            .read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 16)
+            .unwrap_err();
+        assert_eq!(error, Rfc9162ProofDecodeError::InvalidStructure);
+        assert!(
+            reader.offset <= 16,
+            "recursive aggregate limit was observed too late: {}",
+            reader.offset
+        );
     }
 
     #[test]
