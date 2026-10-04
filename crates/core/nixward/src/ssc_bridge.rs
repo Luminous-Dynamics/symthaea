@@ -324,7 +324,9 @@ fn capture_time_ms() -> Result<u64, SscObservationError> {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_millis() as u64)
-        .map_err(|error| SscObservationError::Io(format!("system clock before Unix epoch: {error}")))
+        .map_err(|error| {
+            SscObservationError::Io(format!("system clock before Unix epoch: {error}"))
+        })
 }
 
 fn read_target_identity(path: &Path) -> Result<TargetId, SscObservationError> {
@@ -728,7 +730,10 @@ mod tests {
             captured(observation.clone()).target_snapshot().expect("snapshot"),
         )
         .expect("adapter");
-        let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-1", test_target_id());
+        let mut intent = sovereign_state_compiler::DeploymentIntent::new(
+            "rollback-1",
+            test_target_id(),
+        );
         intent.required_resources.insert(
             nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("resource"),
         );
@@ -825,7 +830,10 @@ mod tests {
             captured(observation.clone()).target_snapshot().expect("snapshot"),
         )
         .expect("adapter");
-        let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-test", test_target_id());
+        let mut intent = sovereign_state_compiler::DeploymentIntent::new(
+            "rollback-test",
+            test_target_id(),
+        );
         intent.required_capabilities.insert(Capability::Rollback);
         intent.required_resources.insert(
             nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("resource"),
