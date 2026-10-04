@@ -88,11 +88,16 @@ impl FederatedClaim {
         provenance_view: ProvenanceView,
         admission_receipt: CanonicalAdmissionReceipt,
     ) -> Result<Self, &'static str> {
+        let representation = ClaimRepresentationIdentity::new(claim_identity)?;
+        let subject = CanonicalAdmissionSubject::new(
+            canonical_identity,
+            Some(provenance_family.into()),
+        )?;
         let claim = Self {
             schema_version: FEDERATED_CLAIM_SCHEMA_VERSION,
-            claim_identity: claim_identity.into(),
-            canonical_identity: canonical_identity.into(),
-            provenance_family: provenance_family.into(),
+            claim_identity: representation.as_str().to_owned(),
+            canonical_identity: subject.canonical_identity().to_owned(),
+            provenance_family: subject.provenance_family().expect("claim subject family").to_owned(),
             author: author.into(),
             statement_ref: statement_ref.into(),
             source_event: None,
