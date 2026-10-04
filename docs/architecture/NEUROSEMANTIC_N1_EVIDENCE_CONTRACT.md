@@ -38,6 +38,8 @@ N2 begins only when the system is evaluated on conceptual representations that a
 
 Consent must specify the permitted data class and inference class separately. A participant agreeing to communication assistance does not automatically authorize unrelated secondary inference, model training, affective inference, or commercial analytics.
 
+Policy-bearing packets must additionally bind the declared data class to an intrinsic payload type. Opaque legacy payloads may remain readable for compatibility, but they must fail closed at the authorization boundary unless the payload type itself makes the declared data class machine-verifiable.
+
 Revocation must have a defined effective time and an auditable downstream behavior. The transport layer must not be treated as the authority for semantic access.
 
 ## Current research anchor
