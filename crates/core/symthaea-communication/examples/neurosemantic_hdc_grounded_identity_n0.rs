@@ -327,6 +327,20 @@ fn main() -> Result<(), String> {
         )
         .is_err();
 
+    let mut ambiguous_relation_receiver = held_out_manifest.clone();
+    ambiguous_relation_receiver.relations.push(HdcRelationIdentityBinding {
+        local_relation: "commencer".into(),
+        relation_id: "relation:initiates".into(),
+    });
+    let ambiguous_receiver_relation_rejected = codebook
+        .decode_graph_with_policy(
+            &held_out_representation,
+            &held_out_manifest,
+            &ambiguous_relation_receiver,
+            policy,
+        )
+        .is_err();
+
     if !metrics.concept_identity_exact
         || !metrics.relation_identity_exact
         || !metrics.structural_equivalence
@@ -342,6 +356,7 @@ fn main() -> Result<(), String> {
         || !wrong_scheme_rejected
         || !wrong_mapping_provenance_rejected
         || !ambiguous_receiver_rejected
+        || !ambiguous_receiver_relation_rejected
     {
         return Err("grounded identity N0 acceptance gates failed".into());
     }
@@ -373,6 +388,7 @@ fn main() -> Result<(), String> {
             "wrong_scheme_rejected": wrong_scheme_rejected,
             "wrong_mapping_provenance_rejected": wrong_mapping_provenance_rejected,
             "ambiguous_receiver_rejected": ambiguous_receiver_rejected,
+            "ambiguous_receiver_relation_rejected": ambiguous_receiver_relation_rejected,
         },
         "metrics": metrics,
     });
