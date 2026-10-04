@@ -947,7 +947,7 @@ impl DaemonState {
             .create_pending_request(
                 intent,
                 command,
-                displayed_action,
+                displayed_action.as_str(),
                 "same-uid-process-v1",
                 created_at,
                 expires_at,
