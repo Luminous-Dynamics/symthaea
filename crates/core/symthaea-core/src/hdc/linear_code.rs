@@ -536,7 +536,7 @@ pub fn recover_linear_bound_with_work(
     let mut independent_basis = Vec::new();
     let mut owners = Vec::new();
 
-    for factor in factors.iter() {
+    for (factor_index, factor) in factors.iter().enumerate() {
         for generator in factor.basis() {
             if extends_span_with_work(&independent_basis, generator, &mut work) {
                 independent_basis.push(generator.clone());
