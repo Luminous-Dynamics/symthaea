@@ -146,6 +146,8 @@ pub struct HdcOntologyCodebookDescriptor {
     pub seed: u64,
     pub dimension: usize,
     pub scheme_id: String,
+    /// Versioned hash of the upstream identity-mapping authority.
+    pub mapping_provenance_hash: String,
     /// Hash of stable concept IDs plus their declared kind, not grounding IDs.
     pub concept_manifest_hash: String,
     /// Hash of stable predicate IDs, not local/lexical relation labels.
@@ -165,6 +167,7 @@ impl HdcOntologyCodebookDescriptor {
             && self.role_revision == HDC_ONTOLOGY_ROLE_REVISION
             && self.dimension == HDC_DIMENSION
             && !self.scheme_id.trim().is_empty()
+            && !self.mapping_provenance_hash.trim().is_empty()
             && !self.concept_manifest_hash.trim().is_empty()
             && !self.relation_manifest_hash.trim().is_empty()
             && !self.training_manifest_hash.trim().is_empty()
@@ -371,6 +374,7 @@ impl HdcOntologyCodebook {
             seed,
             dimension: HDC_DIMENSION,
             scheme_id: training_manifest.scheme_id.clone(),
+            mapping_provenance_hash: training_manifest.mapping_provenance_hash.clone(),
             concept_manifest_hash,
             relation_manifest_hash,
             training_manifest_hash,
@@ -924,6 +928,9 @@ fn validate_manifest_compatibility(
             descriptor.scheme_id, manifest.scheme_id
         ));
     }
+    if descriptor.mapping_provenance_hash != manifest.mapping_provenance_hash {
+        return Err("identity mapping provenance mismatch".into());
+    }
     Ok(())
 }
 
@@ -1341,6 +1348,18 @@ mod tests {
                 .unwrap();
         let mut wrong = training_manifest.clone();
         wrong.scheme_id = "scheme:other".into();
+
+        assert!(codebook.encode_graph(&training, &wrong).is_err());
+    }
+
+    #[test]
+    fn mapping_provenance_mismatch_is_fail_closed() {
+        let (training, training_manifest) = training_graph_and_manifest();
+        let codebook =
+            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
+                .unwrap();
+        let mut wrong = training_manifest.clone();
+        wrong.mapping_provenance_hash = crate::content_hash(b"different-authority-revision");
 
         assert!(codebook.encode_graph(&training, &wrong).is_err());
     }
