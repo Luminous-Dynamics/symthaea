@@ -1,7 +1,8 @@
 use blake3::Hasher;
 use symthaea_core::hdc::linear_code::{
-    BinaryCodeword, LinearCodeWork, RandomLinearCode, basis_rank, factorization_algebra,
-    factorization_count_for_target, recover_direct_sum_bound, recover_independent_bound,
+    BinaryCodeword, LinearCodeDependencyWitness, LinearCodeWork, RandomLinearCode, basis_rank,
+    factorization_algebra, factorization_count_for_target, factorization_dependency_witness,
+    recover_direct_sum_bound, recover_independent_bound,
     recover_linear_bound, recover_linear_bound_with_work, solve_linear_combination,
 };
 
@@ -312,6 +313,42 @@ fn published_parameter_search_space_ledger_is_exact() {
 }
 
 #[test]
+fn dependency_witness_ledger_is_canonical_and_verifiable() {
+    let c1 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b001])])
+        .expect("c1");
+    let c2 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b010])])
+        .expect("c2");
+    let c3 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b011])])
+        .expect("c3");
+    let factors = [&c1, &c2, &c3];
+
+    let first = factorization_dependency_witness(&factors).expect("dependency exists");
+    let second = factorization_dependency_witness(&factors).expect("dependency exists");
+    assert_eq!(first, second);
+    assert_eq!(first.generator_coefficients, vec![true, true, true]);
+    assert_eq!(first.factor_support, vec![0, 1, 2]);
+    assert_eq!(first.generator_support_size(), 3);
+    assert_eq!(first.factor_support_size(), 3);
+    assert!(first.verifies_against(&factors));
+
+    let mut tampered = first.clone();
+    tampered.factor_support = vec![0, 1];
+    assert!(!tampered.verifies_against(&factors));
+
+    println!(
+        "DEPENDENCY_WITNESS=fixture=three-way;generator_coefficients=111;factor_support=0,1,2;generator_support_size={};factor_support_size={};verifies=true",
+        first.generator_support_size(),
+        first.factor_support_size(),
+    );
+}
+
+#[test]
+fn independent_dependency_witness_is_absent() {
+    let (_, left, right) =
+        RandomLinearCode::generate_direct_sum(32, 3, 4, 0x51A7).expect("valid direct sum");
+    assert!(factorization_dependency_witness(&[&left, &right]).is_none());
+}
+#[test]
 fn algebraic_multiplicity_ledger_is_exhaustively_self_consistent() {
     let shared = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b001])])
         .expect("shared code");
@@ -490,6 +527,7 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     let mut nonexistent_targets = 0usize;
     let mut max_kernel_dimension = 0usize;
     let mut max_dependency_order = 0usize;
+    let mut witnessed_dependency_cases = 0usize;
 
     for &dimension in &dimensions {
         for &rank in &ranks {
@@ -596,6 +634,37 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                     );
 
                     let jointly_independent = algebra.unique_factorization;
+                    let dependency_witness = if jointly_independent {
+                        None
+                    } else {
+                        let witness = factorization_dependency_witness(&factors)
+                            .expect("dependent factors must expose a kernel witness");
+                        assert!(witness.verifies_against(&factors));
+                        assert!(
+                            witness.factor_support_size()
+                                >= algebra.dependency_order.unwrap_or(2)
+                        );
+                        Some(witness)
+                    };
+
+                    if let Some(witness) = &dependency_witness {
+                        witnessed_dependency_cases += 1;
+                        result_digest.update(b"dependency-witness");
+                        result_digest.update(
+                            &(witness.generator_coefficients.len() as u64).to_le_bytes(),
+                        );
+                        for coefficient in &witness.generator_coefficients {
+                            result_digest.update(&[*coefficient as u8]);
+                        }
+                        result_digest.update(&(witness.factor_support.len() as u64).to_le_bytes());
+                        for factor_index in &witness.factor_support {
+                            result_digest.update(&(*factor_index as u64).to_le_bytes());
+                        }
+                        result_digest.update(&(witness.generator_support_size() as u64).to_le_bytes());
+                    } else {
+                        result_digest.update(b"no-dependency-witness");
+                    }
+
                     if !jointly_independent {
                         jointly_dependent += 1;
                     }
@@ -667,6 +736,7 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     assert_eq!(valid_representative, cases);
     assert_eq!(unique_cases + non_unique_valid, cases);
     assert_eq!(nonexistent_targets, 0);
+    assert_eq!(witnessed_dependency_cases, jointly_dependent);
 
     let result_digest = result_digest.finalize();
     let result_digest = result_digest
@@ -675,7 +745,7 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
     println!(
-        "PAPER_MATRIX=dimensions=500,1000,2000;ranks=3,5,7;factors=3,4,5;repeats={repeats};cases={cases};exact_original={exact_original};unique_cases={unique_cases};non_unique_valid={non_unique_valid};valid_representative={valid_representative};jointly_dependent={jointly_dependent};nonexistent_targets={nonexistent_targets};max_kernel_dimension={max_kernel_dimension};max_dependency_order={max_dependency_order};failures={failures};result_digest={result_digest};total_span_membership_checks={};total_basis_rank_pivots={};total_solve_pivots={};total_solve_row_xor_words={}",
+        "PAPER_MATRIX=dimensions=500,1000,2000;ranks=3,5,7;factors=3,4,5;repeats={repeats};cases={cases};exact_original={exact_original};unique_cases={unique_cases};non_unique_valid={non_unique_valid};valid_representative={valid_representative};jointly_dependent={jointly_dependent};nonexistent_targets={nonexistent_targets};max_kernel_dimension={max_kernel_dimension};max_dependency_order={max_dependency_order};failures={failures};witnessed_dependency_cases={witnessed_dependency_cases};result_digest={result_digest};total_span_membership_checks={};total_basis_rank_pivots={};total_solve_pivots={};total_solve_row_xor_words={}",
         total_work.span_membership_checks,
         total_work.basis_rank_pivots,
         total_work.solve_pivots,
