@@ -715,6 +715,7 @@ mod tests {
             ChannelDirection::Read,
             RepresentationFamily::Hdc,
             CognitiveSensitivity::Private,
+            semantic_policy(),
             0.77,
             NeurosemanticPayload::Hypervector(vec![1, -1]),
         )
@@ -813,6 +814,7 @@ mod tests {
             ChannelDirection::Write,
             RepresentationFamily::Hdc,
             CognitiveSensitivity::Private,
+            semantic_policy(),
             0.5,
             NeurosemanticPayload::Hypervector(vec![1, -1]),
         )
