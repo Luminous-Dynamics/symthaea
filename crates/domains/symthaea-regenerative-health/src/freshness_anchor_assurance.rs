@@ -193,6 +193,9 @@ impl FreshnessAnchorProfile {
 pub struct FreshnessAnchorVerificationReceipt {
     pub schema_version: String,
     pub profile_fingerprint: String,
+    pub receiver_id: String,
+    pub generation: u64,
+    pub state_fingerprint: String,
     pub verifier_reference: String,
     pub evidence_reference: String,
     pub evidence_digest: String,
@@ -222,6 +225,9 @@ impl VerifiedFreshnessAnchor {
     ) -> Result<Self, FreshnessAnchorAssuranceError> {
         profile.require_authoritative()?;
         if receipt.schema_version != "0.1"
+            || receipt.profile_fingerprint.trim().is_empty()
+            || receipt.receiver_id.trim().is_empty()
+            || receipt.state_fingerprint.trim().is_empty()
             || receipt.verifier_reference.trim().is_empty()
             || receipt.evidence_reference.trim().is_empty()
             || receipt.evidence_digest.trim().is_empty()
@@ -247,6 +253,18 @@ impl VerifiedFreshnessAnchor {
 
     pub fn receipt(&self) -> &FreshnessAnchorVerificationReceipt {
         &self.receipt
+    }
+
+    pub fn receiver_id(&self) -> &str {
+        &self.receipt.receiver_id
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.receipt.generation
+    }
+
+    pub fn state_fingerprint(&self) -> &str {
+        &self.receipt.state_fingerprint
     }
 }
 
@@ -355,6 +373,9 @@ mod tests {
         let receipt = FreshnessAnchorVerificationReceipt {
             schema_version: "0.1".into(),
             profile_fingerprint: "wrong".into(),
+            receiver_id: "receiver-1".into(),
+            generation: 7,
+            state_fingerprint: "state-1".into(),
             verifier_reference: "verifier-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
@@ -383,6 +404,9 @@ mod tests {
         let receipt = FreshnessAnchorVerificationReceipt {
             schema_version: "0.1".into(),
             profile_fingerprint: profile.fingerprint().unwrap(),
+            receiver_id: "receiver-1".into(),
+            generation: 7,
+            state_fingerprint: "state-1".into(),
             verifier_reference: "verifier-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
