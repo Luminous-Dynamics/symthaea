@@ -155,8 +155,6 @@ impl NixActivationMode {
 pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
     [
         Capability::ObserveState,
-        Capability::InstallApplication,
-        Capability::RemoveApplication,
         Capability::ConfigureSystem,
         Capability::UpdateSystem,
         Capability::Rollback,
@@ -385,6 +383,9 @@ impl TargetAdapter for NixOSTargetAdapter {
         let home_manager = Self::property_bool(intent, HOME_MANAGER_KEY)?.unwrap_or(false);
         let install = Self::property_string_list(intent, INSTALL_KEY)?;
         let remove = Self::property_string_list(intent, REMOVE_KEY)?;
+        if !install.is_empty() || !remove.is_empty() {
+            return Err(NixOSAdapterError::ApplicationMutationScopeRequired);
+        }
         let reboot = Self::property_bool(intent, REBOOT_KEY)?.unwrap_or(false);
         let rollback_requested = Self::property_bool(intent, ROLLBACK_KEY)?.unwrap_or(false);
         let rollback_generation = Self::property_u64(intent, ROLLBACK_GENERATION_KEY)?;
@@ -636,6 +637,8 @@ pub enum NixOSAdapterError {
     ConflictingActivationModes,
     #[error("artifacts were provided without a NixOS realization operation")]
     ArtifactsRequireRealization,
+    #[error("application mutation requires an explicit user-profile resource binding")]
+    ApplicationMutationScopeRequired,
     #[error("requested NixOS transition has ambiguous post-state semantics")]
     ConflictingTransitionSemantics,
     #[error("compiled plan violates neutral compiler invariants: {0}")]
@@ -839,7 +842,7 @@ mod tests {
     }
 
     #[test]
-    fn compiles_unrelated_application_install_with_same_neutral_contract() {
+    fn application_mutation_requires_explicit_profile_scope() {
         let adapter = adapter();
         let mut intent = DeploymentIntent::new("app-1", "host-01");
         intent.desired_state.properties.insert(
@@ -850,10 +853,10 @@ mod tests {
             ]),
         );
 
-        let plan = adapter.compile(&intent).expect("compile");
-        assert_eq!(plan.steps[1].kind, PlanStepKind::StageArtifacts);
-        assert_eq!(plan.steps[2].kind, PlanStepKind::ApplyDesiredState);
-        assert!(plan.steps[2].description.contains("firefox, ripgrep"));
+        assert_eq!(
+            adapter.compile(&intent),
+            Err(NixOSAdapterError::ApplicationMutationScopeRequired)
+        );
     }
 
     #[test]
@@ -1230,7 +1233,7 @@ mod tests {
         );
         assert_eq!(
             adapter().compile(&dry),
-            Err(NixOSAdapterError::ConflictingTransitionSemantics)
+            Err(NixOSAdapterError::ApplicationMutationScopeRequired)
         );
 
         let mut test = DeploymentIntent::new("test-reboot", "host-01");
