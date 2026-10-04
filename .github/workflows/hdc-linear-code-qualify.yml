@@ -56,7 +56,32 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
-          ALLOWED='^(.github/workflows/hdc-linear-code-qualify.yml|crates/core/symthaea-core/Cargo.toml|crates/core/symthaea-core/src/hdc/linear_code.rs|crates/core/symthaea-core/src/hdc/mod.rs|crates/core/symthaea-core/tests/linear_code_ambiguity.rs|docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md)
+          CHANGED_PATHS="$RUNNER_TEMP/hdc-linear-code-changed-paths"
+          git diff --name-only "$BASE_SHA" "$GITHUB_SHA" | sort -u > "$CHANGED_PATHS"
+          test -s "$CHANGED_PATHS"
+          while IFS= read -r changed_path; do
+            case "$changed_path" in
+              ".github/workflows/hdc-linear-code-qualify.yml"|\
+              "crates/core/symthaea-core/Cargo.toml"|\
+              "crates/core/symthaea-core/src/hdc/linear_code.rs"|\
+              "crates/core/symthaea-core/src/hdc/mod.rs"|\
+              "crates/core/symthaea-core/tests/linear_code_ambiguity.rs"|\
+              "docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md") ;;
+              *)
+                printf "Unexpected changed path: %s\n" "$changed_path"
+                exit 1
+                ;;
+            esac
+          done < "$CHANGED_PATHS"
+          EXPECTED_COUNT=6
+          ACTUAL_COUNT="$(wc -l < "$CHANGED_PATHS" | tr -d " ")"
+          test "$ACTUAL_COUNT" -eq "$EXPECTED_COUNT"
+          printf "changed_paths=" >> "$GITHUB_OUTPUT"
+          paste -sd "|" "$CHANGED_PATHS" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Rust toolchain
+        id: toolchain_install
+        run: |
           rustup toolchain install 1.96.1 --component rustfmt --component clippy --profile minimal --no-self-update
 
       - name: Verify pinned Rust toolchain
