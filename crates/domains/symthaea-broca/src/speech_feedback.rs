@@ -27,19 +27,21 @@ pub struct SpeechSensoryTarget {
     pub epistemic_delivery: EpistemicDelivery,
 }
 
-impl From<ProsodicIntent> for SpeechSensoryTarget {
-    fn from(prosody: ProsodicIntent) -> Self {
+impl SpeechSensoryTarget {
+    /// Construct a target from prosody while preserving the caller's epistemic state.
+    pub fn from_prosody(
+        prosody: ProsodicIntent,
+        epistemic_delivery: EpistemicDelivery,
+    ) -> Self {
         Self {
             pitch_range: prosody.pitch_range,
             prominence: prosody.prominence,
             rate: prosody.rate,
             pause_weight: prosody.pause_weight,
-            epistemic_delivery: EpistemicDelivery::Qualified,
+            epistemic_delivery,
         }
     }
-}
 
-impl SpeechSensoryTarget {
     pub fn from_plan(plan: &SpeechPlan) -> Self {
         Self {
             pitch_range: plan.prosody.pitch_range,
