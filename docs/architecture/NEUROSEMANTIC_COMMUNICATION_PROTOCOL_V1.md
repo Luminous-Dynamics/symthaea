@@ -168,7 +168,10 @@ It compares a fixed grounded concept graph against controlled transformations:
 - collection reordering;
 - transport-local identifier renaming;
 - edge deletion;
-- edge duplication;\n- lexical relabeling;\n- confidence drift.
+- duplicate nodes;
+- edge duplication;
+- lexical relabeling;
+- confidence drift.
 
 The benchmark reports node/edge precision and recall, confidence mean absolute error,
 content hashes, and serialized sizes. Structural equivalence deliberately ignores
