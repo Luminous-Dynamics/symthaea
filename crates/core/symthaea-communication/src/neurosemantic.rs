@@ -37,7 +37,7 @@ pub enum ChannelDirection {
 }
 
 /// Purpose binding prevents ambient authority.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum CommunicationPurpose {
     AssistiveCommunication,
     HumanCollaboration,
@@ -540,6 +540,15 @@ fn payload_hash(payload: &NeurosemanticPayload) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn semantic_policy() -> NeurosemanticDataPolicy {
+        NeurosemanticDataPolicy {
+            schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            data_class: NeurosemanticDataClass::SemanticRepresentation,
+            inference_classes: BTreeSet::from([NeurosemanticInferenceClass::SemanticContent]),
+            permitted_purposes: BTreeSet::from([CommunicationPurpose::HumanCollaboration]),
+        }
+    }
 
     fn lease() -> CognitiveConsentLease {
         CognitiveConsentLease {
