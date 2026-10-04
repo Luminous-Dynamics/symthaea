@@ -101,7 +101,6 @@ impl CurrentConclusionSupport {
 /// replayed merely because its supporting conclusions remain available.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionAuthorizationWitness {
-            operation_id: None,
     pub action_id: String,
     /// Stable authorization instance identity. Fresh presentation identifiers
     /// must not silently create a fresh spendable authority for the same action.
@@ -120,7 +119,6 @@ pub struct ActionAuthorizationWitness {
 }
 
 impl ActionAuthorizationWitness {
-            operation_id: None,
     pub fn is_bound_to(
         &self,
         action: &EpistemicAction,
@@ -1001,7 +999,7 @@ mod tests {
         let action = EpistemicAction::new("a-bound", "intervention", ActionRisk::High);
         let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: "a-bound".into(),
             authorization_instance: "a-bound".into(), action_digest: action_digest.clone(),
             frame: "f2".into(),
@@ -1051,7 +1049,7 @@ mod tests {
         action = action.with_effect_binding(ActionEffectBinding::new("target-a", "prod", "adapter-a"));
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: action.id.clone(),
             authorization_instance: "approval-1".into(),
             action_digest: digest.clone(),
@@ -1083,7 +1081,7 @@ mod tests {
         let action = EpistemicAction::new("invoked-action", "effect", ActionRisk::Critical);
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: action.id.clone(),
             authorization_instance: "approval-1".into(),
             action_digest: digest.clone(),
@@ -1182,7 +1180,7 @@ mod tests {
         let action = EpistemicAction::new("a-lease", "intervention", ActionRisk::Critical);
         let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: "a-lease".into(),
             authorization_instance: "a-lease".into(), action_digest: action_digest.clone(),
             frame: "f1".into(),
@@ -1212,7 +1210,7 @@ mod tests {
         let action = EpistemicAction::new("a-concurrent", "intervention", ActionRisk::High);
         let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: "a-concurrent".into(), authorization_instance: "a-concurrent".into(), action_digest: action_digest.clone(),
             frame: "f1".into(), support_digest: "sha256:support".into(),
             policy: "policy-v1".into(), decision: "execute".into(),
@@ -1233,7 +1231,7 @@ mod tests {
         let action = EpistemicAction::new("a-crash", "intervention", ActionRisk::Critical);
         let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: "a-crash".into(), authorization_instance: "a-crash".into(), action_digest: action_digest.clone(),
             frame: "f1".into(), support_digest: "sha256:support".into(),
             policy: "policy-v1".into(), decision: "execute".into(),
@@ -1259,7 +1257,7 @@ mod tests {
         let action = EpistemicAction::new("a-semantic-replay", "intervention", ActionRisk::Critical);
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: action.id.clone(),
             authorization_instance: "approval-2026-10-02-001".into(),
             action_digest: digest.clone(),
@@ -1281,7 +1279,7 @@ mod tests {
         lease.commit("attempt-1", ExecutionOutcome::Succeeded).unwrap();
 
         let replay = ActionAuthorizationWitness {
-            operation_id: None,
+        let replay =     operation_id: None,
             issued_at: "2026-10-02T20:01:00Z".into(),
             ..witness
         };
@@ -1296,7 +1294,7 @@ mod tests {
         let action = EpistemicAction::new("a-new-issuance", "intervention", ActionRisk::Critical);
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: action.id.clone(),
             authorization_instance: "approval-old".into(),
             action_digest: digest.clone(),
@@ -1318,7 +1316,7 @@ mod tests {
         old.commit("attempt-old", ExecutionOutcome::Succeeded).unwrap();
 
         let fresh_witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let fresh_witness =     operation_id: None,
             authorization_instance: "approval-new".into(),
             issued_at: "2026-10-02T20:02:00Z".into(),
             ..witness
@@ -1335,7 +1333,7 @@ mod tests {
         let action = EpistemicAction::new("a-binding", "intervention", ActionRisk::High);
         let action_digest = action.canonical_action_digest();
         let base = ActionAuthorizationWitness {
-            operation_id: None,
+        let base =     operation_id: None,
             action_id: "a-binding".into(), authorization_instance: "a-binding".into(), action_digest: action_digest.clone(),
             frame: "f1".into(), support_digest: "sha256:support".into(),
             policy: "policy-v1".into(), decision: "execute".into(),
@@ -1360,7 +1358,7 @@ mod tests {
         let action = EpistemicAction::new("a-terminal", "intervention", ActionRisk::High);
         let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: "a-terminal".into(), authorization_instance: "a-terminal".into(), action_digest: action_digest.clone(),
             frame: "f1".into(), support_digest: "sha256:support".into(),
             policy: "policy-v1".into(), decision: "execute".into(),
@@ -1393,7 +1391,7 @@ mod tests {
         let action = EpistemicAction::new("a-race", "intervention", ActionRisk::Critical);
         let action_digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: "a-race".into(),
             authorization_instance: "a-race".into(), action_digest: action_digest.clone(),
             frame: "f1".into(),
@@ -1459,7 +1457,7 @@ mod tests {
         let digest = action.canonical_action_digest();
 
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: action.id.clone(),
             authorization_instance: "approval-effect-1".into(),
             action_digest: digest.clone(),
@@ -1494,7 +1492,7 @@ mod tests {
             .with_effect_binding(effect.clone());
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: action.id.clone(),
             authorization_instance: "approval-rebind-1".into(),
             action_digest: digest.clone(),
@@ -1543,7 +1541,7 @@ mod tests {
         let mut action = EpistemicAction::new("a-mutation", "intervention", ActionRisk::Critical);
         let digest = action.canonical_action_digest();
         let witness = ActionAuthorizationWitness {
-            operation_id: None,
+        let witness =     operation_id: None,
             action_id: "a-mutation".into(),
             authorization_instance: "legacy-instance".into(), action_digest: digest,
             frame: "f1".into(),
