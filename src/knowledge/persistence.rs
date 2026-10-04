@@ -236,6 +236,23 @@ pub struct KnowledgeSnapshotReceiptHistoryCheckpoint {
 }
 
 impl KnowledgeSnapshotReceiptHistoryCheckpoint {
+    /// Validate the checkpoint artifact without requiring access to the source ledger.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != KNOWLEDGE_SNAPSHOT_RECEIPT_HISTORY_CHECKPOINT_SCHEMA {
+            return Err("Unknown snapshot receipt history checkpoint schema".into());
+        }
+        if !is_hex_digest(&self.history_digest_hex) {
+            return Err("Snapshot receipt history checkpoint digest must be a 64-character hexadecimal digest".into());
+        }
+        if (self.receipt_count == 0) != (self.latest_generation == 0) {
+            return Err("Snapshot receipt history checkpoint count/generation mismatch".into());
+        }
+        if self.receipt_count > 0 && self.latest_generation == 0 {
+            return Err("Snapshot receipt history checkpoint latest generation must be positive".into());
+        }
+        Ok(())
+    }
+
     /// Build a checkpoint from a receipt history, rejecting malformed/unverified histories.
     pub fn from_history(history: &[KnowledgeSnapshotReceipt]) -> Result<Self, String> {
         let checkpoint = Self {
@@ -253,8 +270,7 @@ impl KnowledgeSnapshotReceiptHistoryCheckpoint {
 
     /// Whether the checkpoint exactly matches a structurally valid receipt history.
     pub fn verify_against_history(&self, history: &[KnowledgeSnapshotReceipt]) -> bool {
-        if self.schema_version != KNOWLEDGE_SNAPSHOT_RECEIPT_HISTORY_CHECKPOINT_SCHEMA
-            || !is_hex_digest(&self.history_digest_hex)
+        if self.validate().is_err()
             || self.receipt_count != history.len() as u64
             || self.latest_generation != history.last().map_or(0, |receipt| receipt.generation)
         {
@@ -451,6 +467,27 @@ pub struct KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
 }
 
 impl KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
+    /// Validate the checkpoint artifact without requiring access to the source ledger.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != KNOWLEDGE_SNAPSHOT_VALIDATION_RECEIPT_HISTORY_CHECKPOINT_SCHEMA {
+            return Err("Unknown snapshot validation receipt history checkpoint schema".into());
+        }
+        if !is_hex_digest(&self.history_digest_hex) {
+            return Err("Snapshot validation receipt history checkpoint digest must be a 64-character hexadecimal digest".into());
+        }
+        if self.receipt_count == 0
+            && (self.latest_validation_sequence != 0 || self.latest_generation != 0)
+        {
+            return Err("Snapshot validation receipt history checkpoint empty-state mismatch".into());
+        }
+        if self.receipt_count > 0
+            && (self.latest_validation_sequence == 0 || self.latest_generation == 0)
+        {
+            return Err("Snapshot validation receipt history checkpoint latest position must be positive".into());
+        }
+        Ok(())
+    }
+
     /// Build a checkpoint from validation records, rejecting malformed/unverified histories.
     pub fn from_history(
         history: &[KnowledgeSnapshotValidationReceiptRecord],
@@ -480,8 +517,7 @@ impl KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
         &self,
         history: &[KnowledgeSnapshotValidationReceiptRecord],
     ) -> bool {
-        if self.schema_version != KNOWLEDGE_SNAPSHOT_VALIDATION_RECEIPT_HISTORY_CHECKPOINT_SCHEMA
-            || !is_hex_digest(&self.history_digest_hex)
+        if self.validate().is_err()
             || self.receipt_count != history.len() as u64
             || self.latest_validation_sequence
                 != history.last().map_or(0, |record| record.validation_sequence)
@@ -7676,6 +7712,10 @@ mod tests {
         let checkpoint_round_trip: KnowledgeSnapshotReceiptHistoryCheckpoint =
             serde_json::from_str(&checkpoint_json).unwrap();
         assert_eq!(checkpoint_round_trip, checkpoint);
+        assert!(checkpoint.validate().is_ok());
+        let mut malformed_checkpoint = checkpoint.clone();
+        malformed_checkpoint.history_digest_hex = "not-a-digest".into();
+        assert!(malformed_checkpoint.validate().is_err());
         let mut wrong_schema = checkpoint.clone();
         wrong_schema.schema_version = "symthaea.epf-011.unknown.v1".into();
         assert!(!wrong_schema.verify_against_history(&history));
@@ -8054,6 +8094,11 @@ mod tests {
         let checkpoint_round_trip: KnowledgeSnapshotValidationReceiptHistoryCheckpoint =
             serde_json::from_str(&checkpoint_json).unwrap();
         assert_eq!(checkpoint_round_trip, checkpoint);
+        assert!(checkpoint.validate().is_ok());
+        let mut malformed_checkpoint = checkpoint.clone();
+        malformed_checkpoint.receipt_count = 1;
+        malformed_checkpoint.latest_validation_sequence = 0;
+        assert!(malformed_checkpoint.validate().is_err());
         let mut wrong_schema = checkpoint.clone();
         wrong_schema.schema_version = "symthaea.epf-011.unknown.v1".into();
         assert!(!wrong_schema.verify_against_history(&all));
