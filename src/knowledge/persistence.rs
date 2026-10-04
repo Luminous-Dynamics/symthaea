@@ -7947,11 +7947,12 @@ mod tests {
         assert!(record.verify_self_digest());
         assert!(record.verify_integrity());
 
+        let malformed_receipt = KnowledgeSnapshotValidationReceipt {
+            validator_ref: String::new(),
+            ..record.receipt.clone()
+        };
         let malformed_record = KnowledgeSnapshotValidationReceiptRecord {
-            receipt: KnowledgeSnapshotValidationReceipt {
-                validator_ref: String::new(),
-                ..record.receipt
-            },
+            receipt: malformed_receipt,
             stored_receipt_digest_hex: String::new(),
             ..record
         };
