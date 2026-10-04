@@ -17,18 +17,15 @@
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use symthaea_core::observation_fabric::{
-    IndependenceVerificationReceipt, ReceiptAttestationEnvelope,
-    ReceiptAttestationTemporalStatus,
+    IndependenceVerificationReceipt, ReceiptAttestationEnvelope, ReceiptAttestationTemporalStatus,
 };
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
 pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v5";
 const LEGACY_REPORT_VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v3";
 
-pub const EVALUATION_PROCEDURE_VERSION: &str =
-    "symthaea-observation-evaluation-procedure-v2";
-pub const EVALUATION_PROCEDURE_ID: &str =
-    "symthaea-observation-attestation-ed25519-procedure-v1";
+pub const EVALUATION_PROCEDURE_VERSION: &str = "symthaea-observation-evaluation-procedure-v2";
+pub const EVALUATION_PROCEDURE_ID: &str = "symthaea-observation-attestation-ed25519-procedure-v1";
 
 pub const POLICY_VERSION: &str = "symthaea-observation-verification-policy-v1";
 pub const VERIFIER_IMPLEMENTATION_ID: &str = "symthaea-observation-attestation-ed25519-v1";
@@ -58,7 +55,9 @@ impl VerificationPolicyInputs {
     /// deserialize and mutate public fields before recomputing that fingerprint.
     pub fn is_well_formed(&self) -> bool {
         let optional_nonempty = |value: &Option<String>| {
-            value.as_deref().is_none_or(|value| !value.trim().is_empty())
+            value
+                .as_deref()
+                .is_none_or(|value| !value.trim().is_empty())
         };
 
         !self.policy_version.trim().is_empty()
@@ -80,7 +79,10 @@ impl VerificationPolicyInputs {
         }
         fn write_option(bytes: &mut Vec<u8>, value: Option<&str>) {
             match value {
-                Some(value) => { bytes.push(1); write_string(bytes, value); }
+                Some(value) => {
+                    bytes.push(1);
+                    write_string(bytes, value);
+                }
                 None => bytes.push(0),
             }
         }
@@ -145,7 +147,10 @@ impl VerifierEnvironmentIdentity {
         write_string(&mut bytes, self.implementation_id);
         write_string(&mut bytes, &self.build_fingerprint);
         match self.runtime_profile.as_deref() {
-            Some(profile) => { bytes.push(1); write_string(&mut bytes, profile); }
+            Some(profile) => {
+                bytes.push(1);
+                write_string(&mut bytes, profile);
+            }
             None => bytes.push(0),
         }
         bytes
@@ -209,19 +214,19 @@ const fn verification_outcome_tag(outcome: ReceiptAttestationVerificationOutcome
     }
 }
 
-const CURRENT_ENVELOPE_STRUCTURAL_FAILURE_TAGS: &[u8] = &[
-    verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidEnvelope),
-];
-const CURRENT_RECEIPT_COMMITMENT_FAILURE_TAGS: &[u8] = &[
-    verification_outcome_tag(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch),
-];
+const CURRENT_ENVELOPE_STRUCTURAL_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(
+    ReceiptAttestationVerificationOutcome::InvalidEnvelope,
+)];
+const CURRENT_RECEIPT_COMMITMENT_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(
+    ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
+)];
 const CURRENT_TEMPORAL_FAILURE_TAGS: &[u8] = &[
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
 ];
-const CURRENT_CRYPTOSUITE_FAILURE_TAGS: &[u8] = &[
-    verification_outcome_tag(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch),
-];
+const CURRENT_CRYPTOSUITE_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(
+    ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
+)];
 const CURRENT_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS: &[u8] = &[
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodMismatch),
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable),
@@ -244,19 +249,19 @@ const CURRENT_CRYPTOGRAPHIC_PROOF_FAILURE_TAGS: &[u8] = &[
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidSignature),
 ];
 
-const LEGACY_ENVELOPE_STRUCTURAL_FAILURE_TAGS: &[u8] = &[
-    verification_outcome_tag(ReceiptAttestationVerificationOutcome::InvalidEnvelope),
-];
-const LEGACY_RECEIPT_COMMITMENT_FAILURE_TAGS: &[u8] = &[
-    verification_outcome_tag(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch),
-];
+const LEGACY_ENVELOPE_STRUCTURAL_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(
+    ReceiptAttestationVerificationOutcome::InvalidEnvelope,
+)];
+const LEGACY_RECEIPT_COMMITMENT_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(
+    ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch,
+)];
 const LEGACY_TEMPORAL_FAILURE_TAGS: &[u8] = &[
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::NotYetValid),
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::Expired),
 ];
-const LEGACY_CRYPTOSUITE_FAILURE_TAGS: &[u8] = &[
-    verification_outcome_tag(ReceiptAttestationVerificationOutcome::CryptosuiteMismatch),
-];
+const LEGACY_CRYPTOSUITE_FAILURE_TAGS: &[u8] = &[verification_outcome_tag(
+    ReceiptAttestationVerificationOutcome::CryptosuiteMismatch,
+)];
 const LEGACY_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS: &[u8] = &[
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodMismatch),
     verification_outcome_tag(ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable),
@@ -343,7 +348,9 @@ impl EvaluationCheck {
             Self::ReceiptCommitment => CURRENT_RECEIPT_COMMITMENT_FAILURE_TAGS,
             Self::TemporalValidity => CURRENT_TEMPORAL_FAILURE_TAGS,
             Self::CryptosuiteConformance => CURRENT_CRYPTOSUITE_FAILURE_TAGS,
-            Self::VerificationMethodResolution => CURRENT_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS,
+            Self::VerificationMethodResolution => {
+                CURRENT_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS
+            }
             Self::VerificationMethodLifecycle => CURRENT_VERIFICATION_METHOD_LIFECYCLE_FAILURE_TAGS,
             Self::ProofPurposeAuthorization => CURRENT_PROOF_PURPOSE_AUTHORIZATION_FAILURE_TAGS,
             Self::ProofPolicyConformance => CURRENT_PROOF_POLICY_FAILURE_TAGS,
@@ -358,7 +365,9 @@ impl EvaluationCheck {
             Self::ReceiptCommitment => LEGACY_RECEIPT_COMMITMENT_FAILURE_TAGS,
             Self::TemporalValidity => LEGACY_TEMPORAL_FAILURE_TAGS,
             Self::CryptosuiteConformance => LEGACY_CRYPTOSUITE_FAILURE_TAGS,
-            Self::VerificationMethodResolution => LEGACY_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS,
+            Self::VerificationMethodResolution => {
+                LEGACY_VERIFICATION_METHOD_RESOLUTION_FAILURE_TAGS
+            }
             Self::VerificationMethodLifecycle => LEGACY_VERIFICATION_METHOD_LIFECYCLE_FAILURE_TAGS,
             Self::ProofPurposeAuthorization => LEGACY_PROOF_PURPOSE_AUTHORIZATION_FAILURE_TAGS,
             Self::ProofPolicyConformance => LEGACY_PROOF_POLICY_FAILURE_TAGS,
@@ -366,18 +375,12 @@ impl EvaluationCheck {
         }
     }
 
-    fn allows_legacy_failure_outcome(
-        self,
-        outcome: ReceiptAttestationVerificationOutcome,
-    ) -> bool {
+    fn allows_legacy_failure_outcome(self, outcome: ReceiptAttestationVerificationOutcome) -> bool {
         self.legacy_allowed_failure_outcome_tags()
             .contains(&verification_outcome_tag(outcome))
     }
 
-    fn allows_failure_outcome(
-        self,
-        outcome: ReceiptAttestationVerificationOutcome,
-    ) -> bool {
+    fn allows_failure_outcome(self, outcome: ReceiptAttestationVerificationOutcome) -> bool {
         self.allowed_failure_outcome_tags()
             .contains(&verification_outcome_tag(outcome))
     }
@@ -396,7 +399,10 @@ impl EvaluationCheck {
         }
     }
 
-    fn stage_mut(self, report: &mut ReceiptAttestationVerificationReport) -> &mut VerificationStage {
+    fn stage_mut(
+        self,
+        report: &mut ReceiptAttestationVerificationReport,
+    ) -> &mut VerificationStage {
         match self {
             Self::EnvelopeStructuralValidation => &mut report.structural_validation,
             Self::ReceiptCommitment => &mut report.receipt_commitment,
@@ -461,8 +467,7 @@ impl EvaluationProcedure {
         }
 
         let mut bytes = Vec::new();
-        let legacy_v1 =
-            self.procedure_version == "symthaea-observation-evaluation-procedure-v1";
+        let legacy_v1 = self.procedure_version == "symthaea-observation-evaluation-procedure-v1";
         bytes.extend_from_slice(if legacy_v1 {
             b"symthaea:observation-evaluation-procedure:v1\n"
         } else {
@@ -561,7 +566,9 @@ impl EvaluationTrace {
     ///
     /// Current reports capture the trace directly. This method exists for
     /// historical reports serialized before `execution_trace` was introduced.
-    #[deprecated(note = "use the report's captured execution_trace; this is a legacy compatibility path")]
+    #[deprecated(
+        note = "use the report's captured execution_trace; this is a legacy compatibility path"
+    )]
     pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
         Self::from_report_legacy(report)
     }
@@ -688,14 +695,10 @@ impl EvaluationTrace {
             && self
                 .results
                 .windows(2)
-                .all(|pair| {
-                    !matches!(pair[0].stage, VerificationStage::Failed(_))
-                })
+                .all(|pair| !matches!(pair[0].stage, VerificationStage::Failed(_)))
             && match self.results.last().map(|result| result.stage) {
                 Some(VerificationStage::Failed(_)) => true,
-                Some(VerificationStage::Passed) => {
-                    self.results.len() == procedure.checks.len()
-                }
+                Some(VerificationStage::Passed) => self.results.len() == procedure.checks.len(),
                 _ => false,
             }
     }
@@ -848,9 +851,7 @@ impl ReceiptAttestationVerificationReport {
     /// because first-class execution traces were not part of the v3 evidence identity.
     /// Current v5 reports must validate their captured execution trace directly.
     pub fn is_well_formed(&self) -> bool {
-        if !self.has_consistent_identity_bindings()
-            || !self.has_consistent_resolution_metadata()
-        {
+        if !self.has_consistent_identity_bindings() || !self.has_consistent_resolution_metadata() {
             return false;
         }
 
@@ -1037,7 +1038,10 @@ impl ReceiptAttestationVerificationReport {
             bytes.extend_from_slice(&trace_bytes);
         }
         match &self.resolution_snapshot_fingerprint {
-            Some(value) => { bytes.push(1); write_string(&mut bytes, value); }
+            Some(value) => {
+                bytes.push(1);
+                write_string(&mut bytes, value);
+            }
             None => bytes.push(0),
         }
         match &self.resolved_verification_method {
@@ -1076,15 +1080,11 @@ impl ReceiptAttestationVerificationReport {
         hasher.update(&self.canonical_bytes());
         hasher.finalize().to_hex().to_string()
     }
-
 }
 
-pub const VERIFICATION_CONTEXT_VERSION: &str =
-    "symthaea-observation-verification-context-v4";
-pub const EVIDENCE_EVALUATION_VERSION: &str =
-    "symthaea-observation-evaluation-v7";
-pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str =
-    "receipt-attestation-verification";
+pub const VERIFICATION_CONTEXT_VERSION: &str = "symthaea-observation-verification-context-v4";
+pub const EVIDENCE_EVALUATION_VERSION: &str = "symthaea-observation-evaluation-v7";
+pub const ATTESTATION_VERIFICATION_EVALUATION_TYPE: &str = "receipt-attestation-verification";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationContext {
@@ -1158,7 +1158,9 @@ impl VerificationContext {
         };
 
         let optional_identity_is_well_formed = |value: &Option<String>| {
-            value.as_deref().is_none_or(|identity| !identity.trim().is_empty())
+            value
+                .as_deref()
+                .is_none_or(|identity| !identity.trim().is_empty())
         };
 
         self.context_version == VERIFICATION_CONTEXT_VERSION
@@ -1197,7 +1199,10 @@ impl VerificationContext {
         }
         fn write_option(bytes: &mut Vec<u8>, value: Option<&str>) {
             match value {
-                Some(value) => { bytes.push(1); write_string(bytes, value); }
+                Some(value) => {
+                    bytes.push(1);
+                    write_string(bytes, value);
+                }
                 None => bytes.push(0),
             }
         }
@@ -1387,11 +1392,9 @@ impl EvaluationBoundary {
             report.receipt_commitment,
             report.cryptographic_proof,
         ) {
-            (
-                VerificationStage::Passed,
-                VerificationStage::Passed,
-                VerificationStage::Passed,
-            ) => established.push(EvaluationClaim::AttestationAuthenticity),
+            (VerificationStage::Passed, VerificationStage::Passed, VerificationStage::Passed) => {
+                established.push(EvaluationClaim::AttestationAuthenticity)
+            }
             (VerificationStage::NotEvaluated, _, _)
             | (_, VerificationStage::NotEvaluated, _)
             | (_, _, VerificationStage::NotEvaluated) => {
@@ -1450,15 +1453,42 @@ impl EvaluationBoundary {
         let mut indeterminate = Vec::new();
 
         for (check, claim) in [
-            (EvaluationCheck::EnvelopeStructuralValidation, EvaluationClaim::EnvelopeStructuralValidity),
-            (EvaluationCheck::ReceiptCommitment, EvaluationClaim::ReceiptIntegrity),
-            (EvaluationCheck::TemporalValidity, EvaluationClaim::TemporalValidity),
-            (EvaluationCheck::CryptosuiteConformance, EvaluationClaim::CryptosuiteConformance),
-            (EvaluationCheck::VerificationMethodResolution, EvaluationClaim::VerificationMethodResolution),
-            (EvaluationCheck::VerificationMethodLifecycle, EvaluationClaim::VerificationMethodLifecycle),
-            (EvaluationCheck::ProofPurposeAuthorization, EvaluationClaim::ProofPurposeAuthorization),
-            (EvaluationCheck::ProofPolicyConformance, EvaluationClaim::ProofPolicyConformance),
-            (EvaluationCheck::CryptographicProof, EvaluationClaim::CryptographicProofValidity),
+            (
+                EvaluationCheck::EnvelopeStructuralValidation,
+                EvaluationClaim::EnvelopeStructuralValidity,
+            ),
+            (
+                EvaluationCheck::ReceiptCommitment,
+                EvaluationClaim::ReceiptIntegrity,
+            ),
+            (
+                EvaluationCheck::TemporalValidity,
+                EvaluationClaim::TemporalValidity,
+            ),
+            (
+                EvaluationCheck::CryptosuiteConformance,
+                EvaluationClaim::CryptosuiteConformance,
+            ),
+            (
+                EvaluationCheck::VerificationMethodResolution,
+                EvaluationClaim::VerificationMethodResolution,
+            ),
+            (
+                EvaluationCheck::VerificationMethodLifecycle,
+                EvaluationClaim::VerificationMethodLifecycle,
+            ),
+            (
+                EvaluationCheck::ProofPurposeAuthorization,
+                EvaluationClaim::ProofPurposeAuthorization,
+            ),
+            (
+                EvaluationCheck::ProofPolicyConformance,
+                EvaluationClaim::ProofPolicyConformance,
+            ),
+            (
+                EvaluationCheck::CryptographicProof,
+                EvaluationClaim::CryptographicProofValidity,
+            ),
         ] {
             classify_stage(
                 stage_for(check),
@@ -1474,11 +1504,9 @@ impl EvaluationBoundary {
             stage_for(EvaluationCheck::ReceiptCommitment),
             stage_for(EvaluationCheck::CryptographicProof),
         ) {
-            (
-                VerificationStage::Passed,
-                VerificationStage::Passed,
-                VerificationStage::Passed,
-            ) => established.push(EvaluationClaim::AttestationAuthenticity),
+            (VerificationStage::Passed, VerificationStage::Passed, VerificationStage::Passed) => {
+                established.push(EvaluationClaim::AttestationAuthenticity)
+            }
             (VerificationStage::NotEvaluated, _, _)
             | (_, VerificationStage::NotEvaluated, _)
             | (_, _, VerificationStage::NotEvaluated) => {
@@ -1504,8 +1532,7 @@ impl EvaluationBoundary {
 
     /// Validate the epistemic partition: every known claim occupies exactly one bucket.
     pub fn is_well_formed(&self) -> bool {
-        let established: std::collections::BTreeSet<_> =
-            self.established.iter().copied().collect();
+        let established: std::collections::BTreeSet<_> = self.established.iter().copied().collect();
         let not_established: std::collections::BTreeSet<_> =
             self.not_established.iter().copied().collect();
         let indeterminate: std::collections::BTreeSet<_> =
@@ -1617,11 +1644,9 @@ impl EvidenceEvaluation {
         // therefore cannot be replaced after the evaluation occurred.
         let mut evaluation = Self::from_report(report);
         let mut merged_context = VerificationContext::from_report(report);
-        merged_context.evaluator_identity_fingerprint =
-            context.evaluator_identity_fingerprint;
+        merged_context.evaluator_identity_fingerprint = context.evaluator_identity_fingerprint;
         merged_context.trust_root_fingerprint = context.trust_root_fingerprint;
-        merged_context.authorization_policy_fingerprint =
-            context.authorization_policy_fingerprint;
+        merged_context.authorization_policy_fingerprint = context.authorization_policy_fingerprint;
         evaluation.context_fingerprint = merged_context.fingerprint();
         evaluation.context = merged_context;
         evaluation
@@ -1649,10 +1674,7 @@ impl EvidenceEvaluation {
     /// Validate that this evaluation remains consistent with the report that
     /// materialized it. This catches post-hoc mutation of outcome, subject,
     /// context identity, execution evidence, or epistemic boundary.
-    pub fn is_consistent_with_report(
-        &self,
-        report: &ReceiptAttestationVerificationReport,
-    ) -> bool {
+    pub fn is_consistent_with_report(&self, report: &ReceiptAttestationVerificationReport) -> bool {
         // Refuse to materialize consistency from a report whose own execution
         // evidence no longer satisfies the report contract. This keeps the
         // report-level invariant as the single integrity gate for consumers.
@@ -1967,7 +1989,10 @@ impl Ed25519ReceiptVerifier {
 
     pub fn with_expected_challenge(mut self, challenge: impl Into<String>) -> Self {
         self.expected_challenge = Some(challenge.into());
-        self.policy_inputs.expected_challenge_fingerprint = self.expected_challenge.as_deref().map(|v| blake3::hash(v.as_bytes()).to_hex().to_string());
+        self.policy_inputs.expected_challenge_fingerprint = self
+            .expected_challenge
+            .as_deref()
+            .map(|v| blake3::hash(v.as_bytes()).to_hex().to_string());
         self
     }
 
@@ -2049,7 +2074,8 @@ impl Ed25519ReceiptVerifier {
         receipt: &IndependenceVerificationReceipt,
         resolver: &R,
     ) -> ReceiptAttestationVerificationOutcome {
-        self.verify_with_resolver_report(envelope, receipt, resolver).outcome
+        self.verify_with_resolver_report(envelope, receipt, resolver)
+            .outcome
     }
 
     pub fn verify_with_resolver_report<R: VerificationMethodResolver>(
@@ -2080,9 +2106,9 @@ impl Ed25519ReceiptVerifier {
                 EvaluationCheck::EnvelopeStructuralValidation,
                 receipt.fingerprint(),
                 None,
-                    self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         }
         if !envelope.verify_against_receipt(receipt) {
@@ -2091,9 +2117,9 @@ impl Ed25519ReceiptVerifier {
                 EvaluationCheck::ReceiptCommitment,
                 receipt.fingerprint(),
                 None,
-                    self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         }
         match envelope.temporal_status_at(self.now_unix_ns) {
@@ -2127,9 +2153,9 @@ impl Ed25519ReceiptVerifier {
                 EvaluationCheck::CryptosuiteConformance,
                 receipt.fingerprint(),
                 None,
-                    self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         }
 
@@ -2139,9 +2165,9 @@ impl Ed25519ReceiptVerifier {
                 EvaluationCheck::VerificationMethodResolution,
                 receipt.fingerprint(),
                 None,
-                    self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                self.now_unix_ns,
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         };
         let resolved_snapshot = match resolver.resolve_with_snapshot(method) {
@@ -2190,39 +2216,39 @@ impl Ed25519ReceiptVerifier {
             VerificationMethodStatus::Active => {}
             VerificationMethodStatus::Revoked => {
                 return ReceiptAttestationVerificationReport::failed_with_resolution_snapshot(
-                ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
-                EvaluationCheck::VerificationMethodLifecycle,
-                receipt.fingerprint(),
-                Some(method.to_string()),
-                resolved_snapshot.snapshot_fingerprint.clone(),
-                self.now_unix_ns,
-                self.policy_inputs.clone(),
-                self.environment_identity.clone(),
-            );
+                    ReceiptAttestationVerificationOutcome::VerificationMethodRevoked,
+                    EvaluationCheck::VerificationMethodLifecycle,
+                    receipt.fingerprint(),
+                    Some(method.to_string()),
+                    resolved_snapshot.snapshot_fingerprint.clone(),
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
+                );
             }
             VerificationMethodStatus::Expired => {
                 return ReceiptAttestationVerificationReport::failed_with_resolution_snapshot(
-                ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
-                EvaluationCheck::VerificationMethodLifecycle,
-                receipt.fingerprint(),
-                Some(method.to_string()),
-                resolved_snapshot.snapshot_fingerprint.clone(),
-                self.now_unix_ns,
-                self.policy_inputs.clone(),
-                self.environment_identity.clone(),
-            );
+                    ReceiptAttestationVerificationOutcome::VerificationMethodExpired,
+                    EvaluationCheck::VerificationMethodLifecycle,
+                    receipt.fingerprint(),
+                    Some(method.to_string()),
+                    resolved_snapshot.snapshot_fingerprint.clone(),
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
+                );
             }
             VerificationMethodStatus::Unknown => {
                 return ReceiptAttestationVerificationReport::failed_with_resolution_snapshot(
-                ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
-                EvaluationCheck::VerificationMethodResolution,
-                receipt.fingerprint(),
-                Some(method.to_string()),
-                resolved_snapshot.snapshot_fingerprint.clone(),
-                self.now_unix_ns,
-                self.policy_inputs.clone(),
-                self.environment_identity.clone(),
-            );
+                    ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+                    EvaluationCheck::VerificationMethodResolution,
+                    receipt.fingerprint(),
+                    Some(method.to_string()),
+                    resolved_snapshot.snapshot_fingerprint.clone(),
+                    self.now_unix_ns,
+                    self.policy_inputs.clone(),
+                    self.environment_identity.clone(),
+                );
             }
         }
         if !resolved.is_authorized_for(&envelope.proof_purpose) {
@@ -2237,8 +2263,12 @@ impl Ed25519ReceiptVerifier {
                 self.environment_identity.clone(),
             );
         }
-        let mut report =
-            self.verify_with_resolved_key_report(envelope, receipt, method, &resolved.verifying_key);
+        let mut report = self.verify_with_resolved_key_report(
+            envelope,
+            receipt,
+            method,
+            &resolved.verifying_key,
+        );
         // The resolver's paired result is authoritative once resolution occurs.
         // In particular, a paired None means that no resolver snapshot was supplied;
         // do not silently substitute a later verifier-side observation.
@@ -2253,9 +2283,8 @@ impl Ed25519ReceiptVerifier {
         verification_method: &str,
         verifying_key: &VerifyingKey,
     ) -> ReceiptAttestationVerificationOutcome {
-        self.verify_with_resolved_key_report(
-            envelope, receipt, verification_method, verifying_key,
-        ).outcome
+        self.verify_with_resolved_key_report(envelope, receipt, verification_method, verifying_key)
+            .outcome
     }
 
     fn verify_with_resolved_key_report(
@@ -2275,8 +2304,8 @@ impl Ed25519ReceiptVerifier {
                 fingerprint,
                 method,
                 self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         }
         if !envelope.verify_against_receipt(receipt) {
@@ -2286,8 +2315,8 @@ impl Ed25519ReceiptVerifier {
                 fingerprint,
                 method,
                 self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         }
 
@@ -2297,8 +2326,8 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::NotYetValid,
                     EvaluationCheck::TemporalValidity,
                     fingerprint,
-                method,
-                self.now_unix_ns,
+                    method,
+                    self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
                 );
@@ -2308,8 +2337,8 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::Expired,
                     EvaluationCheck::TemporalValidity,
                     fingerprint,
-                method,
-                self.now_unix_ns,
+                    method,
+                    self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
                 );
@@ -2324,8 +2353,8 @@ impl Ed25519ReceiptVerifier {
                 fingerprint,
                 method,
                 self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         }
         if envelope.verification_method.as_deref() != Some(verification_method) {
@@ -2335,8 +2364,8 @@ impl Ed25519ReceiptVerifier {
                 fingerprint,
                 method,
                 self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         }
         if let Some(expected) = &self.expected_proof_purpose {
@@ -2345,8 +2374,8 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::ProofPurposeMismatch,
                     EvaluationCheck::ProofPolicyConformance,
                     fingerprint,
-                method,
-                self.now_unix_ns,
+                    method,
+                    self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
                 );
@@ -2358,8 +2387,8 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::DomainMismatch,
                     EvaluationCheck::ProofPolicyConformance,
                     fingerprint,
-                method,
-                self.now_unix_ns,
+                    method,
+                    self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
                 );
@@ -2371,8 +2400,8 @@ impl Ed25519ReceiptVerifier {
                     ReceiptAttestationVerificationOutcome::ChallengeMismatch,
                     EvaluationCheck::ProofPolicyConformance,
                     fingerprint,
-                method,
-                self.now_unix_ns,
+                    method,
+                    self.now_unix_ns,
                     self.policy_inputs.clone(),
                     self.environment_identity.clone(),
                 );
@@ -2386,8 +2415,8 @@ impl Ed25519ReceiptVerifier {
                 fingerprint,
                 method,
                 self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         };
         let Ok(proof_bytes) = <[u8; 64]>::try_from(proof) else {
@@ -2397,8 +2426,8 @@ impl Ed25519ReceiptVerifier {
                 fingerprint,
                 method,
                 self.now_unix_ns,
-                    self.policy_inputs.clone(),
-                    self.environment_identity.clone(),
+                self.policy_inputs.clone(),
+                self.environment_identity.clone(),
             );
         };
         let signature = Signature::from_bytes(&proof_bytes);
@@ -2433,7 +2462,9 @@ pub fn sign_envelope(
 ) -> Result<(), SignEnvelopeError> {
     envelope.cryptosuite = Some(CRYPTOSUITE.to_string());
     envelope.verification_method = Some(verification_method.into());
-    envelope.validate().map_err(|_| SignEnvelopeError::InvalidEnvelope)?;
+    envelope
+        .validate()
+        .map_err(|_| SignEnvelopeError::InvalidEnvelope)?;
     let signature = signing_key.sign(&envelope.canonical_payload_bytes());
     envelope.proof = Some(signature.to_bytes().to_vec());
     Ok(())
@@ -2458,7 +2489,10 @@ mod tests {
         let base = Observation {
             id: "obs-a".into(),
             modality: ObservationModality::Optical,
-            time: ObservationTime { observed_at_unix_ns: 100, time_uncertainty_ns: 1 },
+            time: ObservationTime {
+                observed_at_unix_ns: 100,
+                time_uncertainty_ns: 1,
+            },
             location: None,
             feature_of_interest_id: None,
             quality: ObservationQuality {
@@ -2482,8 +2516,13 @@ mod tests {
         let mut other = base.clone();
         other.id = "obs-b".into();
         other.provenance.source = SensorIdentity::new("sensor-b");
-        let graph = ObservationGraph { observations: vec![base, other], relations: vec![] };
-        let assessment = graph.assess_independence_detailed("obs-a", "obs-b").expect("assessment");
+        let graph = ObservationGraph {
+            observations: vec![base, other],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed("obs-a", "obs-b")
+            .expect("assessment");
         IndependenceVerificationReceipt::from_assessment(&assessment)
     }
 
@@ -2505,7 +2544,6 @@ mod tests {
         verifier.verify_with_resolver_report(envelope, receipt, &resolver)
     }
 
-
     fn envelope_and_key() -> (
         ReceiptAttestationEnvelope,
         SigningKey,
@@ -2514,11 +2552,13 @@ mod tests {
         let receipt = receipt();
         let signing_key = SigningKey::from_bytes(&[7u8; 32]);
         let mut envelope = ReceiptAttestationEnvelope::from_receipt(
-            &receipt, "attester-a", "observation-independence", 100,
+            &receipt,
+            "attester-a",
+            "observation-independence",
+            100,
         );
         envelope.expires_at_unix_ns = Some(200);
-        sign_envelope(&mut envelope, &signing_key, "did:example:attester-a#key-1")
-            .expect("sign");
+        sign_envelope(&mut envelope, &signing_key, "did:example:attester-a#key-1").expect("sign");
         (envelope, signing_key, receipt)
     }
 
@@ -2545,7 +2585,10 @@ mod tests {
             150,
         );
         let report = resolved_report(&verifier, &envelope, &receipt);
-        assert_eq!(report.outcome, ReceiptAttestationVerificationOutcome::Verified);
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::Verified
+        );
         assert!(report.matches_attestation_envelope(&envelope));
 
         let mut changed = envelope;
@@ -2627,11 +2670,8 @@ mod tests {
             allowed_proof_purposes: vec!["observation-independence".into()],
         };
         let resolver = InMemoryVerificationMethodResolver::new([method]);
-        let verifier = Ed25519ReceiptVerifier::new(
-            "ignored-by-resolver",
-            signing_key.verifying_key(),
-            150,
-        );
+        let verifier =
+            Ed25519ReceiptVerifier::new("ignored-by-resolver", signing_key.verifying_key(), 150);
         assert_eq!(
             verifier.verify_with_resolver(&envelope, &receipt, &resolver),
             ReceiptAttestationVerificationOutcome::Verified
@@ -2667,11 +2707,8 @@ mod tests {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
         envelope.attester_id.clear();
         let resolver = InMemoryVerificationMethodResolver::new([]);
-        let verifier = Ed25519ReceiptVerifier::new(
-            "ignored-by-resolver",
-            signing_key.verifying_key(),
-            150,
-        );
+        let verifier =
+            Ed25519ReceiptVerifier::new("ignored-by-resolver", signing_key.verifying_key(), 150);
 
         assert_eq!(
             verifier.verify_with_resolver(&envelope, &receipt, &resolver),
@@ -2690,11 +2727,8 @@ mod tests {
             allowed_proof_purposes: vec!["observation-independence".into()],
         };
         let resolver = InMemoryVerificationMethodResolver::new([method]);
-        let verifier = Ed25519ReceiptVerifier::new(
-            "ignored-by-resolver",
-            unrelated_key.verifying_key(),
-            150,
-        );
+        let verifier =
+            Ed25519ReceiptVerifier::new("ignored-by-resolver", unrelated_key.verifying_key(), 150);
 
         assert_eq!(
             verifier.verify_with_resolver(&envelope, &receipt, &resolver),
@@ -2707,8 +2741,7 @@ mod tests {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
         envelope.domain = Some("example.org".into());
         envelope.challenge = Some("c1".into());
-        sign_envelope(&mut envelope, &signing_key, "did:example:attester-a#key-1")
-            .expect("resign");
+        sign_envelope(&mut envelope, &signing_key, "did:example:attester-a#key-1").expect("resign");
         let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
@@ -2747,7 +2780,10 @@ mod tests {
             )
         );
         assert_eq!(report.lifecycle, VerificationStage::NotEvaluated);
-        assert_eq!(report.proof_purpose_authorization, VerificationStage::NotEvaluated);
+        assert_eq!(
+            report.proof_purpose_authorization,
+            VerificationStage::NotEvaluated
+        );
         assert_eq!(report.proof_policy, VerificationStage::NotEvaluated);
         assert_eq!(report.cryptographic_proof, VerificationStage::NotEvaluated);
         assert_eq!(
@@ -2795,11 +2831,8 @@ mod tests {
             allowed_proof_purposes: vec!["observation-independence".into()],
         };
         let resolver = InMemoryVerificationMethodResolver::new([method]);
-        let verifier = Ed25519ReceiptVerifier::new(
-            "ignored-by-resolver",
-            signing_key.verifying_key(),
-            150,
-        );
+        let verifier =
+            Ed25519ReceiptVerifier::new("ignored-by-resolver", signing_key.verifying_key(), 150);
         let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
         assert_eq!(
             report.outcome,
@@ -2812,10 +2845,7 @@ mod tests {
                 ReceiptAttestationVerificationOutcome::VerificationMethodRevoked
             )
         );
-        assert_eq!(
-            report.proof_policy,
-            VerificationStage::NotEvaluated
-        );
+        assert_eq!(report.proof_policy, VerificationStage::NotEvaluated);
     }
 
     #[test]
@@ -2970,16 +3000,30 @@ mod tests {
         .with_expected_proof_purpose("observation-independence")
         .with_expected_domain("mycelix")
         .with_environment_identity(
-            VerifierEnvironmentIdentity::new("build-sha-abc")
-                .with_runtime_profile("portable"),
+            VerifierEnvironmentIdentity::new("build-sha-abc").with_runtime_profile("portable"),
         );
         let report = verifier.verify_report(&envelope, &receipt);
         assert_eq!(report.evaluated_at_unix_ns, 150);
-        assert_eq!(report.policy_inputs.expected_proof_purpose.as_deref(), Some("observation-independence"));
-        assert_eq!(report.policy_inputs.expected_domain.as_deref(), Some("mycelix"));
-        assert_eq!(report.environment_identity.build_fingerprint, "build-sha-abc");
-        assert_eq!(report.policy_fingerprint, report.policy_inputs.fingerprint());
-        assert_eq!(report.environment_fingerprint, report.environment_identity.fingerprint());
+        assert_eq!(
+            report.policy_inputs.expected_proof_purpose.as_deref(),
+            Some("observation-independence")
+        );
+        assert_eq!(
+            report.policy_inputs.expected_domain.as_deref(),
+            Some("mycelix")
+        );
+        assert_eq!(
+            report.environment_identity.build_fingerprint,
+            "build-sha-abc"
+        );
+        assert_eq!(
+            report.policy_fingerprint,
+            report.policy_inputs.fingerprint()
+        );
+        assert_eq!(
+            report.environment_fingerprint,
+            report.environment_identity.fingerprint()
+        );
     }
 
     #[test]
@@ -2999,8 +3043,7 @@ mod tests {
         assert!(!evaluation.is_consistent_with_report(&changed_policy));
 
         let mut changed_environment = report.clone();
-        changed_environment.environment_identity.build_fingerprint =
-            "different-build".into();
+        changed_environment.environment_identity.build_fingerprint = "different-build".into();
         assert!(!evaluation.is_consistent_with_report(&changed_environment));
     }
 
@@ -3013,9 +3056,9 @@ mod tests {
             150,
         );
         let policy = base.clone().with_expected_domain("mycelix");
-        let environment = base.clone().with_environment_identity(
-            VerifierEnvironmentIdentity::new("build-sha-abc")
-        );
+        let environment = base
+            .clone()
+            .with_environment_identity(VerifierEnvironmentIdentity::new("build-sha-abc"));
         assert_ne!(
             base.verify_report(&envelope, &receipt).fingerprint(),
             policy.verify_report(&envelope, &receipt).fingerprint()
@@ -3036,11 +3079,8 @@ mod tests {
             allowed_proof_purposes: vec!["observation-independence".into()],
         };
         let resolver = InMemoryVerificationMethodResolver::new([method]);
-        let verifier = Ed25519ReceiptVerifier::new(
-            "ignored-by-resolver",
-            signing_key.verifying_key(),
-            150,
-        );
+        let verifier =
+            Ed25519ReceiptVerifier::new("ignored-by-resolver", signing_key.verifying_key(), 150);
         let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
         assert!(report.resolution_snapshot_fingerprint.is_some());
 
@@ -3095,10 +3135,7 @@ mod tests {
             verification_method: "did:example:key".into(),
             verifying_key: signing_key.verifying_key(),
             status: VerificationMethodStatus::Active,
-            allowed_proof_purposes: vec![
-                "a-purpose".into(),
-                "z-purpose".into(),
-            ],
+            allowed_proof_purposes: vec!["a-purpose".into(), "z-purpose".into()],
         }]);
         assert_eq!(first.snapshot_fingerprint(), second.snapshot_fingerprint());
     }
@@ -3119,7 +3156,8 @@ mod tests {
             allowed_proof_purposes: vec!["observation-independence".into()],
         };
 
-        let resolver = InMemoryVerificationMethodResolver::new([method_a.clone(), method_b.clone()]);
+        let resolver =
+            InMemoryVerificationMethodResolver::new([method_a.clone(), method_b.clone()]);
         let base = resolver
             .snapshot_fingerprint_for(&method_a.verification_method)
             .expect("method-a snapshot");
@@ -3192,14 +3230,18 @@ mod tests {
             status: VerificationMethodStatus::Active,
             allowed_proof_purposes: vec!["observation-independence".into()],
         }]);
-        let changed_authorization = InMemoryVerificationMethodResolver::new([ResolvedVerificationMethod {
-            verification_method: "did:example:key".into(),
-            verifying_key: signing_key.verifying_key(),
-            status: VerificationMethodStatus::Active,
-            allowed_proof_purposes: vec!["different-purpose".into()],
-        }]);
+        let changed_authorization =
+            InMemoryVerificationMethodResolver::new([ResolvedVerificationMethod {
+                verification_method: "did:example:key".into(),
+                verifying_key: signing_key.verifying_key(),
+                status: VerificationMethodStatus::Active,
+                allowed_proof_purposes: vec!["different-purpose".into()],
+            }]);
 
-        assert_ne!(base.snapshot_fingerprint(), changed_key.snapshot_fingerprint());
+        assert_ne!(
+            base.snapshot_fingerprint(),
+            changed_key.snapshot_fingerprint()
+        );
         assert_ne!(
             base.snapshot_fingerprint(),
             changed_authorization.snapshot_fingerprint()
@@ -3264,7 +3306,8 @@ mod tests {
             fn resolve_with_snapshot(
                 &self,
                 _verification_method: &str,
-            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError>
+            {
                 Ok(ResolvedVerificationMethodSnapshot {
                     resolved: self.method.clone(),
                     snapshot_fingerprint: None,
@@ -3272,8 +3315,7 @@ mod tests {
             }
 
             fn snapshot_fingerprint(&self) -> Option<String> {
-                self.snapshot_calls
-                    .set(self.snapshot_calls.get() + 1);
+                self.snapshot_calls.set(self.snapshot_calls.get() + 1);
                 Some("later-state".to_string())
             }
         }
@@ -3302,7 +3344,10 @@ mod tests {
             report.outcome,
             ReceiptAttestationVerificationOutcome::Verified
         );
-        assert_eq!(report.resolved_verification_method.as_deref(), Some(envelope.attester_id.as_str()));
+        assert_eq!(
+            report.resolved_verification_method.as_deref(),
+            Some(envelope.attester_id.as_str())
+        );
         assert_eq!(report.resolution_snapshot_fingerprint, None);
         assert_eq!(resolver.snapshot_calls.get(), 0);
     }
@@ -3347,7 +3392,8 @@ mod tests {
             fn resolve_with_snapshot(
                 &self,
                 _verification_method: &str,
-            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError>
+            {
                 Ok(ResolvedVerificationMethodSnapshot {
                     resolved: self.method.clone(),
                     snapshot_fingerprint: Some(self.snapshot.clone()),
@@ -3369,11 +3415,8 @@ mod tests {
             },
             snapshot: "atomic-snapshot".into(),
         };
-        let verifier = Ed25519ReceiptVerifier::new(
-            "ignored-by-resolver",
-            signing_key.verifying_key(),
-            150,
-        );
+        let verifier =
+            Ed25519ReceiptVerifier::new("ignored-by-resolver", signing_key.verifying_key(), 150);
         let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
 
         assert_eq!(
@@ -3392,12 +3435,9 @@ mod tests {
             allowed_proof_purposes: vec!["observation-independence".into()],
         };
         let resolver = InMemoryVerificationMethodResolver::new([method]);
-        let verifier = Ed25519ReceiptVerifier::new(
-            "ignored-by-resolver",
-            signing_key.verifying_key(),
-            150,
-        )
-        .with_resolution_snapshot_fingerprint("resolver-snapshot-a");
+        let verifier =
+            Ed25519ReceiptVerifier::new("ignored-by-resolver", signing_key.verifying_key(), 150)
+                .with_resolution_snapshot_fingerprint("resolver-snapshot-a");
         let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
         assert_eq!(
             report.resolution_snapshot_fingerprint,
@@ -3455,11 +3495,8 @@ mod tests {
             allowed_proof_purposes: vec!["observation-independence".into()],
         };
         let resolver = InMemoryVerificationMethodResolver::new([method]);
-        let verifier = Ed25519ReceiptVerifier::new(
-            "ignored-by-resolver",
-            signing_key.verifying_key(),
-            150,
-        );
+        let verifier =
+            Ed25519ReceiptVerifier::new("ignored-by-resolver", signing_key.verifying_key(), 150);
         let report = verifier.verify_with_resolver_report(&envelope, &receipt, &resolver);
         let mut evaluation = report.to_evidence_evaluation();
 
@@ -3467,8 +3504,7 @@ mod tests {
 
         evaluation.verification_report_fingerprint = {
             let mut mutated = report.clone();
-            mutated.resolution_snapshot_fingerprint =
-                Some("different-resolution-state".into());
+            mutated.resolution_snapshot_fingerprint = Some("different-resolution-state".into());
             mutated.fingerprint()
         };
 
@@ -3489,7 +3525,9 @@ mod tests {
             report.attestation_payload_fingerprint,
             envelope.payload_fingerprint()
         );
-        assert!(is_blake3_fingerprint(&report.attestation_payload_fingerprint));
+        assert!(is_blake3_fingerprint(
+            &report.attestation_payload_fingerprint
+        ));
         assert!(report.is_well_formed());
     }
 
@@ -3504,8 +3542,7 @@ mod tests {
 
         let first = resolved_report(&verifier, &envelope, &receipt);
         envelope.domain = Some("different-domain".into());
-        sign_envelope(&mut envelope, &signing_key, "did:example:attester-a#key-1")
-            .expect("resign");
+        sign_envelope(&mut envelope, &signing_key, "did:example:attester-a#key-1").expect("resign");
         let second = resolved_report(&verifier, &envelope, &receipt);
 
         assert_eq!(first.receipt_fingerprint, second.receipt_fingerprint);
@@ -3542,10 +3579,7 @@ mod tests {
     #[test]
     fn evidence_evaluation_boundary_marks_failed_checks_as_not_established() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
-        envelope
-            .proof
-            .as_mut()
-            .expect("signed envelope proof")[0] ^= 0x01;
+        envelope.proof.as_mut().expect("signed envelope proof")[0] ^= 0x01;
         let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
@@ -3553,18 +3587,24 @@ mod tests {
         );
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
-        assert!(evaluation
-            .boundary
-            .not_established
-            .contains(&EvaluationClaim::CryptographicProofValidity));
-        assert!(evaluation
-            .boundary
-            .not_established
-            .contains(&EvaluationClaim::AttestationAuthenticity));
-        assert!(!evaluation
-            .boundary
-            .indeterminate
-            .contains(&EvaluationClaim::CryptographicProofValidity));
+        assert!(
+            evaluation
+                .boundary
+                .not_established
+                .contains(&EvaluationClaim::CryptographicProofValidity)
+        );
+        assert!(
+            evaluation
+                .boundary
+                .not_established
+                .contains(&EvaluationClaim::AttestationAuthenticity)
+        );
+        assert!(
+            !evaluation
+                .boundary
+                .indeterminate
+                .contains(&EvaluationClaim::CryptographicProofValidity)
+        );
     }
 
     #[test]
@@ -3579,22 +3619,30 @@ mod tests {
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
-        assert!(evaluation
-            .boundary
-            .established
-            .contains(&EvaluationClaim::ReceiptIntegrity));
-        assert!(evaluation
-            .boundary
-            .established
-            .contains(&EvaluationClaim::CryptographicProofValidity));
-        assert!(evaluation
-            .boundary
-            .not_established
-            .contains(&EvaluationClaim::UnderlyingObservationTruth));
-        assert!(evaluation
-            .boundary
-            .not_established
-            .contains(&EvaluationClaim::SemanticValidity));
+        assert!(
+            evaluation
+                .boundary
+                .established
+                .contains(&EvaluationClaim::ReceiptIntegrity)
+        );
+        assert!(
+            evaluation
+                .boundary
+                .established
+                .contains(&EvaluationClaim::CryptographicProofValidity)
+        );
+        assert!(
+            evaluation
+                .boundary
+                .not_established
+                .contains(&EvaluationClaim::UnderlyingObservationTruth)
+        );
+        assert!(
+            evaluation
+                .boundary
+                .not_established
+                .contains(&EvaluationClaim::SemanticValidity)
+        );
         assert!(evaluation.boundary.indeterminate.is_empty());
     }
 
@@ -3612,7 +3660,10 @@ mod tests {
         second.boundary.established.clear();
         assert_ne!(first.fingerprint(), second.fingerprint());
         first.boundary.not_established.reverse();
-        assert_eq!(first.fingerprint(), report.to_evidence_evaluation().fingerprint());
+        assert_eq!(
+            first.fingerprint(),
+            report.to_evidence_evaluation().fingerprint()
+        );
     }
 
     #[test]
@@ -3627,13 +3678,21 @@ mod tests {
         .verify_report(&envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
         assert_eq!(evaluation.subject_fingerprint, receipt.fingerprint());
-        assert_eq!(evaluation.context_fingerprint, evaluation.context.fingerprint());
-        assert_eq!(evaluation.verification_report_fingerprint, report.fingerprint());
+        assert_eq!(
+            evaluation.context_fingerprint,
+            evaluation.context.fingerprint()
+        );
+        assert_eq!(
+            evaluation.verification_report_fingerprint,
+            report.fingerprint()
+        );
         assert!(evaluation.execution_trace.is_well_formed());
-        assert!(evaluation
-            .boundary
-            .not_established
-            .contains(&EvaluationClaim::UnderlyingObservationTruth));
+        assert!(
+            evaluation
+                .boundary
+                .not_established
+                .contains(&EvaluationClaim::UnderlyingObservationTruth)
+        );
     }
 
     #[test]
@@ -3648,8 +3707,7 @@ mod tests {
         let base = report.to_evidence_evaluation();
         let changed = EvidenceEvaluation::from_report_with_context(
             &report,
-            VerificationContext::from_report(&report)
-                .with_trust_root_fingerprint("trust-root-a"),
+            VerificationContext::from_report(&report).with_trust_root_fingerprint("trust-root-a"),
         );
         assert_eq!(base.subject_fingerprint, changed.subject_fingerprint);
         assert_ne!(base.context_fingerprint, changed.context_fingerprint);
@@ -3666,16 +3724,17 @@ mod tests {
         )
         .verify_report(&envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
-        assert!(evaluation
-            .canonical_bytes()
-            .starts_with(b"symthaea:evidence-evaluation:v7\n"));
+        assert!(
+            evaluation
+                .canonical_bytes()
+                .starts_with(b"symthaea:evidence-evaluation:v7\n")
+        );
     }
 
     #[test]
     fn evaluation_trace_empty_has_no_terminal_outcome() {
         let trace = EvaluationTrace {
-            procedure_fingerprint:
-                EvaluationProcedure::attestation_ed25519().fingerprint(),
+            procedure_fingerprint: EvaluationProcedure::attestation_ed25519().fingerprint(),
             results: Vec::new(),
         };
         assert_eq!(trace.terminal_outcome(), None);
@@ -3744,10 +3803,7 @@ mod tests {
             evaluation.context.policy_fingerprint,
             report.policy_fingerprint
         );
-        assert_eq!(
-            evaluation.context.verifier_id,
-            VERIFIER_IMPLEMENTATION_ID
-        );
+        assert_eq!(evaluation.context.verifier_id, VERIFIER_IMPLEMENTATION_ID);
         assert_eq!(
             evaluation.context.environment_fingerprint,
             report.environment_fingerprint
@@ -3769,7 +3825,10 @@ mod tests {
             Some("trust-root-1")
         );
         assert_eq!(
-            evaluation.context.authorization_policy_fingerprint.as_deref(),
+            evaluation
+                .context
+                .authorization_policy_fingerprint
+                .as_deref(),
             Some("authz-policy-1")
         );
         assert!(evaluation.is_consistent_with_report(&report));
@@ -3824,10 +3883,14 @@ mod tests {
         assert!(context.is_well_formed());
 
         context.verifier_id = "attacker-verifier";
-        assert_eq!(context.fingerprint(), VerificationContext {
-            verifier_id: "attacker-verifier",
-            ..context.clone()
-        }.fingerprint());
+        assert_eq!(
+            context.fingerprint(),
+            VerificationContext {
+                verifier_id: "attacker-verifier",
+                ..context.clone()
+            }
+            .fingerprint()
+        );
         assert!(!context.is_well_formed());
     }
 
@@ -3854,7 +3917,10 @@ mod tests {
         let mut tampered_evaluation = clean_evaluation.clone();
         tampered_evaluation.boundary = duplicate;
         assert!(!tampered_evaluation.is_well_formed());
-        assert_ne!(tampered_evaluation.fingerprint(), clean_evaluation.fingerprint());
+        assert_ne!(
+            tampered_evaluation.fingerprint(),
+            clean_evaluation.fingerprint()
+        );
     }
 
     #[test]
@@ -3892,7 +3958,11 @@ mod tests {
             ReceiptAttestationVerificationOutcome::Expired
         );
         assert_eq!(
-            report.execution_trace.results.last().map(|result| result.check),
+            report
+                .execution_trace
+                .results
+                .last()
+                .map(|result| result.check),
             Some(EvaluationCheck::TemporalValidity)
         );
         assert!(report.is_well_formed());
@@ -3908,10 +3978,12 @@ mod tests {
         assert!(!evaluation.is_well_formed());
 
         let mut evaluation = evaluation;
-        assert!(evaluation
-            .boundary
-            .not_established
-            .contains(&EvaluationClaim::CryptosuiteConformance));
+        assert!(
+            evaluation
+                .boundary
+                .not_established
+                .contains(&EvaluationClaim::CryptosuiteConformance)
+        );
         evaluation.boundary.established = vec![EvaluationClaim::CryptosuiteConformance];
         assert!(!evaluation.is_well_formed());
     }
@@ -3934,9 +4006,7 @@ mod tests {
             ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
         );
         assert!(!report.is_well_formed());
-        report.resolved_verification_method = Some(
-            "did:example:attester-a#key-1".into(),
-        );
+        report.resolved_verification_method = Some("did:example:attester-a#key-1".into());
         assert!(report.is_well_formed());
     }
 
@@ -3958,11 +4028,8 @@ mod tests {
     #[test]
     fn verification_report_self_validation_rejects_empty_resolution_snapshot() {
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let verifier = Ed25519ReceiptVerifier::new(
-            "ignored-by-resolver",
-            signing_key.verifying_key(),
-            150,
-        );
+        let verifier =
+            Ed25519ReceiptVerifier::new("ignored-by-resolver", signing_key.verifying_key(), 150);
         let method = ResolvedVerificationMethod {
             verification_method: "did:example:attester-a#key-1".into(),
             verifying_key: signing_key.verifying_key(),
@@ -4020,7 +4087,8 @@ mod tests {
     }
 
     #[test]
-    fn verification_context_self_validation_rejects_malformed_policy_and_environment_fingerprints() {
+    fn verification_context_self_validation_rejects_malformed_policy_and_environment_fingerprints()
+    {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
@@ -4127,9 +4195,8 @@ mod tests {
         assert!(context.matches_report(&report));
 
         let mut malformed_report = report;
-        malformed_report.structural_validation = VerificationStage::Failed(
-            ReceiptAttestationVerificationOutcome::InvalidEnvelope,
-        );
+        malformed_report.structural_validation =
+            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::InvalidEnvelope);
 
         assert!(!malformed_report.is_well_formed());
         assert!(!context.matches_report(&malformed_report));
@@ -4179,8 +4246,7 @@ mod tests {
         assert!(evaluation.boundary.is_well_formed());
 
         let mut tampered = evaluation.clone();
-        tampered.outcome =
-            ReceiptAttestationVerificationOutcome::InvalidSignature;
+        tampered.outcome = ReceiptAttestationVerificationOutcome::InvalidSignature;
         assert!(!tampered.is_consistent_with_report(&report));
     }
 
@@ -4195,24 +4261,25 @@ mod tests {
         )
         .verify_report(&envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
-        assert!(evaluation
-            .boundary
-            .not_established
-            .contains(&EvaluationClaim::EnvelopeStructuralValidity));
-        assert!(evaluation
-            .boundary
-            .indeterminate
-            .contains(&EvaluationClaim::ReceiptIntegrity));
+        assert!(
+            evaluation
+                .boundary
+                .not_established
+                .contains(&EvaluationClaim::EnvelopeStructuralValidity)
+        );
+        assert!(
+            evaluation
+                .boundary
+                .indeterminate
+                .contains(&EvaluationClaim::ReceiptIntegrity)
+        );
         assert!(evaluation.boundary.is_well_formed());
     }
 
     #[test]
     fn verification_report_captures_execution_trace_at_execution_time() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
-        envelope
-            .proof
-            .as_mut()
-            .expect("signed envelope proof")[0] ^= 0x01;
+        envelope.proof.as_mut().expect("signed envelope proof")[0] ^= 0x01;
         let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
@@ -4372,7 +4439,10 @@ mod tests {
         assert_ne!(base.context_fingerprint, independent.context_fingerprint);
         assert_ne!(base.fingerprint(), independent.fingerprint());
         assert_eq!(
-            independent.context.evaluator_identity_fingerprint.as_deref(),
+            independent
+                .context
+                .evaluator_identity_fingerprint
+                .as_deref(),
             Some("evaluator-b")
         );
     }
@@ -4413,10 +4483,19 @@ mod tests {
 
         assert!(evaluation.execution_trace.is_well_formed());
         assert_eq!(
-            evaluation.execution_trace.results.last().map(|result| result.stage),
+            evaluation
+                .execution_trace
+                .results
+                .last()
+                .map(|result| result.stage),
             Some(VerificationStage::Passed)
         );
-        assert!(evaluation.boundary.established.contains(&EvaluationClaim::CryptographicProofValidity));
+        assert!(
+            evaluation
+                .boundary
+                .established
+                .contains(&EvaluationClaim::CryptographicProofValidity)
+        );
     }
 
     #[test]
@@ -4491,8 +4570,7 @@ mod tests {
         attempted_rebinding.procedure_fingerprint = "procedure-alternate".into();
         attempted_rebinding.evaluated_at_unix_ns = 999;
 
-        let evaluation =
-            EvidenceEvaluation::from_report_with_context(&report, attempted_rebinding);
+        let evaluation = EvidenceEvaluation::from_report_with_context(&report, attempted_rebinding);
 
         assert_eq!(
             evaluation.context.procedure_fingerprint,
@@ -4613,8 +4691,7 @@ mod tests {
         );
         let mut report = resolved_report(&verifier, &envelope, &receipt);
 
-        report.procedure_fingerprint =
-            EvaluationProcedure::attestation_ed25519_v1().fingerprint();
+        report.procedure_fingerprint = EvaluationProcedure::attestation_ed25519_v1().fingerprint();
         report.execution_trace = EvaluationTrace {
             procedure_fingerprint: report.procedure_fingerprint.clone(),
             results: EvaluationProcedure::attestation_ed25519_v1()
@@ -4631,7 +4708,11 @@ mod tests {
         };
 
         assert!(!report.has_consistent_identity_bindings());
-        assert!(!report.to_evidence_evaluation().is_consistent_with_report(&report));
+        assert!(
+            !report
+                .to_evidence_evaluation()
+                .is_consistent_with_report(&report)
+        );
     }
 
     #[test]
@@ -4682,10 +4763,7 @@ mod tests {
         let evaluation = report.to_evidence_evaluation();
 
         assert!(evaluation.execution_trace.results.is_empty());
-        assert_eq!(
-            evaluation.execution_trace,
-            EvaluationTrace::default()
-        );
+        assert_eq!(evaluation.execution_trace, EvaluationTrace::default());
         assert!(!evaluation.execution_trace.is_well_formed());
         assert!(!evaluation.is_consistent_with_report(&report));
     }
@@ -4700,8 +4778,7 @@ mod tests {
         );
         let mut report = resolved_report(&verifier, &envelope, &receipt);
         report.verifier_version = "symthaea-observation-attestation-report-v3";
-        report.procedure_fingerprint =
-            EvaluationProcedure::attestation_ed25519_v1().fingerprint();
+        report.procedure_fingerprint = EvaluationProcedure::attestation_ed25519_v1().fingerprint();
         report.execution_trace = EvaluationTrace {
             procedure_fingerprint: report.procedure_fingerprint.clone(),
             results: vec![EvaluationCheckResult {
@@ -4730,8 +4807,7 @@ mod tests {
         );
         let mut report = resolved_report(&verifier, &envelope, &receipt);
         report.verifier_version = "symthaea-observation-attestation-report-v3";
-        report.procedure_fingerprint =
-            EvaluationProcedure::attestation_ed25519_v1().fingerprint();
+        report.procedure_fingerprint = EvaluationProcedure::attestation_ed25519_v1().fingerprint();
         report.execution_trace = EvaluationTrace::default();
 
         assert!(report.is_well_formed());
@@ -4750,8 +4826,7 @@ mod tests {
         );
         let mut report = resolved_report(&verifier, &envelope, &receipt);
         report.verifier_version = "symthaea-observation-attestation-report-v3";
-        report.procedure_fingerprint =
-            EvaluationProcedure::attestation_ed25519_v1().fingerprint();
+        report.procedure_fingerprint = EvaluationProcedure::attestation_ed25519_v1().fingerprint();
         report.execution_trace = EvaluationTrace::default();
 
         let evaluation = report.to_evidence_evaluation();
@@ -4766,14 +4841,18 @@ mod tests {
         for check in procedure.checks {
             let id = check.id();
             let version = check.definition_version();
-            assert!(canonical.windows(id.len()).any(|window| window == id.as_bytes()));
-            assert!(canonical
-                .windows(version.len())
-                .any(|window| window == version.as_bytes()));
+            assert!(
+                canonical
+                    .windows(id.len())
+                    .any(|window| window == id.as_bytes())
+            );
+            assert!(
+                canonical
+                    .windows(version.len())
+                    .any(|window| window == version.as_bytes())
+            );
         }
-        assert!(canonical.starts_with(
-            b"symthaea:observation-evaluation-procedure:v2\n"
-        ));
+        assert!(canonical.starts_with(b"symthaea:observation-evaluation-procedure:v2\n"));
     }
 
     #[test]
@@ -4816,10 +4895,7 @@ mod tests {
     #[test]
     fn evaluation_trace_binds_check_results_and_procedure() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
-        envelope
-            .proof
-            .as_mut()
-            .expect("signed envelope proof")[0] ^= 0x01;
+        envelope.proof.as_mut().expect("signed envelope proof")[0] ^= 0x01;
         let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
@@ -4836,16 +4912,23 @@ mod tests {
         assert!(evaluation.execution_trace.is_well_formed());
         assert!(evaluation.boundary.is_well_formed());
         assert_eq!(evaluation.execution_trace.results.len(), 9);
-        let last = evaluation.execution_trace.results.last().expect("trace has a result");
+        let last = evaluation
+            .execution_trace
+            .results
+            .last()
+            .expect("trace has a result");
         assert_eq!(last.check, EvaluationCheck::CryptographicProof);
         assert_eq!(
             last.stage,
-            VerificationStage::Failed(
-                ReceiptAttestationVerificationOutcome::InvalidSignature
-            )
+            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::InvalidSignature)
         );
         assert_eq!(
-            evaluation.execution_trace.results.iter().map(|r| r.sequence).collect::<Vec<_>>(),
+            evaluation
+                .execution_trace
+                .results
+                .iter()
+                .map(|r| r.sequence)
+                .collect::<Vec<_>>(),
             (0..9).collect::<Vec<_>>()
         );
     }
@@ -4959,9 +5042,8 @@ mod tests {
         };
         assert!(!trace.is_well_formed());
 
-        trace.results[0].stage = VerificationStage::Failed(
-            ReceiptAttestationVerificationOutcome::InvalidEnvelope,
-        );
+        trace.results[0].stage =
+            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::InvalidEnvelope);
         assert!(trace.is_well_formed());
     }
 
@@ -4994,8 +5076,7 @@ mod tests {
         assert!(report.resolution_snapshot_fingerprint.is_none());
 
         let mut resolved_method = report.clone();
-        resolved_method.resolved_verification_method =
-            Some("did:example:attester-a#key-2".into());
+        resolved_method.resolved_verification_method = Some("did:example:attester-a#key-2".into());
         assert_ne!(report.fingerprint(), resolved_method.fingerprint());
 
         let mut snapshot = report.clone();
@@ -5003,8 +5084,7 @@ mod tests {
         assert_ne!(report.fingerprint(), snapshot.fingerprint());
 
         let mut paired = report.clone();
-        paired.resolved_verification_method =
-            Some("did:example:attester-a#key-2".into());
+        paired.resolved_verification_method = Some("did:example:attester-a#key-2".into());
         paired.resolution_snapshot_fingerprint = Some("opaque-snapshot-1".into());
         assert_ne!(resolved_method.fingerprint(), paired.fingerprint());
         assert_ne!(snapshot.fingerprint(), paired.fingerprint());
@@ -5012,8 +5092,7 @@ mod tests {
         let evaluation = report.to_evidence_evaluation();
 
         let mut rebound_method = report.clone();
-        rebound_method.resolved_verification_method =
-            Some("did:example:attester-a#key-2".into());
+        rebound_method.resolved_verification_method = Some("did:example:attester-a#key-2".into());
         assert!(!evaluation.is_consistent_with_report(&rebound_method));
 
         let mut rebound_snapshot = report.clone();
@@ -5024,10 +5103,7 @@ mod tests {
     #[test]
     fn resolver_snapshot_is_retained_when_post_resolution_crypto_failure_occurs() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
-        envelope
-            .proof
-            .as_mut()
-            .expect("signed envelope proof")[0] ^= 0x01;
+        envelope.proof.as_mut().expect("signed envelope proof")[0] ^= 0x01;
 
         let method = ResolvedVerificationMethod {
             verification_method: envelope.attester_id.clone(),
@@ -5061,7 +5137,11 @@ mod tests {
         );
         assert!(report.execution_trace.is_well_formed());
         assert_eq!(
-            report.execution_trace.results.last().map(|result| result.stage),
+            report
+                .execution_trace
+                .results
+                .last()
+                .map(|result| result.stage),
             Some(VerificationStage::Failed(
                 ReceiptAttestationVerificationOutcome::InvalidSignature
             ))
@@ -5096,8 +5176,7 @@ mod tests {
 
         evaluation.verification_report_fingerprint = {
             let mut mutated = report.clone();
-            mutated.resolution_snapshot_fingerprint =
-                Some("different-resolution-state".into());
+            mutated.resolution_snapshot_fingerprint = Some("different-resolution-state".into());
             mutated.fingerprint()
         };
 
@@ -5127,7 +5206,8 @@ mod tests {
             fn resolve_with_snapshot(
                 &self,
                 verification_method: &str,
-            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError>
+            {
                 Ok(ResolvedVerificationMethodSnapshot {
                     resolved: self.resolve(verification_method)?,
                     snapshot_fingerprint: Some("identity-mismatch-snapshot".into()),
@@ -5159,7 +5239,11 @@ mod tests {
             ReceiptAttestationVerificationOutcome::Verified
         );
         assert_eq!(
-            report.execution_trace.results.last().map(|result| result.check),
+            report
+                .execution_trace
+                .results
+                .last()
+                .map(|result| result.check),
             Some(EvaluationCheck::VerificationMethodResolution)
         );
         assert_eq!(
@@ -5189,7 +5273,8 @@ mod tests {
             fn resolve_with_snapshot(
                 &self,
                 verification_method: &str,
-            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError>
+            {
                 Ok(ResolvedVerificationMethodSnapshot {
                     resolved: self.resolve(verification_method)?,
                     snapshot_fingerprint: Some(String::new()),
@@ -5203,7 +5288,8 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        let report = verifier.verify_with_resolver_report(&envelope, &receipt, &EmptySnapshotResolver);
+        let report =
+            verifier.verify_with_resolver_report(&envelope, &receipt, &EmptySnapshotResolver);
 
         assert_eq!(
             report.outcome,
@@ -5241,7 +5327,8 @@ mod tests {
             fn resolve_with_snapshot(
                 &self,
                 verification_method: &str,
-            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError> {
+            ) -> Result<ResolvedVerificationMethodSnapshot, VerificationMethodResolutionError>
+            {
                 Ok(ResolvedVerificationMethodSnapshot {
                     resolved: self.resolve(verification_method)?,
                     snapshot_fingerprint: Some(self.snapshot.clone()),
@@ -5263,12 +5350,9 @@ mod tests {
             snapshot: "mismatched-resolution-snapshot".into(),
         };
 
-        let report = Ed25519ReceiptVerifier::new(
-            requested_method.clone(),
-            signing_key.verifying_key(),
-            150,
-        )
-        .verify_with_resolver_report(&envelope, &receipt, &resolver);
+        let report =
+            Ed25519ReceiptVerifier::new(requested_method.clone(), signing_key.verifying_key(), 150)
+                .verify_with_resolver_report(&envelope, &receipt, &resolver);
 
         assert_eq!(
             report.outcome,
@@ -5284,7 +5368,11 @@ mod tests {
         );
         assert!(report.execution_trace.is_well_formed());
         assert_eq!(
-            report.execution_trace.results.last().map(|result| result.stage),
+            report
+                .execution_trace
+                .results
+                .last()
+                .map(|result| result.stage),
             Some(VerificationStage::Failed(
                 ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable
             ))
@@ -5326,7 +5414,11 @@ mod tests {
         );
         assert!(report.execution_trace.is_well_formed());
         assert_eq!(
-            report.execution_trace.results.last().map(|result| result.stage),
+            report
+                .execution_trace
+                .results
+                .last()
+                .map(|result| result.stage),
             Some(VerificationStage::Failed(
                 ReceiptAttestationVerificationOutcome::ProofPurposeUnauthorized
             ))
