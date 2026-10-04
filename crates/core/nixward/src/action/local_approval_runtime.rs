@@ -500,6 +500,8 @@ mod tests {
 
     #[test]
     fn runtime_refuses_to_install_dangerous_operator_display_formatting() {
+        use crate::action::local_approval_projection::LocalApprovalProjectionErrorV1;
+
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
