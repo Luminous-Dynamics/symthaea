@@ -248,6 +248,8 @@ symthaea-dream = { path = "crates/domains/symthaea-dream" }
 # Symthaea Phi Search - Phi-guided architecture search (always enabled)
 symthaea-phi-search = { path = "crates/domains/symthaea-phi-search" }
 sha2 = { version = "0.10", optional = true }
+sha2-gis = { package = "sha2", workspace = true }
+url = { workspace = true }
 hmac = { version = "0.12", optional = true }
 
 # Symthaea Narrative Self - Narrative self-model (always enabled)
