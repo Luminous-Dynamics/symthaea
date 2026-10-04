@@ -586,6 +586,10 @@ pub fn App() -> impl IntoView {
                     .as_ref()
                     .is_some_and(WebGpuRenderer::is_device_lost);
                 if lost {
+                    #[cfg(feature = "browser-qualification")]
+                    if let Some(canvas) = webgpu_canvas.get_untracked() {
+                        let _ = canvas.set_attribute("data-qualification-loss-observed", "true");
+                    }
                     *renderer.borrow_mut() = None;
                     *init_started.borrow_mut() = false;
                     webgpu_ready.set(false);
@@ -618,6 +622,10 @@ pub fn App() -> impl IntoView {
                         .as_ref()
                         .is_some_and(WebGpuMovieRenderer::is_device_lost);
                     if lost {
+                        #[cfg(feature = "browser-qualification")]
+                        if let Some(canvas) = movie_webgpu_canvas.get_untracked() {
+                            let _ = canvas.set_attribute("data-qualification-loss-observed", "true");
+                        }
                         *renderer.borrow_mut() = None;
                         *init_started.borrow_mut() = false;
                         movie_webgpu_ready.set(false);
