@@ -245,3 +245,15 @@ fn syntactically_valid_but_invalid_p256_point_is_rejected_by_crypto_boundary() {
         Err(Rfc9942VdpError::InvalidEs256Signature)
     );
 }
+
+
+#[test]
+fn cose_key_rejects_unknown_key_operation_even_when_verify_is_present() {
+    let mut bytes = valid_key();
+    let pos = bytes.windows(3).position(|w| w == [0x04, 0x81, 0x02]).unwrap();
+    bytes.splice(pos + 1..pos + 3, [0x82, 0x65, b'b', b'o', b'g', b'u', b's', 0x02]);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&bytes),
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+    );
+}
