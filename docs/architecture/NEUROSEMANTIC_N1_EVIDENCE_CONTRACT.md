@@ -63,11 +63,14 @@ cosine-nonconformity-v1:
 s(y, x) = (1 - cosine(x, y)) / 2,
 
 where cosine must be finite and lie in [-1, 1]. The score therefore lies in
-[0, 1], with larger values meaning less conformity. The primitive can turn a
-complete, deterministic candidate universe into a set-valued prediction by
-including every candidate whose nonconformity is at most the calibrated q.
-Candidate identifiers must be unique and non-empty; invalid similarities fail
-closed; the emitted set is canonicalized by stable identifier.
+[0, 1], with larger values meaning less conformity. Calibration is also bound to
+a canonical hash of the complete candidate universe and its size. At inference,
+the supplied candidate universe must reproduce that hash exactly; a missing,
+extra, duplicate, or reordered candidate set therefore cannot silently reuse the
+threshold. The primitive turns that complete, deterministic candidate universe
+into a set-valued prediction by including every candidate whose nonconformity is
+at most the calibrated q. Invalid identifiers or similarities fail closed, and
+the emitted set is canonicalized by stable identifier.
 
 This is deliberately a baseline score, not a claim that cosine alone is the
 best N1 uncertainty statistic. Recent 2026 HDC/conformal work combines prototype
@@ -89,6 +92,7 @@ A conformal N1 artifact should bind at minimum:
 - exact codebook/model hash;
 - exact calibration and evaluation split-manifest hashes;
 - the named nonconformity score definition and revision;
+- the exact candidate-universe hash and size;
 - alpha, calibration count, and resulting threshold;
 - coverage, abstention/set-size, and error results on the untouched evaluation split;
 - the exchangeability/independence assumptions and any known violations;
