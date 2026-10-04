@@ -1541,7 +1541,7 @@ mod tests {
         fn conformal_prediction_set_is_thresholded_and_deterministic() {
         let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
             "codebook",
-            &[0.0, 0.1, 0.2, 0.3],
+            &[0.0, 0.05, 0.1, 0.2],
             0.50,
         )
         .unwrap();
@@ -1553,7 +1553,7 @@ mod tests {
             HdcOntologyRetrievalCandidate { stable_id: "m".into(), score: 0.6 },
             HdcOntologyRetrievalCandidate { stable_id: "q".into(), score: -1.0 },
         ];
-        assert_eq!(calibration.prediction_set(&candidates).unwrap(), vec!["a", "m"]);
+        assert_eq!(calibration.prediction_set(&candidates).unwrap(), vec!["a", "z"]);
     }
 
     #[test]
