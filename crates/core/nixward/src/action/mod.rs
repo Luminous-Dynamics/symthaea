@@ -67,6 +67,7 @@ pub use local_approval_projection::{
 pub use local_approval_ipc::observe_linux_unix_peer_v1;
 #[cfg(target_os = "linux")]
 pub use local_approval_runtime::{
+    operator_visible_action_for_command,
     InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1, LocalApprovalRuntimeV1,
 };
 #[cfg(target_os = "linux")]
