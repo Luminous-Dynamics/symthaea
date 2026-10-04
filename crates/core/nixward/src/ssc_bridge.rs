@@ -80,8 +80,10 @@ pub enum SscObservationError {
     AuthorizedObservationDigestMismatch,
     #[error("NixOS observation could not construct the canonical target adapter: {0}")]
     AdapterConstruction(String),
-    #[error("NixOS /etc/machine-id is missing or empty")]
+    #[error("NixOS target identity is missing or empty")]
     MissingTargetIdentity,
+    #[error("NixOS target identity does not match the canonical derived format")]
+    InvalidTargetIdentity,
     #[error("NixOS /etc/machine-id must be exactly 32 lowercase hexadecimal characters")]
     InvalidMachineId,
 }
@@ -120,6 +122,7 @@ impl NixSystemObservation {
         if self.target_identity.0.is_empty() || self.target_identity.0.trim().is_empty() {
             return Err(SscObservationError::MissingTargetIdentity);
         }
+        validate_target_identity(&self.target_identity)?;
         if self.system_profile_generation == 0 {
             return Err(SscObservationError::InvalidGenerationNumber);
         }
@@ -282,6 +285,20 @@ fn read_target_identity(path: &Path) -> Result<TargetId, SscObservationError> {
     target_identity_from_machine_id(value.trim())
 }
 
+fn validate_target_identity(target: &TargetId) -> Result<(), SscObservationError> {
+    let Some(digest) = target.0.strip_prefix("nixos-machine:") else {
+        return Err(SscObservationError::InvalidTargetIdentity);
+    };
+    if digest.len() != 64
+        || !digest
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        return Err(SscObservationError::InvalidTargetIdentity);
+    }
+    Ok(())
+}
+
 fn target_identity_from_machine_id(machine_id: &str) -> Result<TargetId, SscObservationError> {
     if machine_id.len() != 32
         || !machine_id
@@ -417,6 +434,28 @@ mod tests {
                 SscObservationError::InvalidMachineId
             );
         }
+    }
+
+    #[test]
+    fn observation_validation_rejects_forged_target_identity_format() {
+        let mut observation = NixSystemObservation {
+            target_identity: test_target_id(),
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+        observation.target_identity = TargetId::from("host-01");
+
+        assert_eq!(
+            observation.validate().expect_err("forged target identity"),
+            SscObservationError::InvalidTargetIdentity
+        );
     }
 
     #[test]
