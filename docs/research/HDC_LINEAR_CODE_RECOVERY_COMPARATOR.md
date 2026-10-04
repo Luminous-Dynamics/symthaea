@@ -260,6 +260,13 @@ The fiber API additionally validates the kernel certificate structurally before 
 
 The certificate does not enumerate the exponentially large fiber by default. Bounded qualification tests may enumerate it explicitly; paper-scale qualification remains symbolic while still committing the certificate geometry into the deterministic digest.
 
+### Noisy factorization boundary
+A new bounded oracle tests the noisy extension without pretending that an exact algebraic solver is a decoder. For a fixed ordered factor presentation with kernel dimension `d`, every reachable target has exactly `2^d` factor tuples. Consequently, for any received observation `y` and Hamming radius `t`, the number of factor tuples whose bound lies within that ball is exactly
+
+`(# reachable targets within radius t of y) * 2^d`.
+
+The qualification test exhausts this identity on a small repeated-factor construction across every ambient observation and several radii. This is stronger than checking one decoder output: it proves that the combinatorial candidate-list size factors into image-neighborhood ambiguity and intrinsic affine-fiber multiplicity. In particular, improved target decoding cannot make a non-unique factorization unique; the `2^d` multiplicity survives every zero-noise or noisy observation that lands on the same reachable target.
+
 
 The comparator now exposes the complete kernel basis of the factor-to-bound map, not only its dimension or a single dependency witness.
 
