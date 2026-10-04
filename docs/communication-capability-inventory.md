@@ -25,6 +25,7 @@ assumed as a universal substrate for animal or unknown communication.
 |---|---|---:|---|
 | `symthaea-communication` core contracts | **released architecture** | — | 40+ unit tests; benchmark gates, evidence chain, and expression policy. No claims are released without passing evidence. |
 | `symthaea-communication::neurosemantic` | **experimental N0 protocol infrastructure** | Structure (synthetic protocol only) | Consent-bound, purpose-bound, directional exchange of derived representations with integrity and replay controls. N0 does not establish semantic understanding, neural decoding, or thought reading. |
+| `symthaea-communication::hdc_interlingua` | **experimental N0 HDC interlingua** | Structure (synthetic retrieval only) | Fixed training-derived codebook; held-out graph composition/reconstruction; separate node/edge channels; codec and codebook provenance enforced. Not evidence of semantic understanding or neural decoding. |
 | `symthaea-communication` human pilot (Whisper large-v3) | pilot infrastructure ready | Structure | Workers, FLEURS preparation, plan/provider templates in `communication/`. Not yet released: no gate has been run on production data. |
 | `symthaea-communication` human pilot (SeamlessM4T-v2) | pilot infrastructure ready | Structure | SeamlessM4T worker with MMS-LID identity. No gate run. |
 | `src/language` LLM providers and language manager | active / feature-gated | Intent | Human text orchestration; providers have separate quality characteristics. No 100-language gate exists yet. |
