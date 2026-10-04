@@ -546,9 +546,11 @@ async function runMode(mode) {
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
       await waitForProjection(page, '#webgpu-cognitive-canvas', 'block');
       await waitForProjection(page, '#webgpu-movie-canvas', 'block');
+      await waitForQualificationRecovery(page, '#webgpu-cognitive-canvas');
+      await waitForQualificationRecovery(page, '#webgpu-movie-canvas');
       await waitForQualificationReady(page, '#webgpu-cognitive-canvas');
       await waitForQualificationReady(page, '#webgpu-movie-canvas');
-      failOnPageErrors('WebGPU deterministic repeat render');
+      failOnPageErrors('WebGPU deterministic repeat render after recovery');
 
       const repeatSceneHash = await canvasPngHash(page, '#webgpu-cognitive-canvas');
       const repeatMovieHash = await canvasPngHash(page, '#webgpu-movie-canvas');
