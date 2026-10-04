@@ -90,7 +90,7 @@ The benchmark also verifies that reordering graph collections produces an identi
 
 The benchmark includes:
 
-1. an unrelated random HDC query against the node and edge candidate spaces;
+1. a deterministic null sweep of 256 unrelated random HDC queries against the node and edge candidate spaces; the reported maxima are taken across the full sweep rather than from a single random draw;
 2. a directed-edge role-swap control that must distinguish forward and reversed endpoints;
 3. lexical-label and transport-identifier invariance controls;
 4. deterministic 0%, 0.1%, 1%, 5%, and 10% binary transport-corruption observations;
