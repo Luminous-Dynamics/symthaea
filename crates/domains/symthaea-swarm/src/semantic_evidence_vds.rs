@@ -786,7 +786,7 @@ impl Rfc9942ReceiptEnvelope {
         if vds_id!=RFC9162_VDS_ID{return Err(Rfc9942VdpError::VdsMismatch(vds_id));}
 
         let unprotected_start = reader.offset;
-        let unprotected_entries=reader.read_map_entries_bounded(32).map_err(|error|match error{
+        let unprotected_entries=reader.read_map_entries_bounded_with_bstr_limit(32, MAX_RFC9942_RECEIPT_BYTES).map_err(|error|match error{
             Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
             _=>Rfc9942VdpError::InvalidEncoding,
         })?;
@@ -1247,7 +1247,7 @@ impl Rfc9942SignatureWithReceipts {
         }
 
         let unprotected_start=reader.offset;
-        let unprotected_entries=reader.read_map_entries_bounded(32)
+        let unprotected_entries=reader.read_map_entries_bounded_with_bstr_limit(32, MAX_RFC9942_RECEIPT_BYTES)
             .map_err(|error|match error {
                 Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
                 _=>Rfc9942VdpError::InvalidEncoding,
@@ -1782,7 +1782,7 @@ impl Rfc9942Vdp {
     }
 
     fn from_reader(reader: &mut CborReader<'_>) -> Result<Self, Rfc9942VdpError> {
-        let entries=reader.read_map_entries_bounded(1)
+        let entries=reader.read_map_entries_bounded_with_bstr_limit(1, MAX_RFC9942_PROOF_BYTES)
             .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         if entries.len()!=1{return Err(Rfc9942VdpError::InvalidStructure);}
 
@@ -2070,6 +2070,20 @@ impl<'a> CborReader<'a> {
         &mut self,
         max_entries: usize,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Rfc9162ProofDecodeError> {
+        self.read_map_entries_bounded_with_bstr_limit(max_entries, 4096)
+    }
+
+    /// Variant of the bounded map reader with a protocol-specific bstr cap.
+    ///
+    /// The generic opaque scanner intentionally uses a conservative 4 KiB
+    /// bstr bound. RFC 9942 containers such as VDP/proof arrays and the
+    /// receipts collection have larger, explicit profile limits and must
+    /// propagate those limits while scanning their enclosing maps.
+    fn read_map_entries_bounded_with_bstr_limit(
+        &mut self,
+        max_entries: usize,
+        max_bstr_len: usize,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Rfc9162ProofDecodeError> {
         let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
         self.offset+=1;
         if initial>>5!=5 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
@@ -2106,10 +2120,10 @@ impl<'a> CborReader<'a> {
             }
 
             let key_start=self.offset;
-            self.skip_value(0)?;
+            self.skip_value_with_bstr_limit(0, max_bstr_len)?;
             let key_end=self.offset;
             let value_start=self.offset;
-            self.skip_value(0)?;
+            self.skip_value_with_bstr_limit(0, max_bstr_len)?;
             let value_end=self.offset;
             entries.push((
                 self.bytes[key_start..key_end].to_vec(),
@@ -2279,11 +2293,19 @@ impl<'a> CborReader<'a> {
     }
 
     fn skip_value(&mut self, depth: usize) -> Result<(), Rfc9162ProofDecodeError> {
+        self.skip_value_with_bstr_limit(depth, 4096)
+    }
+
+    fn skip_value_with_bstr_limit(
+        &mut self,
+        depth: usize,
+        max_bstr_len: usize,
+    ) -> Result<(), Rfc9162ProofDecodeError> {
         if depth>16 { return Err(Rfc9162ProofDecodeError::InvalidStructure); }
         let major=self.peek_major_type()?;
         match major {
             0 | 1 => { self.skip_integer().map(|_|()) }
-            2 => { self.read_bstr_bounded(4096).map(|_|()) }
+            2 => { self.read_bstr_bounded(max_bstr_len).map(|_|()) }
             3 => { self.read_text_bounded(4096).map(|_|()) }
             4 => {
                 if self.bytes.get(self.offset).copied().is_some_and(|byte| byte & 0x1f == 31) {
@@ -2297,13 +2319,13 @@ impl<'a> CborReader<'a> {
                         if items >= 64 {
                             return Err(Rfc9162ProofDecodeError::InvalidStructure);
                         }
-                        self.skip_value(depth + 1)?;
+                        self.skip_value_with_bstr_limit(depth + 1, max_bstr_len)?;
                         items += 1;
                     }
                 }
                 let n=self.read_array_len()?;
                 if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-                for _ in 0..n{self.skip_value(depth+1)?;}
+                for _ in 0..n{self.skip_value_with_bstr_limit(depth+1, max_bstr_len)?;}
                 Ok(())
             },
             5 => {
@@ -2318,16 +2340,16 @@ impl<'a> CborReader<'a> {
                         if entries >= 64 {
                             return Err(Rfc9162ProofDecodeError::InvalidStructure);
                         }
-                        self.skip_value(depth + 1)?;
-                        self.skip_value(depth + 1)?;
+                        self.skip_value_with_bstr_limit(depth + 1, max_bstr_len)?;
+                        self.skip_value_with_bstr_limit(depth + 1, max_bstr_len)?;
                         entries += 1;
                     }
                 }
                 let n=self.read_map_len()?;
                 if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
                 for _ in 0..n{
-                    self.skip_value(depth+1)?;
-                    self.skip_value(depth+1)?;
+                    self.skip_value_with_bstr_limit(depth+1, max_bstr_len)?;
+                    self.skip_value_with_bstr_limit(depth+1, max_bstr_len)?;
                 }
                 Ok(())
             },
