@@ -3965,6 +3965,7 @@ mod tests {
         );
         assert!(evaluation.is_consistent_with_report(&report));
     }
+
     #[test]
     fn verification_context_self_validation_rejects_malformed_policy_and_environment_fingerprints() {
         let (envelope, signing_key, receipt) = envelope_and_key();
