@@ -25,7 +25,8 @@ pub const HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION: u16 = 1;
 pub const HDC_SEMANTIC_ADAPTER_ID: &str = "symthaea.hdc.semantic-interlingua-v1";
 pub const HDC_SEMANTIC_CODEBOOK_ID: &str = "symthaea.hdc.semantic-codebook-v1";
 pub const HDC_SEMANTIC_CODEBOOK_ALGORITHM: &str = "blake3-seeded-random-atoms-v1";
-pub const HDC_SEMANTIC_ROLE_REVISION: &str = "source-relation-target-node-v1";
+pub const HDC_SEMANTIC_ROLE_REVISION: &str = "source-relation-target-node-v2";
+pub const HDC_EDGE_TARGET_PERMUTATION: usize = 1;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HdcSemanticCodebookDescriptor {
@@ -381,6 +382,29 @@ impl HdcSemanticCodebook {
         Ok(representation)
     }
 
+    pub fn corrupt_for_transport(
+        &self,
+        representation: &HdcSemanticRepresentation,
+        flip_probability: f32,
+        seed: u64,
+    ) -> Result<HdcSemanticRepresentation, String> {
+        if !representation.validates() {
+            return Err("invalid HDC semantic representation".into());
+        }
+        if !flip_probability.is_finite() || !(0.0..=1.0).contains(&flip_probability) {
+            return Err("flip probability must be finite and within [0, 1]".into());
+        }
+
+        let mut corrupted = representation.clone();
+        let node = representation.node_frame.to_binary()?;
+        let edge = representation.edge_frame.to_binary()?;
+        corrupted.node_frame =
+            HdcBinaryFrame::from_binary(&node.add_noise(flip_probability, seed));
+        corrupted.edge_frame =
+            HdcBinaryFrame::from_binary(&edge.add_noise(flip_probability, seed.wrapping_add(1)));
+        Ok(corrupted)
+    }
+
     pub fn decode_graph(
         &self,
         representation: &HdcSemanticRepresentation,
@@ -521,7 +545,9 @@ impl HdcSemanticCodebook {
         // ContinuousHV::bind is commutative, so role labels alone cannot encode
         // source/target direction. A fixed permutation makes the target position
         // algebraically distinguishable from the source position.
-        let target_bound = self.role_target.bind(&target_hv.permute(1));
+        let target_bound = self
+            .role_target
+            .bind(&target_hv.permute(HDC_EDGE_TARGET_PERMUTATION));
 
         Ok(source_bound
             .bind(&relation_bound)
@@ -956,7 +982,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn edge_candidate_key_is_collision_safe_for_delimiters() {
         let key = serde_json::to_string(&("a::source", "rel::type", "b::target")).unwrap();
         let parsed = parse_edge_candidate(&key).unwrap();
@@ -964,6 +989,22 @@ mod tests {
             parsed,
             ("a::source".into(), "rel::type".into(), "b::target".into())
         );
+    }
+
+    #[test]
+    fn deterministic_transport_corruption_is_reproducible() {
+        let training = training_graphs();
+        let codebook = HdcSemanticCodebook::from_training_graphs(77, &training).unwrap();
+        let representation = codebook.encode_graph(&training[0]).unwrap();
+
+        let a = codebook
+            .corrupt_for_transport(&representation, 0.01, 1234)
+            .unwrap();
+        let b = codebook
+            .corrupt_for_transport(&representation, 0.01, 1234)
+            .unwrap();
+        assert_eq!(a.node_frame, b.node_frame);
+        assert_eq!(a.edge_frame, b.edge_frame);
     }
 
     #[test]
