@@ -22,7 +22,8 @@ The resulting SolverBoundaryBinding records:
 - solver domain and stable boundary id
 - adapter identity
 - opaque external boundary handle
-- candidate-geometry digest
+- candidate-geometry digest (semantic/CAD/CSG identity)
+- candidate-mesh digest (exact mesh presented to the adapter)
 - realized-boundary/patch digest
 - explicit solver-binding verification state
 - explicit physical-transport-unproven state
@@ -33,12 +34,15 @@ A solver-boundary name such as "inlet" is not sufficient provenance. Mesh
 regeneration, partitioning, CAD changes, or an adapter bug can cause the same
 name to refer to a different surface.
 
-Binding therefore requires both the interface identity and the realized patch
-identity.
+Binding therefore requires the interface identity, semantic geometry identity,
+exact candidate-mesh identity, and realized patch identity. This distinguishes
+"same intended design" from "same concrete solver input".
 
 This mirrors modern simulation workflows in which physics definitions are
 separated from geometry/mesh identity and boundary conditions are assigned to
-specific selected entities. The adapter is the authority for that mapping.
+specific selected entities. The adapter is the authority for selecting the solver entity, while Symthaea
+verifies that the recorded candidate mesh is the exact mesh supplied to the
+binding operation.
 
 ## Epistemic boundary
 
