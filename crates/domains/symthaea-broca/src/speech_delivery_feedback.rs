@@ -139,6 +139,24 @@ impl SpeechDeliveryReceipt {
         }
     }
 
+    pub fn validate(&self) -> Result<(), SpeechDeliveryReceiptError> {
+        if self.version != SPEECH_DELIVERY_FEEDBACK_VERSION {
+            return Err(SpeechDeliveryReceiptError::InvalidVersion);
+        }
+        if self.plan_surface.trim().is_empty() {
+            return Err(SpeechDeliveryReceiptError::EmptyPlanSurface);
+        }
+        if self.target.intent.trim().is_empty() {
+            return Err(SpeechDeliveryReceiptError::EmptyIntent);
+        }
+
+        let expected = SpeechDeliveryError::compare(self.target.clone(), self.observation.clone());
+        if expected != self.error {
+            return Err(SpeechDeliveryReceiptError::ErrorMismatch);
+        }
+        Ok(())
+    }
+
     pub fn validate_against_plan(
         &self,
         plan: &SpeechPlan,
@@ -151,6 +169,29 @@ impl SpeechDeliveryReceipt {
         Ok(())
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpeechDeliveryReceiptError {
+    InvalidVersion,
+    EmptyPlanSurface,
+    EmptyIntent,
+    ErrorMismatch,
+    PlanMismatch,
+}
+
+impl std::fmt::Display for SpeechDeliveryReceiptError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidVersion => write!(f, "speech delivery receipt version is unsupported"),
+            Self::EmptyPlanSurface => write!(f, "speech delivery receipt requires a plan grounding surface"),
+            Self::EmptyIntent => write!(f, "speech delivery receipt target intent must be non-empty"),
+            Self::ErrorMismatch => write!(f, "speech delivery receipt error does not match target and observation"),
+            Self::PlanMismatch => write!(f, "speech delivery receipt is not bound to the supplied speech plan"),
+        }
+    }
+}
+
+impl std::error::Error for SpeechDeliveryReceiptError {}
 
 impl SpeechDeliveryTarget {
     pub fn from_plan(plan: &SpeechPlan) -> Self {
