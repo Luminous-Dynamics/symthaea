@@ -349,6 +349,30 @@ fn cose_key_rejects_duplicate_labels() {
 }
 
 #[test]
+fn cose_key_rejects_non_label_root_map_key() {
+    let mut wire=vec![0xbf];
+    wire.push(0x01); wire.push(0x02);
+    wire.extend_from_slice(&[0x42,0xaa,0xbb,0x00]);
+    wire.push(0xff);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&wire),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
+}
+
+#[test]
+fn cose_key_rejects_duplicate_semantic_label_with_nonminimal_integer_encoding() {
+    let mut wire=valid_key();
+    assert_eq!(wire[0],0xa7);
+    wire[0]=0xa8;
+    wire.extend_from_slice(&[0x18,0x01,0x02]);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&wire),
+        Err(Rfc9942VdpError::InvalidEs256CoseKey)
+    );
+}
+
+#[test]
 fn cose_key_rejects_non_map_root_and_trailing_bytes() {
     assert_eq!(
         Rfc9942Es256CoseKey::from_cbor(&[0x80]),
