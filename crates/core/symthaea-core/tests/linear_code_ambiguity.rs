@@ -1704,9 +1704,7 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
         semantically_invalid.kernel_basis[0].generator_coefficients
             [semantically_invalid.kernel_basis[0].dependent_generator_index]
     );
-    assert!(
-        !semantically_invalid.kernel_basis[0].verifies_against(&factors)
-    );
+    assert!(!semantically_invalid.kernel_basis[0].verifies_against(&factors));
 
     let invalid_coefficient_basis = semantically_invalid
         .kernel_basis
