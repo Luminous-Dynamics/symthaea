@@ -3153,7 +3153,7 @@ mod tests {
         let method_b = ResolvedVerificationMethod {
             verification_method: "did:example:attester-b#key-1".into(),
             verifying_key: signing_key.verifying_key(),
-            status: VerificationMethodStatus.Active,
+            status: VerificationMethodStatus::Active,
             allowed_proof_purposes: vec!["observation-independence".into()],
         };
         let resolver =
