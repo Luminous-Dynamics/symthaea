@@ -1486,9 +1486,17 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Test evidence-plane contract
-        env:
-          CARGO_LOG: cargo::core::resolver=trace
         run: cargo test -p symthaea-evidence-plane --locked -vv
+
+      - name: Diagnose locked resolver delta
+        if: failure()
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo generate-lockfile
+          echo "::group::Cargo.lock resolver delta"
+          git diff --no-ext-diff --unified=3 -- Cargo.lock || true
+          echo "::endgroup::"
+          cp /tmp/Cargo.lock.before Cargo.lock
 
   genesis-benchmarks:
     name: Genesis Mission Benchmarks
