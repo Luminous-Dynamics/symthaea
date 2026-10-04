@@ -6232,13 +6232,17 @@ mod tests {
             &TestProviderVerifier
         ).unwrap();
 
+        let (pin_set_id,pin_set_digest): (String,String)=store.connection().unwrap().query_row(
+            "SELECT native_authority_pin_set_id,native_authority_pin_set_digest
+             FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |row| Ok((row.get(0)?,row.get(1)?)),
+        ).unwrap();
         let deleted=store.connection().unwrap().execute(
             "DELETE FROM authorization_native_authority_pin_sets
              WHERE pin_set_id=?1 AND pin_set_digest=?2",
-            params![
-                record_native_pin_set_id_for_test(&store,&record),
-                record_native_pin_set_digest_for_test(&store,&record)
-            ],
+            params![pin_set_id,pin_set_digest],
         ).unwrap();
         assert_eq!(deleted,1);
 
