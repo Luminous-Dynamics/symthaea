@@ -7,21 +7,59 @@
 //!
 //! The adapter layer deliberately owns the vendor/solver-specific handle.
 //! Symthaea owns the invariant that the handle was bound to the exact
-//! PortInterface identity and the exact realized boundary geometry identity.
+//! PortInterface identity and exact candidate mesh supplied to the adapter.
 //!
 //! This crate does not run a solver and does not certify physical transport.
 
 use blake3::Hasher;
 use symthaea_fabrication_kernel::mesh::TriangleMesh;
-use symthaea_passive_void_compiler::{BoundaryConditionDomain, PortInterface, SolverBoundaryIdentity};
+use symthaea_passive_void_compiler::{
+    BoundaryConditionDomain, PortInterface, SolverBoundaryIdentity,
+};
 use symthaea_passive_void_graph::PortId;
 
-/// Opaque identity for the realized boundary patch selected from the candidate
-/// mesh. A solver adapter creates this from its actual boundary entities.
+/// Identity of the realized boundary patch selected from a candidate mesh.
+///
+/// Construction is sealed behind the checked constructor so a verified binding
+/// cannot be assembled without computing the exact candidate-mesh identity.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RealizedBoundaryIdentity {
-    pub candidate_geometry_digest: [u8; 32],
-    pub boundary_patch_digest: [u8; 32],
+    candidate_geometry_digest: [u8; 32],
+    candidate_mesh_digest: [u8; 32],
+    boundary_patch_digest: [u8; 32],
+}
+
+impl RealizedBoundaryIdentity {
+    fn new(
+        candidate_geometry_digest: [u8; 32],
+        candidate_mesh: &TriangleMesh,
+        boundary_patch_digest: [u8; 32],
+    ) -> Result<Self, SolverBindingError> {
+        if candidate_geometry_digest == [0; 32] {
+            return Err(SolverBindingError::EmptyCandidateGeometryDigest);
+        }
+        if boundary_patch_digest == [0; 32] {
+            return Err(SolverBindingError::EmptyBoundaryPatchDigest);
+        }
+
+        Ok(Self {
+            candidate_geometry_digest,
+            candidate_mesh_digest: digest_triangle_mesh(candidate_mesh),
+            boundary_patch_digest,
+        })
+    }
+
+    pub fn candidate_geometry_digest(&self) -> [u8; 32] {
+        self.candidate_geometry_digest
+    }
+
+    pub fn candidate_mesh_digest(&self) -> [u8; 32] {
+        self.candidate_mesh_digest
+    }
+
+    pub fn boundary_patch_digest(&self) -> [u8; 32] {
+        self.boundary_patch_digest
+    }
 }
 
 /// Solver-specific adapter binding to an external boundary entity.
@@ -38,11 +76,14 @@ pub struct SolverBoundaryBinding {
 }
 
 impl SolverBoundaryBinding {
+    /// Construct a verified binding from an actual candidate mesh.
     pub fn verified(
         interface: &PortInterface,
         adapter_id: impl Into<String>,
         external_boundary_handle: impl Into<String>,
-        realized_boundary: RealizedBoundaryIdentity,
+        candidate_geometry_digest: [u8; 32],
+        candidate_mesh: &TriangleMesh,
+        boundary_patch_digest: [u8; 32],
     ) -> Result<Self, SolverBindingError> {
         let adapter_id = adapter_id.into();
         let external_boundary_handle = external_boundary_handle.into();
@@ -57,6 +98,12 @@ impl SolverBoundaryBinding {
         if external_boundary_handle.trim().is_empty() {
             return Err(SolverBindingError::EmptyExternalBoundaryHandle);
         }
+
+        let realized_boundary = RealizedBoundaryIdentity::new(
+            candidate_geometry_digest,
+            candidate_mesh,
+            boundary_patch_digest,
+        )?;
 
         Ok(Self {
             port: interface.port,
@@ -93,10 +140,28 @@ impl SolverBoundaryBinding {
         Ok(())
     }
 
+    /// Re-check the interface, semantic geometry identity, and exact candidate
+    /// mesh identity.
+    pub fn validate_against_candidate(
+        &self,
+        interface: &PortInterface,
+        candidate_geometry_digest: [u8; 32],
+        candidate: &TriangleMesh,
+    ) -> Result<(), SolverBindingError> {
+        self.validate_against(interface)?;
+        if self.realized_boundary.candidate_geometry_digest() != candidate_geometry_digest {
+            return Err(SolverBindingError::CandidateGeometryDigestMismatch);
+        }
+        if self.realized_boundary.candidate_mesh_digest() != digest_triangle_mesh(candidate) {
+            return Err(SolverBindingError::CandidateMeshDigestMismatch);
+        }
+        Ok(())
+    }
+
     /// Stable identity of the complete binding statement.
     pub fn digest(&self) -> [u8; 32] {
         let mut hasher = Hasher::new();
-        hasher.update(b"passive-solver-boundary-binding:v1");
+        hasher.update(b"passive-solver-boundary-binding:v2");
         hasher.update(&self.port.0.to_le_bytes());
         hasher.update(&self.interface_digest);
         hasher.update(&[domain_byte(self.solver_boundary.domain)]);
@@ -106,6 +171,7 @@ impl SolverBoundaryBinding {
         hasher.update(self.external_boundary_handle.as_bytes());
         hasher.update(&[0]);
         hasher.update(&self.realized_boundary.candidate_geometry_digest());
+        hasher.update(&self.realized_boundary.candidate_mesh_digest());
         hasher.update(&self.realized_boundary.boundary_patch_digest());
         hasher.update(&[u8::from(self.solver_binding_verified)]);
         hasher.update(&[u8::from(self.physical_transport_unproven)]);
@@ -113,11 +179,46 @@ impl SolverBoundaryBinding {
     }
 }
 
+/// Canonical digest of the exact TriangleMesh representation supplied to a
+/// solver adapter.
+///
+/// This is deliberately byte-oriented rather than topology-normalized: a
+/// changed coordinate, normal, index, ordering, or count is a different solver
+/// input.
+pub fn digest_triangle_mesh(mesh: &TriangleMesh) -> [u8; 32] {
+    let mut hasher = Hasher::new();
+    hasher.update(b"passive-candidate-mesh:v1");
+
+    hasher.update(&(mesh.vertices.len() as u64).to_le_bytes());
+    for vertex in &mesh.vertices {
+        for value in vertex {
+            hasher.update(&value.to_le_bytes());
+        }
+    }
+
+    hasher.update(&(mesh.normals.len() as u64).to_le_bytes());
+    for normal in &mesh.normals {
+        for value in normal {
+            hasher.update(&value.to_le_bytes());
+        }
+    }
+
+    hasher.update(&(mesh.indices.len() as u64).to_le_bytes());
+    for triangle in &mesh.indices {
+        for index in triangle {
+            hasher.update(&index.to_le_bytes());
+        }
+    }
+
+    *hasher.finalize().as_bytes()
+}
+
 /// Contract implemented by concrete solver adapters.
 ///
-/// The adapter must resolve the typed interface against the actual candidate
-/// geometry and return an opaque handle plus the realized-boundary digest.
-/// It must not reinterpret geometry based on a stale port position or name.
+/// The adapter must inspect the actual candidate mesh, resolve the typed
+/// interface to solver-specific boundary entities, and return the external
+/// handle plus realized-boundary digest. It must not reinterpret geometry based
+/// on a stale port position or label.
 pub trait SolverBoundaryBindingAdapter {
     fn adapter_id(&self) -> &str;
 
@@ -189,6 +290,8 @@ pub enum SolverBindingError {
     PortMismatch,
     InterfaceDigestMismatch,
     SolverBoundaryMismatch,
+    CandidateGeometryDigestMismatch,
+    CandidateMeshDigestMismatch,
     BindingCountMismatch,
     DuplicateInterface(PortId),
     DuplicateBinding(PortId),
@@ -394,6 +497,7 @@ mod tests {
             )
             .unwrap(),
         ];
+
         assert_eq!(
             validate_binding_set(&[a, b], &bindings),
             Err(SolverBindingError::DuplicateExternalBoundaryHandle(
