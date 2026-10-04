@@ -560,7 +560,7 @@ pub fn select_boundary_patch(
         return Err(SolverBindingError::BoundaryPatchEdgeNotOnCandidate);
     }
 
-    let all_boundary = collect_boundary_edge_records(candidate);
+    let all_boundary = collect_boundary_edge_records(candidate)?;
     let expected: Vec<_> = all_boundary
         .iter()
         .filter(|edge| edge_matches_interface(edge, interface, tolerance_mm))
