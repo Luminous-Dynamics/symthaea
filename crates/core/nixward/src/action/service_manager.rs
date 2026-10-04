@@ -243,9 +243,11 @@ impl ServiceManager {
     ) -> Result<(NixServiceObservedStateV1, NixServiceOperationCapabilitiesV1), std::io::Error> {
         let unit = Self::validated_governed_unit(service)?;
         let properties = observe_service_properties(&unit)?;
-        let (state, capabilities, _enablement) =
-            Self::parse_governed_observation_with_evidence(&unit, &properties)?;
-        Ok((state, capabilities))
+        NixServiceObservedStateV1::parse_systemd_observation(&unit, &properties)
+            .map_err(|error| std::io::Error::other(format!(
+                "invalid governed systemd observation for '{}': {error}",
+                unit
+            )))
     }
 
     /// Observe lifecycle capabilities and unit-file enablement evidence
