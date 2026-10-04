@@ -254,7 +254,6 @@ impl KnowledgeSnapshotReceiptHistoryCheckpoint {
     /// Whether the checkpoint exactly matches a structurally valid receipt history.
     pub fn verify_against_history(&self, history: &[KnowledgeSnapshotReceipt]) -> bool {
         if self.schema_version != KNOWLEDGE_SNAPSHOT_RECEIPT_HISTORY_CHECKPOINT_SCHEMA
-        if self.schema_version != KNOWLEDGE_SNAPSHOT_RECEIPT_HISTORY_CHECKPOINT_SCHEMA
             || !is_hex_digest(&self.history_digest_hex)
             || self.receipt_count != history.len() as u64
             || self.latest_generation != history.last().map_or(0, |receipt| receipt.generation)
