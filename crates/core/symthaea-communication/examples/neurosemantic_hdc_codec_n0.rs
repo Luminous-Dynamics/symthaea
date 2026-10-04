@@ -1,6 +1,7 @@
 use serde_json::Value;
 use symthaea_communication::hdc_codec::{
-    quantize_continuous, HDC_CODEC_SCHEMA_VERSION, HdcBinaryFrame,
+    measure_bit_corruption, quantize_continuous, HdcBinaryFrame, HdcCodecDescriptor,
+    HDC_CODEC_SCHEMA_VERSION,
 };
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
@@ -28,10 +29,21 @@ fn main() -> Result<(), String> {
         return Err("HDC codec metrics failed validation".into());
     }
 
+    let codec_descriptor = HdcCodecDescriptor::v1();
+    if !codec_descriptor.validates() {
+        return Err("HDC codec descriptor failed validation".into());
+    }
+
+    let corruption = [0.0_f32, 0.001, 0.01, 0.05, 0.10]
+        .into_iter()
+        .map(|flip_probability| measure_bit_corruption(&continuous, flip_probability, 9001))
+        .collect::<Result<Vec<_>, _>>()?;
+
     let report = serde_json::json!({
         "benchmark": "neurosemantic-hdc-codec-n0",
         "claim_boundary": "continuous_binary_quantization_only",
         "codec_schema_version": HDC_CODEC_SCHEMA_VERSION,
+        "codec_descriptor": codec_descriptor,
         "dimension": HDC_DIMENSION,
         "seed": seed,
         "metrics": metrics,
@@ -39,6 +51,7 @@ fn main() -> Result<(), String> {
         "binary_frame_roundtrip_exact": true,
         "deterministic_repeat_exact": true,
         "semantic_decoder_invoked": false,
+        "bit_corruption_observations": corruption,
     });
 
     // Ensure the report is valid JSON before printing it.
