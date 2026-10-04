@@ -1855,10 +1855,13 @@ impl Ed25519ReceiptVerifier {
         self
     }
 
-    /// Verify structure, receipt commitment, temporal status, policy bindings,
-    /// and the detached Ed25519 proof. This does not perform issuer
-    /// authorization, credential validation, revocation/status resolution,
-    /// or substantive observation validation.
+    /// Verify the full Evidence Fabric procedure without a resolver.
+    ///
+    /// This entry point fails closed once resolver-backed verification is required:
+    /// a locally supplied key is not evidence of current method lifecycle or
+    /// proof-purpose authorization. Use verify_detached_proof() for narrow
+    /// cryptographic validation with the pinned key, or verify_with_resolver()
+    /// for the complete appraisal procedure.
     pub fn verify(
         &self,
         envelope: &ReceiptAttestationEnvelope,
@@ -2352,6 +2355,24 @@ mod tests {
         verifier.verify_with_resolver_report(envelope, receipt, &resolver)
     }
 
+    fn resolved_report(
+        verifier: &Ed25519ReceiptVerifier,
+        envelope: &ReceiptAttestationEnvelope,
+        receipt: &IndependenceVerificationReceipt,
+    ) -> ReceiptAttestationVerificationReport {
+        let method = envelope
+            .verification_method
+            .clone()
+            .expect("test envelope has a verification method");
+        let resolver = InMemoryVerificationMethodResolver::new([ResolvedVerificationMethod {
+            verification_method: method,
+            verifying_key: verifier.verifying_key.clone(),
+            status: VerificationMethodStatus::Active,
+            allowed_proof_purposes: vec![envelope.proof_purpose.clone()],
+        }]);
+        verifier.verify_with_resolver_report(envelope, receipt, &resolver)
+    }
+
     fn envelope_and_key() -> (
         ReceiptAttestationEnvelope,
         SigningKey,
@@ -2396,7 +2417,7 @@ mod tests {
         );
         envelope.challenge = Some("challenge".into());
         assert_eq!(
-            verifier.verify(&envelope, &receipt),
+            verifier.verify_detached_proof(&envelope, &receipt),
             ReceiptAttestationVerificationOutcome::InvalidSignature
         );
     }
@@ -2421,7 +2442,7 @@ mod tests {
             150,
         );
         assert_eq!(
-            verifier.verify(&envelope, &receipt),
+            verifier.verify_detached_proof(&envelope, &receipt),
             ReceiptAttestationVerificationOutcome::VerificationMethodMismatch
         );
     }
@@ -3301,12 +3322,12 @@ mod tests {
             .proof
             .as_mut()
             .expect("signed envelope proof")[0] ^= 0x01;
-        let report = Ed25519ReceiptVerifier::new(
+        let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        .verify_report(&envelope, &receipt);
+        );
+        let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
         assert!(evaluation
             .boundary
@@ -3329,8 +3350,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -3837,8 +3858,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
 
         assert!(report.execution_trace.is_well_formed());
@@ -3878,8 +3899,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let mut trace = EvaluationTrace::from_report_legacy(&report);
         trace.procedure_fingerprint = EvaluationProcedure::attestation_ed25519_v1().fingerprint();
@@ -3897,12 +3918,12 @@ mod tests {
     #[test]
     fn legacy_v3_report_canonicalization_excludes_execution_trace() {
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let mut report = Ed25519ReceiptVerifier::new(
+        let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        .verify_report(&envelope, &receipt);
+        );
+        let mut report = resolved_report(&verifier, &envelope, &receipt);
         let v4 = report.canonical_bytes();
         report.verifier_version = "symthaea-observation-attestation-report-v3";
         report.execution_trace = EvaluationTrace::default();
@@ -3915,12 +3936,12 @@ mod tests {
     #[test]
     fn legacy_v3_report_fingerprint_uses_v3_hash_domain() {
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let mut report = Ed25519ReceiptVerifier::new(
+        let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        .verify_report(&envelope, &receipt);
+        );
+        let mut report = resolved_report(&verifier, &envelope, &receipt);
         report.verifier_version = "symthaea-observation-attestation-report-v3";
         report.execution_trace = EvaluationTrace::default();
 
@@ -3940,8 +3961,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
         assert_eq!(evaluation.execution_trace, report.execution_trace);
@@ -3955,8 +3976,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -3977,8 +3998,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
 
         let base = report.to_evidence_evaluation();
@@ -4004,8 +4025,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -4026,8 +4047,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -4064,8 +4085,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -4086,8 +4107,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
 
         assert_eq!(
@@ -4103,8 +4124,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
 
         let mut attempted_rebinding = VerificationContext::from_report(&report);
@@ -4139,8 +4160,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
 
         let base = report.to_evidence_evaluation();
@@ -4226,12 +4247,12 @@ mod tests {
     #[test]
     fn current_report_cannot_adopt_legacy_procedure_semantics() {
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let mut report = Ed25519ReceiptVerifier::new(
+        let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        .verify_report(&envelope, &receipt);
+        );
+        let mut report = resolved_report(&verifier, &envelope, &receipt);
 
         report.procedure_fingerprint =
             EvaluationProcedure::attestation_ed25519_v1().fingerprint();
@@ -4257,12 +4278,12 @@ mod tests {
     #[test]
     fn verification_report_self_validation_rejects_resolution_metadata_mutation() {
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let mut report = Ed25519ReceiptVerifier::new(
+        let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        .verify_report(&envelope, &receipt);
+        );
+        let mut report = resolved_report(&verifier, &envelope, &receipt);
 
         assert!(report.is_well_formed());
         assert_eq!(report.verification_method, VerificationStage::Passed);
@@ -4274,12 +4295,12 @@ mod tests {
     #[test]
     fn verification_report_self_validation_rejects_stage_mutation() {
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let mut report = Ed25519ReceiptVerifier::new(
+        let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        .verify_report(&envelope, &receipt);
+        );
+        let mut report = resolved_report(&verifier, &envelope, &receipt);
 
         assert!(report.is_well_formed());
         report.cryptographic_proof =
@@ -4313,12 +4334,12 @@ mod tests {
     #[test]
     fn legacy_v3_ignores_unbound_current_execution_trace() {
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let mut report = Ed25519ReceiptVerifier::new(
+        let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        .verify_report(&envelope, &receipt);
+        );
+        let mut report = resolved_report(&verifier, &envelope, &receipt);
         report.verifier_version = "symthaea-observation-attestation-report-v3";
         report.procedure_fingerprint =
             EvaluationProcedure::attestation_ed25519_v1().fingerprint();
@@ -4343,12 +4364,12 @@ mod tests {
     #[test]
     fn legacy_v3_report_self_validation_uses_historical_projection() {
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let mut report = Ed25519ReceiptVerifier::new(
+        let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        .verify_report(&envelope, &receipt);
+        );
+        let mut report = resolved_report(&verifier, &envelope, &receipt);
         report.verifier_version = "symthaea-observation-attestation-report-v3";
         report.procedure_fingerprint =
             EvaluationProcedure::attestation_ed25519_v1().fingerprint();
@@ -4363,12 +4384,12 @@ mod tests {
     #[test]
     fn legacy_v3_report_can_materialize_current_evidence_evaluation() {
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let mut report = Ed25519ReceiptVerifier::new(
+        let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        .verify_report(&envelope, &receipt);
+        );
+        let mut report = resolved_report(&verifier, &envelope, &receipt);
         report.verifier_version = "symthaea-observation-attestation-report-v3";
         report.procedure_fingerprint =
             EvaluationProcedure::attestation_ed25519_v1().fingerprint();
@@ -4425,8 +4446,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let mut trace = EvaluationTrace::from_report(&report);
         trace.procedure_fingerprint = "unknown-procedure".into();
@@ -4444,8 +4465,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -4477,8 +4498,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let mut trace = EvaluationTrace::from_report(&report);
         let original = trace.fingerprint();
@@ -4494,8 +4515,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let first = report.to_evidence_evaluation();
         let mut second = first.clone();
@@ -4512,8 +4533,8 @@ mod tests {
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        ;
+        );
+        
         let report = resolved_report(&verifier, &envelope, &receipt);
         let mut evaluation = report.to_evidence_evaluation();
         assert!(evaluation.is_consistent_with_report(&report));
@@ -4588,12 +4609,12 @@ mod tests {
     #[test]
     fn execution_trace_rejects_contradictory_report_stage_projection() {
         let (envelope, signing_key, receipt) = envelope_and_key();
-        let mut report = Ed25519ReceiptVerifier::new(
+        let verifier = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
             150,
-        )
-        .verify_report(&envelope, &receipt);
+        );
+        let mut report = resolved_report(&verifier, &envelope, &receipt);
         assert!(report.execution_trace.matches_report(&report));
         report.structural_validation =
             VerificationStage::Failed(ReceiptAttestationVerificationOutcome::InvalidEnvelope);
