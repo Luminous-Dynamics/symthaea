@@ -1313,6 +1313,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn conservation_law_rejects_overflowed_public_values() {
+        let rank_overflow = LinearCodeAlgebra {
+            factor_dimension_sum: 0,
+            union_generator_rank: usize::MAX,
+            kernel_dimension: 1,
+            raw_factor_tuple_count: ExactPowerOfTwo::new(0),
+            reachable_target_count: ExactPowerOfTwo::new(0),
+            factorization_count_per_target: ExactPowerOfTwo::new(0),
+            unique_factorization: false,
+            dependency_order: None,
+        };
+        assert!(!rank_overflow.satisfies_conservation_law());
+
+        let exponent_overflow = LinearCodeAlgebra {
+            factor_dimension_sum: 0,
+            union_generator_rank: 0,
+            kernel_dimension: 0,
+            raw_factor_tuple_count: ExactPowerOfTwo::new(0),
+            reachable_target_count: ExactPowerOfTwo::new(usize::MAX),
+            factorization_count_per_target: ExactPowerOfTwo::new(1),
+            unique_factorization: true,
+            dependency_order: None,
+        };
+        assert!(!exponent_overflow.satisfies_conservation_law());
+    }
+
+    #[test]
     fn affine_fiber_certificate_tracks_representative_kernel_and_cardinality() {
         let code = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b001])])
             .expect("code");
