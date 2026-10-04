@@ -180,7 +180,7 @@ pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
 /// Recognized prototype state properties:
 ///
 /// * `nixos.rebuild`: "switch", "test", "boot", or "dry-activate"
-/// * `nixos.home-manager`: boolean
+/// * `nixos.home-manager`: currently rejected until an exact user-profile resource is bound
 /// * `applications.install`: currently rejected until an exact user-profile resource is bound
 /// * `applications.remove`: currently rejected until an exact user-profile resource is bound
 /// * `system.reboot`: boolean
