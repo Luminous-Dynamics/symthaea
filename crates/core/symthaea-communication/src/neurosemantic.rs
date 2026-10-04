@@ -97,6 +97,15 @@ impl Default for NeurosemanticDataPolicy {
 }
 
 impl NeurosemanticDataPolicy {
+    pub fn transportable(&self) -> bool {
+        matches!(
+            self.data_class,
+            NeurosemanticDataClass::DerivedNeuralFeature
+                | NeurosemanticDataClass::SemanticRepresentation
+                | NeurosemanticDataClass::DecodedClaim
+        )
+    }
+
     pub fn validates(&self) -> bool {
         self.schema_version == NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION
             && self.data_class != NeurosemanticDataClass::Unknown
@@ -298,8 +307,8 @@ impl NeurosemanticPacket {
         confidence: f32,
         payload: NeurosemanticPayload,
     ) -> Result<Self, String> {
-        if !data_policy.validates() {
-            return Err("neurosemantic data policy is invalid or deny-by-default".into());
+        if !data_policy.validates() || !data_policy.transportable() {
+            return Err("neurosemantic data policy is invalid or not transportable in protocol v1".into());
         }
         let mut packet = Self::new(
             sequence,
@@ -394,6 +403,9 @@ impl AuthorizedNeurosemanticMessage {
             return Err("packet endpoints do not match the consent direction".into());
         }
 
+        if !self.packet.data_policy.transportable() {
+            return Err("packet data class is not transportable in neurosemantic protocol v1".into());
+        }
         if !self.packet.data_policy.allows_purpose(self.packet.purpose) {
             return Err("packet data policy does not permit the requested purpose".into());
         }
@@ -569,6 +581,16 @@ mod tests {
             consent_epoch: 7,
             revoked: false,
         }
+    }
+
+    #[test]
+    fn v1_transport_rejects_raw_and_personalized_data_classes() {
+        let mut policy = semantic_policy();
+        policy.data_class = NeurosemanticDataClass::RawNeuralRecording;
+        assert!(!policy.transportable());
+        let mut policy = semantic_policy();
+        policy.data_class = NeurosemanticDataClass::PersonalizedDecoderModel;
+        assert!(!policy.transportable());
     }
 
     #[test]
