@@ -57,7 +57,7 @@ pub struct FunctionalGraphRealizationReport {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UnexpectedConnectivity {
+pub struct UnexpectedFlowConnectivity {
     pub from: PortId,
     pub to: PortId,
     pub component: usize,
@@ -117,8 +117,8 @@ impl FunctionalGraphRealizationReport {
                 disconnected_paths: 0,
                 invalid_paths: 0,
                 path_results: Vec::new(),
-                unexpected_connectivity: Self::find_unexpected_connectivity(
-                    graph, embedding, candidate,
+                unexpected_flow_connectivity: Self::find_unexpected_flow_connectivity(
+                    graph, embedding, candidate, boundary_policy,
                 ),
                 physical_transport_unproven: true,
             };
@@ -155,10 +155,11 @@ impl FunctionalGraphRealizationReport {
         }
 
         let declared_flow_paths = path_results.len();
-        let unexpected_connectivity =
-            Self::find_unexpected_connectivity(graph, embedding, candidate);
+        let unexpected_flow_connectivity = Self::find_unexpected_flow_connectivity(
+            graph, embedding, candidate, boundary_policy,
+        );
         let status = if connected_paths == declared_flow_paths {
-            if unexpected_connectivity.is_empty() {
+            if unexpected_flow_connectivity.is_empty() {
                 GraphRealizationStatus::AllDeclaredPathsConnected
             } else {
                 GraphRealizationStatus::TopologyDivergence
@@ -176,16 +177,17 @@ impl FunctionalGraphRealizationReport {
             disconnected_paths,
             invalid_paths,
             path_results,
-            unexpected_connectivity,
+            unexpected_flow_connectivity,
             physical_transport_unproven: true,
         }
     }
 
-    fn find_unexpected_connectivity(
+    fn find_unexpected_flow_connectivity(
         graph: &FunctionalVoidGraph,
         embedding: &GeometryEmbedding,
         candidate: &TriangleMesh,
-    ) -> Vec<UnexpectedConnectivity> {
+        boundary_policy: Option<&PortBoundaryPolicy>,
+    ) -> Vec<UnexpectedFlowConnectivity> {
         let report = symthaea_fabrication_kernel::validate::validate_mesh(candidate);
         if !report.is_valid() {
             return Vec::new();
@@ -219,7 +221,7 @@ impl FunctionalGraphRealizationReport {
                 let declared_reverse =
                     graph.declares_path(*to, *from, VoidRelation::FlowPath);
                 if !declared_forward && !declared_reverse {
-                    unexpected.push(UnexpectedConnectivity {
+                    unexpected.push(UnexpectedFlowConnectivity {
                         from: *from,
                         to: *to,
                         component: *from_component,
@@ -231,7 +233,7 @@ impl FunctionalGraphRealizationReport {
     }
 
     pub fn has_topology_leakage(&self) -> bool {
-        !self.unexpected_connectivity.is_empty()
+        !self.unexpected_flow_connectivity.is_empty()
     }
 
     pub fn is_geometrically_complete(&self) -> bool {
