@@ -210,6 +210,9 @@ impl NativeReplayDerivation {
 pub struct ExecutionReceipt {
     pub action_id: String,
     pub authorization_instance: String,
+    /// Logical operation identity frozen when this lease enters a boundary-owned attempt.
+    /// This remains separate from the native replay identity and provider idempotency key.
+    pub operation_id: Option<String>,
     pub action_digest: String,
     /// Stable downstream replay identity for the exact authorized action.
     ///
@@ -236,6 +239,8 @@ pub enum AuthorizationConsumptionError {
     AuthorizationValidityWindowFailed,
     /// Required provider/native status evidence could not be authenticated or was not fresh.
     ProviderStatusVerificationRequired,
+    /// Terminal provider evidence or its relying-party verifier configuration could not be authenticated.
+    ProviderEvidenceVerificationRequired,
     InvalidNativeReplayProvenance,
     IndeterminateRequiresReconciliation,
     PreDispatchRecoveryNotAllowed,
