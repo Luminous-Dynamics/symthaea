@@ -451,19 +451,19 @@ impl HdcSemanticCodebook {
         let unrelated_node_max_similarity = self
             .nodes
             .keys()
-            .map(|key| full_cosine_similarity(&node_bundle, &self.node_vector(key).unwrap()))
+            .map(|key| full_cosine_similarity(&unrelated, &self.node_vector(key).unwrap()))
             .fold(f64::NEG_INFINITY, f64::max);
-        let unrelated_node_query_similarity =
-            full_cosine_similarity(&unrelated, &node_bundle);
 
-        let unrelated_edge_max_similarity = expected
-            .edges
+        let expected_node_keys = canonical_node_atoms(expected)?.keys().cloned().collect::<Vec<_>>();
+        let unrelated_edge_max_similarity = expected_node_keys
             .iter()
-            .map(|edge| {
-                let source_key = node_key_for_id(expected, &edge.source)?;
-                let target_key = node_key_for_id(expected, &edge.target)?;
-                let candidate = self.edge_vector(source_key, &edge.relation, target_key)?;
-                Ok(full_cosine_similarity(&unrelated, &candidate))
+            .flat_map(|source| {
+                expected_node_keys.iter().flat_map(move |target| {
+                    self.relations.keys().map(move |relation| {
+                        self.edge_vector(source, relation, target)
+                            .map(|candidate| full_cosine_similarity(&unrelated, &candidate))
+                    })
+                })
             })
             .collect::<Result<Vec<_>, String>>()?
             .into_iter()
@@ -478,7 +478,6 @@ impl HdcSemanticCodebook {
         let true_edge = self.edge_vector(source_key, &first_edge.relation, target_key)?;
         let swapped_edge = self.edge_vector(target_key, &first_edge.relation, source_key)?;
 
-        let _ = unrelated_node_max_similarity;
         let controls = HdcSemanticNegativeControls {
             schema_version: HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
             unrelated_node_max_similarity: unrelated_node_query_similarity,
@@ -682,14 +681,20 @@ fn validate_graph_shape(graph: &GroundedConceptGraph) -> Result<(), String> {
     Ok(())
 }
 
+fn node_key(node: &ConceptNode) -> String {
+    let mut grounded_by = node.grounded_by.clone();
+    grounded_by.sort();
+    format!("{}|{}", kind_tag(&node.kind), grounded_by.join(","))
+}
+
 fn canonical_node_atoms(
     graph: &GroundedConceptGraph,
 ) -> Result<BTreeMap<String, (ConceptKind, Vec<String>)>, String> {
     let mut result = BTreeMap::new();
     for node in &graph.nodes {
+        let key = node_key(node);
         let mut grounded_by = node.grounded_by.clone();
         grounded_by.sort();
-        let key = format!("{}|{}", kind_tag(&node.kind), grounded_by.join(","));
         if result
             .insert(key.clone(), (node.kind.clone(), grounded_by))
             .is_some()
@@ -707,10 +712,7 @@ fn canonical_edge_atoms(
     for node in &graph.nodes {
         let mut grounded_by = node.grounded_by.clone();
         grounded_by.sort();
-        node_keys.insert(
-            node.id.clone(),
-            format!("{}|{}", kind_tag(&node.kind), grounded_by.join(",")),
-        );
+        node_keys.insert(node.id.clone(), node_key(node));
     }
 
     let mut edges = Vec::with_capacity(graph.edges.len());
@@ -732,32 +734,15 @@ fn canonical_edge_atoms(
     Ok(edges)
 }
 
-fn node_key_for_id<'a>(
-    graph: &'a GroundedConceptGraph,
+fn node_key_for_id(
+    graph: &GroundedConceptGraph,
     id: &str,
-) -> Result<&'a str, String> {
+) -> Result<String, String> {
     graph
         .nodes
         .iter()
         .find(|node| node.id == id)
-        .map(|node| {
-            // This temporary string is not returned; the helper is only used
-            // by negative controls, so use the node's identity-derived key
-            // through the standalone lookup below.
-            let _ = id;
-            Box::leak(
-                format!(
-                    "{}|{}",
-                    kind_tag(&node.kind),
-                    {
-                        let mut values = node.grounded_by.clone();
-                        values.sort();
-                        values.join(",")
-                    }
-                )
-                .into_boxed_str(),
-            )
-        })
+        .map(node_key)
         .ok_or_else(|| format!("node identifier not found: {id}"))
 }
 
