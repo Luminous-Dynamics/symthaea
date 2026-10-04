@@ -776,6 +776,7 @@ impl Rfc9942ReceiptEnvelope {
                 }
                 _=>{
                     protected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
+                    value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                 }
             }
             value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
@@ -808,6 +809,7 @@ impl Rfc9942ReceiptEnvelope {
                 vdp=Some(parsed);
             }else{
                 unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
+                value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             }
         }
         if unprotected_labels.iter().any(|label| protected_labels.contains(label)) {
@@ -1231,6 +1233,7 @@ impl Rfc9942SignatureWithReceipts {
                 protected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
             } else {
                 protected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
+                value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             }
             value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         }
@@ -1270,6 +1273,7 @@ impl Rfc9942SignatureWithReceipts {
                 unprotected_receipts=Some(Rfc9942ReceiptCollection::from_reader(&mut value_reader)?);
             } else {
                 unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
+                value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             }
             value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         }
