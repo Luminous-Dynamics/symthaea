@@ -713,6 +713,9 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
 
+      - name: Verify TSS 2.0 linker prerequisites
+        run: nix develop .#inoculation --command bash tests/tpm2-tss-linkage-smoke.sh
+
       - name: Exercise TPM2 emulator boundary
         run: nix develop .#inoculation --command bash tests/tpm2-spore-boundary-smoke.sh
 
