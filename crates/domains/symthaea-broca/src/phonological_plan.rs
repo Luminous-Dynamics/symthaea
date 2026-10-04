@@ -210,6 +210,17 @@ impl PhonologicalPlan {
         if !self.pause_weight.is_finite() || !(0.0..=1.0).contains(&self.pause_weight) {
             return Err(PhonologicalPlanError::InvalidPauseWeight);
         }
+        let focused_segments = self.segments.iter().filter(|segment| segment.is_focus).count();
+        match self.focus_role.as_deref() {
+            Some(_) if focused_segments == 0 => {
+                return Err(PhonologicalPlanError::FocusRoleWithoutSegments)
+            }
+            None if focused_segments != 0 => {
+                return Err(PhonologicalPlanError::FocusSegmentsWithoutRole)
+            }
+            _ => {}
+        }
+
         validate_binding_status(&self.segments, self.content_binding)?;
 
         match self.content_binding {
@@ -285,6 +296,8 @@ pub enum PhonologicalPlanError {
     EmptySourceIntent,
     InvalidRate,
     InvalidPauseWeight,
+    FocusRoleWithoutSegments,
+    FocusSegmentsWithoutRole,
     EmptySegmentSymbol { index: usize },
     NonContiguousSyllableIndex { expected: usize, found: usize },
     LexicalBindingWithoutSegments,
@@ -303,6 +316,8 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::EmptySourceIntent => write!(f, "phonological plan source intent must be non-empty"),
             Self::InvalidRate => write!(f, "phonological plan rate is outside the supported range"),
             Self::InvalidPauseWeight => write!(f, "phonological plan pause weight is outside [0, 1]"),
+            Self::FocusRoleWithoutSegments => write!(f, "a focus role requires focused phonemes"),
+            Self::FocusSegmentsWithoutRole => write!(f, "focused phonemes require a focus role"),
             Self::EmptySegmentSymbol { index } => {
                 write!(f, "phoneme slot {index} has an empty symbol")
             }
@@ -604,6 +619,19 @@ mod tests {
 
         assert_eq!(error, PhonologicalPlanError::RoleOnlyWithSegments);
         assert!(!plan.ready_for_realization());
+    }
+
+    #[test]
+    fn focus_state_must_match_the_plan() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.bind_segments(
+            vec![PhonemeSlot::new("AE", 0, SyllableStress::Primary, true, true, true)],
+            ContentBindingStatus::PhonologicallyBound,
+        ).unwrap();
+        assert_eq!(
+            plan.validate().expect_err("focus without target"),
+            PhonologicalPlanError::FocusSegmentsWithoutRole
+        );
     }
 
     #[test]
