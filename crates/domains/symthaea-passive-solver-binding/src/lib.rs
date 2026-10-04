@@ -61,6 +61,10 @@ impl RealizedBoundaryIdentity {
         })
     }
 
+    pub fn evidence_level(&self) -> SolverBoundaryEvidenceLevel {
+        self.evidence_level
+    }
+
     pub fn candidate_geometry_digest(&self) -> [u8; 32] {
         self.candidate_geometry_digest
     }
@@ -105,11 +109,12 @@ pub struct SolverBoundaryBinding {
     pub realized_boundary: RealizedBoundaryIdentity,
     pub solver_binding_verified: bool,
     pub physical_transport_unproven: bool,
+    evidence_level: SolverBoundaryEvidenceLevel,
 }
 
 impl SolverBoundaryBinding {
     /// Construct a verified binding from an actual candidate mesh.
-    pub fn verified(
+    fn verified(
         interface: &PortInterface,
         adapter_id: impl Into<String>,
         external_boundary_handle: impl Into<String>,
@@ -149,6 +154,7 @@ impl SolverBoundaryBinding {
             realized_boundary,
             solver_binding_verified: true,
             physical_transport_unproven: true,
+            evidence_level: SolverBoundaryEvidenceLevel::AdapterAttested,
         })
     }
 
@@ -220,6 +226,9 @@ impl SolverBoundaryBinding {
         );
         hasher.update(&[u8::from(self.solver_binding_verified)]);
         hasher.update(&[u8::from(self.physical_transport_unproven)]);
+        hasher.update(&[match self.evidence_level {
+            SolverBoundaryEvidenceLevel::AdapterAttested => 0,
+        }]);
         *hasher.finalize().as_bytes()
     }
 }
@@ -258,13 +267,45 @@ pub fn digest_triangle_mesh(mesh: &TriangleMesh) -> [u8; 32] {
     *hasher.finalize().as_bytes()
 }
 
+/// Draft returned by a solver adapter before Symthaea stamps adapter-attested evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SolverBoundaryBindingDraft {
+    pub external_boundary_handle: String,
+    pub boundary_patch: BoundaryPatchSelection,
+}
+
+impl SolverBoundaryBindingDraft {
+    pub fn new(
+        external_boundary_handle: impl Into<String>,
+        boundary_patch: BoundaryPatchSelection,
+    ) -> Result<Self, SolverBindingError> {
+        let external_boundary_handle = external_boundary_handle.into();
+        if external_boundary_handle.trim().is_empty() {
+            return Err(SolverBindingError::EmptyExternalBoundaryHandle);
+        }
+        Ok(Self {
+            external_boundary_handle,
+            boundary_patch,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SolverBoundaryEvidenceLevel {
+    AdapterAttested,
+}
+
+impl SolverBoundaryEvidenceLevel {
+    pub fn is_verified(self) -> bool {
+        matches!(self, Self::AdapterAttested)
+    }
+}
+
 /// Contract implemented by concrete solver adapters.
 ///
-/// The adapter must inspect the actual candidate mesh, resolve the typed
-/// interface to solver-specific boundary entities, convert that actual selection
-/// into BoundaryEdgeKey values, and construct the binding through the checked
-/// constructor. The constructor independently re-validates completeness,
-/// interface geometry, and exact mesh identity.
+/// Adapters return a draft. The public `bind_with_adapter` orchestration path
+/// performs the checked candidate/interface construction and is the only path
+/// that stamps adapter-attested verification into a binding.
 pub trait SolverBoundaryBindingAdapter {
     fn adapter_id(&self) -> &str;
 
@@ -273,7 +314,27 @@ pub trait SolverBoundaryBindingAdapter {
         interface: &PortInterface,
         candidate: &TriangleMesh,
         candidate_geometry_digest: [u8; 32],
-    ) -> Result<SolverBoundaryBinding, SolverBindingError>;
+    ) -> Result<SolverBoundaryBindingDraft, SolverBindingError>;
+}
+
+/// Public orchestration path that seals verified binding construction.
+pub fn bind_with_adapter<A: SolverBoundaryBindingAdapter>(
+    adapter: &A,
+    interface: &PortInterface,
+    candidate: &TriangleMesh,
+    candidate_geometry_digest: [u8; 32],
+    tolerance_mm: f64,
+) -> Result<SolverBoundaryBinding, SolverBindingError> {
+    let draft = adapter.bind(interface, candidate, candidate_geometry_digest)?;
+    SolverBoundaryBinding::verified(
+        interface,
+        adapter.adapter_id(),
+        draft.external_boundary_handle,
+        candidate_geometry_digest,
+        candidate,
+        draft.boundary_patch,
+        tolerance_mm,
+    )
 }
 
 /// Deterministic registry-level validation for a complete set of bindings.
@@ -319,6 +380,9 @@ pub fn validate_binding_set(
             return Err(SolverBindingError::UnverifiedBinding);
         }
         if !binding.physical_transport_unproven {
+            return Err(SolverBindingError::InvalidEvidenceState);
+        }
+        if !binding.evidence_level.is_verified() {
             return Err(SolverBindingError::InvalidEvidenceState);
         }
         if let Some(expected) = candidate_geometry_digest {
@@ -908,17 +972,29 @@ mod tests {
             interface: &PortInterface,
             candidate: &TriangleMesh,
             candidate_geometry_digest: [u8; 32],
-        ) -> Result<SolverBoundaryBinding, SolverBindingError> {
-            SolverBoundaryBinding::verified(
-                interface,
-                self.adapter_id(),
+        ) -> Result<SolverBoundaryBindingDraft, SolverBindingError> {
+            SolverBoundaryBindingDraft::new(
                 "fixture:boundary-7",
-                candidate_geometry_digest,
-                candidate,
-                select_boundary_patch(interface, candidate, 0.05),
-                0.05,
+                select_boundary_patch(interface, candidate, 0.05).unwrap(),
             )
         }
+    }
+
+    #[test]
+    fn adapter_orchestration_stamps_verified_evidence() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let binding = bind_with_adapter(
+            &FixtureAdapter,
+            &interface,
+            &candidate,
+            [7; 32],
+            0.05,
+        )
+        .unwrap();
+
+        assert_eq!(binding.evidence_level(), SolverBoundaryEvidenceLevel::AdapterAttested);
+        assert!(binding.solver_binding_verified);
     }
 
     #[test]
@@ -947,7 +1023,7 @@ mod tests {
             "patch:inlet",
             [3; 32],
             &candidate,
-            select_boundary_patch(&interface, &candidate, 0.05),
+            select_boundary_patch(&interface, &candidate, 0.05).unwrap(),
             0.05,
         )
         .unwrap();
@@ -1042,7 +1118,7 @@ mod tests {
             "patch:inlet",
             [3; 32],
             &candidate,
-            select_boundary_patch(&interface, &candidate, 0.05),
+            select_boundary_patch(&interface, &candidate, 0.05).unwrap(),
             0.05,
         )
         .unwrap();
@@ -1071,7 +1147,7 @@ mod tests {
             "patch:inlet",
             [3; 32],
             &candidate,
-            select_boundary_patch(&interface, &candidate, 0.05),
+            select_boundary_patch(&interface, &candidate, 0.05).unwrap(),
             0.05,
         )
         .unwrap();
@@ -1092,7 +1168,7 @@ mod tests {
             "patch:inlet",
             [3; 32],
             &candidate,
-            select_boundary_patch(&interface, &candidate, 0.05),
+            select_boundary_patch(&interface, &candidate, 0.05).unwrap(),
             0.05,
         )
         .unwrap();
@@ -1116,7 +1192,7 @@ mod tests {
                 "patch:shared",
                 [3; 32],
                 &candidate,
-                select_boundary_patch(&interface, &candidate, 0.05),
+                select_boundary_patch(&interface, &candidate, 0.05).unwrap(),
             0.05,
             )
             .unwrap(),
