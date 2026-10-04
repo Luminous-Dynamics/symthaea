@@ -127,7 +127,7 @@ tpm2_verifysignature -Q -c "$ROOT/ak-after-restart.ctx" -g sha256 -m "$ROOT/nv.a
 tpm2_nvundefine -Q -C o "$NV_INDEX"
 
 echo 'TPM2 Spore boundary smoke test: PASS'
-echo "challenge=$CHALLENGE"
+echo "initial_challenge_sha256=$CHALLENGE_DIGEST"
 echo "nv_index=$NV_INDEX"
 echo 'counter_generation=2'
 echo 'counter_persisted_across_tpm_restart=true'
