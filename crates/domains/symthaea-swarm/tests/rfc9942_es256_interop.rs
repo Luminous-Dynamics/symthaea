@@ -185,6 +185,31 @@ fn rfc8392_es256_accepts_nonminimal_message_bstr_lengths() {
 }
 
 #[test]
+fn rfc8392_es256_accepts_indefinite_payload_bstr() {
+    // CBOR permits indefinite-length byte strings. The decoded payload value
+    // remains the same byte string used by COSE Sig_structure construction.
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(&RFC8392_SIGNED_CWT[..27]);
+    encoded.push(0x5f);
+    for chunk in RFC8392_SIGNED_CWT[29..109].chunks(16) {
+        encoded.push(0x50);
+        encoded.extend_from_slice(chunk);
+    }
+    encoded.push(0xff);
+    encoded.extend_from_slice(&RFC8392_SIGNED_CWT[109..]);
+
+    let message = Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+        .expect("indefinite payload bstr must be accepted");
+    assert_eq!(
+        message.payload(),
+        &Rfc9942SignaturePayload::Attached(RFC8392_SIGNED_CWT[29..109].to_vec())
+    );
+    message
+        .verify_es256(&sec1_public_key(), &[], None)
+        .expect("byte-string chunking must not alter the authenticated payload");
+}
+
+#[test]
 fn rfc8392_es256_known_answer_rejects_external_payload_for_attached_content() {
     const PAYLOAD_START: usize = 29;
     const PAYLOAD_END: usize = 109;
