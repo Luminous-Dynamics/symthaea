@@ -110,6 +110,9 @@ impl ServiceManager {
     }
 
     /// Generate a command to start a service.
+    #[deprecated(
+        note = "compatibility-only legacy Custom command; use NixServiceOperationV1 + typed_command for governed semantics"
+    )]
     pub fn start(service: &str) -> NixOSCommand {
         NixOSCommand::Custom {
             command: "systemctl".to_string(),
@@ -119,6 +122,9 @@ impl ServiceManager {
     }
 
     /// Generate a command to stop a service.
+    #[deprecated(
+        note = "compatibility-only legacy Custom command; use NixServiceOperationV1 + typed_command for governed semantics"
+    )]
     pub fn stop(service: &str) -> NixOSCommand {
         NixOSCommand::Custom {
             command: "systemctl".to_string(),
@@ -128,6 +134,9 @@ impl ServiceManager {
     }
 
     /// Generate a command to restart a service.
+    #[deprecated(
+        note = "compatibility-only legacy Custom command; use NixServiceOperationV1 + typed_command for governed semantics"
+    )]
     pub fn restart(service: &str) -> NixOSCommand {
         NixOSCommand::Custom {
             command: "systemctl".to_string(),
@@ -137,6 +146,9 @@ impl ServiceManager {
     }
 
     /// Generate a command to reload a service (without full restart).
+    #[deprecated(
+        note = "compatibility-only legacy Custom command; use NixServiceOperationV1 + typed_command for governed semantics"
+    )]
     pub fn reload(service: &str) -> NixOSCommand {
         NixOSCommand::Custom {
             command: "systemctl".to_string(),
@@ -149,6 +161,9 @@ impl ServiceManager {
     ///
     /// Note: on NixOS this is typically done declaratively. This is for
     /// imperative service management or user services.
+    #[deprecated(
+        note = "compatibility-only legacy Custom command; use NixServiceOperationV1 + typed_command for governed semantics"
+    )]
     pub fn enable(service: &str) -> NixOSCommand {
         NixOSCommand::Custom {
             command: "systemctl".to_string(),
@@ -158,6 +173,9 @@ impl ServiceManager {
     }
 
     /// Generate a command to disable a service.
+    #[deprecated(
+        note = "compatibility-only legacy Custom command; use NixServiceOperationV1 + typed_command for governed semantics"
+    )]
     pub fn disable(service: &str) -> NixOSCommand {
         NixOSCommand::Custom {
             command: "systemctl".to_string(),
@@ -641,5 +659,28 @@ mod tests {
         };
         assert!(!status.active);
         assert!(!status.enabled);
+    }
+
+    #[test]
+    fn serialized_legacy_service_command_cannot_reenter_v1_authority() {
+        use super::super::authorization::{NixActionIntentV1, NixAuthorizationErrorV1};
+
+        let legacy = NixOSCommand::Custom {
+            command: "systemctl".to_string(),
+            args: vec!["restart".to_string(), "nginx.service".to_string()],
+            safety_level: SafetyLevel::SystemModify,
+        };
+        let encoded = serde_json::to_string(&legacy).unwrap();
+        let replayed: NixOSCommand = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(
+            NixActionIntentV1::from_command(
+                "host:x",
+                Some("generation:42".to_string()),
+                &replayed,
+            )
+            .unwrap_err(),
+            NixAuthorizationErrorV1::UnsupportedCustomCommand
+        );
     }
 }
