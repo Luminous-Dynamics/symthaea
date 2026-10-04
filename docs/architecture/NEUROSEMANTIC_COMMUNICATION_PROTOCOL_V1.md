@@ -223,3 +223,18 @@ The N0 graph has two distinct hashes:
 - the ordinary graph hash, which is serialization/content addressing;
 - the structural hash, which is canonicalized across collection order and transport-local
   identifiers while excluding confidence, because confidence is reported separately.
+## Opt-in HDC codec
+
+The communication crate exposes an opt-in `hdc-codec` feature that reuses Symthaea's
+existing `ContinuousHV` and `BinaryHV` types. The codec performs:
+
+`ContinuousHV -> sign quantization -> BinaryHV -> ContinuousHV`
+
+The N0 lab reports full-dimension cosine similarity and sign disagreement. The cosine
+calculation is implemented locally rather than using the global cognitive-stride-aware
+HDC similarity helper, making the evidence independent of ambient stride configuration.
+The compact binary representation is 2,048 bytes for 16,384 dimensions versus 65,536 bytes
+for f32 continuous storage, a 32x storage reduction before protocol framing.
+
+The codec does not invoke the current semantic decoder and does not claim semantic
+reversibility. Quantization loss is an explicit measured boundary for later adapter work.
