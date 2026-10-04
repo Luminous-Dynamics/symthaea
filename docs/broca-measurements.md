@@ -122,3 +122,22 @@ intent provenance reaches the phonological layer unchanged.
 
 This is structural evidence only. It does not claim lexical adequacy, grammatical naturalness,
 or speech quality when the upstream state does not actually contain those things.
+
+
+## Controlled prosody attribution harness
+
+PR #6794 adds a deterministic attribution artifact, `attribution-harness.json`, to the same measurement flow. It evaluates:
+
+    neutral
+    vocal-tract-only
+    broca-only
+    composed
+    composed-feedback
+
+Each condition is captured twice from the same genesis seed. The report includes frame-level F0/energy/formant proxies, total-variation stability, feedback-controller telemetry, the exact SpeechPlan grounding surface, and explicit flags showing that the current pipeline records rather than applies the Broca rate target.
+
+The attribution harness is deliberately not a human-naturalness benchmark. It avoids inventing an absolute acoustic normalization where the current contracts do not provide one, and it keeps semantic-delivery evidence in `SpeechDeliveryReceipt` rather than inferring semantics from acoustic frame statistics.
+
+Feedback-enabled runs use a fixed synthetic `VocalTractObservation`. They therefore measure controller coupling and deterministic response, not real auditory self-hearing.
+
+The five-condition design is intended to support mechanism attribution before optimization: changes can be compared against neutral, isolated to the existing vocal-tract prosody path, isolated to Broca, evaluated under explicit composition, and then compared with feedback enabled.
