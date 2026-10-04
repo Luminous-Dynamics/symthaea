@@ -1,0 +1,196 @@
+use serde_json::Value;
+use symthaea_communication::hdc_interlingua::{
+    HdcSemanticCodebook, HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
+};
+use symthaea_communication::{
+    reorder_collections, ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph,
+};
+use std::collections::BTreeMap;
+
+fn node(id: &str, kind: ConceptKind, grounding: &str, confidence: f32) -> ConceptNode {
+    ConceptNode {
+        id: id.into(),
+        kind,
+        label: Some(id.into()),
+        grounded_by: vec![grounding.into()],
+        confidence,
+    }
+}
+
+fn edge(source: &str, relation: &str, target: &str) -> ConceptEdge {
+    ConceptEdge {
+        source: source.into(),
+        relation: relation.into(),
+        target: target.into(),
+        evidence_ids: Vec::new(),
+        confidence: 0.9,
+    }
+}
+
+fn graph(
+    agent_id: &str,
+    agent_kind: ConceptKind,
+    agent_grounding: &str,
+    event_id: &str,
+    event_grounding: &str,
+    relation_a: &str,
+    relation_b: &str,
+) -> GroundedConceptGraph {
+    GroundedConceptGraph {
+        nodes: vec![
+            node(agent_id, agent_kind, agent_grounding, 0.95),
+            node(event_id, ConceptKind::Event, event_grounding, 0.91),
+            node("object-1", ConceptKind::Object, "obs-object-1", 0.89),
+        ],
+        edges: vec![
+            edge(agent_id, relation_a, event_id),
+            edge(event_id, relation_b, "object-1"),
+        ],
+    }
+}
+
+fn training_graphs() -> Vec<GroundedConceptGraph> {
+    vec![
+        graph(
+            "agent-1",
+            ConceptKind::Agent,
+            "obs-agent-1",
+            "event-1",
+            "obs-event-1",
+            "initiates",
+            "targets",
+        ),
+        GroundedConceptGraph {
+            nodes: vec![
+                node("agent-2", ConceptKind::Agent, "obs-agent-2", 0.94),
+                node("object-1", ConceptKind::Object, "obs-object-1", 0.88),
+            ],
+            edges: vec![edge("agent-2", "observes", "object-1")],
+        },
+        graph(
+            "agent-2",
+            ConceptKind::Agent,
+            "obs-agent-2",
+            "event-2",
+            "obs-event-2",
+            "initiates",
+            "uses",
+        ),
+        graph(
+            "agent-1",
+            ConceptKind::Agent,
+            "obs-agent-1",
+            "event-2",
+            "obs-event-2",
+            "observes",
+            "uses",
+        ),
+    ]
+}
+
+fn held_out_graphs() -> Vec<GroundedConceptGraph> {
+    vec![
+        graph(
+            "agent-2",
+            ConceptKind::Agent,
+            "obs-agent-2",
+            "event-1",
+            "obs-event-1",
+            "initiates",
+            "targets",
+        ),
+        graph(
+            "agent-1",
+            ConceptKind::Agent,
+            "obs-agent-1",
+            "event-2",
+            "obs-event-2",
+            "initiates",
+            "uses",
+        ),
+    ]
+}
+
+fn main() -> Result<(), String> {
+    let training = training_graphs();
+    let held_out = held_out_graphs();
+    let seed = 0x4E53_4D48_4443_5343_u64;
+    let codebook = HdcSemanticCodebook::from_training_graphs(seed, &training)?;
+    let codebook_hash = codebook.codebook_hash();
+
+    let mut cases = Vec::with_capacity(held_out.len());
+    for (index, expected) in held_out.iter().enumerate() {
+        let representation = codebook.encode_graph(expected)?;
+        let metrics = codebook.measure_roundtrip(expected, &representation)?;
+
+        if !metrics.structural_equivalence
+            || metrics.node_precision != 1.0
+            || metrics.node_recall != 1.0
+            || metrics.edge_precision != 1.0
+            || metrics.edge_recall != 1.0
+            || metrics.codebook_hash != codebook_hash
+        {
+            return Err(format!("held-out HDC retrieval failed for case {}", index + 1));
+        }
+
+        cases.push(serde_json::json!({
+            "case_id": format!("held-out-{}", index + 1),
+            "held_out": true,
+            "codebook_hash": codebook_hash,
+            "metrics": metrics,
+        }));
+    }
+
+    let reorder_a = codebook.encode_graph(&held_out[0])?;
+    let reorder_b = codebook.encode_graph(&reorder_collections(&held_out[0]))?;
+    let reordered_representation_exact =
+        reorder_a.node_frame == reorder_b.node_frame && reorder_a.edge_frame == reorder_b.edge_frame;
+
+    let negative_controls =
+        codebook.measure_negative_controls(&reorder_a, &held_out[0], 9_001)?;
+    if negative_controls.unrelated_node_max_similarity.abs() > 0.20
+        || negative_controls.unrelated_edge_max_similarity.abs() > 0.20
+        || negative_controls.true_edge_similarity <= negative_controls.swapped_edge_similarity
+    {
+        return Err("HDC negative controls failed".into());
+    }
+
+    let wrong_codebook = HdcSemanticCodebook::from_training_graphs(seed.wrapping_add(1), &training)?;
+    let wrong_codebook_rejected = wrong_codebook.decode_graph(&reorder_a).is_err();
+    if !wrong_codebook_rejected {
+        return Err("mismatched HDC codebook was not rejected".into());
+    }
+
+    let mut summary = BTreeMap::new();
+    summary.insert("training_graphs", training.len() as u32);
+    summary.insert("held_out_graphs", held_out.len() as u32);
+    summary.insert("all_structurally_equivalent", cases.len() as u32);
+    summary.insert("same_codebook_for_all_cases", 1);
+    summary.insert("reordered_representation_exact", reordered_representation_exact as u32);
+    summary.insert("wrong_codebook_rejected", wrong_codebook_rejected as u32);
+
+    let output = serde_json::json!({
+        "benchmark": "neurosemantic-hdc-interlingua-n0",
+        "benchmark_schema_version": HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
+        "claim_boundary": "held_out_synthetic_graph_retrieval_and_reconstruction_only",
+        "codebook": {
+            "descriptor": codebook.descriptor(),
+            "hash": codebook_hash,
+            "node_keys": codebook.node_keys(),
+            "relation_names": codebook.relation_names(),
+        },
+        "codec_id": "symthaea.hdc.continuous-sign-v1",
+        "summary": summary,
+        "cases": cases,
+        "negative_controls": negative_controls,
+        "reordered_representation_exact": reordered_representation_exact,
+        "wrong_codebook_rejected": wrong_codebook_rejected,
+    });
+
+    let _: Value = output.clone();
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&output).map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
