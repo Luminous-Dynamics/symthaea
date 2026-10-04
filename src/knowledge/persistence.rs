@@ -1176,7 +1176,9 @@ impl KnowledgePersistence {
             .unchecked_transaction()
             .map_err(|e| format!("Begin latest validation verification: {e}"))?;
         verify_snapshot_receipts_in_tx(&tx)?;
-        verify_current_snapshot_matches_latest_receipt_in_tx(&tx)?;
+        if latest_generation_only {
+            verify_current_snapshot_matches_latest_receipt_in_tx(&tx)?;
+        }
         verify_snapshot_validation_receipts_in_tx(&tx)?;
 
         let order_clause = if order_by_sequence {
@@ -7477,6 +7479,28 @@ mod tests {
             vec![2, 3]
         );
         assert!(latest.iter().all(KnowledgeSnapshotValidationReceiptRecord::verify_self_digest));
+
+        // Historical ledger export remains independently auditable after live projection drift.
+        let drifted_fact = FactRecord {
+            source_text: "current projection drift".into(),
+            ..second_fact
+        };
+        p.save_facts(std::slice::from_ref(&drifted_fact)).unwrap();
+
+        let historical = p.snapshot_validation_receipt_records().unwrap();
+        assert_eq!(
+            historical
+                .iter()
+                .map(|record| record.validation_sequence)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        assert!(historical
+            .iter()
+            .all(KnowledgeSnapshotValidationReceiptRecord::verify_self_digest));
+
+        let current_err = p.latest_snapshot_validation_receipt_records().unwrap_err();
+        assert!(current_err.starts_with("Snapshot receipt digest mismatch: generation 2"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
