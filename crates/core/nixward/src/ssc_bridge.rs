@@ -19,6 +19,9 @@ pub const NIXOS_SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
 pub const NIXOS_CURRENT_SYSTEM: &str = "/run/current-system";
 pub const NIXOS_BOOTED_SYSTEM: &str = "/run/booted-system";
 
+const NIXOS_OBSERVATION_DIGEST_DOMAIN: &[u8] =
+    b"LUMINOUS-DYNAMICS/SSC/NIXOS-OBSERVATION/v1\0";
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixGenerationObservation {
     pub number: u64,
@@ -143,7 +146,13 @@ impl NixSystemObservation {
 
     pub fn observation_digest(&self) -> Result<ContentDigest, SscObservationError> {
         let bytes = serde_json::to_vec(self)?;
-        Ok(ContentDigest::blake3(&bytes))
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(NIXOS_OBSERVATION_DIGEST_DOMAIN);
+        hasher.update(&bytes);
+        Ok(ContentDigest {
+            algorithm: "blake3".into(),
+            value: hasher.finalize().to_hex().to_string(),
+        })
     }
 
     pub fn generation_resource(&self, generation: u64) -> Option<ResourceRef> {
@@ -568,6 +577,25 @@ mod tests {
             generation_link(42),
             PathBuf::from("/nix/var/nix/profiles/system-42-link")
         );
+    }
+
+    #[test]
+    fn observation_digest_is_domain_separated() {
+        let observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+        let digest = observation.observation_digest().expect("digest");
+        let bytes = serde_json::to_vec(&observation).expect("serialize");
+        assert_ne!(digest, ContentDigest::blake3(&bytes));
+        assert_eq!(super::NIXOS_OBSERVATION_DIGEST_DOMAIN.len(), 44);
     }
 
     #[test]
