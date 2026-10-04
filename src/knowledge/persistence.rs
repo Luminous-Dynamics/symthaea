@@ -220,6 +220,46 @@ impl KnowledgeSnapshotReceipt {
 
 }
 
+/// A non-persistent evidence checkpoint for an externally anchored snapshot-receipt
+/// history. The checkpoint does not assert truth or authenticity by itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnowledgeSnapshotReceiptHistoryCheckpoint {
+    pub receipt_count: u64,
+    pub latest_generation: u64,
+    pub history_digest_hex: String,
+}
+
+impl KnowledgeSnapshotReceiptHistoryCheckpoint {
+    /// Build a checkpoint from a receipt history that has already passed ledger verification.
+    pub fn from_history(history: &[KnowledgeSnapshotReceipt]) -> Self {
+        Self {
+            receipt_count: history.len() as u64,
+            latest_generation: history.last().map_or(0, |receipt| receipt.generation),
+            history_digest_hex: KnowledgeSnapshotReceipt::canonical_history_digest_hex(history),
+        }
+    }
+
+    /// Whether the checkpoint exactly matches a structurally valid receipt history.
+    pub fn verify_against_history(&self, history: &[KnowledgeSnapshotReceipt]) -> bool {
+        if !is_hex_digest(&self.history_digest_hex)
+            || self.receipt_count != history.len() as u64
+            || self.latest_generation != history.last().map_or(0, |receipt| receipt.generation)
+        {
+            return false;
+        }
+        if history
+            .iter()
+            .enumerate()
+            .any(|(index, receipt)| {
+                receipt.generation != index as u64 + 1 || !receipt.verify_integrity()
+            })
+        {
+            return false;
+        }
+        self.history_digest_hex == KnowledgeSnapshotReceipt::canonical_history_digest_hex(history)
+    }
+}
+
 /// Immutable record that a named validator evaluated the currently committed
 /// complete knowledge snapshot under a specific validator/profile version.
 ///
@@ -372,6 +412,63 @@ impl KnowledgeSnapshotValidationReceiptRecord {
             digest_str(&mut hasher, &record.stored_receipt_digest_hex);
         }
         hasher.finalize().to_hex().to_string()
+    }
+}
+
+/// A non-persistent evidence checkpoint for an externally anchored validation-receipt
+/// history. The checkpoint does not assert truth, validator authority, or authenticity by itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
+    pub receipt_count: u64,
+    pub latest_validation_sequence: u64,
+    pub latest_generation: u64,
+    pub history_digest_hex: String,
+}
+
+impl KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
+    /// Build a checkpoint from validation records that have already passed ledger verification.
+    pub fn from_history(history: &[KnowledgeSnapshotValidationReceiptRecord]) -> Self {
+        Self {
+            receipt_count: history.len() as u64,
+            latest_validation_sequence: history
+                .last()
+                .map_or(0, |record| record.validation_sequence),
+            latest_generation: history.last().map_or(0, |record| record.receipt.generation),
+            history_digest_hex:
+                KnowledgeSnapshotValidationReceiptRecord::canonical_history_digest_hex(history),
+        }
+    }
+
+    /// Whether the checkpoint exactly matches a structurally valid validation history.
+    pub fn verify_against_history(
+        &self,
+        history: &[KnowledgeSnapshotValidationReceiptRecord],
+    ) -> bool {
+        if !is_hex_digest(&self.history_digest_hex)
+            || self.receipt_count != history.len() as u64
+            || self.latest_validation_sequence
+                != history.last().map_or(0, |record| record.validation_sequence)
+            || self.latest_generation != history.last().map_or(0, |record| record.receipt.generation)
+        {
+            return false;
+        }
+
+        let mut previous_generation = None;
+        if history.iter().enumerate().any(|(index, record)| {
+            if record.validation_sequence != index as u64 + 1 || !record.verify_integrity() {
+                return true;
+            }
+            if previous_generation.is_some_and(|previous| record.receipt.generation < previous) {
+                return true;
+            }
+            previous_generation = Some(record.receipt.generation);
+            false
+        }) {
+            return false;
+        }
+
+        self.history_digest_hex
+            == KnowledgeSnapshotValidationReceiptRecord::canonical_history_digest_hex(history)
     }
 }
 
@@ -1001,6 +1098,14 @@ impl KnowledgePersistence {
             .map(|history| KnowledgeSnapshotReceipt::canonical_history_digest_hex(&history))
     }
 
+    /// Return a verified, non-persistent checkpoint suitable for external anchoring.
+    pub fn snapshot_receipt_history_checkpoint(
+        &mut self,
+    ) -> Result<KnowledgeSnapshotReceiptHistoryCheckpoint, String> {
+        self.snapshot_receipt_history()
+            .map(|history| KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&history))
+    }
+
     /// Load the latest committed complete-snapshot receipt.
     ///
     /// This receipt is append-only and is only advanced by successful
@@ -1306,6 +1411,14 @@ impl KnowledgePersistence {
         self.snapshot_validation_receipt_records().map(|history| {
             KnowledgeSnapshotValidationReceiptRecord::canonical_history_digest_hex(&history)
         })
+    }
+
+    /// Return a verified, non-persistent validation-history checkpoint suitable for external anchoring.
+    pub fn snapshot_validation_receipt_history_checkpoint(
+        &mut self,
+    ) -> Result<KnowledgeSnapshotValidationReceiptHistoryCheckpoint, String> {
+        self.snapshot_validation_receipt_records()
+            .map(|history| KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(&history))
     }
 
     fn load_snapshot_validation_receipt_records(
