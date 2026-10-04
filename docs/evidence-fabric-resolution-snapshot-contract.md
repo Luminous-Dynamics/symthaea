@@ -23,6 +23,9 @@ Two distinct signed attestation envelopes over the same receipt MUST produce dis
 
 ## Attester identity boundary
 
+The core envelope API also exposes `verify_against_integral_receipt()`. This opt-in check first verifies the receipt's own assessment commitment and then verifies the envelope↔receipt commitment. It is appropriate for callers that require internal receipt coherence, while leaving the historical Evidence Fabric v5 procedure unchanged until a future versioned procedure explicitly adopts that stronger semantic.
+
+
 The envelope's `attester_id` is part of the signed attestation payload, so changing it changes the payload identity and invalidates an existing detached proof. However, this field is an opaque attester/issuer identifier, not proof that the identifier controls the verification method used by the detached signature.
 
 A successful Evidence Fabric appraisal therefore establishes the cryptographic proof under the resolved verification method and the resolver's proof-purpose authorization state. It does **not** independently establish a controller relationship between `attester_id` and `verification_method`. Applications that need that stronger identity claim MUST obtain and verify the corresponding controller/authorization evidence as a separate trust step.
