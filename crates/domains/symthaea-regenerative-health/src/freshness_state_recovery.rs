@@ -447,6 +447,53 @@ mod tests {
     }
 
     #[test]
+    fn verified_anchor_cannot_cross_receiver_or_generation() {
+        struct AuthoritativeStore;
+        impl FreshnessRecoveryAnchorStore for AuthoritativeStore {
+            fn load(&self) -> Option<FreshnessRecoveryAnchor> { None }
+            fn compare_and_swap(
+                &self,
+                _: Option<&FreshnessRecoveryAnchor>,
+                _: &FreshnessRecoveryAnchor,
+            ) -> bool { true }
+            fn profile(&self) -> FreshnessAnchorProfile {
+                FreshnessAnchorProfile::new(
+                    crate::freshness_anchor_assurance::FreshnessAnchorBacking::RemoteAuthority,
+                    FreshnessAnchorCapabilities::authoritative(),
+                    "remote://authority-a",
+                ).unwrap()
+            }
+        }
+
+        struct Accept;
+        impl crate::freshness_anchor_assurance::FreshnessAnchorEvidenceVerifier for Accept {
+            fn verify(
+                &self,
+                _: &FreshnessAnchorProfile,
+                _: &crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt,
+            ) -> bool { true }
+        }
+
+        let profile = AuthoritativeStore.profile();
+        let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
+            schema_version: "0.1".into(),
+            profile_fingerprint: profile.fingerprint().unwrap(),
+            receiver_id: "receiver-1".into(),
+            generation: 0,
+            state_fingerprint: "different-state".into(),
+            verifier_reference: "verifier-1".into(),
+            evidence_reference: "evidence-1".into(),
+            evidence_digest: "digest-1".into(),
+        };
+        let verified = VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap();
+        let r = record(0, state(), None);
+        assert_eq!(
+            commit_authoritative_anchor(&AuthoritativeStore, &verified, None, &r).unwrap_err(),
+            FreshnessAnchorAssuranceError::SubjectBindingMismatch
+        );
+    }
+
+    #[test]
     fn fully_capable_store_can_make_authoritative_commit() {
         struct AuthoritativeStore;
         impl FreshnessRecoveryAnchorStore for AuthoritativeStore {
