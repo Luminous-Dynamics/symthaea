@@ -106,6 +106,22 @@ fn rfc8392_es256_known_answer_verifies() {
 }
 
 #[test]
+fn rfc8392_es256_accepts_indefinite_protected_bstr() {
+    // The protected field itself is a transported bstr. Chunking its bytes must
+    // not alter the protected-header bytes fed into COSE Sig_structure.
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(&[0xd2, 0x84, 0x5f, 0x43, 0xa1, 0x01, 0x26, 0xff]);
+    encoded.extend_from_slice(&RFC8392_SIGNED_CWT[6..]);
+
+    let message = Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+        .expect("indefinite protected bstr must be accepted");
+    assert_eq!(message.protected_header_bytes(), &[0xa1, 0x01, 0x26]);
+    message
+        .verify_es256(&sec1_public_key(), &[], None)
+        .expect("protected bstr chunking must preserve the authenticated Sig_structure");
+}
+
+#[test]
 fn rfc8392_es256_accepts_indefinite_signature_bstr() {
     let mut encoded = Vec::new();
     encoded.extend_from_slice(&RFC8392_SIGNED_CWT[..109]);
