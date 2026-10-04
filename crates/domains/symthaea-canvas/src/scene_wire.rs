@@ -326,6 +326,9 @@ fn validate_node(
     }
     *count += 1;
 
+    let local_scale_abs = f64::from(node.transform.scale.abs());
+    let combined_scale_abs = parent_scale_abs * local_scale_abs;
+
     let primitive_valid = match &node.primitive {
         WirePrimitive::Group => true,
         WirePrimitive::Circle { cx, cy, r } => {
@@ -349,7 +352,7 @@ fn validate_node(
                     *y1,
                     *x2,
                     *y2,
-                    parent_scale_abs * f64::from(node.transform.scale.abs()),
+                    combined_scale_abs,
                 )
         }
         WirePrimitive::Polygon { points, closed } => {
@@ -396,8 +399,6 @@ fn validate_node(
         return false;
     }
 
-    let local_scale_abs = f64::from(node.transform.scale.abs());
-    let combined_scale_abs = parent_scale_abs * local_scale_abs;
     if !combined_scale_abs.is_finite() {
         return false;
     }
@@ -823,6 +824,31 @@ mod tests {
             !scene.is_supported(),
             "line renderability must account for cumulative scale"
         );
+    }
+
+    #[test]
+    fn externally_constructed_line_rejects_non_renderable_own_scale() {
+        let scene = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Line {
+                    x1: 0.0,
+                    y1: 0.0,
+                    x2: 1.0,
+                    y2: 0.0,
+                },
+                transform: WireTransform {
+                    scale: 1e-7,
+                    ..WireTransform::default()
+                },
+                style: WireStyle {
+                    stroke: Some(Color::rgb(1.0, 1.0, 1.0)),
+                    ..WireStyle::default()
+                },
+                children: vec![],
+            },
+        };
+        assert!(!scene.is_supported(), "line renderability must include its own scale");
     }
 
     #[test]
