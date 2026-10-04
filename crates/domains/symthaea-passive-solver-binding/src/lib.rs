@@ -573,6 +573,7 @@ pub fn select_boundary_patch(
 
     let selection = BoundaryPatchSelection::from_edges(expected)?;
     validate_closed_single_loop(selection.edges())?;
+    validate_simple_boundary_loop(selection.edges(), &all_boundary, interface)?;
     Ok(selection)
 }
 
@@ -612,6 +613,8 @@ pub fn certify_boundary_patch(
     if selection.edges != expected.edges {
         return Err(SolverBindingError::BoundaryPatchSelectionIncomplete);
     }
+
+    validate_simple_boundary_loop(selection.edges(), &all_boundary, interface)?;
 
     let mut max_plane = 0.0f64;
     let mut max_radial = 0.0f64;
@@ -807,6 +810,155 @@ fn validate_closed_single_loop(edges: &[BoundaryEdgeKey]) -> Result<(), SolverBi
     }
 
     Ok(())
+}
+
+fn validate_simple_boundary_loop(
+    edges: &[BoundaryEdgeKey],
+    records: &[QuantizedBoundaryEdge],
+    interface: &PortInterface,
+) -> Result<(), SolverBindingError> {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    if edges.len() < 3 {
+        return Err(SolverBindingError::BoundaryPatchIsNotSingleClosedLoop);
+    }
+
+    let raw: BTreeMap<BoundaryEdgeKey, ([f64; 3], [f64; 3])> = records
+        .iter()
+        .filter(|record| edges.binary_search(&record.key).is_ok())
+        .map(|record| (record.key, (record.a_mm, record.b_mm)))
+        .collect();
+
+    if raw.len() != edges.len() {
+        return Err(SolverBindingError::BoundaryPatchEdgeNotOnCandidate);
+    }
+
+    let mut adjacency = BTreeMap::<[i64; 3], Vec<BoundaryEdgeKey>>::new();
+    for edge in edges {
+        adjacency.entry(edge.a).or_default().push(*edge);
+        adjacency.entry(edge.b).or_default().push(*edge);
+    }
+
+    let start = *adjacency
+        .keys()
+        .next()
+        .ok_or(SolverBindingError::EmptyBoundaryPatchSelection)?;
+    let mut used = BTreeSet::new();
+    let mut current = start;
+    let mut loop_points = Vec::with_capacity(edges.len());
+
+    for step in 0..edges.len() {
+        let incident = adjacency
+            .get(&current)
+            .ok_or(SolverBindingError::BoundaryPatchIsNotSingleClosedLoop)?;
+        let next_edge = incident
+            .iter()
+            .copied()
+            .find(|edge| !used.contains(edge))
+            .ok_or(SolverBindingError::BoundaryPatchIsNotSingleClosedLoop)?;
+
+        let (a_mm, b_mm) = *raw
+            .get(&next_edge)
+            .ok_or(SolverBindingError::BoundaryPatchEdgeNotOnCandidate)?;
+        let next_point = if next_edge.a == current { b_mm } else { a_mm };
+
+        if step == 0 {
+            let start_point = if next_edge.a == current { a_mm } else { b_mm };
+            loop_points.push(start_point);
+        }
+        loop_points.push(next_point);
+
+        used.insert(next_edge);
+        current = if next_edge.a == current {
+            next_edge.b
+        } else {
+            next_edge.a
+        };
+    }
+
+    if current != start || used.len() != edges.len() {
+        return Err(SolverBindingError::BoundaryPatchIsNotSingleClosedLoop);
+    }
+
+    loop_points.pop();
+    if loop_points.len() != edges.len() {
+        return Err(SolverBindingError::BoundaryPatchIsNotSingleClosedLoop);
+    }
+
+    let normal = interface.interface_plane.normal_unit;
+    let ax = (normal[0] as f64).abs();
+    let ay = (normal[1] as f64).abs();
+    let az = (normal[2] as f64).abs();
+    let dropped_axis = if ax >= ay && ax >= az {
+        0
+    } else if ay >= az {
+        1
+    } else {
+        2
+    };
+
+    let project = |point: [f64; 3]| -> [f64; 2] {
+        match dropped_axis {
+            0 => [point[1], point[2]],
+            1 => [point[0], point[2]],
+            _ => [point[0], point[1]],
+        }
+    };
+
+    let points: Vec<[f64; 2]> = loop_points.into_iter().map(project).collect();
+    let epsilon = 1.0e-12;
+
+    for i in 0..points.len() {
+        let a1 = points[i];
+        let a2 = points[(i + 1) % points.len()];
+        for j in (i + 1)..points.len() {
+            if j == i + 1 || (i == 0 && j + 1 == points.len()) {
+                continue;
+            }
+            let b1 = points[j];
+            let b2 = points[(j + 1) % points.len()];
+            if segments_intersect_2d(a1, a2, b1, b2, epsilon) {
+                return Err(SolverBindingError::BoundaryPatchIsNotSingleClosedLoop);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn segments_intersect_2d(
+    a1: [f64; 2],
+    a2: [f64; 2],
+    b1: [f64; 2],
+    b2: [f64; 2],
+    epsilon: f64,
+) -> bool {
+    fn orient(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> f64 {
+        (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+    }
+
+    fn on_segment(a: [f64; 2], b: [f64; 2], p: [f64; 2], epsilon: f64) -> bool {
+        p[0] >= a[0].min(b[0]) - epsilon
+            && p[0] <= a[0].max(b[0]) + epsilon
+            && p[1] >= a[1].min(b[1]) - epsilon
+            && p[1] <= a[1].max(b[1]) + epsilon
+    }
+
+    let o1 = orient(a1, a2, b1);
+    let o2 = orient(a1, a2, b2);
+    let o3 = orient(b1, b2, a1);
+    let o4 = orient(b1, b2, a2);
+
+    if ((o1 > epsilon && o2 < -epsilon) || (o1 < -epsilon && o2 > epsilon))
+        && ((o3 > epsilon && o4 < -epsilon) || (o3 < -epsilon && o4 > epsilon))
+    {
+        return true;
+    }
+
+    (o1.abs() <= epsilon && on_segment(a1, a2, b1, epsilon))
+        || (o2.abs() <= epsilon && on_segment(a1, a2, b2, epsilon))
+        || (o3.abs() <= epsilon && on_segment(b1, b2, a1, epsilon))
+        || (o4.abs() <= epsilon && on_segment(b1, b2, a2, epsilon))
 }
 
 fn micrometers_from_mm(tolerance_mm: f64) -> Result<u64, SolverBindingError> {
@@ -1251,6 +1403,57 @@ mod tests {
 
         assert_eq!(forward, reverse);
         assert!(forward.a < forward.b);
+    }
+
+    #[test]
+    fn self_intersecting_boundary_loop_is_rejected() {
+        let interface = interface(PortId(10), 7);
+        let raw_points = [
+            [0.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0],
+        ];
+        let edges = vec![
+            BoundaryEdgeKey::new(raw_points[0], raw_points[1]).unwrap(),
+            BoundaryEdgeKey::new(raw_points[1], raw_points[2]).unwrap(),
+            BoundaryEdgeKey::new(raw_points[2], raw_points[3]).unwrap(),
+            BoundaryEdgeKey::new(raw_points[3], raw_points[0]).unwrap(),
+        ];
+        let selection = BoundaryPatchSelection::from_edges(edges.clone()).unwrap();
+        let records = edges
+            .into_iter()
+            .map(|key| {
+                let find = |point: [i64; 3]| {
+                    [
+                        point[0] as f64 / 1_000_000.0,
+                        point[1] as f64 / 1_000_000.0,
+                        point[2] as f64 / 1_000_000.0,
+                    ]
+                };
+                let a_mm = find(key.a);
+                let b_mm = find(key.b);
+                QuantizedBoundaryEdge {
+                    key,
+                    a_mm,
+                    b_mm,
+                    midpoint: [
+                        (a_mm[0] + b_mm[0]) / 2.0,
+                        (a_mm[1] + b_mm[1]) / 2.0,
+                        (a_mm[2] + b_mm[2]) / 2.0,
+                    ],
+                    length_mm: ((b_mm[0] - a_mm[0]).powi(2)
+                        + (b_mm[1] - a_mm[1]).powi(2)
+                        + (b_mm[2] - a_mm[2]).powi(2))
+                    .sqrt(),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            validate_simple_boundary_loop(selection.edges(), &records, &interface),
+            Err(SolverBindingError::BoundaryPatchIsNotSingleClosedLoop)
+        );
     }
 
     #[test]
