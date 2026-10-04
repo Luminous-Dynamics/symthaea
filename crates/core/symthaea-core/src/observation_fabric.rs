@@ -1735,7 +1735,12 @@ mod tests {
     #[test]
     fn receipt_attestation_strong_commitment_rejects_invalid_receipt_integrity() {
         let receipt = fixture_receipt();
-        let envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        let envelope = ReceiptAttestationEnvelope::from_receipt(
+            &receipt,
+            "attester-1",
+            "assertion",
+            100,
+        );
         assert!(envelope.verify_against_receipt(&receipt));
         assert!(envelope.verify_against_integral_receipt(&receipt));
 
