@@ -125,9 +125,12 @@ impl TpmNvCounterEvidence {
             && matches!(
                 &receipt.evidence_kind,
                 FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
+                    backend_identity_digest,
+                    counter_namespace_digest,
                     observed_counter,
-                    ..
-                } if *observed_counter == self.counter_value
+                } if backend_identity_digest == &self.tpm_identity_digest
+                    && counter_namespace_digest == &self.nv_index_name_digest
+                    && *observed_counter == self.counter_value
             )
             && receipt.generation == self.counter_value
             && receipt.freshness_handle_digest == self.quote_nonce_digest
@@ -422,6 +425,19 @@ mod tests {
             verify_tpm_nv_counter(&evidence, &profile(), &receipt, &Accept).unwrap_err(),
             TpmNvCounterVerificationError::EvidenceIdentityMismatch
         );
+    }
+
+    #[test]
+    fn structural_validator_rejects_typed_identity_splice() {
+        let evidence = evidence(7);
+        let mut receipt = receipt(7);
+        receipt.evidence_kind = FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
+            backend_identity_digest: "different-tpm".into(),
+            counter_namespace_digest: "nv-name".into(),
+            observed_counter: 7,
+        };
+
+        assert!(!evidence.validate_against_receipt(&profile(), &receipt));
     }
 
     #[test]
