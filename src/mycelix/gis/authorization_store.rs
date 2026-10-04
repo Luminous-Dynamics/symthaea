@@ -1486,11 +1486,6 @@ impl SqliteAuthorizationStore {
                     && implementation_id == configuration.verifier_implementation_id
                     && implementation_digest == configuration.verifier_implementation_digest
                     && digest == configuration.verifier_config_digest => {}
-            (Some(id), Some(digest), _, _, _) => {
-                return Err(AuthorizationStoreError::InvalidState(format!(
-                    "provider status verifier mismatch: pinned {id}/{digest}"
-                )));
-            }
             (Some(id), Some(digest), None, None, None)
                 if id == configuration.verifier_id
                     && digest == configuration.verifier_config_digest => {
@@ -1504,6 +1499,11 @@ impl SqliteAuthorizationStore {
                         params![key, value],
                     )?;
                 }
+            }
+            (Some(id), Some(digest), _, _, _) => {
+                return Err(AuthorizationStoreError::InvalidState(format!(
+                    "provider status verifier mismatch: pinned {id}/{digest}"
+                )));
             }
             (None, None, None, None, None) => {
                 tx.execute(
