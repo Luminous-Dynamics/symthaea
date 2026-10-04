@@ -355,6 +355,62 @@ impl SolverBoundaryEvidenceLevel {
     }
 }
 
+/// Canonical solver-side entity introspection material.
+///
+/// The adapter supplies a semantic entity kind, canonical identity bytes, and the
+/// source digest it observed. The core derives the observation digest and entity
+/// fingerprint from that material, so an adapter cannot satisfy the stronger
+/// evidence level by merely asserting opaque hashes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SolverBoundaryEntityObservation {
+    pub entity_kind: String,
+    pub canonical_identity_bytes: Vec<u8>,
+    pub source_digest: [u8; 32],
+}
+
+impl SolverBoundaryEntityObservation {
+    pub fn new(
+        entity_kind: impl Into<String>,
+        canonical_identity_bytes: impl Into<Vec<u8>>,
+        source_digest: [u8; 32],
+    ) -> Result<Self, SolverBindingError> {
+        let entity_kind = entity_kind.into();
+        let canonical_identity_bytes = canonical_identity_bytes.into();
+        if entity_kind.trim().is_empty() {
+            return Err(SolverBindingError::EmptySolverEntityKind);
+        }
+        if canonical_identity_bytes.is_empty() {
+            return Err(SolverBindingError::EmptySolverEntityIdentity);
+        }
+        if source_digest == [0; 32] {
+            return Err(SolverBindingError::EmptySolverEntitySourceDigest);
+        }
+        Ok(Self {
+            entity_kind,
+            canonical_identity_bytes,
+            source_digest,
+        })
+    }
+
+    pub fn digest(&self) -> [u8; 32] {
+        let mut hasher = Hasher::new();
+        hasher.update(b"passive-solver-entity-observation:v1");
+        hasher.update(self.entity_kind.as_bytes());
+        hasher.update(&[0]);
+        hasher.update(&(self.canonical_identity_bytes.len() as u64).to_le_bytes());
+        hasher.update(&self.canonical_identity_bytes);
+        hasher.update(&self.source_digest);
+        *hasher.finalize().as_bytes()
+    }
+
+    pub fn fingerprint(&self) -> [u8; 32] {
+        let mut hasher = Hasher::new();
+        hasher.update(b"passive-solver-entity-fingerprint:v1");
+        hasher.update(&self.digest());
+        *hasher.finalize().as_bytes()
+    }
+}
+
 /// Solver-side entity evidence returned by a live-capable adapter.
 ///
 /// This is intentionally a provenance claim, not an independent solver proof:
@@ -363,37 +419,36 @@ impl SolverBoundaryEvidenceLevel {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SolverBoundaryEntityAttestation {
     pub external_boundary_handle: String,
-    pub solver_entity_fingerprint: [u8; 32],
-    pub solver_entity_observation_digest: [u8; 32],
+    pub observation: SolverBoundaryEntityObservation,
     pub solver_entity_mapping_digest: [u8; 32],
 }
 
 impl SolverBoundaryEntityAttestation {
     pub fn new(
         external_boundary_handle: impl Into<String>,
-        solver_entity_fingerprint: [u8; 32],
-        solver_entity_observation_digest: [u8; 32],
+        observation: SolverBoundaryEntityObservation,
         solver_entity_mapping_digest: [u8; 32],
     ) -> Result<Self, SolverBindingError> {
         let external_boundary_handle = external_boundary_handle.into();
         if external_boundary_handle.trim().is_empty() {
             return Err(SolverBindingError::EmptyExternalBoundaryHandle);
         }
-        if solver_entity_fingerprint == [0; 32] {
-            return Err(SolverBindingError::EmptySolverEntityFingerprint);
-        }
-        if solver_entity_observation_digest == [0; 32] {
-            return Err(SolverBindingError::EmptySolverEntityObservationDigest);
-        }
         if solver_entity_mapping_digest == [0; 32] {
             return Err(SolverBindingError::EmptySolverEntityMappingDigest);
         }
         Ok(Self {
             external_boundary_handle,
-            solver_entity_fingerprint,
-            solver_entity_observation_digest,
+            observation,
             solver_entity_mapping_digest,
         })
+    }
+
+    pub fn solver_entity_observation_digest(&self) -> [u8; 32] {
+        self.observation.digest()
+    }
+
+    pub fn solver_entity_fingerprint(&self) -> [u8; 32] {
+        self.observation.fingerprint()
     }
 }
 
@@ -461,16 +516,16 @@ pub fn promote_solver_entity_attestation(
         digest_triangle_mesh(candidate),
         binding.realized_boundary.boundary_patch_digest(),
         &attestation.external_boundary_handle,
-        attestation.solver_entity_fingerprint,
-        attestation.solver_entity_observation_digest,
+        attestation.solver_entity_fingerprint(),
+        attestation.solver_entity_observation_digest(),
     );
     if attestation.solver_entity_mapping_digest != expected_mapping_digest {
         return Err(SolverBindingError::SolverEntityMappingDigestMismatch);
     }
 
     binding.evidence_level = SolverBoundaryEvidenceLevel::SolverEntityAttested;
-    binding.solver_entity_fingerprint = Some(attestation.solver_entity_fingerprint);
-    binding.solver_entity_observation_digest = Some(attestation.solver_entity_observation_digest);
+    binding.solver_entity_fingerprint = Some(attestation.solver_entity_fingerprint());
+    binding.solver_entity_observation_digest = Some(attestation.solver_entity_observation_digest());
     binding.solver_entity_mapping_digest = Some(attestation.solver_entity_mapping_digest);
 
     Ok(binding)
@@ -642,6 +697,9 @@ pub enum SolverBindingError {
     UnverifiedBinding,
     InvalidEvidenceState,
     EmptyCandidateGeometryDigest,
+    EmptySolverEntityKind,
+    EmptySolverEntityIdentity,
+    EmptySolverEntitySourceDigest,
     EmptySolverEntityFingerprint,
     EmptySolverEntityObservationDigest,
     EmptySolverEntityMappingDigest,
@@ -1422,7 +1480,11 @@ mod tests {
             candidate: &TriangleMesh,
             binding: &SolverBoundaryBinding,
         ) -> Result<SolverBoundaryEntityAttestation, SolverBindingError> {
-            let fingerprint = [0x42; 32];
+            let observation = SolverBoundaryEntityObservation::new(
+                "fixture-boundary-patch",
+                b"patch-index=7;start-face=0;n-faces=4".to_vec(),
+                [0x77; 32],
+            )?;
             let mapping_digest = solver_entity_mapping_digest(
                 interface,
                 &binding.adapter_id,
@@ -1430,13 +1492,12 @@ mod tests {
                 digest_triangle_mesh(candidate),
                 binding.realized_boundary.boundary_patch_digest(),
                 &binding.external_boundary_handle,
-                fingerprint,
-                [0x99; 32],
+                observation.fingerprint(),
+                observation.digest(),
             );
             SolverBoundaryEntityAttestation::new(
                 binding.external_boundary_handle.clone(),
-                fingerprint,
-                [0x99; 32],
+                observation,
                 mapping_digest,
             )
         }
@@ -1476,7 +1537,20 @@ mod tests {
             binding.evidence_level(),
             SolverBoundaryEvidenceLevel::SolverEntityAttested
         );
-        assert_eq!(binding.solver_entity_fingerprint(), Some([0x42; 32]));
+        let expected_observation = SolverBoundaryEntityObservation::new(
+            "fixture-boundary-patch",
+            b"patch-index=7;start-face=0;n-faces=4".to_vec(),
+            [0x77; 32],
+        )
+        .unwrap();
+        assert_eq!(
+            binding.solver_entity_fingerprint(),
+            Some(expected_observation.fingerprint())
+        );
+        assert_eq!(
+            binding.solver_entity_observation_digest(),
+            Some(expected_observation.digest())
+        );
         assert!(binding.solver_entity_mapping_digest().is_some());
         assert!(binding.validate_against_candidate(&interface, [7; 32], &candidate).is_ok());
     }
@@ -1494,10 +1568,26 @@ mod tests {
         )
         .unwrap();
 
+        let observation = SolverBoundaryEntityObservation::new(
+            "fixture-boundary-patch",
+            b"patch-index=7;start-face=0;n-faces=4".to_vec(),
+            [0x77; 32],
+        )
+        .unwrap();
+        let mapping_digest = solver_entity_mapping_digest(
+            &interface,
+            &binding.adapter_id,
+            [7; 32],
+            digest_triangle_mesh(&candidate),
+            binding.realized_boundary.boundary_patch_digest(),
+            "fixture:other-boundary",
+            observation.fingerprint(),
+            observation.digest(),
+        );
         let attestation = SolverBoundaryEntityAttestation::new(
             "fixture:other-boundary",
-            [0x42; 32],
-            [1; 32],
+            observation,
+            mapping_digest,
         )
         .unwrap();
 
@@ -1563,9 +1653,15 @@ mod tests {
         )
         .unwrap();
 
+        let observation = SolverBoundaryEntityObservation::new(
+            "fixture-boundary-patch",
+            b"patch-index=7;start-face=0;n-faces=4".to_vec(),
+            [0x77; 32],
+        )
+        .unwrap();
         let attestation = SolverBoundaryEntityAttestation::new(
             binding.external_boundary_handle.clone(),
-            [0x42; 32],
+            observation,
             [1; 32],
         )
         .unwrap();
@@ -1607,28 +1703,52 @@ mod tests {
     }
 
     #[test]
-    fn entity_attestation_rejects_empty_observation_digest() {
+    fn entity_observation_rejects_empty_identity() {
         assert_eq!(
-            SolverBoundaryEntityAttestation::new(
-                "fixture:boundary-7",
-                [0x42; 32],
-                [0; 32],
-                [1; 32],
+            SolverBoundaryEntityObservation::new(
+                "fixture-boundary-patch",
+                Vec::<u8>::new(),
+                [0x77; 32],
             ),
-            Err(SolverBindingError::EmptySolverEntityObservationDigest)
+            Err(SolverBindingError::EmptySolverEntityIdentity)
         );
     }
 
     #[test]
-    fn entity_attestation_rejects_empty_fingerprint() {
+    fn entity_observation_rejects_empty_source_digest() {
         assert_eq!(
-            SolverBoundaryEntityAttestation::new(
-                "fixture:boundary-7",
+            SolverBoundaryEntityObservation::new(
+                "fixture-boundary-patch",
+                b"patch".to_vec(),
                 [0; 32],
-                [1; 32],
             ),
-            Err(SolverBindingError::EmptySolverEntityFingerprint)
+            Err(SolverBindingError::EmptySolverEntitySourceDigest)
         );
+    }
+
+    #[test]
+    fn entity_observation_rejects_empty_kind() {
+        assert_eq!(
+            SolverBoundaryEntityObservation::new(
+                "",
+                b"patch".to_vec(),
+                [0x77; 32],
+            ),
+            Err(SolverBindingError::EmptySolverEntityKind)
+        );
+    }
+
+    #[test]
+    fn entity_observation_digest_is_deterministic() {
+        let observation = SolverBoundaryEntityObservation::new(
+            "fixture-boundary-patch",
+            b"patch-index=7;start-face=0;n-faces=4".to_vec(),
+            [0x77; 32],
+        )
+        .unwrap();
+
+        assert_eq!(observation.digest(), observation.clone().digest());
+        assert_eq!(observation.fingerprint(), observation.clone().fingerprint());
     }
 
     #[test]
