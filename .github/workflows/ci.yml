@@ -1513,7 +1513,7 @@ jobs:
           def resolve_dependency(label: str):
               source_match = re.fullmatch(
                   r"(?P<name>.+) (?P<version>\d+(?:\.\d+){0,2}(?:[-+].*)?) "
-                  r"\\((?P<source>.+)\\)",
+                  r"\((?P<source>.+)\)",
                   label,
               )
               version_match = re.fullmatch(
