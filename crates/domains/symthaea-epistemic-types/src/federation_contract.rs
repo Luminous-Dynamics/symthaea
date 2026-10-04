@@ -670,6 +670,40 @@ mod tests {
     }
 
     #[test]
+    fn federated_claim_rejects_provenance_family_subject_mismatch() {
+        let (_, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view = ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            Some("frontier:1".into()),
+            "canonical:1",
+            Some("family:other".into()),
+            view.snapshot_digest.clone(),
+            view.validation.validator_version.clone(),
+            view.validation.snapshot_schema_version,
+        ).unwrap();
+
+        assert_eq!(
+            FederatedClaim::new(
+                "claim:1",
+                "canonical:1",
+                "family:1",
+                "author:1",
+                "statement:1",
+                view,
+                receipt,
+            ).unwrap_err(),
+            "admission receipt must bind claim canonical subject"
+        );
+    }
+
+    #[test]
     fn federated_claim_rejects_admission_subject_mismatch() {
         let (_, validation) = receipt();
         let relation = ProvenanceRelation {
