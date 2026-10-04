@@ -64,6 +64,7 @@ struct AuditCase {
     linguistic_lexical_binding_valid: bool,
     content_binding: String,
     role_only_rejected_segments: bool,
+    realization_authorization_rejected: bool,
     phonological_binding_succeeded: bool,
     phonological_persistence_validated: bool,
     lexical_binding_succeeded: bool,
@@ -417,6 +418,19 @@ fn run() -> Result<()> {
                 );
             }
 
+            let phonological_outcome_ok = if linguistic_ready {
+                role_only_rejected
+                    && phonological_binding_succeeded
+                    && phonological_persistence_validated
+                    && lexical_missing_provenance_rejected
+                    && lexical_binding_succeeded
+            } else {
+                !phonological_binding_succeeded
+                    && phonological_persistence_validated
+                    && lexical_missing_provenance_rejected
+                    && !lexical_binding_succeeded
+            };
+
             let case_ok = speech_plan_valid
                 && acoustic_receipt_valid
                 && acoustic_complete_passed
@@ -427,11 +441,8 @@ fn run() -> Result<()> {
                 && realization_authorization_rejected
                 && linguistic_to_phonological_preserved_intent
                 && linguistic_lexical_binding_valid
-                && role_only_rejected
-                && phonological_binding_succeeded
-                && phonological_persistence_validated
-                && lexical_binding_succeeded
-                && lexical_missing_provenance_rejected
+                && realization_authorization_rejected
+                && phonological_outcome_ok
                 && semantic_exact_passed
                 && semantic_receipt_lineage_valid
                 && semantic_mismatch_rejected
@@ -459,6 +470,7 @@ fn run() -> Result<()> {
                 linguistic_lexical_binding_valid,
                 content_binding: format!("{:?}", lexical.content_binding),
                 role_only_rejected_segments: role_only_rejected,
+                realization_authorization_rejected,
                 phonological_binding_succeeded,
                 phonological_persistence_validated,
                 lexical_binding_succeeded,
