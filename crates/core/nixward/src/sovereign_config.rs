@@ -246,10 +246,25 @@ impl SovereignConfigGenerator {
             warnings.push(conflict.clone());
         }
 
-        // ── Step 9: Reason about packages from migration data ──
+        // ── Step 9: Preserve the TPM trust boundary ──
+        if choices.tpm2_unlock {
+            if hardware.has_tpm {
+                warnings.push(
+                    "TPM2 is available for LUKS key protection, but TPM presence/enrollment is not an attestation or freshness proof; authoritative recovery trust requires separately verified evidence."
+                        .into(),
+                );
+            } else {
+                warnings.push(
+                    "TPM2 unlock was requested but no TPM was reported by the hardware profile; enrollment must be treated as failed until the target is re-probed."
+                        .into(),
+                );
+            }
+        }
+
+        // ── Step 10: Reason about packages from migration data ──
         let packages = self.reason_about_packages(migration);
 
-        // ── Step 10: Generate the config files ──
+        // ── Step 11: Generate the config files ──
         let sovereign_config_nix = self.render_sovereign_config(&nix_options, &packages);
         let welcome_message = self.compose_welcome(hardware, choices, migration, &decisions);
 
@@ -898,6 +913,25 @@ struct ReasonedOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tpm_unlock_warning_does_not_claim_attestation() {
+        let mut generator = SovereignConfigGenerator::new();
+        let hardware = HardwareProfile {
+            has_tpm: true,
+            ..Default::default()
+        };
+        let choices = UserChoices {
+            tpm2_unlock: true,
+            encryption: true,
+            ..Default::default()
+        };
+        let result = generator.generate(&hardware, &choices, &MigrationData::default());
+        assert!(result
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("not an attestation or freshness proof")));
+    }
 
     #[test]
     fn test_generate_gnome_nvidia() {
