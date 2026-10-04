@@ -483,6 +483,7 @@ mod tests {
             &claim,
             ClaimProofPurpose::new("authentication").unwrap(),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
         )
         .unwrap_err();
         assert!(matches!(
