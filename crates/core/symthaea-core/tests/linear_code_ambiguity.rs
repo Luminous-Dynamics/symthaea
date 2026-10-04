@@ -603,7 +603,7 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     let mut failures = 0usize;
     let mut total_work = LinearCodeWork::default();
     let mut result_digest = Hasher::new();
-    result_digest.update(b"symthaea-hdc-paper-matrix-v2\\0");
+    result_digest.update(b"symthaea-hdc-paper-matrix-v3\\0");
     let mut unique_cases = 0usize;
     let mut non_unique_valid = 0usize;
     let mut nonexistent_targets = 0usize;
