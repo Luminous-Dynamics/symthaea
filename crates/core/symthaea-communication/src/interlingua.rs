@@ -73,10 +73,7 @@ pub fn graph_hash(graph: &GroundedConceptGraph) -> Result<String, String> {
 /// Confidence is intentionally excluded because it is measured separately.
 pub fn structural_hash(graph: &GroundedConceptGraph) -> Result<String, String> {
     let canonical = (
-        canonical_nodes(graph)
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>(),
+        canonical_nodes(graph),
         canonical_edges(graph),
     );
     let bytes = serde_json::to_vec(&canonical).map_err(|error| error.to_string())?;
