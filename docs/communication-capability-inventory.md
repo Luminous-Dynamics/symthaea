@@ -1,6 +1,6 @@
 # Communication capability inventory
 
-Status date: 2026-07-13. "Supported" is reserved for benchmarked capability that
+Status date: 2026-10-04. "Supported" is reserved for benchmarked capability that
 has passed a pinned release gate. This inventory describes code paths, not release
 claims. No entry in this table constitutes a supported capability unless its
 `CapabilityLevel` is marked **Released** and a corresponding `SupportRegistry` file
@@ -23,7 +23,7 @@ assumed as a universal substrate for animal or unknown communication.
 
 | Path | Status | Demonstrated ceiling | Notes |
 |---|---|---:|---|
-| `symthaea-communication` core contracts | **released architecture** | — | 40+ unit tests; benchmark gates, evidence chain, and expression policy. No claims are released without passing evidence. |
+| `symthaea-communication` core contracts | **released architecture** | — | 40+ unit tests; benchmark gates, evidence chain, and expression policy. No claims are released without passing evidence. |\n| `symthaea-communication::neurosemantic` | **experimental N0 protocol infrastructure** | Structure (synthetic protocol only) | Consent-bound, purpose-bound, directional exchange of derived representations with integrity and replay controls. N0 does not establish semantic understanding, neural decoding, or thought reading. |
 | `symthaea-communication` human pilot (Whisper large-v3) | pilot infrastructure ready | Structure | Workers, FLEURS preparation, plan/provider templates in `communication/`. Not yet released: no gate has been run on production data. |
 | `symthaea-communication` human pilot (SeamlessM4T-v2) | pilot infrastructure ready | Structure | SeamlessM4T worker with MMS-LID identity. No gate run. |
 | `src/language` LLM providers and language manager | active / feature-gated | Intent | Human text orchestration; providers have separate quality characteristics. No 100-language gate exists yet. |
