@@ -52,6 +52,7 @@ pub struct LinguisticFrame {
     pub version: String,
     pub binding_status: LinguisticBindingStatus,
     pub lexical_provenance: Option<String>,
+    pub source_intent: String,
     pub strategy: FormulationStrategy,
     pub epistemic_delivery: EpistemicDelivery,
     pub prosody: ProsodicIntent,
@@ -88,6 +89,7 @@ impl LinguisticFrame {
         Self {
             version: LINGUISTIC_FRAME_VERSION.to_string(),
             binding_status: LinguisticBindingStatus::RoleStructureOnly,
+            source_intent: plan.intent.clone(),
             strategy,
             epistemic_delivery: plan.epistemic_delivery,
             prosody: plan.prosody,
@@ -193,10 +195,11 @@ impl LinguisticFrame {
             .join("|");
 
         format!(
-            "{};binding={:?};lexical_provenance={};strategy={:?};epistemic={:?};intonation={:?};focus={};constituents={}",
+            "{};binding={:?};lexical_provenance={};intent={};strategy={:?};epistemic={:?};intonation={:?};focus={};constituents={}",
             self.version,
             self.binding_status,
             self.lexical_provenance.is_some(),
+            self.source_intent,
             self.strategy,
             self.epistemic_delivery,
             self.prosody.intonation,
