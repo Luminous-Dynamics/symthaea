@@ -199,10 +199,13 @@ pub struct VerificationEvidence {
     pub proof_purpose: ClaimProofPurpose,
     pub verification_method: ClaimVerificationMethod,
     pub controller: ClaimControllerIdentity,
+    /// Controller identity actually read from the resolved controller document.
+    pub controller_document_controller: ClaimControllerIdentity,
+    /// Verification-method identity actually read from the resolved controller document.
+    pub controller_document_verification_method: ClaimVerificationMethod,
     pub verification_relationship: ClaimVerificationRelationship,
     pub controller_document_ref: String,
     pub controller_document_digest: String,
-    pub verification_relationship: String,
     pub cryptosuite: String,
     pub signed_payload_digest: String,
     pub proof_digest: String,
@@ -215,6 +218,8 @@ impl VerificationEvidence {
         request: &VerificationRequest,
         controller_document_ref: impl Into<String>,
         controller_document_digest: impl Into<String>,
+        controller_document_controller: ClaimControllerIdentity,
+        controller_document_verification_method: ClaimVerificationMethod,
         verification_relationship: impl Into<String>,
         cryptosuite: impl Into<String>,
         signed_payload_digest: impl Into<String>,
@@ -230,6 +235,20 @@ impl VerificationEvidence {
             return Err(VerificationFailure::VerificationRelationshipMismatch {
                 expected: request.expected_verification_relationship.clone(),
                 actual: verification_relationship,
+            });
+        }
+        controller_document_controller.validate_structure()?;
+        controller_document_verification_method.validate_structure()?;
+        if controller_document_controller != request.expected_controller {
+            return Err(VerificationFailure::ControllerMismatch {
+                expected: request.expected_controller.clone(),
+                actual: controller_document_controller,
+            });
+        }
+        if controller_document_verification_method != request.verification_method {
+            return Err(VerificationFailure::VerificationMethodMismatch {
+                expected: request.verification_method.clone(),
+                actual: controller_document_verification_method,
             });
         }
         let cryptosuite = cryptosuite.into();
@@ -268,6 +287,8 @@ impl VerificationEvidence {
             proof_purpose: request.proof_purpose.clone(),
             verification_method: request.verification_method.clone(),
             controller: request.expected_controller.clone(),
+            controller_document_controller,
+            controller_document_verification_method,
             verification_relationship,
             controller_document_ref,
             controller_document_digest,
@@ -320,8 +341,22 @@ impl VerificationEvidence {
             expected_verification_relationship: self.verification_relationship.clone(),
         };
         request.validate_structure()?;
+        self.controller_document_controller.validate_structure()?;
+        self.controller_document_verification_method.validate_structure()?;
+        if self.controller_document_controller != self.controller {
+            return Err(VerificationFailure::ControllerMismatch {
+                expected: self.controller.clone(),
+                actual: self.controller_document_controller.clone(),
+            });
+        }
+        if self.controller_document_verification_method != self.verification_method {
+            return Err(VerificationFailure::VerificationMethodMismatch {
+                expected: self.verification_method.clone(),
+                actual: self.controller_document_verification_method.clone(),
+            });
+        }
 
-        for (name, value) in [
+        for (name, value) [
             ("controller document reference", self.controller_document_ref.as_str()),
             ("verification relationship", self.verification_relationship.as_str()),
             ("cryptosuite", self.cryptosuite.as_str()),
@@ -354,6 +389,8 @@ impl VerificationEvidence {
             && self.proof_purpose == request.proof_purpose
             && self.verification_method == request.verification_method
             && self.controller == request.expected_controller
+            && self.controller_document_controller == request.expected_controller
+            && self.controller_document_verification_method == request.verification_method
             && self.verification_relationship == request.expected_verification_relationship
     }
 }
@@ -389,6 +426,10 @@ pub enum VerificationFailure {
     ControllerMismatch {
         expected: ClaimControllerIdentity,
         actual: ClaimControllerIdentity,
+    },
+    VerificationMethodMismatch {
+        expected: ClaimVerificationMethod,
+        actual: ClaimVerificationMethod,
     },
     VerificationRelationshipMismatch {
         expected: ClaimVerificationRelationship,
@@ -519,6 +560,8 @@ mod tests {
             &request,
             "https://example.test/controller",
             &"11".repeat(32),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
@@ -547,6 +590,8 @@ mod tests {
                 &request,
                 "https://example.test/controller",
                 "not-a-digest",
+                ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+                ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
                 "assertionMethod",
                 "ed25519",
                 &"22".repeat(32),
@@ -572,6 +617,8 @@ mod tests {
                 &request,
                 "https://example.test/controller",
                 &"11".repeat(32),
+                ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+                ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
                 "authentication",
                 "ed25519",
                 &"22".repeat(32),
@@ -595,6 +642,8 @@ mod tests {
             &request,
             "https://example.test/controller",
             &"11".repeat(32),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
@@ -628,6 +677,8 @@ mod tests {
             &changed_request,
             "https://example.test/controller",
             &"11".repeat(32),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
