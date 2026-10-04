@@ -266,7 +266,7 @@ impl AuthorizationClockPolicy {
             if expiry <= issued || now > expiry + skew {
                 return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
             }
-            if expiry > issued + Duration::from_secs(self.max_age_seconds) {
+            if expiry > issued + Duration::seconds(self.max_age_seconds as i64) {
                 return Err(AuthorizationConsumptionError::AuthorizationValidityWindowFailed.into());
             }
         }
@@ -722,6 +722,11 @@ fn append_len_prefixed<H: Digest>(hasher: &mut H, value: &[u8]) {
     hasher.update(value);
 }
 
+fn append_len_prefixed_bytes(buffer: &mut Vec<u8>, value: &[u8]) {
+    buffer.extend_from_slice(&(value.len() as u64).to_be_bytes());
+    buffer.extend_from_slice(value);
+}
+
 fn compute_attempt_binding_digest(
 
     authorization_instance: &str,
@@ -781,11 +786,11 @@ fn compute_attempt_binding_digest(
         status_evidence_digest,
         validity_issued_at,
     ] {
-        append_len_prefixed(&mut material, value.as_bytes());
+        append_len_prefixed_bytes(&mut material, value.as_bytes());
     }
     material.push(u8::from(validity_expires_at.is_some()));
-    append_len_prefixed(&mut material, validity_expires_at.unwrap_or("").as_bytes());
-    append_len_prefixed(&mut material, validity_policy_digest.as_bytes());
+    append_len_prefixed_bytes(&mut material, validity_expires_at.unwrap_or("").as_bytes());
+    append_len_prefixed_bytes(&mut material, validity_policy_digest.as_bytes());
     format!("sha256:{}", hex::encode(Sha256::digest(material)))
 }
 
@@ -1527,6 +1532,12 @@ impl SqliteAuthorizationStore {
                     params![configuration.verifier_config_digest.as_str()],
                 )?;
             }
+            _ => {
+                return Err(AuthorizationStoreError::InvalidState(
+                    "provider status verifier metadata is partially configured".into(),
+                ));
+            }
+            }
         }
         tx.commit()?;
         Ok(())
@@ -1952,8 +1963,8 @@ fn normalize_native_issuer(issuer: &str) -> String {
                 return issuer.to_owned();
             }
         }
-        let path = url.path().trim_end_matches('/');
-        url.set_path(path);
+        let path = url.path().trim_end_matches('/').to_owned();
+        url.set_path(&path);
         return url.to_string();
     }
 
@@ -2015,15 +2026,15 @@ fn validate_native_authority_pin_set(
         canonical.extend_from_slice(b"symthaea:gis:native-pin-set:v1\n");
         for row in rows {
             let (issuer, namespace) = row?;
-            append_len_prefixed(&mut canonical, issuer.as_bytes());
-            append_len_prefixed(&mut canonical, namespace.as_bytes());
+            append_len_prefixed_bytes(&mut canonical, issuer.as_bytes());
+            append_len_prefixed_bytes(&mut canonical, namespace.as_bytes());
         }
 
         let pin_set_id = self.native_authority_pin_set_id();
         let mut digest_material = Vec::with_capacity(canonical.len() + pin_set_id.len() + 64);
         digest_material.extend_from_slice(b"symthaea:gis:native-pin-set-digest:v2\n");
-        append_len_prefixed(&mut digest_material, pin_set_id.as_bytes());
-        append_len_prefixed(&mut digest_material, &canonical);
+        append_len_prefixed_bytes(&mut digest_material, pin_set_id.as_bytes());
+        append_len_prefixed_bytes(&mut digest_material, &canonical);
         let pin_set_digest = format!("sha256:v2:{}", hex::encode(Sha256::digest(&digest_material)));
         let snapshot = hex::encode(&canonical);
 
@@ -2199,7 +2210,7 @@ fn validate_native_authority_pin_set(
         if bound.is_some() {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
-        let mut lease = load_lease(&tx, &witness.authorization_instance)?
+        let lease = load_lease(&tx, &witness.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
         lease.prepare_for_execution(witness, action, current_frame, attempt_id)?;
         tx.execute(
@@ -2504,7 +2515,7 @@ fn validate_native_authority_pin_set(
             &authority_namespace,
         )?;
         let replay = super::NativeReplayDerivation::derive(
-            authority_namespace,
+            authority_namespace.clone(),
             native_authorization_id,
         )
         .map_err(|_| AuthorizationConsumptionError::InvalidNativeReplayProvenance)?;
@@ -3586,7 +3597,7 @@ fn validate_native_authority_pin_set(
             let mut connection = self.connection()?;
             let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
             let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
-            if matches!(persisted_state, "succeeded" | "failed") {
+            if matches!(persisted_state.as_str(), "succeeded" | "failed") {
                 if let Some(receipt) =
                     load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")?
                 {
@@ -4204,7 +4215,7 @@ fn validate_native_authority_pin_set(
         let verified = verifier
             .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
-        Self::validate_verified_terminal_outcome(record, &verified)?;
+        self.validate_verified_terminal_outcome(record, &verified)?;
         if verified.configuration != pinned_verifier {
             return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
         }
@@ -4330,6 +4341,8 @@ fn validate_native_authority_pin_set(
             for row in rows {
                 recovered.push(row?);
             }
+            drop(rows);
+            drop(stmt);
         }
 
         for (instance, action_id, attempt_id, action_digest, authority_epoch, lease_boundary, lease_state) in &recovered {
@@ -4341,7 +4354,7 @@ fn validate_native_authority_pin_set(
                 }
                 let (record, dispatch_state) =
                     load_persisted_dispatch_record(&tx, instance, attempt_id, boundary_id)?;
-                if dispatch_state != lease_state
+                if dispatch_state.as_str() != lease_state.as_str()
                     || dispatch_state != "dispatch_pending" && dispatch_state != "invoked"
                 {
                     return Err(AuthorizationConsumptionError::InvalidBinding.into());
@@ -4408,7 +4421,7 @@ fn validate_native_authority_pin_set(
                     receipt.authority_epoch as i64,
                     lease_boundary,
                     lease_boundary.map(|boundary|
-                        compute_attempt_scope_digest(boundary,&receipt.attempt_id)
+                        compute_attempt_scope_digest(boundary.as_str(),&receipt.attempt_id)
                     ).transpose()?,
                 ],
             )?;
@@ -7180,8 +7193,8 @@ mod tests {
         let snapshot_bytes=hex::decode(&snapshot.2).unwrap();
         let mut digest_material=Vec::new();
         digest_material.extend_from_slice(b"symthaea:gis:native-pin-set-digest:v2\n");
-        append_len_prefixed(&mut digest_material,snapshot.0.as_bytes());
-        append_len_prefixed(&mut digest_material,&snapshot_bytes);
+        append_len_prefixed_bytes(&mut digest_material,snapshot.0.as_bytes());
+        append_len_prefixed_bytes(&mut digest_material,&snapshot_bytes);
         assert_eq!(
             format!("sha256:v2:{}",hex::encode(Sha256::digest(digest_material))),
             snapshot.1
