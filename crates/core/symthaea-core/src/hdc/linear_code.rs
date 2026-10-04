@@ -829,13 +829,8 @@ impl Iterator for LinearCodeFactorizationFiberIter<'_> {
 impl ExactSizeIterator for LinearCodeFactorizationFiberIter<'_> {}
 
 impl LinearCodeFactorizationFiber {
-    /// Return one coefficient tuple selected by a GF(2) mask over the kernel basis.
-    ///
-    /// The returned tuple is guaranteed to remain in the same affine fiber when the
-    /// certificate is valid. A mask length mismatch is rejected.
-    pub fn coefficients_for_mask(&self, mask: &[bool]) -> Option<Vec<bool>> {
-        if mask.len() != self.kernel_basis.len()
-            || self.cardinality.exponent() != self.kernel_basis.len()
+    fn basis_is_well_formed(&self) -> bool {
+        if self.cardinality.exponent() != self.kernel_basis.len()
             || self
                 .kernel_basis
                 .iter()
@@ -843,6 +838,42 @@ impl LinearCodeFactorizationFiber {
                     witness.generator_coefficients.len() != self.representative_coefficients.len()
                 })
         {
+            return false;
+        }
+
+        let mut dependent_indices = self
+            .kernel_basis
+            .iter()
+            .map(|witness| witness.dependent_generator_index)
+            .collect::<Vec<_>>();
+        dependent_indices.sort_unstable();
+        dependent_indices.dedup();
+        if dependent_indices.len() != self.kernel_basis.len() {
+            return false;
+        }
+
+        let coefficient_basis = self
+            .kernel_basis
+            .iter()
+            .map(|witness| {
+                let mut vector = BinaryCodeword::zero(self.representative_coefficients.len());
+                for (index, coefficient) in witness.generator_coefficients.iter().enumerate() {
+                    vector.set_bit(index, *coefficient);
+                }
+                vector
+            })
+            .collect::<Vec<_>>();
+        basis_rank(&coefficient_basis, self.representative_coefficients.len())
+            == self.kernel_basis.len()
+    }
+
+    /// Return one coefficient tuple selected by a GF(2) mask over the kernel basis.
+    /// Return one coefficient tuple selected by a GF(2) mask over the kernel basis.
+    ///
+    /// The returned tuple is guaranteed to remain in the same affine fiber when the
+    /// certificate is valid. A mask length mismatch is rejected.
+    pub fn coefficients_for_mask(&self, mask: &[bool]) -> Option<Vec<bool>> {
+        if mask.len() != self.kernel_basis.len() || !self.basis_is_well_formed() {
             return None;
         }
 
@@ -866,12 +897,7 @@ impl LinearCodeFactorizationFiber {
         &self,
         max_fibers: usize,
     ) -> Option<LinearCodeFactorizationFiberIter<'_>> {
-        if self.cardinality.exponent() != self.kernel_basis.len()
-            || self
-                .kernel_basis
-                .iter()
-                .any(|witness| witness.generator_coefficients.len() != self.representative_coefficients.len())
-        {
+        if !self.basis_is_well_formed() {
             return None;
         }
 
