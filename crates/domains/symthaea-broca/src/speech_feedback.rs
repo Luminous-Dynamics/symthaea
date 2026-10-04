@@ -145,6 +145,18 @@ impl SpeechFeedbackReceipt {
     }
 
     /// Validate the persisted receipt, including its cached derived error.
+    pub fn validate_against_plan(
+        &self,
+        plan: &SpeechPlan,
+    ) -> Result<(), SpeechFeedbackReceiptError> {
+        self.validate()?;
+        let expected_target = SpeechSensoryTarget::from_plan(plan);
+        if self.plan_surface != plan.grounding_surface() || self.target != expected_target {
+            return Err(SpeechFeedbackReceiptError::PlanMismatch);
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), SpeechFeedbackReceiptError> {
         if self.version != SPEECH_FEEDBACK_VERSION {
             return Err(SpeechFeedbackReceiptError::InvalidVersion);
@@ -178,6 +190,7 @@ pub enum SpeechFeedbackReceiptError {
     EmptyPlanSurface,
     InvalidTarget,
     ErrorMismatch,
+    PlanMismatch,
 }
 
 impl std::fmt::Display for SpeechFeedbackReceiptError {
@@ -187,6 +200,7 @@ impl std::fmt::Display for SpeechFeedbackReceiptError {
             Self::EmptyPlanSurface => write!(f, "speech feedback receipt requires a plan grounding surface"),
             Self::InvalidTarget => write!(f, "speech feedback receipt target is outside supported ranges"),
             Self::ErrorMismatch => write!(f, "speech feedback receipt error does not match its target and observation"),
+            Self::PlanMismatch => write!(f, "speech feedback receipt is not bound to the supplied speech plan"),
         }
     }
 }
@@ -214,6 +228,18 @@ mod tests {
     use crate::decoder::StructuredDecoder;
     use crate::encoder::ThoughtChannels;
     use symthaea_core::genesis::GenesisSeed;
+
+    #[test]
+    fn receipt_lineage_matches_exact_plan() {
+        let genesis = GenesisSeed::from_phrase("broca-feedback-lineage");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(4);
+        let readout = decoder.decode(&channels);
+        let plan = SpeechPlan::from_readout(&channels, &readout);
+        let receipt = SpeechFeedbackReceipt::new(&plan, SpeechSensoryObservation::default());
+
+        assert!(receipt.validate_against_plan(&plan).is_ok());
+    }
 
     #[test]
     fn receipt_validation_accepts_fresh_receipts() {
