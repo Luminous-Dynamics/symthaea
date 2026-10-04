@@ -123,8 +123,8 @@ jobs:
 
           cargo +1.96.1 generate-lockfile --manifest-path "$HARNESS/Cargo.toml"
           LOCK_SHA256="$(sha256sum "$HARNESS/Cargo.lock" | cut -d" " -f1)"
-          CARGO_VERSION="$(cargo --version)"
-          RUSTC_VERSION="$(rustc --version)"
+          CARGO_VERSION="$(cargo +1.96.1 --version)"
+          RUSTC_VERSION="$(rustc +1.96.1 --version)"
           UNIT_TEST_COUNT="$(cargo +1.96.1 test --locked --manifest-path "$HARNESS/Cargo.toml" --lib linear_code -- --list | awk '/^[^[:space:]].*: test$/ { count++ } END { print count+0 }')"
           INTEGRATION_TEST_COUNT="$(cargo +1.96.1 test --locked --manifest-path "$HARNESS/Cargo.toml" --test linear_code_ambiguity -- --list | awk '/^[^[:space:]].*: test$/ { count++ } END { print count+0 }')"
           echo "path=$HARNESS" >> "$GITHUB_OUTPUT"
@@ -178,7 +178,7 @@ jobs:
       - name: Capture deterministic code geometry ledger
         id: geometry
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity small_code_geometry_ledger_is_exhaustively_self_consistent -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity small_code_geometry_ledger_is_exhaustively_self_consistent -- --nocapture 2>&1)"
           GEOMETRY_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^GEOMETRY_LEDGER=')"
           test "$GEOMETRY_LEDGER_COUNT" -eq 1
           GEOMETRY_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^GEOMETRY_LEDGER=//p')"
@@ -188,7 +188,7 @@ jobs:
       - name: Capture geometry seed sweep
         id: geometry_sweep
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity small_code_geometry_seed_sweep_is_exhaustively_self_consistent -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity small_code_geometry_seed_sweep_is_exhaustively_self_consistent -- --nocapture 2>&1)"
           GEOMETRY_SWEEP_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^GEOMETRY_SWEEP=')"
           test "$GEOMETRY_SWEEP_COUNT" -eq 4
           GEOMETRY_SWEEP="$(printf '%s\n' "$OUTPUT" | sed -n 's/^GEOMETRY_SWEEP=//p' | paste -sd '|' -)"
@@ -198,7 +198,7 @@ jobs:
       - name: Capture published-grid search-space ledger
         id: search_space
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity published_parameter_search_space_ledger_is_exact -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity published_parameter_search_space_ledger_is_exact -- --nocapture 2>&1)"
           SEARCH_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SEARCH_LEDGER=')"
           test "$SEARCH_LEDGER_COUNT" -eq 1
           SEARCH_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SEARCH_LEDGER=//p')"
@@ -208,7 +208,7 @@ jobs:
       - name: Capture published-parameter storage ledger
         id: storage
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity published_parameter_storage_ledger_is_exact_and_packed_consistent -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity published_parameter_storage_ledger_is_exact_and_packed_consistent -- --nocapture 2>&1)"
           STORAGE_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^STORAGE_LEDGER=')"
           test "$STORAGE_LEDGER_COUNT" -eq 1
           STORAGE_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^STORAGE_LEDGER=//p')"
@@ -218,7 +218,7 @@ jobs:
       - name: Capture paper-scale binding recovery matrix
         id: paper_matrix
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity paper_scale_binding_recovery_smoke_matrix_is_valid -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity paper_scale_binding_recovery_smoke_matrix_is_valid -- --nocapture 2>&1)"
           PAPER_MATRIX_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^PAPER_MATRIX=')"
           test "$PAPER_MATRIX_COUNT" -eq 1
           PAPER_MATRIX="$(printf '%s\n' "$OUTPUT" | sed -n 's/^PAPER_MATRIX=//p')"
@@ -234,7 +234,7 @@ jobs:
       - name: Capture deterministic work ledger
         id: work
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_work_ledger_is_deterministic_and_semantically_linked -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_work_ledger_is_deterministic_and_semantically_linked -- --nocapture 2>&1)"
           WORK_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^WORK_LEDGER=')"
           test "$WORK_LEDGER_COUNT" -eq 1
           WORK_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^WORK_LEDGER=//p')"
@@ -244,7 +244,7 @@ jobs:
       - name: Capture small-fixture scaling ledger
         id: scaling
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_work_scales_over_small_structural_fixtures -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_work_scales_over_small_structural_fixtures -- --nocapture 2>&1)"
           SCALING_LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^SCALING_LEDGER=')"
           test "$SCALING_LEDGER_COUNT" -eq 3
           SCALING_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^SCALING_LEDGER=//p' | paste -sd '|' -)"
@@ -254,7 +254,7 @@ jobs:
       - name: Capture packing-boundary qualification
         id: packing
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_crosses_u64_packing_boundaries -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity recovery_crosses_u64_packing_boundaries -- --nocapture 2>&1)"
           PACKING_BOUNDARY_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^PACKING_BOUNDARY=')"
           test "$PACKING_BOUNDARY_COUNT" -eq 3
           PACKING_BOUNDARY="$(printf '%s\n' "$OUTPUT" | sed -n 's/^PACKING_BOUNDARY=//p' | paste -sd '|' -)"
@@ -264,7 +264,7 @@ jobs:
       - name: Capture exact algebraic multiplicity ledger
         id: algebraic
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity algebraic_multiplicity_ledger_is_exhaustively_self_consistent -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity algebraic_multiplicity_ledger_is_exhaustively_self_consistent -- --nocapture 2>&1)"
           LEDGER_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^ALGEBRAIC_LEDGER=')"
           test "$LEDGER_COUNT" -eq 1
           ALGEBRAIC_LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^ALGEBRAIC_LEDGER=//p')"
@@ -274,7 +274,7 @@ jobs:
       - name: Capture bounded affine-fiber enumeration
         id: affine_fiber
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity bounded_affine_fiber_iterator_exhausts_declared_multiplicity -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity bounded_affine_fiber_iterator_exhausts_declared_multiplicity -- --nocapture 2>&1)"
           ENUMERATION_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^AFFINE_FIBER_ENUMERATION=')"
           test "$ENUMERATION_COUNT" -eq 1
           AFFINE_FIBER_ENUMERATION="$(printf '%s\n' "$OUTPUT" | sed -n 's/^AFFINE_FIBER_ENUMERATION=//p')"
@@ -283,7 +283,7 @@ jobs:
       - name: Capture higher-order dependency stress
         id: higher_order
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity higher_order_dependency_stress_has_pairwise_trivial_cases -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity higher_order_dependency_stress_has_pairwise_trivial_cases -- --nocapture 2>&1)"
           SWEEP_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^HIGHER_ORDER_SWEEP=')"
           test "$SWEEP_COUNT" -eq 1
           HIGHER_ORDER_SWEEP="$(printf '%s\n' "$OUTPUT" | sed -n 's/^HIGHER_ORDER_SWEEP=//p')"
@@ -292,7 +292,7 @@ jobs:
       - name: Capture dependency witness evidence
         id: witness
         run: |
-          OUTPUT="$(cargo test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity dependency_witness_ledger_is_canonical_and_verifiable -- --nocapture 2>&1)"
+          OUTPUT="$(cargo +1.96.1 test --locked --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" --test linear_code_ambiguity dependency_witness_ledger_is_canonical_and_verifiable -- --nocapture 2>&1)"
           WITNESS_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^DEPENDENCY_WITNESS=')"
           test "$WITNESS_COUNT" -eq 1
           DEPENDENCY_WITNESS="$(printf '%s\n' "$OUTPUT" | sed -n 's/^DEPENDENCY_WITNESS=//p')"
