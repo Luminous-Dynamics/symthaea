@@ -35,11 +35,12 @@ pub struct NixGenerationObservation {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NixSystemObservation {
-    /// Privacy-preserving stable identity for this NixOS installation.
+    /// Stable pseudonymous identity for this NixOS installation.
     ///
     /// The raw /etc/machine-id is never carried in the observation. The
     /// identity is an application-specific BLAKE3 derivation so callers cannot
-    /// silently relabel a live observation as another target.
+    /// silently relabel a live observation as another target. This is
+    /// pseudonymization, not anonymity or unlinkability.
     pub target_identity: TargetId,
     pub generations: Vec<NixGenerationObservation>,
     pub system_profile_generation: u64,
@@ -102,17 +103,23 @@ impl From<serde_json::Error> for SscObservationError {
 
 impl NixSystemObservation {
     pub fn observe() -> Result<Self, SscObservationError> {
+        // Capture /run/current-system once and reuse the exact value that was
+        // used to classify generation.current. Re-reading it later could mix
+        // two adjacent atomic NixOS transitions into one observation.
         let current_system_realization = read_realization(Path::new(NIXOS_CURRENT_SYSTEM))?;
         let generations = observe_generations(&current_system_realization)?;
         let target_identity = read_target_identity(Path::new(NIXOS_MACHINE_ID))?;
+        let system_profile_generation = read_profile_generation(Path::new(NIXOS_SYSTEM_PROFILE))?;
+        let system_profile_realization = read_realization(Path::new(NIXOS_SYSTEM_PROFILE))?;
+        let booted_system_realization = read_realization(Path::new(NIXOS_BOOTED_SYSTEM))?;
 
         let observation = Self {
             target_identity,
             generations,
-            system_profile_generation: read_profile_generation(Path::new(NIXOS_SYSTEM_PROFILE))?,
-            system_profile_realization: read_realization(Path::new(NIXOS_SYSTEM_PROFILE))?,
-            current_system_realization: read_realization(Path::new(NIXOS_CURRENT_SYSTEM))?,
-            booted_system_realization: read_realization(Path::new(NIXOS_BOOTED_SYSTEM))?,
+            system_profile_generation,
+            system_profile_realization,
+            current_system_realization,
+            booted_system_realization,
         };
         observation.validate()?;
         Ok(observation)
