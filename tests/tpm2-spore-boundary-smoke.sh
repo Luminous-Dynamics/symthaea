@@ -31,7 +31,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for cmd in swtpm swtpm_setup tpm2_startup tpm2_shutdown tpm2_getcap tpm2_nvdefine tpm2_nvincrement tpm2_nvreadpublic tpm2_nvread tpm2_createprimary tpm2_readpublic tpm2_quote tpm2_checkquote tpm2_nvcertify tpm2_verifysignature tpm2_nvundefine tpm2_print od sha256sum tr grep; do
+for cmd in swtpm swtpm_setup tpm2_startup tpm2_shutdown tpm2_getcap tpm2_nvdefine tpm2_nvincrement tpm2_nvreadpublic tpm2_nvread tpm2_createprimary tpm2_readpublic tpm2_quote tpm2_checkquote tpm2_nvcertify tpm2_verifysignature tpm2_nvundefine tpm2_print od sha256sum tr grep sed; do
   command -v "$cmd" >/dev/null || { echo "missing required command: $cmd" >&2; exit 2; }
 done
 
@@ -117,7 +117,7 @@ tpm2_quote -Q -c "$ROOT/ak-after-restart.ctx" -l sha256:7 -q "$POST_RESTART_CHAL
 tpm2_print -Q -t TPMS_ATTEST "$ROOT/quote-after-restart.attest" > "$ROOT/quote-after-restart.yaml"
 tpm2_checkquote -Q -u "$ROOT/ak-after-restart.pem" -m "$ROOT/quote-after-restart.attest" -s "$ROOT/quote-after-restart.sig" -f "$ROOT/quote-after-restart.pcrs" -g sha256 -q "$POST_RESTART_CHALLENGE" -l sha256:7
 
-QUOTE_SIGNER=$(awk '$1 == "qualifiedSigner:" { print $2; exit }' "$ROOT/quote-after-restart.yaml")
+QUOTE_SIGNER=$(grep -m1 '^qualifiedSigner:' "$ROOT/quote-after-restart.yaml" | sed 's/^qualifiedSigner:[[:space:]]*//')
 [ -n "$QUOTE_SIGNER" ] || {
   echo "ERROR: post-restart Quote is missing a qualified signer" >&2
   exit 1
@@ -128,20 +128,20 @@ tpm2_nvcertify -Q -C "$ROOT/ak-after-restart.ctx" -c "$NV_INDEX" -p "$NV_AUTH" -
 test -s "$ROOT/nv.attest"
 test -s "$ROOT/nv.sig"
 tpm2_print -Q -t TPMS_ATTEST "$ROOT/nv.attest" > "$ROOT/nv.yaml"
-NV_EXTRA_DATA=$(awk '$1 == "extraData:" { print $2; exit }' "$ROOT/nv.yaml")
+NV_EXTRA_DATA=$(grep -m1 '^extraData:' "$ROOT/nv.yaml" | sed 's/^extraData:[[:space:]]*//')
 [ "$NV_EXTRA_DATA" = "$POST_RESTART_CHALLENGE" ] || {
   echo "ERROR: NV_Certify attestation did not bind the fresh challenge" >&2
   exit 1
 }
 grep -Fq "type: 8014" "$ROOT/nv.yaml"
-NV_SIGNER=$(awk '$1 == "qualifiedSigner:" { print $2; exit }' "$ROOT/nv.yaml")
+NV_SIGNER=$(grep -m1 '^qualifiedSigner:' "$ROOT/nv.yaml" | sed 's/^qualifiedSigner:[[:space:]]*//')
 [ "$NV_SIGNER" = "$QUOTE_SIGNER" ] || {
   echo "ERROR: NV_Certify was signed by a different qualified signer than the Quote" >&2
   exit 1
 }
 grep -Fq "indexName:" "$ROOT/nv.yaml"
 grep -Fq "offset: 0" "$ROOT/nv.yaml"
-NV_CONTENTS=$(awk '$1 == "nvContents:" { print $2; exit }' "$ROOT/nv.yaml")
+NV_CONTENTS=$(grep -m1 '^      nvContents:' "$ROOT/nv.yaml" | sed 's/^ *nvContents:[[:space:]]*//')
 [ "$NV_CONTENTS" = "0000000000000002" ] || {
   echo "ERROR: NV_Certify did not certify the expected generation-2 counter contents" >&2
   exit 1
