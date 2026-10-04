@@ -2,23 +2,9 @@ name: HDC Linear-Code Recovery Qualification
 
 on:
   pull_request:
-    paths:
-      - "crates/core/symthaea-core/Cargo.toml"
-      - "crates/core/symthaea-core/src/hdc/linear_code.rs"
-      - "crates/core/symthaea-core/src/hdc/mod.rs"
-      - "crates/core/symthaea-core/tests/linear_code_ambiguity.rs"
-      - "docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md"
-      - ".github/workflows/hdc-linear-code-qualify.yml"
   push:
     branches:
       - "research/hdc-linear-code-recovery-design-v1"
-    paths:
-      - "crates/core/symthaea-core/Cargo.toml"
-      - "crates/core/symthaea-core/src/hdc/linear_code.rs"
-      - "crates/core/symthaea-core/src/hdc/mod.rs"
-      - "crates/core/symthaea-core/tests/linear_code_ambiguity.rs"
-      - "docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md"
-      - ".github/workflows/hdc-linear-code-qualify.yml"
   workflow_dispatch:
 
 concurrency:
@@ -31,6 +17,10 @@ env:
 
 jobs:
   qualify:
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || github.ref == 'refs/heads/research/hdc-linear-code-recovery-design-v1'
+          || github.event.pull_request.head.ref == 'research/hdc-linear-code-recovery-design-v1' }}
     name: Exact-head linear-code qualification
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -55,9 +45,9 @@ jobs:
 
       - name: Enforce research surface
         id: scope
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ steps.head.outputs.sha }}
         run: |
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
@@ -78,9 +68,11 @@ jobs:
                 ;;
             esac
           done < "$CHANGED_PATHS"
-          EXPECTED_COUNT=6
           ACTUAL_COUNT="$(wc -l < "$CHANGED_PATHS" | tr -d " ")"
-          test "$ACTUAL_COUNT" -eq "$EXPECTED_COUNT"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            EXPECTED_COUNT=6
+            test "$ACTUAL_COUNT" -eq "$EXPECTED_COUNT"
+          fi
           printf "changed_paths=" >> "$GITHUB_OUTPUT"
           paste -sd "|" "$CHANGED_PATHS" >> "$GITHUB_OUTPUT"
 
@@ -361,7 +353,7 @@ jobs:
           source_sha256=${{ steps.provenance.outputs.source_sha256 }}
           integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
           qualification_workflow_sha256=${{ steps.provenance.outputs.workflow_sha256 }}
-          research_surface_status=${{ github.event_name == 'pull_request' && steps.scope.outcome || 'not-applicable' }}
+          research_surface_status=${{ (github.event_name == 'pull_request' || github.event_name == 'push') && steps.scope.outcome || 'not-applicable' }}
           research_surface_paths=${{ steps.scope.outputs.changed_paths }}
           rust_toolchain_file_sha256=${{ steps.provenance.outputs.toolchain_file_sha256 }}
           cargo_version=${{ steps.harness.outputs.cargo_version }}
