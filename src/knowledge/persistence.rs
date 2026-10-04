@@ -3285,6 +3285,7 @@ fn verify_snapshot_validation_receipts_in_tx(
         .map_err(|e| format!("Query validation receipts for verification: {e}"))?;
 
     let mut expected_sequence = 1_u64;
+    let mut previous_generation: Option<u64> = None;
     for row in rows {
         let (receipt, validation_sequence, stored_digest, linked_snapshot_digest) =
             row.map_err(|e| format!("Load validation receipt for verification: {e}"))?;
@@ -3292,6 +3293,16 @@ fn verify_snapshot_validation_receipts_in_tx(
         receipt
             .validate_input()
             .map_err(|e| format!("Invalid persisted snapshot validation receipt: {e}"))?;
+
+        if let Some(previous_generation) = previous_generation {
+            if receipt.generation < previous_generation {
+                return Err(format!(
+                    "Snapshot validation receipt generation regression at sequence {}: previous {}, observed {}",
+                    validation_sequence, previous_generation, receipt.generation
+                ));
+            }
+        }
+        previous_generation = Some(receipt.generation);
 
         let Some(linked_snapshot_digest) = linked_snapshot_digest else {
             return Err(format!(
@@ -7501,6 +7512,110 @@ mod tests {
 
         let current_err = p.latest_snapshot_validation_receipt_records().unwrap_err();
         assert!(current_err.starts_with("Snapshot receipt digest mismatch: generation 2"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_validation_receipt_verifier_rejects_generation_regression() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_validation_generation_regression_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let first_fact = FactRecord {
+            memory_id: "generation-regression-one".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x81; BinaryHV::BYTES],
+            source_text: "generation regression one".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&first_fact), &[], &[], &[])
+            .unwrap();
+        let first_snapshot = p.latest_snapshot_receipt().unwrap().unwrap();
+
+        p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:generation-one".into(),
+            generation: first_snapshot.generation,
+            snapshot_digest_hex: first_snapshot.canonical_digest_hex.clone(),
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        })
+        .unwrap();
+
+        let second_fact = FactRecord {
+            memory_id: "generation-regression-two".into(),
+            source_text: "generation regression two".into(),
+            cycle: 2,
+            ..first_fact
+        };
+        p.save_snapshot(std::slice::from_ref(&second_fact), &[], &[], &[])
+            .unwrap();
+        let second_snapshot = p.latest_snapshot_receipt().unwrap().unwrap();
+
+        p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:generation-two".into(),
+            generation: second_snapshot.generation,
+            snapshot_digest_hex: second_snapshot.canonical_digest_hex.clone(),
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        })
+        .unwrap();
+
+        // Bypass the application writer and append a sequence-3 row that is internally
+        // self-consistent but points backwards to generation 1.
+        let late_validation = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:generation-regression".into(),
+            generation: first_snapshot.generation,
+            snapshot_digest_hex: first_snapshot.canonical_digest_hex,
+            validator_ref: "validator:tamper-sim".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        };
+        let sequence = 3_u64;
+        let receipt_digest = late_validation.canonical_digest_hex_for_sequence(sequence);
+        let conn = p.open_connection().unwrap();
+        conn.execute(
+            "INSERT INTO knowledge_snapshot_validation_receipts
+             (validation_event, validation_sequence, generation, snapshot_digest_hex,
+              validator_ref, validator_version, validation_profile, conforms,
+              report_digest_hex, receipt_digest_hex)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            rusqlite::params![
+                late_validation.validation_event,
+                i64::try_from(sequence).unwrap(),
+                i64::try_from(late_validation.generation).unwrap(),
+                late_validation.snapshot_digest_hex,
+                late_validation.validator_ref,
+                late_validation.validator_version,
+                late_validation.validation_profile,
+                late_validation.conforms,
+                late_validation.report_digest_hex,
+                receipt_digest
+            ],
+        )
+        .unwrap();
+
+        let err = p.verify_snapshot_validation_receipts().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot validation receipt generation regression at sequence 3: previous 2, observed 1"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
