@@ -333,6 +333,7 @@ fn dependency_witness_ledger_is_canonical_and_verifiable() {
     assert_eq!(first, kernel[0]);
     assert_eq!(first.generator_coefficients, vec![true, true, true]);
     assert_eq!(first.factor_support, vec![0, 1, 2]);
+    assert_eq!(first.dependent_generator_index, 2);
     assert_eq!(first.generator_support_size(), 3);
     assert_eq!(first.factor_support_size(), 3);
     assert!(first.verifies_against(&factors));
@@ -416,8 +417,9 @@ fn dependency_witness_ledger_is_canonical_and_verifiable() {
     );
 
     println!(
-        "DEPENDENCY_WITNESS=fixture=three-way;kernel_dimension={};generator_coefficients=111;factor_support=0,1,2;generator_support_size={};factor_support_size={};verifies=true",
+        "DEPENDENCY_WITNESS=fixture=three-way;kernel_dimension={};generator_coefficients=111;factor_support=0,1,2;dependent_generator_index={};generator_support_size={};factor_support_size={};verifies=true",
         algebra.kernel_dimension,
+        first.dependent_generator_index,
         first.generator_support_size(),
         first.factor_support_size(),
     );
@@ -720,6 +722,13 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                         let kernel_basis = factorization_kernel_basis(&factors)
                             .expect("dependent factors must expose a complete kernel basis");
                         assert_eq!(kernel_basis.len(), algebra.kernel_dimension);
+                        let mut dependent_indices = kernel_basis
+                            .iter()
+                            .map(|witness| witness.dependent_generator_index)
+                            .collect::<Vec<_>>();
+                        dependent_indices.sort_unstable();
+                        dependent_indices.dedup();
+                        assert_eq!(dependent_indices.len(), kernel_basis.len());
                         for witness in &kernel_basis {
                             assert!(witness.verifies_against(&factors));
                             assert!(
@@ -749,6 +758,8 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                             for factor_index in &witness.factor_support {
                                 result_digest.update(&(*factor_index as u64).to_le_bytes());
                             }
+                            result_digest
+                                .update(&(witness.dependent_generator_index as u64).to_le_bytes());
                         }
                     }
 
