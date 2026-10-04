@@ -5568,6 +5568,20 @@ mod tests {
         assert!(script.contains("TPM specification major is not confirmed as 2"));
         assert!(script.contains("TPM2_PCRS=\"0+7\""));
         assert!(script.contains("This is LUKS key-release policy, not regenerative-health attestation."));
+
+        let version_gate = script.find("if [ \"$TPM2_SPEC_MAJOR\" != \"2\" ]").unwrap();
+        let enroll_call = script.find("systemd-cryptenroll").unwrap();
+        assert!(version_gate < enroll_call);
+
+        let config_stage = script.find("CONFIG_TMP=$(mktemp").unwrap();
+        let config_replace = script.find("mv -f \"$CONFIG_TMP\" \"$CONFIG_FILE\"").unwrap();
+        assert!(config_stage < config_replace);
+
+        let staged_sed = script
+            .find("sed -i '/boot.initrd.luks.devices.\"cryptroot\"")
+            .unwrap();
+        assert!(config_stage < staged_sed);
+        assert!(staged_sed < config_replace);
     }
 
     // ── config_write_commands (heredoc safety) ──
