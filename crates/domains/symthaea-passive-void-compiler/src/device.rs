@@ -6,15 +6,17 @@
 //!
 //! This is deliberately separate from `compile_flow_void_geometry`: the latter
 //! produces the void/tool geometry used for functional reasoning, while this
-//! module subtracts that void from an explicit material body and adds external
-//! port tunnels.
+//! module subtracts that void from an explicit material body and adds typed
+//! external port tunnels.
 
 use std::collections::BTreeSet;
 
 use symthaea_fabrication_kernel::csg::{CSGNode, Transform3D};
 use symthaea_passive_void_graph::{FunctionalVoidGraph, PortId};
 
-use crate::{compile_flow_void_geometry, CompileError, GeometryEmbedding};
+use crate::{
+    compile_flow_void_geometry, CompileError, GeometryEmbedding, PortInterface,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BodyEnvelope {
@@ -72,10 +74,24 @@ impl BodyEnvelope {
     }
 }
 
+/// A material-device external interface is now a complete typed geometric object.
+///
+/// The legacy port id + direction split is intentionally removed from the
+/// device compiler surface so aperture, plane, normal, and solver identity
+/// cannot silently drift apart.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ExternalPortSpec {
-    pub port: PortId,
-    pub outward_unit: [f32; 3],
+    pub interface: PortInterface,
+}
+
+impl ExternalPortSpec {
+    pub fn new(interface: PortInterface) -> Self {
+        Self { interface }
+    }
+
+    pub fn port(&self) -> PortId {
+        self.interface.port
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,9 +113,9 @@ impl Default for DeviceCompilationSemantics {
 
 /// Compile a material device from a functional void graph.
 ///
-/// The output is a candidate solid body. External ports are modeled as
-/// subtraction tunnels that extend beyond the body envelope. No solver or
-/// transport property is inferred from this compilation.
+/// The output is a candidate solid body. Each external port is represented by
+/// a tunnel whose center, aperture radius, and direction come from the same
+/// validated `PortInterface`. No solver or transport property is inferred.
 pub fn compile_passive_device_geometry(
     graph: &FunctionalVoidGraph,
     embedding: &GeometryEmbedding,
@@ -114,54 +130,71 @@ pub fn compile_passive_device_geometry(
     let mut seen_ports = BTreeSet::new();
 
     for spec in external_ports {
-        if !seen_ports.insert(spec.port) {
+        let interface = spec.interface;
+        if !seen_ports.insert(interface.port) {
             return Err(CompileError::InvalidAnchor(
                 "external port may appear only once".into(),
             ));
         }
+
+        interface.validate(0.001).map_err(|error| {
+            CompileError::InvalidAnchor(format!("invalid typed port interface: {error:?}"))
+        })?;
+
         let anchor = embedding
             .ports
-            .get(&spec.port)
-            .ok_or(CompileError::MissingPortAnchor(spec.port))?;
-        if !anchor.radius_mm.is_finite() || anchor.radius_mm <= 0.0 {
+            .get(&interface.port)
+            .ok_or(CompileError::MissingPortAnchor(interface.port))?;
+        if !same_position_and_radius(
+            anchor.center_mm,
+            anchor.radius_mm,
+            interface.position_mm,
+            interface.radius_mm(),
+            0.001,
+        ) {
             return Err(CompileError::InvalidAnchor(
-                "external port radius must be finite and > 0 mm".into(),
+                "typed port interface does not match the embedding anchor".into(),
             ));
         }
-        if !body.contains_strict(anchor.center_mm) {
+        if !body.contains_strict(interface.position_mm) {
             return Err(CompileError::InvalidAnchor(
-                "external port anchor must lie strictly inside the body".into(),
+                "external port interface position must lie strictly inside the body"
+                    .into(),
             ));
         }
 
-        let direction_length = (
-            spec.outward_unit[0] * spec.outward_unit[0]
-                + spec.outward_unit[1] * spec.outward_unit[1]
-                + spec.outward_unit[2] * spec.outward_unit[2]
-        )
-        .sqrt();
-        if !direction_length.is_finite() || direction_length <= 1.0e-6 {
-            return Err(CompileError::InvalidAnchor(
-                "external port direction must be a finite nonzero vector".into(),
-            ));
-        }
-        let direction = [
-            spec.outward_unit[0] / direction_length,
-            spec.outward_unit[1] / direction_length,
-            spec.outward_unit[2] / direction_length,
-        ];
-        let exit_distance = ray_box_exit_distance(anchor.center_mm, direction, body)?;
-        let extra = anchor.radius_mm * 2.0;
+        let direction = interface.outward_normal_unit;
+        let exit_distance = ray_box_exit_distance(interface.position_mm, direction, body)?;
+        let extra = interface.radius_mm() * 2.0;
         let tunnel_end = [
-            anchor.center_mm[0] + direction[0] * (exit_distance + extra),
-            anchor.center_mm[1] + direction[1] * (exit_distance + extra),
-            anchor.center_mm[2] + direction[2] * (exit_distance + extra),
+            interface.position_mm[0] + direction[0] * (exit_distance + extra),
+            interface.position_mm[1] + direction[1] * (exit_distance + extra),
+            interface.position_mm[2] + direction[2] * (exit_distance + extra),
         ];
-        let tunnel = cylinder_between(anchor.center_mm, tunnel_end, anchor.radius_mm)?;
+        let tunnel = cylinder_between(
+            interface.position_mm,
+            tunnel_end,
+            interface.radius_mm(),
+        )?;
         material = material.subtract(tunnel);
     }
 
     Ok((material, DeviceCompilationSemantics::default()))
+}
+
+fn same_position_and_radius(
+    a_center: [f32; 3],
+    a_radius: f32,
+    b_center: [f32; 3],
+    b_radius: f32,
+    tolerance_mm: f32,
+) -> bool {
+    let center_distance = ((a_center[0] - b_center[0]).powi(2)
+        + (a_center[1] - b_center[1]).powi(2)
+        + (a_center[2] - b_center[2]).powi(2))
+    .sqrt();
+    center_distance <= tolerance_mm
+        && (a_radius - b_radius).abs() <= tolerance_mm
 }
 
 fn ray_box_exit_distance(
@@ -180,7 +213,7 @@ fn ray_box_exit_distance(
     }
     if !best.is_finite() || best <= 0.0 {
         return Err(CompileError::InvalidAnchor(
-            "external port direction does not exit the body envelope".into(),
+            "external port interface normal does not exit the body envelope".into(),
         ));
     }
     Ok(best)
@@ -201,7 +234,8 @@ fn cylinder_between(
         to_mm[1] - from_mm[1],
         to_mm[2] - from_mm[2],
     ];
-    let length = (delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]).sqrt();
+    let length =
+        (delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2]).sqrt();
     if !length.is_finite() || length <= 1.0e-6 {
         return Err(CompileError::InvalidAnchor(
             "connection endpoints must be distinct".into(),
@@ -225,42 +259,116 @@ fn cylinder_between(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compile_flow_void_geometry;
+    use crate::{
+        BoundaryConditionDomain, InterfacePlane, PortAperture, SolverBoundaryIdentity,
+    };
     use symthaea_fabrication_kernel::csg::CSGNode;
-    use symthaea_passive_void_graph::{VoidConnection, VoidPort, VoidRegion, VoidRegionRole, VoidRelation, RegionId};
+    use symthaea_passive_void_graph::{
+        RegionId, VoidConnection, VoidPort, VoidRegion, VoidRegionRole, VoidRelation,
+    };
 
     fn graph() -> FunctionalVoidGraph {
         let mut graph = FunctionalVoidGraph::new();
-        graph.add_region(VoidRegion { id: RegionId(1), role: VoidRegionRole::Inlet }).unwrap();
-        graph.add_region(VoidRegion { id: RegionId(2), role: VoidRegionRole::Outlet }).unwrap();
-        graph.add_port(VoidPort { id: PortId(10), region: RegionId(1) }).unwrap();
-        graph.add_port(VoidPort { id: PortId(20), region: RegionId(2) }).unwrap();
-        graph.connect(VoidConnection {
-            from: PortId(10),
-            to: PortId(20),
-            relation: VoidRelation::FlowPath,
-            bidirectional: false,
-        }).unwrap();
+        graph
+            .add_region(VoidRegion {
+                id: RegionId(1),
+                role: VoidRegionRole::Inlet,
+            })
+            .unwrap();
+        graph
+            .add_region(VoidRegion {
+                id: RegionId(2),
+                role: VoidRegionRole::Outlet,
+            })
+            .unwrap();
+        graph
+            .add_port(VoidPort {
+                id: PortId(10),
+                region: RegionId(1),
+            })
+            .unwrap();
+        graph
+            .add_port(VoidPort {
+                id: PortId(20),
+                region: RegionId(2),
+            })
+            .unwrap();
+        graph
+            .connect(VoidConnection {
+                from: PortId(10),
+                to: PortId(20),
+                relation: VoidRelation::FlowPath,
+                bidirectional: false,
+            })
+            .unwrap();
         graph
     }
 
     fn embedding() -> GeometryEmbedding {
         GeometryEmbedding::default()
-            .with_region(RegionId(1), RegionAnchor { center_mm: [-8.0, 0.0, 0.0], radius_mm: 4.0 })
-            .with_region(RegionId(2), RegionAnchor { center_mm: [8.0, 0.0, 0.0], radius_mm: 4.0 })
-            .with_port(PortId(10), PortAnchor { center_mm: [-8.0, 0.0, 0.0], radius_mm: 2.0 })
-            .with_port(PortId(20), PortAnchor { center_mm: [8.0, 0.0, 0.0], radius_mm: 2.0 })
+            .with_region(
+                RegionId(1),
+                RegionAnchor {
+                    center_mm: [-8.0, 0.0, 0.0],
+                    radius_mm: 4.0,
+                },
+            )
+            .with_region(
+                RegionId(2),
+                RegionAnchor {
+                    center_mm: [8.0, 0.0, 0.0],
+                    radius_mm: 4.0,
+                },
+            )
+            .with_port(
+                PortId(10),
+                PortAnchor {
+                    center_mm: [-8.0, 0.0, 0.0],
+                    radius_mm: 2.0,
+                },
+            )
+            .with_port(
+                PortId(20),
+                PortAnchor {
+                    center_mm: [8.0, 0.0, 0.0],
+                    radius_mm: 2.0,
+                },
+            )
+    }
+
+    fn external_interface(port: PortId, position: [f32; 3], normal: [f32; 3]) -> ExternalPortSpec {
+        ExternalPortSpec::new(
+            PortInterface::new(
+                port,
+                position,
+                PortAperture::Circular { radius_mm: 2.0 },
+                normal,
+                InterfacePlane::new(position, normal).unwrap(),
+                SolverBoundaryIdentity {
+                    domain: BoundaryConditionDomain::Fluidic,
+                    id: port.0,
+                },
+            )
+            .unwrap(),
+        )
     }
 
     #[test]
     fn body_realization_produces_material_candidate() {
-        let body = BodyEnvelope { min_mm: [-12.0, -10.0, -10.0], max_mm: [12.0, 10.0, 10.0] };
+        let body = BodyEnvelope {
+            min_mm: [-12.0, -10.0, -10.0],
+            max_mm: [12.0, 10.0, 10.0],
+        };
         let (material, semantics) = compile_passive_device_geometry(
             &graph(),
             &embedding(),
             &body,
-            &[ExternalPortSpec { port: PortId(10), outward_unit: [-1.0, 0.0, 0.0] }, ExternalPortSpec { port: PortId(20), outward_unit: [1.0, 0.0, 0.0] }],
-        ).unwrap();
+            &[
+                external_interface(PortId(10), [-8.0, 0.0, 0.0], [-1.0, 0.0, 0.0]),
+                external_interface(PortId(20), [8.0, 0.0, 0.0], [1.0, 0.0, 0.0]),
+            ],
+        )
+        .unwrap();
         assert!(matches!(material, CSGNode::Boolean { .. }));
         assert!(semantics.output_is_material_candidate);
         assert!(semantics.external_port_tunnels_are_explicit);
@@ -274,14 +382,31 @@ mod tests {
     }
 
     #[test]
-    fn invalid_external_direction_is_rejected() {
-        let body = BodyEnvelope { min_mm: [-12.0, -10.0, -10.0], max_mm: [12.0, 10.0, 10.0] };
+    fn invalid_external_interface_normal_is_rejected() {
+        let body = BodyEnvelope {
+            min_mm: [-12.0, -10.0, -10.0],
+            max_mm: [12.0, 10.0, 10.0],
+        };
         let result = compile_passive_device_geometry(
             &graph(),
             &embedding(),
             &body,
-            &[ExternalPortSpec { port: PortId(10), outward_unit: [0.0, 0.0, 0.0] }],
+            &[ExternalPortSpec::new(
+                PortInterface::new(
+                    PortId(10),
+                    [-8.0, 0.0, 0.0],
+                    PortAperture::Circular { radius_mm: 2.0 },
+                    [1.0, 0.0, 0.0],
+                    InterfacePlane::new([-8.0, 0.0, 0.0], [-1.0, 0.0, 0.0]).unwrap(),
+                    SolverBoundaryIdentity {
+                        domain: BoundaryConditionDomain::Fluidic,
+                        id: 10,
+                    },
+                )
+                .unwrap_err()
+                .into_result()
+            )],
         );
-        assert!(matches!(result, Err(CompileError::InvalidAnchor(_))));
+        assert!(result.is_err());
     }
 }
