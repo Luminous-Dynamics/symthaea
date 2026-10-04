@@ -1522,10 +1522,10 @@ mod tests {
             ],
         };
 
-        assert_eq!(
+        assert!(matches!(
             collect_boundary_edge_records(&mesh),
             Err(SolverBindingError::BoundaryEdgeIdentityCollision)
-        );
+        ));
     }
 
     #[test]
