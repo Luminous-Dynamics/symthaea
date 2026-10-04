@@ -2593,6 +2593,63 @@ mod tests {
     }
 
     #[test]
+    fn evidence_evaluation_does_not_imply_current_graph_correspondence() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed("obs-001", "obs-002")
+            .expect("assessment");
+        let receipt = IndependenceVerificationReceipt::from_assessment(&assessment);
+
+        let mut envelope = ReceiptAttestationEnvelope::from_receipt(
+            &receipt,
+            "attester-a",
+            "observation-independence",
+            100,
+        );
+        envelope.expires_at_unix_ns = Some(200);
+        let signing_key = SigningKey::from_bytes(&[7u8; 32]);
+        sign_envelope(&mut envelope, &signing_key, "did:example:attester-a#key-1")
+            .expect("sign");
+
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = resolved_report(&verifier, &envelope, &receipt);
+        let evaluation = report.to_evidence_evaluation();
+
+        assert!(receipt.verify_integrity());
+        assert!(evaluation.is_well_formed());
+
+        // The receipt remains intrinsically coherent even after the graph changes.
+        // Current graph correspondence is a separate, stronger verification operation.
+        let mut changed_graph = graph.clone();
+        changed_graph.observations[0].provenance.source.platform_id = Some("platform-9".into());
+
+        assert_eq!(receipt.verify_against_graph(&changed_graph), Ok(false));
+        assert_eq!(
+            receipt.verify_against_graph_detailed(&changed_graph),
+            Ok(ReceiptVerificationOutcome::GraphMismatch)
+        );
+        assert!(receipt.verify_integrity());
+
+        // The historical attestation/evaluation remains internally coherent; it must
+        // not silently acquire a claim of correspondence with the changed graph.
+        assert!(evaluation.is_well_formed());
+        assert!(evaluation
+            .boundary
+            .not_established
+            .contains(&EvaluationClaim::ExternalWorldCorrespondence));
+    }
+
+    #[test]
     fn current_boundary_from_report_uses_authoritative_execution_trace() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let verifier = Ed25519ReceiptVerifier::new(
