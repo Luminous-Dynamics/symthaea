@@ -1340,25 +1340,23 @@ mod tests {
 
     #[test]
     fn test_v2_frame_revision_rejects_impossible_conclusion_count() {
-        let mut record = create_test_record("huge_count", "Huge count", 0.4);
-        record.frame_revisions_serialized = vec![
-            "v2|10:gis-default".to_string(),
-            "v2|".to_string(),
-        ];
+        let mut encoded = String::from("v2|");
+        for value in [
+            "gis-default",
+            "gis-default@2",
+            "trigger",
+            "",
+            "scope",
+        ] {
+            push_len_prefixed(&mut encoded, value);
+        }
+        push_len_prefixed(&mut encoded, "999999999");
 
-        let error = record.to_record().unwrap_err();
+        let error = parse_frame_revision_v2(&encoded).unwrap_err();
         assert!(matches!(error, PersistenceError::Deserialization(_)));
-
-        let mut stored = StoredIgnoranceRecord::from_record(&create_test_record(
-            "huge_count2",
-            "Huge count",
-            0.4,
-        ));
-        stored.frame_revisions_serialized = vec![
-            "v2|10:gis-default9:gis-default2:x".to_string()
-        ];
-        let error = stored.to_record().unwrap_err();
-        assert!(matches!(error, PersistenceError::Deserialization(_)));
+        assert!(
+            error.to_string().contains("affected-conclusion count exceeds payload capacity")
+        );
     }
 
     #[test]
