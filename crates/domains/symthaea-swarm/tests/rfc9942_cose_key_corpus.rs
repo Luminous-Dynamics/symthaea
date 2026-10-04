@@ -43,8 +43,9 @@ fn bstr_large(bytes: &[u8]) -> Vec<u8> {
             let len = bytes.len() as u16;
             vec![0x59, (len >> 8) as u8, len as u8]
         }
-        65_536..=u32::MAX as usize => {
-            let len = bytes.len() as u32;
+        65_536.. => {
+            let len = u32::try_from(bytes.len())
+                .expect("fixture bstr exceeds CBOR 32-bit length form");
             vec![
                 0x5a,
                 (len >> 24) as u8,
@@ -53,7 +54,6 @@ fn bstr_large(bytes: &[u8]) -> Vec<u8> {
                 len as u8,
             ]
         }
-        _ => panic!("fixture bstr exceeds CBOR 32-bit length form"),
     };
     out.extend_from_slice(bytes);
     out
