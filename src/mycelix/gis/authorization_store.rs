@@ -1538,7 +1538,6 @@ impl SqliteAuthorizationStore {
                 ));
             }
             }
-        }
         tx.commit()?;
         Ok(())
     }
