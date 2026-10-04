@@ -5,8 +5,6 @@ use symthaea_communication::hdc_interlingua::{
 use symthaea_communication::{
     reorder_collections, ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph,
 };
-use std::collections::BTreeMap;
-
 fn node(id: &str, kind: ConceptKind, grounding: &str, confidence: f32) -> ConceptNode {
     ConceptNode {
         id: id.into(),
@@ -161,13 +159,14 @@ fn main() -> Result<(), String> {
         return Err("mismatched HDC codebook was not rejected".into());
     }
 
-    let mut summary = BTreeMap::new();
-    summary.insert("training_graphs", training.len() as u32);
-    summary.insert("held_out_graphs", held_out.len() as u32);
-    summary.insert("all_structurally_equivalent", cases.len() as u32);
-    summary.insert("same_codebook_for_all_cases", 1);
-    summary.insert("reordered_representation_exact", reordered_representation_exact as u32);
-    summary.insert("wrong_codebook_rejected", wrong_codebook_rejected as u32);
+    let summary = serde_json::json!({
+        "training_graphs": training.len(),
+        "held_out_graphs": held_out.len(),
+        "all_structurally_equivalent": true,
+        "same_codebook_for_all_cases": true,
+        "reordered_representation_exact": reordered_representation_exact,
+        "wrong_codebook_rejected": wrong_codebook_rejected,
+    });
 
     let output = serde_json::json!({
         "benchmark": "neurosemantic-hdc-interlingua-n0",
