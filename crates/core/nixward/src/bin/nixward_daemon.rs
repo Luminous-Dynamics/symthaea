@@ -997,7 +997,8 @@ impl DaemonState {
                     })
                     .collect();
 
-                AlertEntry {                    metric: p.metric.to_string(),                    current_value: p.current_value,
+                AlertEntry {                    metric: p.metric.to_string(),
+                    current_value: p.current_value,
                     predicted_value: p.predicted_value,
                     hours_ahead: p.hours_ahead,
                     threshold: p.threshold,
@@ -2011,7 +2012,8 @@ equivalents of what this daemon does continuously."
 }
 
 fn main() -> ! {    // A real gap found while smoke-testing the symthaea-nix -> nixward
-    // rename: this binary had no arg handling whatsoever, so `--help`    // silently started the real daemon instead of printing usage.
+    // rename: this binary had no arg handling whatsoever, so `--help`
+    // silently started the real daemon instead of printing usage.
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "--help" | "-h" => print_help_and_exit(),
@@ -3011,6 +3013,7 @@ mod tests {
         // Formulate a recovery goal for postgresql service failure
         let goal_description = "Resolve service failure in 'postgresql' (reason: FATAL error)";
         let plan = state.active_inference.process_input(goal_description);
+
         assert!(
             !plan.actions.is_empty(),
             "Active inference should generate a plan to resolve service failure"
