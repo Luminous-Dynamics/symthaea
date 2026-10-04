@@ -1001,6 +1001,7 @@ EOF
             qemu
             OVMF.fd
             swtpm  # Software TPM 2.0 for Secure Boot + BitLocker testing
+            tpm2-tools  # TPM 2.0 command-line inspection/attestation tooling
 
             # Screen recording
             wf-recorder
