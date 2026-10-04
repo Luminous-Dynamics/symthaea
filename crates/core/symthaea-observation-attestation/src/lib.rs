@@ -1149,8 +1149,8 @@ impl VerificationContext {
             && self.verifier_id == VERIFIER_IMPLEMENTATION_ID
             && self.procedure_id == EVALUATION_PROCEDURE_ID
             && self.procedure_fingerprint == expected_procedure_fingerprint
-            && !self.policy_fingerprint.is_empty()
-            && !self.environment_fingerprint.is_empty()
+            && is_blake3_fingerprint(&self.policy_fingerprint)
+            && is_blake3_fingerprint(&self.environment_fingerprint)
             && optional_identity_is_well_formed(&self.evaluator_identity_fingerprint)
             && optional_identity_is_well_formed(&self.resolution_snapshot_fingerprint)
             && optional_identity_is_well_formed(&self.trust_root_fingerprint)
@@ -3965,6 +3965,27 @@ mod tests {
         );
         assert!(evaluation.is_consistent_with_report(&report));
     }
+    #[test]
+    fn verification_context_self_validation_rejects_malformed_policy_and_environment_fingerprints() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+        let base = VerificationContext::from_report(&report);
+        assert!(base.is_well_formed());
+
+        let mut malformed = base.clone();
+        malformed.policy_fingerprint = "not-a-fingerprint".into();
+        assert!(!malformed.is_well_formed());
+
+        let mut malformed = base;
+        malformed.environment_fingerprint = "not-a-fingerprint".into();
+        assert!(!malformed.is_well_formed());
+    }
+
     #[test]
     fn verification_context_self_validation_rejects_empty_optional_identities() {
         let (envelope, signing_key, receipt) = envelope_and_key();
