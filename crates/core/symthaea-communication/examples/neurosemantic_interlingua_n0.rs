@@ -50,6 +50,18 @@ fn fixture() -> GroundedConceptGraph {
     }
 }
 
+fn execution_revision() -> String {
+    std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|revision| revision.trim().to_string())
+        .filter(|revision| !revision.is_empty())
+        .unwrap_or_else(|| "local".into())
+}
+
 fn main() -> Result<(), String> {
     let expected = fixture();
 
@@ -157,7 +169,7 @@ fn main() -> Result<(), String> {
             .count() as u32,
     );
 
-    let execution_revision = std::env::var("GITHUB_SHA").unwrap_or_else(|_| "local".into());
+    let execution_revision = execution_revision();
     let output = serde_json::json!({
         "benchmark": "neurosemantic-interlingua-n0",
         "benchmark_schema_version": symthaea_communication::INTERLINGUA_BENCHMARK_SCHEMA_VERSION,
