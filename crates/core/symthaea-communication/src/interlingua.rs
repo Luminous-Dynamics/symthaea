@@ -4,7 +4,7 @@
 //! understanding. They deliberately separate structural preservation from
 //! transport integrity and from any future neural decoder quality.
 
-use crate::{content_hash, ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph};
+use crate::{content_hash, ConceptNode, GroundedConceptGraph};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
