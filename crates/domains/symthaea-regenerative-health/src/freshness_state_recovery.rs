@@ -279,6 +279,10 @@ pub fn commit_authoritative_anchor<S: FreshnessRecoveryAnchorStore>(
     if verified_anchor.receiver_id() != record.receiver_id
         || verified_anchor.generation() != record.generation
         || verified_anchor.state_fingerprint() != record.state_fingerprint
+        || verified_anchor.recovery_policy_fingerprint() != record.policy_fingerprint
+        || verified_anchor.authority_reference() != record.authority_reference
+        || verified_anchor.authority_statement_digest() != record.authority_statement_digest
+        || verified_anchor.authentication_binding() != record.authentication_binding
     {
         return Err(FreshnessAnchorAssuranceError::SubjectBindingMismatch);
     }
@@ -417,9 +421,22 @@ mod tests {
             receiver_id: "receiver-1".into(),
             generation: 0,
             state_fingerprint: r.state_fingerprint.clone(),
+            recovery_policy_fingerprint: r.policy_fingerprint.clone(),
+            authority_reference: r.authority_reference.clone(),
+            authority_statement_digest: r.authority_statement_digest.clone(),
+            authentication_binding: r.authentication_binding.clone(),
             verifier_reference: "verifier-1".into(),
+            verifier_policy_digest: "verifier-policy-1".into(),
+            reference_values_digest: "reference-values-1".into(),
+            trust_anchor_set_digest: "trust-anchors-1".into(),
+            freshness_handle_digest: "freshness-handle-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
+            evidence_kind: crate::freshness_anchor_assurance::FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
+                authority_identity_digest: "authority-id-1".into(),
+                authority_namespace_digest: "authority-namespace-1".into(),
+                observed_sequence: 7,
+            },
         };
         struct Accept;
         impl crate::freshness_anchor_assurance::FreshnessAnchorEvidenceVerifier for Accept {
@@ -480,14 +497,89 @@ mod tests {
             receiver_id: "receiver-1".into(),
             generation: 0,
             state_fingerprint: "different-state".into(),
+            recovery_policy_fingerprint: "recovery-policy-1".into(),
+            authority_reference: "authority-1".into(),
+            authority_statement_digest: "authority-statement-1".into(),
+            authentication_binding: "authentication-1".into(),
             verifier_reference: "verifier-1".into(),
+            verifier_policy_digest: "verifier-policy-1".into(),
+            reference_values_digest: "reference-values-1".into(),
+            trust_anchor_set_digest: "trust-anchors-1".into(),
+            freshness_handle_digest: "freshness-handle-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
+            evidence_kind: crate::freshness_anchor_assurance::FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
+                authority_identity_digest: "authority-id-1".into(),
+                authority_namespace_digest: "authority-namespace-1".into(),
+                observed_sequence: 7,
+            },
         };
         let verified = VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap();
         let r = record(0, state(), None);
         assert_eq!(
             commit_authoritative_anchor(&AuthoritativeStore, &verified, None, &r).unwrap_err(),
+            FreshnessAnchorAssuranceError::SubjectBindingMismatch
+        );
+    }
+
+    #[test]
+    fn verified_anchor_cannot_cross_recovery_authority_binding() {
+        struct AuthoritativeStore;
+        impl FreshnessRecoveryAnchorStore for AuthoritativeStore {
+            fn load(&self) -> Option<FreshnessRecoveryAnchor> { None }
+            fn compare_and_swap(
+                &self,
+                _: Option<&FreshnessRecoveryAnchor>,
+                _: &FreshnessRecoveryAnchor,
+            ) -> bool { true }
+            fn profile(&self) -> FreshnessAnchorProfile {
+                FreshnessAnchorProfile::new(
+                    crate::freshness_anchor_assurance::FreshnessAnchorBacking::RemoteAuthority,
+                    FreshnessAnchorCapabilities::authoritative(),
+                    "remote://authority-a",
+                ).unwrap()
+            }
+        }
+
+        struct Accept;
+        impl crate::freshness_anchor_assurance::FreshnessAnchorEvidenceVerifier for Accept {
+            fn verify(
+                &self,
+                _: &FreshnessAnchorProfile,
+                _: &crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt,
+            ) -> bool { true }
+        }
+
+        let record = record(0, state(), None);
+        let profile = AuthoritativeStore.profile();
+        let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
+            schema_version: "0.1".into(),
+            profile_fingerprint: profile.fingerprint(),
+            receiver_id: record.receiver_id.clone(),
+            generation: record.generation,
+            state_fingerprint: record.state_fingerprint.clone(),
+            recovery_policy_fingerprint: record.policy_fingerprint.clone(),
+            authority_reference: record.authority_reference.clone(),
+            authority_statement_digest: record.authority_statement_digest.clone(),
+            authentication_binding: record.authentication_binding.clone(),
+            verifier_reference: "verifier-1".into(),
+            verifier_policy_digest: "verifier-policy-1".into(),
+            reference_values_digest: "reference-values-1".into(),
+            trust_anchor_set_digest: "trust-anchors-1".into(),
+            freshness_handle_digest: "freshness-handle-1".into(),
+            evidence_reference: "evidence-1".into(),
+            evidence_digest: "digest-1".into(),
+            evidence_kind: crate::freshness_anchor_assurance::FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
+                authority_identity_digest: "authority-id-1".into(),
+                authority_namespace_digest: "authority-namespace-1".into(),
+                observed_sequence: record.generation,
+            },
+        };
+        let verified = VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap();
+        let mut altered = record.clone();
+        altered.authority_statement_digest = "different-authority-statement".into();
+        assert_eq!(
+            commit_authoritative_anchor(&AuthoritativeStore, &verified, None, &altered).unwrap_err(),
             FreshnessAnchorAssuranceError::SubjectBindingMismatch
         );
     }
@@ -520,19 +612,36 @@ mod tests {
             ) -> bool { true }
         }
 
+        let r = record(0, state(), None);
         let profile = AuthoritativeStore.profile();
         let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
             schema_version: "0.1".into(),
             profile_fingerprint: profile.fingerprint(),
-            receiver_id: "receiver-1".into(),
-            generation: 0,
+            receiver_id: r.receiver_id.clone(),
+            generation: r.generation,
             state_fingerprint: r.state_fingerprint.clone(),
+            recovery_policy_fingerprint: r.policy_fingerprint.clone(),
+            authority_reference: r.authority_reference.clone(),
+            authority_statement_digest: r.authority_statement_digest.clone(),
+            authentication_binding: r.authentication_binding.clone(),
+            recovery_policy_fingerprint: r.policy_fingerprint.clone(),
+            authority_reference: r.authority_reference.clone(),
+            authority_statement_digest: r.authority_statement_digest.clone(),
+            authentication_binding: r.authentication_binding.clone(),
             verifier_reference: "verifier-1".into(),
+            verifier_policy_digest: "verifier-policy-1".into(),
+            reference_values_digest: "reference-values-1".into(),
+            trust_anchor_set_digest: "trust-anchors-1".into(),
+            freshness_handle_digest: "freshness-handle-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
+            evidence_kind: crate::freshness_anchor_assurance::FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
+                authority_identity_digest: "authority-id-1".into(),
+                authority_namespace_digest: "authority-namespace-1".into(),
+                observed_sequence: 7,
+            },
         };
         let verified = VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap();
-        let r = record(0, state(), None);
         assert!(commit_authoritative_anchor(&AuthoritativeStore, &verified, None, &r).is_ok());
     }
 
