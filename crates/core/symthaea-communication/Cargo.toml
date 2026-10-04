@@ -21,3 +21,7 @@ symthaea-core = { path = "../symthaea-core", default-features = false, optional 
 name = "symthaea-comm-eval"
 path = "src/bin/eval.rs"
 
+
+[[example]]
+name = "neurosemantic_hdc_codec_n0"
+required-features = ["hdc-codec"]
