@@ -11,6 +11,7 @@ on:
       - "docs/architecture/NEUROSEMANTIC_COMMUNICATION_PROTOCOL_V1.md"
       - "docs/architecture/NEUROSEMANTIC_N1_EVIDENCE_CONTRACT.md"
       - "docs/communication-capability-inventory.md"
+      - "docs/architecture/NEUROSEMANTIC_HDC_GROUNDED_IDENTITY_N0.md"
   workflow_dispatch:
 
 concurrency:
