@@ -250,6 +250,105 @@ fn skip_value(tokens: &[Token], index: &mut usize) -> Result<(), OpenFoamBoundar
     }
 }
 
+/// OpenFOAM passive boundary adapter backed by an exact boundary-file artifact.
+///
+/// The adapter establishes solver-input entity provenance only. It does not imply
+/// that a live solver loaded this file or that its mesh topology matches the
+/// candidate mesh.
+pub struct OpenFoamPassiveBoundaryAdapter {
+    source_bytes: Vec<u8>,
+    patch_name: String,
+    tolerance_mm: f64,
+}
+
+impl OpenFoamPassiveBoundaryAdapter {
+    pub fn new(
+        source_bytes: impl Into<Vec<u8>>,
+        patch_name: impl Into<String>,
+        tolerance_mm: f64,
+    ) -> Result<Self, OpenFoamBoundaryObservationError> {
+        let patch_name = patch_name.into();
+        if patch_name.trim().is_empty() {
+            return Err(OpenFoamBoundaryObservationError::PatchNotFound(patch_name));
+        }
+        if !tolerance_mm.is_finite() || tolerance_mm < 0.0 {
+            return Err(OpenFoamBoundaryObservationError::ArithmeticOverflow);
+        }
+        Ok(Self {
+            source_bytes: source_bytes.into(),
+            patch_name,
+            tolerance_mm,
+        })
+    }
+}
+
+impl symthaea_passive_solver_binding::SolverBoundaryBindingAdapter
+    for OpenFoamPassiveBoundaryAdapter
+{
+    fn adapter_id(&self) -> &str {
+        "openfoam-passive-boundary/v1"
+    }
+
+    fn bind(
+        &self,
+        interface: &symthaea_passive_void_compiler::PortInterface,
+        candidate: &symthaea_fabrication_kernel::mesh::TriangleMesh,
+        _candidate_geometry_digest: [u8; 32],
+    ) -> Result<
+        symthaea_passive_solver_binding::SolverBoundaryBindingDraft,
+        symthaea_passive_solver_binding::SolverBindingError,
+    > {
+        let boundary_patch =
+            symthaea_passive_solver_binding::select_boundary_patch(
+                interface,
+                candidate,
+                self.tolerance_mm,
+            )?;
+        symthaea_passive_solver_binding::SolverBoundaryBindingDraft::new(
+            format!("openfoam:patch:{}", self.patch_name),
+            boundary_patch,
+        )
+    }
+}
+
+impl symthaea_passive_solver_binding::SolverBoundaryInputEntityObserver
+    for OpenFoamPassiveBoundaryAdapter
+{
+    fn observe_input_entity(
+        &self,
+        interface: &symthaea_passive_void_compiler::PortInterface,
+        candidate: &symthaea_fabrication_kernel::mesh::TriangleMesh,
+        binding: &symthaea_passive_solver_binding::SolverBoundaryBinding,
+    ) -> Result<
+        symthaea_passive_solver_binding::SolverBoundaryEntityAttestation,
+        symthaea_passive_solver_binding::SolverBindingError,
+    > {
+        let (_, observation) = observe_openfoam_boundary_patch(
+            &self.source_bytes,
+            &self.patch_name,
+        )
+        .map_err(symthaea_passive_solver_binding::SolverBindingError::from)?;
+
+        let mapping_digest =
+            symthaea_passive_solver_binding::solver_entity_mapping_digest(
+                interface,
+                &binding.adapter_id,
+                binding.realized_boundary.candidate_geometry_digest(),
+                symthaea_passive_solver_binding::digest_triangle_mesh(candidate),
+                binding.realized_boundary.boundary_patch_digest(),
+                &binding.external_boundary_handle,
+                observation.fingerprint(),
+                observation.digest(),
+            );
+
+        symthaea_passive_solver_binding::SolverBoundaryEntityAttestation::new(
+            binding.external_boundary_handle.clone(),
+            observation,
+            mapping_digest,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -276,6 +375,75 @@ mod tests {
     }
 )
 "#;
+
+    #[test]
+    fn input_adapter_produces_structured_solver_input_evidence() {
+        use symthaea_fabrication_kernel::mesh::TriangleMesh;
+        use symthaea_passive_solver_binding::{
+            bind_with_adapter_and_input_entity_attestation,
+            SolverBoundaryEvidenceLevel,
+        };
+        use symthaea_passive_void_compiler::{
+            BoundaryConditionDomain, InterfacePlane, PortAperture, PortInterface,
+            SolverBoundaryIdentity,
+        };
+        use symthaea_passive_void_graph::PortId;
+
+        let interface = PortInterface::new(
+            PortId(10),
+            [0.0, 0.0, 0.0],
+            PortAperture::Circular { radius_mm: 2.0 },
+            [0.0, 0.0, 1.0],
+            InterfacePlane::new([0.0, 0.0, 0.0], [0.0, 0.0, 1.0]).unwrap(),
+            SolverBoundaryIdentity {
+                domain: BoundaryConditionDomain::Fluidic,
+                id: 7,
+            },
+        )
+        .unwrap();
+
+        let candidate = TriangleMesh {
+            vertices: vec![
+                [0.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [0.0, 2.0, 0.0],
+                [-2.0, 0.0, 0.0],
+                [0.0, -2.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 5],
+            indices: vec![
+                [0, 1, 2],
+                [0, 2, 3],
+                [0, 3, 4],
+                [0, 4, 1],
+            ],
+        };
+        let adapter =
+            OpenFoamPassiveBoundaryAdapter::new(BOUNDARY.to_vec(), "inlet", 0.05)
+                .unwrap();
+
+        let binding = bind_with_adapter_and_input_entity_attestation(
+            &adapter,
+            &interface,
+            &candidate,
+            [7; 32],
+            0.05,
+        )
+        .unwrap();
+
+        assert_eq!(
+            binding.evidence_level(),
+            SolverBoundaryEvidenceLevel::SolverInputEntityAttested
+        );
+        assert_eq!(
+            binding.external_boundary_handle,
+            "openfoam:patch:inlet"
+        );
+        assert_eq!(
+            binding.solver_entity_observation_kind(),
+            Some("openfoam-polyMesh-boundary-patch:v1")
+        );
+    }
 
     #[test]
     fn parses_requested_patch_and_derives_observation() {
