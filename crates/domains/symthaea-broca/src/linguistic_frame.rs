@@ -103,6 +103,9 @@ impl LinguisticFrame {
     /// Lexical binding/provenance may be added downstream, but all source-derived
     /// formulation fields must remain identical to deterministic formulation from the plan.
     pub fn validate_against_plan(&self, plan: &SpeechPlan) -> Result<(), LinguisticFrameError> {
+        if plan.validate().is_err() {
+            return Err(LinguisticFrameError::UpstreamMismatch);
+        }
         self.validate()?;
         let expected = Self::from_speech_plan(plan);
 
