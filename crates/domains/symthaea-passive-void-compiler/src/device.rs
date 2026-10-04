@@ -387,25 +387,16 @@ mod tests {
             min_mm: [-12.0, -10.0, -10.0],
             max_mm: [12.0, 10.0, 10.0],
         };
-        let result = compile_passive_device_geometry(
-            &graph(),
-            &embedding(),
-            &body,
-            &[ExternalPortSpec::new(
-                PortInterface::new(
-                    PortId(10),
-                    [-8.0, 0.0, 0.0],
-                    PortAperture::Circular { radius_mm: 2.0 },
-                    [1.0, 0.0, 0.0],
-                    InterfacePlane::new([-8.0, 0.0, 0.0], [-1.0, 0.0, 0.0]).unwrap(),
-                    SolverBoundaryIdentity {
-                        domain: BoundaryConditionDomain::Fluidic,
-                        id: 10,
-                    },
-                )
-                .unwrap_err()
-                .into_result()
-            )],
+        let result = PortInterface::new(
+            PortId(10),
+            [-8.0, 0.0, 0.0],
+            PortAperture::Circular { radius_mm: 2.0 },
+            [1.0, 0.0, 0.0],
+            InterfacePlane::new([-8.0, 0.0, 0.0], [-1.0, 0.0, 0.0]).unwrap(),
+            SolverBoundaryIdentity {
+                domain: BoundaryConditionDomain::Fluidic,
+                id: 10,
+            },
         );
         assert!(result.is_err());
     }
