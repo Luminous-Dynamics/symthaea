@@ -524,6 +524,9 @@ mod tests {
         let receipt = crate::freshness_anchor_assurance::FreshnessAnchorVerificationReceipt {
             schema_version: "0.1".into(),
             profile_fingerprint: profile.fingerprint(),
+            receiver_id: "receiver-1".into(),
+            generation: 0,
+            state_fingerprint: r.state_fingerprint.clone(),
             verifier_reference: "verifier-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
