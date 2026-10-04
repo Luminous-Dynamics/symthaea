@@ -81,7 +81,7 @@ impl TpmNvCounterEvidence {
                 } if *observed_counter == self.counter_value
             )
             && receipt.generation == self.counter_value
-            && receipt.freshness_handle_digest != self.quote_nonce_digest
+            && receipt.freshness_handle_digest == self.quote_nonce_digest
     }
 
     pub fn as_evidence_kind(&self) -> FreshnessAnchorEvidenceKind {
@@ -150,7 +150,7 @@ pub fn verify_tpm_nv_counter<V: TpmNvCounterEvidenceVerifier>(
     {
         return Err(TpmNvCounterVerificationError::CounterGenerationMismatch);
     }
-    if receipt.freshness_handle_digest == evidence.quote_nonce_digest {
+    if receipt.freshness_handle_digest != evidence.quote_nonce_digest {
         return Err(TpmNvCounterVerificationError::HandleMismatch);
     }
 
