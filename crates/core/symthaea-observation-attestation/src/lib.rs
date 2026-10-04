@@ -2631,6 +2631,7 @@ mod tests {
 
         assert!(receipt.verify_integrity());
         assert!(evaluation.is_well_formed());
+        assert_eq!(evaluation.subject_fingerprint, receipt.fingerprint());
 
         // The receipt remains intrinsically coherent even after the graph changes.
         // Current graph correspondence is a separate, stronger verification operation.
