@@ -378,6 +378,10 @@ mod tests {
         let metrics = compare_graphs(&expected, &observed).unwrap();
         assert!(metrics.structural_equivalence);
         assert_eq!(metrics.node_recall, 1.0);
+        assert_eq!(
+            metrics.expected_structural_hash,
+            metrics.observed_structural_hash
+        );
         assert_eq!(metrics.edge_recall, 1.0);
     }
 
@@ -387,6 +391,21 @@ mod tests {
         let observed = rename_identifiers(&expected, "node-");
         let metrics = compare_graphs(&expected, &observed).unwrap();
         assert!(metrics.structural_equivalence);
+        assert_eq!(
+            metrics.expected_structural_hash,
+            metrics.observed_structural_hash
+        );
+    }
+
+    #[test]
+    fn structural_hash_detects_missing_edge() {
+        let expected = fixture();
+        let observed = drop_last_edge(&expected);
+        let metrics = compare_graphs(&expected, &observed).unwrap();
+        assert_ne!(
+            metrics.expected_structural_hash,
+            metrics.observed_structural_hash
+        );
     }
 
     #[test]
