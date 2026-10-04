@@ -453,6 +453,8 @@ impl BoundaryEdgeKey {
 #[derive(Debug, Clone, Copy)]
 struct QuantizedBoundaryEdge {
     key: BoundaryEdgeKey,
+    a_mm: [f64; 3],
+    b_mm: [f64; 3],
     midpoint: [f64; 3],
     length_mm: f64,
 }
@@ -619,7 +621,10 @@ fn collect_boundary_edge_keys(candidate: &TriangleMesh) -> Vec<BoundaryEdgeKey> 
 fn collect_boundary_edge_records(candidate: &TriangleMesh) -> Vec<QuantizedBoundaryEdge> {
     use std::collections::HashMap;
 
-    let mut edge_counts: HashMap<BoundaryEdgeKey, (usize, [f64; 3], f64)> = HashMap::new();
+    let mut edge_counts: HashMap<
+        BoundaryEdgeKey,
+        (usize, [f64; 3], [f64; 3], [f64; 3], f64),
+    > = HashMap::new();
     for triangle in &candidate.indices {
         if triangle
             .iter()
@@ -648,16 +653,24 @@ fn collect_boundary_edge_records(candidate: &TriangleMesh) -> Vec<QuantizedBound
             let dy = b[1] as f64 - a[1] as f64;
             let dz = b[2] as f64 - a[2] as f64;
             let length_mm = (dx * dx + dy * dy + dz * dz).sqrt();
-            let entry = edge_counts.entry(key).or_insert((0, midpoint, length_mm));
+            let entry = edge_counts.entry(key).or_insert((
+                0,
+                [a[0] as f64, a[1] as f64, a[2] as f64],
+                [b[0] as f64, b[1] as f64, b[2] as f64],
+                midpoint,
+                length_mm,
+            ));
             entry.0 += 1;
         }
     }
 
     edge_counts
         .into_iter()
-        .filter_map(|(key, (count, midpoint, length_mm))| {
+        .filter_map(|(key, (count, a_mm, b_mm, midpoint, length_mm))| {
             (count == 1).then_some(QuantizedBoundaryEdge {
                 key,
+                a_mm,
+                b_mm,
                 midpoint,
                 length_mm,
             })
@@ -670,9 +683,7 @@ fn edge_matches_interface(
     interface: &PortInterface,
     tolerance_mm: f64,
 ) -> bool {
-    let a = dequantize_point(edge.key.a);
-    let b = dequantize_point(edge.key.b);
-    let points = [a, b, edge.midpoint];
+    let points = [edge.a_mm, edge.b_mm, edge.midpoint];
 
     if points.iter().any(|point| {
         plane_distance(
@@ -687,7 +698,7 @@ fn edge_matches_interface(
     }
 
     let radial_tolerance = tolerance_mm;
-    [a, b].iter().all(|point| {
+    [edge.a_mm, edge.b_mm].iter().all(|point| {
         (radial_distance(*point, interface) - interface.radius_mm() as f64).abs()
             <= radial_tolerance
     })
