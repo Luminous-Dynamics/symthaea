@@ -46,6 +46,18 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          # Pull-request qualification must execute the exact proposed head,
+          # not GitHub's synthetic pull/<number>/merge ref.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact checkout provenance
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "qualified_head=${actual}"
+          test "${actual}" = "${EXPECTED_HEAD}"
       - name: Install Rust
         uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
       - name: Cache Cargo
@@ -75,6 +87,18 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          # Pull-request qualification must execute the exact proposed head,
+          # not GitHub's synthetic pull/<number>/merge ref.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact checkout provenance
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "qualified_head=${actual}"
+          test "${actual}" = "${EXPECTED_HEAD}"
       - name: Install Rust
         uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
       - name: Cache fuzz Cargo
@@ -120,6 +144,18 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          # Pull-request qualification must execute the exact proposed head,
+          # not GitHub's synthetic pull/<number>/merge ref.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact checkout provenance
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "qualified_head=${actual}"
+          test "${actual}" = "${EXPECTED_HEAD}"
       - name: Install nightly Rust for libFuzzer instrumentation
         uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58
         with:
