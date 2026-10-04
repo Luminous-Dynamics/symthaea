@@ -212,7 +212,7 @@ impl PhonologicalPlan {
             .join("|");
 
         format!(
-            "{};binding={:?};intent={};focus={};intonation={:?};rate={:.4};pause={:.4};syllables={};segments={}",
+            "{};binding={:?};intent={};focus={};intonation={:?};rate={:.4};pause={:.4};syllables={};lexical_provenance={};segments={}",
             self.version,
             self.content_binding,
             self.source_intent,
@@ -221,6 +221,7 @@ impl PhonologicalPlan {
             self.rate,
             self.pause_weight,
             self.syllables.len(),
+            self.lexical_provenance.is_some(),
             segment_surface,
         )
     }
@@ -458,6 +459,52 @@ mod tests {
             .expect_err("binding status must match payload");
 
         assert_eq!(error, PhonologicalPlanError::RoleOnlyWithSegments);
+    }
+
+    #[test]
+    fn lexical_binding_requires_provenance() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        let segments = vec![PhonemeSlot::new(
+            "AE",
+            0,
+            SyllableStress::Primary,
+            true,
+            false,
+            true,
+        )];
+
+        let error = plan
+            .bind_segments(segments, ContentBindingStatus::LexicallyBound)
+            .expect_err("lexical status must require provenance");
+
+        assert_eq!(
+            error,
+            PhonologicalPlanError::LexicalBindingWithoutProvenance
+        );
+    }
+
+    #[test]
+    fn lexical_binding_records_non_empty_provenance() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.bind_lexical_segments(
+            vec![PhonemeSlot::new(
+                "AE",
+                0,
+                SyllableStress::Primary,
+                true,
+                false,
+                true,
+            )],
+            "lexeme:answer:v1",
+        )
+        .expect("explicit provenance should permit lexical binding");
+
+        assert_eq!(plan.content_binding, ContentBindingStatus::LexicallyBound);
+        assert_eq!(
+            plan.lexical_provenance.as_deref(),
+            Some("lexeme:answer:v1")
+        );
+        assert!(plan.grounding_surface().contains("lexical_provenance=true"));
     }
 
     #[test]
