@@ -243,6 +243,34 @@ fn cose_key_accepts_noncanonical_integer_but_rejects_indefinite_forms() {
 }
 
 #[test]
+fn cose_key_accepts_indefinite_coordinate_bstr() {
+    let mut bytes = valid_key();
+    let pos = bytes.windows(3).position(|w| w == [0x21, 0x58, 0x20]).unwrap();
+    let mut replacement = vec![0x21, 0x5f, 0x50];
+    replacement.extend_from_slice(&X[..16]);
+    replacement.extend_from_slice(&[0x50]);
+    replacement.extend_from_slice(&X[16..]);
+    replacement.push(0xff);
+    bytes.splice(pos..pos + 35, replacement);
+
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&bytes)
+        .expect("indefinite coordinate bstr must be accepted");
+    assert_eq!(&parsed.public_key_sec1()[1..33], &X);
+    assert_eq!(&parsed.public_key_sec1()[33..65], &Y);
+}
+
+#[test]
+fn malformed_indefinite_coordinate_bstr_is_rejected() {
+    let mut bytes = valid_key();
+    let pos = bytes.windows(3).position(|w| w == [0x21, 0x58, 0x20]).unwrap();
+    bytes.splice(pos..pos + 35, [0x21, 0x5f, 0x01, 0xff]);
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&bytes),
+        Err(Rfc9942VdpError::InvalidEncoding)
+    );
+}
+
+#[test]
 fn syntactically_valid_but_invalid_p256_point_is_rejected_by_crypto_boundary() {
     let mut fields = valid_fields();
     fields[5] = bstr_field(0x21, &[0u8; 32]);
