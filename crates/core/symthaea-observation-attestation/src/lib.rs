@@ -1940,8 +1940,7 @@ impl Ed25519ReceiptVerifier {
         resolver: &R,
     ) -> ReceiptAttestationVerificationReport {
         let mut report = self.verify_with_resolver_report_inner(envelope, receipt, resolver);
-        report.attestation_payload_fingerprint =
-            blake3::hash(&envelope.canonical_payload_bytes()).to_hex().to_string();
+        report.attestation_payload_fingerprint = envelope.payload_fingerprint();
         if report.resolution_snapshot_fingerprint.is_none()
             && report.resolved_verification_method.is_none()
         {
@@ -3349,9 +3348,7 @@ mod tests {
 
         assert_eq!(
             report.attestation_payload_fingerprint,
-            blake3::hash(&envelope.canonical_payload_bytes())
-                .to_hex()
-                .to_string()
+            envelope.payload_fingerprint()
         );
         assert!(is_blake3_fingerprint(&report.attestation_payload_fingerprint));
         assert!(report.is_well_formed());
