@@ -58,6 +58,8 @@ struct AuditCase {
     clause_mode: String,
     formulation_strategy: String,
     linguistic_ready: bool,
+    linguistic_lineage_valid: bool,
+    phonological_lineage_valid: bool,
     linguistic_lexical_binding_valid: bool,
     content_binding: String,
     role_only_rejected_segments: bool,
@@ -133,8 +135,18 @@ fn run() -> Result<()> {
             let linguistic = LinguisticFrame::from_speech_plan(&speech_plan);
             let linguistic_ready = linguistic.ready_for_phonology();
             let linguistic_valid = linguistic.validate().is_ok();
+            let linguistic_lineage_valid =
+                linguistic.validate_against_plan(&speech_plan).is_ok();
 
-            report.linguistic_frame_checks += 2;
+            report.linguistic_frame_checks += 3;
+            if !linguistic_lineage_valid {
+                fail(
+                    &mut report,
+                    &case_id,
+                    "linguistic_frame_lineage",
+                    "linguistic frame did not validate against its source speech plan".to_string(),
+                );
+            }
             if linguistic_ready != linguistic_valid {
                 fail(
                     &mut report,
@@ -171,6 +183,16 @@ fn run() -> Result<()> {
             let mut phonological = PhonologicalPlan::from_linguistic_frame(&linguistic);
             let linguistic_to_phonological_preserved_intent =
                 phonological.source_intent == linguistic.source_intent;
+            let phonological_lineage_before_binding =
+                phonological.validate_against_frame(&linguistic).is_ok();
+            if !phonological_lineage_before_binding {
+                fail(
+                    &mut report,
+                    &case_id,
+                    "phonological_plan_lineage",
+                    "phonological plan did not validate against its source linguistic frame".to_string(),
+                );
+            }
 
             let role_only_error = phonological
                 .bind_segments(
@@ -349,6 +371,8 @@ fn run() -> Result<()> {
                 && acoustic_receipt_valid
                 && acoustic_receipt_lineage_valid
                 && linguistic_valid
+                && linguistic_lineage_valid
+                && phonological_lineage_before_binding
                 && linguistic_to_phonological_preserved_intent
                 && linguistic_lexical_binding_valid
                 && role_only_rejected
@@ -377,6 +401,8 @@ fn run() -> Result<()> {
                 clause_mode: format!("{:?}", speech_plan.clause_mode),
                 formulation_strategy: format!("{:?}", linguistic.strategy),
                 linguistic_ready,
+                linguistic_lineage_valid,
+                phonological_lineage_valid: phonological_lineage_before_binding,
                 linguistic_lexical_binding_valid,
                 content_binding: format!("{:?}", lexical.content_binding),
                 role_only_rejected_segments: role_only_rejected,
