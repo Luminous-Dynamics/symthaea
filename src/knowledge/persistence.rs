@@ -6135,7 +6135,10 @@ mod tests {
             .unwrap_err();
         assert!(blocked.to_string().contains("UPDATE prohibited"));
 
-        p.verify_snapshot_validation_receipts().unwrap();
+        let tx = conn.unchecked_transaction().unwrap();
+        verify_snapshot_receipts_in_tx(&tx).unwrap();
+        verify_snapshot_validation_receipts_in_tx(&tx).unwrap();
+        tx.commit().unwrap();
 
         let _ = std::fs::remove_dir_all(&dir);
     }
