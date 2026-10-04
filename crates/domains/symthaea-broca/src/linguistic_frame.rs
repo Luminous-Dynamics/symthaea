@@ -154,23 +154,42 @@ impl LinguisticFrame {
             return Err(LinguisticFrameError::NonContiguousPositions);
         }
 
-        if self
+        let focused_count = self
             .constituents
             .iter()
             .filter(|slot| slot.is_focus)
-            .count()
-            > 1
-        {
+            .count();
+        if focused_count > 1 {
             return Err(LinguisticFrameError::MultipleFocusRoles);
         }
 
-        if let Some(focus) = self.focus_role.as_deref() {
-            if !self.constituents.iter().any(|slot| slot.role == focus && slot.is_focus) {
-                return Err(LinguisticFrameError::FocusRoleNotRepresented);
+        match self.focus_role.as_deref() {
+            Some(focus) => {
+                if !self.constituents.iter().any(|slot| slot.role == focus && slot.is_focus) {
+                    return Err(LinguisticFrameError::FocusRoleNotRepresented);
+                }
             }
+            None if focused_count > 0 => {
+                return Err(LinguisticFrameError::FocusAnnotationWithoutTarget);
+            }
+            None => {}
         }
 
         let required_roles = required_roles(self.strategy);
+        let mut seen_roles = Vec::new();
+        for slot in &self.constituents {
+            if slot.role.trim().is_empty() {
+                return Err(LinguisticFrameError::EmptyRole);
+            }
+            if slot.prime.trim().is_empty() {
+                return Err(LinguisticFrameError::EmptyPrime);
+            }
+            if seen_roles.iter().any(|role| role == &slot.role) {
+                return Err(LinguisticFrameError::DuplicateRole(slot.role.clone()));
+            }
+            seen_roles.push(slot.role.clone());
+        }
+
         for required in required_roles {
             if !self.constituents.iter().any(|slot| slot.role == *required && slot.required) {
                 return Err(LinguisticFrameError::RequiredRoleMissing((*required).to_string()));
@@ -220,6 +239,9 @@ impl LinguisticFrame {
 pub enum LinguisticFrameError {
     InvalidVersion,
     EmptySourceIntent,
+    EmptyRole,
+    EmptyPrime,
+    DuplicateRole(String),
     EmptyLexicalProvenance,
     MissingLexicalProvenance,
     NonLexicalProvenance,
@@ -227,6 +249,7 @@ pub enum LinguisticFrameError {
     NonContiguousPositions,
     MultipleFocusRoles,
     FocusRoleNotRepresented,
+    FocusAnnotationWithoutTarget,
     RequiredRoleMissing(String),
 }
 
@@ -235,6 +258,9 @@ impl std::fmt::Display for LinguisticFrameError {
         match self {
             Self::InvalidVersion => write!(f, "linguistic frame version is unsupported"),
             Self::EmptySourceIntent => write!(f, "linguistic frame source intent must be non-empty"),
+            Self::EmptyRole => write!(f, "linguistic constituent roles must be non-empty"),
+            Self::EmptyPrime => write!(f, "linguistic constituent primes must be non-empty"),
+            Self::DuplicateRole(role) => write!(f, "linguistic frame contains duplicate role {role}"),
             Self::EmptyLexicalProvenance => {
                 write!(f, "lexical binding requires non-empty provenance")
             }
@@ -255,6 +281,9 @@ impl std::fmt::Display for LinguisticFrameError {
             }
             Self::FocusRoleNotRepresented => {
                 write!(f, "focus role must be represented by a focused constituent")
+            }
+            Self::FocusAnnotationWithoutTarget => {
+                write!(f, "a focused constituent requires an explicit focus role")
             }
             Self::RequiredRoleMissing(role) => {
                 write!(f, "required role {role} is missing from the formulation frame")
@@ -376,6 +405,32 @@ mod tests {
             .expect_err("abstention must remain non-realizable");
 
         assert_eq!(error, LinguisticFrameError::AbstentionCannotBind);
+    }
+
+    #[test]
+    fn malformed_version_fails_closed() {
+        let mut frame = LinguisticFrame::from_speech_plan(&plan_for(4, 0.0));
+        frame.version = "broca-linguistic-frame-corrupt-v0".to_string();
+        assert_eq!(frame.validate().expect_err("bad version"), LinguisticFrameError::InvalidVersion);
+    }
+
+    #[test]
+    fn orphan_focus_fails_closed() {
+        let mut frame = LinguisticFrame::from_speech_plan(&plan_for(4, 0.0));
+        frame.focus_role = None;
+        frame.constituents[0].is_focus = true;
+        assert_eq!(frame.validate().expect_err("orphan focus"), LinguisticFrameError::FocusAnnotationWithoutTarget);
+    }
+
+    #[test]
+    fn duplicate_role_fails_closed() {
+        let mut frame = LinguisticFrame::from_speech_plan(&plan_for(4, 0.0));
+        let duplicate = frame.constituents[0].clone();
+        frame.constituents.push(duplicate);
+        for (position, slot) in frame.constituents.iter_mut().enumerate() {
+            slot.position = position;
+        }
+        assert_eq!(frame.validate().expect_err("duplicate role"), LinguisticFrameError::DuplicateRole("AGENT".to_string()));
     }
 
     #[test]
