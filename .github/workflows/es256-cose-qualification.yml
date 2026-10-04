@@ -110,6 +110,7 @@ jobs:
     timeout-minutes: 20
     env:
       CARGO_FUZZ_VERSION: 0.12.0
+      FUZZ_RUST_TOOLCHAIN: nightly-2026-05-03
       FUZZ_RUNS: 1024
       FUZZ_SEED: 9942
       FUZZ_MAX_LEN: 8192
@@ -122,7 +123,7 @@ jobs:
       - name: Install nightly Rust for libFuzzer instrumentation
         uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58
         with:
-          toolchain: nightly
+          toolchain: ${{ env.FUZZ_RUST_TOOLCHAIN }}
       - name: Install pinned cargo-fuzz
         run: cargo install cargo-fuzz --version "${{ env.CARGO_FUZZ_VERSION }}" --locked
       - name: Prepare deterministic parser seeds
@@ -183,13 +184,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rustc +${FUZZ_RUST_TOOLCHAIN} --version --verbose
+          cargo +${FUZZ_RUST_TOOLCHAIN} fuzz --version
           for target in \
             fuzz_cose_key_es256 \
             fuzz_rfc9942_receipt \
             fuzz_rfc9942_signature_with_receipts \
             fuzz_rfc9942_proofs
           do
-            cargo +nightly fuzz run "$target" -- \
+            cargo +${FUZZ_RUST_TOOLCHAIN} fuzz run "$target" -- \
               -runs="${FUZZ_RUNS}" \
               -seed="${FUZZ_SEED}" \
               -max_len="${FUZZ_MAX_LEN}" \
