@@ -32,6 +32,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          # Pull requests run evidence against the immutable PR head, not GitHub's synthetic merge ref.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pinned actionlint
         shell: bash
