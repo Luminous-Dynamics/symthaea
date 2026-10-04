@@ -114,6 +114,14 @@ Multiple bindings for one selected concept are rejected rather than choosing an 
 
 A larger corpus may contain many observations of the same concept, but that corpus-level representation should be normalized into a graph-specific or observation-specific sidecar before decoding.
 
+Receiver-side stable predicate rendering follows the same fail-closed rule:
+the current representation carries the stable relation ID, so the receiver
+manifest must resolve each selected predicate ID to exactly one local relation
+label. Multiple local labels may be valid upstream synonyms, but without an
+explicit preferred-rendering field the HDC representation cannot safely choose
+one; ambiguous receiver predicate mappings are therefore rejected rather than
+silently selecting a label.
+
 ## Composition/generalization matrix
 
 A second executable N0 lab evaluates the frozen identity codebook under increasing
