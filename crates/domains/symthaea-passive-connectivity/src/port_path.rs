@@ -64,8 +64,10 @@ pub fn evaluate_port_path(
         (_, None) => return missing_anchor(to),
     };
     let labels = triangle_components(candidate);
-    let from_component = nearest_component(candidate, &labels, from_point);
-    let to_component = nearest_component(candidate, &labels, to_point);
+    let from_radius = embedding.ports.get(&from).map(|port| port.radius_mm).unwrap_or(0.0);
+    let to_radius = embedding.ports.get(&to).map(|port| port.radius_mm).unwrap_or(0.0);
+    let from_component = nearest_component(candidate, &labels, from_point, from_radius);
+    let to_component = nearest_component(candidate, &labels, to_point, to_radius);
 
     if matches!(from_component, AnchorResolution::Ambiguous) {
         return PortPathEvidence {
@@ -173,21 +175,42 @@ fn component_value(resolution: AnchorResolution) -> Option<usize> {
     }
 }
 
-fn nearest_component(mesh: &TriangleMesh, labels: &[usize], point: [f32;3]) -> AnchorResolution {
-    let mut vertex_component: HashMap<[i64;3], HashSet<usize>> = HashMap::new();
+fn nearest_component(
+    mesh: &TriangleMesh,
+    labels: &[usize],
+    point: [f32; 3],
+    radius_mm: f32,
+) -> AnchorResolution {
+    if !radius_mm.is_finite() || radius_mm <= 0.0 {
+        return AnchorResolution::Missing;
+    }
+
+    let mut vertex_component: HashMap<[i64; 3], HashSet<usize>> = HashMap::new();
     for (tri_index, tri) in mesh.indices.iter().enumerate() {
-        if !tri.iter().all(|i| (*i as usize) < mesh.vertices.len()) { continue; }
+        if !tri.iter().all(|i| (*i as usize) < mesh.vertices.len()) {
+            continue;
+        }
         let label = labels[tri_index];
         for vertex in tri {
-            vertex_component.entry(quantize(mesh.vertices[*vertex as usize])).or_default().insert(label);
+            vertex_component
+                .entry(quantize(mesh.vertices[*vertex as usize]))
+                .or_default()
+                .insert(label);
         }
     }
+
+    let tolerance = (radius_mm as f64 * 1.05).powi(2);
     let mut best: Option<(f64, Vec<usize>)> = None;
+
     for (vertex, components) in vertex_component {
         let dx = vertex[0] as f64 / 1_000_000.0 - point[0] as f64;
         let dy = vertex[1] as f64 / 1_000_000.0 - point[1] as f64;
         let dz = vertex[2] as f64 / 1_000_000.0 - point[2] as f64;
         let distance = dx * dx + dy * dy + dz * dz;
+        if distance > tolerance {
+            continue;
+        }
+
         let mut component_ids = components.into_iter().collect::<Vec<_>>();
         component_ids.sort_unstable();
 
@@ -215,9 +238,7 @@ fn nearest_component(mesh: &TriangleMesh, labels: &[usize], point: [f32;3]) -> A
 
     match best {
         None => AnchorResolution::Missing,
-        Some((_, components)) if components.len() == 1 => {
-            AnchorResolution::Found(components[0])
-        }
+        Some((_, components)) if components.len() == 1 => AnchorResolution::Found(components[0]),
         Some(_) => AnchorResolution::Ambiguous,
     }
 }
@@ -306,6 +327,31 @@ mod tests {
         let evidence = evaluate_port_path(&graph(), &embedding(), &mesh, PortId(10), PortId(20));
         assert_eq!(evidence.status, PortPathStatus::Connected);
         assert!(evidence.physical_transport_unproven);
+    }
+
+    #[test]
+    fn far_away_port_is_not_falsely_attached_to_mesh() {
+        let mesh = resolve_to_mesh(&CSGNode::cube());
+        let e = GeometryEmbedding::default()
+            .with_port(
+                PortId(10),
+                PortAnchor {
+                    center_mm: [100.0, 100.0, 100.0],
+                    radius_mm: 1.0,
+                },
+            )
+            .with_port(
+                PortId(20),
+                PortAnchor {
+                    center_mm: [0.5, 0.5, 0.5],
+                    radius_mm: 1.0,
+                },
+            );
+        let evidence = evaluate_port_path(&graph(), &e, &mesh, PortId(10), PortId(20));
+        assert_eq!(
+            evidence.status,
+            PortPathStatus::AnchorNotRepresented(PortId(10))
+        );
     }
 
     #[test]
