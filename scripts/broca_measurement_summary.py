@@ -104,9 +104,10 @@ def main() -> int:
                 f"max repeat delta {fmt(condition.get('repeat_max_abs_delta'))}, "
                 f"feedback {fmt(condition.get('feedback_enabled'))}"
             )
-        rate_applied = all(
+        attribution_conditions = attribution.get("conditions") or []
+        rate_applied = bool(attribution_conditions) and all(
             condition.get("rate_target_applied_by_pipeline")
-            for condition in attribution.get("conditions") or []
+            for condition in attribution_conditions
         )
         lines.append(f"- Rate target applied by current pipeline: `{fmt(rate_applied)}`")
     if compare is not None:
