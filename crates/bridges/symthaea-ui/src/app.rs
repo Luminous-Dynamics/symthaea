@@ -529,6 +529,7 @@ pub fn App() -> impl IntoView {
     // scene is reconstructed into native scene nodes only at the backend edge.
     {
         let renderer = Rc::clone(&webgpu_renderer);
+        let init_started = Rc::clone(&webgpu_init_started);
         Effect::new(move |_| {
             if !webgpu_ready.get() {
                 return;
@@ -552,7 +553,7 @@ pub fn App() -> impl IntoView {
             if let Err(error) = render_result {
                 leptos::logging::warn!("WebGPU cognitive canvas render failed: {error}");
                 *renderer.borrow_mut() = None;
-                *webgpu_init_started.borrow_mut() = false;
+                *init_started.borrow_mut() = false;
                 webgpu_ready.set(false);
             } else {
                 #[cfg(feature = "browser-qualification")]
@@ -659,11 +660,13 @@ pub fn App() -> impl IntoView {
 
     // Render the current imagination frame through WebGPU when available.
     // The texture is persistent across frames; only the RGBA payload changes.
-    Effect::new(move |_| {
-        if !movie_webgpu_ready.get() {
-            return;
-        }
-        let idx = movie_frame.get();
+    {
+        let init_started = Rc::clone(&movie_webgpu_init_started);
+        Effect::new(move |_| {
+            if !movie_webgpu_ready.get() {
+                return;
+            }
+            let idx = movie_frame.get();
         let Some(movie) = movie.get() else {
             return;
         };
@@ -682,7 +685,7 @@ pub fn App() -> impl IntoView {
         if let Err(error) = render_result {
             leptos::logging::warn!("WebGPU movie render failed: {error}");
             *movie_webgpu_renderer.borrow_mut() = None;
-            *movie_webgpu_init_started.borrow_mut() = false;
+            *init_started.borrow_mut() = false;
             movie_webgpu_ready.set(false);
         } else {
             #[cfg(feature = "browser-qualification")]
@@ -690,7 +693,8 @@ pub fn App() -> impl IntoView {
                 let _ = canvas.set_attribute("data-qualification-ready", "true");
             }
         }
-    });
+        });
+    }
 
     // Draw the current imagination frame through Canvas2D as a graceful
     // fallback. putImageData wants RGBA at native size; CSS scales it up with
