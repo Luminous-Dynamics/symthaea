@@ -4464,6 +4464,50 @@ mod tests {
     }
 
     #[test]
+    fn test_schema_rejects_unsupported_user_version_without_migration() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_user_version_drift_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "user-version-drift".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x94; BinaryHV::BYTES],
+            source_text: "user version drift".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        let conn = p.open_connection().unwrap();
+        conn.execute_batch("PRAGMA user_version = 999;").unwrap();
+
+        let mut restarted = KnowledgePersistence::new(&db_path);
+        let conn = restarted.open_connection().unwrap();
+        let err = restarted.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains("Unsupported knowledge SQLite schema user_version 999"));
+
+        let persisted_version: i64 = conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(persisted_version, 999);
+
+        let fact_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM knowledge_facts", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(fact_count, 1);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_current_schema_does_not_repair_trigger_drift_after_restart() {
         let dir = std::env::temp_dir().join(format!(
             "symthaea_schema_restart_drift_test_{}",
