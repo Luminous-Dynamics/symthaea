@@ -7,5 +7,6 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel" }
+symthaea-passive-solver-binding = { path = "../symthaea-passive-solver-binding" }
 symthaea-passive-void-compiler = { path = "../symthaea-passive-void-compiler" }
 symthaea-passive-void-graph = { path = "../symthaea-passive-void-graph" }
