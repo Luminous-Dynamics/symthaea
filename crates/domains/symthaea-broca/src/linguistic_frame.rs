@@ -98,6 +98,27 @@ impl LinguisticFrame {
         }
     }
 
+    /// Validate this persisted frame against the exact upstream speech plan.
+    ///
+    /// Lexical binding/provenance may be added downstream, but all source-derived
+    /// formulation fields must remain identical to deterministic formulation from the plan.
+    pub fn validate_against_plan(&self, plan: &SpeechPlan) -> Result<(), LinguisticFrameError> {
+        self.validate()?;
+        let expected = Self::from_speech_plan(plan);
+
+        if self.source_intent != expected.source_intent
+            || self.strategy != expected.strategy
+            || self.epistemic_delivery != expected.epistemic_delivery
+            || self.prosody != expected.prosody
+            || self.focus_role != expected.focus_role
+            || self.constituents != expected.constituents
+        {
+            return Err(LinguisticFrameError::UpstreamMismatch);
+        }
+
+        Ok(())
+    }
+
     /// Bind explicit lexical provenance after the lexicalization layer has produced it.
     ///
     /// The lexical text itself stays outside this contract; only its provenance is attached.
@@ -242,6 +263,7 @@ pub enum LinguisticFrameError {
     EmptyRole,
     EmptyPrime,
     DuplicateRole(String),
+    UpstreamMismatch,
     EmptyLexicalProvenance,
     MissingLexicalProvenance,
     NonLexicalProvenance,
@@ -261,6 +283,7 @@ impl std::fmt::Display for LinguisticFrameError {
             Self::EmptyRole => write!(f, "linguistic constituent roles must be non-empty"),
             Self::EmptyPrime => write!(f, "linguistic constituent primes must be non-empty"),
             Self::DuplicateRole(role) => write!(f, "linguistic frame contains duplicate role {role}"),
+            Self::UpstreamMismatch => write!(f, "linguistic frame no longer matches its upstream speech plan"),
             Self::EmptyLexicalProvenance => {
                 write!(f, "lexical binding requires non-empty provenance")
             }
@@ -405,6 +428,17 @@ mod tests {
             .expect_err("abstention must remain non-realizable");
 
         assert_eq!(error, LinguisticFrameError::AbstentionCannotBind);
+    }
+
+    #[test]
+    fn upstream_plan_mismatch_fails_closed() {
+        let plan = plan_for(4, 0.0);
+        let mut frame = LinguisticFrame::from_speech_plan(&plan);
+        frame.source_intent = "tampered".to_string();
+        assert_eq!(
+            frame.validate_against_plan(&plan).expect_err("upstream drift"),
+            LinguisticFrameError::UpstreamMismatch
+        );
     }
 
     #[test]
