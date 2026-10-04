@@ -294,6 +294,8 @@ pub struct FreshnessAnchorVerificationReceipt {
     pub verifier_reference: String,
     pub verifier_policy_digest: String,
     pub reference_values_digest: String,
+    pub trust_anchor_set_digest: String,
+    pub freshness_handle_digest: String,
     pub evidence_reference: String,
     pub evidence_digest: String,
     pub evidence_kind: FreshnessAnchorEvidenceKind,
@@ -329,6 +331,8 @@ impl VerifiedFreshnessAnchor {
             || receipt.verifier_reference.trim().is_empty()
             || receipt.verifier_policy_digest.trim().is_empty()
             || receipt.reference_values_digest.trim().is_empty()
+            || receipt.trust_anchor_set_digest.trim().is_empty()
+            || receipt.freshness_handle_digest.trim().is_empty()
             || receipt.evidence_reference.trim().is_empty()
             || receipt.evidence_digest.trim().is_empty()
             || !receipt.evidence_kind.validate()
@@ -480,6 +484,8 @@ mod tests {
             verifier_reference: "verifier-1".into(),
             verifier_policy_digest: "policy-digest-1".into(),
             reference_values_digest: "reference-values-1".into(),
+            trust_anchor_set_digest: "trust-anchors-1".into(),
+            freshness_handle_digest: "freshness-handle-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
             evidence_kind: FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
@@ -493,6 +499,48 @@ mod tests {
     }
 
     #[test]
+    fn freshness_handle_is_required_for_verification_receipts() {
+        struct Accept;
+        impl FreshnessAnchorEvidenceVerifier for Accept {
+            fn verify(
+                &self,
+                _: &FreshnessAnchorProfile,
+                _: &FreshnessAnchorVerificationReceipt,
+            ) -> bool { true }
+        }
+
+        let profile = FreshnessAnchorProfile::new(
+            FreshnessAnchorBacking::RemoteAuthority,
+            FreshnessAnchorCapabilities::authoritative(),
+            "remote://authority-a",
+        ).unwrap();
+        let receipt = FreshnessAnchorVerificationReceipt {
+            schema_version: "0.1".into(),
+            profile_fingerprint: profile.fingerprint(),
+            receiver_id: "receiver-1".into(),
+            generation: 7,
+            state_fingerprint: "state-1".into(),
+            verifier_reference: "verifier-1".into(),
+            verifier_policy_digest: "policy-digest-1".into(),
+            reference_values_digest: "reference-values-1".into(),
+            trust_anchor_set_digest: "trust-anchors-1".into(),
+            freshness_handle_digest: " ".into(),
+            evidence_reference: "evidence-1".into(),
+            evidence_digest: "digest-1".into(),
+            evidence_kind: FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
+                authority_identity_digest: "authority-id-1".into(),
+                authority_namespace_digest: "namespace-1".into(),
+                observed_sequence: 7,
+            },
+        };
+        assert_eq!(
+            VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap_err(),
+            FreshnessAnchorAssuranceError::InvalidReceipt
+        );
+    }
+
+    #[test]
+    fn evidence_kind_must_match_backing() {    #[test]
     fn evidence_kind_must_match_backing() {
         let profile = FreshnessAnchorProfile::new(
             FreshnessAnchorBacking::RemoteAuthority,
@@ -508,6 +556,8 @@ mod tests {
             verifier_reference: "verifier-1".into(),
             verifier_policy_digest: "policy-digest-1".into(),
             reference_values_digest: "reference-values-1".into(),
+            trust_anchor_set_digest: "trust-anchors-1".into(),
+            freshness_handle_digest: "freshness-handle-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
             evidence_kind: FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
