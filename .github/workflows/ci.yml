@@ -1511,11 +1511,30 @@ jobs:
               by_name.setdefault(package["name"], []).append(package)
 
           def resolve_dependency(label: str):
-              parts = label.rsplit(" ", 1)
-              if len(parts) == 2 and re.fullmatch(r"\d+(?:\.\d+){0,2}(?:[-+].*)?", parts[1]):
-                  name, version = parts
+              source_match = re.fullmatch(
+                  r"(?P<name>.+) (?P<version>\d+(?:\.\d+){0,2}(?:[-+].*)?) "
+                  r"\\((?P<source>.+)\\)",
+                  label,
+              )
+              version_match = re.fullmatch(
+                  r"(?P<name>.+) (?P<version>\d+(?:\.\d+){0,2}(?:[-+].*)?)",
+                  label,
+              )
+              if source_match:
+                  name = source_match.group("name")
+                  version = source_match.group("version")
+                  source = source_match.group("source")
                   matches = [
-                      package for package in by_name.get(name, [])
+                      package
+                      for package in by_name.get(name, [])
+                      if package["version"] == version and package.get("source") == source
+                  ]
+              elif version_match:
+                  name = version_match.group("name")
+                  version = version_match.group("version")
+                  matches = [
+                      package
+                      for package in by_name.get(name, [])
                       if package["version"] == version
                   ]
               else:
@@ -1524,7 +1543,7 @@ jobs:
               if len(matches) != 1:
                   raise SystemExit(
                       f"cannot resolve locked dependency {label!r}: "
-                      f"{[(p['name'], p['version']) for p in matches]!r}"
+                      f"{[(p['name'], p['version'], p.get('source')) for p in matches]!r}"
                   )
               return matches[0]
 
