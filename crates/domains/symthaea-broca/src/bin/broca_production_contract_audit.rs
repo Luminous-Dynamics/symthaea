@@ -276,7 +276,7 @@ fn run() -> Result<()> {
             };
             report.lexical_provenance_checks += 1;
 
-            let lexical_binding_succeeded = if linguistic_ready {
+            let (lexical_binding_succeeded, lexical_content_binding) = if linguistic_ready {
                 let mut lexical = PhonologicalPlan::from_speech_plan(&speech_plan);
                 lexical
                     .bind_lexical_segments(
@@ -284,11 +284,14 @@ fn run() -> Result<()> {
                         format!("lexeme::{intent_name}"),
                     )
                     .with_context(|| format!("lexical binding failed for {case_id}"))?;
-                lexical.content_binding == ContentBindingStatus::LexicallyBound
-                    && lexical.lexical_provenance.is_some()
-                    && lexical.validate().is_ok()
+                (
+                    lexical.content_binding == ContentBindingStatus::LexicallyBound
+                        && lexical.lexical_provenance.is_some()
+                        && lexical.validate().is_ok(),
+                    format!("{:?}", lexical.content_binding),
+                )
             } else {
-                false
+                (false, "NotBound".to_string())
             };
 
             if !lexical_missing_provenance_rejected {
@@ -314,7 +317,7 @@ fn run() -> Result<()> {
             let acoustic_complete_passed = acoustic_receipt.error.passes_complete(0.0);
             let acoustic_receipt_lineage_valid =
                 acoustic_receipt.validate_against_plan(&speech_plan).is_ok();
-            report.acoustic_receipt_checks += 2;
+            report.acoustic_receipt_checks += 3;
             if !acoustic_complete_passed {
                 fail(
                     &mut report,
@@ -441,7 +444,6 @@ fn run() -> Result<()> {
                 && realization_authorization_rejected
                 && linguistic_to_phonological_preserved_intent
                 && linguistic_lexical_binding_valid
-                && realization_authorization_rejected
                 && phonological_outcome_ok
                 && semantic_exact_passed
                 && semantic_receipt_lineage_valid
@@ -468,7 +470,7 @@ fn run() -> Result<()> {
                 linguistic_lineage_valid,
                 phonological_lineage_valid: phonological_lineage_before_binding,
                 linguistic_lexical_binding_valid,
-                content_binding: format!("{:?}", lexical.content_binding),
+                content_binding: lexical_content_binding,
                 role_only_rejected_segments: role_only_rejected,
                 realization_authorization_rejected,
                 phonological_binding_succeeded,
