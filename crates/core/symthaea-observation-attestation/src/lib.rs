@@ -17,7 +17,8 @@
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use symthaea_core::observation_fabric::{
-    IndependenceVerificationReceipt, ReceiptAttestationEnvelope, ReceiptAttestationTemporalStatus,
+    EvidenceIndependence, IndependenceVerificationReceipt, ObservationGraph, ObservationRelation,
+    ObservationRelationKind, ReceiptAttestationEnvelope, ReceiptAttestationTemporalStatus,
 };
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
@@ -2596,6 +2597,32 @@ mod tests {
         assert!(!forged_match.matches_attestation_envelope(&invalid_envelope));
     }
 
+    #[test]
+    fn current_graph_revalidation_fails_closed_when_graph_is_invalid() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let relation = ObservationRelation {
+            source_observation_id: "obs-001".into(),
+            target_observation_id: "obs-002".into(),
+            kind: ObservationRelationKind::Supports,
+            independence: EvidenceIndependence::Unknown,
+        };
+        let invalid_graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![relation.clone(), relation],
+        };
+        let receipt = receipt();
+
+        assert_eq!(
+            invalid_graph.independence_verification_scope_fingerprint(),
+            Err(symthaea_core::observation_fabric::ObservationValidationError::DuplicateObservationRelation)
+        );
+        assert_eq!(
+            receipt.verify_against_graph_detailed(&invalid_graph),
+            Err(symthaea_core::observation_fabric::ObservationValidationError::DuplicateObservationRelation)
+        );
+    }
     #[test]
     fn evidence_evaluation_does_not_imply_current_graph_correspondence() {
         let mut second = fixture();
