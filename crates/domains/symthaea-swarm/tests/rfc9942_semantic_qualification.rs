@@ -77,7 +77,7 @@ fn rfc9942_inclusion_and_consistency_preserve_required_verification_order() {
         Rfc9942ReceiptEnvelope::new(
             COSE_ES256_ALGORITHM_ID,
             consistency_vdp,
-            Rfc9942ReceiptPayload::Attached([0x44; 32]),
+            Rfc9942ReceiptPayload::Detached,
             vec![0xBB; 63],
         )
         .unwrap();
@@ -89,7 +89,7 @@ fn rfc9942_inclusion_and_consistency_preserve_required_verification_order() {
             symthaea_swarm::semantic_evidence_vds::VdsTreeHead::new(1, [0x55; 32]),
             &public_key,
             &[],
-            None,
+            Some(&[0x44; 32]),
         ),
         Err(Rfc9942VdpError::InvalidEs256Signature)
     );
@@ -98,7 +98,7 @@ fn rfc9942_inclusion_and_consistency_preserve_required_verification_order() {
             symthaea_swarm::semantic_evidence_vds::VdsTreeHead::new(1, [0x55; 32]),
             &public_key,
             &[],
-            None,
+            Some(&[0x44; 32]),
         ),
         Err(Rfc9942VdpError::InvalidEs256Signature)
     );
@@ -531,7 +531,7 @@ fn rfc9942_es256_cose_key_consistency_preserves_signature_first_order() {
     let receipt = Rfc9942ReceiptEnvelope::new(
         COSE_ES256_ALGORITHM_ID,
         vdp,
-        Rfc9942ReceiptPayload::Attached([0x44; 32]),
+        Rfc9942ReceiptPayload::Detached,
         vec![0xBB; 63],
     )
     .unwrap();
