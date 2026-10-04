@@ -166,9 +166,11 @@ impl NixSystemObservation {
             .and_then(|entry| nixos_generation_resource(entry.number, &entry.realization).ok())
     }
 
-    /// Confirm that this fresh observation still contains every resource and
-    /// capability required by an already-authorized plan. This is a preflight
-    /// identity gate; it does not authorize or execute the plan.
+    /// Confirm that this captured observation still contains every resource
+    /// required by an already-authorized plan. Callers must obtain the
+    /// observation through the live observer immediately before mutation;
+    /// this method validates supplied evidence but does not perform a new read.
+    /// It does not authorize or execute the plan.
     pub fn validate_against_authorized_plan(
         &self,
         authorized: &AuthorizedDeploymentPlan,
