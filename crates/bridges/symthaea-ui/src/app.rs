@@ -437,6 +437,11 @@ pub fn App() -> impl IntoView {
             if let Err(error) = renderer.render(&gpu) {
                 leptos::logging::warn!("WebGPU cognitive canvas render failed: {error}");
                 webgpu_ready.set(false);
+            } else {
+                #[cfg(feature = "browser-qualification")]
+                if let Some(canvas) = webgpu_canvas.get_untracked() {
+                    let _ = canvas.set_attribute("data-qualification-ready", "true");
+                }
             }
         });
     }
@@ -535,6 +540,11 @@ pub fn App() -> impl IntoView {
         if let Err(error) = renderer.render(movie.width, movie.height, frame) {
             leptos::logging::warn!("WebGPU movie render failed: {error}");
             movie_webgpu_ready.set(false);
+        } else {
+            #[cfg(feature = "browser-qualification")]
+            if let Some(canvas) = movie_webgpu_canvas.get_untracked() {
+                let _ = canvas.set_attribute("data-qualification-ready", "true");
+            }
         }
     });
 
