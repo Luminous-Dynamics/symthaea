@@ -13,8 +13,10 @@ closed() accepts only a mesh with zero boundary edges.
 
 with_allowed_open_port(port) permits a port to explain observed boundary edges.
 with_required_open_port(port) additionally requires at least one observed boundary
-edge to be associated with that port anchor. Both use the anchor radius plus an explicit
-tolerance.
+edge to be associated with that port anchor. Legacy anchors use the anchor radius
+plus an explicit tolerance. The current default tolerance is 50 micrometers (0.05 mm).
+Typed PortInterface openings are matched by the shared solver-binding boundary
+selector, which verifies the complete interface rim against the exact candidate mesh.
 
 The evaluator reports:
 
