@@ -389,6 +389,36 @@ mod tests {
     }
 
     #[test]
+    fn authorized_preflight_rejects_whole_observation_drift() {
+        let observation = NixSystemObservation {
+            generations: vec![
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: true,
+                },
+                NixGenerationObservation {
+                    number: 43,
+                    realization: "/nix/store/bbb-nixos-system-host".into(),
+                    current: false,
+                },
+            ],
+            system_profile_generation: 43,
+            system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/ccc-nixos-system-host".into(),
+        };
+        let authorized = rollback_authorized_plan_for_testing();
+
+        assert_eq!(
+            observation
+                .validate_against_authorized_plan(&authorized)
+                .expect_err("booted-state drift"),
+            SscObservationError::AuthorizedObservationDigestMismatch
+        );
+    }
+
+    #[test]
     fn authorized_preflight_accepts_exact_observed_generation() {
         let observation = NixSystemObservation {
             generations: vec![
