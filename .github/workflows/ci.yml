@@ -1469,6 +1469,22 @@ jobs:
           fi
           cargo test -p ${{ matrix.crate }}
 
+  # Keep the evidence-plane contract independently executable. The broad
+  # sub-crate matrix is intentionally gated on the workspace test job, so an
+  # unrelated workspace failure must not prevent this core provenance contract
+  # from producing its own compile/test evidence.
+  evidence-plane-contract:
+    name: Evidence Plane Contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Test evidence-plane contract
+        run: cargo test -p symthaea-evidence-plane --locked
+
   genesis-benchmarks:
     name: Genesis Mission Benchmarks
     runs-on: ubuntu-latest
