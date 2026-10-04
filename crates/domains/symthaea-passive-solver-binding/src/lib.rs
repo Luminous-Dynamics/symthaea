@@ -107,6 +107,8 @@ pub struct SolverBoundaryBinding {
     pub physical_transport_unproven: bool,
     evidence_level: SolverBoundaryEvidenceLevel,
     solver_entity_fingerprint: Option<[u8; 32]>,
+    solver_entity_observation_kind: Option<String>,
+    solver_entity_observation_source_digest: Option<[u8; 32]>,
     solver_entity_observation_digest: Option<[u8; 32]>,
     solver_entity_mapping_digest: Option<[u8; 32]>,
 }
@@ -155,6 +157,8 @@ impl SolverBoundaryBinding {
             physical_transport_unproven: true,
             evidence_level: SolverBoundaryEvidenceLevel::AdapterAttested,
             solver_entity_fingerprint: None,
+            solver_entity_observation_kind: None,
+            solver_entity_observation_source_digest: None,
             solver_entity_observation_digest: None,
             solver_entity_mapping_digest: None,
         })
@@ -168,6 +172,16 @@ impl SolverBoundaryBinding {
     /// Solver-side entity fingerprint, present only after explicit entity attestation.
     pub fn solver_entity_fingerprint(&self) -> Option<[u8; 32]> {
         self.solver_entity_fingerprint
+    }
+
+    /// Semantic kind recorded by the adapter's canonical solver-entity observation.
+    pub fn solver_entity_observation_kind(&self) -> Option<&str> {
+        self.solver_entity_observation_kind.as_deref()
+    }
+
+    /// Digest of the source artifact from which the canonical observation was derived.
+    pub fn solver_entity_observation_source_digest(&self) -> Option<[u8; 32]> {
+        self.solver_entity_observation_source_digest
     }
 
     /// Digest of the adapter-owned canonical solver-entity introspection observation.
@@ -199,11 +213,13 @@ impl SolverBoundaryBinding {
         match (
             self.evidence_level,
             self.solver_entity_fingerprint,
+            self.solver_entity_observation_kind.as_deref(),
+            self.solver_entity_observation_source_digest,
             self.solver_entity_observation_digest,
             self.solver_entity_mapping_digest,
         ) {
-            (SolverBoundaryEvidenceLevel::AdapterAttested, None, None, None)
-            | (SolverBoundaryEvidenceLevel::SolverEntityAttested, Some(_), Some(_), Some(_)) => {}
+            (SolverBoundaryEvidenceLevel::AdapterAttested, None, None, None, None, None)
+            | (SolverBoundaryEvidenceLevel::SolverEntityAttested, Some(_), Some(_), Some(_), Some(_), Some(_)) => {}
             _ => return Err(SolverBindingError::InvalidEvidenceState),
         }
         if self.port != interface.port {
@@ -268,6 +284,15 @@ impl SolverBoundaryBinding {
             SolverBoundaryEvidenceLevel::SolverEntityAttested => 1,
         }]);
         hasher.update(&self.solver_entity_fingerprint.unwrap_or([0; 32]));
+        if let Some(kind) = &self.solver_entity_observation_kind {
+            hasher.update(kind.as_bytes());
+        }
+        hasher.update(&[0]);
+        hasher.update(
+            &self
+                .solver_entity_observation_source_digest
+                .unwrap_or([0; 32]),
+        );
         hasher.update(&self.solver_entity_observation_digest.unwrap_or([0; 32]));
         hasher.update(&self.solver_entity_mapping_digest.unwrap_or([0; 32]));
         *hasher.finalize().as_bytes()
@@ -525,6 +550,8 @@ pub fn promote_solver_entity_attestation(
 
     binding.evidence_level = SolverBoundaryEvidenceLevel::SolverEntityAttested;
     binding.solver_entity_fingerprint = Some(attestation.solver_entity_fingerprint());
+    binding.solver_entity_observation_kind = Some(attestation.observation.entity_kind.clone());
+    binding.solver_entity_observation_source_digest = Some(attestation.observation.source_digest);
     binding.solver_entity_observation_digest = Some(attestation.solver_entity_observation_digest());
     binding.solver_entity_mapping_digest = Some(attestation.solver_entity_mapping_digest);
 
@@ -646,11 +673,13 @@ pub fn validate_binding_set(
         match (
             binding.evidence_level,
             binding.solver_entity_fingerprint,
+            binding.solver_entity_observation_kind.as_deref(),
+            binding.solver_entity_observation_source_digest,
             binding.solver_entity_observation_digest,
             binding.solver_entity_mapping_digest,
         ) {
-            (SolverBoundaryEvidenceLevel::AdapterAttested, None, None, None)
-            | (SolverBoundaryEvidenceLevel::SolverEntityAttested, Some(_), Some(_), Some(_)) => {}
+            (SolverBoundaryEvidenceLevel::AdapterAttested, None, None, None, None, None)
+            | (SolverBoundaryEvidenceLevel::SolverEntityAttested, Some(_), Some(_), Some(_), Some(_), Some(_)) => {}
             _ => return Err(SolverBindingError::InvalidEvidenceState),
         }
         if let Some(expected) = candidate_geometry_digest {
@@ -1551,6 +1580,14 @@ mod tests {
             binding.solver_entity_observation_digest(),
             Some(expected_observation.digest())
         );
+        assert_eq!(
+            binding.solver_entity_observation_kind(),
+            Some("fixture-boundary-patch")
+        );
+        assert_eq!(
+            binding.solver_entity_observation_source_digest(),
+            Some([0x77; 32])
+        );
         assert!(binding.solver_entity_mapping_digest().is_some());
         assert!(binding.validate_against_candidate(&interface, [7; 32], &candidate).is_ok());
     }
@@ -1736,6 +1773,32 @@ mod tests {
             ),
             Err(SolverBindingError::EmptySolverEntityKind)
         );
+    }
+
+    #[test]
+    fn entity_observation_digest_changes_with_identity_material() {
+        let first = SolverBoundaryEntityObservation::new(
+            "fixture-boundary-patch",
+            b"patch-index=7;start-face=0;n-faces=4".to_vec(),
+            [0x77; 32],
+        )
+        .unwrap();
+        let second = SolverBoundaryEntityObservation::new(
+            "fixture-boundary-patch",
+            b"patch-index=8;start-face=0;n-faces=4".to_vec(),
+            [0x77; 32],
+        )
+        .unwrap();
+        let third = SolverBoundaryEntityObservation::new(
+            "fixture-boundary-patch",
+            b"patch-index=7;start-face=0;n-faces=4".to_vec(),
+            [0x78; 32],
+        )
+        .unwrap();
+
+        assert_ne!(first.digest(), second.digest());
+        assert_ne!(first.digest(), third.digest());
+        assert_ne!(first.fingerprint(), second.fingerprint());
     }
 
     #[test]
