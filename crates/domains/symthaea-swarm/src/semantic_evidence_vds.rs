@@ -3826,7 +3826,7 @@ mod tests {
 
     #[test]
     fn cbor_skip_value_enforces_recursive_aggregate_byte_limit() {
-        // The enclosing map allows only 16 encoded bytes. The nested array is
+        // The map body allows only 14 encoded bytes. The nested array is
         // 13 bytes by itself, but its second child crosses the shared ceiling.
         // The scanner must stop at the boundary instead of consuming the full
         // nested child and only then noticing the aggregate overflow.
@@ -3838,11 +3838,11 @@ mod tests {
         ];
         let mut reader = CborReader::new(&wire);
         let error = reader
-            .read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 16)
+            .read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 14)
             .unwrap_err();
         assert_eq!(error, Rfc9162ProofDecodeError::InvalidStructure);
         assert!(
-            reader.offset <= 16,
+            reader.offset <= 15,
             "recursive aggregate limit was observed too late: {}",
             reader.offset
         );
