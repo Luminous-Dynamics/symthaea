@@ -254,8 +254,7 @@ impl Rfc9942Es256CoseKey {
                                     b"unwrapKey" => CborLabelKey::Integer(6),
                                     b"deriveKey" => CborLabelKey::Integer(7),
                                     b"deriveBits" => CborLabelKey::Integer(8),
-                                    b"verify" => CborLabelKey::Integer(COSE_KEY_OP_VERIFY),
-                                    _ => return Err(Rfc9942VdpError::InvalidEs256CoseKey),
+                                    _ => CborLabelKey::Text(value),
                                 }
                             }
                             _ => return Err(Rfc9942VdpError::InvalidEs256CoseKey),
