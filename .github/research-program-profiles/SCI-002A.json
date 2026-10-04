@@ -1,0 +1,11 @@
+{
+  "schema": "symthaea.research-program-profile.v1",
+  "program": "SCI-002A",
+  "expected_rust": "1.96.0",
+  "packages": [
+    "symthaea-science-research"
+  ],
+  "source_paths": [
+    "crates/core/symthaea-science-research"
+  ]
+}
