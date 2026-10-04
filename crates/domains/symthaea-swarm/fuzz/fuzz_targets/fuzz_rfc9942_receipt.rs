@@ -5,7 +5,9 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use symthaea_swarm::semantic_evidence_vds::{Rfc9942ProofKind, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload, VdsTreeHead};
+use symthaea_swarm::semantic_evidence_vds::{
+    Rfc9942ProofKind, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload, VdsTreeHead,
+};
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(receipt) = Rfc9942ReceiptEnvelope::from_cbor(data) {
@@ -36,5 +38,21 @@ fuzz_target!(|data: &[u8]| {
                 };
             }
         }
+
+        // Also cross the COSE signature boundary with intentionally invalid
+        // fixed keys. This catches panics/resource issues in the full verifier
+        // path while never creating an acceptance oracle.
+        let _ = match receipt.payload() {
+            Rfc9942ReceiptPayload::Attached(_) => {
+                receipt.verify_es256(&[0x04; 65], &[], None)
+            }
+            Rfc9942ReceiptPayload::Detached => {
+                receipt.verify_es256(&[0x04; 65], &[], Some(&[0u8; 32]))
+            }
+        };
+        let _ = receipt.verify_ed25519(&[0u8; 32], &[], match receipt.payload() {
+            Rfc9942ReceiptPayload::Attached(_) => None,
+            Rfc9942ReceiptPayload::Detached => Some(&[0u8; 32]),
+        });
     }
 });
