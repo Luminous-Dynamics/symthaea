@@ -23,7 +23,7 @@ pub enum BoundaryValidationStatus {
     ExpectedOpeningsOnly,
     UnexpectedOpenings,
     MissingPortAnchor(PortId),
-    AmbiguousOpening(PortId),
+    AmbiguousOpening,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -179,7 +179,7 @@ impl PortBoundaryEvidence {
         }
 
         let status = if ambiguous > 0 {
-            BoundaryValidationStatus::AmbiguousOpening(PortId(0))
+            BoundaryValidationStatus::AmbiguousOpening
         } else if unexpected > 0 {
             BoundaryValidationStatus::UnexpectedOpenings
         } else {
@@ -221,7 +221,7 @@ fn edge_key(a: QuantizedPoint, b: QuantizedPoint) -> QuantizedEdge {
 }
 
 fn collect_boundary_edges(mesh: &TriangleMesh) -> Vec<(QuantizedPoint, QuantizedPoint, [f64; 3])> {
-    let mut edges: HashMap<QuantizedEdge, (usize, [f64; 3])> = HashMap::new();
+    let mut edges: HashMap<QuantizedEdge, [f64; 3]> = HashMap::new();
     let mut counts: HashMap<QuantizedEdge, usize> = HashMap::new();
 
     for triangle in &mesh.indices {
@@ -243,13 +243,13 @@ fn collect_boundary_edges(mesh: &TriangleMesh) -> Vec<(QuantizedPoint, Quantized
             let qa = quantize(a);
             let qb = quantize(b);
             let key = edge_key(qa, qb);
-            edges.entry(key).or_insert((1, midpoint(a, b)));
+            edges.entry(key).or_insert(midpoint(a, b));
             *counts.entry(key).or_insert(0) += 1;
         }
     }
 
     let mut boundary = Vec::new();
-    for ((a, b), (_, center)) in edges {
+    for ((a, b), center) in edges {
         if counts.get(&(a, b)).copied().unwrap_or(0) == 1 {
             boundary.push((a, b, center));
         }
