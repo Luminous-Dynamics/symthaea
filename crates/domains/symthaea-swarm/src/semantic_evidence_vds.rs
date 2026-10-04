@@ -2364,14 +2364,17 @@ impl<'a> CborReader<'a> {
                     }
                 }
                 let n=self.read_map_len()?;
-                if n>max_array_items{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+                if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
                 for _ in 0..n{
                     self.skip_value_with_bstr_and_array_limit(depth+1, max_bstr_len, max_array_items)?;
                     self.skip_value_with_bstr_and_array_limit(depth+1, max_bstr_len, max_array_items)?;
                 }
                 Ok(())
             },
-            6 => { self.read_tag()?; self.skip_value(depth+1) },
+            6 => {
+                self.read_tag()?;
+                self.skip_value_with_bstr_and_array_limit(depth+1, max_bstr_len, max_array_items)
+            },
             7 => {
                 let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
                 match initial {
