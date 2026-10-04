@@ -120,6 +120,7 @@ pub enum TpmNvCounterVerificationError {
     BackingMismatch,
     CounterGenerationMismatch,
     HandleMismatch,
+    EvidenceIdentityMismatch,
     QuoteVerificationFailed,
 }
 
@@ -152,6 +153,20 @@ pub fn verify_tpm_nv_counter<V: TpmNvCounterEvidenceVerifier>(
     }
     if receipt.freshness_handle_digest != evidence.quote_nonce_digest {
         return Err(TpmNvCounterVerificationError::HandleMismatch);
+    }
+    let FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
+        backend_identity_digest,
+        counter_namespace_digest,
+        observed_counter,
+    } = &receipt.evidence_kind
+    else {
+        return Err(TpmNvCounterVerificationError::BackingMismatch);
+    };
+    if backend_identity_digest != &evidence.tpm_identity_digest
+        || counter_namespace_digest != &evidence.nv_index_name_digest
+        || *observed_counter != evidence.counter_value
+    {
+        return Err(TpmNvCounterVerificationError::EvidenceIdentityMismatch);
     }
 
     verifier.verify(evidence, profile, receipt)?;
@@ -241,6 +256,22 @@ mod tests {
         assert_eq!(
             verify_tpm_nv_counter(&evidence, &profile(), &receipt, &Accept).unwrap_err(),
             TpmNvCounterVerificationError::CounterGenerationMismatch
+        );
+    }
+
+    #[test]
+    fn typed_evidence_identity_must_match_tpm_identity() {
+        let evidence = evidence(7);
+        let mut receipt = receipt(7);
+        receipt.evidence_kind = FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
+            backend_identity_digest: "different-tpm".into(),
+            counter_namespace_digest: "nv-name".into(),
+            observed_counter: 7,
+        };
+
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt, &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::EvidenceIdentityMismatch
         );
     }
 
