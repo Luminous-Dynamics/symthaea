@@ -23,7 +23,7 @@ pub struct NixServiceOperationCapabilitiesV1 {
 }
 
 impl NixServiceOperationCapabilitiesV1 {
-    pub(crate) fn from_observed_state(
+    pub(super) fn from_observed_state(
         state: &NixServiceObservedStateV1,
         can_start: bool,
         can_stop: bool,
@@ -72,7 +72,7 @@ pub struct NixServiceEnablementEvidenceV1 {
 }
 
 impl NixServiceEnablementEvidenceV1 {
-    pub(crate) fn from_observed_state(
+    pub(super) fn from_observed_state(
         state: &NixServiceObservedStateV1,
     ) -> Result<Self, NixServiceStateErrorV1> {
         let pre_state_digest = state.digest()?;
@@ -287,7 +287,7 @@ impl NixServiceObservedStateV1 {
 
     /// Parse the exact identity/state properties used for the governed pre-state.
     /// Capability facts are parsed only by the complete-observation parser.
-    pub(crate) fn parse_systemd_properties(
+    pub(super) fn parse_systemd_properties(
         requested_unit: impl Into<String>,
         properties: &str,
     ) -> Result<Self, NixServiceStateErrorV1> {
@@ -348,7 +348,7 @@ impl NixServiceObservedStateV1 {
     /// Parse the complete governed observation atomically. Capability facts are
     /// bound to the exact pre-state digest so they cannot be replayed against a
     /// different state observation.
-    pub(crate) fn parse_systemd_observation(
+    pub(super) fn parse_systemd_observation(
         requested_unit: impl Into<String>,
         properties: &str,
     ) -> Result<(Self, NixServiceOperationCapabilitiesV1), NixServiceStateErrorV1> {
