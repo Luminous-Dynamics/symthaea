@@ -703,9 +703,11 @@ jobs:
           nix build .#checks.x86_64-linux.service-module-smoke
 
       - name: Verify TSS 2.0 linker prerequisites
+        if: always()
         run: nix develop .#inoculation --command bash tests/tpm2-tss-linkage-smoke.sh
 
       - name: Exercise TPM2 emulator boundary
+        if: always()
         run: nix develop .#inoculation --command bash tests/tpm2-spore-boundary-smoke.sh
 
       - name: Upload TPM2 smoke evidence
