@@ -349,7 +349,7 @@ action.
 
 ## Interoperability and canonicalization
 
-The v0.4 Rust crate uses deterministic serde/JSON serialization for its internal
+The v0.5 Rust crate uses deterministic serde/JSON serialization for its internal
 preview digests. This is sufficient to bind objects inside the same
 implementation, but it is deliberately **not** presented as a cross-language
 cryptographic canonicalization standard.
@@ -368,9 +368,9 @@ content-addressable artifacts and platform-specific image variants. The
 compiler should bind these references into its plan rather than inventing
 parallel provenance semantics.
 
-## New invariants in the v0.4 prototype
+## New invariants in the v0.5 prototype
 
-The current v0.4 preview adds execution-time binding for the final target observation: receipts now carry the final snapshot observation timestamp and require it to fall within the execution interval. Alongside the v0.3 `ObserveState` semantic capability, explicit verification-policy construction, future-dated observation rejection, and receipt-side attestation evidence validation, this intentionally advances the schema from v0.3 to v0.4.
+The current v0.5 preview adds exact authorization-envelope binding to execution receipts. Receipts now carry a domain-separated authorization digest in addition to the v0.4 final-snapshot observation timestamp. This intentionally advances the schema from v0.4 to v0.5.
 
 Authorization validation now requires:
 
@@ -399,6 +399,8 @@ Authorization validation now requires:
 - receipt validation re-checks the authorization envelope at execution start;
   a forged or incomplete public AuthorizedDeploymentPlan cannot make a receipt
   valid merely by matching the receipt to its altered fields;
+- receipts bind a domain-separated digest of the exact authorization envelope,
+  including authority identity, granted capabilities, validity window, and nonce;
 - Nixward performs a fresh resource-identity preflight before mutation rather
   than trusting the original snapshot indefinitely;
 - receipt timestamps must remain within the authorization validity window;
