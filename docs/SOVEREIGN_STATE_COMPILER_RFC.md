@@ -587,3 +587,44 @@ when both expiries are present.
 Short-lived authorization is preferred for privileged operations; persistent
 management should be implemented as repeated, freshly authorized reconciliation
 rather than an indefinitely valid mutation grant.
+
+## Authorization consumption and replay
+
+Authorization identity is not sufficient by itself to make a privileged
+transition single-use. The consuming boundary must retain durable state.
+
+SSC therefore defines `AuthorizationConsumption` and
+`AuthorizationConsumptionStore` as the protocol seam between the stateless
+compiler and that stateful authority/executor boundary. A consumption record is
+derived only from an `AuthorizedDeploymentPlan` that validates successfully at
+the consumption time, and binds:
+
+- the exact authorization-envelope digest;
+- the authority identifier;
+- the authorization nonce;
+- the consumption timestamp.
+
+The store contract requires an atomic check-and-record operation. The authority
+nonce is the one-shot uniqueness identity, while the stored authorization digest
+prevents the same nonce from being silently rebound to a different authorization.
+
+The invariant is:
+
+`consume(authority, nonce) = success` at most once.
+
+A concurrent second consumer, a retry after process restart, or a replay of the
+same authorization must therefore fail at the durable boundary. SSC deliberately
+does not implement this as a process-local boolean or mutex, because such state
+does not survive restart and cannot establish a cross-process transaction.
+
+This follows the same basic security shape used by replay-resistant protocols:
+a unique transaction identifier helps identify reuse, but the recipient needs
+retained state to reject a previously accepted identifier. RFC 9449 specifies
+retaining DPoP `jti` values during the proof validity window for replay
+prevention; RFC 7519 defines `jti` as an identifier that can be used to prevent
+JWT replay.
+
+The remaining implementation work belongs outside the neutral compiler:
+Nixward's authoritative executor must bind this contract to durable storage or
+an equivalent transactional authority service, and receipt production should
+occur only after successful consumption.
