@@ -784,11 +784,96 @@ pub fn factorization_algebra(factors: &[&RandomLinearCode]) -> Option<LinearCode
 /// Every other factorization is obtained by XORing that representative with a GF(2) combination
 /// of the supplied kernel-basis witnesses. The exact fiber cardinality is therefore carried
 /// alongside its constructive ambiguity directions.
+///
+/// The certificate also carries private provenance and integrity fingerprints
+/// bound to the target, ordered factor presentation, representative, kernel
+/// witnesses, factor supports, and exact cardinality. Public-field mutation
+/// therefore makes bounded operations fail closed rather than silently using
+/// stale certificate geometry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinearCodeFactorizationFiber {
     pub representative_coefficients: Vec<bool>,
     pub kernel_basis: Vec<LinearCodeDependencyWitness>,
     pub cardinality: ExactPowerOfTwo,
+    /// Immutable binding to the exact target and ordered factor presentation used
+    /// to construct this certificate. Public-field mutation cannot refresh it.
+    source_fingerprint: [u8; 32],
+    /// Immutable integrity tag over the certificate fields and source binding.
+    integrity_fingerprint: [u8; 32],
+}
+
+fn factorization_source_fingerprint(
+    target: &BinaryCodeword,
+    factors: &[&RandomLinearCode],
+) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-hdc-linear-code-affine-source-v1\0");
+    hasher.update(&(target.dimension() as u64).to_le_bytes());
+    hasher.update(&(target.words().len() as u64).to_le_bytes());
+    for word in target.words() {
+        hasher.update(&word.to_le_bytes());
+    }
+    hasher.update(&(factors.len() as u64).to_le_bytes());
+    for factor in factors {
+        hasher.update(&(factor.dimension() as u64).to_le_bytes());
+        hasher.update(&(factor.rank() as u64).to_le_bytes());
+        hasher.update(&(factor.basis().len() as u64).to_le_bytes());
+        for generator in factor.basis() {
+            hasher.update(&(generator.dimension() as u64).to_le_bytes());
+            hasher.update(&(generator.words().len() as u64).to_le_bytes());
+            for word in generator.words() {
+                hasher.update(&word.to_le_bytes());
+            }
+        }
+    }
+    *hasher.finalize().as_bytes()
+}
+
+impl LinearCodeFactorizationFiber {
+    fn computed_integrity_fingerprint(&self) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea-hdc-linear-code-affine-integrity-v1\0");
+        hasher.update(&self.source_fingerprint);
+        hasher.update(
+            &(self.representative_coefficients.len() as u64)
+                .to_le_bytes(),
+        );
+        for coefficient in &self.representative_coefficients {
+            hasher.update(&[*coefficient as u8]);
+        }
+        hasher.update(
+            &(self.kernel_basis.len() as u64).to_le_bytes(),
+        );
+        for witness in &self.kernel_basis {
+            hasher.update(
+                &(witness.generator_coefficients.len() as u64)
+                    .to_le_bytes(),
+            );
+            for coefficient in &witness.generator_coefficients {
+                hasher.update(&[*coefficient as u8]);
+            }
+            hasher.update(&(witness.factor_support.len() as u64).to_le_bytes());
+            for factor_index in &witness.factor_support {
+                hasher.update(&(*factor_index as u64).to_le_bytes());
+            }
+            hasher.update(&(witness.dependent_generator_index as u64).to_le_bytes());
+        }
+        hasher.update(&(self.cardinality.exponent() as u64).to_le_bytes());
+        *hasher.finalize().as_bytes()
+    }
+
+    /// Recompute the certificate fingerprint from its current public fields.
+    ///
+    /// For an unmodified certificate this equals the immutable integrity tag.
+    /// Public-field mutation changes the computed fingerprint and is rejected by
+    /// bounded operations because the stored tag cannot be refreshed externally.
+    pub fn fingerprint(&self) -> [u8; 32] {
+        self.computed_integrity_fingerprint()
+    }
+
+    fn integrity_is_valid(&self) -> bool {
+        self.integrity_fingerprint == self.computed_integrity_fingerprint()
+    }
 }
 
 /// Iterator over a bounded affine factorization fiber.
@@ -830,6 +915,9 @@ impl ExactSizeIterator for LinearCodeFactorizationFiberIter<'_> {}
 
 impl LinearCodeFactorizationFiber {
     fn basis_is_well_formed(&self) -> bool {
+        if !self.integrity_is_valid() {
+            return false;
+        }
         if self.cardinality.exponent() != self.kernel_basis.len()
             || self
                 .kernel_basis
@@ -936,6 +1024,14 @@ impl LinearCodeFactorizationFiber {
             || self.representative_coefficients.len() != algebra.factor_dimension_sum
             || self.kernel_basis.len() != algebra.kernel_dimension
             || self.cardinality.exponent() != algebra.kernel_dimension
+        {
+            return false;
+        }
+
+        let expected_source_fingerprint =
+            factorization_source_fingerprint(target, factors);
+        if self.source_fingerprint != expected_source_fingerprint
+            || !self.integrity_is_valid()
         {
             return false;
         }
@@ -1077,11 +1173,15 @@ pub fn factorization_affine_fiber(
     if kernel_basis.len() != algebra.kernel_dimension {
         return None;
     }
-    let fiber = LinearCodeFactorizationFiber {
+    let source_fingerprint = factorization_source_fingerprint(target, factors);
+    let mut fiber = LinearCodeFactorizationFiber {
         representative_coefficients,
         kernel_basis,
         cardinality: algebra.factorization_count_per_target,
+        source_fingerprint,
+        integrity_fingerprint: [0; 32],
     };
+    fiber.integrity_fingerprint = fiber.computed_integrity_fingerprint();
 
     if fiber.representative_coefficients.len() != algebra.factor_dimension_sum
         || !fiber.basis_is_well_formed()
