@@ -1127,7 +1127,18 @@ pub fn factorization_kernel_basis(
             vector
         })
         .collect::<Vec<_>>();
-    if basis_rank(&coefficient_basis, total_rank) != expected_kernel_dimension
+    let mut dependent_indices = kernel_basis
+        .iter()
+        .map(|witness| witness.dependent_generator_index)
+        .collect::<Vec<_>>();
+    dependent_indices.sort_unstable();
+    dependent_indices.dedup();
+    if dependent_indices.len() != kernel_basis.len()
+        || kernel_basis.iter().any(|witness| {
+            witness.dependent_generator_index >= total_rank
+                || !witness.generator_coefficients[witness.dependent_generator_index]
+        })
+        || basis_rank(&coefficient_basis, total_rank) != expected_kernel_dimension
         || kernel_basis
             .iter()
             .any(|witness| !witness.verifies_against(factors))
