@@ -377,6 +377,22 @@ impl LinearCodeAlgebra {
             }
     }
 
+    /// Check the conservation law together with the known number of factor groups.
+    ///
+    /// The aggregate law alone cannot bound dependency_order because the public
+    /// ledger does not otherwise carry the factor count. Callers that have the factor
+    /// presentation should use this stronger form so fabricated metadata cannot claim
+    /// a dependency involving more factor groups than actually exist.
+    pub const fn satisfies_conservation_law_for_factor_count(self, factor_count: usize) -> bool {
+        if factor_count == 0 || !self.satisfies_conservation_law() {
+            return false;
+        }
+        match self.dependency_order {
+            None => self.kernel_dimension == 0,
+            Some(order) => self.kernel_dimension > 0 && order <= factor_count,
+        }
+    }
+
     pub const fn raw_factor_tuple_exponent(self) -> usize {
         self.raw_factor_tuple_count.exponent()
     }
@@ -784,7 +800,7 @@ pub fn factorization_algebra(factors: &[&RandomLinearCode]) -> Option<LinearCode
         minimum_dependent_factor_order(factors)
     };
 
-    Some(LinearCodeAlgebra {
+    let algebra = LinearCodeAlgebra {
         factor_dimension_sum,
         union_generator_rank,
         kernel_dimension,
@@ -793,7 +809,10 @@ pub fn factorization_algebra(factors: &[&RandomLinearCode]) -> Option<LinearCode
         factorization_count_per_target: ExactPowerOfTwo::new(kernel_dimension),
         unique_factorization: kernel_dimension == 0,
         dependency_order,
-    })
+    };
+    algebra
+        .satisfies_conservation_law_for_factor_count(factors.len())
+        .then_some(algebra)
 }
 
 /// Explicit affine fiber of the factor-to-bound map for one representable target.
@@ -1388,6 +1407,37 @@ mod tests {
             dependency_order: Some(1),
         };
         assert!(!singleton_dependency.satisfies_conservation_law());
+    }
+
+    #[test]
+    fn conservation_law_binds_dependency_order_to_factor_count() {
+        let valid = LinearCodeAlgebra {
+            factor_dimension_sum: 3,
+            union_generator_rank: 2,
+            kernel_dimension: 1,
+            raw_factor_tuple_count: ExactPowerOfTwo::new(3),
+            reachable_target_count: ExactPowerOfTwo::new(2),
+            factorization_count_per_target: ExactPowerOfTwo::new(1),
+            unique_factorization: false,
+            dependency_order: Some(3),
+        };
+        assert!(valid.satisfies_conservation_law());
+        assert!(valid.satisfies_conservation_law_for_factor_count(3));
+        assert!(!valid.satisfies_conservation_law_for_factor_count(2));
+        assert!(!valid.satisfies_conservation_law_for_factor_count(0));
+
+        let unique = LinearCodeAlgebra {
+            factor_dimension_sum: 2,
+            union_generator_rank: 2,
+            kernel_dimension: 0,
+            raw_factor_tuple_count: ExactPowerOfTwo::new(2),
+            reachable_target_count: ExactPowerOfTwo::new(2),
+            factorization_count_per_target: ExactPowerOfTwo::new(0),
+            unique_factorization: true,
+            dependency_order: None,
+        };
+        assert!(unique.satisfies_conservation_law_for_factor_count(1));
+        assert!(!unique.satisfies_conservation_law_for_factor_count(0));
     }
 
     #[test]
