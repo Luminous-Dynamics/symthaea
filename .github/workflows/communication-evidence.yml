@@ -112,6 +112,7 @@ jobs:
           assert calibration_identity["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
           assert calibration_identity["claim_boundary"] == "empirical_clean_calibration_disjoint_evaluation_and_null_abstention_only"
           assert calibration_identity["calibration"]["cases"] == 3
+          assert calibration_identity["calibration"]["codebook_hash"] != ""
           assert calibration_identity["calibration"]["lower_quantile"] == 0.10
           assert calibration_identity["calibration"]["calibrated_min_score"] >= calibration_identity["calibration"]["baseline_min_score"]
           assert calibration_identity["calibration"]["calibrated_min_margin"] >= calibration_identity["calibration"]["baseline_min_margin"]
