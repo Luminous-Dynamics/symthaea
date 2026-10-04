@@ -1491,7 +1491,6 @@ jobs:
           contract_root="$(mktemp -d)"
           mkdir -p "$contract_root/crate"
           cp -R crates/core/symthaea-evidence-plane/. "$contract_root/crate/"
-          cp Cargo.lock "$contract_root/Cargo.lock"
 
           python3 - "$contract_root" <<'PY'
           import sys
@@ -1501,13 +1500,13 @@ jobs:
           root = Path(".")
           contract_root = Path(sys.argv[1])
           root_manifest = tomllib.loads((root / "Cargo.toml").read_text())
-          lock = tomllib.loads((root / "Cargo.lock").read_text())
+          root_lock = tomllib.loads((root / "Cargo.lock").read_text())
           workspace_deps = root_manifest["workspace"]["dependencies"]
 
           def locked_version(name: str) -> str:
-              matches = [pkg["version"] for pkg in lock["package"] if pkg["name"] == name]
+              matches = [pkg["version"] for pkg in root_lock["package"] if pkg["name"] == name]
               if len(matches) != 1:
-                  raise SystemExit(f"expected exactly one locked {name} package, found {matches!r}")
+                  raise SystemExit(f"expected exactly one checked-in {name} package, found {matches!r}")
               return matches[0]
 
           serde = workspace_deps["serde"]
@@ -1530,6 +1529,29 @@ jobs:
               f'serde = {{ version = "={locked_version("serde")}", features = ["derive"] }}\n'
               f'serde_json = "={locked_version("serde_json")}"\n'
           )
+          PY
+
+          cargo generate-lockfile --offline || cargo generate-lockfile
+
+          python3 - "$contract_root" <<'PY'
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          contract_root = Path(sys.argv[1])
+          root_lock = tomllib.loads(Path("Cargo.lock").read_text())
+          isolated_lock = tomllib.loads((contract_root / "Cargo.lock").read_text())
+          root_versions = {}
+          isolated_versions = {}
+          for name in ("blake3", "serde", "serde_json"):
+              root_versions[name] = [pkg["version"] for pkg in root_lock["package"] if pkg["name"] == name]
+              isolated_versions[name] = [pkg["version"] for pkg in isolated_lock["package"] if pkg["name"] == name]
+              if root_versions[name] != isolated_versions[name]:
+                  raise SystemExit(
+                      f"{name} resolved differently in isolation: root={root_versions[name]!r}, "
+                      f"isolation={isolated_versions[name]!r}"
+                  )
+          print("Evidence Plane isolated dependency versions match the checked-in root lock.")
           PY
 
           cargo test --manifest-path "$contract_root/Cargo.toml" --locked
