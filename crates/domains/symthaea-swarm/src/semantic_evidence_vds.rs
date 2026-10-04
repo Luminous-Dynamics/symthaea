@@ -726,22 +726,38 @@ impl Rfc9942ReceiptEnvelope {
         if reader.read_tag().map_err(|_|Rfc9942VdpError::InvalidEncoding)?!=COSE_SIGN1_TAG{return Err(Rfc9942VdpError::InvalidStructure);}
         let indefinite_array = reader.read_array_len_exact(4).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         let protected=reader.read_bstr_bounded(4096).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-        let mut ph=CborReader::new(&protected); let ph_len=ph.read_map_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-        if ph_len<2||ph_len>16{return Err(Rfc9942VdpError::InvalidStructure);}
+        let mut ph=CborReader::new(&protected);
+        let protected_entries=if protected.is_empty(){Vec::new()}else{
+            let entries=ph.read_map_entries_bounded(32).map_err(|error|match error{
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                _=>Rfc9942VdpError::InvalidEncoding,
+            })?;
+            ph.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            entries
+        };
         let mut algorithm=None; let mut vds=None; let mut protected_crit=None;
         let mut protected_extensions=Vec::new();
         let mut protected_labels=std::collections::HashSet::new();
-        for _ in 0..ph_len{
-            let entry_start=ph.offset;
-            let label_key=ph.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        for (raw_key,raw_value) in protected_entries{
+            let mut key_reader=CborReader::new(&raw_key);
+            let label_key=key_reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            key_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !protected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
             let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_)=>None };
+            let mut value_reader=CborReader::new(&raw_value);
             match label{
-                Some(COSE_ALG_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if algorithm.replace(value).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
-                Some(RFC9942_VDS_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if value<0{return Err(Rfc9942VdpError::InvalidStructure);}if vds.replace(value as u64).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
+                Some(COSE_ALG_HEADER_LABEL)=>{
+                    let value=value_reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    if algorithm.replace(value).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}
+                }
+                Some(RFC9942_VDS_HEADER_LABEL)=>{
+                    let value=value_reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    if value<0{return Err(Rfc9942VdpError::InvalidStructure);}
+                    if vds.replace(value as u64).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}
+                }
                 Some(COSE_CRIT_HEADER_LABEL)=>{
                     if protected_crit.is_some(){return Err(Rfc9942VdpError::InvalidStructure);}
-                    let items=ph.read_array_items_bounded(16).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                    let items=value_reader.read_array_items_bounded(16).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                     if items.is_empty(){return Err(Rfc9942VdpError::CriticalHeaderMalformed);}
                     let mut crit_labels=Vec::with_capacity(items.len());
                     let mut seen_crit=std::collections::HashSet::new();
@@ -753,42 +769,48 @@ impl Rfc9942ReceiptEnvelope {
                         crit_labels.push(key);
                     }
                     protected_crit=Some(crit_labels);
-                    protected_extensions.push(ph.bytes[entry_start..ph.offset].to_vec());
+                    protected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
                 }
                 _=>{
-                    ph.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-                    protected_extensions.push(ph.bytes[entry_start..ph.offset].to_vec());
+                    protected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
                 }
             }
+            value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         }
         if let Some(crit)=protected_crit.as_deref(){validate_cose_crit(&protected_labels,crit,CoseCritContext::Receipt)?;}
-        ph.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         let algorithm=algorithm.ok_or(Rfc9942VdpError::InvalidStructure)?; let vds_id=vds.ok_or(Rfc9942VdpError::InvalidStructure)?;
         if vds_id!=RFC9162_VDS_ID{return Err(Rfc9942VdpError::VdsMismatch(vds_id));}
+
         let unprotected_start = reader.offset;
-        let uh_len=reader.read_map_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?; if uh_len>32{return Err(Rfc9942VdpError::ResourceLimitExceeded);}
+        let unprotected_entries=reader.read_map_entries_bounded(32).map_err(|error|match error{
+            Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+            _=>Rfc9942VdpError::InvalidEncoding,
+        })?;
+        let payload_start = reader.offset;
         let mut vdp=None;
         let mut unprotected_extensions=Vec::new();
         let mut unprotected_labels=std::collections::HashSet::new();
-        for _ in 0..uh_len{
-            let entry_start=reader.offset;
-            let label_key=reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        for (raw_key,raw_value) in unprotected_entries{
+            let mut key_reader=CborReader::new(&raw_key);
+            let label_key=key_reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            key_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !unprotected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
             let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_)=>None };
             if label==Some(COSE_CRIT_HEADER_LABEL){return Err(Rfc9942VdpError::CriticalHeaderNotProtected);}
             if label==Some(RFC9942_VDP_HEADER_LABEL){
                 if vdp.is_some(){return Err(Rfc9942VdpError::InvalidStructure);}
-                vdp=Some(Rfc9942Vdp::from_reader(&mut reader)?);
+                let mut value_reader=CborReader::new(&raw_value);
+                let parsed=Rfc9942Vdp::from_reader(&mut value_reader)?;
+                value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                vdp=Some(parsed);
             }else{
-                reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-                unprotected_extensions.push(reader.bytes[entry_start..reader.offset].to_vec());
+                unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
             }
         }
         if unprotected_labels.iter().any(|label| protected_labels.contains(label)) {
             return Err(Rfc9942VdpError::InvalidStructure);
         }
         let vdp=vdp.ok_or(Rfc9942VdpError::InvalidStructure)?;
-        let payload_start = reader.offset;
         let payload=match reader.peek_major_type().map_err(|_|Rfc9942VdpError::InvalidEncoding)?{
             2=>{let raw=reader.read_bstr_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;Rfc9942ReceiptPayload::from_bytes(Some(&raw))?}
             7=>{reader.read_nil().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;Rfc9942ReceiptPayload::Detached}
