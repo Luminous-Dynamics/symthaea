@@ -108,3 +108,17 @@ The audit verifies, per case:
 This artifact is a contract/invariant measurement, not a speech-naturalness score. It exists
 to make architectural regressions visible in CI without relying on stochastic generation or
 human judgment.
+
+
+## Linguistic formulation audit
+
+The production-contract artifact now covers the explicit formulation boundary as well:
+
+    SpeechPlan -> LinguisticFrame -> PhonologicalPlan
+
+For every deterministic intent × epistemic case it verifies that the formulation frame is
+internally valid, lexical provenance is retained when explicitly bound, and the original
+intent provenance reaches the phonological layer unchanged.
+
+This is structural evidence only. It does not claim lexical adequacy, grammatical naturalness,
+or speech quality when the upstream state does not actually contain those things.
