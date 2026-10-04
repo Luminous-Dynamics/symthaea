@@ -729,6 +729,26 @@ mod tests {
     }
 
     #[test]
+    fn v2_tampered_required_profile_cannot_hide_in_projection() {
+        let request = request();
+        let mut projection = projection(&request);
+        projection.required_approval_profile = "local-operator-group-v1".to_string();
+        projection.projection_digest = projection.compute_digest().unwrap();
+
+        assert!(projection.validate().is_ok(), "tampered projection remains self-consistent");
+        assert_eq!(
+            LocalApprovalSubmissionV2::for_request_and_projection(
+                &request,
+                &projection,
+                LocalApprovalDecisionKindV1::Approved,
+                ms(1_200),
+            )
+            .unwrap_err(),
+            LocalApprovalAdmissionErrorV1::ProjectionRequestMismatch
+        );
+    }
+
+    #[test]
     fn v2_wire_shape_rejects_unknown_identity_and_authority_fields() {
         let request = request();
         let projection = projection(&request);
