@@ -8,7 +8,7 @@ use libfuzzer_sys::fuzz_target;
 use symthaea_swarm::semantic_evidence_vds::{
     Rfc9162ConsistencyProof,
     Rfc9162InclusionProof,
-    Rfc9942Vdp, Rfc9942VdpError, VdsTreeHead, Rfc9162Sha256Vds,
+    Rfc9942Vdp, VdsTreeHead, Rfc9162Sha256Vds,
 };
 
 fuzz_target!(|data: &[u8]| {
@@ -34,6 +34,4 @@ fuzz_target!(|data: &[u8]| {
         );
         let _ = vds.verify_rfc9942_consistency_cbor(older, newer, data);
     }
-
-    let _ = Rfc9942VdpError::InvalidStructure;
 });
