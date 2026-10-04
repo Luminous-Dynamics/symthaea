@@ -131,6 +131,7 @@ impl TpmNvCounterEvidence {
             )
             && receipt.generation == self.counter_value
             && receipt.freshness_handle_digest == self.quote_nonce_digest
+            && receipt.evidence_digest == self.binding_digest()
     }
 
     pub fn as_evidence_kind(&self) -> FreshnessAnchorEvidenceKind {
@@ -170,6 +171,7 @@ pub enum TpmNvCounterVerificationError {
     CounterGenerationMismatch,
     HandleMismatch,
     EvidenceIdentityMismatch,
+    EvidenceDigestMismatch,
     QuoteVerificationFailed,
     ChallengeDigestMismatch,
 }
@@ -203,6 +205,9 @@ pub fn verify_tpm_nv_counter<V: TpmNvCounterEvidenceVerifier>(
     }
     if receipt.freshness_handle_digest != evidence.quote_nonce_digest {
         return Err(TpmNvCounterVerificationError::HandleMismatch);
+    }
+    if receipt.evidence_digest != evidence.binding_digest() {
+        return Err(TpmNvCounterVerificationError::EvidenceDigestMismatch);
     }
     let FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
         backend_identity_digest,
@@ -282,7 +287,7 @@ mod tests {
             trust_anchor_set_digest: "trust-anchors".into(),
             freshness_handle_digest: "quote-handle".into(),
             evidence_reference: "evidence".into(),
-            evidence_digest: "evidence-digest".into(),
+            evidence_digest: evidence(counter_value).binding_digest(),
             evidence_kind: FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
                 backend_identity_digest: "tpm-identity".into(),
                 counter_namespace_digest: "nv-name".into(),
@@ -373,6 +378,7 @@ mod tests {
         evidence.quote_nonce_digest = digest.clone();
         let mut receipt = receipt(7);
         receipt.freshness_handle_digest = digest;
+        receipt.evidence_digest = evidence.binding_digest();
 
         assert!(verify_tpm_nv_counter_with_challenge(
             &evidence,
@@ -415,6 +421,18 @@ mod tests {
         assert_eq!(
             verify_tpm_nv_counter(&evidence, &profile(), &receipt, &Accept).unwrap_err(),
             TpmNvCounterVerificationError::EvidenceIdentityMismatch
+        );
+    }
+
+    #[test]
+    fn evidence_digest_must_match_canonical_evidence() {
+        let evidence = evidence(7);
+        let mut receipt = receipt(7);
+        receipt.evidence_digest = "different-evidence".into();
+
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt, &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::EvidenceDigestMismatch
         );
     }
 
