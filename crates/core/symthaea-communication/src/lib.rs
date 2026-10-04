@@ -16,6 +16,8 @@ pub mod benchmark;
 pub mod human;
 #[cfg(feature = "hdc-codec")]
 pub mod hdc_codec;
+#[cfg(feature = "hdc-codec")]
+pub mod hdc_interlingua;
 pub mod interlingua;
 pub mod metrics;
 pub mod neurosemantic;
