@@ -677,6 +677,45 @@ mod tests {
     }
 
     #[test]
+    fn local_peer_cannot_satisfy_stronger_required_profile() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = PendingNixApprovalRequestV1::from_intent(
+            &intent(),
+            daemon.reference(),
+            "nixos-rebuild switch --flake .#workstation",
+            "local-operator-group-v1",
+            ms(1_000),
+            ms(2_000),
+            [9; 32],
+        )
+        .unwrap();
+        let request_id = request.request_id().unwrap();
+        let submission = LocalApprovalSubmissionV2 {
+            request_id: request_id.clone(),
+            daemon_incarnation_id: request.daemon_incarnation_id.clone(),
+            action_intent_digest: request.action_intent_digest.clone(),
+            projection_digest: "ab".repeat(32),
+            decision: LocalApprovalDecisionKindV1::Approved,
+            decided_at_unix_ms: 1_200,
+        };
+        store
+            .install_pending_with_projection(request, "ab".repeat(32))
+            .unwrap();
+
+        assert_eq!(
+            store
+                .consume_verified_submission_v2(
+                    &submission,
+                    &peer(1000, 99),
+                    AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+                )
+                .unwrap_err(),
+            LocalApprovalRequestStoreErrorV1::ConsumedProvenanceMismatch("required/evidence profile")
+        );
+        assert!(store.is_pending(&request_id).unwrap());
+    }
+    #[test]
     fn v2_consume_returns_self_contained_approval_provenance_capsule() {
         let daemon = LiveDaemonIncarnationV1::generate().unwrap();
         let store = LocalApprovalRequestStoreV1::new(&daemon);
