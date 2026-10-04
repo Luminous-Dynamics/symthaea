@@ -839,7 +839,9 @@ impl LinearCodeFactorizationFiber {
             || self
                 .kernel_basis
                 .iter()
-                .any(|witness| witness.generator_coefficients.len() != self.representative_coefficients.len())
+                .any(|witness| {
+                    witness.generator_coefficients.len() != self.representative_coefficients.len()
+                })
         {
             return None;
         }
