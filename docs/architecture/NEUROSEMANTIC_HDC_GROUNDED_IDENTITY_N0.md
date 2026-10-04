@@ -181,6 +181,13 @@ separately. CI requires zero confident-wrong accepts while retaining at least on
 clean correct decode. The existing fixed `0.20 / 0.05` score/margin policy is not
 relaxed to accommodate corruption.
 
+A second deterministic sweep interpolates the clean binary node and edge frames
+toward independent null vectors at clean weights from 1.0 down to 0.0, then
+requantizes before decoding. This deliberately probes the neighborhood of the
+open decision boundary rather than sampling only independent random flips. A
+successful decode must still recover the exact stable identity/topology; any
+incorrect acceptance is a hard failure and otherwise the decoder must abstain.
+
 ## Empirical calibration boundary
 
 
