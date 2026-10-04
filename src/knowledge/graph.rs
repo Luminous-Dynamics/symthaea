@@ -58,6 +58,26 @@ impl CanonicalAdmission {
         Ok(Self { canonical_identity, provenance_family, receipt: None })
     }
 
+    /// Validate the capability envelope before it crosses the local admission boundary.
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        if self.canonical_identity.trim().is_empty() {
+            return Err("canonical identity must be non-empty");
+        }
+        if self.provenance_family.as_deref().is_some_and(|family| family.trim().is_empty()) {
+            return Err("provenance family must be non-empty when present");
+        }
+        if let Some(receipt) = self.receipt() {
+            receipt.validate_structure()?;
+            if !receipt.binds_subject(
+                &self.canonical_identity,
+                self.provenance_family.as_deref(),
+            ) {
+                return Err("admission receipt must bind canonical subject");
+            }
+        }
+        Ok(())
+    }
+
     /// Bind the admission to the immutable provenance snapshot that justified the
     /// software-level admission. The receipt carries no confidence/evidence weight.
     pub fn with_receipt(mut self, receipt: CanonicalAdmissionReceipt) -> Self {
@@ -434,6 +454,9 @@ impl EnhancedKnowledgeGraph {
         id: FactId,
         admission: CanonicalAdmission,
     ) -> bool {
+        if admission.validate_structure().is_err() {
+            return false;
+        }
         if let Some(receipt) = admission.receipt() {
             // A receipt is only meaningful if it binds this graph's exact current
             // structural provenance snapshot. Reject stale or non-conforming admission
