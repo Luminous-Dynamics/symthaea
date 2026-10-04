@@ -38,6 +38,20 @@ const SCREENSHOT_DIR = path.resolve(
 );
 const CHROMIUM = process.env.CHROMIUM_PATH || execFileSync('which', ['chromium'], { encoding: 'utf8' }).trim();
 const HEADLESS = process.env.WEBGPU_HEADLESS === 'false' ? false : 'new';
+const CHECKED_OUT_SHA = (() => {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+})();
+const EXPECTED_PR_HEAD_SHA = process.env.EXPECTED_PR_HEAD_SHA || null;
+if (EXPECTED_PR_HEAD_SHA && CHECKED_OUT_SHA !== EXPECTED_PR_HEAD_SHA) {
+  throw new Error(
+    `qualification checkout identity mismatch: expected ${EXPECTED_PR_HEAD_SHA}, got ${CHECKED_OUT_SHA}`,
+  );
+}
+
 const MODES = (process.env.WEBGPU_MODES || 'webgpu-swiftshader,fallback')
   .split(',')
   .map(value => value.trim())
@@ -592,6 +606,8 @@ try {
     headed_under_xvfb: HEADLESS === false,
     modes: MODES,
     git_sha: process.env.GITHUB_SHA || null,
+    checked_out_sha: CHECKED_OUT_SHA,
+    expected_pr_head_sha: EXPECTED_PR_HEAD_SHA,
     run_id: process.env.GITHUB_RUN_ID || null,
     workflow_ref: process.env.GITHUB_WORKFLOW_REF || null,
     ok: Object.keys(failures).length === 0,
