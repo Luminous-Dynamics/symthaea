@@ -57,6 +57,13 @@ impl InstalledLocalApprovalRequestV1 {
         &self.install.request_id
     }
 
+    /// Return the exact operator-visible action derived from the typed command
+    /// when this live request was created. Callers receive a read-only view;
+    /// they cannot replace the runtime-owned ceremony text.
+    pub fn operator_visible_action(&self) -> &str {
+        &self.operator_visible_action
+    }
+
     pub fn superseded_request_ids(&self) -> &[String] {
         &self.install.superseded_request_ids
     }
@@ -143,15 +150,14 @@ impl LocalApprovalRuntimeV1 {
 
     /// Mint and atomically install one exact local approval request.
     ///
-    /// The caller supplies the exact typed command, semantic intent, display,
-    /// profile, and time window. The runtime verifies that the command's semantic
-    /// descriptor and canonical operator display agree before installation.
+    /// The caller supplies the exact typed command, semantic intent, profile,
+    /// and time window. The runtime derives the operator-visible ceremony text
+    /// itself from that command before installation.
     /// Incarnation identity and request nonce remain owned by the live daemon context.
     pub fn create_pending_request(
         &self,
         intent: &NixActionIntentV1,
         command: &NixOSCommand,
-        displayed_action: &str,
         authority_profile_ref: impl Into<String>,
         created_at: UnixMillisV1,
         expires_at: UnixMillisV1,
@@ -160,19 +166,16 @@ impl LocalApprovalRuntimeV1 {
         if intent.action != expected_action {
             return Err(LocalApprovalRuntimeErrorV1::IntentCommandMismatch);
         }
-        let expected_displayed_action = operator_visible_action_for_command(command);
-        if displayed_action != expected_displayed_action {
-            return Err(LocalApprovalRuntimeErrorV1::DisplayedActionMismatch);
-        }
+        let displayed_action = operator_visible_action_for_command(command);
 
         let request = self.daemon_incarnation.create_approval_request(
             intent,
-            displayed_action,
+            &displayed_action,
             authority_profile_ref,
             created_at,
             expires_at,
         )?;
-        let projection = PendingNixApprovalProjectionV1::from_request(&request, displayed_action)?;
+        let projection = PendingNixApprovalProjectionV1::from_request(&request, &displayed_action)?;
         let install = self
             .request_store
             .install_pending_with_projection(request.clone(), projection.projection_digest.clone())?;
@@ -183,7 +186,7 @@ impl LocalApprovalRuntimeV1 {
         Ok(InstalledLocalApprovalRequestV1 {
             request,
             install,
-            operator_visible_action: displayed_action.to_owned(),
+            operator_visible_action: displayed_action,
         })
     }
 
@@ -294,8 +297,6 @@ pub enum LocalApprovalRuntimeErrorV1 {
     Authorization(#[from] super::authorization::NixAuthorizationErrorV1),
     #[error("approval intent action does not match the typed command")]
     IntentCommandMismatch,
-    #[error("operator-visible approval text does not match the typed command rendering")]
-    DisplayedActionMismatch,
     #[error(transparent)]
     Socket(#[from] LocalApprovalSocketErrorV1),
     #[error(transparent)]
@@ -373,7 +374,6 @@ mod tests {
                 .create_pending_request(
                     &intent("nginx.service"),
                     &stop_command,
-                    "systemctl stop nginx.service",
                     "same-uid-process-v1",
                     UnixMillisV1::new(now.saturating_sub(1_000)),
                     UnixMillisV1::new(now + 60_000),
@@ -386,27 +386,28 @@ mod tests {
     }
 
     #[test]
-    fn request_creation_rejects_display_substitution() {
+    fn request_creation_derives_runtime_owned_operator_display() {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
         let command = restart_command("nginx.service");
 
+        let installed = runtime
+            .create_pending_request(
+                &intent("nginx.service"),
+                &command,
+                "same-uid-process-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+
         assert_eq!(
-            runtime
-                .create_pending_request(
-                    &intent("nginx.service"),
-                    &command,
-                    "systemctl stop nginx.service",
-                    "same-uid-process-v1",
-                    UnixMillisV1::new(now.saturating_sub(1_000)),
-                    UnixMillisV1::new(now + 60_000),
-                )
-                .unwrap_err()
-                .to_string(),
-            "operator-visible approval text does not match the typed command rendering"
+            installed.operator_visible_action(),
+            "systemctl restart nginx.service"
         );
-        assert_eq!(runtime.pending_count().unwrap(), 0);
+        let projection = installed.operator_projection().unwrap();
+        assert_eq!(projection.operator_visible_action, installed.operator_visible_action());
     }
 
     #[test]
@@ -418,7 +419,6 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -445,7 +445,6 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -456,7 +455,6 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
@@ -489,7 +487,6 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -517,7 +514,6 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -571,7 +567,6 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -583,7 +578,6 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
@@ -636,7 +630,6 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -666,7 +659,6 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -693,7 +685,6 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -722,7 +713,6 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -734,7 +724,6 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
@@ -771,7 +760,6 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -804,7 +792,6 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -850,7 +837,6 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
@@ -862,7 +848,6 @@ mod tests {
             .create_pending_request(
                 &action,
                 &restart_command("nginx.service"),
-                "restart nginx.service",
                 "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
