@@ -719,6 +719,15 @@ jobs:
       - name: Exercise TPM2 emulator boundary
         run: nix develop .#inoculation --command bash tests/tpm2-spore-boundary-smoke.sh
 
+      - name: Upload TPM2 smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tpm2-spore-boundary-evidence-${{ github.sha }}
+          path: tpm2-spore-boundary-evidence.txt
+          if-no-files-found: ignore
+          retention-days: 30
+
   test-integration:
     name: Integration Tests
     runs-on: ubuntu-latest
