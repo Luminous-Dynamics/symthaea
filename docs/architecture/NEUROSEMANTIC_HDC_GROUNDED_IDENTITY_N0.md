@@ -56,7 +56,8 @@ Therefore:
 
 can be represented by the same HDC atom when one observation is grounded by `train-agent` and another by `heldout-agent`.
 
-The grounding references remain in the manifest and are restored only through that sidecar.
+The grounding references remain in the source manifest and are restored only through that sidecar. Decoding now requires the exact source manifest whose canonical hash equals `source_manifest_hash`; the receiver manifest supplies only the receiver's local node/relation identities. Thus receiver-local remapping cannot silently replace the provenance attached to the transmitted representation.
+
 
 This is not semantic equivalence discovery. A French label, an English label, an audio unit, and a sensor-derived representation become equivalent here only when an independently validated upstream mapping assigns them the same stable concept identity.
 
@@ -90,7 +91,7 @@ These are deliberately different:
 
 A new observation can therefore use the same HDC coordinate system while carrying a different provenance manifest.
 
-The authenticated transport boundary must protect both the representation and any sidecar manifest referenced by `source_manifest_hash`. The HDC adapter does not substitute for packet authentication, confidentiality, signatures, or revocation.
+The authenticated transport boundary must protect both the representation and the source sidecar manifest referenced by `source_manifest_hash`. The decoder's equality check proves that it received the expected sidecar; it does not itself provide transport authentication, confidentiality, signatures, or revocation.
 
 A codebook is therefore tied not just to a scheme label but to the versioned identity-mapping authority that supplied that scheme. A manifest carrying the same scheme ID but a different mapping-authority provenance hash is rejected before encoding or decoding.
 
