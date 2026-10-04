@@ -36,6 +36,14 @@ const RFC8392_SIGNED_CWT: &[u8] = &[
     0x72, 0x09, 0x12, 0x0e, 0x1c, 0x9e, 0x30,
 ];
 
+fn hex_bytes(s: &str) -> Vec<u8> {
+    assert_eq!(s.len() % 2, 0);
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
+        .collect()
+}
+
 const RFC8392_P256_X: [u8; 32] = [
     0x14, 0x33, 0x29, 0xcc, 0xe7, 0x86, 0x8e, 0x41,
     0x69, 0x27, 0x59, 0x9c, 0xf6, 0x5a, 0x34, 0xf3,
@@ -72,6 +80,12 @@ fn rfc8392_detached_signed_cwt() -> Vec<u8> {
 #[test]
 fn rfc8392_es256_known_answer_verifies() {
     assert_eq!(RFC8392_SIGNED_CWT.len(), 175, "RFC 8392 Appendix A.3 wire fixture length changed");
+    assert_eq!(&RFC8392_SIGNED_CWT[109..111], &[0x58, 0x40], "RFC 8392 signature must be a 64-byte bstr");
+    assert_eq!(
+        &RFC8392_SIGNED_CWT[111..],
+        &hex_bytes("5427c1ff28d23fbad1f29c4c7c6a555e601d6fa29f9179bc3d7438bacaca5acd08c8d4d4f96131680c429a01f85951ecee743a52b9b63632c57209120e1c9e30"),
+        "RFC 8392 signature bytes changed"
+    );
     let message = Rfc9942SignatureWithReceipts::from_cbor(RFC8392_SIGNED_CWT)
         .expect("RFC 8392 signed CWT must parse");
 
