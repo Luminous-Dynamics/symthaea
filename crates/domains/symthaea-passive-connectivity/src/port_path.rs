@@ -162,7 +162,7 @@ fn triangle_components(mesh: &TriangleMesh) -> Vec<usize> {
     (0..mesh.indices.len()).map(|i| find(&mut parent, i)).collect()
 }
 
-enum AnchorResolution {
+pub(crate) enum AnchorResolution {
     Missing,
     Ambiguous,
     Found(usize),
@@ -173,6 +173,18 @@ fn component_value(resolution: AnchorResolution) -> Option<usize> {
         AnchorResolution::Found(component) => Some(component),
         AnchorResolution::Missing | AnchorResolution::Ambiguous => None,
     }
+}
+
+pub(crate) fn resolve_port_component(
+    mesh: &TriangleMesh,
+    embedding: &GeometryEmbedding,
+    labels: &[usize],
+    port: PortId,
+) -> AnchorResolution {
+    let Some(anchor) = embedding.ports.get(&port) else {
+        return AnchorResolution::Missing;
+    };
+    nearest_component(mesh, labels, anchor.center_mm, anchor.radius_mm)
 }
 
 fn nearest_component(
