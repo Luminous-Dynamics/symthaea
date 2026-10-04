@@ -1,6 +1,6 @@
 use blake3::Hasher;
 use symthaea_core::hdc::linear_code::{
-    BinaryCodeword, LinearCodeDependencyWitness, LinearCodeWork, RandomLinearCode, basis_rank,
+    BinaryCodeword, LinearCodeWork, RandomLinearCode, basis_rank,
     factorization_algebra, factorization_count_for_target, factorization_dependency_witness,
     recover_direct_sum_bound, recover_independent_bound,
     recover_linear_bound, recover_linear_bound_with_work, solve_linear_combination,
