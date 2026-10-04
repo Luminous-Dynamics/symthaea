@@ -127,12 +127,24 @@ impl HdcOntologyManifest {
             .map(|binding| binding.relation_id.as_str())
     }
 
-    fn local_relation_for_id(&self, relation_id: &str) -> Option<&str> {
-        self.relations
+    fn local_relation_for_id(&self, relation_id: &str) -> Result<&str, String> {
+        let matches = self
+            .relations
             .iter()
             .filter(|binding| binding.relation_id == relation_id)
             .map(|binding| binding.local_relation.as_str())
-            .min()
+            .collect::<Vec<_>>();
+
+        match matches.as_slice() {
+            [local_relation] => Ok(*local_relation),
+            [] => Err(format!(
+                "receiver identity manifest lacks stable relation id {relation_id}"
+            )),
+            _ => Err(format!(
+                "receiver identity manifest ambiguously maps stable relation id {relation_id} to {} local relations",
+                matches.len()
+            )),
+        }
     }
 }
 
@@ -769,13 +781,7 @@ impl HdcOntologyCodebook {
                 .get(&target)
                 .cloned()
                 .ok_or_else(|| format!("edge target concept not selected: {target}"))?;
-            let local_relation = receiver_manifest
-                .local_relation_for_id(&relation_id)
-                .ok_or_else(|| {
-                    format!(
-                        "receiver identity manifest lacks stable relation id {relation_id}"
-                    )
-                })?;
+            let local_relation = receiver_manifest.local_relation_for_id(&relation_id)?;
 
             edges.push(ConceptEdge {
                 source: source_id,
@@ -1583,6 +1589,34 @@ mod tests {
         observed_groundings.sort();
         expected_groundings.sort();
         assert_eq!(observed_groundings, expected_groundings);
+    }
+
+    #[test]
+    fn ambiguous_receiver_relation_mapping_is_fail_closed() {
+        let (training, training_manifest) = training_graph_and_manifest();
+        let codebook =
+            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
+                .unwrap();
+        let representation = codebook
+            .encode_graph(&training, &training_manifest)
+            .unwrap();
+
+        let mut ambiguous = training_manifest.clone();
+        ambiguous.relations.push(HdcRelationIdentityBinding {
+            local_relation: "starts".into(),
+            relation_id: "relation:initiates".into(),
+        });
+        assert!(ambiguous.validates());
+
+        let error = codebook
+            .decode_graph_with_policy(
+                &representation,
+                &training_manifest,
+                &ambiguous,
+                HdcOntologyDecodePolicy::conservative_default(),
+            )
+            .expect_err("ambiguous stable relation rendering must fail closed");
+        assert!(error.contains("ambiguously maps stable relation id"));
     }
 
     #[test]
