@@ -131,8 +131,9 @@ jobs:
           assert calibration_identity["calibration"]["calibrated_min_margin"] >= calibration_identity["calibration"]["baseline_min_margin"]
           assert calibration_identity["evaluation"]["cases"] == 2
           assert calibration_identity["evaluation"]["all_exact"] is True
-          assert calibration_identity["null_test"]["samples"] == 256
-          assert calibration_identity["null_test"]["abstentions"] == 256
+          assert calibration_identity["null_test"]["samples"] == 4096
+          assert calibration_identity["null_test"]["generator"] == "BinaryHV::random"
+          assert calibration_identity["null_test"]["abstentions"] == 4096
           assert calibration_identity["null_test"]["accepted"] == 0
           assert calibration_identity["guarantee_boundary"] == "empirical_only; no distribution_free_or_conformal_coverage_claim"
 
