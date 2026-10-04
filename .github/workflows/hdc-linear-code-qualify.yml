@@ -58,8 +58,8 @@ jobs:
       - name: Verify pinned Rust toolchain
         id: toolchain
         run: |
-          RUSTC_VERSION="$(rustc --version | awk '{print $2}')"
-          CARGO_VERSION="$(cargo --version | awk '{print $2}')"
+          RUSTC_VERSION="$(rustc +1.96.1 --version | awk '{print $2}')"
+          CARGO_VERSION="$(cargo +1.96.1 --version | awk '{print $2}')"
           test "$RUSTC_VERSION" = "1.96.1"
           test "$CARGO_VERSION" = "1.96.1"
 
@@ -84,7 +84,7 @@ jobs:
       - name: Focused formatting
         id: format
         run: |
-          rustfmt --check --edition 2024 \
+          rustfmt +1.96.1 --check --edition 2024 \
             crates/core/symthaea-core/src/hdc/linear_code.rs \
             crates/core/symthaea-core/tests/linear_code_ambiguity.rs
 
@@ -121,12 +121,12 @@ jobs:
           cp "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" \
             "$HARNESS/tests/linear_code_ambiguity.rs"
 
-          cargo generate-lockfile --manifest-path "$HARNESS/Cargo.toml"
+          cargo +1.96.1 generate-lockfile --manifest-path "$HARNESS/Cargo.toml"
           LOCK_SHA256="$(sha256sum "$HARNESS/Cargo.lock" | cut -d" " -f1)"
           CARGO_VERSION="$(cargo --version)"
           RUSTC_VERSION="$(rustc --version)"
-          UNIT_TEST_COUNT="$(cargo test --locked --manifest-path "$HARNESS/Cargo.toml" --lib linear_code -- --list | awk '/^[^[:space:]].*: test$/ { count++ } END { print count+0 }')"
-          INTEGRATION_TEST_COUNT="$(cargo test --locked --manifest-path "$HARNESS/Cargo.toml" --test linear_code_ambiguity -- --list | awk '/^[^[:space:]].*: test$/ { count++ } END { print count+0 }')"
+          UNIT_TEST_COUNT="$(cargo +1.96.1 test --locked --manifest-path "$HARNESS/Cargo.toml" --lib linear_code -- --list | awk '/^[^[:space:]].*: test$/ { count++ } END { print count+0 }')"
+          INTEGRATION_TEST_COUNT="$(cargo +1.96.1 test --locked --manifest-path "$HARNESS/Cargo.toml" --test linear_code_ambiguity -- --list | awk '/^[^[:space:]].*: test$/ { count++ } END { print count+0 }')"
           echo "path=$HARNESS" >> "$GITHUB_OUTPUT"
           echo "lock_sha256=$LOCK_SHA256" >> "$GITHUB_OUTPUT"
           echo "cargo_version=$CARGO_VERSION" >> "$GITHUB_OUTPUT"
@@ -139,21 +139,21 @@ jobs:
       - name: Linear-code unit tests
         id: unit_tests
         run: |
-          cargo test --locked \
+          cargo +1.96.1 test --locked \
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --lib linear_code
 
       - name: Linear-code ambiguity integration test
         id: integration_tests
         run: |
-          cargo test --locked \
+          cargo +1.96.1 test --locked \
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_ambiguity
 
       - name: Capture canonical fixture fingerprint
         id: fingerprint
         run: |
-          OUTPUT="$(cargo test --locked \
+          OUTPUT="$(cargo +1.96.1 test --locked \
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --test linear_code_ambiguity canonical_fixture_fingerprint_is_emitted -- --nocapture 2>&1)"
           FIXTURE_SPEC_COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^FIXTURE_SPEC=')"
@@ -301,7 +301,7 @@ jobs:
       - name: Strict Clippy
         id: clippy
         run: |
-          cargo clippy --locked \
+          cargo +1.96.1 clippy --locked \
             --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
             --all-targets \
             -- -D warnings
