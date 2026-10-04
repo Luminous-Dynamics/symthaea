@@ -15,16 +15,71 @@
 use super::encoding::FactEncoding;
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
+use symthaea_epistemic_types::{
+    CanonicalAdmissionReceipt, MemoryKind, MemoryProvenance, ProvenanceRelation, ProvenanceRelationKind,
+    ProvenanceValidationReport, ProvenanceValidationViolation,
+    ProvenanceView,
+};
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 /// Unique fact identifier
 pub type FactId = u64;
 
+/// Opaque capability representing an explicit canonical-memory admission.
+///
+/// The fields are intentionally private so retrieval/search code cannot manufacture
+/// an admission merely by constructing a provenance envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanonicalAdmission {
+    canonical_identity: String,
+    provenance_family: Option<String>,
+    /// Optional immutable context proving which validated provenance snapshot and
+    /// admission event this capability was derived from. Holochain adapters can
+    /// require this context without coupling the cognitive core to Holochain types.
+    receipt: Option<CanonicalAdmissionReceipt>,
+}
+
+impl CanonicalAdmission {
+    pub fn new(
+        canonical_identity: impl Into<String>,
+        provenance_family: Option<String>,
+    ) -> Result<Self, &'static str> {
+        let canonical_identity = canonical_identity.into();
+        if canonical_identity.trim().is_empty() {
+            return Err("canonical identity must be non-empty");
+        }
+        if provenance_family
+            .as_deref()
+            .is_some_and(|family| family.trim().is_empty())
+        {
+            return Err("provenance family must be non-empty when present");
+        }
+        Ok(Self { canonical_identity, provenance_family, receipt: None })
+    }
+
+    /// Bind the admission to the immutable provenance snapshot that justified the
+    /// software-level admission. The receipt carries no confidence/evidence weight.
+    pub fn with_receipt(mut self, receipt: CanonicalAdmissionReceipt) -> Self {
+        self.receipt = Some(receipt);
+        self
+    }
+
+    pub fn receipt(&self) -> Option<&CanonicalAdmissionReceipt> {
+        self.receipt.as_ref()
+    }
+}
+
 /// A fact stored in the knowledge graph with temporal metadata
 #[derive(Debug, Clone)]
 pub struct TemporalFact {
-    /// Unique identifier
+    /// Stable semantic-memory identity, independent of the in-process FactId.
+    pub memory_id: String,
+    /// Optional canonical identity assigned by the epistemic admission boundary.
+    pub canonical_identity: Option<String>,
+    /// Provenance family shared by representations of the same source lineage.
+    pub provenance_family: Option<String>,
+    /// Unique in-process retrieval identifier
     pub id: FactId,
     /// HDC encoding of this fact
     pub encoding: FactEncoding,
@@ -72,6 +127,18 @@ pub struct FactSearchResult {
     pub confidence: f32,
 }
 
+/// Result of restoring one persisted fact into the bounded graph.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FactRestoreOutcome {
+    /// Whether the persisted fact was admitted into the graph.
+    pub accepted: bool,
+    /// Whether the fact was rejected by the bounded retention policy rather than
+    /// because its persisted representation was malformed.
+    pub rejected_by_policy: bool,
+    /// Number of existing facts evicted by graph retention policy while admitting it.
+    pub policy_evictions: usize,
+}
+
 // ── Enhanced Knowledge Graph ───────────────────────────────────────────────
 
 /// Knowledge graph with temporal awareness and HDC similarity search
@@ -93,6 +160,9 @@ pub struct EnhancedKnowledgeGraph {
     domain_index: HashMap<String, Vec<FactId>>,
     /// Pending contradiction alerts (drained by the knowledge manager each cycle)
     pending_contradictions: Vec<ContradictionAlert>,
+    /// Append-only provenance relations between stable memory identities.
+    /// These relations are structural lineage, not evidence-weighting signals.
+    provenance_relations: Vec<ProvenanceRelation>,
     /// Statistics
     total_insertions: u64,
     total_evictions: u64,
@@ -116,6 +186,7 @@ impl EnhancedKnowledgeGraph {
             contradiction_threshold: 0.7,
             domain_index: HashMap::new(),
             pending_contradictions: Vec::new(),
+            provenance_relations: Vec::new(),
             total_insertions: 0,
             total_evictions: 0,
             total_contradictions: 0,
@@ -135,17 +206,10 @@ impl EnhancedKnowledgeGraph {
         // Check for contradictions before inserting
         let contradictions = self.detect_contradictions(&encoding, current_cycle);
 
-        // Check for corroboration (highly similar existing fact)
-        if let Some(existing_id) = self.find_corroboration(&encoding) {
-            if let Some(fact) = self.facts.get_mut(&existing_id) {
-                fact.corroboration_count += 1;
-                // Boost confidence on corroboration (capped at initial)
-                fact.confidence = (fact.confidence + 0.1).min(1.0);
-                fact.last_accessed_cycle = current_cycle;
-                return (existing_id, contradictions);
-            }
-        }
-
+        // Never collapse a new observation into an existing fact based on HDC similarity.
+        // Similarity is retrieval metadata, not provenance or independent evidence.
+        // Explicit corroboration is represented by ProvenanceRelationKind::Corroborates
+        // and must therefore be recorded at the provenance boundary.
         // Evict if at capacity
         if self.facts.len() >= self.capacity {
             self.evict_lowest_confidence();
@@ -153,9 +217,13 @@ impl EnhancedKnowledgeGraph {
 
         let id = self.next_id;
         self.next_id += 1;
+        let memory_id = uuid::Uuid::new_v4().to_string();
 
         let confidence = encoding.confidence;
         let fact = TemporalFact {
+            memory_id,
+            canonical_identity: None,
+            provenance_family: None,
             id,
             encoding,
             inserted_at_cycle: current_cycle,
@@ -211,6 +279,7 @@ impl EnhancedKnowledgeGraph {
             score_b
                 .partial_cmp(&score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
         });
         results.truncate(k);
 
@@ -251,6 +320,7 @@ impl EnhancedKnowledgeGraph {
             score_b
                 .partial_cmp(&score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
         });
         results.truncate(k);
         results
@@ -306,17 +376,234 @@ impl EnhancedKnowledgeGraph {
         self.facts.get(&id)
     }
 
+    /// Return provenance metadata without treating retrieval metrics as evidence.
+    pub fn provenance(&self, id: FactId) -> Option<MemoryProvenance> {
+        self.facts.get(&id).map(|fact| MemoryProvenance {
+            canonical_identity: fact.canonical_identity.clone(),
+            memory_id: fact.memory_id.clone(),
+            memory_kind: MemoryKind::KnowledgeGraph,
+            created_at: format!("cycle:{}", fact.inserted_at_cycle),
+            source_event: None,
+            canonical_artifact_ref: None,
+            statement_ref: None,
+            provenance_family: fact.provenance_family.clone(),
+            epistemic_state: None,
+            claim_ceiling: None,
+            frontier_ref: None,
+            derivation_ref: None,
+            model_ref: None,
+            retrieval_index_ref: Some(format!("fact-id:{}", fact.id)),
+        })
+    }
+
     /// Get all facts with causal relations (for DAG construction)
     pub fn causal_facts(&self) -> Vec<&TemporalFact> {
-        self.facts
+        let mut facts: Vec<&TemporalFact> = self
+            .facts
             .values()
             .filter(|f| f.has_causal_relations)
-            .collect()
+            .collect();
+        facts.sort_by(|a, b| {
+            a.memory_id
+                .cmp(&b.memory_id)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        facts
     }
 
     /// Drain pending contradiction alerts
     pub fn drain_contradictions(&mut self) -> Vec<ContradictionAlert> {
         std::mem::take(&mut self.pending_contradictions)
+    }
+
+    /// Admit a canonical identity into an opaque capability.
+    /// This is the sole construction path for the capability accepted by
+    /// attach_admitted_provenance; retrieval and HDC similarity do not create it.
+    pub fn admit_canonical_identity(
+        &self,
+        canonical_identity: impl Into<String>,
+        provenance_family: Option<String>,
+    ) -> Result<CanonicalAdmission, &'static str> {
+        CanonicalAdmission::new(canonical_identity, provenance_family)
+    }
+
+    /// Attach an explicitly admitted canonical/provenance identity to a local fact.
+    /// The retrieval handle remains unchanged. No confidence or evidence score is modified.
+    pub fn attach_admitted_provenance(
+        &mut self,
+        id: FactId,
+        admission: CanonicalAdmission,
+    ) -> bool {
+        if let Some(receipt) = admission.receipt() {
+            // A receipt is only meaningful if it binds this graph's exact current
+            // structural provenance snapshot. Reject stale or non-conforming admission
+            // context rather than allowing a canonical identity to bypass the boundary.
+            let validation = self.validate_provenance();
+            if !receipt.binds_validation(&validation) {
+                return false;
+            }
+        }
+
+        if let Some(fact) = self.facts.get_mut(&id) {
+            fact.canonical_identity = Some(admission.canonical_identity);
+            fact.provenance_family = admission.provenance_family;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Record a typed provenance relation without changing either endpoint's confidence.
+    pub fn record_provenance_relation(&mut self, relation: ProvenanceRelation) -> Result<bool, &'static str> {
+        relation.validate()?;
+        // Endpoint memories may have been evicted from the local cognitive projection;
+        // provenance history must remain referentially stable rather than being erased by eviction.
+        if matches!(relation.kind, ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom | ProvenanceRelationKind::Supersedes)
+            && self.lineage_would_cycle(&relation.source_memory_id, &relation.target_memory_id)
+        {
+            return Err("derivation lineage relation would create a cycle");
+        }
+        if self.provenance_relations.iter().any(|existing| existing == &relation) {
+            return Ok(false);
+        }
+        self.provenance_relations.push(relation);
+        Ok(true)
+    }
+
+    pub fn provenance_relations(&self) -> &[ProvenanceRelation] {
+        &self.provenance_relations
+    }
+
+    /// Export a read-only provenance boundary for evidence/federation adapters.
+    ///
+    /// The returned view is a snapshot: mutating the cognitive graph afterwards cannot
+    /// mutate the view. The view carries lineage plus structural validation only.
+    pub fn provenance_view(&self) -> ProvenanceView {
+        ProvenanceView::from_relations(
+            &self.provenance_relations,
+            self.validate_provenance(),
+        )
+        .expect("graph provenance view must match its validation snapshot")
+    }
+
+    /// Validate the current provenance snapshot without mutating graph state.
+    ///
+    /// The report is structural only: it binds to an order-independent snapshot
+    /// digest and checks relation well-formedness plus derivation/revision/supersession acyclicity.
+    /// It does not assign truth, reliability, or evidential weight.
+    pub fn validate_provenance(&self) -> ProvenanceValidationReport {
+        let mut violations = Vec::new();
+
+        for relation in &self.provenance_relations {
+            if let Err(message) = relation.validate() {
+                violations.push(ProvenanceValidationViolation {
+                    code: "invalid_relation".into(),
+                    source_memory_id: Some(relation.source_memory_id.clone()),
+                    target_memory_id: Some(relation.target_memory_id.clone()),
+                    message: message.into(),
+                });
+            }
+        }
+
+        let mut seen = std::collections::HashSet::new();
+        for relation in &self.provenance_relations {
+            if !seen.insert(relation) {
+                violations.push(ProvenanceValidationViolation {
+                    code: "duplicate_relation".into(),
+                    source_memory_id: Some(relation.source_memory_id.clone()),
+                    target_memory_id: Some(relation.target_memory_id.clone()),
+                    message: "duplicate provenance relation".into(),
+                });
+            }
+        }
+
+        let lineage: Vec<&ProvenanceRelation> = self
+            .provenance_relations
+            .iter()
+            .filter(|relation| {
+                matches!(
+                    relation.kind,
+                    ProvenanceRelationKind::DerivedFrom
+                        | ProvenanceRelationKind::RevisedFrom
+                        | ProvenanceRelationKind::Supersedes
+                )
+            })
+            .collect();
+
+        for relation in &lineage {
+            let mut frontier = vec![relation.target_memory_id.clone()];
+            let mut visited = std::collections::HashSet::new();
+            while let Some(current) = frontier.pop() {
+                if current == relation.source_memory_id {
+                    violations.push(ProvenanceValidationViolation {
+                        code: "lineage_cycle".into(),
+                        source_memory_id: Some(relation.source_memory_id.clone()),
+                        target_memory_id: Some(relation.target_memory_id.clone()),
+                        message: "derivation/revision/supersession lineage contains a cycle".into(),
+                    });
+                    break;
+                }
+                if !visited.insert(current.clone()) {
+                    continue;
+                }
+                for edge in &lineage {
+                    if edge.source_memory_id == current {
+                        frontier.push(edge.target_memory_id.clone());
+                    }
+                }
+            }
+        }
+
+        ProvenanceValidationReport::from_relations(&self.provenance_relations)
+            .with_violations(violations)
+    }
+
+    /// Query provenance without assigning evidential weight.
+    pub fn provenance_relations_from(&self, memory_id: &str) -> Vec<&ProvenanceRelation> {
+        self.provenance_relations
+            .iter()
+            .filter(|relation| relation.source_memory_id == memory_id)
+            .collect()
+    }
+
+    /// Query incoming provenance without assigning evidential weight.
+    pub fn provenance_relations_to(&self, memory_id: &str) -> Vec<&ProvenanceRelation> {
+        self.provenance_relations
+            .iter()
+            .filter(|relation| relation.target_memory_id == memory_id)
+            .collect()
+    }
+
+    /// Query one provenance relation kind without assigning evidential weight.
+    pub fn provenance_relations_of_kind(
+        &self,
+        kind: ProvenanceRelationKind,
+    ) -> Vec<&ProvenanceRelation> {
+        self.provenance_relations
+            .iter()
+            .filter(|relation| relation.kind == kind)
+            .collect()
+    }
+
+    pub fn import_provenance_relation(&mut self, relation: ProvenanceRelation) -> Result<bool, &'static str> {
+        self.record_provenance_relation(relation)
+    }
+
+    fn lineage_would_cycle(&self, source: &str, target: &str) -> bool {
+        let mut frontier = vec![target.to_owned()];
+        let mut visited = std::collections::HashSet::new();
+        while let Some(current) = frontier.pop() {
+            if current == source { return true; }
+            if !visited.insert(current.clone()) { continue; }
+            for relation in &self.provenance_relations {
+                if matches!(relation.kind, ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom | ProvenanceRelationKind::Supersedes)
+                    && relation.source_memory_id == current
+                {
+                    frontier.push(relation.target_memory_id.clone());
+                }
+            }
+        }
+        false
     }
 
     /// Number of facts currently stored
@@ -334,7 +621,9 @@ impl EnhancedKnowledgeGraph {
         if self.facts.is_empty() {
             return 0.0;
         }
-        let sum: f32 = self.facts.values().map(|f| f.confidence).sum();
+        // HashMap iteration is arbitrary; sum in the graph's stable memory-identity order
+        // so floating-point accumulation is reproducible across restore/insertion order.
+        let sum: f32 = self.all_facts().map(|f| f.confidence).sum();
         sum / self.facts.len() as f32
     }
 
@@ -359,7 +648,13 @@ impl EnhancedKnowledgeGraph {
 
     /// Iterate over all stored facts.
     pub fn all_facts(&self) -> impl Iterator<Item = &TemporalFact> {
-        self.facts.values()
+        let mut facts: Vec<&TemporalFact> = self.facts.values().collect();
+        facts.sort_by(|a, b| {
+            a.memory_id
+                .cmp(&b.memory_id)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        facts.into_iter()
     }
 
     /// Get per-domain distribution: (domain_name, avg_confidence, fact_count).
@@ -370,14 +665,22 @@ impl EnhancedKnowledgeGraph {
             .domain_index
             .iter()
             .map(|(domain, ids)| {
-                let valid_facts: Vec<f32> = ids
+                // Domain index entries are keyed by process-local FactId and can be
+                // populated in different orders across restore paths. Re-establish the
+                // graph's stable memory identity order before floating-point reduction so
+                // the reported average is reproducible as well as the final ordering.
+                let mut valid_facts: Vec<(&str, FactId, f32)> = ids
                     .iter()
-                    .filter_map(|id| self.facts.get(id))
-                    .map(|f| f.confidence)
+                    .filter_map(|id| self.facts.get(id).map(|f| (f.memory_id.as_str(), f.id, f.confidence)))
                     .collect();
+                valid_facts.sort_by(|a, b| {
+                    a.0.cmp(b.0)
+                        .then_with(|| a.1.cmp(&b.1))
+                });
                 let count = valid_facts.len();
                 let avg_conf = if count > 0 {
-                    valid_facts.iter().sum::<f32>() / count as f32
+                    valid_facts.iter().map(|(_, _, confidence)| *confidence).sum::<f32>()
+                        / count as f32
                 } else {
                     0.0
                 };
@@ -385,7 +688,12 @@ impl EnhancedKnowledgeGraph {
             })
             .collect();
 
-        distribution.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        distribution.sort_by(|a, b| {
+            a.1
+                .partial_cmp(&b.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
         distribution
     }
 
@@ -420,9 +728,23 @@ impl EnhancedKnowledgeGraph {
             activated.insert(seed.fact_id, seed.similarity);
         }
 
+        // HashMap iteration is intentionally arbitrary in Rust. Do not let the
+        // discovery order decide which parent first activates a node: different
+        // parents can yield different activation values. Instead, collect every
+        // candidate at a hop and retain the strongest activation for each node.
+        // This makes the traversal path-independent and reproducible.
+        let mut facts: Vec<(FactId, BinaryHV)> = self
+            .facts
+            .values()
+            .map(|fact| (fact.id, fact.encoding.vector.clone()))
+            .collect();
+        facts.sort_by_key(|(id, _)| *id);
+
         for hop in 0..hops {
             let hop_decay = decay_factor.powi(hop as i32 + 1);
-            let mut next_frontier = Vec::new();
+            let mut candidates: HashMap<FactId, f32> = HashMap::new();
+
+            frontier_ids.sort_unstable();
 
             for &fid in &frontier_ids {
                 let query_vec = match self.facts.get(&fid) {
@@ -430,28 +752,36 @@ impl EnhancedKnowledgeGraph {
                     None => continue,
                 };
 
-                // Find similar facts
-                for fact in self.facts.values() {
-                    if activated.contains_key(&fact.id) {
+                for (fact_id, vector) in &facts {
+                    if activated.contains_key(fact_id) {
                         continue;
                     }
-                    let sim = fact.encoding.vector.similarity(&query_vec);
+                    let sim = vector.similarity(&query_vec);
                     if sim > 0.1 {
                         let decayed_sim = sim * hop_decay;
-                        activated.insert(fact.id, decayed_sim);
-                        next_frontier.push(fact.id);
+                        candidates
+                            .entry(*fact_id)
+                            .and_modify(|existing| *existing = existing.max(decayed_sim))
+                            .or_insert(decayed_sim);
                     }
                 }
             }
 
-            frontier_ids = next_frontier;
-            if frontier_ids.is_empty() {
+            if candidates.is_empty() {
                 break;
+            }
+
+            frontier_ids = candidates.keys().copied().collect();
+            frontier_ids.sort_unstable();
+
+            for (id, activation) in candidates {
+                activated.insert(id, activation);
             }
         }
 
         // Remove seeds from results (caller already has them)
-        let seed_ids: std::collections::HashSet<FactId> = seeds.iter().map(|s| s.fact_id).collect();
+        let seed_ids: std::collections::HashSet<FactId> =
+            seeds.iter().map(|s| s.fact_id).collect();
 
         let mut results: Vec<FactSearchResult> = activated
             .into_iter()
@@ -472,6 +802,7 @@ impl EnhancedKnowledgeGraph {
             score_b
                 .partial_cmp(&score_a)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.fact_id.cmp(&b.fact_id))
         });
         results.truncate(max_results);
 
@@ -514,22 +845,66 @@ impl EnhancedKnowledgeGraph {
 
     // ── Persistence Support ─────────────────────────────────────────────
 
-    /// Import a fact from a persistence record.
-    pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) {
-        if record.vector_bytes.len() != 2048 {
-            return;
+    /// Import a fact from a persistence record, exposing retention-policy outcomes.
+    pub fn import_fact_record_with_outcome(
+        &mut self,
+        record: &super::persistence::FactRecord,
+    ) -> FactRestoreOutcome {
+        if record.vector_bytes.len() != BinaryHV::BYTES
+            || record.memory_id.trim().is_empty()
+            || !record.confidence.is_finite()
+            || !(0.0..=1.0).contains(&record.confidence)
+        {
+            return FactRestoreOutcome::default();
         }
-        let mut arr = [0u8; 2048];
+        if self.capacity == 0 {
+            return FactRestoreOutcome {
+                accepted: false,
+                rejected_by_policy: true,
+                policy_evictions: 0,
+            };
+        }
+        let mut arr = [0u8; BinaryHV::BYTES];
         arr.copy_from_slice(&record.vector_bytes);
         let encoding = super::encoding::FactEncoding {
-            vector: symthaea_core::hdc::binary_hv::BinaryHV(arr),
+            vector: BinaryHV(arr),
             role_vectors: std::collections::HashMap::new(),
             source_text: record.source_text.clone(),
             confidence: record.confidence,
         };
+
+        let mut policy_evictions = 0;
+        if self.facts.len() >= self.capacity {
+            if let Some(weakest) = self.facts.values().min_by(|a, b| {
+                a.confidence
+                    .total_cmp(&b.confidence)
+                    .then_with(|| a.memory_id.cmp(&b.memory_id))
+                    .then_with(|| a.id.cmp(&b.id))
+            }) {
+                let incoming_outranks = record.confidence > weakest.confidence
+                    || (record.confidence == weakest.confidence
+                        && record.memory_id.as_str() < weakest.memory_id.as_str());
+
+                if !incoming_outranks {
+                    return FactRestoreOutcome {
+                        accepted: false,
+                        rejected_by_policy: true,
+                        policy_evictions: 0,
+                    };
+                }
+            }
+
+            if self.evict_lowest_confidence() {
+                policy_evictions = 1;
+            }
+        }
+
         let id: FactId = self.next_id;
         self.next_id += 1;
         let fact = TemporalFact {
+            memory_id: record.memory_id.clone(),
+            canonical_identity: record.canonical_identity.clone(),
+            provenance_family: record.provenance_family.clone(),
             id,
             encoding,
             inserted_at_cycle: record.cycle,
@@ -548,13 +923,32 @@ impl EnhancedKnowledgeGraph {
                 .push(id);
         }
         self.facts.insert(id, fact);
+        FactRestoreOutcome {
+            accepted: true,
+            rejected_by_policy: false,
+            policy_evictions,
+        }
+    }
+
+    /// Import a fact from a persistence record.
+    pub fn import_fact_record(&mut self, record: &super::persistence::FactRecord) -> bool {
+        self.import_fact_record_with_outcome(record).accepted
     }
 
     /// Export all facts as persistence records.
     pub fn export_fact_records(&self) -> Vec<super::persistence::FactRecord> {
-        self.facts
-            .values()
+        let mut facts: Vec<&TemporalFact> = self.facts.values().collect();
+        facts.sort_by(|a, b| {
+            a.memory_id
+                .cmp(&b.memory_id)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        facts
+            .into_iter()
             .map(|f| super::persistence::FactRecord {
+                memory_id: f.memory_id.clone(),
+                canonical_identity: f.canonical_identity.clone(),
+                provenance_family: f.provenance_family.clone(),
                 vector_bytes: f.encoding.vector.0.to_vec(),
                 source_text: f.encoding.source_text.clone(),
                 confidence: f.confidence,
@@ -670,28 +1064,27 @@ impl EnhancedKnowledgeGraph {
             }
         }
 
+        alerts.sort_by(|a, b| {
+            a.existing_fact_id
+                .cmp(&b.existing_fact_id)
+                .then_with(|| a.similarity.total_cmp(&b.similarity))
+        });
         alerts
     }
 
-    fn find_corroboration(&self, encoding: &FactEncoding) -> Option<FactId> {
-        // A fact with >0.85 similarity is likely the same information
-        for existing in self.facts.values() {
-            let sim = encoding.vector.similarity(&existing.encoding.vector);
-            if sim > 0.85 {
-                return Some(existing.id);
-            }
-        }
-        None
-    }
-
-    fn evict_lowest_confidence(&mut self) {
+    fn evict_lowest_confidence(&mut self) -> bool {
         if let Some((&id, _)) = self.facts.iter().min_by(|(_, a), (_, b)| {
             a.confidence
                 .partial_cmp(&b.confidence)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.memory_id.cmp(&a.memory_id))
+                .then_with(|| b.id.cmp(&a.id))
         }) {
             self.remove_fact(id);
             self.total_evictions += 1;
+            true
+        } else {
+            false
         }
     }
 
@@ -730,6 +1123,117 @@ fn contains_negation(text: &str) -> bool {
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_domain_distribution_is_restore_order_invariant() {
+        let records = [
+            super::persistence::FactRecord {
+                memory_id: "memory-a".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: "a".into(),
+                confidence: 0.1,
+                domain: Some("shared".into()),
+                cycle: 1,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "memory-b".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![1u8; 2048],
+                source_text: "b".into(),
+                confidence: 0.2,
+                domain: Some("shared".into()),
+                cycle: 1,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "memory-c".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![2u8; 2048],
+                source_text: "c".into(),
+                confidence: 0.7,
+                domain: Some("shared".into()),
+                cycle: 1,
+                is_causal: false,
+            },
+        ];
+
+        let mut forward = EnhancedKnowledgeGraph::new(10);
+        let mut reverse = EnhancedKnowledgeGraph::new(10);
+        for record in &records {
+            assert!(forward.import_fact_record_with_outcome(record).accepted);
+        }
+        for record in records.iter().rev() {
+            assert!(reverse.import_fact_record_with_outcome(record).accepted);
+        }
+
+        let forward_distribution = forward.domain_distribution();
+        let reverse_distribution = reverse.domain_distribution();
+        assert_eq!(forward_distribution.len(), 1);
+        assert_eq!(reverse_distribution.len(), 1);
+        assert_eq!(
+            forward_distribution[0].1.to_bits(),
+            reverse_distribution[0].1.to_bits()
+        );
+        assert_eq!(forward_distribution[0].2, reverse_distribution[0].2);
+    }
+
+    #[test]
+    fn test_average_confidence_is_restore_order_invariant() {
+        let records = [
+            super::persistence::FactRecord {
+                memory_id: "memory-a".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: "a".into(),
+                confidence: 0.1,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "memory-b".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![1u8; 2048],
+                source_text: "b".into(),
+                confidence: 0.2,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "memory-c".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![2u8; 2048],
+                source_text: "c".into(),
+                confidence: 0.7,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            },
+        ];
+
+        let mut forward = EnhancedKnowledgeGraph::new(10);
+        let mut reverse = EnhancedKnowledgeGraph::new(10);
+        for record in &records {
+            assert!(forward.import_fact_record_with_outcome(record).accepted);
+        }
+        for record in records.iter().rev() {
+            assert!(reverse.import_fact_record_with_outcome(record).accepted);
+        }
+
+        assert_eq!(
+            forward.average_confidence().to_bits(),
+            reverse.average_confidence().to_bits()
+        );
+    }
 
 #[cfg(test)]
 mod tests {
@@ -779,20 +1283,51 @@ mod tests {
     }
 
     #[test]
-    fn test_corroboration() {
+    fn test_similar_insertions_preserve_distinct_memory_identity() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
         let enc1 = make_encoding("oil prices rose", 0.7);
         let (id1, _) = graph.insert(enc1, 1, None, false);
 
-        // Insert same fact again — should corroborate, not duplicate
+        // A second observation is a distinct memory until an explicit provenance
+        // relation says otherwise. HDC similarity must not silently collapse it.
         let enc2 = make_encoding("oil prices rose", 0.8);
         let (id2, _) = graph.insert(enc2, 2, None, false);
 
-        assert_eq!(id1, id2); // Same ID = corroborated
-        assert_eq!(graph.len(), 1); // Still one fact
-        let fact = graph.get_fact(id1).unwrap();
-        assert_eq!(fact.corroboration_count, 1);
+        assert_ne!(id1, id2);
+        assert_eq!(graph.len(), 2);
+        assert_eq!(graph.get_fact(id1).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(id2).unwrap().corroboration_count, 0);
+
+        let memory_1 = graph.provenance(id1).unwrap().memory_id;
+        let memory_2 = graph.provenance(id2).unwrap().memory_id;
+        assert_ne!(memory_1, memory_2);
+
+        graph.record_provenance_relation(ProvenanceRelation {
+            source_memory_id: memory_2,
+            target_memory_id: memory_1,
+            kind: ProvenanceRelationKind::Corroborates,
+            created_at: "cycle:2".into(),
+        }).unwrap();
+
+        // The relation is structural provenance, not an implicit confidence boost.
+        assert_eq!(graph.get_fact(id1).unwrap().confidence, 0.7);
+        assert_eq!(graph.get_fact(id2).unwrap().confidence, 0.8);
+    }
+
+    #[test]
+    fn test_retrieval_repetition_does_not_create_corroboration() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (id, _) = graph.insert(make_encoding("retrieval-only claim", 0.8), 1, None, false);
+        let query = graph.get_fact(id).unwrap().encoding.vector.clone();
+
+        for cycle in 2..=10 {
+            let _ = graph.search(&query, 5, cycle);
+        }
+
+        let fact = graph.get_fact(id).unwrap();
+        assert_eq!(fact.corroboration_count, 0);
+        assert!((fact.confidence - 0.8).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -838,10 +1373,222 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_graph() {
-        let graph = EnhancedKnowledgeGraph::new(100);
+    fn test_restore_rejects_invalid_fact_identity_and_confidence() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let valid_vector = vec![0u8; 2048];
+
+        for (memory_id, confidence) in [
+            ("", 0.8),
+            ("nan-confidence", f32::NAN),
+            ("high-confidence", 1.1),
+            ("negative-confidence", -0.1),
+        ] {
+            let record = super::persistence::FactRecord {
+                memory_id: memory_id.into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: valid_vector.clone(),
+                source_text: "invalid".into(),
+                confidence,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            };
+            let outcome = graph.import_fact_record_with_outcome(&record);
+            assert!(!outcome.accepted);
+            assert_eq!(outcome.policy_evictions, 0);
+        }
+
         assert!(graph.is_empty());
-        assert_eq!(graph.average_confidence(), 0.0);
-        assert_eq!(graph.domain_count(), 0);
     }
-}
+
+    #[test]
+    fn test_zero_capacity_fact_restore_is_policy_rejection() {
+        let mut graph = EnhancedKnowledgeGraph::new(0);
+        let record = super::persistence::FactRecord {
+            memory_id: "policy-limited".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; 2048],
+            source_text: "policy limited".into(),
+            confidence: 0.9,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+
+        let outcome = graph.import_fact_record_with_outcome(&record);
+        assert!(!outcome.accepted);
+        assert!(outcome.rejected_by_policy);
+        assert_eq!(outcome.policy_evictions, 0);
+        assert!(graph.is_empty());
+    }
+    #[test]
+    fn test_fact_restore_uses_binary_hv_contract_width() {
+        let mut graph = EnhancedKnowledgeGraph::new(1);
+        let record = super::persistence::FactRecord {
+            memory_id: "dimension-contract".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; BinaryHV::BYTES],
+            source_text: "dimension contract".into(),
+            confidence: 0.9,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        assert!(graph.import_fact_record_with_outcome(&record).accepted);
+        assert_eq!(graph.export_fact_records()[0].vector_bytes.len(), BinaryHV::BYTES);
+    }
+    #[test]
+    fn test_bounded_fact_restore_is_order_invariant() {
+        let records = [
+            super::persistence::FactRecord {
+                memory_id: "alpha".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: "alpha".into(),
+                confidence: 0.8,
+                domain: None,
+                cycle: 3,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "beta".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![1u8; 2048],
+                source_text: "beta".into(),
+                confidence: 0.7,
+                domain: None,
+                cycle: 2,
+                is_causal: false,
+            },
+            super::persistence::FactRecord {
+                memory_id: "gamma".into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![2u8; 2048],
+                source_text: "gamma".into(),
+                confidence: 0.1,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            },
+        ];
+
+        let mut forward = EnhancedKnowledgeGraph::new(2);
+        let mut reverse = EnhancedKnowledgeGraph::new(2);
+        for record in &records {
+            forward.import_fact_record_with_outcome(record);
+        }
+        for record in records.iter().rev() {
+            reverse.import_fact_record_with_outcome(record);
+        }
+
+        let forward_ids: Vec<_> = forward.all_facts().map(|f| f.memory_id.as_str()).collect();
+        let reverse_ids: Vec<_> = reverse.all_facts().map(|f| f.memory_id.as_str()).collect();
+        assert_eq!(forward_ids, vec!["alpha", "beta"]);
+        assert_eq!(forward_ids, reverse_ids);
+    }
+
+    #[test]
+    fn test_bounded_fact_restore_equal_confidence_prefers_smaller_memory_id() {
+        let records = [
+            ("beta", 0.8),
+            ("gamma", 0.8),
+            ("alpha", 0.8),
+        ];
+        let mut graph = EnhancedKnowledgeGraph::new(2);
+        for (memory_id, confidence) in records {
+            let record = super::persistence::FactRecord {
+                memory_id: memory_id.into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: memory_id.into(),
+                confidence,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            };
+            graph.import_fact_record_with_outcome(&record);
+        }
+
+        assert_eq!(
+            graph.all_facts().map(|f| f.memory_id.as_str()).collect::<Vec<_>>(),
+            vec!["alpha", "beta"]
+        );
+    }
+    #[test]
+    fn test_bounded_fact_restore_rejects_weaker_incoming_without_eviction() {
+        let mut graph = EnhancedKnowledgeGraph::new(2);
+        for (memory_id, confidence) in [("alpha", 0.9), ("beta", 0.8)] {
+            let record = super::persistence::FactRecord {
+                memory_id: memory_id.into(),
+                canonical_identity: None,
+                provenance_family: None,
+                vector_bytes: vec![0u8; 2048],
+                source_text: memory_id.into(),
+                confidence,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            };
+            assert!(graph.import_fact_record_with_outcome(&record).accepted);
+        }
+
+        let weak = super::persistence::FactRecord {
+            memory_id: "gamma".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; 2048],
+            source_text: "gamma".into(),
+            confidence: 0.1,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        let outcome = graph.import_fact_record_with_outcome(&weak);
+        assert!(!outcome.accepted);
+        assert!(outcome.rejected_by_policy);
+        assert_eq!(outcome.policy_evictions, 0);
+        assert_eq!(
+            graph.all_facts().map(|f| f.memory_id.as_str()).collect::<Vec<_>>(),
+            vec!["alpha", "beta"]
+        );
+    }
+    #[test]
+    fn test_memory_identity_survives_export_import() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let enc = make_encoding("stable claim", 0.8);
+        let (id, _) = graph.insert(enc, 1, Some("test".into()), false);
+
+        let original = graph.provenance(id).unwrap();
+        let records = graph.export_fact_records();
+
+        let mut restored = EnhancedKnowledgeGraph::new(100);
+        restored.import_fact_record(&records[0]);
+        let restored_record = &restored.export_fact_records()[0];
+
+        assert_eq!(restored_record.memory_id, original.memory_id);
+        assert_eq!(restored_record.provenance_family, original.provenance_family);
+        assert_eq!(restored_record.source_text, "stable claim");
+
+        let restored_id = restored.facts.keys().next().copied().unwrap();
+        let round_trip = restored.provenance(restored_id).unwrap();
+        assert_eq!(round_trip.retrieval_index_ref, Some(format!("fact-id:{restored_id}")));
+        assert_ne!(restored_id, id);
+    }
+
+    #[test]
+    fn test_contradiction_alerts_are_stable_by_existing_fact_id() {
+        let mut graph = EnhancedKnowledgeGraph::new(10);
+        graph.insert(make_encoding("claim one", 0.8), 1, None, false);
+        graph.insert(make_encoding("claim two", 0.8), 2, None, false);
+
+        let mut alerts = graph.detect_contradictions(
+            &FactEncoding {
+                vector: graph.get_fact(1).unwrap().encoding.vector.clone(),
+                role_vectors: HashMap::new(),
