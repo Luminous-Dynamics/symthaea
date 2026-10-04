@@ -545,6 +545,15 @@ impl ExecutionReceipt {
         if self.started_at_ms < plan.plan.target_snapshot.observed_at_ms {
             return Err(ReceiptValidationError::StartedBeforeTargetSnapshot);
         }
+        if let Some(max_age_ms) = plan.plan.max_target_snapshot_age_ms {
+            let age_ms = self.started_at_ms - plan.plan.target_snapshot.observed_at_ms;
+            if age_ms > max_age_ms {
+                return Err(ReceiptValidationError::TargetSnapshotStaleAtExecution {
+                    age_ms,
+                    max_age_ms,
+                });
+            }
+        }
         if self.started_at_ms
             < plan
                 .authorization
@@ -624,6 +633,8 @@ pub enum ReceiptValidationError {
     FinalSnapshotObservationOutsideExecution,
     #[error("execution started before the authorized target snapshot was observed")]
     StartedBeforeTargetSnapshot,
+    #[error("execution started with a target snapshot older than the plan permits")]
+    TargetSnapshotStaleAtExecution { age_ms: u64, max_age_ms: u64 },
     #[error("execution started before authorization became valid")]
     StartedBeforeAuthorization,
     #[error("execution finished after authorization expired")]
