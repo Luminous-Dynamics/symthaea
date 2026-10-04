@@ -442,6 +442,36 @@ mod tests {
     }
 
     #[test]
+    fn request_identity_binds_required_approval_profile() {
+        let intent = intent("machine:workstation", "generation:42");
+        let same_uid = PendingNixApprovalRequestV1::from_intent(
+            &intent,
+            "daemon-incarnation:1",
+            "nixos-rebuild switch --flake .#workstation",
+            "same-uid-process-v1",
+            ms(1_000),
+            ms(2_000),
+            [1; 32],
+        )
+        .unwrap();
+        let operator_group = PendingNixApprovalRequestV1::from_intent(
+            &intent,
+            "daemon-incarnation:1",
+            "nixos-rebuild switch --flake .#workstation",
+            "local-operator-group-v1",
+            ms(1_000),
+            ms(2_000),
+            [1; 32],
+        )
+        .unwrap();
+
+        assert_ne!(
+            same_uid.request_id().unwrap(),
+            operator_group.request_id().unwrap(),
+            "changing the required assurance profile must create a distinct approval identity"
+        );
+    }
+    #[test]
     fn request_identity_changes_when_intent_or_prestate_changes() {
         let a_intent = intent("machine:workstation", "generation:42");
         let b_intent = intent("machine:workstation", "generation:43");
