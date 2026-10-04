@@ -580,9 +580,6 @@ pub fn App() -> impl IntoView {
                     break;
                 }
                 gloo_timers::future::TimeoutFuture::new(500).await;
-                if !webgpu_ready.get_untracked() {
-                    break;
-                }
                 let lost = renderer
                     .borrow()
                     .as_ref()
@@ -595,6 +592,9 @@ pub fn App() -> impl IntoView {
                     *renderer.borrow_mut() = None;
                     *init_started.borrow_mut() = false;
                     webgpu_ready.set(false);
+                    break;
+                }
+                if !webgpu_ready.get_untracked() {
                     break;
                 }
             }
@@ -618,9 +618,6 @@ pub fn App() -> impl IntoView {
                         break;
                     }
                     gloo_timers::future::TimeoutFuture::new(500).await;
-                    if !movie_webgpu_ready.get_untracked() {
-                        break;
-                    }
                     let lost = renderer
                         .borrow()
                         .as_ref()
@@ -633,6 +630,9 @@ pub fn App() -> impl IntoView {
                         *renderer.borrow_mut() = None;
                         *init_started.borrow_mut() = false;
                         movie_webgpu_ready.set(false);
+                        break;
+                    }
+                    if !movie_webgpu_ready.get_untracked() {
                         break;
                     }
                 }
