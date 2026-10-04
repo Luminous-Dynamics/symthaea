@@ -1345,7 +1345,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_previous_schema_version_after_v0_3_change() {
+    fn rejects_previous_schema_version_after_v0_4_change() {
         let mut plan = sample_plan();
         plan.schema_version = "ssc/v0.2".into();
 
@@ -1353,6 +1353,35 @@ mod tests {
             plan.validate(),
             Err(PlanValidationError::UnsupportedSchemaVersion(
                 "ssc/v0.2".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_previous_receipt_schema_version_after_v0_4_change() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+
+        let receipt = ExecutionReceipt {
+            schema_version: "ssc/v0.3".into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
+            observed_disposition: authorized.plan.verification.disposition,
+            started_at_ms: 151,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Satisfied,
+            verification_digest: Some(ContentDigest::blake3(b"verified-postcondition")),
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::UnsupportedSchemaVersion(
+                "ssc/v0.3".into()
             ))
         );
     }
