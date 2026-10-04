@@ -9,7 +9,10 @@
 //! same mesh component. It does not establish pressure-flow capability,
 //! directionality, hydraulic performance, or any other transport property.
 
-use crate::{evaluate_port_path, PortPathEvidence, PortPathStatus};
+use crate::{
+    evaluate_port_path, resolve_port_component, triangle_components, AnchorResolution,
+    PortPathEvidence, PortPathStatus,
+};
 use symthaea_fabrication_kernel::mesh::TriangleMesh;
 use symthaea_passive_void_compiler::GeometryEmbedding;
 use symthaea_passive_void_graph::{FunctionalVoidGraph, PortId, VoidRelation};
@@ -44,8 +47,18 @@ pub struct FunctionalGraphRealizationReport {
     pub disconnected_paths: usize,
     pub invalid_paths: usize,
     pub path_results: Vec<ConnectionRealization>,
+    /// Port pairs that the realized mesh connects even though the functional graph
+    /// declares no FlowPath in either direction.
+    pub unexpected_connectivity: Vec<UnexpectedConnectivity>,
     /// Geometry/topology evidence only; transport remains unproven.
     pub physical_transport_unproven: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnexpectedConnectivity {
+    pub from: PortId,
+    pub to: PortId,
+    pub component: usize,
 }
 
 impl FunctionalGraphRealizationReport {
@@ -62,6 +75,7 @@ impl FunctionalGraphRealizationReport {
                 disconnected_paths: 0,
                 invalid_paths: 0,
                 path_results: Vec::new(),
+                unexpected_connectivity: Vec::new(),
                 physical_transport_unproven: true,
             };
         }
@@ -81,6 +95,9 @@ impl FunctionalGraphRealizationReport {
                 disconnected_paths: 0,
                 invalid_paths: 0,
                 path_results: Vec::new(),
+                unexpected_connectivity: Self::find_unexpected_connectivity(
+                    graph, embedding, candidate,
+                ),
                 physical_transport_unproven: true,
             };
         }
@@ -130,14 +147,64 @@ impl FunctionalGraphRealizationReport {
             disconnected_paths,
             invalid_paths,
             path_results,
+            unexpected_connectivity: Self::find_unexpected_connectivity(
+                graph, embedding, candidate,
+            ),
             physical_transport_unproven: true,
         }
+    }
+
+    fn find_unexpected_connectivity(
+        graph: &FunctionalVoidGraph,
+        embedding: &GeometryEmbedding,
+        candidate: &TriangleMesh,
+    ) -> Vec<UnexpectedConnectivity> {
+        let report = symthaea_fabrication_kernel::validate::validate_mesh(candidate);
+        if !report.is_valid() || !report.is_watertight {
+            return Vec::new();
+        }
+
+        let labels = triangle_components(candidate);
+        let mut realized = Vec::new();
+        for port in &graph.ports {
+            if let AnchorResolution::Found(component) =
+                resolve_port_component(candidate, embedding, &labels, port.id)
+            {
+                realized.push((port.id, component));
+            }
+        }
+
+        let mut unexpected = Vec::new();
+        for (index, (from, from_component)) in realized.iter().enumerate() {
+            for (to, to_component) in realized.iter().skip(index + 1) {
+                if from_component != to_component {
+                    continue;
+                }
+                let declared_forward =
+                    graph.declares_path(*from, *to, VoidRelation::FlowPath);
+                let declared_reverse =
+                    graph.declares_path(*to, *from, VoidRelation::FlowPath);
+                if !declared_forward && !declared_reverse {
+                    unexpected.push(UnexpectedConnectivity {
+                        from: *from,
+                        to: *to,
+                        component: *from_component,
+                    });
+                }
+            }
+        }
+        unexpected
+    }
+
+    pub fn has_topology_leakage(&self) -> bool {
+        !self.unexpected_connectivity.is_empty()
     }
 
     pub fn is_geometrically_complete(&self) -> bool {
         matches!(self.status, GraphRealizationStatus::AllDeclaredPathsConnected)
             && self.invalid_paths == 0
             && self.disconnected_paths == 0
+            && !self.has_topology_leakage()
     }
 }
 
@@ -246,8 +313,92 @@ mod tests {
         assert_eq!(report.connected_paths, 2);
         assert_eq!(report.disconnected_paths, 0);
         assert_eq!(report.invalid_paths, 0);
+        assert!(report.unexpected_connectivity.is_empty());
         assert!(report.is_geometrically_complete());
         assert!(report.physical_transport_unproven);
+    }
+
+    #[test]
+    fn realized_mesh_can_expose_unexpected_connectivity() {
+        let mut graph = FunctionalVoidGraph::new();
+        graph
+            .add_region(VoidRegion {
+                id: RegionId(1),
+                role: VoidRegionRole::Inlet,
+            })
+            .unwrap();
+        graph
+            .add_region(VoidRegion {
+                id: RegionId(2),
+                role: VoidRegionRole::Outlet,
+            })
+            .unwrap();
+        graph
+            .add_region(VoidRegion {
+                id: RegionId(3),
+                role: VoidRegionRole::Cavity,
+            })
+            .unwrap();
+        graph
+            .add_port(VoidPort {
+                id: PortId(10),
+                region: RegionId(1),
+            })
+            .unwrap();
+        graph
+            .add_port(VoidPort {
+                id: PortId(20),
+                region: RegionId(2),
+            })
+            .unwrap();
+        graph
+            .add_port(VoidPort {
+                id: PortId(30),
+                region: RegionId(3),
+            })
+            .unwrap();
+        graph
+            .connect(VoidConnection {
+                from: PortId(10),
+                to: PortId(20),
+                relation: VoidRelation::FlowPath,
+                bidirectional: false,
+            })
+            .unwrap();
+
+        let embedding = GeometryEmbedding::default()
+            .with_port(
+                PortId(10),
+                PortAnchor {
+                    center_mm: [-0.5, -0.5, -0.5],
+                    radius_mm: 1.0,
+                },
+            )
+            .with_port(
+                PortId(20),
+                PortAnchor {
+                    center_mm: [0.0, 0.0, 0.0],
+                    radius_mm: 1.0,
+                },
+            )
+            .with_port(
+                PortId(30),
+                PortAnchor {
+                    center_mm: [0.5, 0.5, 0.5],
+                    radius_mm: 1.0,
+                },
+            );
+
+        let mesh = resolve_to_mesh(&CSGNode::cube());
+        let report = FunctionalGraphRealizationReport::evaluate(&graph, &embedding, &mesh);
+
+        assert_eq!(report.status, GraphRealizationStatus::AllDeclaredPathsConnected);
+        assert!(report.has_topology_leakage());
+        assert!(!report.is_geometrically_complete());
+        assert!(report
+            .unexpected_connectivity
+            .iter()
+            .any(|pair| pair.from == PortId(10) && pair.to == PortId(30)));
     }
 
     #[test]
