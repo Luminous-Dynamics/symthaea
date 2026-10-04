@@ -924,7 +924,7 @@ impl DaemonState {
             .as_ref()
             .is_some_and(|pending| {
                 pending.action_intent_digest == intent_digest
-                    && self.pending_action.as_deref() == Some(displayed_action)
+                    && self.pending_action.as_deref() == Some(displayed_action.as_str())
             })
         {
             return Ok(());
@@ -1279,8 +1279,6 @@ impl DaemonState {
                                     return (dynamic_threshold, None);
                                 },
                             };
-                            let (bin, args) = default_cmd.to_command();
-                            let command_str = format!("{} {}", bin, args.join(" "));
                             (default_cmd, None)
                         };
 
