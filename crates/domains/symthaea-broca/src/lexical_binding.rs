@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use crate::linguistic_frame::LinguisticFrame;
+use crate::linguistic_frame::{FormulationStrategy, LinguisticFrame};
 
 pub const LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION: &str =
     "broca-lexical-morphosyntactic-binding-v1";
@@ -143,6 +143,9 @@ impl LexicalMorphosyntacticBinding {
     ) -> Result<Self, LexicalBindingError> {
         frame.validate()
             .map_err(|_| LexicalBindingError::UpstreamMismatch)?;
+        if matches!(frame.strategy, FormulationStrategy::Abstain) {
+            return Err(LexicalBindingError::AbstentionCannotBind);
+        }
 
         let binding = Self {
             version: LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION.to_string(),
@@ -472,6 +475,7 @@ pub enum LexicalBindingError {
     InvalidVersion,
     MissingUpstreamLineage,
     UpstreamMismatch,
+    AbstentionCannotBind,
     EmptyLanguageTag,
     BoundRuleMissingId,
     BoundRuleMissingProvenance,
@@ -511,6 +515,7 @@ impl std::fmt::Display for LexicalBindingError {
             Self::InvalidVersion => write!(f, "lexical/morphosyntactic binding version is unsupported"),
             Self::MissingUpstreamLineage => write!(f, "upstream linguistic-frame lineage is missing"),
             Self::UpstreamMismatch => write!(f, "lexical binding no longer matches its upstream linguistic frame"),
+            Self::AbstentionCannotBind => write!(f, "abstention linguistic frames cannot be lexically bound"),
             Self::EmptyLanguageTag => write!(f, "language tag must be non-empty"),
             Self::BoundRuleMissingId => write!(f, "bound language rules require a non-empty rule id"),
             Self::BoundRuleMissingProvenance => write!(f, "bound language rules require provenance"),
@@ -740,6 +745,29 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn abstention_cannot_be_lexically_bound() {
+        let genesis = GenesisSeed::from_phrase("lexical-binding-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let mut channels = ThoughtChannels::with_intent(7);
+        channels.set_epistemic(3.0);
+        let readout = decoder.decode(&channels);
+        let frame = LinguisticFrame::from_speech_plan(
+            &crate::SpeechPlan::from_readout(&channels, &readout),
+        );
+
+        let error = LexicalMorphosyntacticBinding::new(
+            &frame,
+            english_rule_binding(),
+            base_semantic_bindings(),
+            vec![],
+            vec![],
+        )
+        .expect_err("abstention must remain non-realizable");
+
+        assert_eq!(error, LexicalBindingError::AbstentionCannotBind);
     }
 
     #[test]
