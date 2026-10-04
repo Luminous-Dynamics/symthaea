@@ -756,10 +756,25 @@ impl WebGpuRenderer {
             .map_err(|error| format!("failed to create WebGPU device: {error}"))?;
 
         let device_lost = Arc::new(AtomicBool::new(false));
+        #[cfg(feature = "browser-qualification")]
+        let qualification_canvas = canvas.clone();
         {
             let device_lost = Arc::clone(&device_lost);
+            #[cfg(feature = "browser-qualification")]
+            let qualification_canvas = qualification_canvas.clone();
             device.set_device_lost_callback(move |reason, message| {
                 device_lost.store(true, Ordering::Release);
+                #[cfg(feature = "browser-qualification")]
+                {
+                    let reason = match reason {
+                        wgpu::DeviceLostReason::Destroyed => "destroyed",
+                        wgpu::DeviceLostReason::Unknown => "unknown",
+                    };
+                    let _ = qualification_canvas.set_attribute(
+                        "data-qualification-loss-reason",
+                        reason,
+                    );
+                }
                 web_sys::console::warn_2(
                     &format!("Symthaea WebGPU cognitive device lost ({reason:?})").into(),
                     &message.into(),
@@ -1041,10 +1056,25 @@ impl WebGpuMovieRenderer {
             .map_err(|error| format!("failed to create WebGPU movie device: {error}"))?;
 
         let device_lost = Arc::new(AtomicBool::new(false));
+        #[cfg(feature = "browser-qualification")]
+        let qualification_canvas = canvas.clone();
         {
             let device_lost = Arc::clone(&device_lost);
+            #[cfg(feature = "browser-qualification")]
+            let qualification_canvas = qualification_canvas.clone();
             device.set_device_lost_callback(move |reason, message| {
                 device_lost.store(true, Ordering::Release);
+                #[cfg(feature = "browser-qualification")]
+                {
+                    let reason = match reason {
+                        wgpu::DeviceLostReason::Destroyed => "destroyed",
+                        wgpu::DeviceLostReason::Unknown => "unknown",
+                    };
+                    let _ = qualification_canvas.set_attribute(
+                        "data-qualification-loss-reason",
+                        reason,
+                    );
+                }
                 web_sys::console::warn_2(
                     &format!("Symthaea WebGPU movie device lost ({reason:?})").into(),
                     &message.into(),
