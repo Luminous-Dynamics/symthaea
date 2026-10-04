@@ -279,6 +279,8 @@ pub fn validate_binding_set(
     let mut binding_digests = std::collections::BTreeSet::new();
     let mut binding_ports = std::collections::BTreeSet::new();
     let mut handles = std::collections::BTreeSet::new();
+    let mut candidate_geometry_digest = None;
+    let mut candidate_mesh_digest = None;
 
     for interface in interfaces {
         if !interface_ports.insert(interface.port) {
@@ -306,6 +308,20 @@ pub fn validate_binding_set(
         }
         if !binding.physical_transport_unproven {
             return Err(SolverBindingError::InvalidEvidenceState);
+        }
+        if let Some(expected) = candidate_geometry_digest {
+            if expected != binding.realized_boundary.candidate_geometry_digest() {
+                return Err(SolverBindingError::CandidateGeometryDigestMismatch);
+            }
+        } else {
+            candidate_geometry_digest = Some(binding.realized_boundary.candidate_geometry_digest());
+        }
+        if let Some(expected) = candidate_mesh_digest {
+            if expected != binding.realized_boundary.candidate_mesh_digest() {
+                return Err(SolverBindingError::CandidateMeshDigestMismatch);
+            }
+        } else {
+            candidate_mesh_digest = Some(binding.realized_boundary.candidate_mesh_digest());
         }
         if !binding_digests.insert(binding.digest()) {
             return Err(SolverBindingError::DuplicateBinding(binding.port));
@@ -747,6 +763,40 @@ fn radial_distance(point: [f64; 3], interface: &PortInterface) -> f64 {
     (radial[0] * radial[0] + radial[1] * radial[1] + radial[2] * radial[2]).sqrt()
 }
 
+
+/// Deterministic identity for a complete, validated set of solver bindings.
+///
+/// The digest is order-independent with respect to the supplied binding slice,
+/// while still committing to every per-binding digest and the common candidate
+/// geometry/mesh identity.
+pub fn digest_binding_set(
+    interfaces: &[PortInterface],
+    bindings: &[SolverBoundaryBinding],
+) -> Result<[u8; 32], SolverBindingError> {
+    validate_binding_set(interfaces, bindings)?;
+
+    let mut digests: Vec<_> = bindings.iter().map(SolverBoundaryBinding::digest).collect();
+    digests.sort_unstable();
+
+    let mut hasher = Hasher::new();
+    hasher.update(b"passive-solver-boundary-binding-set:v1");
+    hasher.update(&(interfaces.len() as u64).to_le_bytes());
+
+    if let Some(binding) = bindings.first() {
+        hasher.update(&binding.realized_boundary.candidate_geometry_digest());
+        hasher.update(&binding.realized_boundary.candidate_mesh_digest());
+    } else {
+        hasher.update(&[0; 32]);
+        hasher.update(&[0; 32]);
+    }
+
+    for digest in digests {
+        hasher.update(&digest);
+    }
+
+    Ok(*hasher.finalize().as_bytes())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1044,6 +1094,106 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.boundary_edge_count, 4);
         assert!(a.boundary_perimeter_micrometers > 0);
+    }
+
+    #[test]
+    fn binding_set_rejects_mixed_candidate_geometry_identity() {
+        let a = interface(PortId(10), 7);
+        let b = interface(PortId(20), 8);
+        let candidate = candidate();
+        let bindings = vec![
+            SolverBoundaryBinding::verified(
+                &a,
+                "test-adapter/v1",
+                "patch:a",
+                [3; 32],
+                &candidate,
+                select_boundary_patch(&a, &candidate, 0.05).unwrap(),
+                0.05,
+            )
+            .unwrap(),
+            SolverBoundaryBinding::verified(
+                &b,
+                "test-adapter/v1",
+                "patch:b",
+                [4; 32],
+                &candidate,
+                select_boundary_patch(&b, &candidate, 0.05).unwrap(),
+                0.05,
+            )
+            .unwrap(),
+        ];
+
+        assert_eq!(
+            validate_binding_set(&[a, b], &bindings),
+            Err(SolverBindingError::CandidateGeometryDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn binding_set_rejects_mixed_candidate_mesh_identity() {
+        let a = interface(PortId(10), 7);
+        let b = interface(PortId(20), 8);
+        let candidate = candidate();
+        let mut changed = candidate.clone();
+        changed.vertices[1][0] += 0.125;
+        let first = SolverBoundaryBinding::verified(
+            &a,
+            "test-adapter/v1",
+            "patch:a",
+            [3; 32],
+            &candidate,
+            select_boundary_patch(&a, &candidate, 0.05).unwrap(),
+            0.05,
+        )
+        .unwrap();
+        let second = SolverBoundaryBinding::verified(
+            &b,
+            "test-adapter/v1",
+            "patch:b",
+            [3; 32],
+            &changed,
+            select_boundary_patch(&b, &changed, 0.05).unwrap(),
+            0.05,
+        )
+        .unwrap();
+
+        assert_eq!(
+            validate_binding_set(&[a, b], &[first, second]),
+            Err(SolverBindingError::CandidateMeshDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn binding_set_digest_is_order_independent() {
+        let a = interface(PortId(10), 7);
+        let b = interface(PortId(20), 8);
+        let candidate = candidate();
+        let first = SolverBoundaryBinding::verified(
+            &a,
+            "test-adapter/v1",
+            "patch:a",
+            [3; 32],
+            &candidate,
+            select_boundary_patch(&a, &candidate, 0.05).unwrap(),
+            0.05,
+        )
+        .unwrap();
+        let second = SolverBoundaryBinding::verified(
+            &b,
+            "test-adapter/v1",
+            "patch:b",
+            [3; 32],
+            &candidate,
+            select_boundary_patch(&b, &candidate, 0.05).unwrap(),
+            0.05,
+        )
+        .unwrap();
+
+        assert_eq!(
+            digest_binding_set(&[a.clone(), b.clone()], &[first.clone(), second.clone()]).unwrap(),
+            digest_binding_set(&[b, a], &[second, first]).unwrap()
+        );
     }
 
     #[test]
