@@ -6514,34 +6514,6 @@ mod tests {
             "operation:verifier-config","native-verifier-config"
         ).unwrap();
 
-        struct WrongConfigVerifier;
-        impl ProviderEvidenceVerifier for WrongConfigVerifier {
-            fn verify(
-                &self,
-                purpose: ProviderVerificationPurpose,
-                record: &DurableDispatchRecord,
-                evidence: &ProviderTerminalEvidence,
-            ) -> Result<VerifiedProviderOutcome, ProviderVerificationError> {
-                if !matches!(purpose,ProviderVerificationPurpose::TerminalOutcome) {
-                    return Err(ProviderVerificationError::VerificationFailed);
-                }
-                Ok(VerifiedProviderOutcome {
-                    evidence:evidence.clone(),
-                    configuration:ProviderVerifierConfiguration {
-                        relying_party_id:"legacy-local".into(),
-                        verifier_id:"test-verifier/v2".into(),
-                        verifier_revision: "test-verifier/rev2".into(),
-                        verifier_implementation_id: "test-verifier".into(),
-                        verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
-                        verifier_config_digest:"sha256:tampered-config".into(),
-                        trust_anchor_digest:"sha256:test-trust-anchors".into(),
-                        evidence_profile_digest:"sha256:test-evidence-profile".into(),
-                    },
-                    verification_digest:format!("sha256:verification:{}",record.attempt_id),
-                })
-            }
-        }
-
         let err=store.commit_bound_verified(
             &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifierForRp { relying_party_id: "wrong-rp".into() }
         ).unwrap_err();
