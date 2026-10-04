@@ -954,7 +954,7 @@ impl ReceiptAttestationVerificationReport {
             cryptographic_proof: VerificationStage::Passed,
         }
     }
-    
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         fn write_string(bytes: &mut Vec<u8>, value: &str) {
             bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
@@ -1031,7 +1031,6 @@ impl ReceiptAttestationVerificationReport {
     }
 
 }
-
 
 pub const VERIFICATION_CONTEXT_VERSION: &str =
     "symthaea-observation-verification-context-v4";
@@ -1616,9 +1615,10 @@ pub struct ResolvedVerificationMethodSnapshot {
     pub snapshot_fingerprint: Option<String>,
 }
 
-/// Internal fail-closed resolver used by the resolver-free compatibility entry point.
-struct UnresolvedVerificationMethodResolver;
-
+/// Application-supplied verification-method resolver.
+///
+/// Resolution, controller authorization, key lifecycle, and status are deliberately
+/// injected rather than performed through network access in this crate.
 pub trait VerificationMethodResolver {
     fn resolve(
         &self,
@@ -1663,10 +1663,9 @@ pub trait VerificationMethodResolver {
     }
 }
 
-/// Application-supplied verification-method resolver.
-///
-/// Resolution, controller authorization, key lifecycle, and status are deliberately
-/// injected rather than performed through network access in this crate.
+/// Internal fail-closed resolver used by the resolver-free compatibility entry point.
+struct UnresolvedVerificationMethodResolver;
+
 impl VerificationMethodResolver for UnresolvedVerificationMethodResolver {
     fn resolve(
         &self,
@@ -2650,7 +2649,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn fingerprint_shape_validation_rejects_noncanonical_digests() {
         let (envelope, signing_key, receipt) = envelope_and_key();
@@ -3314,9 +3312,6 @@ mod tests {
         assert_ne!(first.receipt_fingerprint, other_receipt.fingerprint());
     }
 
-
-
-
     #[test]
     fn evidence_evaluation_boundary_marks_failed_checks_as_not_established() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
@@ -3353,7 +3348,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -3861,7 +3856,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
 
         assert!(report.execution_trace.is_well_formed());
@@ -3902,7 +3897,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let mut trace = EvaluationTrace::from_report_legacy(&report);
         trace.procedure_fingerprint = EvaluationProcedure::attestation_ed25519_v1().fingerprint();
@@ -3964,7 +3959,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
         assert_eq!(evaluation.execution_trace, report.execution_trace);
@@ -3979,7 +3974,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -4001,7 +3996,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
 
         let base = report.to_evidence_evaluation();
@@ -4028,7 +4023,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -4050,7 +4045,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -4088,7 +4083,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -4110,7 +4105,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
 
         assert_eq!(
@@ -4127,7 +4122,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
 
         let mut attempted_rebinding = VerificationContext::from_report(&report);
@@ -4163,7 +4158,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
 
         let base = report.to_evidence_evaluation();
@@ -4449,7 +4444,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let mut trace = EvaluationTrace::from_report(&report);
         trace.procedure_fingerprint = "unknown-procedure".into();
@@ -4468,7 +4463,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let evaluation = report.to_evidence_evaluation();
 
@@ -4501,7 +4496,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let mut trace = EvaluationTrace::from_report(&report);
         let original = trace.fingerprint();
@@ -4518,7 +4513,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let first = report.to_evidence_evaluation();
         let mut second = first.clone();
@@ -4536,7 +4531,7 @@ mod tests {
             signing_key.verifying_key(),
             150,
         );
-        
+
         let report = resolved_report(&verifier, &envelope, &receipt);
         let mut evaluation = report.to_evidence_evaluation();
         assert!(evaluation.is_consistent_with_report(&report));
@@ -4664,8 +4659,6 @@ mod tests {
         assert!(!evaluation.is_consistent_with_report(&rebound_snapshot));
     }
 
-
-
     #[test]
     fn resolver_snapshot_is_retained_when_post_resolution_crypto_failure_occurs() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
@@ -4713,9 +4706,6 @@ mod tests {
         );
     }
 
-
-
-
     #[test]
     fn failed_resolution_report_binds_snapshot_into_evidence_evaluation() {
         let (envelope, signing_key, receipt) = envelope_and_key();
@@ -4751,7 +4741,6 @@ mod tests {
 
         assert!(!evaluation.is_consistent_with_report(&report));
     }
-
 
     #[test]
     fn resolver_identity_mismatch_cannot_fall_through_to_crypto_verification() {
