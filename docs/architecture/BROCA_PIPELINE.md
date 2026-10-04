@@ -809,3 +809,23 @@ articulatory control; sensory targets and prediction errors are used for feedbac
 correction. This repository's implementation is an engineering correspondence, not a
 claim of anatomical identity with human Broca's area or of human-level speech
 naturalness.
+
+
+### Current formulation ceiling
+
+The typed phonological boundary does not claim to solve lexical selection or grammatical
+encoding. The current deterministic StructuredDecoder can still emit generic role fillers
+such as PATIENT:SOMETHING. PhonologicalPlan therefore remains unbound until an upstream
+linguistic formatter supplies an actual phoneme sequence.
+
+The intended evolution is:
+
+    semantic structure
+        -> lexical / morphosyntactic formulation
+        -> phonological sequence
+        -> syllable / prosodic structure
+        -> articulatory realization
+        -> sensory observation
+
+The important invariant is that each newly introduced layer must preserve explicit
+provenance for what is known versus what is merely a realization placeholder.
