@@ -3556,6 +3556,47 @@ mod tests {
     }
 
     #[test]
+    fn from_report_with_context_cannot_rebind_execution_identity() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let mut supplied = VerificationContext::from_report(&report);
+        supplied.verifier_id = "attacker-verifier";
+        supplied.procedure_id = "attacker-procedure";
+        supplied.policy_fingerprint = "attacker-policy".into();
+        supplied.environment_fingerprint = "attacker-environment".into();
+        supplied.evaluated_at_unix_ns = 999;
+        supplied.evaluator_identity_fingerprint = Some("evaluator-a".into());
+
+        let evaluation = EvidenceEvaluation::from_report_with_context(&report, supplied);
+        let expected = VerificationContext::from_report(&report);
+
+        assert_eq!(evaluation.context.verifier_id, expected.verifier_id);
+        assert_eq!(evaluation.context.procedure_id, expected.procedure_id);
+        assert_eq!(
+            evaluation.context.policy_fingerprint,
+            expected.policy_fingerprint
+        );
+        assert_eq!(
+            evaluation.context.environment_fingerprint,
+            expected.environment_fingerprint
+        );
+        assert_eq!(
+            evaluation.context.evaluated_at_unix_ns,
+            expected.evaluated_at_unix_ns
+        );
+        assert_eq!(
+            evaluation.context.evaluator_identity_fingerprint.as_deref(),
+            Some("evaluator-a")
+        );
+        assert!(evaluation.is_consistent_with_report(&report));
+    }
+    #[test]
     fn verification_context_self_validation_rejects_empty_optional_identities() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
