@@ -101,6 +101,34 @@ impl ClaimProofPurpose {
     }
 }
 
+/// Typed identifier for the verification method associated with an authorship proof.
+///
+/// This is an identifier namespace, not the verification method's resolved key material.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ClaimVerificationMethod(String);
+
+impl ClaimVerificationMethod {
+    pub fn new(value: impl Into<String>) -> Result<Self, &'static str> {
+        let value = value.into();
+        if value.trim().is_empty() {
+            return Err("claim verification method must be non-empty");
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        if self.0.trim().is_empty() {
+            Err("claim verification method must be non-empty")
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// Typed authorship context for a claim.
 ///
 /// Structural validation binds the declared author to the proof context but does not
@@ -109,14 +137,14 @@ impl ClaimProofPurpose {
 pub struct ClaimAuthorship {
     author: ClaimAuthorIdentity,
     proof_purpose: ClaimProofPurpose,
-    verification_method: Option<String>,
+    verification_method: Option<ClaimVerificationMethod>,
 }
 
 impl ClaimAuthorship {
     pub fn new(
         author: ClaimAuthorIdentity,
         proof_purpose: ClaimProofPurpose,
-        verification_method: Option<String>,
+        verification_method: Option<ClaimVerificationMethod>,
     ) -> Result<Self, &'static str> {
         if verification_method
             .as_deref()
@@ -139,8 +167,13 @@ impl ClaimAuthorship {
         &self.proof_purpose
     }
 
-    pub fn verification_method(&self) -> Option<&str> {
-        self.verification_method.as_deref()
+    /// Return true only when this authorship proof is intended for the caller's exact purpose.
+    pub fn proof_purpose_matches(&self, expected: &ClaimProofPurpose) -> bool {
+        &self.proof_purpose == expected
+    }
+
+    pub fn verification_method(&self) -> Option<&ClaimVerificationMethod> {
+        self.verification_method.as_ref()
     }
 
     pub fn digest(&self) -> String {
@@ -148,7 +181,7 @@ impl ClaimAuthorship {
             "symthaea:claim-authorship:v1",
             self.author.as_str(),
             self.proof_purpose.as_str(),
-            &self.verification_method,
+            self.verification_method.as_ref().map(ClaimVerificationMethod::as_str),
         );
         let bytes = serde_json::to_vec(&encoded)
             .expect("claim authorship is serializable");
@@ -158,12 +191,8 @@ impl ClaimAuthorship {
     pub fn validate_structure(&self) -> Result<(), &'static str> {
         self.author.validate_structure()?;
         self.proof_purpose.validate_structure()?;
-        if self
-            .verification_method
-            .as_deref()
-            .is_some_and(|value| value.trim().is_empty())
-        {
-            return Err("claim verification method must be non-empty when present");
+        if let Some(verification_method) = &self.verification_method {
+            verification_method.validate_structure()?;
         }
         Ok(())
     }
@@ -286,7 +315,8 @@ impl FederatedClaim {
             "verification_method",
             self.authorship
                 .as_ref()
-                .and_then(|authorship| authorship.verification_method()),
+                .and_then(|authorship| authorship.verification_method())
+                .map(ClaimVerificationMethod::as_str),
         );
         field(&mut bytes, "statement_ref", Some(&self.statement_ref));
         field(&mut bytes, "source_event", self.source_event.as_deref());
@@ -762,17 +792,35 @@ mod tests {
         let author = ClaimAuthorIdentity::new("author:1").unwrap();
         let purpose = ClaimProofPurpose::new("assertionMethod").unwrap();
         let authorship =
-            ClaimAuthorship::new(author.clone(), purpose, Some("https://example.test/key/1".into()))
+            ClaimAuthorship::new(author.clone(), purpose, Some(ClaimVerificationMethod::new("https://example.test/key/1").unwrap()))
                 .unwrap();
 
         assert_eq!(authorship.author(), &author);
         assert_eq!(authorship.proof_purpose().as_str(), "assertionMethod");
         assert_eq!(
-            authorship.verification_method(),
+            authorship.verification_method().map(ClaimVerificationMethod::as_str),
             Some("https://example.test/key/1")
         );
         assert!(!authorship.digest().is_empty());
         assert!(authorship.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn proof_purpose_is_checked_explicitly_for_reuse() {
+        let author = ClaimAuthorIdentity::new("author:1").unwrap();
+        let assertion = ClaimProofPurpose::new("assertionMethod").unwrap();
+        let authentication = ClaimProofPurpose::new("authentication").unwrap();
+        let authorship = ClaimAuthorship::new(author, assertion.clone(), None).unwrap();
+
+        assert!(authorship.proof_purpose_matches(&assertion));
+        assert!(!authorship.proof_purpose_matches(&authentication));
+    }
+
+    #[test]
+    fn verification_method_is_a_distinct_typed_namespace() {
+        let method = ClaimVerificationMethod::new("https://example.test/key/1").unwrap();
+        assert_eq!(method.as_str(), "https://example.test/key/1");
+        assert!(method.validate_structure().is_ok());
     }
 
     #[test]
@@ -836,7 +884,7 @@ mod tests {
         let authorship = ClaimAuthorship::new(
             base.author.clone(),
             ClaimProofPurpose::new("assertionMethod").unwrap(),
-            Some("https://example.test/key/1".into()),
+            Some(ClaimVerificationMethod::new("https://example.test/key/1").unwrap()),
         )
         .unwrap();
         let with_authorship = base.clone().with_authorship(authorship).unwrap();
@@ -854,7 +902,7 @@ mod tests {
         let author = ClaimAuthorIdentity::new("author:1").unwrap();
         let purpose = ClaimProofPurpose::new("assertionMethod").unwrap();
         assert_eq!(
-            ClaimAuthorship::new(author, purpose, Some("   ".into())).unwrap_err(),
+            ClaimAuthorship::new(author, purpose, Some(ClaimVerificationMethod::new("   ").unwrap())).unwrap_err(),
             "claim verification method must be non-empty when present"
         );
     }
