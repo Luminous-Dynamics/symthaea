@@ -1389,6 +1389,22 @@ mod tests {
 
 
     #[test]
+    fn public_selector_rejects_out_of_range_mesh_coordinates() {
+        let interface = interface(PortId(10), 7);
+        let mesh = TriangleMesh {
+            vertices: vec![
+                [f32::MAX, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, -1.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        };
+
+        assert!(select_boundary_patch(&interface, &mesh, 0.05).is_err());
+    }
+
+    #[test]
     fn boundary_edge_key_rejects_out_of_range_coordinates() {
         assert_eq!(
             BoundaryEdgeKey::new([f32::MAX, 0.0, 0.0], [0.0, 0.0, 0.0]),
