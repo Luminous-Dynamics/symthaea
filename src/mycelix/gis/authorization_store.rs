@@ -2876,11 +2876,11 @@ fn validate_native_authority_pin_set(
 
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let row = tx.query_row(        self.validate_persisted_provider_status_verifier_configuration(
+        self.validate_persisted_provider_status_verifier_configuration(
             &tx,
             &pinned_status_verifier_configuration,
         )?;
-
+        let row = tx.query_row(
             "SELECT operation_id,native_replay_identity,action_id,action_digest,provider_idempotency_key,target_identity,audience,adapter,boundary_id,state
              FROM authorization_dispatches WHERE authorization_instance=?1 AND attempt_id=?2",
             params![record.authorization_instance, record.attempt_id],
