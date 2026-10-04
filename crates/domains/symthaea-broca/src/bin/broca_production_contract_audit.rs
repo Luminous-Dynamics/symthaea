@@ -204,7 +204,7 @@ fn run() -> Result<()> {
                 role_only_error,
                 symthaea_broca::PhonologicalPlanError::RoleOnlyWithSegments
             );
-            report.phonological_binding_checks += 1;
+            report.phonological_binding_checks += 2;
             if !role_only_rejected {
                 fail(
                     &mut report,
@@ -338,7 +338,7 @@ fn run() -> Result<()> {
                 },
             );
             let semantic_partial_gate_rejected = !partial_receipt.error.passes();
-            report.semantic_delivery_checks += 3;
+            report.semantic_delivery_checks += 4;
 
             if !semantic_exact_passed
                 || !semantic_mismatch_rejected
