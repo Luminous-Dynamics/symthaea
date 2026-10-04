@@ -1100,7 +1100,6 @@ fn rfc9942_round_trip_preserves_unprotected_header_entry_order() {
         let vdp_bytes = receipt.vdp().to_cbor();
         let mut protected = Vec::new();
         protected.extend_from_slice(&[0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b]);
-        protected.extend_from_slice(&[0x19, 0x01, 0x8c]);
         let mut out = vec![0xd2, 0x84];
         out.extend_from_slice(&bstr(&protected));
         out.extend_from_slice(&[
