@@ -7,13 +7,22 @@ set -euo pipefail
 
 : "${TMPDIR:=/tmp}"
 ROOT=$(mktemp -d "${TMPDIR%/}/symthaea-tpm-smoke.XXXXXX")
+EVIDENCE_FILE="${GITHUB_WORKSPACE:-$PWD}/tpm2-spore-boundary-evidence.txt"
 TPM_STATE="$ROOT/tpm-state"
 CTRL_PORT=2322
 TPM_PORT=2321
 NV_INDEX=0x1500016
 NV_AUTH=index
 CHALLENGE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+CHALLENGE_DIGEST=$(printf '%s' "$CHALLENGE" | sha256sum | cut -d' ' -f1)
+printf 'initial_challenge_sha256=%s\n' "$CHALLENGE_DIGEST" >> "$EVIDENCE_FILE"
 
+printf 'schema=tpm2-spore-boundary-smoke-v2\n' > "$EVIDENCE_FILE"
+printf 'git_head=%s\n' "$(git rev-parse HEAD 2>/dev/null || echo unavailable)" >> "$EVIDENCE_FILE"
+printf 'swtpm=%s\n' "$(swtpm --version 2>/dev/null | head -1 || echo unavailable)" >> "$EVIDENCE_FILE"
+printf 'tpm2_tools=%s\n' "$(tpm2_getcap --version 2>/dev/null | head -1 || echo unavailable)" >> "$EVIDENCE_FILE"
+printf 'nix=%s\n' "$(nix --version 2>/dev/null || echo unavailable)" >> "$EVIDENCE_FILE"
+for pkg in tss2-esys tss2-tctildr tss2-mu; do printf '%s=%s\n' "$pkg" "$(pkg-config --modversion "$pkg" 2>/dev/null || echo unavailable)" >> "$EVIDENCE_FILE"; done
 cleanup() {
   if [ -n "${SWTPM_PID:-}" ]; then
     kill "$SWTPM_PID" 2>/dev/null || true
@@ -63,6 +72,8 @@ tpm2_print -Q -t TPMS_ATTEST "$ROOT/quote.attest" > "$ROOT/quote.yaml"
 
 # A valid old Quote must not verify for a fresh challenge.
 REPLAY_CHALLENGE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+REPLAY_CHALLENGE_DIGEST=$(printf '%s' "$REPLAY_CHALLENGE" | sha256sum | cut -d' ' -f1)
+printf 'replay_challenge_sha256=%s\n' "$REPLAY_CHALLENGE_DIGEST" >> "$EVIDENCE_FILE"
 if tpm2_checkquote -Q -u "$ROOT/ak.pem" -m "$ROOT/quote.attest" -s "$ROOT/quote.sig" -f "$ROOT/quote.pcrs" -g sha256 -q "$REPLAY_CHALLENGE" -l sha256:7 >/dev/null 2>&1; then
   echo "ERROR: old Quote was accepted for a different challenge" >&2
   exit 1
@@ -101,6 +112,8 @@ tpm2_readpublic -Q -c "$ROOT/ak-after-restart.ctx" -f pem -o "$ROOT/ak-after-res
 
 # Use a fresh challenge for post-restart evidence.
 POST_RESTART_CHALLENGE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \\n')
+POST_RESTART_CHALLENGE_DIGEST=$(printf '%s' "$POST_RESTART_CHALLENGE" | sha256sum | cut -d' ' -f1)
+printf 'post_restart_challenge_sha256=%s\n' "$POST_RESTART_CHALLENGE_DIGEST" >> "$EVIDENCE_FILE"
 tpm2_quote -Q -c "$ROOT/ak-after-restart.ctx" -l sha256:7 -q "$POST_RESTART_CHALLENGE" -m "$ROOT/quote-after-restart.attest" -s "$ROOT/quote-after-restart.sig" -o "$ROOT/quote-after-restart.pcrs" -g sha256
 tpm2_checkquote -Q -u "$ROOT/ak-after-restart.pem" -m "$ROOT/quote-after-restart.attest" -s "$ROOT/quote-after-restart.sig" -f "$ROOT/quote-after-restart.pcrs" -g sha256 -q "$POST_RESTART_CHALLENGE" -l sha256:7
 
