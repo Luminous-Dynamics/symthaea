@@ -2593,6 +2593,28 @@ mod tests {
     }
 
     #[test]
+    fn current_boundary_from_report_uses_authoritative_execution_trace() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = resolved_report(&verifier, &envelope, &receipt);
+        let expected = EvaluationBoundary::from_execution_trace(&report.execution_trace);
+
+        assert_eq!(EvaluationBoundary::from_report(&report), expected);
+
+        // A legacy-compatible report stage projection may be mutated independently
+        // in memory, but current boundary derivation must never trust that duplicate.
+        let mut mutated = report.clone();
+        mutated.receipt_commitment =
+            VerificationStage::Failed(ReceiptAttestationVerificationOutcome::ReceiptCommitmentMismatch);
+        assert!(!mutated.is_well_formed());
+        assert_eq!(EvaluationBoundary::from_report(&mutated), expected);
+    }
+
+    #[test]
     fn payload_mutation_invalidates_signature() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
         let verifier = Ed25519ReceiptVerifier::new(
