@@ -112,7 +112,7 @@ jobs:
       CARGO_FUZZ_VERSION: 0.12.0
       FUZZ_RUNS: 1024
       FUZZ_SEED: 9942
-      FUZZ_MAX_LEN: 4096
+      FUZZ_MAX_LEN: 8192
       FUZZ_TIMEOUT_SECONDS: 2
     steps:
       - name: Checkout
@@ -153,6 +153,30 @@ jobs:
               path = Path("corpus") / relative
               path.parent.mkdir(parents=True, exist_ok=True)
               path.write_bytes(b64decode(encoded, validate=True))
+
+          proof = b"\x83\x02\x00\x81\x58\x20" + (b"\x00" * 32)
+          vdp_65 = b"\xa1\x20\x18\x41" + b"".join(
+              b"\x58\x26" + proof for _ in range(65)
+          )
+          large_tagged_outer = (
+              b"\xd2\x84"
+              + b"\x41\xa0"
+              + b"\xa1\x18\x1e\xd8\x18\x59\x10\x01"
+              + (b"\x00" * 4097)
+              + b"\xf6"
+              + b"\x58\x40"
+              + (b"\x00" * 64)
+          )
+
+          generated = {
+              "fuzz_rfc9942_proofs/seed-65-proof-vdp.cbor": vdp_65,
+              "fuzz_rfc9942_signature_with_receipts/seed-tagged-large-opaque.cbor":
+                  large_tagged_outer,
+          }
+          for relative, data in generated.items():
+              path = Path("corpus") / relative
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(data)
           PY
       - name: Run bounded fuzz smoke corpus
         working-directory: crates/domains/symthaea-swarm/fuzz
