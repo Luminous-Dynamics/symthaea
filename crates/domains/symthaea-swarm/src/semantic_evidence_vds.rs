@@ -542,11 +542,13 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        self.verify_ed25519(public_key,external_aad,detached_payload)?;
-        match detached_payload {
-            Some(payload)=>self.verify_consistency_with_detached_payload(older,payload),
-            None=>self.verify_consistency(older),
+        if !matches!(self.payload, Rfc9942ReceiptPayload::Detached) {
+            return Err(Rfc9942VdpError::InvalidStructure);
         }
+        let payload = detached_payload.ok_or(Rfc9942VdpError::DetachedPayloadRequired)?;
+        self.verify_ed25519(public_key, external_aad, Some(payload))?;
+        self.vdp.validate_vds_id(self.vds_id)?;
+        self.vdp.verify_consistency_with_payload(older, payload)
     }
 
     /// Verify an RFC9942 inclusion Receipt with ES256: proof first, then
@@ -654,18 +656,17 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<Rfc9942VerifiedReceipt, Rfc9942VdpError> {
-        // RFC 9942 consistency verification is intentionally signature-first:
-        // authenticate the exact newer-tree root payload before evaluating the
-        // append-only proof.
-        self.verify_es256(public_key, external_aad, detached_payload)?;
+        // RFC 9942 §5.3.1 defines the newer consistency root as a detached
+        // payload. Enforce that profile boundary before cryptographic
+        // verification, then preserve the required signature-first ordering.
+        if !matches!(self.payload, Rfc9942ReceiptPayload::Detached) {
+            return Err(Rfc9942VdpError::InvalidStructure);
+        }
+        let payload = detached_payload.ok_or(Rfc9942VdpError::DetachedPayloadRequired)?;
+        self.verify_es256(public_key, external_aad, Some(payload))?;
         self.vdp.validate_vds_id(self.vds_id)?;
-        let (proof_index, newer) = match detached_payload {
-            Some(payload) => self.vdp.verify_consistency_with_payload_index(older, payload)?,
-            None => {
-                let root = self.payload.attached_root().ok_or(Rfc9942VdpError::DetachedPayloadRequired)?;
-                self.vdp.verify_consistency_with_payload_index(older, &root)?
-            }
-        };
+        let (proof_index, newer) =
+            self.vdp.verify_consistency_with_payload_index(older, payload)?;
         Ok(self.verified_state(Rfc9942VerifiedProof::Consistency { proof_index, older, newer }))
     }
 
