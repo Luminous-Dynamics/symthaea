@@ -121,7 +121,7 @@ fn anchor_commitment(
             hasher.update(&[1]);
             hasher.update(head.as_bytes());
         }
-        None => hasher.update(&[0]),
+        None => { hasher.update(&[0]); }
     }
 
     hasher.update(checkpoint.snapshot().as_bytes());

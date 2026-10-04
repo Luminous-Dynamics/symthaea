@@ -8,5 +8,7 @@ use libfuzzer_sys::fuzz_target;
 use symthaea_swarm::semantic_evidence_vds::Rfc9942Es256CoseKey;
 
 fuzz_target!(|data: &[u8]| {
-    let _ = Rfc9942Es256CoseKey::from_cbor(data);
+    if let Ok(key) = Rfc9942Es256CoseKey::from_cbor(data) {
+        let _ = key.public_key_sec1();
+    }
 });

@@ -26,8 +26,11 @@ const Y: [u8; 32] = [
 ];
 
 fn bstr(bytes: &[u8]) -> Vec<u8> {
-    assert!(bytes.len() < 24);
-    let mut out = vec![0x40 + bytes.len() as u8];
+    let mut out = match bytes.len() {
+        0..=23 => vec![0x40 + bytes.len() as u8],
+        24..=255 => vec![0x58, bytes.len() as u8],
+        _ => panic!("fixture bstr too large"),
+    };
     out.extend_from_slice(bytes);
     out
 }
@@ -39,11 +42,7 @@ fn neg1_field(value: u8) -> Vec<u8> {
 }
 fn bstr_field(label: u8, bytes: &[u8]) -> Vec<u8> {
     let mut out = vec![label];
-    out.extend_from_slice(&if bytes.len() < 24 {
-        bstr(bytes)
-    } else {
-        panic!("fixture too large")
-    });
+    out.extend_from_slice(&bstr(bytes));
     out
 }
 fn valid_fields() -> Vec<Vec<u8>> {
@@ -109,7 +108,8 @@ fn cose_key_rejects_wrong_curve() {
 #[test]
 fn cose_key_rejects_mismatched_algorithm() {
     let mut bytes = valid_key();
-    bytes[bytes.windows(2).position(|w| w == [0x03, 0x26]).unwrap() + 1] = 0x38;
+    let alg_pos = bytes.windows(2).position(|w| w == [0x03, 0x26]).unwrap();
+    bytes[alg_pos + 1] = 0x38;
     bytes.insert(
         bytes.windows(2).position(|w| w == [0x03, 0x38]).unwrap() + 2,
         0x22,

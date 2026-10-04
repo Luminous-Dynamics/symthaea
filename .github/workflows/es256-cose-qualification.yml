@@ -2,11 +2,29 @@ name: ES256 COSE Qualification
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-swarm/src/semantic_evidence_vds.rs"
       - "crates/domains/symthaea-swarm/src/semantic_evidence_anchor.rs"
       - "crates/domains/symthaea-swarm/tests/rfc9942_cose_key_corpus.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_es256_interop.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_semantic_qualification.rs"
       - "crates/domains/symthaea-swarm/fuzz/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/es256-cose-qualification.yml"
+  push:
+    branches:
+      - "hardening/**"
+    paths:
+      - "crates/domains/symthaea-swarm/src/semantic_evidence_vds.rs"
+      - "crates/domains/symthaea-swarm/src/semantic_evidence_anchor.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_cose_key_corpus.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_es256_interop.rs"
+      - "crates/domains/symthaea-swarm/tests/rfc9942_semantic_qualification.rs"
+      - "crates/domains/symthaea-swarm/fuzz/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/es256-cose-qualification.yml"
   workflow_dispatch:
 
@@ -20,17 +38,18 @@ concurrency:
 jobs:
   corpus:
     name: ES256 COSE corpus
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
       - name: Cache Cargo
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -41,22 +60,25 @@ jobs:
             ${{ runner.os }}-es256-cose-
       - name: Run COSE_Key interoperability corpus
         run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_cose_key_corpus
-      - name: Run semantic_evidence_vds unit tests
-        run: cargo test -p symthaea-swarm --features semantic-receipts --lib semantic_evidence_vds
+      - name: Run focused RFC 9942 semantic qualification
+        run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_semantic_qualification
+      - name: Run RFC 8392 ES256 known-answer vector
+        run: cargo test -p symthaea-swarm --features semantic-receipts --test rfc9942_es256_interop
 
   fuzz-build:
     name: ES256 COSE fuzz target build
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58 # 1.96.0
       - name: Cache fuzz Cargo
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -65,5 +87,81 @@ jobs:
           key: ${{ runner.os }}-es256-cose-fuzz-${{ hashFiles('crates/domains/symthaea-swarm/fuzz/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-es256-cose-fuzz-
+      - name: Assert expected fuzz target inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="$(cargo metadata --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --no-deps --format-version 1)"
+          for target in \
+            fuzz_cose_key_es256 \
+            fuzz_rfc9942_receipt \
+            fuzz_rfc9942_signature_with_receipts \
+            fuzz_rfc9942_proofs
+          do
+            grep -F '"name":"'"$target"'"' <<<"$metadata" >/dev/null
+          done
       - name: Check fuzz manifest
-        run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bin fuzz_cose_key_es256
+        run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bins
+
+  fuzz-smoke:
+    name: ES256 COSE bounded fuzz smoke
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_FUZZ_VERSION: 0.12.0
+      FUZZ_RUNS: 1024
+      FUZZ_SEED: 9942
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install nightly Rust for libFuzzer instrumentation
+        uses: dtolnay/rust-toolchain@3db9de313aa3e84732d075f6fd8938cc0d6d4b58
+        with:
+          toolchain: nightly
+      - name: Install pinned cargo-fuzz
+        run: cargo install cargo-fuzz --version "${{ env.CARGO_FUZZ_VERSION }}" --locked
+      - name: Prepare deterministic parser seeds
+        working-directory: crates/domains/symthaea-swarm/fuzz
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from base64 import b64decode
+          from pathlib import Path
+
+          seeds = {
+              "fuzz_cose_key_es256/seed-valid-public-key.cbor":
+                  "pAECIAEhWCAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBCJYIAUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUF",
+              "fuzz_rfc9942_receipt/seed-inclusion-receipt.cbor":
+                  "0oRHogEmGQGLAaEZAYyhIIFYJoMCAIFYIBERERERERERERERERERERERERERERERERERERERERER9lhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "fuzz_rfc9942_receipt/seed-consistency-receipt.cbor":
+                  "0oRHogEmGQGLAaEZAYyhIYFYJoMBAoFYIBERERERERERERERERERERERERERERERERERERERERER9lhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "fuzz_rfc9942_signature_with_receipts/seed-signature-with-receipt.cbor":
+                  "0oRDoQEmoRkBioFYfNKER6IBJhkBiwGhGQGMoSCBWCaDAgCBWCAREREREREREREREREREREREREREREREREREREREREREfZYQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABHcGF5bG9hZFhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "fuzz_rfc9942_proofs/seed-inclusion-vdp.cbor":
+                  "oSCBWCaDAgCBWCAREREREREREREREREREREREREREREREREREREREREREQ==",
+              "fuzz_rfc9942_proofs/seed-consistency-vdp.cbor":
+                  "oSGBWCaDAQKBWCAREREREREREREREREREREREREREREREREREREREREREQ==",
+          }
+
+          for relative, encoded in seeds.items():
+              path = Path("corpus") / relative
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(b64decode(encoded, validate=True))
+          PY
+      - name: Run bounded fuzz smoke corpus
+        working-directory: crates/domains/symthaea-swarm/fuzz
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in \
+            fuzz_cose_key_es256 \
+            fuzz_rfc9942_receipt \
+            fuzz_rfc9942_signature_with_receipts \
+            fuzz_rfc9942_proofs
+          do
+            cargo fuzz run "$target" -- -runs="${FUZZ_RUNS}" -seed="${FUZZ_SEED}" -print_final_stats=1
+          done

@@ -22,9 +22,12 @@ pub const RFC9942_VDS_HEADER_LABEL: i64 = 395;
 /// implementation resource limits, not changes to the RFC wire format.
 pub const MAX_RFC9942_PROOFS: usize = 256;
 pub const MAX_RFC9942_PROOF_BYTES: usize = 8 * 1024;
-/// A u64-sized RFC 9162 tree cannot require more than 64 authentication-path
-/// hashes. Enforce this before allocating from an attacker-controlled CBOR length.
-pub const MAX_RFC9162_PROOF_PATH: usize = 64;
+/// Inclusion proofs for a u64-sized tree need at most 64 authentication-path
+/// hashes. Consistency proofs have RFC 9162's ceil(log2(n)) + 1 upper bound and
+/// can therefore reach 65 nodes for the largest representable tree size.
+/// Enforce this before allocating from an attacker-controlled CBOR length.
+pub const MAX_RFC9162_INCLUSION_PROOF_PATH: usize = 64;
+pub const MAX_RFC9162_CONSISTENCY_PROOF_PATH: usize = 65;
 /// Defensive bounds for the RFC 9942 receipts header value. These limits
 /// constrain decoding/allocation without changing the RFC wire representation.
 pub const MAX_RFC9942_RECEIPTS: usize = 16;
@@ -73,6 +76,101 @@ impl Rfc9942ReceiptPayload {
     }
     pub const fn attached_root(&self) -> Option<[u8;32]> {
         match self { Self::Detached => None, Self::Attached(root) => Some(*root) }
+    }
+}
+
+/// A receipt reaches this state only after its cryptographic signature,
+/// protected VDS binding, payload binding, and the requested VDP proof have
+/// all succeeded through one semantic verification path.
+///
+/// The verified receipt wrapper keeps its capability-bearing fields private,
+/// so callers cannot manufacture this verification state from an isolated
+/// successful verify_es256() result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rfc9942VerifiedProof {
+    Inclusion {
+        proof_index: usize,
+        head: VdsTreeHead,
+        candidate_leaf: [u8; 32],
+    },
+    Consistency {
+        proof_index: usize,
+        older: VdsTreeHead,
+        newer: VdsTreeHead,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rfc9942VerifiedReceipt {
+    algorithm_id: i64,
+    vds_id: u64,
+    proof: Rfc9942VerifiedProof,
+}
+
+impl Rfc9942VerifiedReceipt {
+    pub const fn algorithm_id(&self) -> i64 { self.algorithm_id }
+    pub const fn vds_id(&self) -> u64 { self.vds_id }
+    pub const fn proof(&self) -> Rfc9942VerifiedProof { self.proof }
+}
+
+/// Where RFC 9942 header parameter 394 was carried on the outer
+/// Signature_With_Receipt object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rfc9942ReceiptPlacement {
+    Protected,
+    Unprotected,
+}
+
+/// Semantic state for an outer Signature_With_Receipt carrying an inclusion
+/// Receipt. Its construction proves that:
+/// - the outer COSE_Sign1 signature verified;
+/// - the selected inner Receipt verified its inclusion proof and signature;
+/// - the exact outer payload bytes were the candidate entry supplied to the
+///   inclusion proof;
+/// - the inner Receipt was bound to VDS 1 and its signed Merkle root.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rfc9942VerifiedSignatureWithReceipt {
+    outer_algorithm_id: i64,
+    outer_payload_sha256: [u8; 32],
+    receipt_index: usize,
+    receipt_placement: Rfc9942ReceiptPlacement,
+    receipt: Rfc9942VerifiedReceipt,
+}
+
+impl Rfc9942VerifiedSignatureWithReceipt {
+    pub const fn outer_algorithm_id(&self) -> i64 { self.outer_algorithm_id }
+    pub const fn outer_payload_sha256(&self) -> [u8; 32] { self.outer_payload_sha256 }
+    pub const fn receipt_index(&self) -> usize { self.receipt_index }
+    pub const fn receipt_placement(&self) -> Rfc9942ReceiptPlacement { self.receipt_placement }
+    pub const fn receipt(&self) -> Rfc9942VerifiedReceipt { self.receipt }
+}
+
+impl Rfc9942VerifiedProof {
+    pub const fn proof_index(&self) -> usize {
+        match self {
+            Self::Inclusion { proof_index, .. } | Self::Consistency { proof_index, .. } => *proof_index,
+        }
+    }
+
+    pub const fn inclusion_head(&self) -> Option<VdsTreeHead> {
+        match self {
+            Self::Inclusion { head, .. } => Some(*head),
+            Self::Consistency { .. } => None,
+        }
+    }
+
+    pub const fn inclusion_candidate_leaf(&self) -> Option<[u8; 32]> {
+        match self {
+            Self::Inclusion { candidate_leaf, .. } => Some(*candidate_leaf),
+            Self::Consistency { .. } => None,
+        }
+    }
+
+    pub const fn consistency_heads(&self) -> Option<(VdsTreeHead, VdsTreeHead)> {
+        match self {
+            Self::Inclusion { .. } => None,
+            Self::Consistency { older, newer, .. } => Some((*older, *newer)),
+        }
     }
 }
 
@@ -301,6 +399,14 @@ impl Rfc9942ReceiptEnvelope {
     pub fn signature(&self)->&[u8]{&self.signature}
     pub fn protected_header_bytes(&self)->Vec<u8>{self.protected_bytes.as_deref().map_or_else(||self.protected_header_cbor(),ToOwned::to_owned)}
 
+    fn verified_state(&self, proof: Rfc9942VerifiedProof) -> Rfc9942VerifiedReceipt {
+        Rfc9942VerifiedReceipt {
+            algorithm_id: self.algorithm_id,
+            vds_id: self.vds_id,
+            proof,
+        }
+    }
+
     /// Verify only the Ed25519 COSE signature over this Receipt.
     ///
     /// Proof verification is intentionally separate; the RFC9942-specific
@@ -374,12 +480,16 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        let head=match detached_payload {
-            Some(payload)=>self.verify_inclusion_with_detached_payload(candidate_entry,payload)?,
-            None=>self.verify_inclusion(candidate_entry)?,
-        };
-        self.verify_es256_cose_key(key,external_aad,detached_payload)?;
-        Ok(head)
+        let state = self.verify_es256_inclusion_state(
+            candidate_entry,
+            &key.public_key_sec1(),
+            external_aad,
+            detached_payload,
+        )?;
+        state
+            .proof()
+            .inclusion_head()
+            .ok_or(Rfc9942VdpError::WrongProofKind)
     }
 
     /// Verify RFC9942 consistency using a validated ES256 COSE_Key.
@@ -391,11 +501,17 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        self.verify_es256_cose_key(key,external_aad,detached_payload)?;
-        match detached_payload {
-            Some(payload)=>self.verify_consistency_with_detached_payload(older,payload),
-            None=>self.verify_consistency(older),
-        }
+        let state = self.verify_es256_consistency_state(
+            older,
+            &key.public_key_sec1(),
+            external_aad,
+            detached_payload,
+        )?;
+        state
+            .proof()
+            .consistency_heads()
+            .map(|(_, newer)| newer)
+            .ok_or(Rfc9942VdpError::WrongProofKind)
     }
 
     /// Verify an RFC9942 inclusion Receipt with Ed25519: proof first, then
@@ -426,11 +542,13 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        self.verify_ed25519(public_key,external_aad,detached_payload)?;
-        match detached_payload {
-            Some(payload)=>self.verify_consistency_with_detached_payload(older,payload),
-            None=>self.verify_consistency(older),
+        if !matches!(self.payload, Rfc9942ReceiptPayload::Detached) {
+            return Err(Rfc9942VdpError::InvalidStructure);
         }
+        let payload = detached_payload.ok_or(Rfc9942VdpError::DetachedPayloadRequired)?;
+        self.verify_ed25519(public_key, external_aad, Some(payload))?;
+        self.vdp.validate_vds_id(self.vds_id)?;
+        self.vdp.verify_consistency_with_payload(older, payload)
     }
 
     /// Verify an RFC9942 inclusion Receipt with ES256: proof first, then
@@ -443,12 +561,19 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        let head=match detached_payload {
-            Some(payload)=>self.verify_inclusion_with_detached_payload(candidate_entry,payload)?,
-            None=>self.verify_inclusion(candidate_entry)?,
-        };
-        self.verify_es256(public_key,external_aad,detached_payload)?;
-        Ok(head)
+        // Keep the legacy head-returning API on the same proof-derived semantic
+        // path as the capability-returning verifier. This prevents callers from
+        // accidentally making detached roots authoritative merely by supplying them.
+        let state = self.verify_es256_inclusion_state(
+            candidate_entry,
+            public_key,
+            external_aad,
+            detached_payload,
+        )?;
+        state
+            .proof()
+            .inclusion_head()
+            .ok_or(Rfc9942VdpError::WrongProofKind)
     }
 
     /// Verify an RFC9942 consistency Receipt with ES256: signature first,
@@ -461,11 +586,88 @@ impl Rfc9942ReceiptEnvelope {
         external_aad: &[u8],
         detached_payload: Option<&[u8]>,
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
-        self.verify_es256(public_key,external_aad,detached_payload)?;
-        match detached_payload {
-            Some(payload)=>self.verify_consistency_with_detached_payload(older,payload),
-            None=>self.verify_consistency(older),
+        // Keep the legacy head-returning API on the same signature-first
+        // semantic path as the capability-returning verifier.
+        let state = self.verify_es256_consistency_state(
+            older,
+            public_key,
+            external_aad,
+            detached_payload,
+        )?;
+        state
+            .proof()
+            .consistency_heads()
+            .map(|(_, newer)| newer)
+            .ok_or(Rfc9942VdpError::WrongProofKind)
+    }
+
+    /// Return a single semantic verification capability for an inclusion
+    /// Receipt. Proof verification happens before signature verification, and
+    /// both consume the same Receipt VDS/payload binding.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256_inclusion_state(
+        &self,
+        candidate_entry: &[u8],
+        public_key: &[u8],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<Rfc9942VerifiedReceipt, Rfc9942VdpError> {
+        let (proof_index, head, signature_payload) = match (&self.payload, detached_payload) {
+            (Rfc9942ReceiptPayload::Attached(_), Some(_)) => {
+                return Err(Rfc9942VdpError::InvalidStructure);
+            }
+            (Rfc9942ReceiptPayload::Attached(_), None) => {
+                let root = self.payload.attached_root().ok_or(Rfc9942VdpError::InvalidPayloadLength)?;
+                let (proof_index, head) = self.vdp.verify_inclusion_with_payload_index(candidate_entry, &root)?;
+                (proof_index, head, None)
+            }
+            (Rfc9942ReceiptPayload::Detached, supplied) => {
+                // Inclusion proof verification derives the root first. A
+                // caller-supplied detached payload, when present, must equal
+                // that derived root byte-for-byte before signature checking.
+                self.vdp.validate_vds_id(self.vds_id)?;
+                let (proof_index, head) = self.vdp.derive_inclusion_root_index(candidate_entry)?;
+                if let Some(payload) = supplied {
+                    if payload != head.root() {
+                        return Err(Rfc9942VdpError::NoMatchingProof);
+                    }
+                }
+                let root = head.root();
+                (proof_index, head, Some(root))
+            }
+        };
+
+        self.verify_es256(public_key, external_aad, signature_payload.as_ref().map(|root| root.as_slice()))?;
+        Ok(self.verified_state(Rfc9942VerifiedProof::Inclusion {
+            proof_index,
+            head,
+            candidate_leaf: leaf_hash(candidate_entry),
+        }))
+    }
+
+    /// Return a single semantic verification capability for a consistency
+    /// Receipt. RFC 9942 requires the signature to be checked before the
+    /// consistency proof and uses the newer tree root as a detached payload.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256_consistency_state(
+        &self,
+        older: VdsTreeHead,
+        public_key: &[u8],
+        external_aad: &[u8],
+        detached_payload: Option<&[u8]>,
+    ) -> Result<Rfc9942VerifiedReceipt, Rfc9942VdpError> {
+        // RFC 9942 §5.3.1 defines the newer consistency root as a detached
+        // payload. Enforce that profile boundary before cryptographic
+        // verification, then preserve the required signature-first ordering.
+        if !matches!(self.payload, Rfc9942ReceiptPayload::Detached) {
+            return Err(Rfc9942VdpError::InvalidStructure);
         }
+        let payload = detached_payload.ok_or(Rfc9942VdpError::DetachedPayloadRequired)?;
+        self.verify_es256(public_key, external_aad, Some(payload))?;
+        self.vdp.validate_vds_id(self.vds_id)?;
+        let (proof_index, newer) =
+            self.vdp.verify_consistency_with_payload_index(older, payload)?;
+        Ok(self.verified_state(Rfc9942VerifiedProof::Consistency { proof_index, older, newer }))
     }
 
     pub fn signature1_tbs(
@@ -516,7 +718,7 @@ impl Rfc9942ReceiptEnvelope {
             let entry_start=ph.offset;
             let label_key=ph.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !protected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
-            let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Text(_)=>None };
+            let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_)=>None };
             match label{
                 Some(COSE_ALG_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if algorithm.replace(value).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
                 Some(RFC9942_VDS_HEADER_LABEL)=>{let value=ph.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;if value<0{return Err(Rfc9942VdpError::InvalidStructure);}if vds.replace(value as u64).is_some(){return Err(Rfc9942VdpError::InvalidStructure);}}
@@ -552,7 +754,7 @@ impl Rfc9942ReceiptEnvelope {
             let entry_start=reader.offset;
             let label_key=reader.read_cose_label_key().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
             if !unprotected_labels.insert(label_key.clone()) { return Err(Rfc9942VdpError::InvalidStructure); }
-            let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Text(_)=>None };
+            let label=match &label_key { CborLabelKey::Integer(value)=>Some(*value), CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_)=>None };
             if label==Some(COSE_CRIT_HEADER_LABEL){return Err(Rfc9942VdpError::CriticalHeaderNotProtected);}
             if label==Some(RFC9942_VDP_HEADER_LABEL){
                 if vdp.is_some(){return Err(Rfc9942VdpError::InvalidStructure);}
@@ -771,6 +973,68 @@ impl Rfc9942SignatureWithReceipts {
         self.verify_es256(&key.public_key_sec1(),external_aad,detached_payload)
     }
 
+    /// Verify an outer Signature_With_Receipt and one selected inclusion
+    /// Receipt as one semantic operation.
+    ///
+    /// The outer payload is used verbatim as the inclusion candidate, closing
+    /// the composition gap where a valid inner Receipt could otherwise be
+    /// verified for a different caller-supplied entry.
+    #[cfg(feature = "semantic-receipts")]
+    pub fn verify_es256_inclusion_receipt_state(
+        &self,
+        receipt_index: usize,
+        receipt_public_key: &[u8],
+        outer_public_key: &[u8],
+        receipt_external_aad: &[u8],
+        outer_external_aad: &[u8],
+        detached_outer_payload: Option<&[u8]>,
+    ) -> Result<Rfc9942VerifiedSignatureWithReceipt, Rfc9942VdpError> {
+        let (receipt, placement) = if let Some(receipts) = self.protected_receipts.as_ref() {
+            let receipt = receipts
+                .receipts()
+                .get(receipt_index)
+                .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
+            (receipt, Rfc9942ReceiptPlacement::Protected)
+        } else if let Some(receipts) = self.unprotected_receipts.as_ref() {
+            let receipt = receipts
+                .receipts()
+                .get(receipt_index)
+                .ok_or(Rfc9942VdpError::ReceiptIndexOutOfBounds)?;
+            (receipt, Rfc9942ReceiptPlacement::Unprotected)
+        } else {
+            return Err(Rfc9942VdpError::ReceiptsMissing);
+        };
+
+        let payload = match (&self.payload, detached_outer_payload) {
+            (Rfc9942SignaturePayload::Attached(bytes), None) => bytes.as_slice(),
+            (Rfc9942SignaturePayload::Attached(_), Some(_)) =>
+                return Err(Rfc9942VdpError::InvalidStructure),
+            (Rfc9942SignaturePayload::Detached, Some(bytes)) => bytes,
+            (Rfc9942SignaturePayload::Detached, None) =>
+                return Err(Rfc9942VdpError::DetachedPayloadRequired),
+        };
+
+        // Inner inclusion verification consumes the exact outer payload bytes.
+        // Its API verifies the proof before the inner Receipt signature.
+        let verified_receipt = receipt.verify_es256_inclusion_state(
+            payload,
+            receipt_public_key,
+            receipt_external_aad,
+            None,
+        )?;
+
+        // The outer signature authenticates those exact candidate bytes.
+        self.verify_es256(outer_public_key, outer_external_aad, detached_outer_payload)?;
+
+        Ok(Rfc9942VerifiedSignatureWithReceipt {
+            outer_algorithm_id: self.protected_algorithm_id()?,
+            outer_payload_sha256: sha256(payload),
+            receipt_index,
+            receipt_placement: placement,
+            receipt: verified_receipt,
+        })
+    }
+
     pub fn signature(&self) -> &[u8] {
         &self.signature
     }
@@ -860,7 +1124,7 @@ impl Rfc9942SignatureWithReceipts {
             }
             let label = match &label_key {
                 CborLabelKey::Integer(value) => Some(*value),
-                CborLabelKey::Text(_) => None,
+                CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_) => None,
             };
             if label == Some(RFC9942_RECEIPTS_HEADER_LABEL) {
                 if protected_receipts.is_some() {
@@ -917,7 +1181,7 @@ impl Rfc9942SignatureWithReceipts {
             }
             let label = match &label_key {
                 CborLabelKey::Integer(value) => Some(*value),
-                CborLabelKey::Text(_) => None,
+                CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_) => None,
             };
             if label == Some(COSE_CRIT_HEADER_LABEL) {
                 return Err(Rfc9942VdpError::CriticalHeaderNotProtected);
@@ -1133,6 +1397,10 @@ pub enum Rfc9942VdpError {
     EmptyReceiptCollection,
     #[error("RFC 9942 receipts collection exceeds its defensive resource bound")]
     ReceiptCollectionResourceLimitExceeded,
+    #[error("requested RFC 9942 receipt index is outside the receipt collection")]
+    ReceiptIndexOutOfBounds,
+    #[error("outer RFC 9942 Signature_With_Receipt does not carry receipts")]
+    ReceiptsMissing,
     #[error("outer RFC 9942 COSE_Sign1 payload exceeds its defensive resource bound")]
     SignaturePayloadResourceLimitExceeded,
     #[error("COSE signature algorithm {0} is not supported by this verifier")]
@@ -1258,6 +1526,15 @@ impl Rfc9942Vdp {
         candidate_entry: &[u8],
         payload: &[u8],
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.verify_inclusion_with_payload_index(candidate_entry, payload)
+            .map(|(_, head)| head)
+    }
+
+    fn verify_inclusion_with_payload_index(
+        &self,
+        candidate_entry: &[u8],
+        payload: &[u8],
+    ) -> Result<(usize, VdsTreeHead), Rfc9942VdpError> {
         if self.kind != Rfc9942ProofKind::Inclusion {
             return Err(Rfc9942VdpError::WrongProofKind);
         }
@@ -1267,11 +1544,38 @@ impl Rfc9942Vdp {
         let mut root = [0u8; 32];
         root.copy_from_slice(payload);
         let vds = Rfc9162Sha256Vds;
-        for proof_bytes in &self.proofs {
+        for (proof_index, proof_bytes) in self.proofs.iter().enumerate() {
             let proof = Rfc9162InclusionProof::from_cbor(proof_bytes)?;
             let head = VdsTreeHead::new(proof.tree_size, root);
             if vds.verify_inclusion(candidate_entry, root, &proof) {
-                return Ok(head);
+                return Ok((proof_index, head));
+            }
+        }
+        Err(Rfc9942VdpError::NoMatchingProof)
+    }
+
+    /// Derive the Merkle root directly from the inclusion proof and candidate
+    /// entry. This is the RFC 9942 inclusion ordering primitive: the proof is
+    /// evaluated first, and the resulting root becomes the COSE payload.
+    pub fn derive_inclusion_root(
+        &self,
+        candidate_entry: &[u8],
+    ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.derive_inclusion_root_index(candidate_entry)
+            .map(|(_, head)| head)
+    }
+
+    fn derive_inclusion_root_index(
+        &self,
+        candidate_entry: &[u8],
+    ) -> Result<(usize, VdsTreeHead), Rfc9942VdpError> {
+        if self.kind != Rfc9942ProofKind::Inclusion {
+            return Err(Rfc9942VdpError::WrongProofKind);
+        }
+        for (proof_index, proof_bytes) in self.proofs.iter().enumerate() {
+            let proof = Rfc9162InclusionProof::from_cbor(proof_bytes)?;
+            if let Some(root) = derive_rfc9162_inclusion_root(candidate_entry, &proof) {
+                return Ok((proof_index, VdsTreeHead::new(proof.tree_size, root)));
             }
         }
         Err(Rfc9942VdpError::NoMatchingProof)
@@ -1338,6 +1642,16 @@ impl Rfc9942Vdp {
         older: VdsTreeHead,
         payload: &[u8],
     ) -> Result<VdsTreeHead, Rfc9942VdpError> {
+        self.verify_consistency_with_payload_index(older, payload)
+            .map(|(_, newer)| newer)
+    }
+
+    fn verify_consistency_with_payload_index(
+        &self,
+        older: VdsTreeHead,
+        payload: &[u8],
+    ) -> Result<(usize, VdsTreeHead), Rfc9942VdpError> {
+
         if self.kind != Rfc9942ProofKind::Consistency {
             return Err(Rfc9942VdpError::WrongProofKind);
         }
@@ -1347,14 +1661,14 @@ impl Rfc9942Vdp {
         let mut root = [0u8; 32];
         root.copy_from_slice(payload);
         let vds = Rfc9162Sha256Vds;
-        for proof_bytes in &self.proofs {
+        for (proof_index, proof_bytes) in self.proofs.iter().enumerate() {
             let proof = Rfc9162ConsistencyProof::from_cbor(proof_bytes)?;
             if proof.first != older.tree_size() {
                 continue;
             }
             let newer = VdsTreeHead::new(proof.second, root);
             if vds.verify(older.root(), root, &proof) {
-                return Ok(newer);
+                return Ok((proof_index, newer));
             }
         }
         Err(Rfc9942VdpError::NoMatchingProof)
@@ -1588,6 +1902,10 @@ fn validate_cose_crit(
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum CborLabelKey {
     Integer(i64),
+    /// Positive CBOR labels above i64::MAX remain distinguishable from signed labels.
+    Unsigned(u64),
+    /// Negative CBOR labels below i64::MIN remain distinguishable from ordinary signed labels.
+    Negative(u64),
     Text(Vec<u8>),
 }
 
@@ -1672,26 +1990,6 @@ impl<'a> CborReader<'a> {
         Ok(bytes)
     }
 
-    fn read_bstr(&mut self) -> Result<Vec<u8>, Rfc9162ProofDecodeError> {
-        let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
-        self.offset+=1;
-        if initial>>5!=2 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
-        let ai=initial&0x1f;
-        let n=match ai {
-            0..=23=>ai as u64,
-            24=>self.read_uint(1,24)?,
-            25=>self.read_uint(2,256)?,
-            26=>self.read_uint(4,65_536)?,
-            27=>self.read_uint(8,4_294_967_296)?,
-            _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
-        };
-        let n=usize::try_from(n).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
-        let end=self.offset.checked_add(n).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
-        if end>self.bytes.len() { return Err(Rfc9162ProofDecodeError::UnexpectedEof); }
-        let bytes=self.bytes[self.offset..end].to_vec();
-        self.offset=end;
-        Ok(bytes)
-    }
     fn read_array_len(&mut self)->Result<usize,Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure) }
     fn read_bstr32(&mut self)->Result<[u8;32],Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=2{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; if n!=32{return Err(Rfc9162ProofDecodeError::InvalidHashLength)} let end=self.offset.checked_add(32).ok_or(Rfc9162ProofDecodeError::InvalidStructure)?; if end>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)} let mut out=[0u8;32]; out.copy_from_slice(&self.bytes[self.offset..end]); self.offset=end; Ok(out) }
     fn peek_major_type(&self) -> Result<u8, Rfc9162ProofDecodeError> {
@@ -1711,7 +2009,32 @@ impl<'a> CborReader<'a> {
 
     fn read_cose_label_key(&mut self) -> Result<CborLabelKey, Rfc9162ProofDecodeError> {
         match self.peek_major_type()? {
-            0 | 1 => self.read_i64().map(CborLabelKey::Integer),
+            0 => {
+                let value = self.read_u64()?;
+                match i64::try_from(value) {
+                    Ok(value) => Ok(CborLabelKey::Integer(value)),
+                    Err(_) => Ok(CborLabelKey::Unsigned(value)),
+                }
+            }
+            1 => {
+                let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                if initial>>5 != 1 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
+                self.offset+=1;
+                let ai=initial&0x1f;
+                let argument=match ai {
+                    0..=23=>ai as u64,
+                    24=>self.read_uint(1,24)?,
+                    25=>self.read_uint(2,256)?,
+                    26=>self.read_uint(4,65_536)?,
+                    27=>self.read_uint(8,4_294_967_296)?,
+                    _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                };
+                if argument <= i64::MAX as u64 {
+                    Ok(CborLabelKey::Integer(-(argument as i64) - 1))
+                } else {
+                    Ok(CborLabelKey::Negative(argument))
+                }
+            },
             3 => self.read_text_bounded(256).map(CborLabelKey::Text),
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
@@ -1720,7 +2043,7 @@ impl<'a> CborReader<'a> {
     fn read_cose_label(&mut self) -> Result<Option<i64>, Rfc9162ProofDecodeError> {
         match self.read_cose_label_key()? {
             CborLabelKey::Integer(value) => Ok(Some(value)),
-            CborLabelKey::Text(_) => Ok(None),
+            CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_) => Ok(None),
         }
     }
 
@@ -1728,13 +2051,47 @@ impl<'a> CborReader<'a> {
         if depth>16 { return Err(Rfc9162ProofDecodeError::InvalidStructure); }
         let major=self.peek_major_type()?;
         match major {
-            0 | 1 => { self.read_i64().map(|_|()) }
+            0 | 1 => { self.skip_integer().map(|_|()) }
             2 => { self.read_bstr_bounded(4096).map(|_|()) }
             3 => { self.read_text_bounded(4096).map(|_|()) }
             4 => { let n=self.read_array_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_value(depth+1)?;} Ok(()) },
             5 => { let n=self.read_map_len()?; if n>64{return Err(Rfc9162ProofDecodeError::InvalidStructure)} for _ in 0..n{self.skip_label()?;self.skip_value(depth+1)?;} Ok(()) },
             6 => { self.read_tag()?; self.skip_value(depth+1) },
-            7 => { let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; match initial {0xf4|0xf5|0xf6|0xf7=>{self.offset+=1;Ok(())},0xf9=>{self.take(3)?;Ok(())},0xfa=>{self.take(5)?;Ok(())},0xfb=>{self.take(9)?;Ok(())},_=>Err(Rfc9162ProofDecodeError::InvalidEncoding)} },
+            7 => {
+                let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                match initial {
+                    0xe0..=0xf7 => { self.offset+=1; Ok(()) },
+                    0xf8 => {
+                        self.offset+=1;
+                        let value=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                        if value < 0x20 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
+                        self.offset+=1;
+                        Ok(())
+                    },
+                    0xf9 => { self.take(3)?; Ok(()) },
+                    0xfa => { self.take(5)?; Ok(()) },
+                    0xfb => { self.take(9)?; Ok(()) },
+                    _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+                }
+            },
+            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        }
+    }
+
+    fn skip_integer(&mut self) -> Result<(), Rfc9162ProofDecodeError> {
+        let initial = *self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        let major = initial >> 5;
+        if major != 0 && major != 1 {
+            return Err(Rfc9162ProofDecodeError::InvalidEncoding);
+        }
+        self.offset += 1;
+        let ai = initial & 0x1f;
+        match ai {
+            0..=23 => Ok(()),
+            24 => { self.read_uint(1, 24)?; Ok(()) },
+            25 => { self.read_uint(2, 256)?; Ok(()) },
+            26 => { self.read_uint(4, 65_536)?; Ok(()) },
+            27 => { self.read_uint(8, 4_294_967_296)?; Ok(()) },
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }
     }
@@ -1753,10 +2110,21 @@ impl<'a> CborReader<'a> {
     fn finish(self)->Result<(),Rfc9162ProofDecodeError>{ if self.offset==self.bytes.len(){Ok(())}else{Err(Rfc9162ProofDecodeError::TrailingBytes)} }
 }
 
+fn rfc9162_ceil_log2(n: u64) -> usize {
+    if n <= 1 {
+        0
+    } else {
+        (u64::BITS - (n - 1).leading_zeros()) as usize
+    }
+}
+
 impl Rfc9162ConsistencyProof {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
         let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-        let first=r.read_u64()?; let second=r.read_u64()?; let n=r.read_array_len()?; if n>MAX_RFC9162_PROOF_PATH{return Err(Rfc9162ProofDecodeError::InvalidStructure)} let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
+        let first=r.read_u64()?; let second=r.read_u64()?; let n=r.read_array_len()?;
+        let max_path=rfc9162_ceil_log2(second).saturating_add(1);
+        if n>MAX_RFC9162_CONSISTENCY_PROOF_PATH || n>max_path{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+        let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
         if first==0 || first>=second || path.is_empty(){return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         Ok(Self::new(first,second,path))
     }
@@ -1765,7 +2133,10 @@ impl Rfc9162ConsistencyProof {
 impl Rfc9162InclusionProof {
     pub fn from_cbor(bytes: &[u8]) -> Result<Self, Rfc9162ProofDecodeError> {
         let mut r=CborReader::new(bytes); if r.read_array_len()? != 3{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
-        let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?; let n=r.read_array_len()?; if n>MAX_RFC9162_PROOF_PATH{return Err(Rfc9162ProofDecodeError::InvalidStructure)} let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
+        let tree_size=r.read_u64()?; let leaf_index=r.read_u64()?; let n=r.read_array_len()?;
+        let max_path=rfc9162_ceil_log2(tree_size);
+        if n>MAX_RFC9162_INCLUSION_PROOF_PATH || n>max_path{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
+        let mut path=Vec::with_capacity(n); for _ in 0..n{path.push(r.read_bstr32()?)} r.finish()?;
         if tree_size==0 || leaf_index>=tree_size{return Err(Rfc9162ProofDecodeError::InvalidStructure)}
         Ok(Self::new(tree_size,leaf_index,path))
     }
@@ -2090,18 +2461,22 @@ fn inclusion_path(index: usize, leaves: &[Vec<u8>]) -> Vec<[u8; 32]> {
     }
 }
 
-fn verify_rfc9162_inclusion(
+fn derive_rfc9162_inclusion_root(
     leaf: &[u8],
-    root: [u8; 32],
     proof: &Rfc9162InclusionProof,
-) -> bool {
-    if proof.tree_size == 0 || proof.leaf_index >= proof.tree_size { return false; }
+) -> Option<[u8; 32]> {
+    if proof.tree_size == 0 || proof.leaf_index >= proof.tree_size {
+        return None;
+    }
+
     let mut fn_ = proof.leaf_index;
     let mut sn = proof.tree_size - 1;
     let mut r = leaf_hash(leaf);
 
     for p in &proof.inclusion_path {
-        if sn == 0 { return false; }
+        if sn == 0 {
+            return None;
+        }
         if (fn_ & 1) == 1 || fn_ == sn {
             r = node_hash(p, &r);
             if fn_ & 1 == 0 {
@@ -2117,7 +2492,16 @@ fn verify_rfc9162_inclusion(
         sn >>= 1;
     }
 
-    sn == 0 && r == root
+    (sn == 0).then_some(r)
+}
+
+fn verify_rfc9162_inclusion(
+    leaf: &[u8],
+    root: [u8; 32],
+    proof: &Rfc9162InclusionProof,
+) -> bool {
+    derive_rfc9162_inclusion_root(leaf, proof)
+        .is_some_and(|derived_root| derived_root == root)
 }
 
 fn consistency_subproof(m: usize, leaves: &[Vec<u8>], complete: bool) -> Vec<[u8; 32]> {
@@ -2215,6 +2599,57 @@ mod tests {
     use super::*;
 
     #[test]
+    fn rfc9162_generated_inclusion_and_consistency_proofs_cover_all_small_shapes() {
+        let vds = Rfc9162Sha256Vds;
+
+        for tree_size in 1usize..=64 {
+            let leaves: Vec<Vec<u8>> = (0..tree_size)
+                .map(|i| format!("leaf-{i}").into_bytes())
+                .collect();
+            let newer = vds.tree_head(&leaves);
+
+            for leaf_index in 0..tree_size {
+                let proof = vds
+                    .inclusion_proof(&leaves, leaf_index)
+                    .expect("in-range inclusion proof");
+                assert!(
+                    vds.verify_inclusion(&leaves[leaf_index], newer.root(), &proof),
+                    "inclusion failed for tree_size={tree_size}, leaf_index={leaf_index}"
+                );
+            }
+
+            for first in 1usize..tree_size {
+                let older = vds.tree_head(&leaves[..first].to_vec());
+                let proof = vds.prove(&leaves, first).expect("strict extension proof");
+                assert!(
+                    vds.verify_tree_heads(older, newer, &proof),
+                    "consistency failed for first={first}, second={tree_size}, path_len={}",
+                    proof.consistency_path.len()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn inclusion_verification_and_root_derivation_share_one_walk() {
+        let vds = Rfc9162Sha256Vds;
+        for tree_size in 1usize..=32 {
+            let leaves: Vec<Vec<u8>> = (0..tree_size)
+                .map(|i| format!("leaf-{i}").into_bytes())
+                .collect();
+            let head = vds.tree_head(&leaves);
+            for leaf_index in 0..tree_size {
+                let proof = vds.inclusion_proof(&leaves, leaf_index).unwrap();
+                assert_eq!(
+                    derive_rfc9162_inclusion_root(&leaves[leaf_index], &proof),
+                    Some(head.root())
+                );
+                assert!(vds.verify_inclusion(&leaves[leaf_index], head.root(), &proof));
+            }
+        }
+    }
+
+    #[test]
     fn rfc9162_root_is_deterministic_and_order_sensitive() {
         let vds = Rfc9162Sha256Vds;
         let a = vec![b"a".to_vec(), b"b".to_vec(), b"c".to_vec()];
@@ -2243,6 +2678,25 @@ mod tests {
         assert_eq!(Rfc9162InclusionProof::from_cbor(&inclusion.to_cbor()).unwrap(), inclusion);
         let consistency = Rfc9162ConsistencyProof::new(20, 104, vec![[0x33; 32], [0x44; 32]]);
         assert_eq!(Rfc9162ConsistencyProof::from_cbor(&consistency.to_cbor()).unwrap(), consistency);
+    }
+
+    #[test]
+    fn rfc9162_consistency_decoder_accepts_maximal_u64_sized_path_bound() {
+        let mut bytes = vec![0x83, 0x01, 0x1b];
+        bytes.extend_from_slice(&u64::MAX.to_be_bytes());
+        bytes.push(0x98);
+        bytes.push(65);
+        for _ in 0..65 {
+            bytes.push(0x58);
+            bytes.push(0x20);
+            bytes.extend_from_slice(&[0xAA; 32]);
+        }
+
+        let decoded = Rfc9162ConsistencyProof::from_cbor(&bytes)
+            .expect("RFC 9162 permits up to ceil(log2(n)) + 1 consistency nodes");
+        assert_eq!(decoded.first, 1);
+        assert_eq!(decoded.second, u64::MAX);
+        assert_eq!(decoded.consistency_path.len(), 65);
     }
 
     #[test]
@@ -2868,15 +3322,16 @@ mod tests {
         let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Consistency,vec![proof]).unwrap();
 
         let unsigned=Rfc9942ReceiptEnvelope::new(
-            COSE_EDDSA_ALGORITHM_ID,vdp,Rfc9942ReceiptPayload::Attached(newer.root()),Vec::new()
+            COSE_EDDSA_ALGORITHM_ID,vdp,Rfc9942ReceiptPayload::Detached,Vec::new()
         ).unwrap();
-        let signature=signing_key.sign(&unsigned.signature1_tbs(b"",None).unwrap()).to_bytes().to_vec();
+        let root=newer.root();
+        let signature=signing_key.sign(&unsigned.signature1_tbs(b"",Some(&root)).unwrap()).to_bytes().to_vec();
         let receipt=Rfc9942ReceiptEnvelope::new(
             COSE_EDDSA_ALGORITHM_ID,unsigned.vdp().clone(),unsigned.payload().clone(),signature
         ).unwrap();
         assert_eq!(
             receipt.verify_ed25519_consistency(
-                older,signing_key.verifying_key().as_bytes(),b"",None
+                older,signing_key.verifying_key().as_bytes(),b"",Some(&root)
             ).unwrap(),
             newer
         );
@@ -2885,10 +3340,10 @@ mod tests {
         let invalid_unsigned=Rfc9942ReceiptEnvelope::new(
             COSE_EDDSA_ALGORITHM_ID,
             receipt.vdp().clone(),
-            Rfc9942ReceiptPayload::Attached(wrong_root),
+            Rfc9942ReceiptPayload::Detached,
             Vec::new(),
         ).unwrap();
-        let invalid_signature=signing_key.sign(&invalid_unsigned.signature1_tbs(b"",None).unwrap()).to_bytes().to_vec();
+        let invalid_signature=signing_key.sign(&invalid_unsigned.signature1_tbs(b"",Some(&wrong_root)).unwrap()).to_bytes().to_vec();
         let cryptographically_valid_but_inconsistent=Rfc9942ReceiptEnvelope::new(
             COSE_EDDSA_ALGORITHM_ID,
             invalid_unsigned.vdp().clone(),
@@ -2897,7 +3352,7 @@ mod tests {
         ).unwrap();
         assert_eq!(
             cryptographically_valid_but_inconsistent.verify_ed25519_consistency(
-                older,signing_key.verifying_key().as_bytes(),b"",None
+                older,signing_key.verifying_key().as_bytes(),b"",Some(&wrong_root)
             ),
             Err(Rfc9942VdpError::NoMatchingProof)
         );
@@ -2909,7 +3364,7 @@ mod tests {
         ).unwrap();
         assert_eq!(
             forged.verify_ed25519_consistency(
-                older,signing_key.verifying_key().as_bytes(),b"",None
+                older,signing_key.verifying_key().as_bytes(),b"",Some(&root)
             ),
             Err(Rfc9942VdpError::InvalidEd25519Signature)
         );
@@ -3573,4 +4028,370 @@ mod tests {
         assert_ne!(ConsistencyStatus::Unsupported, ConsistencyStatus::Invalid);
         assert_ne!(ConsistencyStatus::Unsupported, ConsistencyStatus::Valid);
     }
+    #[test]
+    fn rfc9942_semantic_adversarial_wire_matrix() {
+        // Keep this matrix at the wire boundary: every mutation is applied to
+        // an otherwise valid RFC 9942 Receipt so a passing parser cannot rely
+        // on constructor invariants alone.
+        let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, 2);
+        cbor_int(&mut protected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected, RFC9162_VDS_ID);
+
+        let mut valid = Vec::new();
+        cbor_tag(&mut valid, COSE_SIGN1_TAG);
+        cbor_array_len(&mut valid, 4);
+        cbor_bytes(&mut valid, &protected);
+        cbor_map_len(&mut valid, 1);
+        cbor_int(&mut valid, RFC9942_VDP_HEADER_LABEL);
+        valid.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut valid, &[0x22; 32]);
+        cbor_bytes(&mut valid, &[0xAA; 64]);
+
+        let decoded = Rfc9942ReceiptEnvelope::from_cbor(&valid).unwrap();
+        assert_eq!(decoded.algorithm_id(), COSE_ES256_ALGORITHM_ID);
+        assert_eq!(decoded.vds_id(), RFC9162_VDS_ID);
+
+        // alg moved to the unprotected bucket: RFC 9942 requires it in
+        // protected, and the implementation must not silently apply
+        // unprotected precedence.
+        let mut alg_unprotected = Vec::new();
+        cbor_tag(&mut alg_unprotected, COSE_SIGN1_TAG);
+        cbor_array_len(&mut alg_unprotected, 4);
+        let mut protected_without_alg = Vec::new();
+        cbor_map_len(&mut protected_without_alg, 1);
+        cbor_int(&mut protected_without_alg, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected_without_alg, RFC9162_VDS_ID);
+        cbor_bytes(&mut alg_unprotected, &protected_without_alg);
+        cbor_map_len(&mut alg_unprotected, 2);
+        cbor_int(&mut alg_unprotected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut alg_unprotected, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut alg_unprotected, RFC9942_VDP_HEADER_LABEL);
+        alg_unprotected.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut alg_unprotected, &[0x22; 32]);
+        cbor_bytes(&mut alg_unprotected, &[0xAA; 64]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&alg_unprotected),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        // vds moved to the unprotected bucket must not become an implicit
+        // semantic binding for the proof.
+        let mut vds_unprotected = Vec::new();
+        cbor_tag(&mut vds_unprotected, COSE_SIGN1_TAG);
+        cbor_array_len(&mut vds_unprotected, 4);
+        let mut protected_without_vds = Vec::new();
+        cbor_map_len(&mut protected_without_vds, 1);
+        cbor_int(&mut protected_without_vds, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected_without_vds, COSE_ES256_ALGORITHM_ID);
+        cbor_bytes(&mut vds_unprotected, &protected_without_vds);
+        cbor_map_len(&mut vds_unprotected, 2);
+        cbor_int(&mut vds_unprotected, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut vds_unprotected, RFC9162_VDS_ID);
+        cbor_int(&mut vds_unprotected, RFC9942_VDP_HEADER_LABEL);
+        vds_unprotected.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut vds_unprotected, &[0x22; 32]);
+        cbor_bytes(&mut vds_unprotected, &[0xAA; 64]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&vds_unprotected),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        // vdp is a COSE unprotected parameter; moving it into protected must
+        // not create an alternate parsing path.
+        let mut vdp_protected = Vec::new();
+        cbor_tag(&mut vdp_protected, COSE_SIGN1_TAG);
+        cbor_array_len(&mut vdp_protected, 4);
+        let mut protected_with_vdp = Vec::new();
+        cbor_map_len(&mut protected_with_vdp, 3);
+        cbor_int(&mut protected_with_vdp, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected_with_vdp, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected_with_vdp, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected_with_vdp, RFC9162_VDS_ID);
+        cbor_int(&mut protected_with_vdp, RFC9942_VDP_HEADER_LABEL);
+        protected_with_vdp.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut vdp_protected, &protected_with_vdp);
+        cbor_map_len(&mut vdp_protected, 0);
+        cbor_bytes(&mut vdp_protected, &[0x22; 32]);
+        cbor_bytes(&mut vdp_protected, &[0xAA; 64]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&vdp_protected),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        // A proof of the wrong registered type must not be accepted as the
+        // requested inclusion proof.
+        let consistency = Rfc9942Vdp::new(
+            Rfc9942ProofKind::Consistency,
+            vec![Rfc9162ConsistencyProof::new(1, 2, vec![[0x33; 32]]).to_cbor()],
+        )
+        .unwrap();
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::new(
+                COSE_ES256_ALGORITHM_ID,
+                consistency,
+                Rfc9942ReceiptPayload::Attached([0x22; 32]),
+                vec![0xAA; 64],
+            )
+            .unwrap()
+            .verify_inclusion(b"candidate"),
+            Err(Rfc9942VdpError::WrongProofKind)
+        );
+
+        // Attached payload is part of the proof binding; a valid-looking
+        // 32-byte root with different bytes must fail.
+        let proof_receipt = Rfc9942ReceiptEnvelope::from_cbor(&valid).unwrap();
+        assert_eq!(
+            proof_receipt.verify_inclusion(b"candidate"),
+            Err(Rfc9942VdpError::NoMatchingProof)
+        );
+
+        // Receipt arrays are priority ordered, not sets: reversing them must
+        // survive a wire round trip without normalization.
+        let first = Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp.clone(),
+            Rfc9942ReceiptPayload::Attached([0x22; 32]),
+            vec![0x01; 64],
+        ).unwrap();
+        let second = Rfc9942ReceiptEnvelope::new(
+            COSE_EDDSA_ALGORITHM_ID,
+            vdp,
+            Rfc9942ReceiptPayload::Detached,
+            vec![0x02; 64],
+        ).unwrap();
+        let forward = Rfc9942ReceiptCollection::new(vec![first.clone(), second.clone()]).unwrap();
+        let reverse = Rfc9942ReceiptCollection::new(vec![second.clone(), first.clone()]).unwrap();
+        assert_ne!(forward.to_cbor(), reverse.to_cbor());
+        assert_eq!(
+            Rfc9942ReceiptCollection::from_cbor(&reverse.to_cbor()).unwrap().receipts(),
+            &[second, first]
+        );
+    }
+
+
+    #[test]
+    fn rfc9942_outer_receipts_preserve_protected_placement_and_reject_conflicts() {
+        let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x44; 32]]).to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+        let receipt = Rfc9942ReceiptEnvelope::new(
+            COSE_ES256_ALGORITHM_ID,
+            vdp,
+            Rfc9942ReceiptPayload::Attached([0x55; 32]),
+            vec![0x66; 64],
+        ).unwrap();
+        let collection = Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
+        let collection_cbor = collection.to_cbor();
+
+        // RFC 9942 permits header 394 in either protected or unprotected
+        // headers. A protected placement must remain protected after parsing
+        // rather than being normalized into the unprotected representation.
+        let mut protected_outer = Vec::new();
+        cbor_map_len(&mut protected_outer, 1);
+        cbor_int(&mut protected_outer, RFC9942_RECEIPTS_HEADER_LABEL);
+        protected_outer.extend_from_slice(&collection_cbor);
+
+        let mut protected_wire = Vec::new();
+        cbor_tag(&mut protected_wire, COSE_SIGN1_TAG);
+        cbor_array_len(&mut protected_wire, 4);
+        cbor_bytes(&mut protected_wire, &protected_outer);
+        cbor_map_len(&mut protected_wire, 0);
+        cbor_bytes(&mut protected_wire, b"payload");
+        cbor_bytes(&mut protected_wire, &[0x77; 64]);
+
+        let decoded = Rfc9942SignatureWithReceipts::from_cbor(&protected_wire).unwrap();
+        assert!(decoded.protected_receipts().is_some());
+        assert!(decoded.unprotected_receipts().is_none());
+        assert_eq!(decoded.receipts().unwrap().receipts().len(), 1);
+        assert_eq!(decoded.to_cbor(), protected_wire);
+
+        // The same 394 label in both buckets is rejected instead of relying on
+        // COSE precedence semantics that could make the signed meaning differ
+        // from the selected receipt collection.
+        let mut conflicting = Vec::new();
+        cbor_tag(&mut conflicting, COSE_SIGN1_TAG);
+        cbor_array_len(&mut conflicting, 4);
+        cbor_bytes(&mut conflicting, &protected_outer);
+        cbor_map_len(&mut conflicting, 1);
+        cbor_int(&mut conflicting, RFC9942_RECEIPTS_HEADER_LABEL);
+        conflicting.extend_from_slice(&collection_cbor);
+        cbor_bytes(&mut conflicting, b"payload");
+        cbor_bytes(&mut conflicting, &[0x77; 64]);
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&conflicting),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+    }
+
+    #[test]
+    fn rfc9942_outer_receipts_require_nonempty_tagged_receipt_items() {
+        let mut empty = Vec::new();
+        cbor_tag(&mut empty, COSE_SIGN1_TAG);
+        cbor_array_len(&mut empty, 4);
+        cbor_bytes(&mut empty, &[]);
+        cbor_map_len(&mut empty, 0);
+        cbor_bytes(&mut empty, b"payload");
+        cbor_bytes(&mut empty, &[0x88; 64]);
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&empty),
+            Err(Rfc9942VdpError::EmptyReceiptCollection)
+        );
+
+        // Each array element is a bstr containing a tagged COSE_Sign1 Receipt.
+        // A structurally plausible but untagged COSE_Sign1 must not be admitted
+        // through the outer receipt collection boundary.
+        let untagged = vec![0x84, 0x40, 0xa0, 0xf6, 0x40];
+        let mut collection = Vec::new();
+        cbor_array_len(&mut collection, 1);
+        cbor_bytes(&mut collection, &untagged);
+        assert_eq!(
+            Rfc9942ReceiptCollection::from_cbor(&collection),
+            Err(Rfc9942VdpError::InvalidReceiptStructure)
+        );
+    }
+
+
+    #[test]
+    fn rfc9942_registry_and_required_field_boundaries_fail_closed() {
+        let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x99; 32]]).to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+        fn receipt_wire(protected: &[u8], unprotected: &[u8]) -> Vec<u8> {
+            let mut out = Vec::new();
+            cbor_tag(&mut out, COSE_SIGN1_TAG);
+            cbor_array_len(&mut out, 4);
+            cbor_bytes(&mut out, protected);
+            out.extend_from_slice(unprotected);
+            cbor_bytes(&mut out, &[0x11; 32]);
+            cbor_bytes(&mut out, &[0x22; 64]);
+            out
+        }
+
+        let mut good_protected = Vec::new();
+        cbor_map_len(&mut good_protected, 2);
+        cbor_int(&mut good_protected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut good_protected, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut good_protected, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut good_protected, RFC9162_VDS_ID);
+
+        let mut good_unprotected = Vec::new();
+        cbor_map_len(&mut good_unprotected, 1);
+        cbor_int(&mut good_unprotected, RFC9942_VDP_HEADER_LABEL);
+        good_unprotected.extend_from_slice(&vdp.to_cbor());
+
+        assert!(Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&good_protected, &good_unprotected)).is_ok());
+
+        let mut unknown_vds = good_protected.clone();
+        let vds_pos = unknown_vds
+            .windows(4)
+            .position(|w| w == [0x19, 0x01, 0x8b, 0x01])
+            .expect("vds label/value fixture");
+        unknown_vds[vds_pos + 3] = 0x02;
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&unknown_vds, &good_unprotected)),
+            Err(Rfc9942VdpError::VdsMismatch(2))
+        );
+
+        let mut unknown_vdp = Vec::new();
+        cbor_map_len(&mut unknown_vdp, 1);
+        cbor_int(&mut unknown_vdp, RFC9942_VDP_HEADER_LABEL);
+        cbor_map_len(&mut unknown_vdp, 1);
+        cbor_int(&mut unknown_vdp, -3);
+        cbor_array_len(&mut unknown_vdp, 1);
+        cbor_bytes(&mut unknown_vdp, &[0x80]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&good_protected, &unknown_vdp)),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        let mut missing_alg = Vec::new();
+        cbor_map_len(&mut missing_alg, 1);
+        cbor_int(&mut missing_alg, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut missing_alg, RFC9162_VDS_ID);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&missing_alg, &good_unprotected)),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        let mut missing_vds = Vec::new();
+        cbor_map_len(&mut missing_vds, 1);
+        cbor_int(&mut missing_vds, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut missing_vds, COSE_ES256_ALGORITHM_ID);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&missing_vds, &good_unprotected)),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+
+        let mut missing_vdp = Vec::new();
+        cbor_map_len(&mut missing_vdp, 0);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&receipt_wire(&good_protected, &missing_vdp)),
+            Err(Rfc9942VdpError::InvalidStructure)
+        );
+    }
+
+
+    #[test]
+    fn rfc9942_crit_header_binding_is_fail_closed() {
+        let proof = Rfc9162InclusionProof::new(2, 0, vec![[0xAA; 32]]).to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+        let mut protected_unknown_crit = Vec::new();
+        cbor_map_len(&mut protected_unknown_crit, 3);
+        cbor_int(&mut protected_unknown_crit, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected_unknown_crit, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected_unknown_crit, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected_unknown_crit, RFC9162_VDS_ID);
+        cbor_int(&mut protected_unknown_crit, COSE_CRIT_HEADER_LABEL);
+        cbor_array_len(&mut protected_unknown_crit, 1);
+        cbor_int(&mut protected_unknown_crit, 999);
+
+        let mut unprotected = Vec::new();
+        cbor_map_len(&mut unprotected, 1);
+        cbor_int(&mut unprotected, RFC9942_VDP_HEADER_LABEL);
+        unprotected.extend_from_slice(&vdp.to_cbor());
+        let mut wire = Vec::new();
+        cbor_tag(&mut wire, COSE_SIGN1_TAG);
+        cbor_array_len(&mut wire, 4);
+        cbor_bytes(&mut wire, &protected_unknown_crit);
+        wire.extend_from_slice(&unprotected);
+        cbor_bytes(&mut wire, &[0x11; 32]);
+        cbor_bytes(&mut wire, &[0x22; 64]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&wire),
+            Err(Rfc9942VdpError::CriticalHeaderNotUnderstood)
+        );
+
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, 2);
+        cbor_int(&mut protected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected, RFC9162_VDS_ID);
+        let mut unprotected_crit = Vec::new();
+        cbor_map_len(&mut unprotected_crit, 2);
+        cbor_int(&mut unprotected_crit, COSE_CRIT_HEADER_LABEL);
+        cbor_array_len(&mut unprotected_crit, 1);
+        cbor_int(&mut unprotected_crit, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut unprotected_crit, RFC9942_VDP_HEADER_LABEL);
+        unprotected_crit.extend_from_slice(&vdp.to_cbor());
+        let mut wire = Vec::new();
+        cbor_tag(&mut wire, COSE_SIGN1_TAG);
+        cbor_array_len(&mut wire, 4);
+        cbor_bytes(&mut wire, &protected);
+        wire.extend_from_slice(&unprotected_crit);
+        cbor_bytes(&mut wire, &[0x11; 32]);
+        cbor_bytes(&mut wire, &[0x22; 64]);
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&wire),
+            Err(Rfc9942VdpError::CriticalHeaderNotProtected)
+        );
+    }
+
+
 }
