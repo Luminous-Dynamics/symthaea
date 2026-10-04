@@ -14,6 +14,7 @@ pub mod animal;
 pub mod artifact;
 pub mod benchmark;
 pub mod human;
+pub mod interlingua;
 pub mod metrics;
 pub mod neurosemantic;
 pub mod pilot;
