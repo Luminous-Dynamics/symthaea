@@ -10,7 +10,6 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 pub const HDC_CODEC_SCHEMA_VERSION: u16 = 1;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HdcCodecDescriptor {
     pub schema_version: u16,
@@ -47,6 +46,7 @@ impl HdcCodecDescriptor {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HdcQuantizationMetrics {
     pub schema_version: u16,
     pub dimension: usize,
@@ -154,10 +154,7 @@ pub fn quantize_continuous(
         .values
         .iter()
         .zip(&reconstructed.values)
-        .filter(|(original, quantized)| {
-            ((**original > 0.0) != (**quantized > 0.0))
-                || (**original == 0.0 && **quantized > 0.0)
-        })
+        .filter(|(original, quantized)| (**original > 0.0) != (**quantized > 0.0))
         .count() as f64
         / continuous.values.len() as f64;
 
