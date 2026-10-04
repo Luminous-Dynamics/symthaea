@@ -1409,6 +1409,12 @@ fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
     let mut total_factor_tuple_candidates = 0usize;
     let mut singleton_codeword_observations = 0usize;
     let mut ambiguous_codeword_observations = 0usize;
+    let unique_decoding_radius = (min_distance - 1) / 2;
+    assert_eq!(unique_decoding_radius, 1);
+    let mut subhalf_observations = 0usize;
+    let mut subhalf_singleton_observations = 0usize;
+    let mut boundary_observations = 0usize;
+    let mut boundary_ambiguous_observations = 0usize;
 
     for mask in 0..(1usize << 8) {
         if mask.count_ones() > 2 {
@@ -1443,6 +1449,17 @@ fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
             factor_tuple_candidates,
             candidates.len() * fiber_multiplicity
         );
+        if error_weight <= unique_decoding_radius {
+            subhalf_observations += 1;
+            assert_eq!(candidates.len(), 1);
+            subhalf_singleton_observations += 1;
+        } else if error_weight == min_distance / 2 {
+            boundary_observations += 1;
+            if candidates.len() > 1 {
+                boundary_ambiguous_observations += 1;
+            }
+        }
+
         observations += 1;
         total_candidate_codewords += candidates.len();
         max_candidate_codewords = max_candidate_codewords.max(candidates.len());
@@ -1462,13 +1479,19 @@ fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
     assert!(singleton_codeword_observations > 0);
     assert!(ambiguous_codeword_observations > 0);
     assert!(max_candidate_codewords >= 2);
+    assert!(subhalf_observations > 1);
+    assert_eq!(subhalf_observations, 9);
+    assert_eq!(subhalf_singleton_observations, subhalf_observations);
+    assert_eq!(boundary_observations, 28);
+    assert!(boundary_ambiguous_observations > 0);
+    assert_eq!(boundary_ambiguous_observations, 12);
     assert_eq!(
         total_factor_tuple_candidates,
         total_candidate_codewords * fiber_multiplicity
     );
 
     println!(
-        "NOISY_LIST_LEDGER=dimension=8;rank=2;factors=3;radius=2;min_distance={min_distance};observations={observations};singleton_codeword_observations={singleton_codeword_observations};ambiguous_codeword_observations={ambiguous_codeword_observations};total_candidate_codewords={total_candidate_codewords};max_candidate_codewords={max_candidate_codewords};fiber_multiplicity=2^{};total_factor_tuple_candidates={total_factor_tuple_candidates}",
+        "NOISY_LIST_LEDGER=dimension=8;rank=2;factors=3;radius=2;min_distance={min_distance};unique_radius={unique_decoding_radius};observations={observations};subhalf_observations={subhalf_observations};subhalf_singleton_observations={subhalf_singleton_observations};boundary_observations={boundary_observations};boundary_ambiguous_observations={boundary_ambiguous_observations};singleton_codeword_observations={singleton_codeword_observations};ambiguous_codeword_observations={ambiguous_codeword_observations};total_candidate_codewords={total_candidate_codewords};max_candidate_codewords={max_candidate_codewords};fiber_multiplicity=2^{};total_factor_tuple_candidates={total_factor_tuple_candidates}",
         algebra.kernel_dimension,
     );
 }
