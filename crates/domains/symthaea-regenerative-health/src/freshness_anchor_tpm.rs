@@ -202,7 +202,7 @@ mod tests {
             verifier_policy_digest: "verifier-policy".into(),
             reference_values_digest: "reference-values".into(),
             trust_anchor_set_digest: "trust-anchors".into(),
-            freshness_handle_digest: "receipt-handle".into(),
+            freshness_handle_digest: "quote-handle".into(),
             evidence_reference: "evidence".into(),
             evidence_digest: "evidence-digest".into(),
             evidence_kind: FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
@@ -241,6 +241,18 @@ mod tests {
         assert_eq!(
             verify_tpm_nv_counter(&evidence, &profile(), &receipt, &Accept).unwrap_err(),
             TpmNvCounterVerificationError::CounterGenerationMismatch
+        );
+    }
+
+    #[test]
+    fn quote_handle_must_match_receipt_handle() {
+        let evidence = evidence(7);
+        let mut receipt = receipt(7);
+        receipt.freshness_handle_digest = "different-handle".into();
+
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt, &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::HandleMismatch
         );
     }
 
