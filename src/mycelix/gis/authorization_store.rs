@@ -1499,7 +1499,7 @@ impl SqliteAuthorizationStore {
                         params![key, value],
                     )?;
                 }
-            }
+            },
             (Some(id), Some(digest), _, _, _) => {
                 return Err(AuthorizationStoreError::InvalidState(format!(
                     "provider status verifier mismatch: pinned {id}/{digest}"
