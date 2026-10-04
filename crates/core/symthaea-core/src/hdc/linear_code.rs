@@ -536,7 +536,7 @@ pub fn recover_linear_bound_with_work(
     let mut independent_basis = Vec::new();
     let mut owners = Vec::new();
 
-    for (factor_index, factor) in factors.iter().enumerate() {
+    for factor in factors.iter() {
         for generator in factor.basis() {
             if extends_span_with_work(&independent_basis, generator, &mut work) {
                 independent_basis.push(generator.clone());
@@ -672,11 +672,64 @@ pub struct LinearCodeDependencyWitness {
 
 impl LinearCodeDependencyWitness {
     pub fn generator_support_size(&self) -> usize {
-        self.generator_coefficients.iter().filter(|bit| **bit).count()
+        self.generator_coefficients
+            .iter()
+            .filter(|bit| **bit)
+            .count()
     }
 
     pub fn factor_support_size(&self) -> usize {
         self.factor_support.len()
+    }
+
+    /// Verify the witness against the ordered factor generator presentation.
+    ///
+    /// The coefficient vector must be non-zero, have exactly one slot per
+    /// supplied generator, identify the declared factor support, and XOR to
+    /// the zero word.
+    pub fn verifies_against(&self, factors: &[&RandomLinearCode]) -> bool {
+        if factors.is_empty() {
+            return false;
+        }
+        let dimension = factors[0].dimension();
+        if factors.iter().any(|factor| factor.dimension() != dimension) {
+            return false;
+        }
+        let total_rank = factors.iter().map(|factor| factor.rank()).sum::<usize>();
+        if self.generator_coefficients.len() != total_rank
+            || self.generator_coefficients.iter().all(|bit| !*bit)
+        {
+            return false;
+        }
+
+        let offsets = factor_offsets(factors);
+        let expected_support = factors
+            .iter()
+            .enumerate()
+            .filter_map(|(index, _)| {
+                let start = offsets[index];
+                let end = offsets[index + 1];
+                self.generator_coefficients[start..end]
+                    .iter()
+                    .any(|bit| *bit)
+                    .then_some(index)
+            })
+            .collect::<Vec<_>>();
+        if expected_support != self.factor_support || expected_support.len() < 2 {
+            return false;
+        }
+
+        let mut sum = BinaryCodeword::zero(dimension);
+        for (&coefficient, generator) in self.generator_coefficients.iter().zip(
+            factors
+                .iter()
+                .flat_map(|factor| factor.basis().iter()),
+        ) {
+            if coefficient {
+                sum.xor_assign(generator);
+            }
+        }
+        sum == BinaryCodeword::zero(dimension)
     }
 }
 /// Compute exact rank/nullity and multiplicity structure for a factor tuple.
@@ -788,7 +841,6 @@ pub fn factorization_dependency_witness(
                     return None;
                 }
 
-                let _ = factor_index;
                 return Some(LinearCodeDependencyWitness {
                     generator_coefficients: coefficients,
                     factor_support,
