@@ -778,8 +778,9 @@ pub fn factorization_algebra(factors: &[&RandomLinearCode]) -> Option<LinearCode
 ///
 /// One witness is emitted for every generator that fails the maximal-independent-prefix
 /// construction. Each witness therefore has a distinct dependent-generator coordinate, so the
-/// witnesses are linearly independent and span the complete kernel. The basis is canonical relative
-/// to the ordered factor-generator presentation. It is not a minimum-weight dependency basis.
+/// witnesses are linearly independent and span the complete kernel. The basis is canonical
+/// relative to the ordered factor-generator presentation. It is not a minimum-weight dependency
+/// basis.
 pub fn factorization_kernel_basis(
     factors: &[&RandomLinearCode],
 ) -> Option<Vec<LinearCodeDependencyWitness>> {
@@ -848,6 +849,7 @@ pub fn factorization_dependency_witness(
 ) -> Option<LinearCodeDependencyWitness> {
     factorization_kernel_basis(factors)?.into_iter().next()
 }
+
 fn factor_offsets(factors: &[&RandomLinearCode]) -> Vec<usize> {
     let mut offsets = Vec::with_capacity(factors.len() + 1);
     offsets.push(0);
