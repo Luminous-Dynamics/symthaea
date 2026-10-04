@@ -1732,12 +1732,22 @@ impl Rfc9942Vdp {
     }
 
     fn from_reader(reader: &mut CborReader<'_>) -> Result<Self, Rfc9942VdpError> {
-        let map_len=reader.read_map_len().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
-        if map_len!=1{return Err(Rfc9942VdpError::InvalidStructure);}
-        let label=reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        let entries=reader.read_map_entries_bounded(1)
+            .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        if entries.len()!=1{return Err(Rfc9942VdpError::InvalidStructure);}
+
+        let (label_bytes,value_bytes)=&entries[0];
+        let mut label_reader=CborReader::new(label_bytes);
+        let label=label_reader.read_i64().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        label_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         let kind=Rfc9942ProofKind::from_label(label).ok_or(Rfc9942VdpError::InvalidStructure)?;
-        let items=reader.read_array_items_bounded(MAX_RFC9942_PROOFS).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+
+        let mut value_reader=CborReader::new(value_bytes);
+        let items=value_reader.read_array_items_bounded(MAX_RFC9942_PROOFS)
+            .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+        value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         if items.is_empty(){return Err(Rfc9942VdpError::EmptyProofCollection);}
+
         let mut proofs=Vec::with_capacity(items.len());
         for item in items{
             let mut item_reader=CborReader::new(&item);
@@ -2009,6 +2019,56 @@ impl<'a> CborReader<'a> {
             _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding),
         };
         usize::try_from(n).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)
+    }
+
+    fn read_map_entries_bounded(
+        &mut self,
+        max_entries: usize,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Rfc9162ProofDecodeError> {
+        let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        self.offset+=1;
+        if initial>>5!=5 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
+        let ai=initial&0x1f;
+        let count=match ai {
+            31 => None,
+            0..=23 => Some(ai as usize),
+            24 => Some(usize::try_from(self.read_uint(1,24)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            25 => Some(usize::try_from(self.read_uint(2,256)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            26 => Some(usize::try_from(self.read_uint(4,65_536)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            27 => Some(usize::try_from(self.read_uint(8,4_294_967_296)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        };
+
+        if count.is_some_and(|count| count > max_entries) {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+
+        let mut entries=Vec::with_capacity(count.unwrap_or(max_entries.min(8)));
+        loop {
+            if let Some(remaining)=count {
+                if entries.len()==remaining {
+                    return Ok(entries);
+                }
+            } else if self.bytes.get(self.offset).copied()==Some(0xff) {
+                self.offset+=1;
+                return Ok(entries);
+            }
+
+            if entries.len()>=max_entries {
+                return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            }
+
+            let key_start=self.offset;
+            self.skip_value(0)?;
+            let key_end=self.offset;
+            let value_start=self.offset;
+            self.skip_value(0)?;
+            let value_end=self.offset;
+            entries.push((
+                self.bytes[key_start..key_end].to_vec(),
+                self.bytes[value_start..value_end].to_vec(),
+            ));
+        }
     }
 
     fn read_bstr_bounded(&mut self, max_len: usize) -> Result<Vec<u8>, Rfc9162ProofDecodeError> {
@@ -3181,6 +3241,30 @@ mod tests {
         assert_eq!(vdp.verify_inclusion_for_vds_with_payload(1,b"a",&head.root()).unwrap(),head);
         assert_eq!(vdp.verify_inclusion_for_vds_with_payload(2,b"a",&head.root()),Err(Rfc9942VdpError::VdsMismatch(2)));
         assert_eq!(vdp.verify_inclusion_for_vds_with_payload(1,b"a",&[0xAA;32]),Err(Rfc9942VdpError::NoMatchingProof));
+    }
+
+    #[test]
+    fn rfc9942_vdp_accepts_indefinite_map() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let canonical=vdp.to_cbor();
+        let mut encoded=vec![0xbf,0x20];
+        encoded.extend_from_slice(&canonical[2..]);
+        encoded.push(0xff);
+        assert_eq!(Rfc9942Vdp::from_cbor(&encoded).unwrap(),vdp);
+    }
+
+    #[test]
+    fn rfc9942_vdp_rejects_indefinite_map_without_break() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let canonical=vdp.to_cbor();
+        let mut encoded=vec![0xbf,0x20];
+        encoded.extend_from_slice(&canonical[2..]);
+        assert_eq!(
+            Rfc9942Vdp::from_cbor(&encoded),
+            Err(Rfc9942VdpError::InvalidEncoding)
+        );
     }
 
     #[test]
