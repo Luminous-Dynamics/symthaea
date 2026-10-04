@@ -128,11 +128,36 @@ impl CanonicalAdmissionReceipt {
         })
     }
 
+    /// Validate the receipt fields before they are used as an admission binding.
+    ///
+    /// This is intentionally structural: it checks the receipt's own envelope but does
+    /// not assert that the admission event was authentically authored.
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        if self.admission_event.trim().is_empty() {
+            return Err("admission event must be non-empty");
+        }
+        if self.frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
+            return Err("frontier reference must be non-empty when present");
+        }
+        if !is_hex_digest(&self.provenance_snapshot_digest) {
+            return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
+        }
+        if self.validator_version.trim().is_empty() {
+            return Err("validator version must be non-empty");
+        }
+        if self.snapshot_schema_version != PROVENANCE_SNAPSHOT_SCHEMA_VERSION {
+            return Err("admission receipt snapshot schema version mismatch");
+        }
+        Ok(())
+    }
+
     /// Returns true only when this receipt identifies exactly the supplied
     /// provenance validation snapshot. This binds admission to a concrete,
     /// schema-versioned structural state without assigning epistemic weight.
     pub fn binds_validation(&self, validation: &ProvenanceValidationReport) -> bool {
-        validation.conforms
+        self.validate_structure().is_ok()
+            && validation.validate_metadata().is_ok()
+            && validation.conforms
             && self.provenance_snapshot_digest == validation.snapshot_digest
             && self.validator_version == validation.validator_version
             && self.snapshot_schema_version == validation.snapshot_schema_version
@@ -305,6 +330,27 @@ impl ProvenanceValidationReport {
         self
     }
 
+    /// Validate the report's self-contained metadata without requiring the relation slice.
+    ///
+    /// This closes the deserialized-report boundary for callers that only possess the
+    /// report, such as an admission receipt, while leaving relation binding to
+    /// validate_against_relations.
+    pub fn validate_metadata(&self) -> Result<(), &'static str> {
+        if self.validator_version.trim().is_empty() {
+            return Err("provenance validator version must be non-empty");
+        }
+        if self.snapshot_schema_version != PROVENANCE_SNAPSHOT_SCHEMA_VERSION {
+            return Err("provenance validation schema version mismatch");
+        }
+        if !is_hex_digest(&self.snapshot_digest) {
+            return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
+        }
+        if self.conforms != self.violations.is_empty() {
+            return Err("provenance validation outcome does not match violations");
+        }
+        Ok(())
+    }
+
     /// Defensive structural validation for a report that may have come from
     /// deserialization rather than from from_relations.
     ///
@@ -315,24 +361,13 @@ impl ProvenanceValidationReport {
         &self,
         relations: &[ProvenanceRelation],
     ) -> Result<(), &'static str> {
-        if self.validator_version.trim().is_empty() {
-            return Err("provenance validator version must be non-empty");
-        }
-        if self.snapshot_schema_version != PROVENANCE_SNAPSHOT_SCHEMA_VERSION {
-            return Err("provenance validation schema version mismatch");
-        }
-        if !is_hex_digest(&self.snapshot_digest) {
-            return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
-        }
+        self.validate_metadata()?
         if self.relation_count != relations.len() {
             return Err("provenance validation relation count mismatch");
         }
         let expected_digest = Self::snapshot_digest_for(relations, self.snapshot_schema_version);
         if expected_digest != self.snapshot_digest {
             return Err("provenance view validation digest mismatch");
-        }
-        if self.conforms != self.violations.is_empty() {
-            return Err("provenance validation outcome does not match violations");
         }
 
         let mut seen = std::collections::HashSet::with_capacity(relations.len());
@@ -534,6 +569,23 @@ mod tests {
         nonconforming.conforms = false;
         assert!(!receipt.binds_validation(&nonconforming));
 
+        let mut inconsistent = validation.clone();
+        inconsistent.violations.push(ProvenanceValidationViolation {
+            code: "tampered".into(),
+            source_memory_id: None,
+            target_memory_id: None,
+            message: "tampered report".into(),
+        });
+        assert!(!receipt.binds_validation(&inconsistent));
+
+        let mut malformed_digest = validation.clone();
+        malformed_digest.snapshot_digest = "not-a-digest".into();
+        assert!(!receipt.binds_validation(&malformed_digest));
+
+        let mut malformed_receipt = receipt.clone();
+        malformed_receipt.admission_event = "   ".into();
+        assert!(!malformed_receipt.binds_validation(&validation));
+
         let mut changed = validation.clone();
         changed.snapshot_schema_version += 1;
         assert!(!receipt.binds_validation(&changed));
@@ -633,6 +685,7 @@ mod tests {
             ProvenanceView::from_relations(std::slice::from_ref(&relation), mismatched_outcome).unwrap_err(),
             "provenance validation outcome does not match violations"
         );
+        assert!(valid.validate_metadata().is_ok());
     }
 
     #[test]
