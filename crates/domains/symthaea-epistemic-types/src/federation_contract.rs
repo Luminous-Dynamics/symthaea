@@ -653,6 +653,21 @@ impl FederatedClaim {
             .unwrap_or(false)
     }
 
+    /// Validate the declared authorship binding for one exact proof purpose.
+    /// This is the local structural analogue of an expected-proof-purpose check;
+    /// cryptographic verification and controller relationship validation remain
+    /// adapter responsibilities.
+    pub fn authorship_is_valid_for_purpose(&self, expected: &ClaimProofPurpose) -> bool {
+        self.authorship
+            .as_ref()
+            .map(|authorship| {
+                authorship.validate_structure().is_ok()
+                    && authorship.author() == &self.author
+                    && authorship.proof_purpose_matches(expected)
+            })
+            .unwrap_or(false)
+    }
+
     /// Typed proposition identity: this is distinct from both the representation
     /// identity and the subject-level admission identity.
     pub fn statement_identity(&self) -> Result<CanonicalStatementIdentity, &'static str> {
@@ -821,6 +836,45 @@ mod tests {
         let method = ClaimVerificationMethod::new("https://example.test/key/1").unwrap();
         assert_eq!(method.as_str(), "https://example.test/key/1");
         assert!(method.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn claim_authorship_requires_the_expected_proof_purpose() {
+        let (receipt, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view =
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            view,
+            receipt,
+        )
+        .unwrap()
+        .with_authorship(
+            ClaimAuthorship::new(
+                ClaimAuthorIdentity::new("author:1").unwrap(),
+                ClaimProofPurpose::new("assertionMethod").unwrap(),
+                None,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert!(claim.authorship_is_valid_for_purpose(
+            &ClaimProofPurpose::new("assertionMethod").unwrap()
+        ));
+        assert!(!claim.authorship_is_valid_for_purpose(
+            &ClaimProofPurpose::new("authentication").unwrap()
+        ));
     }
 
     #[test]
