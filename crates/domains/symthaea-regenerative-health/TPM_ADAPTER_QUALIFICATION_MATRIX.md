@@ -20,6 +20,8 @@ Every emulator campaign must demonstrate:
 - an `TPM_NT_COUNTER` NV index has exactly 8 bytes;
 - counter generation is observed and advanced only by `TPM2_NV_Increment`;
 - the same fresh challenge binds PCR Quote and NV certification;
+- the NV_Certify attestation is TPM_ST_ATTEST_NV and records the expected NV Index Name, offset 0, and complete eight-byte counter contents;
+- the Quote and NV_Certify attestations carry the same qualified signer;
 - a Quote replay under a different challenge is rejected;
 - the counter survives a controlled TPM restart when the emulator is configured with persistent state;
 - the counter advances after restart;
