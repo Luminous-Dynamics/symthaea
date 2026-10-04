@@ -255,6 +255,18 @@ impl KnowledgeSnapshotValidationReceipt {
     }
 }
 
+/// A persisted validation receipt together with the append sequence that is
+/// cryptographically bound into its self-digest.
+///
+/// The input type remains sequence-free because the sequence is assigned atomically by
+/// SQLite at append time. This record type exposes the assigned sequence for audit/export
+/// without allowing callers to choose or spoof it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnowledgeSnapshotValidationReceiptRecord {
+    pub validation_sequence: u64,
+    pub receipt: KnowledgeSnapshotValidationReceipt,
+}
+
 impl KnowledgePersistenceSnapshot {
     /// Compute a versioned, order-independent digest of the complete persisted
     /// cognitive snapshot. This is an integrity/evidence identifier, not a claim
@@ -1090,9 +1102,31 @@ impl KnowledgePersistence {
     }
 
     /// Load validation receipts for the latest committed snapshot generation.
+    ///
+    /// The legacy API preserves its historical event-name ordering and receipt-only shape.
+    /// Use latest_snapshot_validation_receipt_records when the append sequence is required
+    /// for audit/export or independent re-computation of the v2 self-digest.
     pub fn latest_snapshot_validation_receipts(
         &mut self,
     ) -> Result<Vec<KnowledgeSnapshotValidationReceipt>, String> {
+        self.load_latest_snapshot_validation_receipt_records(false)
+            .map(|records| records.into_iter().map(|record| record.receipt).collect())
+    }
+
+    /// Load latest-generation validation receipts together with their SQLite append sequence.
+    ///
+    /// The returned sequence is the exact value bound into each receipt's v2 self-digest.
+    /// Ordering is deterministic by that append sequence.
+    pub fn latest_snapshot_validation_receipt_records(
+        &mut self,
+    ) -> Result<Vec<KnowledgeSnapshotValidationReceiptRecord>, String> {
+        self.load_latest_snapshot_validation_receipt_records(true)
+    }
+
+    fn load_latest_snapshot_validation_receipt_records(
+        &mut self,
+        order_by_sequence: bool,
+    ) -> Result<Vec<KnowledgeSnapshotValidationReceiptRecord>, String> {
         if !self.is_configured() {
             return Err("No database path configured".into());
         }
@@ -1111,35 +1145,49 @@ impl KnowledgePersistence {
         verify_current_snapshot_matches_latest_receipt_in_tx(&tx)?;
         verify_snapshot_validation_receipts_in_tx(&tx)?;
 
+        let order_clause = if order_by_sequence {
+            "v.validation_sequence ASC"
+        } else {
+            "v.validation_event ASC"
+        };
+        let query = format!(
+            "SELECT v.validation_sequence, v.validation_event, v.generation, v.snapshot_digest_hex,
+                    v.validator_ref, v.validator_version, v.validation_profile, v.conforms,
+                    v.report_digest_hex
+             FROM knowledge_snapshot_validation_receipts v
+             WHERE v.generation = (
+                 SELECT generation
+                 FROM knowledge_snapshot_receipts
+                 ORDER BY generation DESC
+                 LIMIT 1
+             )
+             ORDER BY {order_clause}"
+        );
         let mut stmt = tx
-            .prepare(
-                "SELECT validation_event, generation, snapshot_digest_hex, validator_ref,
-                        validator_version, validation_profile, conforms, report_digest_hex
-                 FROM knowledge_snapshot_validation_receipts
-                 WHERE generation = (
-                     SELECT generation
-                     FROM knowledge_snapshot_receipts
-                     ORDER BY generation DESC
-                     LIMIT 1
-                 )
-                 ORDER BY validation_event ASC",
-            )
+            .prepare(&query)
             .map_err(|e| format!("Prepare latest snapshot validations: {e}"))?;
 
-        let validations = stmt
+        let records = stmt
             .query_map([], |row| {
-                let generation = row.get::<_, i64>(1)?;
-                Ok(KnowledgeSnapshotValidationReceipt {
-                    validation_event: row.get(0)?,
-                    generation: u64::try_from(generation).map_err(|_| {
-                        rusqlite::Error::IntegralValueOutOfRange(1, generation)
-                    })?,
-                    snapshot_digest_hex: row.get(2)?,
-                    validator_ref: row.get(3)?,
-                    validator_version: row.get(4)?,
-                    validation_profile: row.get(5)?,
-                    conforms: row.get(6)?,
-                    report_digest_hex: row.get(7)?,
+                let validation_sequence_i64 = row.get::<_, i64>(0)?;
+                let validation_sequence = u64::try_from(validation_sequence_i64).map_err(|_| {
+                    rusqlite::Error::IntegralValueOutOfRange(0, validation_sequence_i64)
+                })?;
+                let generation = row.get::<_, i64>(2)?;
+                Ok(KnowledgeSnapshotValidationReceiptRecord {
+                    validation_sequence,
+                    receipt: KnowledgeSnapshotValidationReceipt {
+                        validation_event: row.get(1)?,
+                        generation: u64::try_from(generation).map_err(|_| {
+                            rusqlite::Error::IntegralValueOutOfRange(2, generation)
+                        })?,
+                        snapshot_digest_hex: row.get(3)?,
+                        validator_ref: row.get(4)?,
+                        validator_version: row.get(5)?,
+                        validation_profile: row.get(6)?,
+                        conforms: row.get(7)?,
+                        report_digest_hex: row.get(8)?,
+                    },
                 })
             })
             .map_err(|e| format!("Query latest snapshot validations: {e}"))?
@@ -1149,7 +1197,7 @@ impl KnowledgePersistence {
         tx.commit()
             .map_err(|e| format!("Commit latest validation verification: {e}"))?;
 
-        Ok(validations)
+        Ok(records)
     }
 
     /// Load all persistence domains from one SQLite read transaction.
@@ -3367,9 +3415,12 @@ mod tests {
         let err = conn
             .execute(
                 "INSERT INTO knowledge_snapshot_validation_receipts
-                 (validation_event, generation, snapshot_digest_hex, validator_ref,
-                  validator_version, validation_profile, conforms)
-                 VALUES ('orphan', 999999, 'digest', 'validator', 'v1', 'profile', 1)",
+                 (validation_event, validation_sequence, generation, snapshot_digest_hex,
+                  validator_ref, validator_version, validation_profile, conforms, receipt_digest_hex)
+                 VALUES ('orphan', 1, 999999,
+                         '0000000000000000000000000000000000000000000000000000000000000000',
+                         'validator', 'v1', 'profile', 1,
+                         '0000000000000000000000000000000000000000000000000000000000000000')",
                 [],
             )
             .unwrap_err();
@@ -7232,8 +7283,12 @@ mod tests {
 
         assert_eq!(
             p.latest_snapshot_validation_receipts().unwrap(),
-            vec![validation]
+            vec![validation.clone()]
         );
+        let audit_records = p.latest_snapshot_validation_receipt_records().unwrap();
+        assert_eq!(audit_records.len(), 1);
+        assert_eq!(audit_records[0].validation_sequence, 1);
+        assert_eq!(audit_records[0].receipt, validation);
 
         let second = KnowledgeSnapshotValidationReceipt {
             validation_event: "validation:event-2".into(),
@@ -7248,6 +7303,14 @@ mod tests {
         assert_eq!(receipts[1].validation_event, "validation:event-2");
         assert!(receipts[0].conforms);
         assert!(!receipts[1].conforms);
+
+        let audit_records = p.latest_snapshot_validation_receipt_records().unwrap();
+        assert_eq!(
+            audit_records.iter().map(|r| r.validation_sequence).collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        assert_eq!(audit_records[0].receipt.validation_event, "validation:event-1");
+        assert_eq!(audit_records[1].receipt.validation_event, "validation:event-2");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -7644,7 +7707,7 @@ mod tests {
             .unwrap_err();
         assert!(err
             .to_string()
-            .contains("requires a valid event and positive sequence"));
+            .contains("requires valid identity, digest, validator, outcome, and positive sequence"));
 
         let err = conn
             .execute(
@@ -7657,7 +7720,7 @@ mod tests {
             .unwrap_err();
         assert!(err
             .to_string()
-            .contains("requires a valid event and positive sequence"));
+            .contains("requires valid identity, digest, validator, outcome, and positive sequence"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
