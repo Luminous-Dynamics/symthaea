@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use sovereign_state_compiler::{
-    ContentDigest, ResourceRef, TargetId, TargetProfile, TargetSnapshot,
+    AuthorizedDeploymentPlan, Capability, ContentDigest, ResourceRef, TargetId, TargetProfile,
+    TargetSnapshot,
 };
 use sovereign_state_compiler_nix::{default_nixos_capabilities, nixos_generation_resource};
 use thiserror::Error;
@@ -58,6 +59,10 @@ pub enum SscObservationError {
     NoSystemGenerations,
     #[error("NixOS system profile generation does not match its exact realization")]
     SystemProfileRealizationMismatch,
+    #[error("authorized deployment requires an unobserved NixOS resource")]
+    AuthorizedResourceMissing(ResourceRef),
+    #[error("authorized deployment requires an unavailable NixOS capability")]
+    AuthorizedCapabilityUnavailable(Capability),
 }
 
 impl From<std::io::Error> for SscObservationError {
@@ -148,6 +153,37 @@ impl NixSystemObservation {
             .iter()
             .find(|entry| entry.number == generation)
             .and_then(|entry| nixos_generation_resource(entry.number, &entry.realization).ok())
+    }
+
+    /// Confirm that this fresh observation still contains every resource and
+    /// capability required by an already-authorized plan. This is a preflight
+    /// identity gate; it does not authorize or execute the plan.
+    pub fn validate_against_authorized_plan(
+        &self,
+        authorized: &AuthorizedDeploymentPlan,
+    ) -> Result<(), SscObservationError> {
+        self.validate()?;
+
+        let observed_resources = self
+            .generations
+            .iter()
+            .map(|entry| nixos_generation_resource(entry.number, &entry.realization))
+            .collect::<Result<_, _>>()
+            .map_err(|error| SscObservationError::Io(error.to_string()))?;
+
+        for resource in &authorized.plan.intent.required_resources {
+            if !observed_resources.contains(resource) {
+                return Err(SscObservationError::AuthorizedResourceMissing(resource.clone()));
+            }
+        }
+
+        for capability in &authorized.authorization.granted_capabilities {
+            if !default_nixos_capabilities().contains(capability) {
+                return Err(SscObservationError::AuthorizedCapabilityUnavailable(*capability));
+            }
+        }
+
+        Ok(())
     }
 
     pub fn target_snapshot(
@@ -324,6 +360,155 @@ mod tests {
             observation.validate().expect_err("missing realization"),
             SscObservationError::MissingRealization
         );
+    }
+
+    #[test]
+    fn authorized_preflight_accepts_exact_observed_generation() {
+        let observation = NixSystemObservation {
+            generations: vec![
+                NixGenerationObservation {
+                    number: 42,
+                    realization: "/nix/store/aaa-nixos-system-host".into(),
+                    current: true,
+                },
+            ],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+        let adapter = sovereign_state_compiler_nix::NixOSTargetAdapter::from_snapshot(
+            observation.target_snapshot("host-01", 100).expect("snapshot"),
+        )
+        .expect("adapter");
+        let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-1", "host-01");
+        intent.required_resources.insert(
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("resource"),
+        );
+        intent.required_capabilities.insert(Capability::Rollback);
+        let plan = adapter.compile(&intent).expect("plan");
+        let auth = sovereign_state_compiler::AuthorizationEvidence {
+            authority_id: "authority-1".into(),
+            intent_digest: plan.intent.digest().expect("intent digest"),
+            target_profile_digest: plan.target_snapshot.profile.digest().expect("profile digest"),
+            target_snapshot_digest: plan.target_snapshot.digest().expect("snapshot digest"),
+            plan_digest: plan.digest().expect("plan digest"),
+            granted_capabilities: [Capability::Rollback, Capability::ObserveState]
+                .into_iter()
+                .collect(),
+            nonce: "nonce-1".into(),
+            valid_from_ms: Some(100),
+            valid_until_ms: Some(200),
+        };
+        let authorized = plan.authorize(auth, 100).expect("authorization");
+
+        assert!(observation
+            .validate_against_authorized_plan(&authorized)
+            .is_ok());
+    }
+
+    #[test]
+    fn authorized_preflight_rejects_generation_realization_drift() {
+        let observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/bbb-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/bbb-nixos-system-host".into(),
+            current_system_realization: "/nix/store/bbb-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/bbb-nixos-system-host".into(),
+        };
+        let authorized = rollback_authorized_plan_for_testing();
+
+        assert_eq!(
+            observation
+                .validate_against_authorized_plan(&authorized)
+                .expect_err("realization drift"),
+            SscObservationError::AuthorizedResourceMissing(
+                nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                    .expect("resource")
+            )
+        );
+    }
+
+    #[test]
+    fn authorized_preflight_rejects_generation_ordinal_drift() {
+        let observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 43,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 43,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+        let authorized = rollback_authorized_plan_for_testing();
+
+        assert_eq!(
+            observation
+                .validate_against_authorized_plan(&authorized)
+                .expect_err("generation drift"),
+            SscObservationError::AuthorizedResourceMissing(
+                nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host")
+                    .expect("resource")
+            )
+        );
+    }
+
+    fn rollback_authorized_plan_for_testing() -> AuthorizedDeploymentPlan {
+        let observation = NixSystemObservation {
+            generations: vec![NixGenerationObservation {
+                number: 42,
+                realization: "/nix/store/aaa-nixos-system-host".into(),
+                current: true,
+            }],
+            system_profile_generation: 42,
+            system_profile_realization: "/nix/store/aaa-nixos-system-host".into(),
+            current_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+            booted_system_realization: "/nix/store/aaa-nixos-system-host".into(),
+        };
+        let adapter = sovereign_state_compiler_nix::NixOSTargetAdapter::from_snapshot(
+            observation.target_snapshot("host-01", 100).expect("snapshot"),
+        )
+        .expect("adapter");
+        let mut intent = sovereign_state_compiler::DeploymentIntent::new("rollback-test", "host-01");
+        intent.required_capabilities.insert(Capability::Rollback);
+        intent.required_resources.insert(
+            nixos_generation_resource(42, "/nix/store/aaa-nixos-system-host").expect("resource"),
+        );
+        intent.desired_state.properties.insert(
+            "nixos.rollback".into(),
+            sovereign_state_compiler::StateValue::Bool(true),
+        );
+        intent.desired_state.properties.insert(
+            "nixos.rollback-generation".into(),
+            sovereign_state_compiler::StateValue::Integer(42),
+        );
+        intent.desired_state.properties.insert(
+            "nixos.rollback-realization".into(),
+            sovereign_state_compiler::StateValue::String(
+                "/nix/store/aaa-nixos-system-host".into(),
+            ),
+        );
+        let plan = adapter.compile(&intent).expect("plan");
+        let auth = sovereign_state_compiler::AuthorizationEvidence {
+            authority_id: "authority-test".into(),
+            intent_digest: plan.intent.digest().expect("intent digest"),
+            target_profile_digest: plan.target_snapshot.profile.digest().expect("profile digest"),
+            target_snapshot_digest: plan.target_snapshot.digest().expect("snapshot digest"),
+            plan_digest: plan.digest().expect("plan digest"),
+            granted_capabilities: [Capability::Rollback, Capability::ObserveState]
+                .into_iter()
+                .collect(),
+            nonce: "nonce-test".into(),
+            valid_from_ms: Some(100),
+            valid_until_ms: Some(200),
+        };
+        plan.authorize(auth, 100).expect("authorization")
     }
 
     #[test]
