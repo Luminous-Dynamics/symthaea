@@ -1350,8 +1350,8 @@ mod tests {
             union_generator_rank: 2,
             kernel_dimension: 1,
             raw_factor_tuple_count: ExactPowerOfTwo::new(3),
-            reachable_target_count: ExactPowerOfTwo::new(5),
-            factorization_count_per_target: ExactPowerOfTwo::new(1),
+            reachable_target_count: ExactPowerOfTwo::new(1),
+            factorization_count_per_target: ExactPowerOfTwo::new(2),
             unique_factorization: false,
             dependency_order: Some(3),
         };
