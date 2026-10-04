@@ -814,7 +814,8 @@ impl ReceiptAttestationVerificationReport {
     /// proof; it only checks report↔envelope identity binding and must be paired
     /// with the report's own well-formedness and proof-verification checks.
     pub fn matches_attestation_envelope(&self, envelope: &ReceiptAttestationEnvelope) -> bool {
-        self.verifier_version == VERIFIER_VERSION
+        self.has_consistent_identity_bindings()
+            && self.verifier_version == VERIFIER_VERSION
             && self.attestation_payload_fingerprint == envelope.payload_fingerprint()
             && self.receipt_fingerprint == envelope.receipt_fingerprint
     }
@@ -2591,6 +2592,11 @@ mod tests {
         let mut changed = envelope;
         changed.domain = Some("different-domain".into());
         assert!(!report.matches_attestation_envelope(&changed));
+
+        let mut inconsistent = report.clone();
+        inconsistent.policy_inputs.cryptosuite = "attacker-cryptosuite";
+        inconsistent.policy_fingerprint = inconsistent.policy_inputs.fingerprint();
+        assert!(!inconsistent.matches_attestation_envelope(&envelope));
     }
 
     #[test]
