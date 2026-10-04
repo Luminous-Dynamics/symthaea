@@ -198,15 +198,12 @@ impl LocalApprovalRuntimeV1 {
         projection: &super::local_approval_projection::PendingNixApprovalProjectionV1,
         now: UnixMillisV1,
     ) -> Result<PendingRequestCurrentnessV1, LocalApprovalRuntimeErrorV1> {
-        projection.validate()?;
-        if projection.daemon_incarnation_ref != self.daemon_incarnation.reference()
-            || projection.request_id.is_empty()
-        {
+        if projection.request_id.is_empty() {
             return Ok(PendingRequestCurrentnessV1::NotPending);
         }
         Ok(self
             .request_store
-            .observe_currentness(&projection.request_id, now)?)
+            .observe_projection_currentness(projection, now)?)
     }
 
     /// Observe whether a runtime-owned installed request is current at one instant.
