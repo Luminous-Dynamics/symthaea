@@ -29,6 +29,7 @@ struct AuditReport {
     matrix_cases: usize,
     passed_cases: usize,
     speech_plan_validation_checks: usize,
+    acoustic_receipt_checks: usize,
     linguistic_frame_checks: usize,
     phonological_binding_checks: usize,
     semantic_delivery_checks: usize,
@@ -49,6 +50,7 @@ struct AuditFailure {
 struct AuditCase {
     case_id: String,
     speech_plan_valid: bool,
+    acoustic_receipt_valid: bool,
     intent: String,
     epistemic_input: f32,
     plan_epistemic: String,
@@ -87,6 +89,7 @@ fn run() -> Result<()> {
         matrix_cases: 0,
         passed_cases: 0,
         speech_plan_validation_checks: 0,
+        acoustic_receipt_checks: 0,
         linguistic_frame_checks: 0,
         phonological_binding_checks: 0,
         semantic_delivery_checks: 0,
@@ -231,6 +234,27 @@ fn run() -> Result<()> {
                 );
             }
 
+            let sensory_target = symthaea_broca::SpeechSensoryTarget::from_plan(&speech_plan);
+            let acoustic_receipt = symthaea_broca::SpeechFeedbackReceipt::new(
+                &speech_plan,
+                symthaea_broca::SpeechSensoryObservation {
+                    pitch_range: Some(sensory_target.pitch_range),
+                    prominence: Some(sensory_target.prominence),
+                    rate: Some(sensory_target.rate),
+                    pause_weight: Some(sensory_target.pause_weight),
+                },
+            );
+            let acoustic_receipt_valid = acoustic_receipt.validate().is_ok();
+            report.acoustic_receipt_checks += 1;
+            if !acoustic_receipt_valid {
+                fail(
+                    &mut report,
+                    &case_id,
+                    "acoustic_receipt_validation",
+                    "fresh acoustic receipt failed persisted-state validation".to_string(),
+                );
+            }
+
             let delivery_target =
                 symthaea_broca::SpeechDeliveryTarget::from_plan(&speech_plan);
             let exact_observation = SpeechDeliveryObservation {
@@ -300,6 +324,7 @@ fn run() -> Result<()> {
             }
 
             let case_ok = speech_plan_valid
+                && acoustic_receipt_valid
                 && linguistic_valid
                 && linguistic_to_phonological_preserved_intent
                 && linguistic_lexical_binding_valid
@@ -320,6 +345,7 @@ fn run() -> Result<()> {
             report.cases.push(AuditCase {
                 case_id,
                 speech_plan_valid,
+                acoustic_receipt_valid,
                 intent: (*intent_name).to_string(),
                 epistemic_input: epistemic,
                 plan_epistemic: format!("{:?}", speech_plan.epistemic_delivery),
