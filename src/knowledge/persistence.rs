@@ -2480,7 +2480,16 @@ fn verify_persistence_trigger_behavior(conn: &rusqlite::Connection) -> Result<()
         .map_err(|e| format!("Schema integrity trigger probe savepoint: {e}"))?;
 
     let result = (|| {
-        let fact_memory_id = "__epf011_trigger_probe_fact";
+        let fact_probe_rowid: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(rowid), 0) FROM knowledge_facts",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Schema integrity trigger probe fact rowid: {e}"))?
+            .checked_add(1)
+            .ok_or("Schema integrity trigger probe fact rowid exhausted SQLite INTEGER range")?;
+        let fact_memory_id = format!("__epf011_trigger_probe_fact_{fact_probe_rowid}");
         conn.execute(
             "INSERT INTO knowledge_facts
              (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
@@ -2518,12 +2527,26 @@ fn verify_persistence_trigger_behavior(conn: &rusqlite::Connection) -> Result<()
             );
         }
 
+        let provenance_probe_rowid: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(rowid), 0) FROM knowledge_provenance_relations",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Schema integrity trigger probe provenance rowid: {e}"))?
+            .checked_add(1)
+            .ok_or("Schema integrity trigger probe provenance rowid exhausted SQLite INTEGER range")?;
+        let provenance_source =
+            format!("__epf011_trigger_probe_source_{provenance_probe_rowid}");
+        let provenance_target =
+            format!("__epf011_trigger_probe_target_{provenance_probe_rowid}");
+        let provenance_event = format!("event:trigger-probe-{provenance_probe_rowid}");
+
         conn.execute(
             "INSERT INTO knowledge_provenance_relations
              (source_memory_id, target_memory_id, kind, created_at)
-             VALUES ('__epf011_trigger_probe_source', '__epf011_trigger_probe_target',
-                     'derived_from', 'event:trigger-probe')",
-            [],
+             VALUES (?1, ?2, 'derived_from', ?3)",
+            rusqlite::params![provenance_source, provenance_target, provenance_event],
         )
         .map_err(|e| format!("Schema integrity trigger probe provenance insert: {e}"))?;
 
@@ -2531,9 +2554,12 @@ fn verify_persistence_trigger_behavior(conn: &rusqlite::Connection) -> Result<()
             .execute(
                 "INSERT INTO knowledge_provenance_relations
                  (source_memory_id, target_memory_id, kind, created_at)
-                 VALUES ('__epf011_trigger_probe_source', '__epf011_trigger_probe_target',
-                         'unknown_kind', 'event:trigger-probe-bad')",
-                [],
+                 VALUES (?1, ?2, 'unknown_kind', ?3)",
+                rusqlite::params![
+                    provenance_source,
+                    provenance_target,
+                    format!("event:trigger-probe-bad-{provenance_probe_rowid}"),
+                ],
             )
             .is_ok()
         {
@@ -2546,9 +2572,12 @@ fn verify_persistence_trigger_behavior(conn: &rusqlite::Connection) -> Result<()
             .execute(
                 "INSERT INTO knowledge_provenance_relations
                  (source_memory_id, target_memory_id, kind, created_at)
-                 VALUES ('__epf011_trigger_probe_source', '__epf011_trigger_probe_target',
-                         NULL, 'event:trigger-probe-null')",
-                [],
+                 VALUES (?1, ?2, NULL, ?3)",
+                rusqlite::params![
+                    provenance_source,
+                    provenance_target,
+                    format!("event:trigger-probe-null-{provenance_probe_rowid}"),
+                ],
             )
             .is_ok()
         {
@@ -2562,11 +2591,11 @@ fn verify_persistence_trigger_behavior(conn: &rusqlite::Connection) -> Result<()
             .execute(
                 "UPDATE knowledge_provenance_relations
                  SET source_memory_id = ' '
-                 WHERE source_memory_id = '__epf011_trigger_probe_source'
-                   AND target_memory_id = '__epf011_trigger_probe_target'
+                 WHERE source_memory_id = ?1
+                   AND target_memory_id = ?2
                    AND kind = 'derived_from'
-                   AND created_at = 'event:trigger-probe'",
-                [],
+                   AND created_at = ?3",
+                rusqlite::params![provenance_source, provenance_target, provenance_event],
             )
             .is_ok()
         {
@@ -3881,6 +3910,51 @@ mod tests {
             err,
             "Schema integrity check failed: missing column memory_id on knowledge_facts"
         );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_trigger_probe_survives_existing_sentinel_ids() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_trigger_probe_collision_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "trigger-probe-bootstrap".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x64; BinaryHV::BYTES],
+            source_text: "trigger probe bootstrap".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        let conn = p.open_connection().unwrap();
+        conn.execute(
+            "INSERT INTO knowledge_facts
+             (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+             VALUES ('__epf011_trigger_probe_fact', ?1, 'sentinel', 0.5, 1, 0)",
+            [vec![0x65u8; BinaryHV::BYTES]],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO knowledge_provenance_relations
+             (source_memory_id, target_memory_id, kind, created_at)
+             VALUES ('__epf011_trigger_probe_source', '__epf011_trigger_probe_target',
+                     'derived_from', 'event:trigger-probe')",
+            [],
+        )
+        .unwrap();
+
+        verify_initialized_schema_integrity(&conn).unwrap();
 
         let _ = std::fs::remove_dir_all(&dir);
     }
