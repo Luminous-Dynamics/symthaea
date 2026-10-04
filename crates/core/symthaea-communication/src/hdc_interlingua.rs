@@ -444,7 +444,6 @@ impl HdcSemanticCodebook {
             representation.node_frame.to_binary()?,
             representation.edge_frame.to_binary()?,
         );
-        let node_bundle = node_binary.to_continuous();
         let edge_bundle = edge_binary.to_continuous();
 
         let unrelated = derive_atom_vector(seed, "negative", "unrelated");
@@ -480,7 +479,7 @@ impl HdcSemanticCodebook {
 
         let controls = HdcSemanticNegativeControls {
             schema_version: HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
-            unrelated_node_max_similarity: unrelated_node_query_similarity,
+            unrelated_node_max_similarity,
             unrelated_edge_max_similarity,
             true_edge_similarity: full_cosine_similarity(&edge_bundle, &true_edge),
             swapped_edge_similarity: full_cosine_similarity(&edge_bundle, &swapped_edge),
