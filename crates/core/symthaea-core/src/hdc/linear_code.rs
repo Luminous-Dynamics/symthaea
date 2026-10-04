@@ -1112,7 +1112,24 @@ pub fn factorization_kernel_basis(
         }
     }
 
-    if kernel_basis.len() != total_rank - independent_basis.len() {
+    let expected_kernel_dimension = total_rank - independent_basis.len();
+    if kernel_basis.len() != expected_kernel_dimension {
+        return None;
+    }
+
+    let coefficient_basis = kernel_basis
+        .iter()
+        .map(|witness| {
+            let mut vector = BinaryCodeword::zero(total_rank);
+            for (index, coefficient) in witness.generator_coefficients.iter().enumerate() {
+                vector.set_bit(index, *coefficient);
+            }
+            vector
+        })
+        .collect::<Vec<_>>();
+    if basis_rank(&coefficient_basis, total_rank) != expected_kernel_dimension
+        || kernel_basis.iter().any(|witness| !witness.verifies_against(factors))
+    {
         return None;
     }
 
