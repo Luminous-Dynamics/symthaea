@@ -3,7 +3,9 @@ name: HDC Linear-Code Recovery Qualification
 on:
   pull_request:
     paths:
+      - "crates/core/symthaea-core/Cargo.toml"
       - "crates/core/symthaea-core/src/hdc/linear_code.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/tests/linear_code_ambiguity.rs"
       - "docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md"
       - ".github/workflows/hdc-linear-code-qualify.yml"
@@ -11,7 +13,9 @@ on:
     branches:
       - "research/hdc-linear-code-recovery-design-v1"
     paths:
+      - "crates/core/symthaea-core/Cargo.toml"
       - "crates/core/symthaea-core/src/hdc/linear_code.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/tests/linear_code_ambiguity.rs"
       - "docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md"
       - ".github/workflows/hdc-linear-code-qualify.yml"
