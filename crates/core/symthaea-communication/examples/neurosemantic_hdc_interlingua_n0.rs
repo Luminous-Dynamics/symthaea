@@ -173,6 +173,17 @@ fn main() -> Result<(), String> {
         }));
     }
 
+    let conservative_clean_decode =
+        codebook
+            .decode_graph_with_policy(
+                &reorder_a,
+                symthaea_communication::hdc_interlingua::HdcSemanticDecodePolicy::conservative_default(),
+            )
+            .is_ok();
+    if !conservative_clean_decode {
+        return Err("conservative HDC decode policy rejected clean held-out representation".into());
+    }
+
     let negative_controls =
         codebook.measure_negative_controls(&reorder_a, &held_out[0], 9_001)?;
     if negative_controls.unrelated_node_max_similarity.abs() > 0.20
@@ -195,6 +206,7 @@ fn main() -> Result<(), String> {
         "same_codebook_for_all_cases": true,
         "reordered_representation_exact": reordered_representation_exact,
         "wrong_codebook_rejected": wrong_codebook_rejected,
+        "conservative_clean_decode": conservative_clean_decode,
     });
 
     let output = serde_json::json!({
