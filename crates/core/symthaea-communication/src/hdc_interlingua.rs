@@ -174,7 +174,6 @@ impl HdcSemanticRoundtripMetrics {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HdcSemanticDecodePolicy {
     pub node_min_score: f64,
