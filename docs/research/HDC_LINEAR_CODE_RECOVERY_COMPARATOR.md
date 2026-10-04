@@ -436,6 +436,19 @@ The branch is ready for a benchmark-producing Stage-C/Stage-D experiment only wh
 
 No production integration is proposed by this document.
 
+## Qualification-surface provenance
+
+The qualification workflow now locks this research branch to the declared six-file surface:
+
+- `.github/workflows/hdc-linear-code-qualify.yml`;
+- `crates/core/symthaea-core/Cargo.toml`;
+- `crates/core/symthaea-core/src/hdc/linear_code.rs`;
+- `crates/core/symthaea-core/src/hdc/mod.rs`;
+- `crates/core/symthaea-core/tests/linear_code_ambiguity.rs`;
+- `docs/research/HDC_LINEAR_CODE_RECOVERY_COMPARATOR.md`.
+
+For pull-request runs, the workflow compares the exact PR head against the PR base and fails closed if any other path is present. The receipt records the accepted path set. This is a provenance boundary rather than a build optimization: the qualification should not silently certify production changes merely because the research tests still pass.
+
 ## References
 
 - Raviv, N. (2024), Linear Codes for Hyperdimensional Computing, Neural Computation 36(6), 1084–1120. DOI: 10.1162/neco_a_01665; arXiv:2403.03278.
