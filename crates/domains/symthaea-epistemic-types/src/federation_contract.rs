@@ -22,12 +22,17 @@ pub const FEDERATED_CLAIM_DIGEST_VERSION: u16 = 3;
 pub enum FederationDependency {
     Frontier(String),
     Derivation(String),
+    VerificationMethod(String),
+    ControllerDocument(String),
 }
 
 impl FederationDependency {
     pub fn reference(&self) -> &str {
         match self {
-            Self::Frontier(reference) | Self::Derivation(reference) => reference,
+            Self::Frontier(reference)
+            | Self::Derivation(reference)
+            | Self::VerificationMethod(reference)
+            | Self::ControllerDocument(reference) => reference,
         }
     }
 }
@@ -656,6 +661,18 @@ impl FederatedClaim {
                 .cloned()
                 .map(FederationDependency::Derivation),
         );
+        if let Some(authorship) = &self.authorship {
+            if let Some(method) = authorship.verification_method() {
+                dependencies.push(FederationDependency::VerificationMethod(
+                    method.as_str().to_owned(),
+                ));
+            }
+            if let Some(controller) = authorship.verification_controller() {
+                dependencies.push(FederationDependency::ControllerDocument(
+                    controller.as_str().to_owned(),
+                ));
+            }
+        }
         dependencies.sort();
         dependencies.dedup();
         dependencies
