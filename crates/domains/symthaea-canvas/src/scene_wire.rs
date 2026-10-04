@@ -353,6 +353,7 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
                 && valid_nonnegative(*w)
                 && valid_nonnegative(*h)
                 && valid_nonnegative(*rx)
+                && *rx <= w.min(*h) * 0.5
         }
     };
 
@@ -660,6 +661,28 @@ mod tests {
         let mut scene = RemoteScene::from_scene(&SceneNode::circle(1.0, 1.0, 1.0));
         scene.version = RemoteScene::VERSION + 1;
         assert!(!scene.is_supported());
+    }
+
+    #[test]
+    fn externally_constructed_rect_radius_must_fit_shape() {
+        let mut scene = RemoteScene::from_scene(&SceneNode::rect(0.0, 0.0, 10.0, 20.0));
+        scene.root = WireNode {
+            primitive: WirePrimitive::Rect {
+                x: 0.0,
+                y: 0.0,
+                w: 10.0,
+                h: 20.0,
+                rx: 6.0,
+            },
+            transform: WireTransform::default(),
+            style: WireStyle::default(),
+            children: Vec::new(),
+        };
+        assert!(
+            !scene.is_supported(),
+            "wire rect radius must match GPU reconstruction clamping semantics"
+        );
+        assert_eq!(scene.to_scene_node().children.len(), 0);
     }
 
     #[test]
