@@ -7657,17 +7657,28 @@ mod tests {
         invalid_history[0].receipt_digest_hex = invalid_history[0].canonical_receipt_digest_hex();
         assert!(KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&invalid_history).is_ok());
 
-        let malformed_history = vec![KnowledgeSnapshotReceipt {
-            generation: 2,
-            canonical_digest_hex: "a".repeat(64),
-            receipt_digest_hex: "b".repeat(64),
-        }];
-        assert!(KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&malformed_history).is_err());
+        let malformed_receipt = KnowledgeSnapshotReceipt {
+            generation: 1,
+            canonical_digest_hex: "not-a-digest".into(),
+            receipt_digest_hex: String::new(),
+        };
+        let malformed_receipt = KnowledgeSnapshotReceipt {
+            receipt_digest_hex: malformed_receipt.canonical_receipt_digest_hex(),
+            ..malformed_receipt
+        };
+        assert!(malformed_receipt.verify_self_digest());
+        assert!(!malformed_receipt.verify_integrity());
+        assert!(
+            KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&[malformed_receipt]).is_err()
+        );
 
         let checkpoint_json = serde_json::to_string(&checkpoint).unwrap();
         let checkpoint_round_trip: KnowledgeSnapshotReceiptHistoryCheckpoint =
             serde_json::from_str(&checkpoint_json).unwrap();
         assert_eq!(checkpoint_round_trip, checkpoint);
+        let mut wrong_schema = checkpoint.clone();
+        wrong_schema.schema_version = "symthaea.epf-011.unknown.v1".into();
+        assert!(!wrong_schema.verify_against_history(&history));
         assert_eq!(checkpoint.receipt_count, 2);
         assert_eq!(checkpoint.latest_generation, 2);
         assert!(checkpoint.verify_against_history(&history));
@@ -8017,20 +8028,35 @@ mod tests {
         );
 
         let checkpoint = p.snapshot_validation_receipt_history_checkpoint().unwrap();
-        let malformed_history = vec![KnowledgeSnapshotValidationReceiptRecord {
-            validation_sequence: 2,
-            receipt: all[0].receipt.clone(),
-            stored_receipt_digest_hex: all[0].stored_receipt_digest_hex.clone(),
-        }];
-        assert!(KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(
-            &malformed_history
-        )
-        .is_err());
+        let malformed_receipt = KnowledgeSnapshotValidationReceipt {
+            validator_ref: String::new(),
+            ..all[0].receipt.clone()
+        };
+        let malformed_record = KnowledgeSnapshotValidationReceiptRecord {
+            validation_sequence: all[0].validation_sequence,
+            receipt: malformed_receipt,
+            stored_receipt_digest_hex: String::new(),
+        };
+        let malformed_record = KnowledgeSnapshotValidationReceiptRecord {
+            stored_receipt_digest_hex: malformed_record.recomputed_receipt_digest_hex(),
+            ..malformed_record
+        };
+        assert!(malformed_record.verify_self_digest());
+        assert!(!malformed_record.verify_integrity());
+        assert!(
+            KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(&[
+                malformed_record
+            ])
+            .is_err()
+        );
 
         let checkpoint_json = serde_json::to_string(&checkpoint).unwrap();
         let checkpoint_round_trip: KnowledgeSnapshotValidationReceiptHistoryCheckpoint =
             serde_json::from_str(&checkpoint_json).unwrap();
         assert_eq!(checkpoint_round_trip, checkpoint);
+        let mut wrong_schema = checkpoint.clone();
+        wrong_schema.schema_version = "symthaea.epf-011.unknown.v1".into();
+        assert!(!wrong_schema.verify_against_history(&all));
         assert_eq!(checkpoint.receipt_count, 3);
         assert_eq!(checkpoint.latest_validation_sequence, 3);
         assert_eq!(checkpoint.latest_generation, 2);
