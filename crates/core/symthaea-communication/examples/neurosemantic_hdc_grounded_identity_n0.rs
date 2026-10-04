@@ -233,6 +233,13 @@ fn main() -> Result<(), String> {
         .encode_graph(&held_out, &wrong_scheme)
         .is_err();
 
+    let mut wrong_mapping_provenance = held_out_manifest.clone();
+    wrong_mapping_provenance.mapping_provenance_hash =
+        symthaea_communication::content_hash(b"different-authority-revision");
+    let wrong_mapping_provenance_rejected = codebook
+        .encode_graph(&held_out, &wrong_mapping_provenance)
+        .is_err();
+
     let mut ambiguous_receiver = held_out_manifest.clone();
     ambiguous_receiver.concepts.push(HdcConceptIdentityBinding {
         node_id: "agent-fr-alias".into(),
@@ -258,6 +265,7 @@ fn main() -> Result<(), String> {
         || !new_grounding_allowed_without_recodebook
         || !novel_oov_rejected
         || !wrong_scheme_rejected
+        || !wrong_mapping_provenance_rejected
         || !ambiguous_receiver_rejected
     {
         return Err("grounded identity N0 acceptance gates failed".into());
@@ -284,6 +292,7 @@ fn main() -> Result<(), String> {
             "structurally_equivalent": metrics.structural_equivalence,
             "novel_oov_rejected": novel_oov_rejected,
             "wrong_scheme_rejected": wrong_scheme_rejected,
+            "wrong_mapping_provenance_rejected": wrong_mapping_provenance_rejected,
             "ambiguous_receiver_rejected": ambiguous_receiver_rejected,
         },
         "metrics": metrics,
