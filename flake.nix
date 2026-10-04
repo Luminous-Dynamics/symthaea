@@ -1002,6 +1002,7 @@ EOF
             OVMF.fd
             swtpm  # Software TPM 2.0 for Secure Boot + BitLocker testing
             tpm2-tools  # TPM 2.0 command-line inspection/attestation tooling
+            tpm2-tss  # TSS 2.0 ESAPI/TCTI/MU libraries for the Rust FFI adapter
 
             # Screen recording
             wf-recorder
