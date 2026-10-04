@@ -100,6 +100,7 @@ if [[ -n "${BROCA_CHECKPOINT_PATH:-}" ]]; then
 fi
 
 # Deterministic attribution evidence: separates neutral, existing vocal-tract,
+# The resulting JSON is also rendered by broca_measurement_summary.py for reviewer-facing evidence.
 # Broca-only, composed, and composed+feedback conditions.
 if [[ "${BROCA_RUN_ATTRIBUTION_HARNESS:-1}" == "1" ]]; then
   cargo run "${cargo_locked_args[@]}" --features "ssm_language,vocal-tract" --bin broca-attribution-harness -- \
