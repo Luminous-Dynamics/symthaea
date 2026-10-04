@@ -2186,7 +2186,21 @@ impl<'a> CborReader<'a> {
         }
     }
 
-    fn read_array_len(&mut self)->Result<usize,Rfc9162ProofDecodeError>{(&mut self)->Result<usize,Rfc9162ProofDecodeError>{ let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?; self.offset+=1; if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} let ai=initial&0x1f; let n=match ai{0..=23=>ai as u64,24=>self.read_uint(1,24)?,25=>self.read_uint(2,256)?,26=>self.read_uint(4,65536)?,27=>self.read_uint(8,4294967296)?,_=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)}; usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure) }
+    fn read_array_len(&mut self)->Result<usize,Rfc9162ProofDecodeError>{
+        let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        self.offset+=1;
+        if initial>>5!=4{return Err(Rfc9162ProofDecodeError::InvalidEncoding)}
+        let ai=initial&0x1f;
+        let n=match ai{
+            0..=23=>ai as u64,
+            24=>self.read_uint(1,24)?,
+            25=>self.read_uint(2,256)?,
+            26=>self.read_uint(4,65536)?,
+            27=>self.read_uint(8,4294967296)?,
+            _=>return Err(Rfc9162ProofDecodeError::InvalidEncoding)
+        };
+        usize::try_from(n).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)
+    }
 
     /// Start a fixed-cardinality CBOR array. Indefinite-length arrays are
     /// accepted when the caller already knows exactly how many elements the
