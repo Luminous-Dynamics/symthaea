@@ -562,6 +562,32 @@ impl ExecutionReceipt {
         {
             return Err(ReceiptValidationError::StartedBeforeAuthorization);
         }
+
+        match plan
+            .authorization
+            .validate_for(&plan.plan, self.started_at_ms)
+        {
+            Ok(()) => {}
+            Err(PlanValidationError::AuthorizationNotYetValid) => {
+                return Err(ReceiptValidationError::StartedBeforeAuthorization);
+            }
+            Err(PlanValidationError::AuthorizationExpired) => {
+                return Err(ReceiptValidationError::FinishedAfterAuthorizationExpiry);
+            }
+            Err(PlanValidationError::AuthorizationMissingExpiry) => {
+                return Err(ReceiptValidationError::AuthorizationMissingExpiry);
+            }
+            Err(PlanValidationError::TargetSnapshotStale {
+                age_ms,
+                max_age_ms,
+            }) => {
+                return Err(ReceiptValidationError::TargetSnapshotStaleAtExecution {
+                    age_ms,
+                    max_age_ms,
+                });
+            }
+            Err(error) => return Err(ReceiptValidationError::InvalidAuthorization(error)),
+        }
         if let Some(valid_until_ms) = plan.authorization.valid_until_ms
             && self.finished_at_ms > valid_until_ms
         {
@@ -627,6 +653,10 @@ pub enum ReceiptValidationError {
     ObservedDispositionMismatch,
     #[error("execution receipt carries no concrete final target snapshot digest")]
     MissingFinalSnapshotEvidence,
+    #[error("execution receipt references an invalid authorized plan: {0}")]
+    InvalidAuthorization(PlanValidationError),
+    #[error("execution receipt references authorization without an explicit expiry")]
+    AuthorizationMissingExpiry,
     #[error("execution receipt timestamps are out of order")]
     TimestampOrderInvalid,
     #[error("execution receipt final snapshot observation falls outside the execution interval")]
@@ -1806,6 +1836,70 @@ mod tests {
         assert_eq!(
             receipt.validate_for(&authorized),
             Err(ReceiptValidationError::MissingFinalSnapshotEvidence)
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_forged_authorization_binding() {
+        let plan = sample_plan();
+        let mut auth = authorization_for(&plan);
+        auth.target_snapshot_digest.value = "forged".into();
+        let authorized = AuthorizedDeploymentPlan {
+            plan,
+            authorization: auth,
+        };
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.authorization.target_snapshot_digest.clone(),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
+            observed_disposition: authorized.plan.verification.disposition,
+            started_at_ms: 151,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Unproven,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::InvalidAuthorization(
+                PlanValidationError::AuthorizationTargetSnapshotDigestMismatch
+            ))
+        );
+    }
+
+    #[test]
+    fn receipt_rejects_authorization_without_expiry() {
+        let plan = sample_plan();
+        let mut auth = authorization_for(&plan);
+        auth.valid_until_ms = None;
+        let authorized = AuthorizedDeploymentPlan {
+            plan,
+            authorization: auth,
+        };
+
+        let receipt = ExecutionReceipt {
+            schema_version: SCHEMA_VERSION.into(),
+            plan_digest: authorized.plan.digest().expect("plan digest"),
+            target_snapshot_digest: authorized.plan.target_snapshot.digest().expect("snapshot"),
+            final_target_snapshot_digest: ContentDigest::blake3(b"after-execution"),
+            final_target_snapshot_observed_at_ms: 160,
+            observed_disposition: authorized.plan.verification.disposition,
+            started_at_ms: 151,
+            finished_at_ms: 160,
+            outcome: ExecutionOutcome::Succeeded,
+            postcondition: PostconditionOutcome::Unproven,
+            verification_digest: None,
+            evidence: Vec::new(),
+        };
+
+        assert_eq!(
+            receipt.validate_for(&authorized),
+            Err(ReceiptValidationError::AuthorizationMissingExpiry)
         );
     }
 
