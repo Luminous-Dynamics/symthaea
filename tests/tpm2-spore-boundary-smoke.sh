@@ -55,7 +55,7 @@ grep -A2 'TPM2_PT_FAMILY_INDICATOR:' "$ROOT/tpm-properties.txt" | grep -Fq 'valu
 tpm2_nvdefine -Q -C o -s 8 -a 'ownerread|authread|authwrite|nt=counter' "$NV_INDEX" -p "$NV_AUTH"
 tpm2_nvincrement -Q -C "$NV_INDEX" "$NV_INDEX" -P "$NV_AUTH"
 tpm2_nvread -Q -C "$NV_INDEX" -s 8 -P "$NV_AUTH" -o "$ROOT/counter.bin" "$NV_INDEX"
-[ "$(xxd -p "$ROOT/counter.bin")" = "0000000000000001" ]
+read_hex() { od -An -tx1 -v "$1" | tr -d ' \\n'; }\n[ "$(read_hex "$ROOT/counter.bin")" = "0000000000000001" ]
 
 # Pin the public NV object and its Name.
 tpm2_nvreadpublic > "$ROOT/nv-public.txt"
@@ -93,7 +93,7 @@ done
 export TPM2TOOLS_TCTI="swtpm:host=127.0.0.1,port=$TPM_PORT"
 tpm2_startup -c
 tpm2_nvread -Q -C "$NV_INDEX" -s 8 -P "$NV_AUTH" -o "$ROOT/counter-after-restart.bin" "$NV_INDEX"
-[ "$(xxd -p "$ROOT/counter-after-restart.bin")" = "0000000000000001" ] || {
+[ "$(read_hex "$ROOT/counter-after-restart.bin")" = "0000000000000001" ] || {
   echo "ERROR: TPM NV counter did not survive restart" >&2
   exit 1
 }
@@ -101,7 +101,7 @@ tpm2_nvread -Q -C "$NV_INDEX" -s 8 -P "$NV_AUTH" -o "$ROOT/counter-after-restart
 # A post-restart generation advance proves the counter remains usable after recovery.
 tpm2_nvincrement -Q -C "$NV_INDEX" "$NV_INDEX" -P "$NV_AUTH"
 tpm2_nvread -Q -C "$NV_INDEX" -s 8 -P "$NV_AUTH" -o "$ROOT/counter-generation-2.bin" "$NV_INDEX"
-[ "$(xxd -p "$ROOT/counter-generation-2.bin")" = "0000000000000002" ] || {
+[ "$(read_hex "$ROOT/counter-generation-2.bin")" = "0000000000000002" ] || {
   echo "ERROR: TPM NV counter did not advance to generation 2" >&2
   exit 1
 }
