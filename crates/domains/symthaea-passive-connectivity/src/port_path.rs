@@ -7,6 +7,7 @@ use symthaea_passive_void_graph::{FunctionalVoidGraph, PortId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PortPathStatus {
+    InvalidGraph,
     InvalidMesh,
     UndeclaredPath,
     AnchorNotRepresented(PortId),
@@ -33,7 +34,7 @@ pub fn evaluate_port_path(
 ) -> PortPathEvidence {
     if graph.validate().is_err() {
         return PortPathEvidence {
-            status: PortPathStatus::InvalidMesh,
+            status: PortPathStatus::InvalidGraph,
             from_component: None,
             to_component: None,
             physical_transport_unproven: true,
