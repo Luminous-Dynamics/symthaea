@@ -898,12 +898,10 @@ mod tests {
     }
 
     #[test]
-    fn claim_authorship_rejects_blank_verification_method() {
-        let author = ClaimAuthorIdentity::new("author:1").unwrap();
-        let purpose = ClaimProofPurpose::new("assertionMethod").unwrap();
+    fn claim_verification_method_rejects_blank_identifiers() {
         assert_eq!(
-            ClaimAuthorship::new(author, purpose, Some(ClaimVerificationMethod::new("   ").unwrap())).unwrap_err(),
-            "claim verification method must be non-empty when present"
+            ClaimVerificationMethod::new("   ").unwrap_err(),
+            "claim verification method must be non-empty"
         );
     }
 
