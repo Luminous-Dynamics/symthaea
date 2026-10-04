@@ -58,7 +58,7 @@ fn statement_frame() -> LinguisticFrame {
     let decoder = StructuredDecoder::new(&genesis);
     let channels = ThoughtChannels::with_intent(4);
     let readout = decoder.decode(&channels);
-    SpeechPlan::from_readout(&channels, &readout).into()
+    LinguisticFrame::from_speech_plan(&SpeechPlan::from_readout(&channels, &readout))
 }
 
 fn question_frame() -> LinguisticFrame {
