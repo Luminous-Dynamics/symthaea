@@ -169,7 +169,7 @@ impl RemoteScene {
         // caller-supplied oversized object from forcing a large temporary JSON
         // allocation merely to discover that it is structurally invalid.
         let mut count = 0usize;
-        if !validate_node(&self.root, 0, &mut count) {
+        if !validate_node(&self.root, 0, &mut count, 1.0) {
             return false;
         }
 
@@ -315,7 +315,12 @@ fn compile_node(
     })
 }
 
-fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
+fn validate_node(
+    node: &WireNode,
+    depth: usize,
+    count: &mut usize,
+    parent_scale_abs: f64,
+) -> bool {
     if depth > MAX_SCENE_DEPTH || *count >= MAX_SCENE_NODES {
         return false;
     }
@@ -339,7 +344,13 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
                 && valid_coordinate(*y1)
                 && valid_coordinate(*x2)
                 && valid_coordinate(*y2)
-                && line_is_renderable(*x1, *y1, *x2, *y2)
+                && line_is_renderable(
+                    *x1,
+                    *y1,
+                    *x2,
+                    *y2,
+                    parent_scale_abs * f64::from(node.transform.scale.abs()),
+                )
         }
         WirePrimitive::Polygon { points, closed } => {
             ((!*closed && points.len() >= 2) || (*closed && points.len() >= 3))
@@ -385,9 +396,15 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
         return false;
     }
 
+    let local_scale_abs = f64::from(node.transform.scale.abs());
+    let combined_scale_abs = parent_scale_abs * local_scale_abs;
+    if !combined_scale_abs.is_finite() {
+        return false;
+    }
+
     node.children
         .iter()
-        .all(|child| validate_node(child, depth + 1, count))
+        .all(|child| validate_node(child, depth + 1, count, combined_scale_abs))
 }
 
 fn is_valid_closed_polygon(points: &[[f32; 2]]) -> bool {
@@ -574,11 +591,18 @@ fn valid_positive(value: f32) -> bool {
     valid_nonnegative(value) && value > 0.0
 }
 
-fn line_is_renderable(x1: f32, y1: f32, x2: f32, y2: f32) -> bool {
+fn line_is_renderable(
+    x1: f32,
+    y1: f32,
+    x2: f32,
+    y2: f32,
+    effective_scale_abs: f64,
+) -> bool {
     let dx = f64::from(x2) - f64::from(x1);
     let dy = f64::from(y2) - f64::from(y1);
     let length = dx.mul_add(dx, dy * dy).sqrt();
-    length.is_finite() && length > MIN_RENDERABLE_LINE_LENGTH
+    let rendered_length = length * effective_scale_abs;
+    rendered_length.is_finite() && rendered_length > MIN_RENDERABLE_LINE_LENGTH
 }
 
 fn valid_color(color: Color) -> bool {
@@ -766,6 +790,39 @@ mod tests {
             },
         };
         assert!(!zero_rect.is_supported());
+    }
+
+    #[test]
+    fn externally_constructed_line_rejects_non_renderable_nested_scale() {
+        let scene = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Group,
+                transform: WireTransform {
+                    scale: 1e-7,
+                    ..WireTransform::default()
+                },
+                style: WireStyle::default(),
+                children: vec![WireNode {
+                    primitive: WirePrimitive::Line {
+                        x1: 0.0,
+                        y1: 0.0,
+                        x2: 1.0,
+                        y2: 0.0,
+                    },
+                    transform: WireTransform::default(),
+                    style: WireStyle {
+                        stroke: Some(Color::rgb(1.0, 1.0, 1.0)),
+                        ..WireStyle::default()
+                    },
+                    children: vec![],
+                }],
+            },
+        };
+        assert!(
+            !scene.is_supported(),
+            "line renderability must account for cumulative scale"
+        );
     }
 
     #[test]
