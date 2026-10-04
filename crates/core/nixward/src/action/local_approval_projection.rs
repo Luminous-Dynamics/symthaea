@@ -262,6 +262,20 @@ mod tests {
     }
 
     #[test]
+    fn projection_rejects_invisible_and_bidirectional_display_formatting() {
+        let mut request = request();
+        for ch in ['\u{00AD}', '\u{200B}', '\u{202E}', '\u{2066}', '\u{FEFF}'] {
+            let display = format!("nixos-rebuild switch --flake .#workstation{ch}");
+            request.displayed_action_digest = digest_display(&display);
+            let result = PendingNixApprovalProjectionV1::from_request(&request, &display);
+            assert_eq!(
+                result.unwrap_err(),
+                LocalApprovalProjectionErrorV1::DangerousDisplayFormatCharacterInOperatorVisibleAction
+            );
+        }
+    }
+
+    #[test]
     fn projection_is_exactly_derived_and_digest_stable() {
         let request = request();
         let projection =
