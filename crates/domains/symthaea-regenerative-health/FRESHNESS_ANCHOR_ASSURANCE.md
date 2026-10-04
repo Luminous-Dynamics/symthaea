@@ -69,6 +69,8 @@ The typed evidence mechanism records one of:
 
 The mechanism type must match the declared backing category before the evidence verifier is invoked. This prevents a proof envelope from silently changing mechanism class.
 
+The mechanism's observed monotonic value must also equal the recovery generation being asserted. The verifier cannot therefore attest generation N while presenting counter/sequence N-1 as the anti-rollback evidence.
+
 The Handle, verifier policy, reference values, and verifier trust-anchor set are also explicit inputs to the evidence appraisal boundary. They are not treated as decorative metadata.
 
 The receipt exposes a domain-separated `binding_digest()` over every security-relevant receipt field, including the typed evidence mechanism. A concrete verifier can bind its signed Attestation Result to this exact digest instead of signing an implicitly reconstructed subset of fields.
