@@ -1401,6 +1401,91 @@ impl EvaluationBoundary {
         }
     }
 
+    /// Derive the epistemic boundary solely from the captured execution trace.
+    ///
+    /// This is the standalone integrity form: unlike `from_report`, it cannot
+    /// inherit mutated legacy stage projections from a source report.
+    pub fn from_execution_trace(trace: &EvaluationTrace) -> Self {
+        fn classify_stage(
+            stage: VerificationStage,
+            claim: EvaluationClaim,
+            established: &mut Vec<EvaluationClaim>,
+            not_established: &mut Vec<EvaluationClaim>,
+            indeterminate: &mut Vec<EvaluationClaim>,
+        ) {
+            match stage {
+                VerificationStage::Passed => established.push(claim),
+                VerificationStage::Failed(_) => not_established.push(claim),
+                VerificationStage::NotEvaluated => indeterminate.push(claim),
+            }
+        }
+
+        let stage_for = |check: EvaluationCheck| {
+            trace
+                .results
+                .iter()
+                .find(|result| result.check == check)
+                .map(|result| result.stage)
+                .unwrap_or(VerificationStage::NotEvaluated)
+        };
+
+        let mut established = Vec::new();
+        let mut not_established = Vec::new();
+        let mut indeterminate = Vec::new();
+
+        for (check, claim) in [
+            (EvaluationCheck::EnvelopeStructuralValidation, EvaluationClaim::EnvelopeStructuralValidity),
+            (EvaluationCheck::ReceiptCommitment, EvaluationClaim::ReceiptIntegrity),
+            (EvaluationCheck::TemporalValidity, EvaluationClaim::TemporalValidity),
+            (EvaluationCheck::CryptosuiteConformance, EvaluationClaim::CryptosuiteConformance),
+            (EvaluationCheck::VerificationMethodResolution, EvaluationClaim::VerificationMethodResolution),
+            (EvaluationCheck::VerificationMethodLifecycle, EvaluationClaim::VerificationMethodLifecycle),
+            (EvaluationCheck::ProofPurposeAuthorization, EvaluationClaim::ProofPurposeAuthorization),
+            (EvaluationCheck::ProofPolicyConformance, EvaluationClaim::ProofPolicyConformance),
+            (EvaluationCheck::CryptographicProof, EvaluationClaim::CryptographicProofValidity),
+        ] {
+            classify_stage(
+                stage_for(check),
+                claim,
+                &mut established,
+                &mut not_established,
+                &mut indeterminate,
+            );
+        }
+
+        match (
+            stage_for(EvaluationCheck::EnvelopeStructuralValidation),
+            stage_for(EvaluationCheck::ReceiptCommitment),
+            stage_for(EvaluationCheck::CryptographicProof),
+        ) {
+            (
+                VerificationStage::Passed,
+                VerificationStage::Passed,
+                VerificationStage::Passed,
+            ) => established.push(EvaluationClaim::AttestationAuthenticity),
+            (VerificationStage::NotEvaluated, _, _)
+            | (_, VerificationStage::NotEvaluated, _)
+            | (_, _, VerificationStage::NotEvaluated) => {
+                indeterminate.push(EvaluationClaim::AttestationAuthenticity)
+            }
+            _ => not_established.push(EvaluationClaim::AttestationAuthenticity),
+        }
+
+        not_established.extend([
+            EvaluationClaim::UnderlyingObservationTruth,
+            EvaluationClaim::SemanticValidity,
+            EvaluationClaim::ExternalWorldCorrespondence,
+            EvaluationClaim::AttesterIntent,
+            EvaluationClaim::EvaluatorIndependence,
+        ]);
+
+        Self {
+            established,
+            not_established,
+            indeterminate,
+        }
+    }
+
     /// Validate the epistemic partition: every known claim occupies exactly one bucket.
     pub fn is_well_formed(&self) -> bool {
         let established: std::collections::BTreeSet<_> =
@@ -1542,6 +1627,7 @@ impl EvidenceEvaluation {
             && self.execution_trace.is_well_formed()
             && self.execution_trace.terminal_outcome() == Some(self.outcome)
             && self.boundary.is_well_formed()
+            && self.boundary == EvaluationBoundary::from_execution_trace(&self.execution_trace)
     }
 
     /// Validate that this evaluation remains consistent with the report that
@@ -3967,6 +4053,36 @@ mod tests {
 
         assert!(!malformed_report.is_well_formed());
         assert!(!context.matches_report(&malformed_report));
+    }
+
+    #[test]
+    fn evidence_evaluation_rejects_boundary_claims_not_supported_by_trace() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            200,
+        );
+        let report = verifier.verify_report(&envelope, &receipt);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::Expired
+        );
+        let mut evaluation = report.to_evidence_evaluation();
+        assert!(evaluation.is_well_formed());
+
+        evaluation
+            .boundary
+            .established
+            .push(EvaluationClaim::CryptosuiteConformance);
+        evaluation
+            .boundary
+            .indeterminate
+            .retain(|claim| *claim != EvaluationClaim::CryptosuiteConformance);
+
+        assert!(evaluation.boundary.is_well_formed());
+        assert!(!evaluation.is_well_formed());
     }
 
     #[test]
