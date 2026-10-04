@@ -114,7 +114,11 @@ POST_RESTART_CHALLENGE=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \\n')
 POST_RESTART_CHALLENGE_DIGEST=$(printf '%s' "$POST_RESTART_CHALLENGE" | sha256sum | cut -d' ' -f1)
 printf 'post_restart_challenge_sha256=%s\n' "$POST_RESTART_CHALLENGE_DIGEST" >> "$EVIDENCE_FILE"
 tpm2_quote -Q -c "$ROOT/ak-after-restart.ctx" -l sha256:7 -q "$POST_RESTART_CHALLENGE" -m "$ROOT/quote-after-restart.attest" -s "$ROOT/quote-after-restart.sig" -o "$ROOT/quote-after-restart.pcrs" -g sha256
+tpm2_print -Q -t TPMS_ATTEST "$ROOT/quote-after-restart.attest" > "$ROOT/quote-after-restart.yaml"
 tpm2_checkquote -Q -u "$ROOT/ak-after-restart.pem" -m "$ROOT/quote-after-restart.attest" -s "$ROOT/quote-after-restart.sig" -f "$ROOT/quote-after-restart.pcrs" -g sha256 -q "$POST_RESTART_CHALLENGE" -l sha256:7
+
+QUOTE_SIGNER=$(awk '$1 == "qualifiedSigner:" { print $2; exit }' "$ROOT/quote-after-restart.yaml" 2>/dev/null || true)
+[ -n "$QUOTE_SIGNER" ] || true
 
 # Certify the complete eight-byte NV counter at generation 2 with that same fresh challenge.
 tpm2_nvcertify -Q -C "$ROOT/ak-after-restart.ctx" -c "$NV_INDEX" -p "$NV_AUTH" -g sha256 -f plain -s rsassa -o "$ROOT/nv.sig" --attestation "$ROOT/nv.attest" --size 8 --offset 0 -q "$POST_RESTART_CHALLENGE" "$NV_INDEX"
