@@ -189,7 +189,7 @@ fn run() -> Result<()> {
 
             phonological
                 .bind_segments(
-                    sample_segments(false),
+                    sample_segments(speech_plan.focus_role.is_some()),
                     ContentBindingStatus::PhonologicallyBound,
                 )
                 .with_context(|| format!("phonological binding failed for {case_id}"))?;
@@ -213,7 +213,7 @@ fn run() -> Result<()> {
             let mut lexical = PhonologicalPlan::from_speech_plan(&speech_plan);
             lexical
                 .bind_lexical_segments(
-                    sample_segments(true),
+                    sample_segments(speech_plan.focus_role.is_some()),
                     format!("lexeme::{intent_name}"),
                 )
                 .with_context(|| format!("lexical binding failed for {case_id}"))?;
