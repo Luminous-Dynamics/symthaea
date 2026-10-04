@@ -19,6 +19,7 @@ Every emulator campaign must demonstrate:
 - TPM 2.0 family is actually reported;
 - an `TPM_NT_COUNTER` NV index has exactly 8 bytes;
 - counter generation is observed and advanced only by `TPM2_NV_Increment`;
+- the authoritative emulator fixture uses `TPMA_NV_ORDERLY` clear, so the counter update is the TPM's NV-resident counter path rather than an orderly-shutdown-deferred RAM copy;
 - the same fresh challenge binds PCR Quote and NV certification;
 - the NV_Certify attestation is TPM_ST_ATTEST_NV and records the expected NV Index Name, offset 0, and complete eight-byte counter contents;
 - the Quote and NV_Certify attestations carry the same qualified signer;
@@ -36,6 +37,7 @@ A real-hardware run may not claim Q3 until the adapter captures, validates, and 
 
 - exact TPM device identity and TCTI configuration;
 - exact NV public area and canonical NV Index Name, independently derived from the trusted NV public profile rather than copied from the attestation itself;
+- exact NV attributes, including explicit confirmation that `TPMA_NV_ORDERLY` is clear for the authoritative crash-persistent counter profile;
 - exact NV attributes, name algorithm, authorization policy, and data size;
 - exact attestation-key identity and its deployment authorization chain;
 - fresh Quote and NV certification with the same challenge;
