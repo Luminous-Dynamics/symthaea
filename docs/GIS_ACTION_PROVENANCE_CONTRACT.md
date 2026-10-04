@@ -386,3 +386,11 @@ This two-phase construction preserves the important ordering property without co
 
 Two concrete implementation defects found during this hardening pass were repaired without weakening any safety gate: authorization_store.rs now contains its own canonical length-prefix helper required by the boundary provenance commitments, and the startup index migration no longer contains the stray duplicate ON authorization_dispatches(operation_id) SQL fragment.
 
+### Latest execution-lineage hardening — verifier lock isolation
+
+- `1e8b596cea071e8261de7ab8e5a917bf49d4e4b7` — move terminal provider verification outside the SQLite `IMMEDIATE` write transaction while preserving durable prevalidation.
+- `f3a0ad53177832485bfc881cea6ed8de1f38366c` — add matching adversarial coverage for indeterminate reconciliation.
+
+Terminal settlement and authenticated reconciliation now use the same two-phase boundary: a short durable dispatch precheck in a `DEFERRED` transaction, external provider-evidence verification against the frozen in-memory record, then an authoritative `IMMEDIATE` transaction that revalidates the complete dispatch commitment, adapter/native provenance, and relying-party verifier pin before settlement. A verifier-side pin mutation during its external work is therefore observable and fail-closed instead of being hidden behind the authorization store's write lock. This removes an unnecessary writer-lock/foreign-code coupling while retaining the provenance TOCTOU defense.
+
+This is an implementation hardening motivated by AEB-07's requirement that relying-party-selected trust inputs remain authoritative and that accepted evidence remain bound to the exact validated operation; AEB-07 does not mandate SQLite or this exact two-phase construction. citeturn896375search0turn896375search1
