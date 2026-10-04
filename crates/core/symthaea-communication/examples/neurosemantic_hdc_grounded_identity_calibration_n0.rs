@@ -280,6 +280,8 @@ fn main() -> Result<(), String> {
         "claim_boundary": "empirical_clean_calibration_disjoint_evaluation_and_null_abstention_only",
         "calibration": {
             "cases": calibration_metrics.len(),
+            "codebook_hash": calibration.codebook_hash,
+
             "lower_quantile": calibration.quantile,
             "baseline_min_score": baseline.min_score,
             "baseline_min_margin": baseline.min_margin,
