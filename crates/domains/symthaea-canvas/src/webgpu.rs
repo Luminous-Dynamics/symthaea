@@ -386,7 +386,7 @@ fn emit_ellipse(
 
 fn emit_polygon_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) -> bool {
     if points.len() < 3 {
-        return true;
+        return false;
     }
     if points
         .iter()
@@ -411,7 +411,7 @@ fn emit_polygon_fill(out: &mut GpuScene, points: &[[f32; 2]], color: [f32; 4]) -
         polygon.pop();
     }
     if polygon.len() < 3 {
-        return true;
+        return false;
     }
     if !is_simple_polygon(points, &polygon) {
         return false;
@@ -1563,6 +1563,21 @@ mod tests {
         let scene = GpuScene::from_scene(&polygon);
         assert_eq!(scene.vertex_count(), 12, "six-point simple polygon needs four triangles");
         assert_eq!(scene.skipped_nodes, 0);
+    }
+
+    #[test]
+    fn collapsed_closed_polygon_fill_is_rejected() {
+        let polygon = SceneNode::polygon(
+            vec![(20.0, 20.0), (140.0, 140.0), (20.0, 20.0)],
+            true,
+        )
+        .with_style(Style {
+            fill: Some(Color::rgb(0.8, 0.2, 0.2)),
+            ..Style::default()
+        });
+        let scene = GpuScene::from_scene(&polygon);
+        assert!(scene.vertices.is_empty());
+        assert_eq!(scene.skipped_nodes, 1);
     }
 
     #[test]
