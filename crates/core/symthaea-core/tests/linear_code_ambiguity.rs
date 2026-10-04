@@ -341,6 +341,51 @@ fn dependency_witness_ledger_is_canonical_and_verifiable() {
     tampered.factor_support = vec![0, 1];
     assert!(!tampered.verifies_against(&factors));
 
+    let repeated = RandomLinearCode::from_basis(vec![
+        BinaryCodeword::from_words(4, vec![0b0001]),
+        BinaryCodeword::from_words(4, vec![0b0010]),
+    ])
+    .expect("repeated 2D code");
+    let repeated_factors = [&repeated, &repeated, &repeated];
+    let repeated_algebra =
+        factorization_algebra(&repeated_factors).expect("repeated algebra");
+    assert_eq!(repeated_algebra.factor_dimension_sum, 6);
+    assert_eq!(repeated_algebra.union_generator_rank, 2);
+    assert_eq!(repeated_algebra.kernel_dimension, 4);
+    let repeated_kernel =
+        factorization_kernel_basis(&repeated_factors).expect("repeated kernel basis");
+    assert_eq!(repeated_kernel.len(), 4);
+    assert_eq!(
+        repeated_kernel
+            .iter()
+            .filter(|witness| witness.verifies_against(&repeated_factors))
+            .count(),
+        4
+    );
+    let repeated_coefficient_basis = repeated_kernel
+        .iter()
+        .map(|witness| {
+            let mut vector = BinaryCodeword::zero(witness.generator_coefficients.len());
+            for (index, coefficient) in witness.generator_coefficients.iter().enumerate() {
+                vector.set_bit(index, *coefficient);
+            }
+            vector
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        basis_rank(
+            &repeated_coefficient_basis,
+            repeated_algebra.factor_dimension_sum,
+        ),
+        repeated_algebra.kernel_dimension
+    );
+    assert!(repeated_algebra.factorization_count_per_target.is_one() == false);
+    assert_eq!(
+        factorization_count_for_target(&repeated.encode(&[true, false]), &repeated_factors)
+            .expect("repeated target"),
+        repeated_algebra.factorization_count_per_target
+    );
+
     println!(
         "DEPENDENCY_WITNESS=fixture=three-way;kernel_dimension={};generator_coefficients=111;factor_support=0,1,2;generator_support_size={};factor_support_size={};verifies=true",
         algebra.kernel_dimension,
