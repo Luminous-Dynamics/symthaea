@@ -1636,6 +1636,77 @@ fn overlapping_factor_bases_allow_valid_recovery_without_uniqueness() {
 }
 
 #[test]
+fn exact_factorization_neighborhood_identity_holds_under_hamming_noise() {
+    // For a linear factor-to-bound map, every reachable target has exactly
+    // 2^d preimages. Therefore a Hamming-ball oracle over factor tuples must
+    // equal the number of reachable targets in that ball multiplied by 2^d.
+    // This cleanly separates noise-induced target ambiguity from intrinsic
+    // affine-fiber multiplicity.
+    let repeated = RandomLinearCode::from_basis(vec![
+        BinaryCodeword::from_words(4, vec![0b0001]),
+        BinaryCodeword::from_words(4, vec![0b0010]),
+    ])
+    .expect("repeated 2D code");
+    let factors = [&repeated, &repeated, &repeated];
+    let algebra = factorization_algebra(&factors).expect("algebra");
+    assert_eq!(algebra.factor_dimension_sum, 6);
+    assert_eq!(algebra.union_generator_rank, 2);
+    assert_eq!(algebra.kernel_dimension, 4);
+
+    let combined_basis = factors
+        .iter()
+        .flat_map(|factor| factor.basis().iter())
+        .collect::<Vec<_>>();
+    let all_factorization_targets = (0..(1usize << algebra.factor_dimension_sum))
+        .map(|mask| {
+            let mut target = BinaryCodeword::zero(4);
+            for (index, generator) in combined_basis.iter().enumerate() {
+                if (mask >> index) & 1 == 1 {
+                    target.xor_assign(generator);
+                }
+            }
+            target
+        })
+        .collect::<Vec<_>>();
+
+    let reachable_targets = repeated.enumerate();
+    assert_eq!(
+        all_factorization_targets.len(),
+        1usize << algebra.factor_dimension_sum
+    );
+    assert_eq!(reachable_targets.len(), 1usize << algebra.union_generator_rank);
+
+    let hamming_distance = |left: &BinaryCodeword, right: &BinaryCodeword| {
+        left.words()
+            .iter()
+            .zip(right.words())
+            .map(|(a, b)| (a ^ b).count_ones() as usize)
+            .sum::<usize>()
+    };
+
+    for observed_mask in 0..(1usize << 4) {
+        let observed = BinaryCodeword::from_words(4, vec![observed_mask as u64]);
+
+        for radius in 0..=2 {
+            let factor_tuple_neighbors = all_factorization_targets
+                .iter()
+                .filter(|target| hamming_distance(target, &observed) <= radius)
+                .count();
+            let reachable_target_neighbors = reachable_targets
+                .iter()
+                .filter(|target| hamming_distance(target, &observed) <= radius)
+                .count();
+
+            assert_eq!(
+                factor_tuple_neighbors,
+                reachable_target_neighbors * (1usize << algebra.kernel_dimension),
+                "factorization neighborhood mismatch for observed={observed_mask:#x}, radius={radius}"
+            );
+        }
+    }
+}
+
+#[test]
 fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
     let repeated = RandomLinearCode::from_basis(vec![
         BinaryCodeword::from_words(4, vec![0b0001]),
