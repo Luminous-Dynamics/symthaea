@@ -73,6 +73,13 @@ impl LocalApprovalSubmissionV2 {
     ) -> Result<Self, LocalApprovalAdmissionErrorV1> {
         request.validate_shape()?;
         projection.validate()?;
+        // A projection may be internally self-consistent yet still have been
+        // recomputed from tampered ceremony fields. Require exact regeneration
+        // from the immutable pending request before accepting it as the thing
+        // the operator is approving.
+        if !projection.matches_request(request, &projection.operator_visible_action)? {
+            return Err(LocalApprovalAdmissionErrorV1::ProjectionRequestMismatch);
+        }
         if projection.request_id != request.request_id()? {
             return Err(LocalApprovalAdmissionErrorV1::ProjectionRequestMismatch);
         }
@@ -699,6 +706,26 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err, LocalApprovalAdmissionErrorV1::ProjectionRequestMismatch);
+    }
+
+    #[test]
+    fn v2_self_consistent_but_tampered_projection_is_rejected() {
+        let request = request();
+        let mut projection = projection(&request);
+        projection.machine_target_ref = "machine:tampered".to_string();
+        projection.projection_digest = projection.compute_digest().unwrap();
+
+        assert!(projection.validate().is_ok(), "tampered projection remains self-consistent");
+        assert_eq!(
+            LocalApprovalSubmissionV2::for_request_and_projection(
+                &request,
+                &projection,
+                LocalApprovalDecisionKindV1::Approved,
+                ms(1_200),
+            )
+            .unwrap_err(),
+            LocalApprovalAdmissionErrorV1::ProjectionRequestMismatch
+        );
     }
 
     #[test]
