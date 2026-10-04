@@ -42,6 +42,14 @@ impl AttributionCondition {
         matches!(self, Self::ComposedWithFeedback)
     }
 
+    fn vocal_tract_factor(self) -> bool {
+        matches!(self, Self::VocalTractOnly | Self::Composed | Self::ComposedWithFeedback)
+    }
+
+    fn broca_factor(self) -> bool {
+        matches!(self, Self::BrocaOnly | Self::Composed | Self::ComposedWithFeedback)
+    }
+
     fn label(self) -> &'static str {
         match self {
             Self::Neutral => "neutral",
@@ -79,6 +87,8 @@ struct FepTelemetry {
 #[derive(Debug, Clone, Serialize)]
 struct ConditionResult {
     condition: String,
+    vocal_tract_prosody: bool,
+    broca_prosody: bool,
     feedback_enabled: bool,
     plan_surface: String,
     plan_rate_target: f32,
@@ -103,6 +113,7 @@ struct AttributionReport {
     semantic_stage_note: &'static str,
     conditions: Vec<ConditionResult>,
     deltas_from_neutral: BTreeMap<String, FrameProxyDelta>,
+    composition_policy: &'static str,
     limitations: Vec<&'static str>,
 }
 
@@ -185,6 +196,8 @@ fn run() -> Result<()> {
             "This harness preserves the exact SpeechPlan surface but does not claim semantic-delivery success from frame metrics.",
         conditions: results,
         deltas_from_neutral,
+        composition_policy:
+            "vocal-tract owns scheduler/base-F0/stress metadata; Broca overlays intonation/arousal/pitch-accent intent in composed conditions.",
         limitations: vec![
             "Frame proxies are mechanism-attribution measures, not human naturalness scores.",
             "Absolute intelligibility is not measured here; use the existing semantic-delivery and waveform/ASR gates separately.",
@@ -213,6 +226,8 @@ fn run_condition(
 
     Ok(ConditionResult {
         condition: condition.label().to_string(),
+        vocal_tract_prosody: condition.vocal_tract_factor(),
+        broca_prosody: condition.broca_factor(),
         feedback_enabled: condition.feedback_enabled(),
         plan_surface: plan.grounding_surface(),
         plan_rate_target: plan.prosody.rate,
