@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::{Duration, DateTime, SecondsFormat, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
-use sha2::{Digest, Sha256};
+use sha2_gis::{Digest, Sha256};
 use url::Url;
 
 use super::{
@@ -1173,7 +1173,7 @@ impl SqliteAuthorizationStore {
         )?;
 
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        validate_native_authority_pin_set(&tx)?;
+        Self::validate_native_authority_pin_set(&tx)?;
         let clock_policy_digest = store.clock_policy.digest_for_clock(store.clock.source_id());
         let configured_clock_source: Option<String> = tx
             .query_row(
@@ -1769,7 +1769,7 @@ impl SqliteAuthorizationStore {
             return Ok(());
         }
 
-        let normalized_issuer = normalize_native_issuer(issuer);
+        let normalized_issuer = Self::normalize_native_issuer(issuer);
         let mut stmt = tx.prepare(
             "SELECT issuer,authority_namespace
              FROM authorization_native_authority_pins",
@@ -1778,7 +1778,7 @@ impl SqliteAuthorizationStore {
         while let Some(row) = rows.next()? {
             let existing_issuer: String = row.get(0)?;
             let existing_namespace: String = row.get(1)?;
-            if normalize_native_issuer(&existing_issuer) == normalized_issuer
+            if Self::normalize_native_issuer(&existing_issuer) == normalized_issuer
                 && existing_namespace != authority_namespace
             {
                 return Err(AuthorizationStoreError::InvalidState(format!(
@@ -1861,9 +1861,9 @@ fn validate_native_authority_pin_set(
                 "invalid native authority pin set: issuer and authority namespace must be non-empty".into(),
             ));
         }
-        let normalized = normalize_native_issuer(&issuer);
+        let normalized = Self::normalize_native_issuer(&issuer);
         if let Some((existing_issuer, existing_namespace)) =
-            seen.iter().find(|(existing, _)| normalize_native_issuer(existing) == normalized)
+            seen.iter().find(|(existing, _)| Self::normalize_native_issuer(existing) == normalized)
         {
             if existing_namespace != &namespace {
                 return Err(AuthorizationStoreError::InvalidState(format!(
@@ -1940,7 +1940,7 @@ fn validate_native_authority_pin_set(
         let (Some(issuer), Some(namespace)) = (issuer, authority_namespace) else {
             return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
         };
-        let normalized = normalize_native_issuer(issuer);
+        let normalized = Self::normalize_native_issuer(issuer);
         let mut stmt = tx.prepare(
             "SELECT issuer,authority_namespace
              FROM authorization_native_authority_pins",
@@ -1950,7 +1950,7 @@ fn validate_native_authority_pin_set(
         while let Some(row) = rows.next()? {
             let pinned_issuer: String = row.get(0)?;
             let pinned_namespace: String = row.get(1)?;
-            if normalize_native_issuer(&pinned_issuer) == normalized {
+            if Self::normalize_native_issuer(&pinned_issuer) == normalized {
                 if pinned_namespace != namespace {
                     return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
                 }
@@ -2013,7 +2013,7 @@ fn validate_native_authority_pin_set(
         if issuer.is_empty() {
             return Err(AuthorizationConsumptionError::InvalidNativeReplayProvenance.into());
         }
-        let normalized = normalize_native_issuer(issuer);
+        let normalized = Self::normalize_native_issuer(issuer);
         let connection = self.connection()?;
         let mut stmt = connection.prepare(
             "SELECT issuer,authority_namespace
@@ -2023,7 +2023,7 @@ fn validate_native_authority_pin_set(
         let mut matched_namespace: Option<String> = None;
         while let Some(row) = rows.next()? {
             let pinned_issuer: String = row.get(0)?;
-            if normalize_native_issuer(&pinned_issuer) != normalized {
+            if Self::normalize_native_issuer(&pinned_issuer) != normalized {
                 continue;
             }
             let namespace: String = row.get(1)?;
@@ -6828,10 +6828,10 @@ mod tests {
             ),
             Err(AuthorizationStoreError::InvalidState(_))
         ));
-        let normalized_a=normalize_native_issuer("HTTPS://Issuer.Example.:443/");
-        let normalized_b=normalize_native_issuer("https://issuer.example");
-        let normalized_short_url=normalize_native_issuer("https:issuer.example");
-        let normalized_explicit_url=normalize_native_issuer("https://issuer.example");
+        let normalized_a=SqliteAuthorizationStore::normalize_native_issuer("HTTPS://Issuer.Example.:443/");
+        let normalized_b=SqliteAuthorizationStore::normalize_native_issuer("https://issuer.example");
+        let normalized_short_url=SqliteAuthorizationStore::normalize_native_issuer("https:issuer.example");
+        let normalized_explicit_url=SqliteAuthorizationStore::normalize_native_issuer("https://issuer.example");
         assert_eq!(normalized_a,normalized_b);
         assert_eq!(normalized_short_url,normalized_explicit_url);
 
