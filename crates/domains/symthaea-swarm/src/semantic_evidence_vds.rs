@@ -2141,6 +2141,12 @@ impl<'a> CborReader<'a> {
                     return Ok(entries);
                 }
             } else if self.bytes.get(self.offset).copied()==Some(0xff) {
+                // The break stop code is part of the encoded container and must
+                // fit within the aggregate byte budget.
+                let consumed = self.offset.saturating_sub(map_start);
+                if consumed >= max_total_bytes {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                }
                 self.offset+=1;
                 return Ok(entries);
             } else if self.bytes.get(self.offset).is_none() {
@@ -3827,6 +3833,30 @@ mod tests {
             .chain([0x33; 32])
             .collect::<Vec<_>>();
         assert_eq!(consistency.to_cbor(), expected);
+    }
+
+    #[test]
+    fn cbor_indefinite_map_counts_break_against_aggregate_byte_limit() {
+        let wire = vec![0xbf, 0x01, 0x02, 0xff];
+
+        let mut rejected = CborReader::new(&wire);
+        assert_eq!(
+            rejected.read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 3),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+        // The scanner fails closed before consuming a break that would exceed
+        // the configured encoded-byte ceiling.
+        assert_eq!(rejected.offset, 3);
+
+        let mut accepted = CborReader::new(&wire);
+        assert_eq!(
+            accepted
+                .read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 4)
+                .unwrap()
+                .len(),
+            1
+        );
+        accepted.finish().unwrap();
     }
 
     #[test]
