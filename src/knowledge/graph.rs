@@ -16,7 +16,7 @@ use super::encoding::FactEncoding;
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 use symthaea_epistemic_types::{
-    CanonicalAdmissionReceipt, CanonicalAdmissionSubject, MemoryKind, MemoryProvenance, ProvenanceRelation, ProvenanceRelationKind,
+    CanonicalAdmissionReceipt, CanonicalAdmissionSubject, CanonicalStatementIdentity, MemoryKind, MemoryProvenance, ProvenanceRelation, ProvenanceRelationKind,
     ProvenanceValidationReport, ProvenanceValidationViolation,
     ProvenanceView,
 };
@@ -54,6 +54,7 @@ impl CanonicalAdmission {
             canonical_identity: subject.canonical_identity().to_owned(),
             provenance_family: subject.provenance_family().map(str::to_owned),
             receipt: None,
+            statement: None,
         }
     }
 
@@ -74,6 +75,15 @@ impl CanonicalAdmission {
                 return Err("admission receipt must bind canonical subject");
             }
         }
+        if let Some(statement) = self.statement_identity() {
+            let subject = CanonicalAdmissionSubject::new(
+                self.canonical_identity.clone(),
+                self.provenance_family.clone(),
+            )?;
+            if statement.subject() != &subject {
+                return Err("statement identity must bind canonical subject");
+            }
+        }
         Ok(())
     }
 
@@ -84,8 +94,39 @@ impl CanonicalAdmission {
         self
     }
 
+    /// Bind one explicit proposition to this exact canonical subject.
+    pub fn with_statement(
+        mut self,
+        statement_ref: impl Into<String>,
+    ) -> Result<Self, &'static str> {
+        let subject = CanonicalAdmissionSubject::new(
+            self.canonical_identity.clone(),
+            self.provenance_family.clone(),
+        )?;
+        self.statement = Some(CanonicalStatementIdentity::new(subject, statement_ref)?);
+        Ok(self)
+    }
+
+    /// Construct an admission capability already coupled to a proposition.
+    pub fn from_statement(
+        subject: CanonicalAdmissionSubject,
+        statement_ref: impl Into<String>,
+    ) -> Result<Self, &'static str> {
+        let statement = CanonicalStatementIdentity::new(subject.clone(), statement_ref)?;
+        Ok(Self {
+            canonical_identity: subject.canonical_identity().to_owned(),
+            provenance_family: subject.provenance_family().map(str::to_owned),
+            receipt: None,
+            statement: Some(statement),
+        })
+    }
+
     pub fn receipt(&self) -> Option<&CanonicalAdmissionReceipt> {
         self.receipt.as_ref()
+    }
+
+    pub fn statement_identity(&self) -> Option<&CanonicalStatementIdentity> {
+        self.statement.as_ref()
     }
 }
 
@@ -1145,6 +1186,36 @@ fn contains_negation(text: &str) -> bool {
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_canonical_admission_statement_identity_is_subject_bound() {
+        let subject = CanonicalAdmissionSubject::new(
+            "canonical:typed",
+            Some("family:typed".into()),
+        ).unwrap();
+        let admission = CanonicalAdmission::from_statement(
+            subject.clone(),
+            "statement:typed",
+        ).unwrap();
+
+        assert_eq!(
+            admission.statement_identity().unwrap().subject(),
+            &subject
+        );
+        assert_eq!(
+            admission.statement_identity().unwrap().statement_ref(),
+            "statement:typed"
+        );
+        assert!(admission.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn test_subject_only_admission_does_not_claim_statement_admission() {
+        let admission =
+            CanonicalAdmission::new("canonical:typed", Some("family:typed".into())).unwrap();
+        assert!(admission.statement_identity().is_none());
+        assert!(admission.validate_structure().is_ok());
+    }
 
     #[test]
     fn test_canonical_admission_from_typed_subject_preserves_namespace() {
