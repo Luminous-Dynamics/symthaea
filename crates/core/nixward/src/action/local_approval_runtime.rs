@@ -282,8 +282,12 @@ impl std::fmt::Debug for LocalApprovalRuntimeV1 {
 pub fn operator_visible_action_for_command(command: &NixOSCommand) -> String {
     match command {
         NixOSCommand::ConfigPatch {
-            option_path, value, ..
-        } => format!("PATCH /etc/nixos/configuration.nix: {option_path} = {value}"),
+            option_path,
+            value,
+            expected_config_digest,
+        } => format!(
+            "PATCH /etc/nixos/configuration.nix: {option_path} = {value} [expected-config-digest={expected_config_digest}]"
+        ),
         _ => {
             let (bin, args) = command.to_command();
             if args.is_empty() {
@@ -414,6 +418,58 @@ mod tests {
         );
         let projection = installed.operator_projection().unwrap();
         assert_eq!(projection.operator_visible_action, installed.operator_visible_action());
+    }
+    
+    #[test]
+    fn config_patch_display_binds_expected_config_digest() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let command_a = NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "ab".repeat(32),
+        };
+        let command_b = NixOSCommand::ConfigPatch {
+            option_path: "services.nginx.enable".to_string(),
+            value: "true".to_string(),
+            expected_config_digest: "cd".repeat(32),
+        };
+        let intent_a = NixActionIntentV1::from_command(
+            "machine:workstation",
+            Some("generation:42".to_string()),
+            &command_a,
+        )
+        .unwrap();
+        let intent_b = NixActionIntentV1::from_command(
+            "machine:workstation",
+            Some("generation:42".to_string()),
+            &command_b,
+        )
+        .unwrap();
+
+        let a = runtime
+            .create_pending_request(
+                &intent_a,
+                &command_a,
+                RequiredApprovalProfileV1::SameUidProcessV1,
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let b = runtime
+            .create_pending_request(
+                &intent_b,
+                &command_b,
+                RequiredApprovalProfileV1::SameUidProcessV1,
+                UnixMillisV1::new(now.saturating_sub(500)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+
+        assert_ne!(a.operator_visible_action(), b.operator_visible_action());
+        assert!(a.operator_visible_action().contains(&"ab".repeat(32)));
+        assert!(b.operator_visible_action().contains(&"cd".repeat(32)));
     }
 
     #[test]
