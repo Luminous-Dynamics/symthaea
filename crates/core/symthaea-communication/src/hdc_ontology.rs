@@ -242,6 +242,97 @@ pub struct HdcOntologyDecodePolicy {
     pub min_margin: f64,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HdcOntologyEmpiricalCalibration {
+    pub baseline: HdcOntologyDecodePolicy,
+    pub quantile: f64,
+    pub calibrated_min_score: f64,
+    pub calibrated_min_margin: f64,
+    pub calibration_case_count: usize,
+}
+
+impl HdcOntologyEmpiricalCalibration {
+    /// Build a conservative empirical policy floor from successful calibration
+    /// cases. This is descriptive calibration only; it does not provide a
+    /// distribution-free or conformal coverage guarantee.
+    pub fn from_clean_metrics(
+        baseline: HdcOntologyDecodePolicy,
+        calibration_metrics: &[HdcOntologyRoundtripMetrics],
+        lower_quantile: f64,
+    ) -> Result<Self, String> {
+        if !baseline.validates() {
+            return Err("invalid baseline ontology HDC decode policy".into());
+        }
+        if calibration_metrics.is_empty() {
+            return Err("empirical calibration requires at least one clean case".into());
+        }
+        if !lower_quantile.is_finite() || !(0.0..=1.0).contains(&lower_quantile) {
+            return Err("calibration quantile must be finite and within [0, 1]".into());
+        }
+        if calibration_metrics.iter().any(|metrics| {
+            !metrics.validates()
+                || !metrics.structural_equivalence
+                || !metrics.concept_identity_exact
+                || !metrics.relation_identity_exact
+                || metrics.node_precision != 1.0
+                || metrics.node_recall != 1.0
+                || metrics.edge_precision != 1.0
+                || metrics.edge_recall != 1.0
+        }) {
+            return Err("empirical calibration accepts only clean exact calibration metrics".into());
+        }
+
+        fn lower_empirical_quantile(values: &[f64], q: f64) -> f64 {
+            let mut values = values.to_vec();
+            values.sort_by(f64::total_cmp);
+            let index = ((values.len() - 1) as f64 * q).floor() as usize;
+            values[index]
+        }
+
+        let score_floor = lower_empirical_quantile(
+            &calibration_metrics
+                .iter()
+                .flat_map(|metrics| [metrics.node_min_selected_score, metrics.edge_min_selected_score])
+                .collect::<Vec<_>>(),
+            lower_quantile,
+        );
+        let margin_floor = lower_empirical_quantile(
+            &calibration_metrics
+                .iter()
+                .flat_map(|metrics| [metrics.node_selection_margin, metrics.edge_selection_margin])
+                .collect::<Vec<_>>(),
+            lower_quantile,
+        );
+
+        Ok(Self {
+            baseline,
+            quantile: lower_quantile,
+            calibrated_min_score: baseline.min_score.max(score_floor),
+            calibrated_min_margin: baseline.min_margin.max(margin_floor),
+            calibration_case_count: calibration_metrics.len(),
+        })
+    }
+
+    pub fn policy(&self) -> HdcOntologyDecodePolicy {
+        HdcOntologyDecodePolicy {
+            min_score: self.calibrated_min_score,
+            min_margin: self.calibrated_min_margin,
+        }
+    }
+
+    pub fn validates(&self) -> bool {
+        self.baseline.validates()
+            && self.quantile.is_finite()
+            && (0.0..=1.0).contains(&self.quantile)
+            && self.calibrated_min_score.is_finite()
+            && (-1.0..=1.0).contains(&self.calibrated_min_score)
+            && self.calibrated_min_score >= self.baseline.min_score
+            && self.calibrated_min_margin.is_finite()
+            && self.calibrated_min_margin >= self.baseline.min_margin
+            && self.calibration_case_count > 0
+    }
+}
+
 impl HdcOntologyDecodePolicy {
     pub fn conservative_default() -> Self {
         Self {
@@ -1140,6 +1231,67 @@ fn kind_tag(kind: &ConceptKind) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn empirical_calibration_never_weakens_baseline() {
+        let baseline = HdcOntologyDecodePolicy::conservative_default();
+        let metrics = HdcOntologyRoundtripMetrics {
+            schema_version: HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
+            adapter_id: HDC_ONTOLOGY_ADAPTER_ID.into(),
+            codebook_hash: "codebook".into(),
+            source_manifest_hash: "manifest".into(),
+            concept_identity_exact: true,
+            relation_identity_exact: true,
+            node_precision: 1.0,
+            node_recall: 1.0,
+            edge_precision: 1.0,
+            edge_recall: 1.0,
+            structural_equivalence: true,
+            confidence_mae: 0.0,
+            node_min_selected_score: 0.31,
+            node_selection_margin: 0.09,
+            edge_min_selected_score: 0.27,
+            edge_selection_margin: 0.07,
+        };
+        let calibration =
+            HdcOntologyEmpiricalCalibration::from_clean_metrics(baseline, &[metrics], 0.0)
+                .unwrap();
+        assert_eq!(calibration.calibrated_min_score, 0.31);
+        assert_eq!(calibration.calibrated_min_margin, 0.09);
+        assert!(calibration.validates());
+        assert!(calibration.policy().min_score >= 0.20);
+        assert!(calibration.policy().min_margin >= 0.05);
+    }
+
+    #[test]
+    fn empirical_calibration_rejects_non_clean_metrics() {
+        let baseline = HdcOntologyDecodePolicy::conservative_default();
+        let mut metrics = HdcOntologyRoundtripMetrics {
+            schema_version: HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
+            adapter_id: HDC_ONTOLOGY_ADAPTER_ID.into(),
+            codebook_hash: "codebook".into(),
+            source_manifest_hash: "manifest".into(),
+            concept_identity_exact: true,
+            relation_identity_exact: true,
+            node_precision: 1.0,
+            node_recall: 1.0,
+            edge_precision: 1.0,
+            edge_recall: 1.0,
+            structural_equivalence: true,
+            confidence_mae: 0.0,
+            node_min_selected_score: 0.4,
+            node_selection_margin: 0.1,
+            edge_min_selected_score: 0.4,
+            edge_selection_margin: 0.1,
+        };
+        metrics.concept_identity_exact = false;
+        assert!(
+            HdcOntologyEmpiricalCalibration::from_clean_metrics(baseline, &[metrics], 0.1)
+                .is_err()
+        );
+    }
+
     use super::*;
 
     fn graph(
