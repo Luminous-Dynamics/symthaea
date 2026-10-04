@@ -216,13 +216,13 @@ fn cose_key_accepts_textual_ec2_p256_es256_and_verify() {
 
 
 #[test]
-fn cose_key_rejects_noncanonical_integer_and_indefinite_forms() {
+fn cose_key_accepts_noncanonical_integer_but_rejects_indefinite_forms() {
     let mut bytes = valid_key();
     let pos = bytes.windows(2).position(|w| w == [0x01, 0x02]).unwrap();
     bytes.splice(pos..pos + 2, [0x01, 0x18, 0x02]);
-    assert_eq!(
-        Rfc9942Es256CoseKey::from_cbor(&bytes),
-        Err(Rfc9942VdpError::InvalidEncoding)
+    assert!(
+        Rfc9942Es256CoseKey::from_cbor(&bytes).is_ok(),
+        "valid non-minimal integer encoding must remain interoperable"
     );
 
     let mut indefinite = valid_key();
