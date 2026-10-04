@@ -5394,7 +5394,9 @@ mod tests {
         ).unwrap();
 
         let err=store.commit_bound_verified(
-            &record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier
+            &record,
+            &verified_evidence(&record,ExecutionOutcome::Succeeded),
+            &TestProviderVerifier
         ).unwrap_err();
         assert!(matches!(
             err,
@@ -5403,29 +5405,35 @@ mod tests {
             )
         ));
 
-        assert_eq!(
-            store.recover_incomplete_attempt_for_boundary(
-                "boundary-verifier-config",
-                "attempt-verifier-config"
-            ).unwrap(),
-            1
-        );
-        let reconcile_err=store.reconcile_indeterminate_bound_verified(
+        store.pin_provider_evidence_verifier_configuration(&ProviderVerifierConfiguration {
+            relying_party_id: store.relying_party_id().to_owned(),
+            verifier_id: "test-verifier/v1".into(),
+            verifier_revision: "test-verifier/rev1".into(),
+            verifier_implementation_id: "test-verifier".into(),
+            verifier_implementation_digest: "sha256:test-verifier-implementation".into(),
+            verifier_config_digest: "sha256:test-verifier-config".into(),
+            trust_anchor_digest: "sha256:test-trust-anchors".into(),
+            evidence_profile_digest: "sha256:test-evidence-profile".into(),
+        }).unwrap();
+
+        let mismatch=store.commit_bound_verified(
             &record,
             &verified_evidence(&record,ExecutionOutcome::Succeeded),
             &TestProviderVerifierForRp { relying_party_id: "wrong-rp".into() }
         ).unwrap_err();
         assert!(matches!(
-            reconcile_err,
+            mismatch,
             AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
             )
         ));
-        store.reconcile_indeterminate_bound_verified(
+
+        let receipt=store.commit_bound_verified(
             &record,
             &verified_evidence(&record,ExecutionOutcome::Succeeded),
             &TestProviderVerifier
         ).unwrap();
+        assert_eq!(receipt.outcome,ExecutionOutcome::Succeeded);
 
         let _=std::fs::remove_file(path);
     }
