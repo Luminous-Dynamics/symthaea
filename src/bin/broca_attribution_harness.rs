@@ -107,6 +107,7 @@ struct ConditionResult {
     fep: FepTelemetry,
     exact_repeat: bool,
     repeat_max_abs_delta: f32,
+    fep_exact_repeat: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -242,6 +243,8 @@ fn run_condition(
     let first = capture(genesis, plan, condition)?;
     let second = capture(genesis, plan, condition)?;
     let (exact_repeat, repeat_max_abs_delta) = compare_captures(&first.0, &second.0);
+    let fep_exact_repeat = first.1.prediction_errors == second.1.prediction_errors
+        && first.1.selected_actions == second.1.selected_actions;
 
     Ok(ConditionResult {
         condition: condition.label().to_string(),
@@ -255,6 +258,7 @@ fn run_condition(
         fep: first.1,
         exact_repeat,
         repeat_max_abs_delta,
+        fep_exact_repeat,
     })
 }
 
