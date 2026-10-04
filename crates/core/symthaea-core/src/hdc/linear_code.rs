@@ -365,6 +365,9 @@ impl LinearCodeAlgebra {
             return false;
         };
         self.factor_dimension_sum == rank_sum
+            && self.raw_factor_tuple_count.exponent() == self.factor_dimension_sum
+            && self.reachable_target_count.exponent() == self.union_generator_rank
+            && self.factorization_count_per_target.exponent() == self.kernel_dimension
             && self.raw_factor_tuple_count.exponent() == exponent_sum
             && self.unique_factorization == (self.kernel_dimension == 0)
             && self.factorization_count_per_target.is_one() == self.unique_factorization
@@ -1338,6 +1341,21 @@ mod tests {
             dependency_order: None,
         };
         assert!(!exponent_overflow.satisfies_conservation_law());
+    }
+
+    #[test]
+    fn conservation_law_rejects_inconsistent_public_exponents() {
+        let inconsistent = LinearCodeAlgebra {
+            factor_dimension_sum: 3,
+            union_generator_rank: 2,
+            kernel_dimension: 1,
+            raw_factor_tuple_count: ExactPowerOfTwo::new(3),
+            reachable_target_count: ExactPowerOfTwo::new(5),
+            factorization_count_per_target: ExactPowerOfTwo::new(1),
+            unique_factorization: false,
+            dependency_order: Some(3),
+        };
+        assert!(!inconsistent.satisfies_conservation_law());
     }
 
     #[test]
