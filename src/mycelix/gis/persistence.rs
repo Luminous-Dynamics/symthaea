@@ -112,13 +112,21 @@ fn serialize_resolution(resolution: &IgnoranceResolution) -> String {
     output
 }
 
+fn has_explicit_format_version(encoded: &str) -> bool {
+    let Some(prefix) = encoded.split('|').next() else {
+        return false;
+    };
+    let Some(version_digits) = prefix.strip_prefix('v') else {
+        return false;
+    };
+    !version_digits.is_empty() && version_digits.bytes().all(|byte| byte.is_ascii_digit())
+}
+
 fn deserialize_resolution(encoded: &str) -> Result<IgnoranceResolution, PersistenceError> {
-    if encoded.split('|').next().is_some_and(|prefix| prefix.starts_with('v')) {
-        if !encoded.starts_with("v2|") {
-            return Err(PersistenceError::Deserialization(
-                "resolution has an unsupported format version".into(),
-            ));
-        }
+    if has_explicit_format_version(encoded) && !encoded.starts_with("v2|") {
+        return Err(PersistenceError::Deserialization(
+            "resolution has an unsupported format version".into(),
+        ));
     }
 
     if let Some(payload) = encoded.strip_prefix("v2|") {
@@ -292,7 +300,7 @@ fn deserialize_frame_revision(encoded: &str) -> Result<EpistemicFrameRevision, P
     if encoded.starts_with("v2|") {
         return parse_frame_revision_v2(encoded);
     }
-    if encoded.split('|').next().is_some_and(|prefix| prefix.starts_with('v')) {
+    if has_explicit_format_version(encoded) {
         return Err(PersistenceError::Deserialization(
             "frame revision has an unsupported format version".into(),
         ));
@@ -1383,6 +1391,18 @@ mod tests {
         assert!(
             error.to_string().contains("affected-conclusion count exceeds payload capacity")
         );
+    }
+
+    #[test]
+    fn test_legacy_frame_id_starting_with_v_is_not_misclassified_as_versioned() {
+        let mut record = create_test_record("legacy_v_frame", "Legacy v frame", 0.4);
+        record.frame_revisions_serialized = vec![
+            "vframe@1;vframe@2;legacy trigger;;legacy scope;c1".to_string(),
+        ];
+
+        let restored = record.to_record().unwrap();
+        assert_eq!(restored.frame_revisions.len(), 1);
+        assert_eq!(restored.frame_revisions[0].prior_frame, "vframe@1");
     }
 
     #[test]
