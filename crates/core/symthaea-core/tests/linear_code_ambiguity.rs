@@ -1370,6 +1370,110 @@ fn exhaustive_bounded_distance_oracle_separates_detection_from_correction() {
 }
 
 #[test]
+fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
+    // Stage-E research oracle only: enumerate noisy observations around a
+    // small linear-code and keep codeword-candidate multiplicity separate
+    // from the affine factorization multiplicity of each candidate.
+    let code = RandomLinearCode::from_basis(vec![
+        BinaryCodeword::from_words(8, vec![0b1111_0000]),
+        BinaryCodeword::from_words(8, vec![0b0000_1111]),
+    ])
+    .expect("fixed rank-2 code");
+    let factors = [&code, &code, &code];
+    let algebra = factorization_algebra(&factors).expect("factor algebra");
+    assert_eq!(algebra.kernel_dimension, 4);
+    assert_eq!(algebra.dependency_order, Some(2));
+    assert!(algebra.satisfies_conservation_law_for_factor_count(factors.len()));
+    let fiber_multiplicity = 1usize << algebra.kernel_dimension;
+
+    let codewords = code.enumerate();
+    let hamming_distance = |left: &BinaryCodeword, right: &BinaryCodeword| {
+        left.words()
+            .iter()
+            .zip(right.words())
+            .map(|(a, b)| (a ^ b).count_ones() as usize)
+            .sum::<usize>()
+    };
+    let min_distance = codewords
+        .iter()
+        .filter(|word| word.weight() > 0)
+        .map(|word| hamming_distance(word, &BinaryCodeword::zero(8)))
+        .min()
+        .expect("non-zero codeword exists");
+    assert_eq!(min_distance, 4);
+
+    let clean = codewords[1].clone();
+    let mut observations = 0usize;
+    let mut total_candidate_codewords = 0usize;
+    let mut max_candidate_codewords = 0usize;
+    let mut total_factor_tuple_candidates = 0usize;
+    let mut singleton_codeword_observations = 0usize;
+    let mut ambiguous_codeword_observations = 0usize;
+
+    for mask in 0..(1usize << 8) {
+        if mask.count_ones() > 2 {
+            continue;
+        }
+
+        let mut error = BinaryCodeword::zero(8);
+        for index in 0..8 {
+            if (mask >> index) & 1 == 1 {
+                error.set_bit(index, true);
+            }
+        }
+        let observation = clean.bound(&error);
+
+        let candidates: Vec<_> = codewords
+            .iter()
+            .filter(|candidate| hamming_distance(&observation, candidate) <= 2)
+            .cloned()
+            .collect();
+
+        assert!(candidates.contains(&clean));
+
+        let mut factor_tuple_candidates = 0usize;
+        for candidate in &candidates {
+            let multiplicity = factorization_count_for_target(candidate, &factors)
+                .expect("every codeword candidate is representable");
+            assert_eq!(multiplicity.exponent(), algebra.kernel_dimension);
+            factor_tuple_candidates += 1usize << multiplicity.exponent();
+        }
+
+        assert_eq!(
+            factor_tuple_candidates,
+            candidates.len() * fiber_multiplicity
+        );
+        observations += 1;
+        total_candidate_codewords += candidates.len();
+        max_candidate_codewords = max_candidate_codewords.max(candidates.len());
+        total_factor_tuple_candidates += factor_tuple_candidates;
+
+        if candidates.len() == 1 {
+            singleton_codeword_observations += 1;
+            assert_eq!(factor_tuple_candidates, fiber_multiplicity);
+        } else {
+            ambiguous_codeword_observations += 1;
+            assert!(candidates.len() > 1);
+            assert!(factor_tuple_candidates > fiber_multiplicity);
+        }
+    }
+
+    assert!(observations > 1);
+    assert!(singleton_codeword_observations > 0);
+    assert!(ambiguous_codeword_observations > 0);
+    assert!(max_candidate_codewords >= 2);
+    assert_eq!(
+        total_factor_tuple_candidates,
+        total_candidate_codewords * fiber_multiplicity
+    );
+
+    println!(
+        "NOISY_LIST_LEDGER=dimension=8;rank=2;factors=3;radius=2;min_distance={min_distance};observations={observations};singleton_codeword_observations={singleton_codeword_observations};ambiguous_codeword_observations={ambiguous_codeword_observations};total_candidate_codewords={total_candidate_codewords};max_candidate_codewords={max_candidate_codewords};fiber_multiplicity=2^{};total_factor_tuple_candidates={total_factor_tuple_candidates}",
+        algebra.kernel_dimension,
+    );
+}
+
+#[test]
 fn minimum_distance_boundary_can_map_one_valid_codeword_to_another() {
     // At d_min, a corruption can itself be a non-zero codeword. The observed
     // vector is then another valid codeword, so an exact span solver has no
