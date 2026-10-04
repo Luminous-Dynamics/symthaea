@@ -10,7 +10,7 @@ use crate::{ClaimRepresentationIdentity, CanonicalAdmissionReceipt, CanonicalAdm
 pub const FEDERATED_CLAIM_SCHEMA_VERSION: u16 = 1;
 /// Version of the canonical federated-envelope digest encoding. Bump whenever
 /// fields included in canonical_digest() or their canonical encoding changes.
-pub const FEDERATED_CLAIM_DIGEST_VERSION: u16 = 2;
+pub const FEDERATED_CLAIM_DIGEST_VERSION: u16 = 3;
 
 /// A typed dependency identity exposed to a federation adapter.
 ///
@@ -246,7 +246,7 @@ impl ClaimAuthorship {
 
     pub fn digest(&self) -> String {
         let encoded = (
-            "symthaea:claim-authorship:v1",
+            "symthaea:claim-authorship:v2",
             self.author.as_str(),
             self.proof_purpose.as_str(),
             self.verification_method.as_ref().map(ClaimVerificationMethod::as_str),
