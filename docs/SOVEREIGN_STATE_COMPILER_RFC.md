@@ -503,7 +503,9 @@ TargetSnapshot.
 These facts are evidence, not authority. The bridge performs no authorization,
 command execution, reboot, or mutation. The exact observation digest is then
 available for SSC target-snapshot binding and for Nixward's later post-state
-verification pass.
+verification pass. The Nixward observation digest is domain-separated from
+other SSC/Nix digests so the same canonical JSON bytes cannot be confused with
+a digest from another protocol object.
 
 Before a previously authorized plan reaches mutation, a fresh Nixward
 observation can be checked against the authorization as a read-only preflight:
