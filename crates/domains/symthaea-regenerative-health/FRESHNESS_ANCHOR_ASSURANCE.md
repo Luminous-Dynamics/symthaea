@@ -73,6 +73,10 @@ The Handle, verifier policy, reference values, and verifier trust-anchor set are
 
 The receipt exposes a domain-separated `binding_digest()` over every security-relevant receipt field, including the typed evidence mechanism. A concrete verifier can bind its signed Attestation Result to this exact digest instead of signing an implicitly reconstructed subset of fields.
 
+A concrete Ed25519 attestation envelope is provided by the adjacent `freshness_anchor_attestation` module. It signs the exact receipt binding digest with a domain-separated message and refuses verification when any signed receipt field changes.
+
+This cryptographic layer authenticates the verifier's statement, not the verifier's authority by itself. Deployment policy must still establish that the verification key corresponds to the declared verifier identity and trust-anchor set, and the verifier implementation must actually appraise the underlying hardware, remote-authority, or quorum evidence.
+
 The authoritative recovery commit additionally requires the verified receipt to match the recovery record's policy fingerprint, authority reference, authority statement digest, and authentication binding. A receipt for one recovery authorization context cannot be spliced onto another record that happens to share the same receiver, generation, and state fingerprint.
 
 VerifiedFreshnessAnchor is deliberately non-serializable and can only be minted after a verifier accepts that exact profile/receipt pair.
@@ -159,6 +163,7 @@ Implemented:
 - domain-separated deterministic profile commitment with explicit field framing;
 - evidence-bound verification receipt;
 - deterministic, domain-separated verification-receipt statement commitment;
+- concrete Ed25519 attestation-result protection over that commitment;
 - explicit recovery-policy and authority binding;
 - typed hardware/remote/quorum evidence envelope;
 - verifier-policy and reference-value binding;
@@ -173,6 +178,7 @@ Not yet implemented:
 - concrete HSM adapter;
 - remote-authority protocol;
 - quorum/consensus adapter;
-- production evidence parser/attestation verifier.
+- production platform evidence parser/attestation verifier;
+- deployment-specific verifier-key/trust-anchor resolution.
 
 This separation is intentional: platform-specific evidence verification must remain an independently reviewable trust boundary.
