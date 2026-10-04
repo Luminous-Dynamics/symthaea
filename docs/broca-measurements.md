@@ -141,3 +141,6 @@ The attribution harness is deliberately not a human-naturalness benchmark. It av
 Feedback-enabled runs use a fixed synthetic `VocalTractObservation`. They therefore measure controller coupling and deterministic response, not real auditory self-hearing.
 
 The five-condition design is intended to support mechanism attribution before optimization: changes can be compared against neutral, isolated to the existing vocal-tract prosody path, isolated to Broca, evaluated under explicit composition, and then compared with feedback enabled.
+
+
+The attribution artifact also records `feedback_delta_from_composed` and `composition_interaction_delta`. The former isolates the effect of enabling the fixed feedback controller condition; the latter reports non-additivity of the composed result relative to the two isolated conditions. Neither is interpreted as unrestricted causal identification outside the declared fixed-seed control design.
