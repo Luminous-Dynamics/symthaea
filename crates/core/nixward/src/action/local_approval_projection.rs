@@ -302,7 +302,6 @@ mod tests {
             PendingNixApprovalProjectionV1::from_request(&request, "nixos-rebuild switch --flake .#workstation")
                 .unwrap();
         projection.required_approval_profile = "unknown-profile-v99".to_string();
-        projection.projection_digest = projection.compute_digest().unwrap();
 
         assert_eq!(
             projection.validate().unwrap_err(),
