@@ -2540,6 +2540,26 @@ mod tests {
     }
 
     #[test]
+    fn attester_identity_mutation_invalidates_detached_signature() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        assert_eq!(
+            verifier.verify_detached_proof(&envelope, &receipt),
+            ReceiptAttestationVerificationOutcome::Verified
+        );
+
+        envelope.attester_id = "attester-forged".into();
+        assert_eq!(
+            verifier.verify_detached_proof(&envelope, &receipt),
+            ReceiptAttestationVerificationOutcome::InvalidSignature
+        );
+    }
+
+    #[test]
     fn temporal_and_key_policy_failures_are_distinct() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
         let verifier = Ed25519ReceiptVerifier::new(
