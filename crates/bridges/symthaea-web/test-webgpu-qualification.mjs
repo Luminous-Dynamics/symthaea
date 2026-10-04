@@ -246,6 +246,23 @@ async function waitForProjection(page, selector, display, classification = 'rend
   }
 }
 
+async function waitForQualificationReady(page, selector) {
+  try {
+    await page.waitForFunction(
+      selector => document.querySelector(selector)?.getAttribute('data-qualification-ready') === 'true',
+      { timeout: 30_000 },
+      selector,
+    );
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+  } catch (error) {
+    throw new QualificationError(
+      `WebGPU projection ${selector} did not report render completion: ${error instanceof Error ? error.message : String(error)}`,
+      'renderer',
+    );
+  }
+}
+
 async function waitForVisible(page, selector, classification = 'fallback') {
   try {
     await page.waitForFunction(
@@ -352,7 +369,8 @@ async function runMode(mode) {
 
       await waitForProjection(page, '#webgpu-cognitive-canvas', 'block');
       await waitForProjection(page, '#webgpu-movie-canvas', 'block');
-      await sleep(250);
+      await waitForQualificationReady(page, '#webgpu-cognitive-canvas');
+      await waitForQualificationReady(page, '#webgpu-movie-canvas');
       failOnPageErrors('WebGPU first render');
 
       const firstSceneHash = await canvasPngHash(page, '#webgpu-cognitive-canvas');
@@ -397,7 +415,8 @@ async function runMode(mode) {
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
       await waitForProjection(page, '#webgpu-cognitive-canvas', 'block');
       await waitForProjection(page, '#webgpu-movie-canvas', 'block');
-      await sleep(250);
+      await waitForQualificationReady(page, '#webgpu-cognitive-canvas');
+      await waitForQualificationReady(page, '#webgpu-movie-canvas');
       failOnPageErrors('WebGPU deterministic repeat render');
 
       const repeatSceneHash = await canvasPngHash(page, '#webgpu-cognitive-canvas');
