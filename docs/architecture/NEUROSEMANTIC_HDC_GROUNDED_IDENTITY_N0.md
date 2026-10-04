@@ -144,6 +144,31 @@ The benchmark remains an N0 synthetic representation test. Passing it does not
 demonstrate that an upstream neural decoder has correctly inferred a person's
 meaning.
 
+## Identity-confusion adversarial sweep
+
+
+The `neurosemantic_hdc_grounded_identity_adversarial_n0` lab applies deterministic
+random bit corruption independently to the node and edge HDC frames at:
+
+`0%, 2%, 5%, 10%, 20%, 30%, 40%, 50%`
+
+The acceptance rule is deliberately asymmetric:
+
+- a corrupted frame may remain accepted only when the decoded stable identities
+  are still exactly correct;
+- a decoder error is treated as abstention;
+- an accepted but incorrect stable identity is a hard failure.
+
+This does not establish adversarial robustness in the cryptographic sense.
+It is an N0 red-team boundary against a simpler and important failure mode:
+random transport corruption turning into an apparently confident but incorrect
+ontology identity.
+
+The lab reports correct accepts, abstentions, and confident-wrong accepts
+separately. CI requires zero confident-wrong accepts while retaining at least one
+clean correct decode. The existing fixed `0.20 / 0.05` score/margin policy is not
+relaxed to accommodate corruption.
+
 ## Evidence ladder
 
 The accompanying executable N0 lab demonstrates:
