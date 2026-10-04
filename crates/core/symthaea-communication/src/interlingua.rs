@@ -157,7 +157,7 @@ pub fn drop_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
     reduced
 }
 
-pub fn duplicate_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
+pub fn relabel_nodes(graph: &GroundedConceptGraph, suffix: &str) -> GroundedConceptGraph {\n    let mut relabeled = graph.clone();\n    for node in &mut relabeled.nodes {\n        node.label = node.label.as_ref().map(|label| format!("{label}{suffix}"));\n    }\n    relabeled\n}\n\npub fn adjust_confidence(graph: &GroundedConceptGraph, delta: f32) -> GroundedConceptGraph {\n    let mut adjusted = graph.clone();\n    for node in &mut adjusted.nodes {\n        node.confidence = (node.confidence + delta).clamp(0.0, 1.0);\n    }\n    adjusted\n}\n\npub fn duplicate_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
     let mut duplicated = graph.clone();
     if let Some(edge) = duplicated.edges.last().cloned() {
         duplicated.edges.push(edge);
@@ -165,7 +165,7 @@ pub fn duplicate_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph
     duplicated
 }
 
-fn canonical_nodes(graph: &GroundedConceptGraph) -> BTreeMap<String, (ConceptKind, Vec<String>, f32)> {
+fn canonical_nodes(graph: &GroundedConceptGraph) -> BTreeMap<String, f32> {
     graph
         .nodes
         .iter()
