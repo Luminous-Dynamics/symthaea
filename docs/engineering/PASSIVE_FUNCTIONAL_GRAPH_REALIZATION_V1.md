@@ -81,9 +81,7 @@ realized geometry before expensive physical evaluation.
 
 ## Topology divergence
 
-TopologyDivergence is emitted when every declared FlowPath is geometrically connected
-but the candidate also connects at least one represented port pair that the functional
-graph does not connect in either direction.
+TopologyDivergence is emitted when every declared FlowPath is geometrically connected\nbut the candidate also creates at least one represented port pair that the functional\ngraph does not connect by FlowPath in either direction.
 
 This is intentionally stricter than endpoint reachability alone: a candidate can satisfy
 all requested paths while still realizing too much connectivity. That can matter for
