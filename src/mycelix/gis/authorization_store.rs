@@ -3476,6 +3476,9 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
         }
 
+        // A verifier result is never authoritative by itself: mutable pins or
+        // durable attempt fields may change while foreign verification executes.
+        // Only the second transaction can admit terminal state.
         // Phase 2: acquire the authoritative write transaction only after
         // verification, then revalidate every durable binding before settlement.
         let mut connection = self.connection()?;
