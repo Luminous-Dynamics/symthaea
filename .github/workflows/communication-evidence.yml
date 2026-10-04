@@ -8,6 +8,9 @@ on:
       - "crates/core/symthaea-stt/src/communication_adapter.rs"
       - "communication/**"
       - ".github/workflows/communication-evidence.yml"
+      - "docs/architecture/NEUROSEMANTIC_COMMUNICATION_PROTOCOL_V1.md"
+      - "docs/architecture/NEUROSEMANTIC_N1_EVIDENCE_CONTRACT.md"
+      - "docs/communication-capability-inventory.md"
   workflow_dispatch:
 
 concurrency:
