@@ -810,9 +810,10 @@ impl ReceiptAttestationVerificationReport {
     ///
     /// The report's payload fingerprint commits to the complete signed payload, including
     /// attester identity, verification method, proof purpose, validity interval, domain,
-    /// and challenge. This helper intentionally does not verify the envelope's detached
-    /// proof; it only checks report↔envelope identity binding and must be paired
-    /// with the report's own well-formedness and proof-verification checks.
+    /// and challenge. This helper rejects internally inconsistent report identity bindings
+    /// before checking report↔envelope identity. It does not verify the envelope's detached
+    /// proof or the full report execution trace, so callers must still apply the complete
+    /// verification contract.
     pub fn matches_attestation_envelope(&self, envelope: &ReceiptAttestationEnvelope) -> bool {
         self.has_consistent_identity_bindings()
             && self.verifier_version == VERIFIER_VERSION
