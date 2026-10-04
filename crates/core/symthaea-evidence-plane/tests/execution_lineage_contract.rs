@@ -123,6 +123,146 @@ fn environment_identity_is_stable_across_workload_only_changes() {
 }
 
 #[test]
+fn every_canonical_lineage_field_changes_only_its_declared_projection() {
+    let base = fixture();
+    let workload = base.workload_digest().unwrap();
+    let environment = base.environment_digest().unwrap();
+
+    let cases: Vec<(
+        &str,
+        Box<dyn Fn(&mut ExecutionLineageV1)>,
+        bool,
+    )> = vec![
+        (
+            "source_repository",
+            Box::new(|lineage| lineage.source_repository = "another-org/symthaea".into()),
+            true,
+        ),
+        (
+            "source_revision",
+            Box::new(|lineage| lineage.source_revision = "d".repeat(40)),
+            true,
+        ),
+        (
+            "source_tree",
+            Box::new(|lineage| lineage.source_tree = "e".repeat(40)),
+            true,
+        ),
+        (
+            "repository_source_snapshot_id",
+            Box::new(|lineage| {
+                lineage.repository_source_snapshot_id =
+                    RepositorySourceSnapshotId::parse(&"f".repeat(64)).unwrap();
+            }),
+            true,
+        ),
+        (
+            "lock_digests",
+            Box::new(|lineage| {
+                lineage
+                    .lock_digests
+                    .insert("flake.lock".into(), "sha256:1122334455667788".into());
+            }),
+            true,
+        ),
+        (
+            "feature_flags",
+            Box::new(|lineage| {
+                lineage.feature_flags.insert("research".into());
+            }),
+            true,
+        ),
+        (
+            "working_directory",
+            Box::new(|lineage| lineage.cwd = "/workspace/changed".into()),
+            true,
+        ),
+        (
+            "command_argv",
+            Box::new(|lineage| lineage.argv.push("--nocapture".into())),
+            true,
+        ),
+        (
+            "immutable_input_digests",
+            Box::new(|lineage| {
+                lineage
+                    .immutable_input_digests
+                    .insert("dataset.bin".into(), "blake3:1122334455667788".into());
+            }),
+            true,
+        ),
+        (
+            "toolchain_versions",
+            Box::new(|lineage| {
+                lineage
+                    .toolchain_versions
+                    .insert("cargo".into(), "1.96.0".into());
+            }),
+            false,
+        ),
+        (
+            "host_triple",
+            Box::new(|lineage| lineage.host_triple = "aarch64-unknown-linux-gnu".into()),
+            false,
+        ),
+        (
+            "target_triple",
+            Box::new(|lineage| lineage.target_triple = "wasm32-unknown-unknown".into()),
+            false,
+        ),
+        (
+            "nix_identity",
+            Box::new(|lineage| lineage.nix_identity = None),
+            false,
+        ),
+        (
+            "allowed_environment",
+            Box::new(|lineage| {
+                lineage
+                    .allowed_env
+                    .insert("RUSTFLAGS".into(), "-Copt-level=3".into());
+            }),
+            false,
+        ),
+    ];
+
+    for (name, mutate, affects_workload) in cases {
+        let mut changed = base.clone();
+        mutate(&mut changed);
+
+        assert_ne!(
+            changed.validated_digest().unwrap(),
+            base.validated_digest().unwrap(),
+            "{name} must change the full lineage identity",
+        );
+
+        if affects_workload {
+            assert_ne!(
+                changed.workload_digest().unwrap(),
+                workload,
+                "{name} must change workload identity",
+            );
+            assert_eq!(
+                changed.environment_digest().unwrap(),
+                environment,
+                "{name} must not change environment identity",
+            );
+        } else {
+            assert_eq!(
+                changed.workload_digest().unwrap(),
+                workload,
+                "{name} must not change workload identity",
+            );
+            assert_ne!(
+                changed.environment_digest().unwrap(),
+                environment,
+                "{name} must change environment identity",
+            );
+        }
+    }
+}
+
+#[test]
 fn every_canonical_lineage_field_changes_identity_and_drift_report() {
     let base = fixture();
 
