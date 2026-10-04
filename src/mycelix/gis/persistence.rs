@@ -534,17 +534,25 @@ impl InMemoryPersistence {
         let domain = stored.domain.clone();
         let status = stored.status.clone();
 
+        self.remove_from_indexes(&id);
         self.ignorance_records.insert(id.clone(), stored);
 
-        // Update indices
         self.category_index
             .entry(domain)
             .or_default()
             .push(id.clone());
-
         self.status_index.entry(status).or_default().push(id);
 
         Ok(())
+    }
+
+    fn remove_from_indexes(&mut self, id: &str) {
+        for ids in self.category_index.values_mut() {
+            ids.retain(|indexed_id| indexed_id != id);
+        }
+        for ids in self.status_index.values_mut() {
+            ids.retain(|indexed_id| indexed_id != id);
+        }
     }
 
     /// Get an ignorance record by ID
@@ -565,7 +573,14 @@ impl InMemoryPersistence {
         }
 
         let stored = StoredIgnoranceRecord::from_record(record);
-        self.ignorance_records.insert(record.id.clone(), stored);
+        let id = record.id.clone();
+        let domain = stored.domain.clone();
+        let status = stored.status.clone();
+
+        self.remove_from_indexes(&id);
+        self.ignorance_records.insert(id.clone(), stored);
+        self.category_index.entry(domain).or_default().push(id.clone());
+        self.status_index.entry(status).or_default().push(id);
         Ok(())
     }
 
@@ -992,6 +1007,29 @@ mod tests {
         let mid = db.query_by_eig_range(0.3, 0.7).unwrap();
         assert_eq!(mid.len(), 1);
         assert_eq!(mid[0].id, "mid_1");
+    }
+
+    #[test]
+    fn test_update_refreshes_category_and_status_indexes() {
+        let mut db = InMemoryPersistence::new();
+        let mut record = create_test_record("index_update", "Index", 0.5);
+
+        db.store_ignorance_record(&record).unwrap();
+        assert_eq!(db.query_by_category("General").unwrap().len(), 1);
+        assert_eq!(db.query_by_status("Active").unwrap().len(), 1);
+
+        record.detection.domain = Domain::Physics;
+        record.status = IgnoranceStatus::Resolved;
+        db.update_ignorance_record(&record).unwrap();
+
+        assert!(db.query_by_category("General").unwrap().is_empty());
+        assert_eq!(db.query_by_category("Physics").unwrap().len(), 1);
+        assert!(db.query_by_status("Active").unwrap().is_empty());
+        assert_eq!(db.query_by_status("Resolved").unwrap().len(), 1);
+
+        db.store_ignorance_record(&record).unwrap();
+        assert_eq!(db.query_by_category("Physics").unwrap().len(), 1);
+        assert_eq!(db.query_by_status("Resolved").unwrap().len(), 1);
     }
 
     #[test]
