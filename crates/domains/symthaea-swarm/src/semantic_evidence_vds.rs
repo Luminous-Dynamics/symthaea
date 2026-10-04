@@ -3824,6 +3824,36 @@ mod tests {
     }
 
     #[test]
+    fn cbor_skip_value_enforces_exact_recursion_depth_cap() {
+        fn tagged_integer(tag_count: usize) -> Vec<u8> {
+            let mut value = Vec::with_capacity(tag_count + 1);
+            for _ in 0..tag_count {
+                value.push(0xc0); // tag(0)
+            }
+            value.push(0x01);
+            value
+        }
+
+        let mut accepted = vec![0xa1, 0x01];
+        accepted.extend_from_slice(&tagged_integer(16));
+        let mut reader = CborReader::new(&accepted);
+        assert_eq!(
+            reader.read_map_entries_bounded(1).unwrap().len(),
+            1,
+            "depth 16 should remain within the inclusive recursion budget"
+        );
+        reader.finish().unwrap();
+
+        let mut rejected = vec![0xa1, 0x01];
+        rejected.extend_from_slice(&tagged_integer(17));
+        let mut reader = CborReader::new(&rejected);
+        assert_eq!(
+            reader.read_map_entries_bounded(1),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
+    #[test]
     fn cbor_skip_value_enforces_recursive_aggregate_byte_limit() {
         // The map body allows only 14 encoded bytes. The nested array is
         // 13 bytes by itself, but its second child crosses the shared ceiling.
