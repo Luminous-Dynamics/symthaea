@@ -220,6 +220,7 @@ impl NixOSTargetAdapter {
         }
     }
 
+    #[cfg(test)]
     pub fn from_observation(
         target: impl Into<TargetId>,
         observed_at_ms: u64,
