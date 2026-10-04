@@ -248,3 +248,27 @@ The N0 lab additionally sweeps deterministic binary corruption at 0%, 0.1%, 1%, 
 10% nominal bit-flip probability and records binary similarity plus full-dimension cosine
 similarity to the original continuous vector. These are transport/representation metrics
 only; they are not semantic-accuracy metrics.
+
+## Deterministic HDC semantic interlingua N0
+
+The opt-in HDC track now has a deterministic semantic adapter documented in
+`docs/architecture/NEUROSEMANTIC_HDC_INTERLINGUA_N0.md` and executable as
+`neurosemantic_hdc_interlingua_n0`.
+
+The adapter uses a versioned training-derived codebook and two independently framed
+HDC channels: a role-marked node bundle and a compositional directed-edge bundle. Each
+channel is composed in continuous space and then crosses the already measured
+`ContinuousHV -> sign -> BinaryHV` codec boundary.
+
+The N0 lab builds the codebook from four synthetic training graphs and evaluates two
+held-out graphs. The held-out cases reuse only atoms present in the training manifest,
+but test unseen graph combinations. Retrieval uses the same codebook and reports node
+and edge precision/recall, structural equivalence, confidence MAE, selected-score
+margins, and representation size.
+
+The lab also includes unrelated-vector, role-swap, collection-reordering, and codebook-
+mismatch controls. A codebook descriptor or hash mismatch is rejected before semantic
+interpretation, preventing silent coordinate-system substitution.
+
+This remains synthetic representation/retrieval evidence. It is not neural decoding,
+semantic-understanding evidence, or evidence of preserving subjective intent.
