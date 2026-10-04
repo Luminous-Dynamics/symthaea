@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use symthaea_communication::{
-    adjust_confidence, compare_graphs, drop_last_edge, duplicate_last_edge, graph_hash,
+    adjust_confidence, compare_graphs, drop_last_edge, duplicate_last_edge, duplicate_last_node, graph_hash,
     relabel_nodes, rename_identifiers, reorder_collections, ConceptEdge, ConceptKind,
     ConceptNode, GroundedConceptGraph, InterlinguaBenchmarkCase, InterlinguaPerturbation,
 };
@@ -79,20 +79,26 @@ fn main() -> Result<(), String> {
             drop_last_edge(&expected),
         ),
         (
-            "duplicate-edge",
+            "duplicate-node",
             1005,
+            InterlinguaPerturbation::DuplicateNode,
+            duplicate_last_node(&expected),
+        ),
+        (
+            "duplicate-edge",
+            1006,
             InterlinguaPerturbation::DuplicateEdge,
             duplicate_last_edge(&expected),
         ),
         (
             "relabelled",
-            1006,
+            1007,
             InterlinguaPerturbation::Relabeled,
             relabel_nodes(&expected, " (paraphrase)"),
         ),
         (
             "confidence-drift",
-            1007,
+            1008,
             InterlinguaPerturbation::ConfidenceDrift,
             adjust_confidence(&expected, 0.05),
         ),
@@ -114,6 +120,9 @@ fn main() -> Result<(), String> {
     let renamed_ok = case_is(&report, "renamed-identifiers", |metrics| metrics.structural_equivalence);
     let missing_rejected = case_is(&report, "missing-edge", |metrics| {
         !metrics.structural_equivalence && metrics.edge_recall < 1.0
+    });
+    let duplicate_node_rejected = case_is(&report, "duplicate-node", |metrics| {
+        !metrics.structural_equivalence && metrics.node_precision < 1.0
     });
     let duplicate_rejected = case_is(&report, "duplicate-edge", |metrics| {
         !metrics.structural_equivalence && metrics.edge_precision < 1.0
