@@ -405,7 +405,7 @@ fn main() -> Result<(), String> {
         "benchmark_schema_version": HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
         "execution_revision": execution_revision(),
         "adapter_id": HDC_ONTOLOGY_ADAPTER_ID,
-        "claim_boundary": "identity_confusion_red_team_with_random_bit_corruption_only",
+        "claim_boundary": "identity_confusion_red_team_with_random_bit_corruption_and_boundary_interpolation_only",
         "policy": {
             "min_score": policy.min_score,
             "min_margin": policy.min_margin,
