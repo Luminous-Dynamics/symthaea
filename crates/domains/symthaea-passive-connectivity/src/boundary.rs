@@ -315,6 +315,22 @@ impl PortBoundaryGeometry {
 type QuantizedPoint = [i64; 3];
 type QuantizedEdge = (QuantizedPoint, QuantizedPoint);
 
+fn quantize(point: [f32; 3]) -> QuantizedPoint {
+    [
+        (point[0] as f64 * 1_000_000.0).round() as i64,
+        (point[1] as f64 * 1_000_000.0).round() as i64,
+        (point[2] as f64 * 1_000_000.0).round() as i64,
+    ]
+}
+
+fn edge_key(a: QuantizedPoint, b: QuantizedPoint) -> QuantizedEdge {
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
 fn collect_boundary_edges(mesh: &TriangleMesh) -> Vec<(BoundaryEdgeKey, [f64; 3])> {
     let mut edges: HashMap<QuantizedEdge, [f64; 3]> = HashMap::new();
     let mut counts: HashMap<QuantizedEdge, usize> = HashMap::new();
