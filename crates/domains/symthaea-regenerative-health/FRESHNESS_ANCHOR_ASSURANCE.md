@@ -118,6 +118,7 @@ A real adapter must still independently verify:
 - full-contents NV certification mode (`TPM_ST_ATTEST_NV`);
 - NV certification qualifying data matching the verifier challenge;
 - NV certification carrying the same NV Index Name as the selected counter;
+- NV certification using the same attestation-key identity as the PCR Quote;
 - certification `offset = 0` and `size = 8`;
 - the certified NV contents digest matching the observed counter value;
 - the observed counter value;
