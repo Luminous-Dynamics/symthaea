@@ -84,6 +84,16 @@ struct FepTelemetry {
     selected_actions: Vec<String>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+struct FeedbackProbe {
+    articulation_score: f64,
+    formant_accuracy: f64,
+    pitch_stability: f64,
+    coarticulation_smoothness: f64,
+    duration_accuracy: f64,
+    energy_consistency: f64,
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct ConditionResult {
     condition: String,
@@ -114,6 +124,7 @@ struct AttributionReport {
     conditions: Vec<ConditionResult>,
     deltas_from_neutral: BTreeMap<String, FrameProxyDelta>,
     composition_policy: &'static str,
+    feedback_probe: FeedbackProbe,
     limitations: Vec<&'static str>,
 }
 
@@ -198,11 +209,19 @@ fn run() -> Result<()> {
         deltas_from_neutral,
         composition_policy:
             "vocal-tract owns scheduler/base-F0/stress metadata; Broca overlays intonation/arousal/pitch-accent intent in composed conditions.",
+        feedback_probe: FeedbackProbe {
+            articulation_score: 0.78,
+            formant_accuracy: 0.84,
+            pitch_stability: 0.72,
+            coarticulation_smoothness: 0.88,
+            duration_accuracy: 0.80,
+            energy_consistency: 0.86,
+        },
         limitations: vec![
             "Frame proxies are mechanism-attribution measures, not human naturalness scores.",
             "Absolute intelligibility is not measured here; use the existing semantic-delivery and waveform/ASR gates separately.",
             "Broca rate_target is recorded but is not consumed by VocalTractPipeline timing in this harness.",
-            "Feedback-enabled runs use a fixed synthetic VocalTractObservation and therefore test controller coupling, not real auditory self-hearing.",
+            "Feedback-enabled runs use a fixed perturbed synthetic VocalTractObservation and therefore test controller coupling, not real auditory self-hearing.",
             "The composed condition uses an explicit field-level precedence policy documented by compose_context().",
         ],
     };
@@ -251,12 +270,12 @@ fn capture(
     let mut prediction_errors = Vec::new();
     let mut selected_actions = Vec::new();
     let feedback = VocalTractObservation {
-        articulation_score: 1.0,
-        formant_accuracy: 1.0,
-        pitch_stability: 1.0,
-        coarticulation_smoothness: 1.0,
-        duration_accuracy: 1.0,
-        energy_consistency: 1.0,
+        articulation_score: 0.78,
+        formant_accuracy: 0.84,
+        pitch_stability: 0.72,
+        coarticulation_smoothness: 0.88,
+        duration_accuracy: 0.80,
+        energy_consistency: 0.86,
     };
 
     for (phoneme_index, phoneme) in PHONEMES.iter().enumerate() {
@@ -289,7 +308,11 @@ fn capture(
                 BrocaFramePosition {
                     utterance_progress,
                     phoneme_progress,
-                    stress,
+                    stress: if matches!(condition, AttributionCondition::BrocaOnly) {
+                        0
+                    } else {
+                        stress
+                    },
                     phrase_index: 0,
                     phrase_progress: utterance_progress,
                     is_focus: false,
