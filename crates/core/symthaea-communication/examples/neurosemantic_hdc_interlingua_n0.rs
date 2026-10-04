@@ -3,7 +3,8 @@ use symthaea_communication::hdc_interlingua::{
     HdcSemanticCodebook, HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
 };
 use symthaea_communication::{
-    reorder_collections, ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph,
+    relabel_nodes, rename_identifiers, reorder_collections, ConceptEdge, ConceptKind, ConceptNode,
+    GroundedConceptGraph,
 };
 fn node(id: &str, kind: ConceptKind, grounding: &str, confidence: f32) -> ConceptNode {
     ConceptNode {
@@ -144,6 +145,32 @@ fn main() -> Result<(), String> {
     let reordered_representation_exact =
         reorder_a.node_frame == reorder_b.node_frame && reorder_a.edge_frame == reorder_b.edge_frame;
 
+    let relabelled = codebook.encode_graph(&relabel_nodes(&held_out[0], " (paraphrase)"))?;
+    let renamed = codebook.encode_graph(&rename_identifiers(&held_out[0], "renamed-"))?;
+    let lexical_invariance_exact =
+        reorder_a.node_frame == relabelled.node_frame && reorder_a.edge_frame == relabelled.edge_frame;
+    let identifier_invariance_exact =
+        reorder_a.node_frame == renamed.node_frame && reorder_a.edge_frame == renamed.edge_frame;
+    if !lexical_invariance_exact || !identifier_invariance_exact {
+        return Err("HDC canonicalization invariance failed".into());
+    }
+
+    let corruption_probabilities = [0.0_f32, 0.001, 0.01, 0.05, 0.10];
+    let mut corruption_observations = Vec::with_capacity(corruption_probabilities.len());
+    for (index, probability) in corruption_probabilities.into_iter().enumerate() {
+        let corrupted =
+            codebook.corrupt_for_transport(&reorder_a, probability, 50_000 + index as u64)?;
+        let metrics = codebook.measure_roundtrip(&held_out[0], &corrupted)?;
+        if probability == 0.0 && !metrics.structural_equivalence {
+            return Err("zero-corruption HDC roundtrip was not exact".into());
+        }
+        corruption_observations.push(serde_json::json!({
+            "flip_probability": probability,
+            "seed": 50_000 + index as u64,
+            "metrics": metrics,
+        }));
+    }
+
     let negative_controls =
         codebook.measure_negative_controls(&reorder_a, &held_out[0], 9_001)?;
     if negative_controls.unrelated_node_max_similarity.abs() > 0.20
@@ -179,10 +206,22 @@ fn main() -> Result<(), String> {
             "relation_names": codebook.relation_names(),
         },
         "codec_id": "symthaea.hdc.continuous-sign-v1",
-        "summary": summary,
+        "summary": {
+            "training_graphs": training.len(),
+            "held_out_graphs": held_out.len(),
+            "all_structurally_equivalent": true,
+            "same_codebook_for_all_cases": true,
+            "reordered_representation_exact": reordered_representation_exact,
+            "lexical_invariance_exact": lexical_invariance_exact,
+            "identifier_invariance_exact": identifier_invariance_exact,
+            "wrong_codebook_rejected": wrong_codebook_rejected
+        },
         "cases": cases,
         "negative_controls": negative_controls,
+        "transport_corruption": corruption_observations,
         "reordered_representation_exact": reordered_representation_exact,
+        "lexical_invariance_exact": lexical_invariance_exact,
+        "identifier_invariance_exact": identifier_invariance_exact,
         "wrong_codebook_rejected": wrong_codebook_rejected,
     });
 
