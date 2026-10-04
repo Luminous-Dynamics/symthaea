@@ -1560,7 +1560,7 @@ pub enum VerificationMethodStatus {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedVerificationMethod {
     pub verification_method: String,
     pub verifying_key: VerifyingKey,
@@ -1645,7 +1645,7 @@ pub enum VerificationMethodResolutionError {
     Unavailable,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct InMemoryVerificationMethodResolver {
     methods: std::collections::BTreeMap<String, ResolvedVerificationMethod>,
 }
@@ -3077,7 +3077,10 @@ mod tests {
     #[test]
     fn evidence_evaluation_boundary_marks_failed_checks_as_not_established() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
-        envelope.proof.proof_value[0] ^= 0x01;
+        envelope
+            .proof
+            .as_mut()
+            .expect("signed envelope proof")[0] ^= 0x01;
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
@@ -3507,7 +3510,10 @@ mod tests {
     #[test]
     fn verification_report_captures_execution_trace_at_execution_time() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
-        envelope.proof.proof_value[0] ^= 0x01;
+        envelope
+            .proof
+            .as_mut()
+            .expect("signed envelope proof")[0] ^= 0x01;
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
@@ -3742,7 +3748,7 @@ mod tests {
                 .checks
                 .iter()
                 .map(|check| check.id())
-                .collect()
+                .collect::<Vec<_>>()
         );
     }
 
@@ -4099,7 +4105,10 @@ mod tests {
     #[test]
     fn evaluation_trace_binds_check_results_and_procedure() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
-        envelope.proof.proof_value[0] ^= 0x01;
+        envelope
+            .proof
+            .as_mut()
+            .expect("signed envelope proof")[0] ^= 0x01;
         let report = Ed25519ReceiptVerifier::new(
             "did:example:attester-a#key-1",
             signing_key.verifying_key(),
@@ -4302,7 +4311,10 @@ mod tests {
     #[test]
     fn resolver_snapshot_is_retained_when_post_resolution_crypto_failure_occurs() {
         let (mut envelope, signing_key, receipt) = envelope_and_key();
-        envelope.proof.proof_value[0] ^= 0x01;
+        envelope
+            .proof
+            .as_mut()
+            .expect("signed envelope proof")[0] ^= 0x01;
 
         let method = ResolvedVerificationMethod {
             verification_method: envelope.attester_id.clone(),
