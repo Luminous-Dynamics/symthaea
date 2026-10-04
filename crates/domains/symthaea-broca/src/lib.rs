@@ -130,6 +130,10 @@ pub use secure_dreaming::{SecureDreamResult, SecureDreamingEngine};
 pub use self_actualization::ReflectionEngine;
 pub use self_optimization::SelfOptimizationEngine;
 pub use species_learning::MemoryConsolidator;
+pub use phonological_plan::{
+    ContentBindingStatus, PhonemeSlot, PhonologicalPlan, PhonologicalPlanError, SyllableSlot,
+    SyllableStress, PHONOLOGICAL_PLAN_VERSION,
+};
 pub use speech_feedback::{
     SpeechFeedbackError, SpeechFeedbackReceipt, SpeechSensoryObservation, SpeechSensoryTarget,
     SPEECH_FEEDBACK_VERSION,
