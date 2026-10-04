@@ -105,8 +105,8 @@ impl SolverBoundaryBinding {
         hasher.update(&[0]);
         hasher.update(self.external_boundary_handle.as_bytes());
         hasher.update(&[0]);
-        hasher.update(&self.realized_boundary.candidate_geometry_digest);
-        hasher.update(&self.realized_boundary.boundary_patch_digest);
+        hasher.update(&self.realized_boundary.candidate_geometry_digest());
+        hasher.update(&self.realized_boundary.boundary_patch_digest());
         hasher.update(&[u8::from(self.solver_binding_verified)]);
         hasher.update(&[u8::from(self.physical_transport_unproven)]);
         *hasher.finalize().as_bytes()
@@ -276,7 +276,7 @@ mod tests {
         assert_eq!(binding.port, PortId(10));
         assert_eq!(binding.external_boundary_handle, "fixture:boundary-7");
         assert_eq!(
-            binding.realized_boundary.candidate_mesh_digest,
+            binding.realized_boundary.candidate_mesh_digest(),
             digest_triangle_mesh(&candidate)
         );
     }
