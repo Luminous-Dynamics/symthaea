@@ -372,6 +372,27 @@ mod tests {
     }
 
     #[test]
+    fn nv_certify_challenge_must_match_quote_challenge() {
+        let challenge = TpmQuoteChallenge::new([9u8; TPM_QUOTE_NONCE_BYTES]).unwrap();
+        let mut evidence = evidence(7);
+        let digest = challenge.digest();
+        evidence.quote_nonce_digest = digest.clone();
+        let receipt = receipt(7);
+
+        assert_eq!(
+            verify_tpm_nv_counter_with_challenge(
+                &evidence,
+                &challenge,
+                &profile(),
+                &receipt,
+                &Accept,
+            )
+            .unwrap_err(),
+            TpmNvCounterVerificationError::ChallengeDigestMismatch
+        );
+    }
+
+    #[test]
     fn challenge_mismatch_is_rejected_before_external_verifier() {
         let challenge = TpmQuoteChallenge::new([9u8; TPM_QUOTE_NONCE_BYTES]).unwrap();
         let evidence = evidence(7);
