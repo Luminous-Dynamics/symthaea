@@ -295,7 +295,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-qualification.txt <<EOF
           HDC Linear-Code Recovery Qualification
           ======================================
-          receipt_schema=hdc-linear-code-qualification-v1
+          receipt_schema=hdc-linear-code-qualification-v2
           exact_head=${{ steps.head.outputs.sha }}
           runner_os=${{ steps.runner.outputs.runner_os }}
           runner_arch=${{ steps.runner.outputs.runner_arch }}
@@ -331,7 +331,7 @@ jobs:
           geometry_sweep_schema=linear-code-geometry-sweep-v2
           geometry_sweep_status=${{ steps.geometry_sweep.outcome }}
           geometry_sweep=${{ steps.geometry_sweep.outputs.geometry_sweep }}
-          paper_matrix_schema=linear-code-paper-matrix-v2
+          paper_matrix_schema=linear-code-paper-matrix-v3
           paper_matrix_status=${{ steps.paper_matrix.outcome }}
           paper_matrix=${{ steps.paper_matrix.outputs.paper_matrix }}
           paper_matrix_result_digest=${{ steps.paper_matrix.outputs.paper_matrix_result_digest }}
@@ -347,9 +347,10 @@ jobs:
           higher_order_dependency_schema=linear-code-higher-order-v1
           higher_order_dependency_status=${{ steps.higher_order.outcome }}
           higher_order_dependency=${{ steps.higher_order.outputs.higher_order_sweep }}
-          dependency_witness_schema=linear-code-dependency-witness-v1
+          dependency_witness_schema=linear-code-dependency-witness-v2
           dependency_witness_status=${{ steps.witness.outcome }}
           dependency_witness=${{ steps.witness.outputs.dependency_witness }}
+          kernel_basis_schema=linear-code-kernel-basis-v1
           rng_algorithm=rand_chacha::ChaCha12Rng
           rng_seed_derivation=SeedableRng::seed_from_u64
           representation=gf2_random_linear_code
