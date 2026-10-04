@@ -453,6 +453,30 @@ mod tests {
     }
 
     #[test]
+    fn evidence_digest_mismatch_is_rejected_before_external_verifier() {
+        let evidence = evidence(7);
+        let mut receipt = receipt(7);
+        receipt.evidence_digest = "different-evidence".into();
+
+        struct MustNotRun;
+        impl TpmNvCounterEvidenceVerifier for MustNotRun {
+            fn verify(
+                &self,
+                _: &TpmNvCounterEvidence,
+                _: &FreshnessAnchorProfile,
+                _: &FreshnessAnchorVerificationReceipt,
+            ) -> Result<(), TpmNvCounterVerificationError> {
+                panic!("external verifier must not run before evidence digest validation");
+            }
+        }
+
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt, &MustNotRun).unwrap_err(),
+            TpmNvCounterVerificationError::EvidenceDigestMismatch
+        );
+    }
+
+    #[test]
     fn quote_handle_must_match_receipt_handle() {
         let evidence = evidence(7);
         let mut receipt = receipt(7);
