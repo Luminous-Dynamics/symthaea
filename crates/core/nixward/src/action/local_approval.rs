@@ -46,6 +46,41 @@ pub struct PendingNixApprovalRequestV1 {
     pub request_nonce: [u8; 32],
 }
 
+/// Encode one command argument so distinct typed argument vectors cannot
+/// collapse to the same operator-visible text.
+///
+/// The encoding is display syntax only; it is not intended to be copied into a
+/// shell. Bare arguments use a deliberately narrow alphabet. Everything else is
+/// double-quoted with backslash/quote escaping.
+fn operator_display_arg(arg: &str) -> String {
+    if !arg.is_empty()
+        && arg
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._/@+:-".contains(&byte))
+    {
+        return arg.to_owned();
+    }
+
+    let mut encoded = String::with_capacity(arg.len() + 2);
+    encoded.push('"');
+    for ch in arg.chars() {
+        match ch {
+            '\\' => encoded.push_str("\\\\"),
+            '"' => encoded.push_str("\\""),
+            _ => encoded.push(ch),
+        }
+    }
+    encoded.push('"');
+    encoded
+}
+
+fn operator_display_args(args: &[String]) -> String {
+    args.iter()
+        .map(|arg| operator_display_arg(arg))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Canonical operator-facing rendering for a typed Nixward command.
 ///
 /// This is presentation data, not execution authority. The renderer lives in
@@ -67,11 +102,12 @@ pub fn operator_visible_action_for_command(
             if args.is_empty() {
                 bin
             } else {
-                format!("{} {}", bin, args.join(" "))
+                format!("{} {}", bin, operator_display_args(&args))
             }
         }
     }
 }
+
 
 impl PendingNixApprovalRequestV1 {
     pub fn from_intent(
@@ -413,6 +449,55 @@ mod tests {
             [nonce_byte; 32],
         )
         .unwrap()
+    }
+
+    #[test]
+    fn operator_display_distinguishes_argument_boundaries() {
+        use crate::action::executor::NixOSCommand;
+
+        let one_argument = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec!["profile with spaces".to_string()],
+        };
+        let two_arguments = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec!["profile".to_string(), "with".to_string(), "spaces".to_string()],
+        };
+
+        let one = operator_visible_action_for_command(&one_argument);
+        let two = operator_visible_action_for_command(&two_arguments);
+
+        assert_ne!(
+            one, two,
+            "distinct typed argument vectors must never collapse to identical approval text"
+        );
+        assert_eq!(
+            one,
+            r#"nixos-rebuild switch "profile with spaces""#
+        );
+        assert_eq!(
+            two,
+            "nixos-rebuild switch profile with spaces"
+        );
+    }
+
+    #[test]
+    fn operator_display_quotes_non_bare_arguments_without_control_characters() {
+        use crate::action::executor::NixOSCommand;
+
+        let command = NixOSCommand::RebuildSwitch {
+            flake: None,
+            extra_args: vec![
+                "a"b".to_string(),
+                "a\\b".to_string(),
+                "".to_string(),
+            ],
+        };
+
+        assert_eq!(
+            operator_visible_action_for_command(&command),
+            r#"nixos-rebuild switch "a"b" "a\b" """#
+        );
     }
 
     #[test]
