@@ -3257,6 +3257,23 @@ mod tests {
     }
 
     #[test]
+    fn rfc9942_vdp_rejects_indefinite_map_above_entry_cap() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let canonical=vdp.to_cbor();
+
+        let mut encoded=vec![0xbf,0x20];
+        encoded.extend_from_slice(&canonical[2..]);
+        encoded.extend_from_slice(&canonical[1..]);
+        encoded.push(0xff);
+
+        assert_eq!(
+            Rfc9942Vdp::from_cbor(&encoded),
+            Err(Rfc9942VdpError::InvalidEncoding)
+        );
+    }
+
+    #[test]
     fn rfc9942_vdp_rejects_indefinite_map_without_break() {
         let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
         let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
