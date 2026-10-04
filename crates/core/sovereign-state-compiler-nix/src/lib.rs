@@ -40,6 +40,9 @@ pub fn nixos_generation_resource(
     generation: u64,
     realization: &str,
 ) -> Result<sovereign_state_compiler::ResourceRef, NixOSAdapterError> {
+    if generation == 0 {
+        return Err(NixOSAdapterError::InvalidGenerationNumber);
+    }
     if realization.is_empty() {
         return Err(NixOSAdapterError::InvalidGenerationRealization);
     }
@@ -607,6 +610,8 @@ pub enum NixOSAdapterError {
     RollbackGenerationRequired,
     #[error("nixos.rollback-generation must be greater than zero")]
     InvalidRollbackGeneration,
+    #[error("NixOS generation number must be greater than zero")]
+    InvalidGenerationNumber,
     #[error("rollback target realization identity must not be empty")]
     InvalidGenerationRealization,
     #[error("nixos.rollback=true requires an exact nixos.rollback-realization")]
@@ -868,6 +873,15 @@ mod tests {
                 .expect("generation resource"),
             nixos_generation_resource(43, "/nix/store/aaa-nixos-system-host")
                 .expect("generation resource")
+        );
+    }
+
+    #[test]
+    fn rollback_generation_resource_rejects_zero_generation() {
+        assert_eq!(
+            nixos_generation_resource(0, "/nix/store/aaa-nixos-system-host")
+                .expect_err("zero generation"),
+            NixOSAdapterError::InvalidGenerationNumber
         );
     }
 
