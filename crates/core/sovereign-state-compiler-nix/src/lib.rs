@@ -155,7 +155,6 @@ impl NixActivationMode {
 pub fn default_nixos_capabilities() -> BTreeSet<Capability> {
     [
         Capability::ObserveState,
-        Capability::ObserveHardware,
         Capability::InstallApplication,
         Capability::RemoveApplication,
         Capability::ConfigureSystem,
@@ -656,6 +655,7 @@ mod tests {
     fn default_capabilities_do_not_overclaim_recovery() {
         assert!(!default_nixos_capabilities().contains(&Capability::CreateRecoveryEnvironment));
         assert!(default_nixos_capabilities().contains(&Capability::ObserveState));
+        assert!(!default_nixos_capabilities().contains(&Capability::ObserveHardware));
         assert!(default_nixos_capabilities().contains(&Capability::Rollback));
     }
 
