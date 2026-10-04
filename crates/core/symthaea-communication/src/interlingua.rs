@@ -16,6 +16,7 @@ pub enum InterlinguaPerturbation {
     ReorderedCollections,
     RenamedIdentifiers,
     MissingEdge,
+    DuplicateNode,
     DuplicateEdge,
     Relabeled,
     ConfidenceDrift,
@@ -81,10 +82,14 @@ pub fn compare_graphs(
         .map(|(key, expected_confidences)| {
             observed_nodes
                 .get(key)
-                .map(|observed_confidences| expected_confidences.len().min(observed_confidences.len()))
+                .map(|observed_confidences| {
+                    expected_confidences
+                        .len()
+                        .min(observed_confidences.len())
+                })
                 .unwrap_or(0)
         })
-        .sum();
+        .sum::<usize>();
     let edge_intersection = expected_edges
         .iter()
         .filter(|key| observed_edges.binary_search(key).is_ok())
@@ -94,13 +99,13 @@ pub fn compare_graphs(
         schema_version: INTERLINGUA_BENCHMARK_SCHEMA_VERSION,
         expected_graph_hash: graph_hash(expected)?,
         observed_graph_hash: graph_hash(observed)?,
-        node_precision: ratio(node_intersection, observed_nodes.len()),
-        node_recall: ratio(node_intersection, expected_nodes.len()),
+        node_precision: ratio(node_intersection, observed.nodes.len()),
+        node_recall: ratio(node_intersection, expected.nodes.len()),
         edge_precision: ratio(edge_intersection, observed_edges.len()),
         edge_recall: ratio(edge_intersection, expected_edges.len()),
         confidence_mae: confidence_mae(&expected_nodes, &observed_nodes),
         structural_equivalence: expected_nodes.keys().eq(observed_nodes.keys())
-            && expected_edges == observed_edges,
+            && multiset_edges_equal(&expected_edges, &observed_edges),
         expected_bytes: serde_json::to_vec(expected)
             .map_err(|error| error.to_string())?
             .len(),
@@ -164,18 +169,18 @@ pub fn adjust_confidence(graph: &GroundedConceptGraph, delta: f32) -> GroundedCo
     adjusted
 }
 
-pub fn drop_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
-    let mut reduced = graph.clone();
-    reduced.edges.pop();
-    reduced
-}
-
 pub fn duplicate_last_node(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
     let mut duplicated = graph.clone();
     if let Some(node) = duplicated.nodes.last().cloned() {
         duplicated.nodes.push(node);
     }
     duplicated
+}
+
+pub fn drop_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
+    let mut reduced = graph.clone();
+    reduced.edges.pop();
+    reduced
 }
 
 pub fn duplicate_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
@@ -186,12 +191,18 @@ pub fn duplicate_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph
     duplicated
 }
 
-fn canonical_nodes(graph: &GroundedConceptGraph) -> BTreeMap<String, f32> {
-    graph
-        .nodes
-        .iter()
-        .map(|node| (canonical_node_key(node), node.confidence))
-        .collect()
+fn canonical_nodes(graph: &GroundedConceptGraph) -> BTreeMap<String, Vec<f32>> {
+    let mut nodes = BTreeMap::<String, Vec<f32>>::new();
+    for node in &graph.nodes {
+        nodes
+            .entry(canonical_node_key(node))
+            .or_default()
+            .push(node.confidence);
+    }
+    for confidences in nodes.values_mut() {
+        confidences.sort_by(f32::total_cmp);
+    }
+    nodes
 }
 
 fn canonical_edges(graph: &GroundedConceptGraph) -> Vec<(String, String, String)> {
@@ -218,6 +229,13 @@ fn canonical_edges(graph: &GroundedConceptGraph) -> Vec<(String, String, String)
     edges
 }
 
+fn multiset_edges_equal(
+    expected: &[(String, String, String)],
+    observed: &[(String, String, String)],
+) -> bool {
+    expected == observed
+}
+
 fn canonical_node_key(node: &ConceptNode) -> String {
     let mut grounded = node.grounded_by.clone();
     grounded.sort();
@@ -226,16 +244,24 @@ fn canonical_node_key(node: &ConceptNode) -> String {
     format!("{kind}|{}", grounded.join(","))
 }
 
-fn confidence_mae(expected: &BTreeMap<String, f32>, observed: &BTreeMap<String, f32>) -> f64 {
+fn confidence_mae(expected: &BTreeMap<String, Vec<f32>>, observed: &BTreeMap<String, Vec<f32>>) -> f64 {
     let mut total = 0.0_f64;
     let mut count = 0_u64;
-    for (key, expected_confidence) in expected {
-        if let Some(observed_confidence) = observed.get(key) {
-            total += (*expected_confidence as f64 - *observed_confidence as f64).abs();
-            count += 1;
+    for (key, expected_confidences) in expected {
+        if let Some(observed_confidences) = observed.get(key) {
+            for (expected_confidence, observed_confidence) in
+                expected_confidences.iter().zip(observed_confidences)
+            {
+                total += (*expected_confidence as f64 - *observed_confidence as f64).abs();
+                count += 1;
+            }
         }
     }
-    if count == 0 { 0.0 } else { total / count as f64 }
+    if count == 0 {
+        0.0
+    } else {
+        total / count as f64
+    }
 }
 
 fn ratio(numerator: usize, denominator: usize) -> f64 {
@@ -330,21 +356,21 @@ mod tests {
     }
 
     #[test]
-    fn missing_edge_lowers_recall_without_fabricating_equivalence() {
-        let expected = fixture();
-        let observed = drop_last_edge(&expected);
-        let metrics = compare_graphs(&expected, &observed).unwrap();
-        assert!(!metrics.structural_equivalence);
-        assert!(metrics.edge_recall < 1.0);
-    }
-
-    #[test]
     fn duplicate_node_does_not_hide_precision_loss() {
         let expected = fixture();
         let observed = duplicate_last_node(&expected);
         let metrics = compare_graphs(&expected, &observed).unwrap();
         assert!(!metrics.structural_equivalence);
         assert!(metrics.node_precision < 1.0);
+    }
+
+    #[test]
+    fn missing_edge_lowers_recall_without_fabricating_equivalence() {
+        let expected = fixture();
+        let observed = drop_last_edge(&expected);
+        let metrics = compare_graphs(&expected, &observed).unwrap();
+        assert!(!metrics.structural_equivalence);
+        assert!(metrics.edge_recall < 1.0);
     }
 
     #[test]
