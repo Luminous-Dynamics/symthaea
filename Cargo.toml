@@ -31,6 +31,10 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # STAGED 2026-10-04: observation-attestation has preserved source on-tree but is not yet
+    # compatible with the current symthaea-core observation API. Exclude it from workspace
+    # resolution until its adapter contract is intentionally integrated; do not delete it.
+    "crates/core/symthaea-observation-attestation",
 ]
 default-members = [
     "xtask",
