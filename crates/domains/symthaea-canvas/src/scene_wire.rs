@@ -340,7 +340,7 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
                 && valid_coordinate(*y2)
         }
         WirePrimitive::Polygon { points, closed } => {
-            points.len() >= 2
+            ((!*closed && points.len() >= 2) || (*closed && points.len() >= 3))
                 && points.len() <= MAX_POLYGON_POINTS
                 && points
                     .iter()
@@ -782,6 +782,23 @@ mod tests {
         assert!(matches!(wire.root.primitive, WirePrimitive::Group));
         assert!(wire.root.children.is_empty());
         assert!(wire.is_supported());
+    }
+
+    #[test]
+    fn externally_constructed_closed_polygon_requires_three_vertices() {
+        let scene = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Polygon {
+                    points: vec![[0.0, 0.0], [10.0, 10.0]],
+                    closed: true,
+                },
+                transform: WireTransform::default(),
+                style: WireStyle::default(),
+                children: vec![],
+            },
+        };
+        assert!(!scene.is_supported());
     }
 
     #[test]
