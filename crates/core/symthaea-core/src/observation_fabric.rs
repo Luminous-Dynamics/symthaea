@@ -3401,6 +3401,7 @@ mod tests {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
             process_definition_fingerprint: None,
+            execution_fingerprint: None,
             started_at_unix_ns: None,
             ended_at_unix_ns: None,
             agent_id: None,
