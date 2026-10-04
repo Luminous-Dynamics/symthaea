@@ -124,8 +124,28 @@ impl NeurosemanticDataPolicy {
 pub enum NeurosemanticPayload {
     SemanticGraph(Vec<u8>),
     Hypervector(Vec<i8>),
+    /// A representation that has already crossed an explicit decode boundary.
+    DecodedClaim(Vec<u8>),
+    /// Legacy opaque representation retained for deserialization compatibility.
+    /// It cannot be authorized under a declared v1 data policy because its
+    /// semantic data class is not machine-verifiable from the enum variant.
     StructuredRepresentation(Vec<u8>),
     DerivedNeuralFeature(Vec<f32>),
+}
+
+impl NeurosemanticPayload {
+    /// Return the data class that this concrete payload variant can authorize
+    /// without inspecting opaque user-defined bytes.
+    pub fn intrinsic_data_class(&self) -> Option<NeurosemanticDataClass> {
+        match self {
+            Self::SemanticGraph(_) | Self::Hypervector(_) => {
+                Some(NeurosemanticDataClass::SemanticRepresentation)
+            }
+            Self::DecodedClaim(_) => Some(NeurosemanticDataClass::DecodedClaim),
+            Self::StructuredRepresentation(_) => None,
+            Self::DerivedNeuralFeature(_) => Some(NeurosemanticDataClass::DerivedNeuralFeature),
+        }
+    }
 }
 
 /// Sensitivity class for policy and data minimization.
@@ -310,6 +330,9 @@ impl NeurosemanticPacket {
         if !data_policy.validates() || !data_policy.transportable() {
             return Err("neurosemantic data policy is invalid or not transportable in protocol v1".into());
         }
+        if payload.intrinsic_data_class() != Some(data_policy.data_class) {
+            return Err("neurosemantic payload type does not match its declared data class".into());
+        }
         let mut packet = Self::new(
             sequence,
             sender_id,
@@ -343,6 +366,11 @@ impl NeurosemanticPacket {
 
         if self.data_policy.schema_version != NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION {
             return Err("unsupported neurosemantic data policy schema version".into());
+        }
+        if self.data_policy.validates()
+            && self.payload.intrinsic_data_class() != Some(self.data_policy.data_class)
+        {
+            return Err("neurosemantic payload type does not match its declared data class".into());
         }
         validate_payload(&self.payload)?;
         let expected_payload_hash = payload_hash(&self.payload)?;
@@ -677,6 +705,91 @@ mod tests {
         assert_eq!(decoded, policy);
     }
     #[test]
+    fn policy_binds_payload_to_declared_data_class() {
+        let result = NeurosemanticPacket::new_with_policy(
+            101,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            NeurosemanticDataPolicy {
+                data_class: NeurosemanticDataClass::DerivedNeuralFeature,
+                ..semantic_policy()
+            },
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        );
+        assert!(result.is_err());
+
+        let mut packet = NeurosemanticPacket::new_with_policy(
+            102,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        packet.data_policy.data_class = NeurosemanticDataClass::DecodedClaim;
+        packet.refresh_hashes().unwrap();
+        assert!(packet.validate_integrity().is_err());
+    }
+
+    #[test]
+    fn opaque_legacy_structured_representation_cannot_cross_policy_boundary() {
+        assert_eq!(
+            NeurosemanticPayload::StructuredRepresentation(b"hello".to_vec())
+                .intrinsic_data_class(),
+            None
+        );
+        assert!(NeurosemanticPacket::new_with_policy(
+            103,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::StructuredRepresentation(b"hello".to_vec()),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn decoded_claim_is_a_typed_transport_payload() {
+        let policy = NeurosemanticDataPolicy {
+            data_class: NeurosemanticDataClass::DecodedClaim,
+            ..semantic_policy()
+        };
+        let packet = NeurosemanticPacket::new_with_policy(
+            104,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            policy,
+            0.5,
+            NeurosemanticPayload::DecodedClaim(b"claim".to_vec()),
+        )
+        .unwrap();
+        assert!(packet.validate_integrity().is_ok());
+    }
+
+    #[test]
     fn legacy_packet_data_policy_defaults_to_unknown_and_cannot_authorize() {
         let packet = NeurosemanticPacket::new(
             1,
@@ -814,7 +927,7 @@ mod tests {
             CognitiveSensitivity::Private,
             semantic_policy(),
             0.88,
-            NeurosemanticPayload::StructuredRepresentation(b"hello".to_vec()),
+            NeurosemanticPayload::Hypervector(vec![1, -1, 1]),
         )
         .unwrap();
 
