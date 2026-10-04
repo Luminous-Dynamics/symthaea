@@ -250,6 +250,48 @@ impl ServiceManager {
             )))
     }
 
+    /// Observe lifecycle capabilities and unit-file enablement evidence
+    /// from one exact governed systemd property projection.
+    ///
+    /// This is the preferred composition point when a caller needs both
+    /// evidence classes: the observed state, lifecycle capability facts, and
+    /// enablement evidence all commit to the same pre-state rather than being
+    /// produced by separate host observations.
+    ///
+    /// These values remain observational evidence only; none of them implies
+    /// authorization to execute an effect.
+    pub fn observed_state_with_capabilities_and_enablement_evidence(
+        service: &str,
+    ) -> Result<(
+        NixServiceObservedStateV1,
+        NixServiceOperationCapabilitiesV1,
+        NixServiceEnablementEvidenceV1,
+    ), std::io::Error> {
+        let unit = Self::validated_governed_unit(service)?;
+        let properties = observe_service_properties(&unit)?;
+        let state = NixServiceObservedStateV1::parse_systemd_observation(&unit, &properties)
+            .map_err(|error| std::io::Error::other(format!(
+                "invalid governed systemd observation for '{}': {error}",
+                unit
+            )))?;
+        let capabilities = NixServiceOperationCapabilitiesV1::from_observed_state(
+            &state,
+            state.can_start(),
+            state.can_stop(),
+            state.can_reload(),
+        )
+        .map_err(|error| std::io::Error::other(format!(
+            "invalid governed capability evidence for '{}': {error}",
+            unit
+        )))?;
+        let enablement = NixServiceEnablementEvidenceV1::from_observed_state(&state)
+            .map_err(|error| std::io::Error::other(format!(
+                "invalid governed enablement evidence for '{}': {error}",
+                unit
+            )))?;
+        Ok((state, capabilities, enablement))
+    }
+
     /// Check if a service is active through the single governed observation path.
     ///
     /// This remains a compatibility/diagnostic boolean and is not governed
