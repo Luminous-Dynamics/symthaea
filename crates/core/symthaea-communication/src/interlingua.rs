@@ -73,7 +73,7 @@ pub fn graph_hash(graph: &GroundedConceptGraph) -> Result<String, String> {
 /// Confidence is intentionally excluded because it is measured separately.
 pub fn structural_hash(graph: &GroundedConceptGraph) -> Result<String, String> {
     let canonical = (
-        canonical_nodes(graph),
+        canonical_node_multiset_keys(graph),
         canonical_edges(graph),
     );
     let bytes = serde_json::to_vec(&canonical).map_err(|error| error.to_string())?;
@@ -202,6 +202,16 @@ pub fn duplicate_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph
         duplicated.edges.push(edge);
     }
     duplicated
+}
+
+fn canonical_node_multiset_keys(graph: &GroundedConceptGraph) -> Vec<String> {
+    let mut keys = graph
+        .nodes
+        .iter()
+        .map(canonical_node_key)
+        .collect::<Vec<_>>();
+    keys.sort();
+    keys
 }
 
 fn canonical_nodes(graph: &GroundedConceptGraph) -> BTreeMap<String, Vec<f32>> {
@@ -420,6 +430,16 @@ mod tests {
         let observed = relabel_nodes(&expected, " (paraphrase)");
         let metrics = compare_graphs(&expected, &observed).unwrap();
         assert!(metrics.structural_equivalence);
+    }
+
+    #[test]
+    fn structural_hash_ignores_confidence() {
+        let expected = fixture();
+        let observed = adjust_confidence(&expected, 0.05);
+        assert_eq!(
+            structural_hash(&expected).unwrap(),
+            structural_hash(&observed).unwrap()
+        );
     }
 
     #[test]
