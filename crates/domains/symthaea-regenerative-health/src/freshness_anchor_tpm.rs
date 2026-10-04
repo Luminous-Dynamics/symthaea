@@ -77,8 +77,11 @@ pub struct TpmNvCounterEvidence {
     pub attestation_key_id_digest: String,
     /// Digest of the verifier challenge/freshness handle bound into the evidence.
     pub quote_nonce_digest: String,
-    /// Digest of the TPM quote or equivalent attestation statement.
+    /// Digest of the TPM Quote attestation statement covering required PCRs.
     pub quote_digest: String,
+    /// Digest of the TPM NV_Certify attestation statement covering this exact
+    /// NV Index Name and counter contents.
+    pub nv_certify_digest: String,
     /// Digest binding the quote to the measured platform state required by policy.
     pub pcr_binding_digest: String,
     /// Counter value read from the exact NV counter described above.
@@ -95,6 +98,7 @@ impl TpmNvCounterEvidence {
             &self.attestation_key_id_digest,
             &self.quote_nonce_digest,
             &self.quote_digest,
+            &self.nv_certify_digest,
             &self.pcr_binding_digest,
         ]
         .iter()
@@ -161,6 +165,7 @@ impl TpmNvCounterEvidence {
         write_string(&mut hasher, &self.attestation_key_id_digest);
         write_string(&mut hasher, &self.quote_nonce_digest);
         write_string(&mut hasher, &self.quote_digest);
+        write_string(&mut hasher, &self.nv_certify_digest);
         write_string(&mut hasher, &self.pcr_binding_digest);
         hasher.update(&self.counter_value.to_le_bytes());
         hasher.finalize().to_hex().to_string()
@@ -267,6 +272,7 @@ mod tests {
             attestation_key_id_digest: "ak-id".into(),
             quote_nonce_digest: "quote-handle".into(),
             quote_digest: "quote".into(),
+            nv_certify_digest: "nv-certify".into(),
             pcr_binding_digest: "pcr-binding".into(),
             counter_value,
         }
@@ -496,6 +502,14 @@ mod tests {
             verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
             TpmNvCounterVerificationError::InvalidEvidence
         );
+    }
+
+    #[test]
+    fn nv_certify_digest_is_part_of_evidence_binding() {
+        let mut evidence = evidence(7);
+        let original = evidence.binding_digest();
+        evidence.nv_certify_digest = "different-nv-certify".into();
+        assert_ne!(original, evidence.binding_digest());
     }
 
     #[test]
