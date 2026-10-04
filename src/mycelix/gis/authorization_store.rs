@@ -2511,6 +2511,10 @@ fn validate_native_authority_pin_set(
             &tx,
             status_verifier_configuration,
         )?;
+        // Revalidate the relying-party adapter pin inside the same authoritative
+        // transaction that creates DispatchPending. The adapter configuration
+        // resolved before entering this transaction is not itself a trust anchor.
+        Self::validate_persisted_adapter_configuration_for_expected(&tx, adapter_configuration)?;
 
         let prior_owner: Option<(String, String)> = tx
             .query_row(
@@ -3244,30 +3248,50 @@ fn validate_native_authority_pin_set(
         Ok(())
     }
 
-    /// Compare every immutable identity field of a caller-supplied dispatch
-    /// record against the durable dispatch row before terminal settlement.
-    fn validate_persisted_adapter_configuration(
+    /// Compare a previously resolved adapter configuration against the
+    /// relying-party pin while holding the authoritative transaction.
+    ///
+    /// The adapter is resolved once for the caller-facing path, but the selected
+    /// revision and implementation digest are revalidated here immediately before
+    /// the durable DispatchPending record is created. A pin change or deletion in
+    /// the lookup→commit window therefore fails closed rather than producing a
+    /// record carrying stale adapter authority.
+    fn validate_persisted_adapter_configuration_for_expected(
         tx: &Transaction<'_>,
-        record: &DurableDispatchRecord,
+        expected: &ProviderAdapterConfiguration,
     ) -> Result<(), AuthorizationStoreError> {
         let configuration = tx
             .query_row(
                 "SELECT adapter_revision,implementation_digest
                  FROM authorization_provider_adapter_pins
                  WHERE adapter_id=?1",
-                params![record.adapter.as_str()],
+                params![expected.adapter_id.as_str()],
                 |row| Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?)),
             )
             .optional()?
             .ok_or_else(|| AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidBinding
             ))?;
-        if configuration.0 != record.adapter_revision
-            || configuration.1 != record.adapter_implementation_digest
+        if configuration.0 != expected.adapter_revision
+            || configuration.1 != expected.implementation_digest
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
         Ok(())
+    }
+
+    /// Compare every immutable identity field of a caller-supplied dispatch
+    /// record against the durable dispatch row before terminal settlement.
+    fn validate_persisted_adapter_configuration(
+        tx: &Transaction<'_>,
+        record: &DurableDispatchRecord,
+    ) -> Result<(), AuthorizationStoreError> {
+        let expected = ProviderAdapterConfiguration::new(
+            record.adapter.clone(),
+            record.adapter_revision.clone(),
+            record.adapter_implementation_digest.clone(),
+        );
+        Self::validate_persisted_adapter_configuration_for_expected(tx, &expected)
     }
 
     fn validate_persisted_dispatch_record(
@@ -5195,6 +5219,168 @@ mod tests {
             ))
         ));
         let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn stale_adapter_configuration_is_rejected_at_dispatch_commit() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-adapter-stale-commit-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open(&path).unwrap();
+        let effect = super::super::ActionEffectBinding::new(
+            "target-adapter-stale",
+            "prod",
+            "adapter-adapter-stale",
+        );
+        let action = EpistemicAction::new(
+            "adapter-stale-commit",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            authorization_instance: "adapter-stale-commit".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "sha256:support".into(),
+            policy: "policy-v1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-02T20:00:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                digest.clone(),
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        store
+            .pin_provider_status_source_digest("sha256:test-status-source")
+            .unwrap();
+        store
+            .pin_provider_status_verifier_configuration(
+                &TestProviderStatusVerifier.configuration(),
+            )
+            .unwrap();
+        let adapter_configuration = ProviderAdapterConfiguration::new(
+            effect.adapter.clone(),
+            "test-adapter/v1",
+            "sha256:test-adapter-implementation",
+        );
+        store
+            .pin_provider_adapter_configuration(&adapter_configuration)
+            .unwrap();
+        store
+            .pin_native_authority_namespace("test-issuer", "test-authority/v1")
+            .unwrap();
+        store
+            .prepare_for_execution_bound_with_operation(
+                &witness,
+                &action,
+                "frame@1",
+                "attempt-adapter-stale",
+                "boundary-adapter-stale",
+                "operation-adapter-stale",
+            )
+            .unwrap();
+
+        let native_authorization_id = "native-adapter-stale";
+        let authority_namespace = store
+            .pinned_native_authority_namespace("test-issuer")
+            .unwrap();
+        let replay = NativeReplayDerivation::derive(
+            authority_namespace,
+            native_authorization_id,
+        )
+        .unwrap();
+        let status_verifier = TestProviderStatusVerifier;
+        let status_identifier = format!("status:{native_authorization_id}");
+        let status = status_verifier
+            .verify_current_status(
+                ProviderStatusVerificationPurpose::Admission,
+                "test-issuer",
+                &replay.authority_namespace,
+                native_authorization_id,
+                &status_identifier,
+                &digest,
+                &effect.target_identity,
+                &effect.audience,
+                &effect.adapter,
+                Some("sha256:test-status-source"),
+            )
+            .unwrap();
+        let status_verifier_configuration = status_verifier.configuration();
+
+        store
+            .connection()
+            .unwrap()
+            .execute(
+                "UPDATE authorization_provider_adapter_pins
+                 SET adapter_revision='tampered-before-commit'
+                 WHERE adapter_id=?1",
+                params![effect.adapter.as_str()],
+            )
+            .unwrap();
+
+        let err = store
+            .mark_dispatch_pending_bound_with_provenance(
+                &witness.authorization_instance,
+                "attempt-adapter-stale",
+                &action,
+                &effect,
+                "boundary-adapter-stale",
+                "operation-adapter-stale",
+                &replay.native_replay_identity,
+                "test-issuer",
+                &replay,
+                &status,
+                &adapter_configuration,
+                &status_verifier_configuration,
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+        assert_eq!(
+            store
+                .connection()
+                .unwrap()
+                .query_row::<i64, _, _>(
+                    "SELECT COUNT(*) FROM authorization_dispatches",
+                    [],
+                    |row| row.get(0)
+                )
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            store
+                .connection()
+                .unwrap()
+                .query_row::<String, _, _>(
+                    "SELECT state FROM authorization_leases WHERE authorization_instance=?1",
+                    params![witness.authorization_instance.as_str()],
+                    |row| row.get(0)
+                )
+                .unwrap(),
+            "prepared"
+        );
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
