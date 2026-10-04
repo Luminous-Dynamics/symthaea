@@ -538,7 +538,16 @@ mod tests {
 
         let mut tampered = projection.clone();
         tampered.machine_target_ref = "machine:other".to_string();
-        assert!(tampered.validate().is_err());
+        tampered.projection_digest = tampered.compute_digest().unwrap();
+        assert!(tampered.validate().is_ok());
+
+        assert_eq!(
+            runtime
+                .observe_projection_currentness(&tampered, UnixMillisV1::new(now))
+                .unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
+
         assert!(matches!(
             runtime.observe_installed_projection_currentness(
                 &installed,
