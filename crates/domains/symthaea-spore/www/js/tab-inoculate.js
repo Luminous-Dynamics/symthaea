@@ -1298,14 +1298,15 @@
     var hasExistingOS = hwData && hwData.detected_os && hwData.detected_os.length > 0;
     var hasTpm = hwData && hwData.tpm2_available;
     var tpmSpecMajor = hwData && hwData.tpm2_spec_major;
+    var tpm2Confirmed = hasTpm && tpmSpecMajor === 2;
     var measuredUki = hwData && hwData.measured_uki;
     var tpmObservation = '';
     if (hasTpm) {
-      var tpmVersionText = tpmSpecMajor != null ? ' TPM spec v' + tpmSpecMajor + '.' : '';
-      tpmObservation = '<p style="font-size:0.75rem; color:var(--leaf-green); margin-top:0.3rem;">TPM 2.0 detected —' +
+      var tpmVersionText = tpmSpecMajor != null ? ' TPM spec v' + tpmSpecMajor + '.' : ' TPM spec version unconfirmed.';
+      tpmObservation = '<p style="font-size:0.75rem; color:var(--leaf-green); margin-top:0.3rem;">TPM device detected —' +
         tpmVersionText +
-        ' available for key protection (presence is not attestation).' +
-        (measuredUki ? ' Measured UKI reported.' : '') +
+        (tpm2Confirmed ? ' TPM 2.0 key protection is available (presence is not attestation).' : ' TPM 2.0 is not confirmed; auto-unlock will remain unavailable.') +
+        (measuredUki ? ' Live installer reports Measured UKI.' : '') +
         '</p>';
     }
     layoutDiv.innerHTML =
@@ -1327,7 +1328,7 @@
       '  <label style="font-size:0.82rem; color:var(--fg-dim); cursor:pointer;">' +
       '    <input type="checkbox" id="secure-boot-toggle"' + (hwData && hwData.setup_mode ? ' checked' : '') + '> Enable Secure Boot (lanzaboote)' +
       '  </label>' +
-      (hasTpm ? '  <label style="font-size:0.82rem; color:var(--fg-dim); cursor:pointer;">' +
+      (tpm2Confirmed ? '  <label style="font-size:0.82rem; color:var(--fg-dim); cursor:pointer;">' +
       '    <input type="checkbox" id="tpm2-toggle" checked> TPM2 auto-unlock (passphrase fallback retained)' +
       '  </label>' : '') +
       '</div>' +
