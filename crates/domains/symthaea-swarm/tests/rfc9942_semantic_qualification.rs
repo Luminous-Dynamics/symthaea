@@ -697,7 +697,25 @@ fn rfc9942_outer_detached_payload_binds_inner_inclusion_and_outer_signature() {
             &[],
             Some(b"wrong-application-payload"),
         ),
-        Err(Rfc9942VdpError::NoMatchingProof)
+        Err(Rfc9942VdpError::InvalidEs256Signature)
+    );
+
+    // Separately tamper the outer signature while keeping the detached payload
+    // and inner Receipt unchanged. This must fail at the outer COSE boundary.
+    let mut tampered = outer.to_cbor();
+    let last = tampered.len() - 1;
+    tampered[last] ^= 0x01;
+    let tampered_outer = Rfc9942SignatureWithReceipts::from_cbor(&tampered).unwrap();
+    assert_eq!(
+        tampered_outer.verify_es256_inclusion_receipt_state(
+            0,
+            &key,
+            &key,
+            &[],
+            &[],
+            Some(candidate),
+        ),
+        Err(Rfc9942VdpError::InvalidEs256Signature)
     );
 }
 
