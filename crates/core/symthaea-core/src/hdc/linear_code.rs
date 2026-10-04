@@ -811,6 +811,44 @@ impl LinearCodeFactorizationFiber {
         }
         Some(coefficients)
     }
+
+    /// Verify the certificate against the ordered factor presentation and target.
+    ///
+    /// This checks the representative, the kernel witness count, every witness itself,
+    /// and the exact symbolic cardinality 2^d.
+    pub fn verifies_against(
+        &self,
+        target: &BinaryCodeword,
+        factors: &[&RandomLinearCode],
+    ) -> bool {
+        let Some(algebra) = factorization_algebra(factors) else {
+            return false;
+        };
+        if target.dimension() != factors[0].dimension()
+            || self.representative_coefficients.len() != algebra.factor_dimension_sum
+            || self.kernel_basis.len() != algebra.kernel_dimension
+            || self.cardinality.exponent() != algebra.kernel_dimension
+        {
+            return false;
+        }
+
+        let combined_basis = concatenate_factor_bases(factors, algebra.factor_dimension_sum);
+        let mut reconstructed = BinaryCodeword::zero(target.dimension());
+        for (&coefficient, generator) in self
+            .representative_coefficients
+            .iter()
+            .zip(&combined_basis)
+        {
+            if coefficient {
+                reconstructed.xor_assign(generator);
+            }
+        }
+        reconstructed == *target
+            && self
+                .kernel_basis
+                .iter()
+                .all(|witness| witness.verifies_against(factors))
+    }
 }
 /// Return a deterministic basis of the kernel of the factor-to-bound map.
 ///
@@ -1020,6 +1058,7 @@ mod tests {
         assert_eq!(fiber.representative_coefficients.len(), 2);
         assert_eq!(fiber.kernel_basis.len(), 1);
         assert_eq!(fiber.cardinality.exponent(), 1);
+        assert!(fiber.verifies_against(&target, &factors));
         assert_eq!(
             fiber.coefficients_for_mask(&[false]).expect("zero mask"),
             fiber.representative_coefficients,
