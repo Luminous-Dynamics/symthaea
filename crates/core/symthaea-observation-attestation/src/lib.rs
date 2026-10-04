@@ -1315,128 +1315,18 @@ pub struct EvaluationBoundary {
 }
 
 impl EvaluationBoundary {
+    /// Derive the epistemic boundary from the authoritative execution trace.
+    ///
+    /// Current reports carry legacy stage projections for compatibility, but the
+    /// captured `EvaluationTrace` is the sole authoritative execution representation.
+    /// This constructor therefore ignores mutable report-stage projections for current
+    /// verifier reports. Legacy v3 reports retain their historical projection semantics.
     pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
         if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
             return Self::from_execution_trace_v7(&EvaluationTrace::from_report_legacy(report));
         }
 
-        fn classify(
-            stage: VerificationStage,
-            claim: EvaluationClaim,
-            established: &mut Vec<EvaluationClaim>,
-            not_established: &mut Vec<EvaluationClaim>,
-            indeterminate: &mut Vec<EvaluationClaim>,
-        ) {
-            match stage {
-                VerificationStage::Passed => established.push(claim),
-                VerificationStage::Failed(_) => not_established.push(claim),
-                VerificationStage::NotEvaluated => indeterminate.push(claim),
-            }
-        }
-
-        let mut established = Vec::new();
-        let mut not_established = Vec::new();
-        let mut indeterminate = Vec::new();
-
-        classify(
-            report.structural_validation,
-            EvaluationClaim::EnvelopeStructuralValidity,
-            &mut established,
-            &mut not_established,
-            &mut indeterminate,
-        );
-        classify(
-            report.receipt_commitment,
-            EvaluationClaim::ReceiptCommitment,
-            &mut established,
-            &mut not_established,
-            &mut indeterminate,
-        );
-        classify(
-            report.temporal_validity,
-            EvaluationClaim::TemporalValidity,
-            &mut established,
-            &mut not_established,
-            &mut indeterminate,
-        );
-        classify(
-            report.cryptosuite,
-            EvaluationClaim::CryptosuiteConformance,
-            &mut established,
-            &mut not_established,
-            &mut indeterminate,
-        );
-        classify(
-            report.verification_method,
-            EvaluationClaim::VerificationMethodResolution,
-            &mut established,
-            &mut not_established,
-            &mut indeterminate,
-        );
-        classify(
-            report.lifecycle,
-            EvaluationClaim::VerificationMethodLifecycle,
-            &mut established,
-            &mut not_established,
-            &mut indeterminate,
-        );
-        classify(
-            report.proof_purpose_authorization,
-            EvaluationClaim::ProofPurposeAuthorization,
-            &mut established,
-            &mut not_established,
-            &mut indeterminate,
-        );
-        classify(
-            report.proof_policy,
-            EvaluationClaim::ProofPolicyConformance,
-            &mut established,
-            &mut not_established,
-            &mut indeterminate,
-        );
-        classify(
-            report.cryptographic_proof,
-            EvaluationClaim::CryptographicProofValidity,
-            &mut established,
-            &mut not_established,
-            &mut indeterminate,
-        );
-
-        // Authenticity is a compound claim: the receipt must be structurally
-        // acceptable, bound to its commitment, and cryptographically valid.
-        match (
-            report.structural_validation,
-            report.receipt_commitment,
-            report.cryptographic_proof,
-        ) {
-            (VerificationStage::Passed, VerificationStage::Passed, VerificationStage::Passed) => {
-                established.push(EvaluationClaim::AttestationAuthenticity)
-            }
-            (VerificationStage::NotEvaluated, _, _)
-            | (_, VerificationStage::NotEvaluated, _)
-            | (_, _, VerificationStage::NotEvaluated) => {
-                indeterminate.push(EvaluationClaim::AttestationAuthenticity)
-            }
-            _ => not_established.push(EvaluationClaim::AttestationAuthenticity),
-        }
-
-        // These claims are outside the scope of this cryptographic verifier.
-        // They are therefore explicitly not-established, not merely omitted.
-        not_established.extend([
-            EvaluationClaim::UnderlyingObservationTruth,
-            EvaluationClaim::SemanticValidity,
-            EvaluationClaim::ExternalWorldCorrespondence,
-            EvaluationClaim::AttesterIntent,
-            EvaluationClaim::EvaluatorIndependence,
-        ]);
-        // The stronger receipt.verify_integrity() check is not part of this procedure.
-        indeterminate.push(EvaluationClaim::ReceiptIntegrity);
-
-        Self {
-            established,
-            not_established,
-            indeterminate,
-        }
+        Self::from_execution_trace(&report.execution_trace)
     }
 
     /// Derive the epistemic boundary solely from the captured execution trace.
