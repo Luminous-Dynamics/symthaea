@@ -84,6 +84,71 @@ pub struct MemoryProvenance {
     pub retrieval_index_ref: Option<String>,
 }
 
+/// Typed identity for the canonical subject being admitted.
+///
+/// This is deliberately distinct from a local claim/representation identity: multiple
+/// representations may refer to the same canonical subject without sharing a replay key.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CanonicalAdmissionSubject {
+    canonical_identity: String,
+    provenance_family: Option<String>,
+}
+
+impl CanonicalAdmissionSubject {
+    pub fn new(
+        canonical_identity: impl Into<String>,
+        provenance_family: Option<String>,
+    ) -> Result<Self, &'static str> {
+        let canonical_identity = canonical_identity.into();
+        if canonical_identity.trim().is_empty() {
+            return Err("canonical identity must be non-empty");
+        }
+        if provenance_family.as_deref().is_some_and(|family| family.trim().is_empty()) {
+            return Err("provenance family must be non-empty when present");
+        }
+        Ok(Self { canonical_identity, provenance_family })
+    }
+
+    pub fn canonical_identity(&self) -> &str {
+        &self.canonical_identity
+    }
+
+    pub fn provenance_family(&self) -> Option<&str> {
+        self.provenance_family.as_deref()
+    }
+
+    pub fn digest(&self) -> String {
+        let encoded = (
+            "symthaea:canonical-admission-subject:v1",
+            &self.canonical_identity,
+            &self.provenance_family,
+        );
+        let bytes = serde_json::to_vec(&encoded)
+            .expect("canonical admission subject is serializable");
+        sha256_hex(&bytes)
+    }
+}
+
+/// Typed identity for one exported claim/representation.
+///
+/// This must not be used as the canonical admission subject identifier.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ClaimRepresentationIdentity(String);
+
+impl ClaimRepresentationIdentity {
+    pub fn new(value: impl Into<String>) -> Result<Self, &'static str> {
+        let value = value.into();
+        if value.trim().is_empty() {
+            return Err("claim identity must be non-empty");
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Software-level receipt binding an explicit canonical admission to the
 /// provenance snapshot and frontier from which the admission was made.
 /// This is not a claim that the admitted object is true.
@@ -148,14 +213,9 @@ impl CanonicalAdmissionReceipt {
     }
 
     fn subject_digest_for(canonical_identity: &str, provenance_family: Option<&str>) -> String {
-        let subject = (
-            "symthaea:canonical-admission-subject:v1",
-            canonical_identity,
-            provenance_family,
-        );
-        let bytes = serde_json::to_vec(&subject)
-            .expect("canonical admission subject is serializable");
-        sha256_hex(&bytes)
+        CanonicalAdmissionSubject::new(canonical_identity.to_owned(), provenance_family.map(str::to_owned))
+            .expect("receipt subject must be structurally valid")
+            .digest()
     }
 
     /// Returns true when the receipt is bound to the exact canonical subject envelope.
@@ -164,10 +224,17 @@ impl CanonicalAdmissionReceipt {
         canonical_identity: &str,
         provenance_family: Option<&str>,
     ) -> bool {
-        !canonical_identity.trim().is_empty()
-            && provenance_family.map_or(true, |family| !family.trim().is_empty())
-            && self.admitted_subject_digest
-                == Self::subject_digest_for(canonical_identity, provenance_family)
+        let Ok(subject) = CanonicalAdmissionSubject::new(
+            canonical_identity.to_owned(),
+            provenance_family.map(str::to_owned),
+        ) else {
+            return false;
+        };
+        self.admitted_subject_digest == subject.digest()
+    }
+
+    pub fn subject_binding_matches(&self, subject: &CanonicalAdmissionSubject) -> bool {
+        self.admitted_subject_digest == subject.digest()
     }
 
     /// Validate the receipt fields before they are used as an admission binding.
@@ -605,6 +672,21 @@ mod tests {
         assert_blank_optional_rejected!(retrieval_index_ref);
     }
 
+    #[test]
+    fn typed_identity_namespaces_remain_distinct() {
+        let subject = CanonicalAdmissionSubject::new(
+            "canonical:1",
+            Some("family:1".into()),
+        ).unwrap();
+        let claim = ClaimRepresentationIdentity::new("claim:1").unwrap();
+
+        assert_eq!(subject.canonical_identity(), "canonical:1");
+        assert_eq!(subject.provenance_family(), Some("family:1"));
+        assert_eq!(claim.as_str(), "claim:1");
+        assert_ne!(subject.digest(), sha256_hex(claim.as_str().as_bytes()));
+    }
+
+    #[test]
     #[test]
     fn admission_receipt_binds_exact_validation_snapshot() {
         let relation = ProvenanceRelation {
