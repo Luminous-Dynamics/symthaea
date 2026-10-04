@@ -778,6 +778,40 @@ pub fn factorization_algebra(factors: &[&RandomLinearCode]) -> Option<LinearCode
     })
 }
 
+/// Explicit affine fiber of the factor-to-bound map for one representable target.
+///
+/// The representative is one coefficient tuple in the ordered concatenated generator basis.
+/// Every other factorization is obtained by XORing that representative with a GF(2) combination
+/// of the supplied kernel-basis witnesses. The exact fiber cardinality is therefore carried
+/// alongside its constructive ambiguity directions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinearCodeFactorizationFiber {
+    pub representative_coefficients: Vec<bool>,
+    pub kernel_basis: Vec<LinearCodeDependencyWitness>,
+    pub cardinality: ExactPowerOfTwo,
+}
+
+impl LinearCodeFactorizationFiber {
+    /// Return one coefficient tuple selected by a GF(2) mask over the kernel basis.
+    ///
+    /// The returned tuple is guaranteed to remain in the same affine fiber when the
+    /// certificate is valid. A mask length mismatch is rejected.
+    pub fn coefficients_for_mask(&self, mask: &[bool]) -> Option<Vec<bool>> {
+        if mask.len() != self.kernel_basis.len() {
+            return None;
+        }
+
+        let mut coefficients = self.representative_coefficients.clone();
+        for (enabled, witness) in mask.iter().zip(&self.kernel_basis) {
+            if *enabled {
+                for (index, coefficient) in witness.generator_coefficients.iter().enumerate() {
+                    coefficients[index] ^= *coefficient;
+                }
+            }
+        }
+        Some(coefficients)
+    }
+}
 /// Return a deterministic basis of the kernel of the factor-to-bound map.
 ///
 /// One witness is emitted for every generator that fails the maximal-independent-prefix
@@ -867,6 +901,37 @@ fn factor_offsets(factors: &[&RandomLinearCode]) -> Vec<usize> {
     }
     offsets
 }
+/// Construct the full affine-fiber certificate for one representable target.
+///
+/// The certificate contains one deterministic representative coefficient tuple, the complete
+/// kernel basis, and the exact cardinality 2^d. No exhaustive enumeration of the fiber is needed.
+pub fn factorization_affine_fiber(
+    target: &BinaryCodeword,
+    factors: &[&RandomLinearCode],
+) -> Option<LinearCodeFactorizationFiber> {
+    let algebra = factorization_algebra(factors)?;
+    if target.dimension() != factors[0].dimension() {
+        return None;
+    }
+
+    let combined_basis = concatenate_factor_bases(factors, algebra.factor_dimension_sum);
+    let representative_coefficients = solve_linear_combination(target, &combined_basis)?;
+    let kernel_basis = factorization_kernel_basis(factors)?;
+    if kernel_basis.len() != algebra.kernel_dimension {
+        return None;
+    }
+    let fiber = LinearCodeFactorizationFiber {
+        representative_coefficients,
+        kernel_basis,
+        cardinality: algebra.factorization_count_per_target,
+    };
+
+    let zero_mask = vec![false; fiber.kernel_basis.len()];
+    if fiber.coefficients_for_mask(&zero_mask)? != fiber.representative_coefficients {
+        return None;
+    }
+    Some(fiber)
+}
 /// Return the exact fiber cardinality for a target in the factor-span.
 /// None means that the target is not representable by the supplied factors.
 pub fn factorization_count_for_target(
@@ -942,6 +1007,37 @@ fn has_dependent_factor_subset(
 mod tests {
     use super::*;
 
+    #[test]
+    fn affine_fiber_certificate_tracks_representative_kernel_and_cardinality() {
+        let code = RandomLinearCode::from_basis(vec![
+            BinaryCodeword::from_words(3, vec![0b001]),
+        ])
+        .expect("code");
+        let factors = [&code, &code];
+        let target = code.encode(&[true]);
+        let fiber = factorization_affine_fiber(&target, &factors).expect("affine fiber");
+
+        assert_eq!(fiber.representative_coefficients.len(), 2);
+        assert_eq!(fiber.kernel_basis.len(), 1);
+        assert_eq!(fiber.cardinality.exponent(), 1);
+        assert_eq!(
+            fiber.coefficients_for_mask(&[false]).expect("zero mask"),
+            fiber.representative_coefficients,
+        );
+        let alternate = fiber.coefficients_for_mask(&[true]).expect("kernel mask");
+        assert_ne!(alternate, fiber.representative_coefficients);
+
+        let mut zero = BinaryCodeword::zero(3);
+        for (coefficient, generator) in alternate.iter().zip(
+            factors.iter().flat_map(|factor| factor.basis().iter()),
+        ) {
+            if *coefficient {
+                zero.xor_assign(generator);
+            }
+        }
+        assert_eq!(zero, target);
+        assert!(fiber.coefficients_for_mask(&[]).is_none());
+    }
     #[test]
     fn dependency_kernel_basis_is_deterministic_and_complete() {
         let c1 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b01])])
