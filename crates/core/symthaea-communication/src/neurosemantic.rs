@@ -45,6 +45,71 @@ pub enum CommunicationPurpose {
     Research,
 }
 
+/// Machine-readable class of the cognitive data being transported.
+/// Unknown is the conservative legacy/default state and cannot authorize
+/// neurosemantic access.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticDataClass {
+    #[default]
+    Unknown,
+    RawNeuralRecording,
+    DerivedNeuralFeature,
+    SemanticRepresentation,
+    DecodedClaim,
+    PersonalizedDecoderModel,
+}
+
+/// Machine-readable inference classes a data product may expose or enable.
+/// These remain separate from data class and transport sensitivity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum NeurosemanticInferenceClass {
+    Unknown,
+    SignalPattern,
+    UnitPattern,
+    LinguisticContent,
+    SemanticContent,
+    AffectiveState,
+    Intent,
+    Identity,
+}
+
+pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 1;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeurosemanticDataPolicy {
+    pub schema_version: u16,
+    pub data_class: NeurosemanticDataClass,
+    #[serde(default)]
+    pub inference_classes: BTreeSet<NeurosemanticInferenceClass>,
+    #[serde(default)]
+    pub permitted_purposes: BTreeSet<CommunicationPurpose>,
+}
+
+impl Default for NeurosemanticDataPolicy {
+    fn default() -> Self {
+        Self {
+            schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            data_class: NeurosemanticDataClass::Unknown,
+            inference_classes: BTreeSet::new(),
+            permitted_purposes: BTreeSet::new(),
+        }
+    }
+}
+
+impl NeurosemanticDataPolicy {
+    pub fn validates(&self) -> bool {
+        self.schema_version == NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION
+            && self.data_class != NeurosemanticDataClass::Unknown
+            && !self.inference_classes.is_empty()
+            && !self.inference_classes.contains(&NeurosemanticInferenceClass::Unknown)
+            && !self.permitted_purposes.is_empty()
+    }
+
+    pub fn allows_purpose(&self, purpose: CommunicationPurpose) -> bool {
+        self.validates() && self.permitted_purposes.contains(&purpose)
+    }
+}
+
 /// Derived representations only. Raw neural samples are intentionally absent.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum NeurosemanticPayload {
@@ -76,6 +141,14 @@ pub struct CognitiveConsentLease {
     pub max_read_sensitivity: CognitiveSensitivity,
     #[serde(default = "default_public_sensitivity")]
     pub max_write_sensitivity: CognitiveSensitivity,
+    #[serde(default)]
+    pub read_data_classes: BTreeSet<NeurosemanticDataClass>,
+    #[serde(default)]
+    pub write_data_classes: BTreeSet<NeurosemanticDataClass>,
+    #[serde(default)]
+    pub read_inference_classes: BTreeSet<NeurosemanticInferenceClass>,
+    #[serde(default)]
+    pub write_inference_classes: BTreeSet<NeurosemanticInferenceClass>,
     pub issued_at_unix_s: u64,
     pub expires_at_unix_s: u64,
     pub consent_epoch: u64,
@@ -104,6 +177,27 @@ impl CognitiveConsentLease {
             ChannelDirection::Write => self.max_write_sensitivity,
         };
         sensitivity <= maximum
+    }
+
+    pub fn authorizes_data_policy(
+        &self,
+        direction: ChannelDirection,
+        policy: &NeurosemanticDataPolicy,
+    ) -> bool {
+        if !policy.validates() {
+            return false;
+        }
+
+        let (allowed_data_classes, allowed_inference_classes) = match direction {
+            ChannelDirection::Read => (&self.read_data_classes, &self.read_inference_classes),
+            ChannelDirection::Write => (&self.write_data_classes, &self.write_inference_classes),
+        };
+
+        allowed_data_classes.contains(&policy.data_class)
+            && policy
+                .inference_classes
+                .iter()
+                .all(|inference| allowed_inference_classes.contains(inference))
     }
 
     pub fn authorizes(
@@ -142,6 +236,8 @@ pub struct NeurosemanticPacket {
     pub direction: ChannelDirection,
     pub representation: RepresentationFamily,
     pub sensitivity: CognitiveSensitivity,
+    #[serde(default)]
+    pub data_policy: NeurosemanticDataPolicy,
     pub confidence: f32,
     pub payload: NeurosemanticPayload,
     pub payload_hash: String,
@@ -179,11 +275,45 @@ impl NeurosemanticPacket {
             direction,
             representation,
             sensitivity,
+            data_policy: NeurosemanticDataPolicy::default(),
             confidence,
             payload,
             payload_hash: String::new(),
             packet_hash: String::new(),
         };
+        packet.refresh_hashes()?;
+        Ok(packet)
+    }
+
+    pub fn new_with_policy(
+        sequence: u64,
+        sender_id: impl Into<String>,
+        recipient_id: impl Into<String>,
+        purpose: CommunicationPurpose,
+        channel: CognitiveChannel,
+        direction: ChannelDirection,
+        representation: RepresentationFamily,
+        sensitivity: CognitiveSensitivity,
+        data_policy: NeurosemanticDataPolicy,
+        confidence: f32,
+        payload: NeurosemanticPayload,
+    ) -> Result<Self, String> {
+        if !data_policy.validates() {
+            return Err("neurosemantic data policy is invalid or deny-by-default".into());
+        }
+        let mut packet = Self::new(
+            sequence,
+            sender_id,
+            recipient_id,
+            purpose,
+            channel,
+            direction,
+            representation,
+            sensitivity,
+            confidence,
+            payload,
+        )?;
+        packet.data_policy = data_policy;
         packet.refresh_hashes()?;
         Ok(packet)
     }
@@ -202,6 +332,9 @@ impl NeurosemanticPacket {
             return Err("packet confidence must be finite and in [0, 1]".into());
         }
 
+        if self.data_policy.schema_version != NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION {
+            return Err("unsupported neurosemantic data policy schema version".into());
+        }
         validate_payload(&self.payload)?;
         let expected_payload_hash = payload_hash(&self.payload)?;
         if self.payload_hash != expected_payload_hash {
@@ -259,6 +392,13 @@ impl AuthorizedNeurosemanticMessage {
         if self.packet.sender_id != expected_sender || self.packet.recipient_id != expected_recipient
         {
             return Err("packet endpoints do not match the consent direction".into());
+        }
+
+        if !self.packet.data_policy.allows_purpose(self.packet.purpose) {
+            return Err("packet data policy does not permit the requested purpose".into());
+        }
+        if !lease.authorizes_data_policy(self.packet.direction, &self.packet.data_policy) {
+            return Err("packet data class or inference class is not authorized by the consent lease".into());
         }
 
         if !lease.authorizes(
@@ -411,6 +551,10 @@ mod tests {
             write_scopes: BTreeSet::from([CognitiveChannel::Semantic]),
             max_read_sensitivity: CognitiveSensitivity::Private,
             max_write_sensitivity: CognitiveSensitivity::Private,
+            read_data_classes: BTreeSet::from([NeurosemanticDataClass::SemanticRepresentation]),
+            write_data_classes: BTreeSet::from([NeurosemanticDataClass::SemanticRepresentation]),
+            read_inference_classes: BTreeSet::from([NeurosemanticInferenceClass::SemanticContent]),
+            write_inference_classes: BTreeSet::from([NeurosemanticInferenceClass::SemanticContent]),
             issued_at_unix_s: 100,
             expires_at_unix_s: 200,
             consent_epoch: 7,
