@@ -493,6 +493,58 @@ mod tests {
     }
 
     #[test]
+    fn evidence_kind_must_match_backing() {
+        let profile = FreshnessAnchorProfile::new(
+            FreshnessAnchorBacking::RemoteAuthority,
+            FreshnessAnchorCapabilities::authoritative(),
+            "remote://authority-a",
+        ).unwrap();
+        let receipt = FreshnessAnchorVerificationReceipt {
+            schema_version: "0.1".into(),
+            profile_fingerprint: profile.fingerprint(),
+            receiver_id: "receiver-1".into(),
+            generation: 7,
+            state_fingerprint: "state-1".into(),
+            verifier_reference: "verifier-1".into(),
+            verifier_policy_digest: "policy-digest-1".into(),
+            reference_values_digest: "reference-values-1".into(),
+            evidence_reference: "evidence-1".into(),
+            evidence_digest: "digest-1".into(),
+            evidence_kind: FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
+                backend_identity_digest: "backend-id-1".into(),
+                counter_namespace_digest: "namespace-1".into(),
+                observed_counter: 7,
+            },
+        };
+
+        struct Accept;
+        impl FreshnessAnchorEvidenceVerifier for Accept {
+            fn verify(
+                &self,
+                _: &FreshnessAnchorProfile,
+                _: &FreshnessAnchorVerificationReceipt,
+            ) -> bool { true }
+        }
+
+        assert_eq!(
+            VerifiedFreshnessAnchor::verify(profile, receipt, &Accept).unwrap_err(),
+            FreshnessAnchorAssuranceError::InvalidReceipt
+        );
+    }
+
+    #[test]
+    fn quorum_evidence_requires_a_positive_threshold() {
+        let evidence = FreshnessAnchorEvidenceKind::QuorumMonotonicSequence {
+            quorum_policy_digest: "policy".into(),
+            member_set_digest: "members".into(),
+            threshold: 0,
+            observed_sequence: 7,
+            certificate_digest: "certificate".into(),
+        };
+        assert!(!evidence.validate());
+    }
+
+    #[test]
     fn evidence_verifier_is_required_to_mint_opaque_capability() {
         struct Reject;
         impl FreshnessAnchorEvidenceVerifier for Reject {
@@ -516,8 +568,15 @@ mod tests {
             generation: 7,
             state_fingerprint: "state-1".into(),
             verifier_reference: "verifier-1".into(),
+            verifier_policy_digest: "policy-digest-1".into(),
+            reference_values_digest: "reference-values-1".into(),
             evidence_reference: "evidence-1".into(),
             evidence_digest: "digest-1".into(),
+            evidence_kind: FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
+                authority_identity_digest: "authority-id-1".into(),
+                authority_namespace_digest: "namespace-1".into(),
+                observed_sequence: 7,
+            },
         };
         let err = VerifiedFreshnessAnchor::verify(profile, receipt, &Reject).unwrap_err();
         assert_eq!(err, FreshnessAnchorAssuranceError::EvidenceVerificationFailed);
