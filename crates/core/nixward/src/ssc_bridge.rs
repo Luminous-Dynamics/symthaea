@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use sovereign_state_compiler::{
-    AuthorizedDeploymentPlan, Capability, ContentDigest, ResourceRef, TargetId, TargetProfile,
-    TargetSnapshot,
+    AuthorizedDeploymentPlan, Capability, ContentDigest, ExecutionPreflightObserver, ResourceRef,
+    TargetId, TargetProfile, TargetSnapshot,
 };
 use sovereign_state_compiler_nix::{
     NixOSTargetAdapter, default_nixos_capabilities, nixos_generation_resource,
@@ -59,6 +59,22 @@ pub struct NixSystemObservation {
 #[derive(Debug)]
 pub struct CapturedNixSystemObservation {
     observation: NixSystemObservation,
+}
+
+/// Canonical live target observer for SSC execution preflight.
+///
+/// Each call performs a new NixOS observation. It never returns portable
+/// evidence supplied by the caller, so an executor cannot satisfy the fresh
+/// preflight contract by replaying an older serialized observation.
+#[derive(Debug, Default)]
+pub struct LiveNixExecutionObserver;
+
+impl ExecutionPreflightObserver for LiveNixExecutionObserver {
+    type Error = SscObservationError;
+
+    fn observe(&mut self) -> Result<TargetSnapshot, Self::Error> {
+        NixSystemObservation::observe()?.target_snapshot()
+    }
 }
 
 impl CapturedNixSystemObservation {
