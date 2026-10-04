@@ -17,6 +17,8 @@ pub enum InterlinguaPerturbation {
     RenamedIdentifiers,
     MissingEdge,
     DuplicateEdge,
+    Relabeled,
+    ConfidenceDrift,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -63,8 +65,8 @@ pub fn graph_hash(graph: &GroundedConceptGraph) -> Result<String, String> {
     Ok(content_hash(&bytes))
 }
 
-/// Compare graphs by grounded semantic structure, not collection order or
-/// lexical labels. Node identifiers are treated as transport-local names.
+/// Compare graphs by grounded structure, not collection order or lexical labels.
+/// Node identifiers are treated as transport-local names.
 pub fn compare_graphs(
     expected: &GroundedConceptGraph,
     observed: &GroundedConceptGraph,
@@ -83,33 +85,23 @@ pub fn compare_graphs(
         .filter(|key| observed_edges.binary_search(key).is_ok())
         .count();
 
-    let node_precision = ratio(node_intersection, observed_nodes.len());
-    let node_recall = ratio(node_intersection, expected_nodes.len());
-    let edge_precision = ratio(edge_intersection, observed_edges.len());
-    let edge_recall = ratio(edge_intersection, expected_edges.len());
-
-    let confidence_mae = confidence_mae(&expected_nodes, &observed_nodes);
-    let structural_equivalence = expected_nodes == observed_nodes && expected_edges == observed_edges;
-
-    let expected_bytes = serde_json::to_vec(expected)
-        .map_err(|error| error.to_string())?
-        .len();
-    let observed_bytes = serde_json::to_vec(observed)
-        .map_err(|error| error.to_string())?
-        .len();
-
     let metrics = InterlinguaMetrics {
         schema_version: INTERLINGUA_BENCHMARK_SCHEMA_VERSION,
         expected_graph_hash: graph_hash(expected)?,
         observed_graph_hash: graph_hash(observed)?,
-        node_precision,
-        node_recall,
-        edge_precision,
-        edge_recall,
-        confidence_mae,
-        structural_equivalence,
-        expected_bytes,
-        observed_bytes,
+        node_precision: ratio(node_intersection, observed_nodes.len()),
+        node_recall: ratio(node_intersection, expected_nodes.len()),
+        edge_precision: ratio(edge_intersection, observed_edges.len()),
+        edge_recall: ratio(edge_intersection, expected_edges.len()),
+        confidence_mae: confidence_mae(&expected_nodes, &observed_nodes),
+        structural_equivalence: expected_nodes.keys().eq(observed_nodes.keys())
+            && expected_edges == observed_edges,
+        expected_bytes: serde_json::to_vec(expected)
+            .map_err(|error| error.to_string())?
+            .len(),
+        observed_bytes: serde_json::to_vec(observed)
+            .map_err(|error| error.to_string())?
+            .len(),
     };
 
     if !metrics.validates() {
@@ -151,13 +143,29 @@ pub fn rename_identifiers(graph: &GroundedConceptGraph, prefix: &str) -> Grounde
     renamed
 }
 
+pub fn relabel_nodes(graph: &GroundedConceptGraph, suffix: &str) -> GroundedConceptGraph {
+    let mut relabeled = graph.clone();
+    for node in &mut relabeled.nodes {
+        node.label = node.label.as_ref().map(|label| format!("{label}{suffix}"));
+    }
+    relabeled
+}
+
+pub fn adjust_confidence(graph: &GroundedConceptGraph, delta: f32) -> GroundedConceptGraph {
+    let mut adjusted = graph.clone();
+    for node in &mut adjusted.nodes {
+        node.confidence = (node.confidence + delta).clamp(0.0, 1.0);
+    }
+    adjusted
+}
+
 pub fn drop_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
     let mut reduced = graph.clone();
     reduced.edges.pop();
     reduced
 }
 
-pub fn relabel_nodes(graph: &GroundedConceptGraph, suffix: &str) -> GroundedConceptGraph {\n    let mut relabeled = graph.clone();\n    for node in &mut relabeled.nodes {\n        node.label = node.label.as_ref().map(|label| format!("{label}{suffix}"));\n    }\n    relabeled\n}\n\npub fn adjust_confidence(graph: &GroundedConceptGraph, delta: f32) -> GroundedConceptGraph {\n    let mut adjusted = graph.clone();\n    for node in &mut adjusted.nodes {\n        node.confidence = (node.confidence + delta).clamp(0.0, 1.0);\n    }\n    adjusted\n}\n\npub fn duplicate_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
+pub fn duplicate_last_edge(graph: &GroundedConceptGraph) -> GroundedConceptGraph {
     let mut duplicated = graph.clone();
     if let Some(edge) = duplicated.edges.last().cloned() {
         duplicated.edges.push(edge);
@@ -169,14 +177,7 @@ fn canonical_nodes(graph: &GroundedConceptGraph) -> BTreeMap<String, f32> {
     graph
         .nodes
         .iter()
-        .map(|node| {
-            let mut grounded = node.grounded_by.clone();
-            grounded.sort();
-            (
-                canonical_node_key(node),
-                (node.kind.clone(), grounded, node.confidence),
-            )
-        })
+        .map(|node| (canonical_node_key(node), node.confidence))
         .collect()
 }
 
@@ -207,27 +208,21 @@ fn canonical_edges(graph: &GroundedConceptGraph) -> Vec<(String, String, String)
 fn canonical_node_key(node: &ConceptNode) -> String {
     let mut grounded = node.grounded_by.clone();
     grounded.sort();
-    let kind = serde_json::to_string(&node.kind).unwrap_or_else(|_| format!("{:?}", node.kind));
+    let kind =
+        serde_json::to_string(&node.kind).unwrap_or_else(|_| format!("{:?}", node.kind));
     format!("{kind}|{}", grounded.join(","))
 }
 
-fn confidence_mae(
-    expected: &BTreeMap<String, (ConceptKind, Vec<String>, f32)>,
-    observed: &BTreeMap<String, (ConceptKind, Vec<String>, f32)>,
-) -> f64 {
+fn confidence_mae(expected: &BTreeMap<String, f32>, observed: &BTreeMap<String, f32>) -> f64 {
     let mut total = 0.0_f64;
     let mut count = 0_u64;
-    for (key, (_, _, expected_confidence)) in expected {
-        if let Some((_, _, observed_confidence)) = observed.get(key) {
+    for (key, expected_confidence) in expected {
+        if let Some(observed_confidence) = observed.get(key) {
             total += (*expected_confidence as f64 - *observed_confidence as f64).abs();
             count += 1;
         }
     }
-    if count == 0 {
-        0.0
-    } else {
-        total / count as f64
-    }
+    if count == 0 { 0.0 } else { total / count as f64 }
 }
 
 fn ratio(numerator: usize, denominator: usize) -> f64 {
@@ -302,6 +297,23 @@ mod tests {
         let observed = rename_identifiers(&expected, "node-");
         let metrics = compare_graphs(&expected, &observed).unwrap();
         assert!(metrics.structural_equivalence);
+    }
+
+    #[test]
+    fn lexical_relabeling_is_structurally_neutral() {
+        let expected = fixture();
+        let observed = relabel_nodes(&expected, " (paraphrase)");
+        let metrics = compare_graphs(&expected, &observed).unwrap();
+        assert!(metrics.structural_equivalence);
+    }
+
+    #[test]
+    fn confidence_drift_is_reported_separately_from_structure() {
+        let expected = fixture();
+        let observed = adjust_confidence(&expected, 0.05);
+        let metrics = compare_graphs(&expected, &observed).unwrap();
+        assert!(metrics.structural_equivalence);
+        assert!(metrics.confidence_mae > 0.0);
     }
 
     #[test]
