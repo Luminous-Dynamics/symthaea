@@ -335,6 +335,37 @@ mod tests {
     }
 
     #[test]
+    fn challenge_mismatch_is_rejected_before_external_verifier() {
+        let challenge = TpmQuoteChallenge::new([9u8; TPM_QUOTE_NONCE_BYTES]).unwrap();
+        let evidence = evidence(7);
+        let receipt = receipt(7);
+
+        struct MustNotRun;
+        impl TpmNvCounterEvidenceVerifier for MustNotRun {
+            fn verify(
+                &self,
+                _: &TpmNvCounterEvidence,
+                _: &FreshnessAnchorProfile,
+                _: &FreshnessAnchorVerificationReceipt,
+            ) -> Result<(), TpmNvCounterVerificationError> {
+                panic!("external verifier must not run before challenge validation");
+            }
+        }
+
+        assert_eq!(
+            verify_tpm_nv_counter_with_challenge(
+                &evidence,
+                &challenge,
+                &profile(),
+                &receipt,
+                &MustNotRun,
+            )
+            .unwrap_err(),
+            TpmNvCounterVerificationError::ChallengeDigestMismatch
+        );
+    }
+
+    #[test]
     fn matching_challenge_allows_tpm_evidence_verification() {
         let challenge = TpmQuoteChallenge::new([7u8; TPM_QUOTE_NONCE_BYTES]).unwrap();
         let mut evidence = evidence(7);
