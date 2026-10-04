@@ -8,7 +8,7 @@ This experiment defines the first deterministic, versioned HDC representation fo
 
 It is intentionally narrower than semantic decoding. The tested claim is:
 
-> Given a fixed training-derived codebook, a held-out synthetic concept graph whose atomic node and relation vocabulary is already present in that codebook can be encoded, quantized, transmitted as binary HDC frames, retrieved with the same codebook, and reconstructed with measured structural precision and recall.
+> Given a fixed training-derived codebook, a held-out synthetic concept graph whose atomic node and relation vocabulary is already present in that codebook can be encoded, quantized, transmitted as binary HDC frames, retrieved with the same codebook, and reconstructed with measured structural precision and recall. Clean retrieval can also be passed through a conservative decode policy that abstains when score or margin is insufficient.
 
 It does **not** establish that the representation captures a person's meaning, that a neural decoder can produce the graph, or that a brain-mediated channel can carry it.
 
@@ -99,6 +99,8 @@ The benchmark includes:
 
 
 The first two quantify accidental retrieval. The third checks that provenance mismatch is rejected before interpretation rather than producing plausible-looking output in the wrong semantic coordinate system.
+
+The decoder additionally supports explicit minimum score and minimum margin thresholds. This is important because a top-k nearest-neighbour decoder otherwise always produces an answer, even for unrelated input.
 
 ## Evidence boundary
 
