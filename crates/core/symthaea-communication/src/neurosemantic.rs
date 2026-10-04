@@ -649,7 +649,7 @@ mod tests {
 
     #[test]
     fn authorized_message_requires_scope_epoch_and_subject_binding() {
-        let packet = NeurosemanticPacket::new(
+        let packet = NeurosemanticPacket::new_with_policy(
             3,
             "peer",
             "subject",
@@ -658,6 +658,7 @@ mod tests {
             ChannelDirection::Write,
             RepresentationFamily::Hdc,
             CognitiveSensitivity::Private,
+            semantic_policy(),
             0.88,
             NeurosemanticPayload::StructuredRepresentation(b"hello".to_vec()),
         )
@@ -678,7 +679,7 @@ mod tests {
     #[test]
     fn read_direction_flows_from_subject_to_peer() {
         let base = lease();
-        let packet = NeurosemanticPacket::new(
+        let packet = NeurosemanticPacket::new_with_policy(
             9,
             "subject",
             "peer",
@@ -687,6 +688,7 @@ mod tests {
             ChannelDirection::Read,
             RepresentationFamily::Hdc,
             CognitiveSensitivity::Private,
+            semantic_policy(),
             0.77,
             NeurosemanticPayload::Hypervector(vec![1, -1]),
         )
@@ -704,7 +706,7 @@ mod tests {
     #[test]
     fn read_direction_rejects_peer_to_subject_packet() {
         let base = lease();
-        let packet = NeurosemanticPacket::new(
+        let packet = NeurosemanticPacket::new_with_policy(
             10,
             "peer",
             "subject",
@@ -738,6 +740,7 @@ mod tests {
             ChannelDirection::Write,
             RepresentationFamily::Hdc,
             CognitiveSensitivity::Private,
+            semantic_policy(),
             0.5,
             NeurosemanticPayload::DerivedNeuralFeature(vec![0.1, f32::NAN]),
         );
@@ -801,7 +804,7 @@ mod tests {
     #[test]
     fn authorized_replay_path_requires_active_consent() {
         let base = lease();
-        let packet = NeurosemanticPacket::new(
+        let packet = NeurosemanticPacket::new_with_policy(
             14,
             "peer",
             "subject",
@@ -834,7 +837,7 @@ mod tests {
     #[test]
     fn sensitivity_ceiling_is_enforced() {
         let base = lease();
-        let packet = NeurosemanticPacket::new(
+        let packet = NeurosemanticPacket::new_with_policy(
             15,
             "peer",
             "subject",
@@ -843,6 +846,7 @@ mod tests {
             ChannelDirection::Write,
             RepresentationFamily::Hdc,
             CognitiveSensitivity::HighlyPrivate,
+            semantic_policy(),
             0.5,
             NeurosemanticPayload::Hypervector(vec![1, -1]),
         )
