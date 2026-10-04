@@ -311,7 +311,7 @@ fn receipt_accepts_unknown_unprotected_extension_and_round_trips() {
 fn outer_cose_accepts_large_tagged_opaque_extension_and_round_trips() {
     let payload = vec![0x5a, 0x00, 0x00, 0x10, 0x01];
     payload.extend_from_slice(&[0xaa; 4097]);
-    let mut protected = vec![0xa0];
+    let protected = vec![0xa0];
     let mut unprotected = vec![0xa1, 0x18, 0x1e, 0xd8, 0x18];
     unprotected.extend_from_slice(&payload);
 
