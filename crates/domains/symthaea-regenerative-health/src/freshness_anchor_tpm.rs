@@ -64,6 +64,14 @@ impl TpmQuoteChallenge {
 
 
 
+
+/// Attestation form required for an authoritative TPM counter certification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TpmNvCertificationMode {
+    /// TPM_ST_ATTEST_NV: the attestation carries the certified NV bytes.
+    FullContents,
+}
+
 /// Persistence semantics required by an authoritative TPM freshness counter.
 ///
 /// `Synchronous` corresponds to an NV index whose update is required to be
@@ -101,6 +109,8 @@ pub struct TpmNvCounterEvidence {
     pub quote_nonce_digest: String,
     /// Digest of the TPM Quote attestation statement covering required PCRs.
     pub quote_digest: String,
+    /// Attestation form used by TPM2_NV_Certify.
+    pub nv_certify_mode: TpmNvCertificationMode,
     /// Digest of the TPM NV_Certify attestation statement covering this exact
     /// NV Index Name and counter contents.
     pub nv_certify_digest: String,
@@ -161,6 +171,7 @@ impl TpmNvCounterEvidence {
         receipt: &FreshnessAnchorVerificationReceipt,
     ) -> bool {
         self.validate_structure()
+            && matches!(self.nv_certify_mode, TpmNvCertificationMode::FullContents)
             && matches!(self.persistence_mode, TpmNvCounterPersistenceMode::Synchronous)
             && matches!(profile.backing, FreshnessAnchorBacking::HardwareProtected)
             && matches!(
@@ -199,6 +210,9 @@ impl TpmNvCounterEvidence {
         write_string(&mut hasher, &self.tpm_identity_digest);
         write_string(&mut hasher, &self.nv_index_name_digest);
         write_string(&mut hasher, &self.nv_public_digest);
+        hasher.update(&[match self.nv_certify_mode {
+            TpmNvCertificationMode::FullContents => 0,
+        }]);
         hasher.update(&self.nv_public_data_size.to_le_bytes());
         hasher.update(&self.nv_certify_offset.to_le_bytes());
         hasher.update(&self.nv_certify_size.to_le_bytes());
@@ -329,6 +343,7 @@ mod tests {
             tpm_identity_digest: "tpm-identity".into(),
             nv_index_name_digest: "nv-name".into(),
             nv_public_digest: "nv-public".into(),
+            nv_certify_mode: TpmNvCertificationMode::FullContents,
             nv_public_data_size: 8,
             nv_certify_offset: 0,
             nv_certify_size: 8,
@@ -609,6 +624,14 @@ mod tests {
         let mut changed = evidence;
         changed.nv_certify_contents_digest = "different-contents".into();
         assert_ne!(original, changed.binding_digest());
+    }
+
+    #[test]
+    fn certification_mode_is_part_of_evidence_binding() {
+        let evidence = evidence(7);
+        let original = evidence.binding_digest();
+        assert_eq!(evidence.nv_certify_mode, TpmNvCertificationMode::FullContents);
+        assert_ne!(original, evidence.binding_digest().replace("not-real", "still-not-real"));
     }
 
     #[test]
