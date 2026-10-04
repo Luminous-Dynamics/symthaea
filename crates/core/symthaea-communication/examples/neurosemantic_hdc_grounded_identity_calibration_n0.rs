@@ -211,7 +211,8 @@ fn main() -> Result<(), String> {
     }
 
     let mut null_abstentions = 0_u32;
-    let null_samples = 12_u32;
+    const NULL_SAMPLES: u32 = 256;
+    let null_samples = NULL_SAMPLES;
     for index in 0..null_samples {
         let (graph, manifest) = make_graph("null", &[0, 1, 2], &[(0, 0, 1), (1, 1, 2)]);
         let clean = codebook.encode_graph(&graph, &manifest)?;
