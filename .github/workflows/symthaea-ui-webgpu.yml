@@ -66,6 +66,9 @@ jobs:
         working-directory: crates/bridges/symthaea-web
         run: node --check test-webgpu-qualification.mjs
 
+      - name: Run semantic wire validation tests
+        run: cargo test -p symthaea-canvas --lib scene_wire::tests
+
       - name: Build qualification fixture
         working-directory: crates/bridges/symthaea-ui
         run: trunk build --release --features browser-qualification --dist dist
