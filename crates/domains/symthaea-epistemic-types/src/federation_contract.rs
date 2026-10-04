@@ -196,6 +196,20 @@ impl FederatedClaim {
         if self.admission_receipt.frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
             return Err("admission receipt frontier reference must be non-empty when present");
         }
+        if self.provenance_validation.validator_version.trim().is_empty() {
+            return Err("provenance validator version must be non-empty");
+        }
+        if self.admission_receipt.validator_version.trim().is_empty() {
+            return Err("admission receipt validator version must be non-empty");
+        }
+        if self.source_event.as_deref().is_some_and(|v| v.trim().is_empty())
+            || self.frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty())
+            || self.epistemic_state.as_deref().is_some_and(|v| v.trim().is_empty())
+            || self.claim_ceiling.as_deref().is_some_and(|v| v.trim().is_empty())
+            || self.model_ref.as_deref().is_some_and(|v| v.trim().is_empty())
+        {
+            return Err("federated claim reference must be non-empty when present");
+        }
         if !self.provenance_validation.conforms {
             return Err("federated claim provenance validation does not conform");
         }
@@ -761,6 +775,39 @@ mod digest_tests {
             b.validate_structure().unwrap_err(),
             "claim relation count must match validation report"
         );
+    }
+
+    #[test]
+    fn validation_is_defensive_against_deserialized_blank_versions_and_references() {
+        let mut claim = base_claim();
+
+        claim.provenance_validation.validator_version.clear();
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "provenance validator version must be non-empty"
+        );
+
+        claim = base_claim();
+        claim.admission_receipt.validator_version.clear();
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "admission receipt validator version must be non-empty"
+        );
+
+        for mutation in [
+            |c: &mut FederatedClaim| c.source_event = Some("   ".into()),
+            |c: &mut FederatedClaim| c.frontier_ref = Some("   ".into()),
+            |c: &mut FederatedClaim| c.epistemic_state = Some("   ".into()),
+            |c: &mut FederatedClaim| c.claim_ceiling = Some("   ".into()),
+            |c: &mut FederatedClaim| c.model_ref = Some("   ".into()),
+        ] {
+            claim = base_claim();
+            mutation(&mut claim);
+            assert_eq!(
+                claim.validate_structure().unwrap_err(),
+                "federated claim reference must be non-empty when present"
+            );
+        }
     }
 }
 
