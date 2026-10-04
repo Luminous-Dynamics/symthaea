@@ -78,10 +78,15 @@ jobs:
           assert hdc_interlingua["summary"]["all_structurally_equivalent"] is True
           assert hdc_interlingua["summary"]["same_codebook_for_all_cases"] is True
           assert hdc_interlingua["summary"]["reordered_representation_exact"] is True
+          assert hdc_interlingua["summary"]["lexical_invariance_exact"] is True
+          assert hdc_interlingua["summary"]["identifier_invariance_exact"] is True
           assert hdc_interlingua["summary"]["wrong_codebook_rejected"] is True
+          assert hdc_interlingua["codebook"]["descriptor"]["role_revision"] == "source-relation-target-node-v2"
           assert hdc_interlingua["negative_controls"]["unrelated_node_max_similarity"] < 0.2
           assert hdc_interlingua["negative_controls"]["unrelated_edge_max_similarity"] < 0.2
           assert hdc_interlingua["negative_controls"]["true_edge_similarity"] > hdc_interlingua["negative_controls"]["swapped_edge_similarity"]
+          assert [obs["flip_probability"] for obs in hdc_interlingua["transport_corruption"]] == [0.0, 0.001, 0.01, 0.05, 0.10]
+          assert hdc_interlingua["transport_corruption"][0]["metrics"]["structural_equivalence"] is True
           for case in hdc_interlingua["cases"]:
               metrics = case["metrics"]
               assert metrics["codebook_hash"] == hdc_interlingua["codebook"]["hash"]
