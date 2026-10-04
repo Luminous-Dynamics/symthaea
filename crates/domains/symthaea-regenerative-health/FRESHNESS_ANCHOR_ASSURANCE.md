@@ -115,6 +115,9 @@ A real adapter must still independently verify:
 - counter type and relevant NV attributes;
 - authorization policy;
 - TPM identity/attestation binding;
+- NV certification qualifying data matching the verifier challenge;
+- NV certification carrying the same NV Index Name as the selected counter;
+- the certified NV contents digest matching the observed counter value;
 - the observed counter value;
 - persistence semantics required by the deployment; and
 - the relationship between the counter value and the freshness recovery generation.
