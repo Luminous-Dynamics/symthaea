@@ -147,6 +147,11 @@ impl FederatedClaim {
         field(&mut bytes, "receipt_frontier_ref", self.admission_receipt.frontier_ref.as_deref());
         field(
             &mut bytes,
+            "receipt_admitted_subject_digest",
+            Some(&self.admission_receipt.admitted_subject_digest),
+        );
+        field(
+            &mut bytes,
             "receipt_provenance_snapshot_digest",
             Some(&self.admission_receipt.provenance_snapshot_digest),
         );
@@ -243,6 +248,12 @@ impl FederatedClaim {
         }
         if self.admission_receipt.provenance_snapshot_digest != self.provenance_snapshot_digest {
             return Err("claim snapshot digest must match validation report");
+        }
+        if !self.admission_receipt.binds_subject(
+            &self.canonical_identity,
+            Some(&self.provenance_family),
+        ) {
+            return Err("admission receipt must bind claim canonical subject");
         }
         if self.admission_receipt.frontier_ref != self.frontier_ref {
             return Err("claim frontier must match admission receipt");
@@ -435,6 +446,8 @@ mod tests {
         let receipt = CanonicalAdmissionReceipt::new(
             "admission:event-1",
             Some("frontier:1".into()),
+            "canonical:1",
+            Some("family:1".into()),
             validation.snapshot_digest.clone(),
             validation.validator_version.clone(),
             validation.snapshot_schema_version,
@@ -499,6 +512,8 @@ mod tests {
         let receipt = CanonicalAdmissionReceipt::new(
             "admission:event-cycle",
             Some("frontier:cycle".into()),
+            "canonical:cycle",
+            Some("family:cycle".into()),
             view.snapshot_digest.clone(),
             view.validation.validator_version.clone(),
             view.validation.snapshot_schema_version,
@@ -575,6 +590,8 @@ mod tests {
         let duplicate_receipt = CanonicalAdmissionReceipt::new(
             "admission:event-1",
             Some("frontier:1".into()),
+            "canonical:duplicate",
+            Some("family:1".into()),
             duplicate_validation.snapshot_digest.clone(),
             duplicate_validation.validator_version.clone(),
             duplicate_validation.snapshot_schema_version,
@@ -601,6 +618,39 @@ mod tests {
         assert_eq!(
             duplicate_claim.validate_structure().unwrap_err(),
             "claim relations must match validation snapshot"
+        );
+    }
+
+    #[test]
+    fn federated_claim_rejects_admission_subject_mismatch() {
+        let (_, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view = ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            Some("frontier:1".into()),
+            "canonical:other",
+            Some("family:1".into()),
+            view.snapshot_digest.clone(),
+            view.validation.validator_version.clone(),
+            view.validation.snapshot_schema_version,
+        ).unwrap();
+        assert_eq!(
+            FederatedClaim::new(
+                "claim:1",
+                "canonical:1",
+                "family:1",
+                "author:1",
+                "statement:1",
+                view,
+                receipt,
+            ).unwrap_err(),
+            "admission receipt must bind claim canonical subject"
         );
     }
 
@@ -652,6 +702,8 @@ mod digest_tests {
         let receipt = CanonicalAdmissionReceipt::new(
             "admission:event-1",
             Some("frontier:1".into()),
+            "canonical:1",
+            Some("family:1".into()),
             validation.snapshot_digest.clone(),
             validation.validator_version.clone(),
             validation.snapshot_schema_version,
@@ -709,6 +761,14 @@ mod digest_tests {
         let a = base_claim();
         let mut b = a.clone();
         b.author = "author:2".into();
+        assert_ne!(a.canonical_digest(), b.canonical_digest());
+    }
+
+    #[test]
+    fn canonical_digest_covers_admitted_subject_binding() {
+        let a = base_claim();
+        let mut b = a.clone();
+        b.admission_receipt.admitted_subject_digest = "0".repeat(64);
         assert_ne!(a.canonical_digest(), b.canonical_digest());
     }
 
