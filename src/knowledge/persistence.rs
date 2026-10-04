@@ -190,6 +190,24 @@ impl KnowledgeSnapshotReceipt {
     pub fn verify_self_digest(&self) -> bool {
         self.receipt_digest_hex == self.recomputed_receipt_digest_hex()
     }
+
+    /// Compute a canonical commitment over an already verified receipt history.
+    ///
+    /// The ordered generation, canonical snapshot digest, and per-receipt self-digest are
+    /// all bound into the history commitment. The commitment is deterministic and intended
+    /// for external evidence anchoring; it is not an authenticated signature.
+    pub fn canonical_history_digest_hex(history: &[Self]) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.epf-011.snapshot-receipt-history.v1");
+        digest_u64(&mut hasher, history.len() as u64);
+        for receipt in history {
+            digest_u64(&mut hasher, receipt.generation);
+            digest_str(&mut hasher, &receipt.canonical_digest_hex);
+            digest_str(&mut hasher, &receipt.receipt_digest_hex);
+        }
+        hasher.finalize().to_hex().to_string()
+    }
+
 }
 
 /// Immutable record that a named validator evaluated the currently committed
@@ -304,6 +322,33 @@ impl KnowledgeSnapshotValidationReceiptRecord {
     /// Whether the stored self-digest exactly matches the canonical v2 digest.
     pub fn verify_self_digest(&self) -> bool {
         self.stored_receipt_digest_hex == self.recomputed_receipt_digest_hex()
+    }
+
+    /// Compute a canonical commitment over an already verified validation history.
+    ///
+    /// The ordered append sequence, complete receipt fields, and stored v2 self-digest are
+    /// all bound into the history commitment. The commitment is deterministic and intended
+    /// for external evidence anchoring; it is not an authenticated signature.
+    pub fn canonical_history_digest_hex(history: &[Self]) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.epf-011.snapshot-validation-receipt-history.v1");
+        digest_u64(&mut hasher, history.len() as u64);
+        for record in history {
+            digest_u64(&mut hasher, record.validation_sequence);
+            digest_str(&mut hasher, &record.receipt.validation_event);
+            digest_u64(&mut hasher, record.receipt.generation);
+            digest_str(&mut hasher, &record.receipt.snapshot_digest_hex);
+            digest_str(&mut hasher, &record.receipt.validator_ref);
+            digest_str(&mut hasher, &record.receipt.validator_version);
+            digest_str(&mut hasher, &record.receipt.validation_profile);
+            digest_bool(&mut hasher, record.receipt.conforms);
+            digest_opt_str(
+                &mut hasher,
+                record.receipt.report_digest_hex.as_deref(),
+            );
+            digest_str(&mut hasher, &record.stored_receipt_digest_hex);
+        }
+        hasher.finalize().to_hex().to_string()
     }
 }
 
@@ -924,6 +969,15 @@ impl KnowledgePersistence {
         Ok(receipts)
     }
 
+    /// Compute one deterministic commitment over the complete verified snapshot-receipt history.
+    ///
+    /// This is an evidence/anchoring primitive. It does not replace per-record verification and
+    /// does not provide authenticity without an independent authenticated external anchor.
+    pub fn snapshot_receipt_history_digest_hex(&mut self) -> Result<String, String> {
+        self.snapshot_receipt_history()
+            .map(|history| KnowledgeSnapshotReceipt::canonical_history_digest_hex(&history))
+    }
+
     /// Load the latest committed complete-snapshot receipt.
     ///
     /// This receipt is append-only and is only advanced by successful
@@ -1219,6 +1273,16 @@ impl KnowledgePersistence {
         &mut self,
     ) -> Result<Vec<KnowledgeSnapshotValidationReceiptRecord>, String> {
         self.load_snapshot_validation_receipt_records(true, true)
+    }
+
+    /// Compute one deterministic commitment over the complete verified validation-receipt history.
+    ///
+    /// This is an evidence/anchoring primitive. It does not replace per-record verification and
+    /// does not provide authenticity without an independent authenticated external anchor.
+    pub fn snapshot_validation_receipt_history_digest_hex(&mut self) -> Result<String, String> {
+        self.snapshot_validation_receipt_records().map(|history| {
+            KnowledgeSnapshotValidationReceiptRecord::canonical_history_digest_hex(&history)
+        })
     }
 
     fn load_snapshot_validation_receipt_records(
@@ -7343,6 +7407,20 @@ mod tests {
             vec![1, 2]
         );
         assert!(history.iter().all(KnowledgeSnapshotReceipt::verify_self_digest));
+        let history_digest =
+            KnowledgeSnapshotReceipt::canonical_history_digest_hex(&history);
+        assert_eq!(
+            p.snapshot_receipt_history_digest_hex().unwrap(),
+            history_digest
+        );
+
+        let mut reordered = history.clone();
+        reordered.swap(0, 1);
+        assert_ne!(
+            KnowledgeSnapshotReceipt::canonical_history_digest_hex(&reordered),
+            history_digest
+        );
+
         assert_eq!(
             p.latest_snapshot_receipt().unwrap().unwrap(),
             history[1]
@@ -7641,6 +7719,19 @@ mod tests {
         assert_eq!(all[1].receipt.generation, 2);
         assert_eq!(all[2].receipt.generation, 2);
         assert!(all.iter().all(KnowledgeSnapshotValidationReceiptRecord::verify_self_digest));
+        let history_digest =
+            KnowledgeSnapshotValidationReceiptRecord::canonical_history_digest_hex(&all);
+        assert_eq!(
+            p.snapshot_validation_receipt_history_digest_hex().unwrap(),
+            history_digest
+        );
+
+        let mut reordered = all.clone();
+        reordered.swap(0, 1);
+        assert_ne!(
+            KnowledgeSnapshotValidationReceiptRecord::canonical_history_digest_hex(&reordered),
+            history_digest
+        );
 
         let latest = p.latest_snapshot_validation_receipt_records().unwrap();
         assert_eq!(latest.len(), 2);
