@@ -46,7 +46,16 @@ pub fn nixos_generation_resource(
     if realization.is_empty() {
         return Err(NixOSAdapterError::InvalidGenerationRealization);
     }
-    if !realization.starts_with("/nix/store/") {
+    let store_entry = realization
+        .strip_prefix("/nix/store/")
+        .ok_or(NixOSAdapterError::InvalidGenerationRealizationPath)?;
+    if store_entry.is_empty()
+        || store_entry.contains('/')
+        || store_entry == "."
+        || store_entry == ".."
+        || store_entry.contains("/../")
+        || store_entry.contains("/./")
+    {
         return Err(NixOSAdapterError::InvalidGenerationRealizationPath);
     }
 
@@ -894,6 +903,15 @@ mod tests {
         );
         assert_eq!(
             nixos_generation_resource(42, "/etc/nixos").expect_err("non-store realization"),
+            NixOSAdapterError::InvalidGenerationRealizationPath
+        );
+        assert_eq!(
+            nixos_generation_resource(42, "/nix/store/../etc").expect_err("traversal realization"),
+            NixOSAdapterError::InvalidGenerationRealizationPath
+        );
+        assert_eq!(
+            nixos_generation_resource(42, "/nix/store/foo/bar")
+                .expect_err("nested realization"),
             NixOSAdapterError::InvalidGenerationRealizationPath
         );
     }
