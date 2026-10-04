@@ -532,7 +532,7 @@ capability ceiling. There is therefore one typed observation-to-adapter seam;
 callers do not need to reconstruct the Nix adapter from independently assembled
 identity/capability fields.
 
-The prototype `applications.install` and `applications.remove` properties are
+The prototype `nixos.home-manager`, `applications.install`, and `applications.remove` properties are
 adapter-local vocabulary. They are currently rejected by the Nix adapter rather
 than compiled into an executable plan, because the existing `nix-env` path targets
 the invoking user's profile implicitly. Admission should resume only after the
