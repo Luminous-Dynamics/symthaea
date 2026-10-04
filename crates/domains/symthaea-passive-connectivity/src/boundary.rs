@@ -98,7 +98,11 @@ impl PortBoundaryPolicy {
         if !tolerance_mm.is_finite() || tolerance_mm < 0.0 {
             return None;
         }
-        self.tolerance_micrometers = (tolerance_mm as f64 * 1_000.0).round() as u64;
+        let tolerance_micrometers = tolerance_mm as f64 * 1_000.0;
+        if tolerance_micrometers > u64::MAX as f64 {
+            return None;
+        }
+        self.tolerance_micrometers = tolerance_micrometers.round() as u64;
         Some(self)
     }
 }
@@ -562,6 +566,11 @@ mod tests {
             PortBoundaryPolicy::closed().tolerance_micrometers,
             50
         );
+    }
+
+    #[test]
+    fn tolerance_builder_rejects_overflow() {
+        assert!(PortBoundaryPolicy::closed().tolerance_mm(f32::MAX).is_none());
     }
 
     #[test]
