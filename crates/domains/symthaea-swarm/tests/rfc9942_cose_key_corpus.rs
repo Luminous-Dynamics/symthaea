@@ -9,7 +9,7 @@
 use symthaea_swarm::semantic_evidence_vds::{
     Rfc9942Es256CoseKey, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload,
     Rfc9942Vdp, Rfc9942ProofKind, Rfc9942VdpError, Rfc9162InclusionProof,
-    COSE_ES256_ALGORITHM_ID,
+    COSE_ES256_ALGORITHM_ID, MAX_CBOR_BSTR_CHUNKS, MAX_CBOR_TSTR_CHUNKS,
 };
 
 const X: [u8; 32] = [
@@ -66,6 +66,74 @@ fn key(fields: &[Vec<u8>]) -> Vec<u8> {
 }
 fn valid_key() -> Vec<u8> {
     key(&valid_fields())
+}
+
+fn indefinite_bstr_with_exact_chunk_cap(bytes: &[u8]) -> Vec<u8> {
+    assert!(MAX_CBOR_BSTR_CHUNKS >= 1);
+    let mut out = vec![0x5f];
+    for _ in 0..MAX_CBOR_BSTR_CHUNKS - 1 {
+        out.push(0x40);
+    }
+    assert!(bytes.len() <= 23);
+    out.push(0x40 + bytes.len() as u8);
+    out.extend_from_slice(bytes);
+    out.push(0xff);
+    out
+}
+
+fn indefinite_text_with_exact_chunk_cap(bytes: &[u8]) -> Vec<u8> {
+    assert!(MAX_CBOR_TSTR_CHUNKS >= 1);
+    std::str::from_utf8(bytes).expect("test text must be UTF-8");
+    let mut out = vec![0x7f];
+    for _ in 0..MAX_CBOR_TSTR_CHUNKS - 1 {
+        out.push(0x60);
+    }
+    assert!(bytes.len() <= 23);
+    out.push(0x60 + bytes.len() as u8);
+    out.extend_from_slice(bytes);
+    out.push(0xff);
+    out
+}
+
+
+#[test]
+fn cose_key_accepts_exact_indefinite_bstr_chunk_cap_before_break() {
+    let mut fields = valid_fields();
+    let mut encoded = vec![0x21];
+    encoded.extend_from_slice(&indefinite_bstr_with_exact_chunk_cap(&X));
+    fields[5] = encoded;
+
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
+        .expect("the break after exactly MAX_CBOR_BSTR_CHUNKS chunks is valid");
+    assert_eq!(&parsed.public_key_sec1()[1..33], &X);
+}
+
+#[test]
+fn cose_key_accepts_exact_indefinite_tstr_chunk_cap_before_break() {
+    let mut fields = valid_fields();
+    let mut encoded = vec![0x01];
+    encoded.extend_from_slice(&indefinite_text_with_exact_chunk_cap(b"EC2"));
+    fields[0] = encoded;
+
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
+        .expect("the break after exactly MAX_CBOR_TSTR_CHUNKS chunks is valid");
+    assert_eq!(&parsed.public_key_sec1()[1..33], &X);
+}
+
+#[test]
+fn rfc9162_inclusion_path_accepts_indefinite_32_byte_hash_bstr() {
+    let mut proof = vec![0x83, 0x02, 0x00, 0x81, 0x5f];
+    proof.push(0x50);
+    proof.extend_from_slice(&[0x11; 16]);
+    proof.push(0x50);
+    proof.extend_from_slice(&[0x11; 16]);
+    proof.push(0xff);
+
+    let decoded = symthaea_swarm::semantic_evidence_vds::Rfc9162InclusionProof::from_cbor(&proof)
+        .expect("an indefinite-length bstr remains a valid 32-byte hash value");
+    assert_eq!(decoded.tree_size, 2);
+    assert_eq!(decoded.leaf_index, 0);
+    assert_eq!(decoded.inclusion_path, vec![[0x11; 32]]);
 }
 
 #[test]
