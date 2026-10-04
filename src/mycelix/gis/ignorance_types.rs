@@ -358,6 +358,7 @@ impl EpistemicFrame {
     /// their proposition-level confidence happens to be similar.
     pub fn divergence_from(&self, other: &Self) -> EpistemicFrameDivergence {
         EpistemicFrameDivergence {
+            identity_changed: self.id != other.id,
             version_changed: self.version != other.version,
             evidence_boundary_changed: self.evidence_boundary != other.evidence_boundary,
             ontology_changed: self.ontology_id != other.ontology_id,
@@ -375,6 +376,8 @@ impl EpistemicFrame {
 /// correction, and later model comparison.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EpistemicFrameDivergence {
+    /// Stable frame identity changed; provenance must therefore remain distinct.
+    pub identity_changed: bool,
     /// Frame schema revision changed; provenance must therefore remain distinct.
     pub version_changed: bool,
     pub evidence_boundary_changed: bool,
@@ -387,7 +390,8 @@ pub struct EpistemicFrameDivergence {
 impl EpistemicFrameDivergence {
     /// Whether any epistemically material frame component differs.
     pub fn is_divergent(&self) -> bool {
-        self.version_changed
+        self.identity_changed
+            || self.version_changed
             || self.evidence_boundary_changed
             || self.ontology_changed
             || self.causal_model_changed
@@ -780,6 +784,24 @@ impl std::fmt::Display for FrameLineageError {
 }
 
 impl std::error::Error for FrameLineageError {}
+
+#[cfg(test)]
+mod frame_identity_divergence_tests {
+    use super::*;
+
+    #[test]
+    fn distinct_frame_id_is_provenance_divergence() {
+        let left = EpistemicFrame::default();
+        let right = EpistemicFrame {
+            id: "different-frame".to_string(),
+            ..left.clone()
+        };
+
+        let divergence = left.divergence_from(&right);
+        assert!(divergence.identity_changed);
+        assert!(divergence.is_divergent());
+    }
+}
 
 impl Default for EpistemicFrame {
     fn default() -> Self {
