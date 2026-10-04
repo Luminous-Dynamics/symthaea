@@ -82,6 +82,12 @@ pub struct TpmNvCounterEvidence {
     /// Digest of the TPM NV_Certify attestation statement covering this exact
     /// NV Index Name and counter contents.
     pub nv_certify_digest: String,
+    /// Digest of the qualifying data carried by the NV_Certify attestation.
+    pub nv_certify_nonce_digest: String,
+    /// Digest of the exact NV Index Name carried by the NV_Certify attestation.
+    pub nv_certify_index_name_digest: String,
+    /// Digest of the NV contents certified by NV_Certify.
+    pub nv_certify_contents_digest: String,
     /// Digest binding the quote to the measured platform state required by policy.
     pub pcr_binding_digest: String,
     /// Counter value read from the exact NV counter described above.
@@ -99,6 +105,9 @@ impl TpmNvCounterEvidence {
             &self.quote_nonce_digest,
             &self.quote_digest,
             &self.nv_certify_digest,
+            &self.nv_certify_nonce_digest,
+            &self.nv_certify_index_name_digest,
+            &self.nv_certify_contents_digest,
             &self.pcr_binding_digest,
         ]
         .iter()
@@ -116,6 +125,7 @@ impl TpmNvCounterEvidence {
         receipt: &FreshnessAnchorVerificationReceipt,
     ) -> bool {
         self.quote_nonce_digest == challenge.digest()
+            && self.nv_certify_nonce_digest == challenge.digest()
             && receipt.freshness_handle_digest == challenge.digest()
     }
 
@@ -138,6 +148,7 @@ impl TpmNvCounterEvidence {
             )
             && receipt.generation == self.counter_value
             && receipt.freshness_handle_digest == self.quote_nonce_digest
+            && self.nv_certify_index_name_digest == self.nv_index_name_digest
             && receipt.evidence_digest == self.binding_digest()
     }
 
@@ -180,6 +191,7 @@ pub enum TpmNvCounterVerificationError {
     HandleMismatch,
     EvidenceIdentityMismatch,
     EvidenceDigestMismatch,
+    NvCertificationBindingMismatch,
     QuoteVerificationFailed,
     ChallengeDigestMismatch,
 }
@@ -216,6 +228,11 @@ pub fn verify_tpm_nv_counter<V: TpmNvCounterEvidenceVerifier>(
     }
     if receipt.evidence_digest != evidence.binding_digest() {
         return Err(TpmNvCounterVerificationError::EvidenceDigestMismatch);
+    }
+    if evidence.nv_certify_nonce_digest != evidence.quote_nonce_digest
+        || evidence.nv_certify_index_name_digest != evidence.nv_index_name_digest
+    {
+        return Err(TpmNvCounterVerificationError::NvCertificationBindingMismatch);
     }
     let FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
         backend_identity_digest,
@@ -273,6 +290,9 @@ mod tests {
             quote_nonce_digest: "quote-handle".into(),
             quote_digest: "quote".into(),
             nv_certify_digest: "nv-certify".into(),
+            nv_certify_nonce_digest: "quote-handle".into(),
+            nv_certify_index_name_digest: "nv-name".into(),
+            nv_certify_contents_digest: "nv-contents".into(),
             pcr_binding_digest: "pcr-binding".into(),
             counter_value,
         }
@@ -501,6 +521,23 @@ mod tests {
         assert_eq!(
             verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
             TpmNvCounterVerificationError::InvalidEvidence
+        );
+    }
+
+    #[test]
+    fn nv_certification_binding_must_match_challenge_and_index() {
+        let mut evidence = evidence(7);
+        evidence.nv_certify_nonce_digest = "different-challenge".into();
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::NvCertificationBindingMismatch
+        );
+
+        let mut evidence = evidence(7);
+        evidence.nv_certify_index_name_digest = "different-index".into();
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::NvCertificationBindingMismatch
         );
     }
 
