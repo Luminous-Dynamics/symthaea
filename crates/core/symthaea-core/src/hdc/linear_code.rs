@@ -1011,9 +1011,7 @@ impl LinearCodeFactorizationFiber {
         }
 
         let expected_source_fingerprint = factorization_source_fingerprint(target, factors);
-        if self.source_fingerprint != expected_source_fingerprint
-            || !self.basis_is_well_formed()
-        {
+        if self.source_fingerprint != expected_source_fingerprint || !self.basis_is_well_formed() {
             return false;
         }
 
