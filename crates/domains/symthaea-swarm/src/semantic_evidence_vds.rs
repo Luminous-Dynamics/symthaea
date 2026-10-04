@@ -3157,6 +3157,60 @@ mod tests {
     }
 
     #[test]
+    fn cbor_bounded_map_reader_accepts_exact_indefinite_capacity() {
+        let wire = vec![
+            0xbf,
+            0x01, 0x02,
+            0x42, 0xaa, 0xbb, 0x63, b'f', b'o', b'o',
+            0x82, 0x01, 0x02,
+            0xff,
+        ];
+        let mut reader=CborReader::new(&wire);
+        let entries=reader.read_map_entries_bounded(3).unwrap();
+        assert_eq!(entries.len(),3);
+        assert_eq!(entries[0],(vec![0x01],vec![0x02]));
+        assert_eq!(entries[1],(vec![0x42,0xaa,0xbb],vec![0x63,b'f',b'o',b'o']));
+        assert_eq!(entries[2],(vec![0x82,0x01,0x02],vec![0xff]));
+        reader.finish().unwrap();
+    }
+
+    #[test]
+    fn cbor_bounded_map_reader_rejects_over_capacity_before_consuming_value() {
+        let wire = vec![
+            0xbf,
+            0x01, 0x02,
+            0x03, 0x04,
+            0x05, 0x06,
+            0x07, 0x08,
+            0xff,
+        ];
+        let mut reader=CborReader::new(&wire);
+        assert_eq!(
+            reader.read_map_entries_bounded(3),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+    }
+
+    #[test]
+    fn cbor_bounded_map_reader_requires_indefinite_break_at_exact_capacity() {
+        let wire = vec![0xbf,0x01,0x02,0x03,0x04,0x05,0x06];
+        let mut reader=CborReader::new(&wire);
+        assert_eq!(
+            reader.read_map_entries_bounded(3),
+            Err(Rfc9162ProofDecodeError::UnexpectedEof)
+        );
+    }
+
+    #[test]
+    fn cbor_bounded_map_reader_preserves_noncanonical_integer_wire_bytes() {
+        let wire = vec![0xa1,0x18,0x01,0x18,0x02];
+        let mut reader=CborReader::new(&wire);
+        let entries=reader.read_map_entries_bounded(1).unwrap();
+        assert_eq!(entries,vec![(vec![0x18,0x01],vec![0x18,0x02])]);
+        reader.finish().unwrap();
+    }
+
+    #[test]
     fn rfc9942_indefinite_array_accepts_exact_resource_cap() {
         let mut wire=vec![0x9f, 0x01, 0x02, 0xff];
         let mut reader=CborReader::new(&wire);
