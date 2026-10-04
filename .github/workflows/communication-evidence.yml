@@ -23,11 +23,30 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.96.0
       - uses: Swatinem/rust-cache@v2
-      - name: Test communication contracts and CLI
+      - name: Test communication contracts and execute N0 evidence labs
         run: |
           cargo test -p symthaea-communication
-          cargo run -p symthaea-communication --example neurosemantic_n0
-          cargo run -p symthaea-communication --example neurosemantic_interlingua_n0
+          mkdir -p target/communication-evidence
+          cargo run -p symthaea-communication --example neurosemantic_n0 | tee target/communication-evidence/neurosemantic_n0.json
+          cargo run -p symthaea-communication --example neurosemantic_interlingua_n0 | tee target/communication-evidence/neurosemantic_interlingua_n0.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("target/communication-evidence/neurosemantic_interlingua_n0.json").read_text())
+          assert report["protocol_version"] == 1
+          assert report["benchmark_schema_version"] == 1
+          assert report["summary"]["cases"] == 7
+          assert report["summary"]["structurally_equivalent_cases"] == 5
+          assert report["execution_revision"] != ""
+          for case in report["cases"]:
+              metrics = case["metrics"]
+              assert 0.0 <= metrics["node_precision"] <= 1.0
+              assert 0.0 <= metrics["node_recall"] <= 1.0
+              assert 0.0 <= metrics["edge_precision"] <= 1.0
+              assert 0.0 <= metrics["edge_recall"] <= 1.0
+              assert metrics["confidence_mae"] >= 0.0
+          PY
       - name: Check locked offline worker and Python syntax
         run: |
           uv lock --check --project communication/worker
@@ -43,6 +62,15 @@ jobs:
           ]:
               ast.parse(path.read_text(), filename=str(path))
           PY
+      - name: Upload deterministic communication evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: communication-evidence-${{ github.sha }}
+          path: target/communication-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Check acoustic capability adapter
         run: cargo check -p symthaea-stt --lib
       - name: Ensure unpinned templates cannot become release evidence
