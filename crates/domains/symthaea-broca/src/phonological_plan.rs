@@ -187,9 +187,33 @@ impl PhonologicalPlan {
         Ok(())
     }
 
-    /// Whether enough phonological content exists for segment-level realization.
+    /// Validate the whole persisted/deserialized object, including cross-field invariants.
+    pub fn validate(&self) -> Result<(), PhonologicalPlanError> {
+        validate_binding_status(&self.segments, self.content_binding)?;
+
+        match self.content_binding {
+            ContentBindingStatus::LexicallyBound => {
+                let provenance = self
+                    .lexical_provenance
+                    .as_deref()
+                    .ok_or(PhonologicalPlanError::LexicalBindingWithoutProvenance)?;
+                if provenance.trim().is_empty() {
+                    return Err(PhonologicalPlanError::EmptyLexicalProvenance);
+                }
+            }
+            ContentBindingStatus::RoleStructureOnly | ContentBindingStatus::PhonologicallyBound => {
+                if self.lexical_provenance.is_some() {
+                    return Err(PhonologicalPlanError::NonLexicalProvenance);
+                }
+            }
+        }
+
+        validate_segment_sequence(&self.segments)
+    }
+
+    /// Whether enough valid phonological content exists for segment-level realization.
     pub fn ready_for_realization(&self) -> bool {
-        !self.segments.is_empty()
+        !self.segments.is_empty() && self.validate().is_ok()
     }
 
     /// Stable trace representation for evidence capture.
@@ -234,6 +258,7 @@ pub enum PhonologicalPlanError {
     LexicalBindingWithoutSegments,
     LexicalBindingWithoutProvenance,
     EmptyLexicalProvenance,
+    NonLexicalProvenance,
     PhonologicalBindingWithoutSegments,
     RoleOnlyWithSegments,
 }
@@ -258,6 +283,9 @@ impl std::fmt::Display for PhonologicalPlanError {
             }
             Self::EmptyLexicalProvenance => {
                 write!(f, "lexically bound plans require non-empty lexical provenance")
+            }
+            Self::NonLexicalProvenance => {
+                write!(f, "non-lexical plans must not carry lexical provenance")
             }
             Self::PhonologicalBindingWithoutSegments => {
                 write!(f, "phonologically bound plans require explicit phonological segments")
@@ -516,6 +544,62 @@ mod tests {
             .expect_err("lexical binding cannot be asserted without phonology");
 
         assert_eq!(error, PhonologicalPlanError::LexicalBindingWithoutProvenance);
+    }
+
+    #[test]
+    fn deserialized_style_cross_field_invariants_are_validated() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.segments = vec![PhonemeSlot::new(
+            "AH",
+            0,
+            SyllableStress::None,
+            true,
+            false,
+            false,
+        )];
+
+        let error = plan
+            .validate()
+            .expect_err("role-only plans cannot carry phonological data");
+
+        assert_eq!(error, PhonologicalPlanError::RoleOnlyWithSegments);
+        assert!(!plan.ready_for_realization());
+    }
+
+    #[test]
+    fn lexical_provenance_is_required_on_the_persisted_object() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.content_binding = ContentBindingStatus::LexicallyBound;
+        plan.segments = sample_for_validation();
+
+        let error = plan
+            .validate()
+            .expect_err("lexical binding without provenance must fail closed");
+
+        assert_eq!(error, PhonologicalPlanError::LexicalBindingWithoutProvenance);
+    }
+
+    #[test]
+    fn non_lexical_plan_cannot_retain_lexical_provenance() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.lexical_provenance = Some("stale".to_string());
+
+        let error = plan
+            .validate()
+            .expect_err("stale provenance must fail validation");
+
+        assert_eq!(error, PhonologicalPlanError::NonLexicalProvenance);
+    }
+
+    fn sample_for_validation() -> Vec<PhonemeSlot> {
+        vec![PhonemeSlot::new(
+            "AE",
+            0,
+            SyllableStress::Primary,
+            true,
+            false,
+            true,
+        )]
     }
 
     #[test]
