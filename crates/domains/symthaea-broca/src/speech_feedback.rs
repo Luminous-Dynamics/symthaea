@@ -114,6 +114,16 @@ impl SpeechFeedbackError {
             && self.mean_error.is_finite()
             && self.mean_error > threshold.max(0.0)
     }
+
+    /// Strict evidence gate: all four acoustic dimensions must be observed and within threshold.
+    pub fn passes_complete(&self, threshold: f32) -> bool {
+        threshold.is_finite()
+            && threshold >= 0.0
+            && self.compared_features == 4
+            && [self.pitch_range, self.prominence, self.rate, self.pause_weight]
+                .into_iter()
+                .all(|value| value.is_some_and(|error| error.is_finite() && error <= threshold))
+    }
 }
 
 /// End-to-end closed-loop evidence linking a plan, observation, and discrepancy.
@@ -149,6 +159,9 @@ impl SpeechFeedbackReceipt {
         &self,
         plan: &SpeechPlan,
     ) -> Result<(), SpeechFeedbackReceiptError> {
+        if plan.validate().is_err() {
+            return Err(SpeechFeedbackReceiptError::PlanMismatch);
+        }
         self.validate()?;
         let expected_target = SpeechSensoryTarget::from_plan(plan);
         if self.plan_surface != plan.grounding_surface() || self.target != expected_target {
@@ -319,6 +332,36 @@ mod tests {
         assert!(receipt.error.prominence.is_none());
         assert!(receipt.error.pause_weight.is_none());
         assert!(receipt.error.mean_error > 0.0);
+    }
+
+    #[test]
+    fn complete_acoustic_gate_rejects_partial_observation() {
+        let target = SpeechSensoryTarget {
+            pitch_range: 1.0,
+            prominence: 0.5,
+            rate: 1.0,
+            pause_weight: 0.5,
+            epistemic_delivery: EpistemicDelivery::Assertive,
+        };
+        let partial = SpeechFeedbackError::compare(
+            target,
+            SpeechSensoryObservation {
+                rate: Some(1.0),
+                ..Default::default()
+            },
+        );
+        assert!(!partial.passes_complete(0.1));
+
+        let exact = SpeechFeedbackError::compare(
+            target,
+            SpeechSensoryObservation {
+                pitch_range: Some(1.0),
+                prominence: Some(0.5),
+                rate: Some(1.0),
+                pause_weight: Some(0.5),
+            },
+        );
+        assert!(exact.passes_complete(0.0));
     }
 
     #[test]
