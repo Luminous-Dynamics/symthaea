@@ -97,7 +97,7 @@ impl FunctionalGraphRealizationReport {
                 disconnected_paths: 0,
                 invalid_paths: 0,
                 path_results: Vec::new(),
-                unexpected_connectivity: Vec::new(),
+                unexpected_flow_connectivity: Vec::new(),
                 physical_transport_unproven: true,
             };
         }
@@ -349,7 +349,7 @@ mod tests {
         assert_eq!(report.connected_paths, 2);
         assert_eq!(report.disconnected_paths, 0);
         assert_eq!(report.invalid_paths, 0);
-        assert!(report.unexpected_connectivity.is_empty());
+        assert!(report.unexpected_flow_connectivity.is_empty());
         assert!(report.is_geometrically_complete());
         assert!(report.physical_transport_unproven);
     }
@@ -432,7 +432,7 @@ mod tests {
         assert!(report.has_topology_leakage());
         assert!(!report.is_geometrically_complete());
         assert!(report
-            .unexpected_connectivity
+            .unexpected_flow_connectivity
             .iter()
             .any(|pair| pair.from == PortId(10) && pair.to == PortId(30)));
     }
