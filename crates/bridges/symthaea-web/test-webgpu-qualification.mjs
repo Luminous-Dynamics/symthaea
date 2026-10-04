@@ -79,10 +79,35 @@ const QUALIFICATION_ENVIRONMENT = {
   cargo: commandVersion('cargo', ['--version']),
   trunk: commandVersion('trunk', ['--version']),
   wasm_bindgen: commandVersion('wasm-bindgen', ['--version']),
+  npm: commandVersion('npm', ['--version']),
   runner_os: process.env.RUNNER_OS || null,
   runner_arch: process.env.RUNNER_ARCH || null,
   runner_name: process.env.RUNNER_NAME || null,
 };
+const missingInputDigests = Object.entries(QUALIFICATION_INPUT_DIGESTS)
+  .filter(([, digest]) => !/^[a-f0-9]{64}$/.test(digest || ''))
+  .map(([name]) => name);
+if (missingInputDigests.length > 0) {
+  throw new Error('qualification input digest collection failed: ' + missingInputDigests.join(', '));
+}
+
+const requiredEnvironmentFields = [
+  'node',
+  'chromium',
+  'chromium_binary_sha256',
+  'chromium_package',
+  'rustc',
+  'cargo',
+  'trunk',
+  'wasm_bindgen',
+  'npm',
+];
+const missingEnvironmentFields = requiredEnvironmentFields.filter(
+  field => !QUALIFICATION_ENVIRONMENT[field],
+);
+if (missingEnvironmentFields.length > 0) {
+  throw new Error('qualification environment provenance incomplete: ' + missingEnvironmentFields.join(', '));
+}
 if (process.env.GITHUB_EVENT_NAME === 'pull_request' && !EXPECTED_CHECKED_OUT_SHA) {
   throw new Error('qualification missing EXPECTED_CHECKED_OUT_SHA for pull_request run');
 }
