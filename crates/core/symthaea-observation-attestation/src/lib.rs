@@ -22,7 +22,7 @@ use symthaea_core::observation_fabric::{
 };
 
 pub const CRYPTOSUITE: &str = "symthaea-ed25519-detached-v1";
-pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v4";
+pub const VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v5";
 const LEGACY_REPORT_VERIFIER_VERSION: &str = "symthaea-observation-attestation-report-v3";
 
 pub const EVALUATION_PROCEDURE_VERSION: &str =
@@ -716,6 +716,11 @@ pub struct ReceiptAttestationVerificationReport {
     pub outcome: ReceiptAttestationVerificationOutcome,
     pub verifier_version: &'static str,
     pub receipt_fingerprint: String,
+    /// Fingerprint of the exact attestation payload whose detached proof was evaluated.
+    ///
+    /// This binds the appraisal result to the complete attestation envelope payload,
+    /// not merely to the underlying receipt. Legacy v3 reports did not carry this field.
+    pub attestation_payload_fingerprint: String,
     pub evaluated_at_unix_ns: i128,
     pub policy_inputs: VerificationPolicyInputs,
     pub policy_fingerprint: String,
@@ -753,7 +758,8 @@ pub struct ReceiptAttestationVerificationReport {
 }
 
 impl ReceiptAttestationVerificationReport {
-    /// Check that stored identity fingerprints still commit to their semantic inputs.
+    /// Check that stored identity fingerprints still commit to their semantic inputs,
+    /// including the exact attestation payload evaluated by the current report version.
     ///
     /// Reports are serializable public data, so callers must not assume these
     /// redundant fields remain mutually consistent after deserialization.
@@ -770,6 +776,8 @@ impl ReceiptAttestationVerificationReport {
 
         supported_version
             && is_blake3_fingerprint(&self.receipt_fingerprint)
+            && (self.verifier_version == LEGACY_REPORT_VERIFIER_VERSION
+                || is_blake3_fingerprint(&self.attestation_payload_fingerprint))
             && self.policy_inputs.is_well_formed()
             && self.environment_identity.is_well_formed()
             && self.policy_fingerprint == self.policy_inputs.fingerprint()
@@ -839,6 +847,7 @@ impl ReceiptAttestationVerificationReport {
             outcome,
             verifier_version: VERIFIER_VERSION,
             receipt_fingerprint,
+            attestation_payload_fingerprint: String::new(),
             evaluated_at_unix_ns,
             policy_fingerprint: policy_inputs.fingerprint(),
             environment_fingerprint: environment_identity.fingerprint(),
@@ -934,6 +943,7 @@ impl ReceiptAttestationVerificationReport {
             outcome: ReceiptAttestationVerificationOutcome::Verified,
             verifier_version: VERIFIER_VERSION,
             receipt_fingerprint,
+            attestation_payload_fingerprint: String::new(),
             evaluated_at_unix_ns,
             policy_fingerprint: policy_inputs.fingerprint(),
             environment_fingerprint: environment_identity.fingerprint(),
@@ -980,6 +990,9 @@ impl ReceiptAttestationVerificationReport {
         });
         write_string(&mut bytes, self.verifier_version);
         write_string(&mut bytes, &self.receipt_fingerprint);
+        if !legacy_v3 {
+            write_string(&mut bytes, &self.attestation_payload_fingerprint);
+        }
         bytes.extend_from_slice(&self.evaluated_at_unix_ns.to_be_bytes());
         write_string(&mut bytes, &self.policy_fingerprint);
         write_string(&mut bytes, &self.environment_fingerprint);
@@ -1926,6 +1939,8 @@ impl Ed25519ReceiptVerifier {
         resolver: &R,
     ) -> ReceiptAttestationVerificationReport {
         let mut report = self.verify_with_resolver_report_inner(envelope, receipt, resolver);
+        report.attestation_payload_fingerprint =
+            blake3::hash(&envelope.canonical_payload_bytes()).to_hex().to_string();
         if report.resolution_snapshot_fingerprint.is_none()
             && report.resolved_verification_method.is_none()
         {
@@ -3307,6 +3322,51 @@ mod tests {
     }
 
     #[test]
+    fn verification_report_binds_exact_attestation_payload() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = resolved_report(&verifier, &envelope, &receipt);
+
+        assert_eq!(
+            report.attestation_payload_fingerprint,
+            blake3::hash(&envelope.canonical_payload_bytes())
+                .to_hex()
+                .to_string()
+        );
+        assert!(is_blake3_fingerprint(&report.attestation_payload_fingerprint));
+        assert!(report.is_well_formed());
+    }
+
+    #[test]
+    fn report_identity_changes_when_attestation_payload_changes_even_with_same_receipt() {
+        let (mut envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+
+        let first = resolved_report(&verifier, &envelope, &receipt);
+        envelope.domain = Some("different-domain".into());
+        sign_envelope(&mut envelope, &signing_key, "did:example:attester-a#key-1")
+            .expect("resign");
+        let second = resolved_report(&verifier, &envelope, &receipt);
+
+        assert_eq!(first.receipt_fingerprint, second.receipt_fingerprint);
+        assert_ne!(
+            first.attestation_payload_fingerprint,
+            second.attestation_payload_fingerprint
+        );
+        assert_ne!(first.fingerprint(), second.fingerprint());
+        assert!(first.is_well_formed());
+        assert!(second.is_well_formed());
+    }
+
+    #[test]
     fn verification_report_fingerprint_is_deterministic_and_binds_receipt() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let verifier = Ed25519ReceiptVerifier::new(
@@ -3936,13 +3996,13 @@ mod tests {
             150,
         );
         let mut report = resolved_report(&verifier, &envelope, &receipt);
-        let v4 = report.canonical_bytes();
+        let v5 = report.canonical_bytes();
         report.verifier_version = "symthaea-observation-attestation-report-v3";
         report.execution_trace = EvaluationTrace::default();
         let v3 = report.canonical_bytes();
         assert!(v3.starts_with(b"symthaea:observation-attestation-report:v3\n"));
-        assert!(v4.starts_with(b"symthaea:observation-attestation-report:v4\n"));
-        assert_ne!(v3, v4);
+        assert!(v5.starts_with(b"symthaea:observation-attestation-report:v5\n"));
+        assert_ne!(v3, v5);
     }
 
     #[test]
