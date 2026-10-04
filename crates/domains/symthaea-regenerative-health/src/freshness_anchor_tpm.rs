@@ -426,6 +426,28 @@ pub fn verify_tpm_nv_counter_with_challenge<V: TpmNvCounterEvidenceVerifier>(
     verify_tpm_nv_counter(evidence, profile, receipt, verifier)
 }
 
+/// Authoritative gate combining the fresh challenge with the pre-authorized TPM/NV
+/// trust policy. This is the preferred entry point for callers that will feed the
+/// resulting evidence into the authoritative freshness path.
+///
+/// The challenge is checked before the policy and before the external verifier, so
+/// stale evidence cannot turn a valid trust policy into an accepted attestation.
+pub fn verify_tpm_nv_counter_with_challenge_and_trust_policy<
+    V: TpmNvCounterEvidenceVerifier,
+>(
+    evidence: &TpmNvCounterEvidence,
+    challenge: &TpmQuoteChallenge,
+    policy: &TpmNvCounterTrustPolicy,
+    profile: &FreshnessAnchorProfile,
+    receipt: &FreshnessAnchorVerificationReceipt,
+    verifier: &V,
+) -> Result<FreshnessAnchorEvidenceKind, TpmNvCounterVerificationError> {
+    if !evidence.validate_challenge(challenge, receipt) {
+        return Err(TpmNvCounterVerificationError::ChallengeDigestMismatch);
+    }
+    verify_tpm_nv_counter_with_trust_policy(evidence, policy, profile, receipt, verifier)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -538,6 +560,77 @@ mod tests {
             .unwrap_err(),
             TpmNvCounterVerificationError::TrustPolicyMismatch
         );
+    }
+
+    #[test]
+    fn challenge_and_trust_policy_gate_rejects_stale_evidence_before_verifier() {
+        let evidence = evidence(7);
+        let policy = TpmNvCounterTrustPolicy {
+            tpm_identity_digest: "tpm-identity".into(),
+            nv_index_name_digest: "nv-name".into(),
+            nv_public_digest: "nv-public".into(),
+            auth_policy_digest: "auth-policy".into(),
+            attestation_key_id_digest: "ak-id".into(),
+            pcr_binding_digest: "pcr-binding".into(),
+        };
+        let challenge = TpmQuoteChallenge::new([9u8; TPM_QUOTE_NONCE_BYTES]).unwrap();
+
+        struct MustNotRun;
+        impl TpmNvCounterEvidenceVerifier for MustNotRun {
+            fn verify(
+                &self,
+                _: &TpmNvCounterEvidence,
+                _: &FreshnessAnchorProfile,
+                _: &FreshnessAnchorVerificationReceipt,
+            ) -> Result<(), TpmNvCounterVerificationError> {
+                panic!("external verifier must not run before challenge/policy validation");
+            }
+        }
+
+        assert_eq!(
+            verify_tpm_nv_counter_with_challenge_and_trust_policy(
+                &evidence,
+                &challenge,
+                &policy,
+                &profile(),
+                &receipt(7),
+                &MustNotRun,
+            )
+            .unwrap_err(),
+            TpmNvCounterVerificationError::ChallengeDigestMismatch
+        );
+    }
+
+    #[test]
+    fn challenge_and_trust_policy_gate_accepts_exact_bindings() {
+        let challenge = TpmQuoteChallenge::new([7u8; TPM_QUOTE_NONCE_BYTES]).unwrap();
+        let digest = challenge.digest();
+        let mut evidence = evidence(7);
+        evidence.quote_nonce_digest = digest.clone();
+        evidence.nv_certify_nonce_digest = digest.clone();
+
+        let mut receipt = receipt(7);
+        receipt.freshness_handle_digest = digest;
+        receipt.evidence_digest = evidence.binding_digest();
+
+        let policy = TpmNvCounterTrustPolicy {
+            tpm_identity_digest: "tpm-identity".into(),
+            nv_index_name_digest: "nv-name".into(),
+            nv_public_digest: "nv-public".into(),
+            auth_policy_digest: "auth-policy".into(),
+            attestation_key_id_digest: "ak-id".into(),
+            pcr_binding_digest: "pcr-binding".into(),
+        };
+
+        assert!(verify_tpm_nv_counter_with_challenge_and_trust_policy(
+            &evidence,
+            &challenge,
+            &policy,
+            &profile(),
+            &receipt,
+            &Accept,
+        )
+        .is_ok());
     }
 
     #[test]
