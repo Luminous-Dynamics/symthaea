@@ -195,60 +195,100 @@ fn run() -> Result<()> {
                 );
             }
 
-            let role_only_error = phonological
-                .bind_segments(
-                    sample_segments(false),
-                    ContentBindingStatus::RoleStructureOnly,
-                )
-                .expect_err("role-only binding must reject segments");
-            let role_only_rejected = matches!(
-                role_only_error,
-                symthaea_broca::PhonologicalPlanError::RoleOnlyWithSegments
-            );
-            report.phonological_binding_checks += 2;
-            if !role_only_rejected {
-                fail(
-                    &mut report,
-                    &case_id,
-                    "role_only_segment_rejection",
-                    format!("unexpected error: {role_only_error}"),
-                );
-            }
+            let mut role_only_rejected = false;
+            let mut realization_authorization_rejected = linguistic_ready;
+            let mut phonological_binding_succeeded = false;
+            let mut phonological_persistence_validated = false;
 
-            phonological
-                .bind_segments(
-                    sample_segments(speech_plan.focus_role.is_some()),
-                    ContentBindingStatus::PhonologicallyBound,
-                )
-                .with_context(|| format!("phonological binding failed for {case_id}"))?;
-            let phonological_binding_succeeded =
-                phonological.content_binding == ContentBindingStatus::PhonologicallyBound
-                    && phonological.ready_for_realization();
-            let phonological_persistence_validated = phonological.validate().is_ok();
+            if linguistic_ready {
+                let role_only_error = phonological
+                    .bind_segments(
+                        sample_segments(false),
+                        ContentBindingStatus::RoleStructureOnly,
+                    )
+                    .expect_err("role-only binding must reject segments");
+                role_only_rejected = matches!(
+                    role_only_error,
+                    symthaea_broca::PhonologicalPlanError::RoleOnlyWithSegments
+                );
+                report.phonological_binding_checks += 1;
+                if !role_only_rejected {
+                    fail(
+                        &mut report,
+                        &case_id,
+                        "role_only_segment_rejection",
+                        format!("unexpected error: {role_only_error}"),
+                    );
+                }
+
+                phonological
+                    .bind_segments(
+                        sample_segments(speech_plan.focus_role.is_some()),
+                        ContentBindingStatus::PhonologicallyBound,
+                    )
+                    .with_context(|| format!("phonological binding failed for {case_id}"))?;
+                phonological_binding_succeeded =
+                    phonological.content_binding == ContentBindingStatus::PhonologicallyBound
+                        && phonological.ready_for_realization();
+                phonological_persistence_validated = phonological.validate().is_ok();
+                realization_authorization_rejected = true;
+                report.phonological_binding_checks += 1;
+            } else {
+                let authorization_error = phonological
+                    .bind_segments(
+                        sample_segments(false),
+                        ContentBindingStatus::PhonologicallyBound,
+                    )
+                    .expect_err("abstention must block realization");
+                realization_authorization_rejected = matches!(
+                    authorization_error,
+                    symthaea_broca::PhonologicalPlanError::RealizationNotAuthorized
+                );
+                report.phonological_binding_checks += 1;
+                if !realization_authorization_rejected {
+                    fail(
+                        &mut report,
+                        &case_id,
+                        "realization_authorization",
+                        format!("unexpected error: {authorization_error}"),
+                    );
+                }
+                phonological_persistence_validated = phonological.validate().is_ok();
+            }
 
             let lexical_missing_provenance = PhonologicalPlan::from_speech_plan(&speech_plan)
                 .bind_segments(
-                    sample_segments(true),
+                    sample_segments(speech_plan.focus_role.is_some()),
                     ContentBindingStatus::LexicallyBound,
                 )
-                .expect_err("lexical binding must require provenance");
-            let lexical_missing_provenance_rejected = matches!(
-                lexical_missing_provenance,
-                symthaea_broca::PhonologicalPlanError::LexicalBindingWithoutProvenance
-            );
+                .expect_err("lexical binding must be guarded");
+            let lexical_missing_provenance_rejected = if linguistic_ready {
+                matches!(
+                    lexical_missing_provenance,
+                    symthaea_broca::PhonologicalPlanError::LexicalBindingWithoutProvenance
+                )
+            } else {
+                matches!(
+                    lexical_missing_provenance,
+                    symthaea_broca::PhonologicalPlanError::RealizationNotAuthorized
+                )
+            };
             report.lexical_provenance_checks += 1;
 
-            let mut lexical = PhonologicalPlan::from_speech_plan(&speech_plan);
-            lexical
-                .bind_lexical_segments(
-                    sample_segments(speech_plan.focus_role.is_some()),
-                    format!("lexeme::{intent_name}"),
-                )
-                .with_context(|| format!("lexical binding failed for {case_id}"))?;
-            let lexical_binding_succeeded =
+            let lexical_binding_succeeded = if linguistic_ready {
+                let mut lexical = PhonologicalPlan::from_speech_plan(&speech_plan);
+                lexical
+                    .bind_lexical_segments(
+                        sample_segments(speech_plan.focus_role.is_some()),
+                        format!("lexeme::{intent_name}"),
+                    )
+                    .with_context(|| format!("lexical binding failed for {case_id}"))?;
                 lexical.content_binding == ContentBindingStatus::LexicallyBound
                     && lexical.lexical_provenance.is_some()
-                    && lexical.validate().is_ok();
+                    && lexical.validate().is_ok()
+            } else {
+                false
+            };
 
             if !lexical_missing_provenance_rejected {
                 fail(
@@ -384,6 +424,7 @@ fn run() -> Result<()> {
                 && linguistic_valid
                 && linguistic_lineage_valid
                 && phonological_lineage_before_binding
+                && realization_authorization_rejected
                 && linguistic_to_phonological_preserved_intent
                 && linguistic_lexical_binding_valid
                 && role_only_rejected
