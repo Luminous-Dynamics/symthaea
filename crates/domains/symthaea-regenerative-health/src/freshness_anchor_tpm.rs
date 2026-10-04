@@ -108,8 +108,10 @@ pub struct TpmNvCounterEvidence {
     pub nv_certify_size: u16,
     /// Digest of the authorization policy required for the counter.
     pub auth_policy_digest: String,
-    /// Identifier for the attestation key used to authenticate the evidence.
+    /// Identifier for the attestation key used to authenticate the PCR Quote.
     pub attestation_key_id_digest: String,
+    /// Identifier for the attestation key used to authenticate NV_Certify.
+    pub nv_certify_attestation_key_id_digest: String,
     /// Digest of the verifier challenge/freshness handle bound into the evidence.
     pub quote_nonce_digest: String,
     /// Digest of the TPM Quote attestation statement covering required PCRs.
@@ -141,6 +143,7 @@ impl TpmNvCounterEvidence {
             &self.nv_public_digest,
             &self.auth_policy_digest,
             &self.attestation_key_id_digest,
+            &self.nv_certify_attestation_key_id_digest,
             &self.quote_nonce_digest,
             &self.quote_digest,
             &self.nv_certify_digest,
@@ -225,6 +228,10 @@ impl TpmNvCounterEvidence {
         hasher.update(&self.nv_certify_size.to_le_bytes());
         write_string(&mut hasher, &self.auth_policy_digest);
         write_string(&mut hasher, &self.attestation_key_id_digest);
+        write_string(
+            &mut hasher,
+            &self.nv_certify_attestation_key_id_digest,
+        );
         write_string(&mut hasher, &self.quote_nonce_digest);
         write_string(&mut hasher, &self.quote_digest);
         write_string(&mut hasher, &self.nv_certify_digest);
@@ -299,6 +306,7 @@ pub fn verify_tpm_nv_counter<V: TpmNvCounterEvidenceVerifier>(
     }
     if evidence.nv_certify_nonce_digest != evidence.quote_nonce_digest
         || evidence.nv_certify_index_name_digest != evidence.nv_index_name_digest
+        || evidence.nv_certify_attestation_key_id_digest != evidence.attestation_key_id_digest
     {
         return Err(TpmNvCounterVerificationError::NvCertificationBindingMismatch);
     }
@@ -359,6 +367,7 @@ mod tests {
             nv_certify_size: 8,
             auth_policy_digest: "auth-policy".into(),
             attestation_key_id_digest: "ak-id".into(),
+            nv_certify_attestation_key_id_digest: "ak-id".into(),
             quote_nonce_digest: "quote-handle".into(),
             quote_digest: "quote".into(),
             nv_certify_digest: "nv-certify".into(),
@@ -677,6 +686,16 @@ mod tests {
         assert_eq!(
             verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
             TpmNvCounterVerificationError::CounterPersistenceMismatch
+        );
+    }
+
+    #[test]
+    fn nv_certification_signer_must_match_quote_signer() {
+        let mut evidence = evidence(7);
+        evidence.nv_certify_attestation_key_id_digest = "different-key".into();
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::NvCertificationBindingMismatch
         );
     }
 
