@@ -51,6 +51,7 @@ struct AuditCase {
     case_id: String,
     speech_plan_valid: bool,
     acoustic_receipt_valid: bool,
+    acoustic_complete_passed: bool,
     acoustic_receipt_lineage_valid: bool,
     intent: String,
     epistemic_input: f32,
@@ -269,9 +270,18 @@ fn run() -> Result<()> {
                 },
             );
             let acoustic_receipt_valid = acoustic_receipt.validate().is_ok();
+            let acoustic_complete_passed = acoustic_receipt.error.passes_complete(0.0);
             let acoustic_receipt_lineage_valid =
                 acoustic_receipt.validate_against_plan(&speech_plan).is_ok();
             report.acoustic_receipt_checks += 2;
+            if !acoustic_complete_passed {
+                fail(
+                    &mut report,
+                    &case_id,
+                    "acoustic_complete_gate",
+                    "exact acoustic observation did not satisfy the complete zero-error gate".to_string(),
+                );
+            }
             if !acoustic_receipt_valid {
                 fail(
                     &mut report,
@@ -369,6 +379,7 @@ fn run() -> Result<()> {
 
             let case_ok = speech_plan_valid
                 && acoustic_receipt_valid
+                && acoustic_complete_passed
                 && acoustic_receipt_lineage_valid
                 && linguistic_valid
                 && linguistic_lineage_valid
@@ -394,6 +405,7 @@ fn run() -> Result<()> {
                 case_id,
                 speech_plan_valid,
                 acoustic_receipt_valid,
+                acoustic_complete_passed,
                 acoustic_receipt_lineage_valid,
                 intent: (*intent_name).to_string(),
                 epistemic_input: epistemic,
