@@ -1,7 +1,7 @@
 use symthaea_communication::hdc_interlingua::{
-    HdcSemanticCodebook, HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
+    relabel_nodes, rename_identifiers, reorder_collections, HdcSemanticCodebook,
+    HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
 };
-use symthaea_communication::hdc_interlingua::{relabel_nodes, rename_identifiers, reorder_collections};
 use symthaea_communication::{ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph};
 fn node(id: &str, kind: ConceptKind, grounding: &str, confidence: f32) -> ConceptNode {
     ConceptNode {
