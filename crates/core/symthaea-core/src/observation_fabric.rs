@@ -333,10 +333,10 @@ impl ProcessingActivity {
     
     pub fn validate(&self) -> Result<(), ObservationValidationError> {
         self.validate_without_execution_fingerprint()?;
-        if let Some(fingerprint) = self.execution_fingerprint.as_deref() {
-            if fingerprint.len() != 64 || !fingerprint.bytes().all(|b| b.is_ascii_hexdigit()) {
-                return Err(ObservationValidationError::InvalidExecutionFingerprint);
-            }
+        if let Some(fingerprint) = self.execution_fingerprint.as_deref()
+            && (fingerprint.len() != 64 || !fingerprint.bytes().all(|b| b.is_ascii_hexdigit()))
+        {
+            return Err(ObservationValidationError::InvalidExecutionFingerprint);
         }
         Ok(())
     }
@@ -468,20 +468,15 @@ fn write_canonical_independence_basis(hasher: &mut blake3::Hasher, value: &Indep
 /// This is a provenance-availability declaration, not a cryptographic trust result.
 /// A value of Partial or Redacted prevents the bounded independence verifier from
 /// converting absence of a discovered shared basis into VerifiedIndependent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ProvenanceCoverage {
     /// The represented provenance is intended to be complete for this observation.
+    #[default]
     Complete,
     /// Some provenance relevant to independence may be unavailable.
     Partial,
     /// Provenance was intentionally withheld or redacted.
     Redacted,
-}
-
-impl Default for ProvenanceCoverage {
-    fn default() -> Self {
-        Self::Complete
-    }
 }
 
 /// Provenance linking an observation to its producer and processing lineage.
@@ -1185,15 +1180,14 @@ impl ObservationGraph {
         if let (Some(source_platform), Some(target_platform)) = (
             source.provenance.source.platform_id.as_ref(),
             target.provenance.source.platform_id.as_ref(),
-        ) {
-            if source_platform == target_platform {
-                return Ok(assessment(
-                    EvidenceIndependence::SharedUpstream,
-                    IndependenceBasis::SharedPlatform {
-                        platform_id: source_platform.clone(),
-                    },
-                ));
-            }
+        ) && source_platform == target_platform
+        {
+            return Ok(assessment(
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedPlatform {
+                    platform_id: source_platform.clone(),
+                },
+            ));
         }
 
         let source_ancestors = Self::ancestor_ids(source_observation_id, &by_id)?;
@@ -1248,18 +1242,16 @@ impl ObservationGraph {
 
         if let Some((source_asset, target_asset)) =
             source.asset.as_ref().zip(target.asset.as_ref())
+            && source_asset.hash_algorithm == target_asset.hash_algorithm
+            && source_asset.content_hash == target_asset.content_hash
         {
-            if source_asset.hash_algorithm == target_asset.hash_algorithm
-                && source_asset.content_hash == target_asset.content_hash
-            {
-                return Ok(assessment(
-                    EvidenceIndependence::SharedUpstream,
-                    IndependenceBasis::IdenticalAsset {
-                        hash_algorithm: source_asset.hash_algorithm.clone(),
-                        content_hash: source_asset.content_hash.clone(),
-                    },
-                ));
-            }
+            return Ok(assessment(
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::IdenticalAsset {
+                    hash_algorithm: source_asset.hash_algorithm.clone(),
+                    content_hash: source_asset.content_hash.clone(),
+                },
+            ));
         }
 
         Ok(assessment(
@@ -1418,12 +1410,11 @@ impl ObservationGraph {
                 if let Some(previous) = activity_fingerprints.insert(
                     activity.activity_id.clone(),
                     computed_fingerprint.clone(),
-                ) {
-                    if previous != computed_fingerprint {
-                        return Err(ObservationValidationError::InconsistentProcessingActivity(
-                            activity.activity_id.clone(),
-                        ));
-                    }
+                ) && previous != computed_fingerprint
+                {
+                    return Err(ObservationValidationError::InconsistentProcessingActivity(
+                        activity.activity_id.clone(),
+                    ));
                 }
                 for input_id in &activity.input_observation_ids {
                     if !by_id.contains_key(input_id.as_str()) {
