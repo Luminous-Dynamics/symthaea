@@ -276,7 +276,6 @@ fn rfc9942_crit_rejects_unknown_critical_header() {
 #[test]
 fn rfc9942_crit_rejects_unprotected_critical_header() {
     // Unprotected = {2: [999], 999: null}; crit may not be unprotected.
-    let protected = [0xa0];
     let unprotected = [0xa2, 0x02, 0x81, 0x19, 0x03, 0xe7, 0x19, 0x03, 0xe7, 0xf6];
 
     let mut wire = vec![0xd2, 0x84, 0x41, 0xa0];
@@ -1179,7 +1178,7 @@ fn rfc9942_round_trip_preserves_unprotected_header_entry_order() {
         let mut out = vec![0xd2, 0x84];
         out.extend_from_slice(&bstr(&protected));
         out.extend_from_slice(&unprotected);
-        out.extend_from_slice(&[0x66, b'p', b'a', b'y', b'l', b'o', b'a', b'd']);
+        out.extend_from_slice(&[0x46, b'p', b'a', b'y', b'l', b'o', b'a', b'd']);
         out.extend_from_slice(&[0x58, 0x40]);
         out.extend_from_slice(&[0xBB; 64]);
         out
