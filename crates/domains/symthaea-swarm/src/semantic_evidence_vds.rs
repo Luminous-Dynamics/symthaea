@@ -4598,6 +4598,3 @@ mod tests {
             &[second, first]
         );
     }
-
-
-    #[test]
