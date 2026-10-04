@@ -891,6 +891,18 @@ impl ReceiptAttestationEnvelope {
             && self.examined_scope_fingerprint == receipt.examined_scope_fingerprint
     }
 
+    /// Verify the envelope against a receipt whose own assessment fingerprint is valid.
+    ///
+    /// Unlike `verify_against_receipt`, this stronger helper rejects a self-inconsistent
+    /// receipt before accepting the envelope's commitment to it. It still does not
+    /// re-run the observation graph or establish substantive truth.
+    pub fn verify_against_integral_receipt(
+        &self,
+        receipt: &IndependenceVerificationReceipt,
+    ) -> bool {
+        receipt.verify_integrity() && self.verify_against_receipt(receipt)
+    }
+
     /// Evaluate the declared temporal validity at an explicit Unix-nanosecond instant.
     ///
     /// Expiry is an exclusive boundary: an envelope is expired at the
@@ -1718,6 +1730,20 @@ mod tests {
         let mut changed_attester = envelope;
         changed_attester.attester_id = "attester-2".into();
         assert_ne!(baseline, changed_attester.payload_fingerprint());
+    }
+
+    #[test]
+    fn receipt_attestation_strong_commitment_rejects_invalid_receipt_integrity() {
+        let receipt = fixture_receipt();
+        let envelope = ReceiptAttestationEnvelope::from_receipt(&receipt, "attester-1", "assertion", 100);
+        assert!(envelope.verify_against_receipt(&receipt));
+        assert!(envelope.verify_against_integral_receipt(&receipt));
+
+        let mut invalid_receipt = receipt;
+        invalid_receipt.assessment_fingerprint = "0".repeat(64);
+        assert!(!invalid_receipt.verify_integrity());
+        assert!(envelope.verify_against_receipt(&invalid_receipt));
+        assert!(!envelope.verify_against_integral_receipt(&invalid_receipt));
     }
 
     #[test]
