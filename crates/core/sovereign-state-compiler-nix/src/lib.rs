@@ -198,10 +198,11 @@ pub struct NixOSTargetAdapter {
 }
 
 impl NixOSTargetAdapter {
-    /// Synthetic constructor for deterministic adapter tests and local contract
-    /// development. Production callers should prefer `from_observation` so
-    /// the capability/resource surface and observation digest come from the
-    /// actual target.
+    /// Synthetic constructor reserved for deterministic unit tests and local
+    /// contract development. It is intentionally unavailable to production
+    /// builds so a live NixOS deployment cannot bypass the Nixward observation
+    /// boundary with fabricated snapshot evidence.
+    #[cfg(test)]
     pub fn new(target: impl Into<TargetId>, observed_at_ms: u64) -> Self {
         Self {
             snapshot: TargetSnapshot {
