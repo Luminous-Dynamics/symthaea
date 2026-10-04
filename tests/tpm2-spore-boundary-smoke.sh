@@ -124,6 +124,14 @@ test -s "$ROOT/nv.sig"
 tpm2_print -Q -t TPMS_ATTEST "$ROOT/nv.attest" > "$ROOT/nv.yaml"
 tpm2_verifysignature -Q -c "$ROOT/ak-after-restart.ctx" -g sha256 -m "$ROOT/nv.attest" -s "$ROOT/nv.sig" -f rsassa
 
+# The TPM will also certify a partial range. This is a negative domain fixture:
+# the authoritative contract requires the complete eight-byte counter at offset 0.
+tpm2_nvcertify -Q -C "$ROOT/ak-after-restart.ctx" -c "$NV_INDEX" -p "$NV_AUTH" -g sha256 -f plain -s rsassa -o "$ROOT/nv-partial.sig" --attestation "$ROOT/nv-partial.attest" --size 4 --offset 4 -q "$POST_RESTART_CHALLENGE" "$NV_INDEX"
+test -s "$ROOT/nv-partial.attest"
+test -s "$ROOT/nv-partial.sig"
+tpm2_verifysignature -Q -c "$ROOT/ak-after-restart.ctx" -g sha256 -m "$ROOT/nv-partial.attest" -s "$ROOT/nv-partial.sig" -f rsassa
+printf 'partial_nv_certification_accepted_by_tpm=true_domain_should_reject=true\n' >> "$EVIDENCE_FILE"
+
 tpm2_nvundefine -Q -C o "$NV_INDEX"
 
 echo 'TPM2 Spore boundary smoke test: PASS'
