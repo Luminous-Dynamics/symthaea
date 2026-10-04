@@ -112,6 +112,8 @@ jobs:
       CARGO_FUZZ_VERSION: 0.12.0
       FUZZ_RUNS: 1024
       FUZZ_SEED: 9942
+      FUZZ_MAX_LEN: 4096
+      FUZZ_TIMEOUT_SECONDS: 2
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -163,5 +165,10 @@ jobs:
             fuzz_rfc9942_signature_with_receipts \
             fuzz_rfc9942_proofs
           do
-            cargo +nightly fuzz run "$target" -- -runs="${FUZZ_RUNS}" -seed="${FUZZ_SEED}" -print_final_stats=1
+            cargo +nightly fuzz run "$target" -- \
+              -runs="${FUZZ_RUNS}" \
+              -seed="${FUZZ_SEED}" \
+              -max_len="${FUZZ_MAX_LEN}" \
+              -timeout="${FUZZ_TIMEOUT_SECONDS}" \
+              -print_final_stats=1
           done
