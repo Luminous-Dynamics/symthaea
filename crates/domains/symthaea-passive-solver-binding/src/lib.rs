@@ -1310,6 +1310,30 @@ mod tests {
         }
     }
 
+    impl SolverBoundaryEntityIntrospector for FixtureAdapter {
+        fn attest_entity(
+            &self,
+            interface: &PortInterface,
+            candidate: &TriangleMesh,
+            binding: &SolverBoundaryBinding,
+        ) -> Result<SolverBoundaryEntityAttestation, SolverBindingError> {
+            let fingerprint = [0x42; 32];
+            let mapping_digest = solver_entity_mapping_digest(
+                interface,
+                binding.realized_boundary.candidate_geometry_digest(),
+                digest_triangle_mesh(candidate),
+                binding.realized_boundary.boundary_patch_digest(),
+                &binding.external_boundary_handle,
+                fingerprint,
+            );
+            SolverBoundaryEntityAttestation::new(
+                binding.external_boundary_handle.clone(),
+                fingerprint,
+                mapping_digest,
+            )
+        }
+    }
+
     #[test]
     fn adapter_orchestration_stamps_verified_evidence() {
         let interface = interface(PortId(10), 7);
@@ -1325,6 +1349,104 @@ mod tests {
 
         assert_eq!(binding.evidence_level(), SolverBoundaryEvidenceLevel::AdapterAttested);
         assert!(binding.solver_binding_verified);
+    }
+
+    #[test]
+    fn entity_attestation_orchestration_stamps_solver_entity_evidence() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let binding = bind_with_adapter_and_entity_attestation(
+            &FixtureAdapter,
+            &interface,
+            &candidate,
+            [7; 32],
+            0.05,
+        )
+        .unwrap();
+
+        assert_eq!(
+            binding.evidence_level(),
+            SolverBoundaryEvidenceLevel::SolverEntityAttested
+        );
+        assert_eq!(binding.solver_entity_fingerprint(), Some([0x42; 32]));
+        assert!(binding.solver_entity_mapping_digest().is_some());
+        assert!(binding.validate_against_candidate(&interface, [7; 32], &candidate).is_ok());
+    }
+
+    #[test]
+    fn entity_attestation_rejects_handle_mismatch() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let binding = bind_with_adapter(
+            &FixtureAdapter,
+            &interface,
+            &candidate,
+            [7; 32],
+            0.05,
+        )
+        .unwrap();
+
+        let attestation = SolverBoundaryEntityAttestation::new(
+            "fixture:other-boundary",
+            [0x42; 32],
+            [1; 32],
+        )
+        .unwrap();
+
+        assert_eq!(
+            promote_solver_entity_attestation(
+                binding,
+                &interface,
+                [7; 32],
+                &candidate,
+                attestation,
+            ),
+            Err(SolverBindingError::SolverEntityHandleMismatch)
+        );
+    }
+
+    #[test]
+    fn entity_attestation_rejects_mapping_digest_mismatch() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let binding = bind_with_adapter(
+            &FixtureAdapter,
+            &interface,
+            &candidate,
+            [7; 32],
+            0.05,
+        )
+        .unwrap();
+
+        let attestation = SolverBoundaryEntityAttestation::new(
+            binding.external_boundary_handle.clone(),
+            [0x42; 32],
+            [1; 32],
+        )
+        .unwrap();
+
+        assert_eq!(
+            promote_solver_entity_attestation(
+                binding,
+                &interface,
+                [7; 32],
+                &candidate,
+                attestation,
+            ),
+            Err(SolverBindingError::SolverEntityMappingDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn entity_attestation_rejects_empty_fingerprint() {
+        assert_eq!(
+            SolverBoundaryEntityAttestation::new(
+                "fixture:boundary-7",
+                [0; 32],
+                [1; 32],
+            ),
+            Err(SolverBindingError::EmptySolverEntityFingerprint)
+        );
     }
 
     #[test]
