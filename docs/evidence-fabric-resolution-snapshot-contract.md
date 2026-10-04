@@ -27,7 +27,7 @@ The envelope's `attester_id` is part of the signed attestation payload, so chang
 
 A successful Evidence Fabric appraisal therefore establishes the cryptographic proof under the resolved verification method and the resolver's proof-purpose authorization state. It does **not** independently establish a controller relationship between `attester_id` and `verification_method`. Applications that need that stronger identity claim MUST obtain and verify the corresponding controller/authorization evidence as a separate trust step.
 
-This distinction mirrors the broader RATS model: the verifier produces appraisal results from evidence and policy, while a relying party may apply additional policy to decide whether the resulting evidence is sufficient for a particular authorization decision. citeturn114310search6turn114310search3
+This distinction mirrors the broader RATS model in RFC 9334 and the current EAR-04 Internet-Draft: the verifier produces appraisal results from evidence and policy, while a relying party may apply additional policy to decide whether the resulting evidence is sufficient for a particular authorization decision.
 
 
 ## Required semantics
