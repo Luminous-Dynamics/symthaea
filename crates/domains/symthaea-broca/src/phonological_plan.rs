@@ -679,6 +679,45 @@ mod tests {
     }
 
     #[test]
+    fn malformed_sequence_annotations_fail_closed() {
+        let mixed_stress = vec![
+            PhonemeSlot::new("A", 0, SyllableStress::Primary, true, false, false),
+            PhonemeSlot::new("B", 0, SyllableStress::None, false, false, true),
+        ];
+        assert_eq!(
+            validate_segment_sequence(&mixed_stress).expect_err("stress mismatch"),
+            PhonologicalPlanError::ConflictingSyllableStress { syllable_index: 0 }
+        );
+
+        let mixed_focus = vec![
+            PhonemeSlot::new("A", 0, SyllableStress::Primary, true, true, false),
+            PhonemeSlot::new("B", 0, SyllableStress::Primary, false, false, true),
+        ];
+        assert_eq!(
+            validate_segment_sequence(&mixed_focus).expect_err("focus mismatch"),
+            PhonologicalPlanError::MixedSyllableFocus { syllable_index: 0 }
+        );
+
+        let double_onset = vec![
+            PhonemeSlot::new("A", 0, SyllableStress::Primary, true, false, false),
+            PhonemeSlot::new("B", 0, SyllableStress::Primary, true, false, true),
+        ];
+        assert_eq!(
+            validate_segment_sequence(&double_onset).expect_err("multiple onsets"),
+            PhonologicalPlanError::MultipleSyllableOnsets { syllable_index: 0 }
+        );
+
+        let internal_boundary = vec![
+            PhonemeSlot::new("A", 0, SyllableStress::Primary, true, false, true),
+            PhonemeSlot::new("B", 0, SyllableStress::Primary, false, false, false),
+        ];
+        assert_eq!(
+            validate_segment_sequence(&internal_boundary).expect_err("internal boundary"),
+            PhonologicalPlanError::MidSyllablePhraseBoundary { syllable_index: 0 }
+        );
+    }
+
+        #[test]
     fn lexical_provenance_is_required_on_the_persisted_object() {
         let mut plan = PhonologicalPlan::from_speech_plan(&plan());
         plan.content_binding = ContentBindingStatus::LexicallyBound;
