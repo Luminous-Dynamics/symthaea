@@ -5,15 +5,19 @@
 //! Explicit boundary-policy evidence for passive ported geometries.
 //!
 //! The baseline fabrication validator is intentionally a closed-solid gate.
-//! Fluidic devices can legitimately contain openings, so this module provides
-//! a narrower alternative: open boundary edges are admitted only when they can
-//! be geometrically associated with explicitly allowed port anchors.
+//! Ported devices are different because an inlet or outlet can be an intentional
+//! boundary. The typed path below therefore matches the observed boundary to an
+//! explicit aperture and interface plane instead of accepting any opening that
+//! merely falls inside a large anchor radius.
+//!
+//! The solver-boundary identity and outward normal remain intent/provenance fields;
+//! geometry alone does not prove that a solver applied the boundary condition.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use symthaea_fabrication_kernel::mesh::TriangleMesh;
 use symthaea_fabrication_kernel::validate::validate_mesh;
-use symthaea_passive_void_compiler::GeometryEmbedding;
+use symthaea_passive_void_compiler::{GeometryEmbedding, PortInterface};
 use symthaea_passive_void_graph::PortId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,10 +31,11 @@ pub enum BoundaryValidationStatus {
     MissingPortOpening(PortId),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PortBoundaryPolicy {
     allowed_open_ports: BTreeSet<PortId>,
     required_open_ports: BTreeSet<PortId>,
+    typed_interfaces: BTreeMap<PortId, PortInterface>,
     tolerance_micrometers: u64,
 }
 
@@ -39,6 +44,7 @@ impl Default for PortBoundaryPolicy {
         Self {
             allowed_open_ports: BTreeSet::new(),
             required_open_ports: BTreeSet::new(),
+            typed_interfaces: BTreeMap::new(),
             tolerance_micrometers: 50_000,
         }
     }
@@ -60,8 +66,31 @@ impl PortBoundaryPolicy {
         self
     }
 
+    /// Permit an opening described by the complete typed interface identity.
+    pub fn with_allowed_port_interface(mut self, interface: PortInterface) -> Self {
+        self.allowed_open_ports.insert(interface.port);
+        self.typed_interfaces.insert(interface.port, interface);
+        self
+    }
+
+    /// Require an opening described by the complete typed interface identity.
+    pub fn with_required_port_interface(mut self, interface: PortInterface) -> Self {
+        self.allowed_open_ports.insert(interface.port);
+        self.required_open_ports.insert(interface.port);
+        self.typed_interfaces.insert(interface.port, interface);
+        self
+    }
+
     pub fn required_open_ports(&self) -> impl Iterator<Item = PortId> + '_ {
         self.required_open_ports.iter().copied()
+    }
+
+    pub fn allowed_open_ports(&self) -> impl Iterator<Item = PortId> + '_ {
+        self.allowed_open_ports.iter().copied()
+    }
+
+    pub fn typed_interfaces(&self) -> impl Iterator<Item = &PortInterface> {
+        self.typed_interfaces.values()
     }
 
     pub fn tolerance_mm(mut self, tolerance_mm: f32) -> Option<Self> {
@@ -70,10 +99,6 @@ impl PortBoundaryPolicy {
         }
         self.tolerance_micrometers = (tolerance_mm as f64 * 1_000.0).round() as u64;
         Some(self)
-    }
-
-    pub fn allowed_open_ports(&self) -> impl Iterator<Item = PortId> + '_ {
-        self.allowed_open_ports.iter().copied()
     }
 }
 
@@ -137,16 +162,32 @@ impl PortBoundaryEvidence {
         let mut valid_ports = Vec::new();
 
         for port in &policy.allowed_open_ports {
-            match embedding.ports.get(port) {
-                Some(anchor)
-                    if anchor.center_mm.iter().all(|value| value.is_finite())
-                        && anchor.radius_mm.is_finite()
-                        && anchor.radius_mm > 0.0 =>
-                {
-                    valid_ports.push((*port, anchor.center_mm, anchor.radius_mm));
-                }
-                None => missing_port_anchors.push(*port),
-                Some(_) => missing_port_anchors.push(*port),
+            match policy
+                .typed_interfaces
+                .get(port)
+                .or_else(|| embedding.interfaces.get(port))
+            {
+                Some(interface) => match interface.validate(0.001) {
+                    Ok(()) => {
+                        valid_ports.push(PortBoundaryGeometry::Typed(*interface));
+                    }
+                    Err(_) => missing_port_anchors.push(*port),
+                },
+                None => match embedding.ports.get(port) {
+                    Some(anchor)
+                        if anchor.center_mm.iter().all(|value| value.is_finite())
+                            && anchor.radius_mm.is_finite()
+                            && anchor.radius_mm > 0.0 =>
+                    {
+                        valid_ports.push(PortBoundaryGeometry::Legacy {
+                            port: *port,
+                            center_mm: anchor.center_mm,
+                            radius_mm: anchor.radius_mm,
+                        });
+                    }
+                    None => missing_port_anchors.push(*port),
+                    Some(_) => missing_port_anchors.push(*port),
+                },
             }
         }
 
@@ -168,12 +209,11 @@ impl PortBoundaryEvidence {
         let mut matched_by_port = BTreeSet::new();
         let tolerance_mm = policy.tolerance_micrometers as f64 / 1_000.0;
 
-        for (_, _, midpoint) in boundary_edges {
+        for (a, b, midpoint) in boundary_edges {
             let mut matches = Vec::new();
-            for (port, center, radius) in &valid_ports {
-                let distance = distance_mm(midpoint, *center);
-                if distance <= *radius as f64 + tolerance_mm {
-                    matches.push(*port);
+            for port_geometry in &valid_ports {
+                if port_geometry.matches(a, b, midpoint, tolerance_mm) {
+                    matches.push(port_geometry.port());
                 }
             }
 
@@ -183,12 +223,7 @@ impl PortBoundaryEvidence {
                     matched += 1;
                     matched_by_port.insert(*port);
                 }
-                ports => {
-                    ambiguous += 1;
-                    if let Some(port) = ports.first().copied() {
-                        let _ = port;
-                    }
-                }
+                _ => ambiguous += 1,
             }
         }
 
@@ -236,8 +271,99 @@ impl PortBoundaryEvidence {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum PortBoundaryGeometry {
+    Typed(PortInterface),
+    Legacy {
+        port: PortId,
+        center_mm: [f32; 3],
+        radius_mm: f32,
+    },
+}
+
+impl PortBoundaryGeometry {
+    fn port(self) -> PortId {
+        match self {
+            Self::Typed(interface) => interface.port,
+            Self::Legacy { port, .. } => port,
+        }
+    }
+
+    fn matches(
+        self,
+        a: QuantizedPoint,
+        b: QuantizedPoint,
+        midpoint: [f64; 3],
+        tolerance_mm: f64,
+    ) -> bool {
+        match self {
+            Self::Legacy {
+                center_mm,
+                radius_mm,
+                ..
+            } => distance_mm(midpoint, center_mm) <= radius_mm as f64 + tolerance_mm,
+            Self::Typed(interface) => typed_interface_matches(
+                a,
+                b,
+                midpoint,
+                interface,
+                tolerance_mm,
+            ),
+        }
+    }
+}
+
 type QuantizedPoint = [i64; 3];
 type QuantizedEdge = (QuantizedPoint, QuantizedPoint);
+
+fn typed_interface_matches(
+    a: QuantizedPoint,
+    b: QuantizedPoint,
+    midpoint: [f64; 3],
+    interface: PortInterface,
+    tolerance_mm: f64,
+) -> bool {
+    let plane_origin = interface.interface_plane.origin_mm;
+    let plane_normal = interface.interface_plane.normal_unit;
+    let center = interface.position_mm;
+    let radius = interface.radius_mm() as f64;
+
+    let a_mm = dequantize(a);
+    let b_mm = dequantize(b);
+    let endpoints = [a_mm, b_mm, midpoint];
+
+    if endpoints
+        .iter()
+        .any(|point| plane_distance(*point, plane_origin, plane_normal).abs() > tolerance_mm)
+    {
+        return false;
+    }
+
+    let edge_delta = [
+        b_mm[0] - a_mm[0],
+        b_mm[1] - a_mm[1],
+        b_mm[2] - a_mm[2],
+    ];
+    let edge_length =
+        (edge_delta[0] * edge_delta[0] + edge_delta[1] * edge_delta[1] + edge_delta[2] * edge_delta[2])
+            .sqrt();
+    if !edge_length.is_finite() || edge_length <= 1.0e-9 {
+        return false;
+    }
+
+    // For a circular aperture, the open-boundary rim is near the declared
+    // aperture circumference. The edge-length allowance accounts for polygonal
+    // chord approximation without permitting an arbitrary interior hole.
+    let radial_tolerance = tolerance_mm + edge_length * 0.25;
+    let endpoint_radii = [
+        radial_distance_from_plane(a_mm, center, plane_normal),
+        radial_distance_from_plane(b_mm, center, plane_normal),
+    ];
+
+    endpoint_radii
+        .iter()
+        .all(|distance| (distance - radius).abs() <= radial_tolerance)
+}
 
 fn quantize(point: [f32; 3]) -> QuantizedPoint {
     [
@@ -247,16 +373,33 @@ fn quantize(point: [f32; 3]) -> QuantizedPoint {
     ]
 }
 
-fn edge_key(a: QuantizedPoint, b: QuantizedPoint) -> QuantizedEdge {
-    if a <= b { (a, b) } else { (b, a) }
+fn dequantize(point: QuantizedPoint) -> [f64; 3] {
+    [
+        point[0] as f64 / 1_000_000.0,
+        point[1] as f64 / 1_000_000.0,
+        point[2] as f64 / 1_000_000.0,
+    ]
 }
 
-fn collect_boundary_edges(mesh: &TriangleMesh) -> Vec<(QuantizedPoint, QuantizedPoint, [f64; 3])> {
+fn edge_key(a: QuantizedPoint, b: QuantizedPoint) -> QuantizedEdge {
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+fn collect_boundary_edges(
+    mesh: &TriangleMesh,
+) -> Vec<(QuantizedPoint, QuantizedPoint, [f64; 3])> {
     let mut edges: HashMap<QuantizedEdge, [f64; 3]> = HashMap::new();
     let mut counts: HashMap<QuantizedEdge, usize> = HashMap::new();
 
     for triangle in &mesh.indices {
-        if triangle.iter().any(|index| (*index as usize) >= mesh.vertices.len()) {
+        if triangle
+            .iter()
+            .any(|index| (*index as usize) >= mesh.vertices.len())
+        {
             continue;
         }
 
@@ -296,6 +439,38 @@ fn midpoint(a: [f32; 3], b: [f32; 3]) -> [f64; 3] {
     ]
 }
 
+fn plane_distance(
+    point: [f64; 3],
+    origin: [f32; 3],
+    normal: [f32; 3],
+) -> f64 {
+    let dx = point[0] - origin[0] as f64;
+    let dy = point[1] - origin[1] as f64;
+    let dz = point[2] - origin[2] as f64;
+    dx * normal[0] as f64 + dy * normal[1] as f64 + dz * normal[2] as f64
+}
+
+fn radial_distance_from_plane(
+    point: [f64; 3],
+    center: [f32; 3],
+    normal: [f32; 3],
+) -> f64 {
+    let delta = [
+        point[0] - center[0] as f64,
+        point[1] - center[1] as f64,
+        point[2] - center[2] as f64,
+    ];
+    let axial = delta[0] * normal[0] as f64
+        + delta[1] * normal[1] as f64
+        + delta[2] * normal[2] as f64;
+    let radial = [
+        delta[0] - axial * normal[0] as f64,
+        delta[1] - axial * normal[1] as f64,
+        delta[2] - axial * normal[2] as f64,
+    ];
+    (radial[0] * radial[0] + radial[1] * radial[1] + radial[2] * radial[2]).sqrt()
+}
+
 fn distance_mm(a: [f64; 3], b: [f32; 3]) -> f64 {
     let dx = a[0] - b[0] as f64;
     let dy = a[1] - b[1] as f64;
@@ -308,24 +483,32 @@ mod tests {
     use super::*;
     use symthaea_fabrication_kernel::csg::CSGNode;
     use symthaea_fabrication_kernel::mesh::resolve_to_mesh;
-    use symthaea_passive_void_compiler::PortAnchor;
+    use symthaea_passive_void_compiler::{
+        BoundaryConditionDomain, InterfacePlane, PortAperture, SolverBoundaryIdentity,
+    };
 
-    fn embedding() -> GeometryEmbedding {
-        GeometryEmbedding::default().with_port(
-            PortId(10),
-            PortAnchor {
-                center_mm: [0.0, 0.0, 0.0],
-                radius_mm: 1.0,
+    fn typed_interface(port: PortId, center_mm: [f32; 3], normal: [f32; 3], radius_mm: f32) -> PortInterface {
+        PortInterface::new(
+            port,
+            center_mm,
+            PortAperture::Circular { radius_mm },
+            normal,
+            InterfacePlane::new(center_mm, normal).unwrap(),
+            SolverBoundaryIdentity {
+                domain: BoundaryConditionDomain::Fluidic,
+                id: port.0,
             },
         )
+        .unwrap()
     }
 
     #[test]
     fn closed_cube_passes_closed_policy() {
+        let embedding = GeometryEmbedding::default();
         let mesh = resolve_to_mesh(&CSGNode::cube());
         let evidence = PortBoundaryEvidence::evaluate(
             &mesh,
-            &embedding(),
+            &embedding,
             &PortBoundaryPolicy::closed(),
         );
         assert_eq!(evidence.status, BoundaryValidationStatus::Closed);
@@ -339,10 +522,103 @@ mod tests {
             normals: vec![[0.0, 0.0, 1.0]; 3],
             indices: vec![[0, 1, 2]],
         };
-        let evidence =
-            PortBoundaryEvidence::evaluate(&mesh, &embedding(), &PortBoundaryPolicy::closed());
+        let evidence = PortBoundaryEvidence::evaluate(
+            &mesh,
+            &GeometryEmbedding::default(),
+            &PortBoundaryPolicy::closed(),
+        );
         assert_eq!(evidence.status, BoundaryValidationStatus::UnexpectedOpenings);
         assert!(!evidence.is_admissible());
+    }
+
+    #[test]
+    fn typed_circular_interface_matches_its_rim() {
+        let mesh = TriangleMesh {
+            vertices: vec![
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [-1.0, 0.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        };
+        let interface = typed_interface(
+            PortId(10),
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            1.0,
+        );
+        let policy = PortBoundaryPolicy::closed()
+            .with_required_port_interface(interface)
+            .tolerance_mm(0.05)
+            .unwrap();
+        let evidence = PortBoundaryEvidence::evaluate(
+            &mesh,
+            &GeometryEmbedding::default().with_port_interface(interface),
+            &policy,
+        );
+        assert_eq!(evidence.status, BoundaryValidationStatus::ExpectedOpeningsOnly);
+        assert!(evidence.is_admissible());
+    }
+
+    #[test]
+    fn typed_interface_rejects_smaller_hole_inside_large_aperture() {
+        let mesh = TriangleMesh {
+            vertices: vec![
+                [0.5, 0.0, 0.0],
+                [0.0, 0.5, 0.0],
+                [-0.5, 0.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        };
+        let interface = typed_interface(
+            PortId(10),
+            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            1.0,
+        );
+        let policy = PortBoundaryPolicy::closed()
+            .with_required_port_interface(interface)
+            .tolerance_mm(0.05)
+            .unwrap();
+        let evidence = PortBoundaryEvidence::evaluate(
+            &mesh,
+            &GeometryEmbedding::default().with_port_interface(interface),
+            &policy,
+        );
+        assert_eq!(evidence.status, BoundaryValidationStatus::UnexpectedOpenings);
+        assert!(!evidence.is_admissible());
+    }
+
+    #[test]
+    fn typed_interface_rejects_wrong_plane() {
+        let mesh = TriangleMesh {
+            vertices: vec![
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [-1.0, 0.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        };
+        let mut interface = typed_interface(
+            PortId(10),
+            [0.0, 0.0, 1.0],
+            [0.0, 0.0, 1.0],
+            1.0,
+        );
+        interface.position_mm = [0.0, 0.0, 1.0];
+        let policy = PortBoundaryPolicy::closed()
+            .with_required_port_interface(interface)
+            .tolerance_mm(0.05)
+            .unwrap();
+        let evidence = PortBoundaryEvidence::evaluate(
+            &mesh,
+            &GeometryEmbedding::default().with_port_interface(interface),
+            &policy,
+        );
+        assert_eq!(evidence.status, BoundaryValidationStatus::MissingPortOpening(PortId(10)));
     }
 
     #[test]
