@@ -261,6 +261,86 @@ pub struct HdcOntologyDecodePolicy {
     pub min_margin: f64,
 }
 
+/// N1 building block: finite-sample split-conformal threshold over a
+/// pre-registered nonconformity score. This primitive intentionally does not
+/// claim coverage by itself; the exchangeability, calibration/test separation,
+/// score definition, and deployment protocol must be established by the N1
+/// experiment before the theorem applies.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HdcOntologyConformalCalibration {
+    pub alpha: f64,
+    pub threshold: f64,
+    pub calibration_case_count: usize,
+    pub codebook_hash: String,
+}
+
+impl HdcOntologyConformalCalibration {
+    pub fn from_nonconformity_scores(
+        codebook_hash: impl Into<String>,
+        calibration_scores: &[f64],
+        alpha: f64,
+    ) -> Result<Self, String> {
+        let codebook_hash = codebook_hash.into();
+        if codebook_hash.trim().is_empty() {
+            return Err("conformal calibration requires a codebook hash".into());
+        }
+        if calibration_scores.is_empty() {
+            return Err("conformal calibration requires at least one score".into());
+        }
+        if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+            return Err("conformal alpha must be finite and within (0, 1)".into());
+        }
+        if calibration_scores
+            .iter()
+            .any(|score| !score.is_finite() || !(0.0..=1.0).contains(score))
+        {
+            return Err("conformal nonconformity scores must be finite and within [0, 1]".into());
+        }
+
+        let mut sorted = calibration_scores.to_vec();
+        sorted.sort_by(f64::total_cmp);
+
+        // Split-conformal finite-sample rank:
+        // k = ceil((n + 1) * (1 - alpha)).
+        // The rank is clipped to n because the calibration set has only n
+        // observed scores. Small calibration sets therefore conservatively
+        // collapse to their maximum score rather than fabricating a tighter
+        // threshold.
+        let n = sorted.len();
+        let rank = (((n + 1) as f64) * (1.0 - alpha)).ceil() as usize;
+        let rank = rank.clamp(1, n);
+
+        Ok(Self {
+            alpha,
+            threshold: sorted[rank - 1],
+            calibration_case_count: n,
+            codebook_hash,
+        })
+    }
+
+    pub fn accepts(&self, nonconformity: f64) -> bool {
+        nonconformity.is_finite()
+            && (0.0..=1.0).contains(&nonconformity)
+            && nonconformity <= self.threshold
+    }
+
+    pub fn minimum_cases_for_non_max_threshold(alpha: f64) -> Result<usize, String> {
+        if !alpha.is_finite() || !(0.0..1.0).contains(&alpha) {
+            return Err("conformal alpha must be finite and within (0, 1)".into());
+        }
+        Ok(((2.0 / alpha) - 1.0).ceil() as usize)
+    }
+
+    pub fn validates(&self) -> bool {
+        self.alpha.is_finite()
+            && (0.0..1.0).contains(&self.alpha)
+            && self.threshold.is_finite()
+            && (0.0..=1.0).contains(&self.threshold)
+            && self.calibration_case_count > 0
+            && !self.codebook_hash.trim().is_empty()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HdcOntologyEmpiricalCalibration {
     pub baseline: HdcOntologyDecodePolicy,
@@ -1367,6 +1447,51 @@ mod tests {
         assert!(edge_candidate_count(usize::MAX, 2).is_err());
         let over = edge_candidate_count(512, 4_096).unwrap();
         assert!(over > HDC_ONTOLOGY_MAX_EDGE_CANDIDATES);
+    }
+
+    #[test]
+    fn conformal_rank_is_finite_sample_conservative() {
+        let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
+            "codebook",
+            &[0.10, 0.20, 0.30],
+            0.10,
+        )
+        .unwrap();
+        // ceil((3 + 1) * 0.90) = 4, clipped to n=3: the maximum score.
+        assert_eq!(calibration.threshold, 0.30);
+        assert!(calibration.accepts(0.30));
+        assert!(!calibration.accepts(0.31));
+        assert!(calibration.validates());
+    }
+
+    #[test]
+    fn conformal_non_max_threshold_requires_enough_calibration_cases() {
+        assert_eq!(
+            HdcOntologyConformalCalibration::minimum_cases_for_non_max_threshold(0.10)
+                .unwrap(),
+            19
+        );
+        assert_eq!(
+            HdcOntologyConformalCalibration::minimum_cases_for_non_max_threshold(0.05)
+                .unwrap(),
+            39
+        );
+    }
+
+    #[test]
+    fn conformal_calibration_rejects_invalid_scores_and_alpha() {
+        assert!(HdcOntologyConformalCalibration::from_nonconformity_scores(
+            "codebook",
+            &[0.1, f64::NAN],
+            0.10,
+        )
+        .is_err());
+        assert!(HdcOntologyConformalCalibration::from_nonconformity_scores(
+            "codebook",
+            &[0.1, 0.2],
+            1.0,
+        )
+        .is_err());
     }
 
     #[test]
