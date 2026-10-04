@@ -393,6 +393,7 @@ impl DeploymentPlan {
         )?;
 
         validate_artifacts(&self.intent.artifacts)?;
+        validate_resource_binding(self)?;
 
         for resource in &self.intent.required_resources {
             if !self.target_snapshot.resources.contains(resource) {
@@ -834,6 +835,30 @@ fn validate_step_capability_semantics(step: &PlanStep) -> Result<(), PlanValidat
     Ok(())
 }
 
+fn validate_resource_binding(plan: &DeploymentPlan) -> Result<(), PlanValidationError> {
+    if plan.intent.required_resources.is_empty() {
+        let mut required_capabilities = plan.intent.required_capabilities.clone();
+        for step in &plan.steps {
+            required_capabilities.extend(step.required_capabilities.iter().copied());
+        }
+
+        for capability in [
+            Capability::InstallApplication,
+            Capability::RemoveApplication,
+            Capability::ReplaceOs,
+            Capability::ModifyBootChain,
+            Capability::ConfigureSecureBoot,
+            Capability::EncryptStorage,
+        ] {
+            if required_capabilities.contains(&capability) {
+                return Err(PlanValidationError::ResourceBindingRequired(capability));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn validate_capabilities(
     required: &BTreeSet<Capability>,
     supported: &BTreeSet<Capability>,
@@ -900,6 +925,8 @@ pub enum PlanValidationError {
     MissingTargetCapability(Capability),
     #[error("required capability {0:?} is not granted")]
     MissingGrantedCapability(Capability),
+    #[error("resource-bound capability {0:?} requires at least one explicit target resource")]
+    ResourceBindingRequired(Capability),
     #[error("required target resource is absent from the observed snapshot")]
     MissingTargetResource(ResourceRef),
     #[error("plan step sequence is not contiguous from zero")]
@@ -1193,6 +1220,30 @@ mod tests {
         assert_eq!(
             plan.authorize(auth, 150),
             Err(PlanValidationError::AuthorizationTargetDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn rejects_resource_bound_capability_without_resource_binding() {
+        let mut plan = sample_plan();
+        plan.intent.required_resources.clear();
+        plan.target_snapshot.resources.clear();
+        plan.target_snapshot
+            .profile
+            .capabilities
+            .insert(Capability::EncryptStorage);
+        plan.intent
+            .required_capabilities
+            .insert(Capability::EncryptStorage);
+        plan.steps[1]
+            .required_capabilities
+            .insert(Capability::EncryptStorage);
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::ResourceBindingRequired(
+                Capability::EncryptStorage
+            ))
         );
     }
 
