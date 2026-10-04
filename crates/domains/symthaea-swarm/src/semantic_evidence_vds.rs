@@ -3162,7 +3162,7 @@ mod tests {
             0xbf,
             0x01, 0x02,
             0x42, 0xaa, 0xbb, 0x63, b'f', b'o', b'o',
-            0x82, 0x01, 0x02,
+            0x82, 0x01, 0x02, 0x00,
             0xff,
         ];
         let mut reader=CborReader::new(&wire);
@@ -3170,7 +3170,7 @@ mod tests {
         assert_eq!(entries.len(),3);
         assert_eq!(entries[0],(vec![0x01],vec![0x02]));
         assert_eq!(entries[1],(vec![0x42,0xaa,0xbb],vec![0x63,b'f',b'o',b'o']));
-        assert_eq!(entries[2],(vec![0x82,0x01,0x02],vec![0xff]));
+        assert_eq!(entries[2],(vec![0x82,0x01,0x02],vec![0x00]));
         reader.finish().unwrap();
     }
 
