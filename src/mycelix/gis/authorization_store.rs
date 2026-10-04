@@ -3536,8 +3536,8 @@ fn validate_native_authority_pin_set(
             || target_identity != record.target_identity
             || audience != record.audience
             || adapter != record.adapter
-            || adapter_revision.as_deref() != Some(record.adapter_revision.as_str())
-            || adapter_implementation_digest.as_deref() != Some(record.adapter_implementation_digest.as_str())
+            || adapter_revision.as_str() != record.adapter_revision.as_str()
+            || adapter_implementation_digest.as_str() != record.adapter_implementation_digest.as_str()
             || boundary_id != record.boundary_id
             || attempt_scope_digest.as_deref() != Some(
                 compute_attempt_scope_digest(&record.boundary_id,&record.attempt_id)?.as_str()
@@ -4917,7 +4917,7 @@ fn validate_persisted_terminal_evidence(
         || provider_idempotency_key != record.provider_idempotency_key
         || target_identity != record.target_identity
         || audience != record.audience
-        || adapter.as_deref() != Some(record.adapter.as_str())
+        || adapter.as_str() != record.adapter.as_str()
         || adapter_revision.as_deref() != Some(record.adapter_revision.as_str())
         || adapter_implementation_digest.as_deref() != Some(record.adapter_implementation_digest.as_str())
         || outcome != expected_outcome
@@ -4925,11 +4925,11 @@ fn validate_persisted_terminal_evidence(
         || evidence_digest.is_empty()
         || attempt_binding_digest != record.attempt_binding_digest
         || verifier_id != pinned_verifier.verifier_id
-        || verifier_revision.as_deref() != Some(pinned_verifier.verifier_revision.as_str())
-        || verifier_implementation_id.as_deref()
-            != Some(pinned_verifier.verifier_implementation_id.as_str())
-        || verifier_implementation_digest.as_deref()
-            != Some(pinned_verifier.verifier_implementation_digest.as_str())
+        || verifier_revision.as_str() != pinned_verifier.verifier_revision.as_str()
+        || verifier_implementation_id.as_str()
+            != pinned_verifier.verifier_implementation_id.as_str()
+        || verifier_implementation_digest.as_str()
+            != pinned_verifier.verifier_implementation_digest.as_str()
         || verifier_config_digest != pinned_verifier.verifier_config_digest
         || trust_anchor_digest != pinned_verifier.trust_anchor_digest
         || evidence_profile_digest != pinned_verifier.evidence_profile_digest
