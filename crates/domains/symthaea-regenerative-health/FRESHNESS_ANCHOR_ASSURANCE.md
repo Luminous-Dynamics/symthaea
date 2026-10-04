@@ -107,7 +107,7 @@ The adjacent `freshness_anchor_tpm` module provides a deployment-neutral contrac
 
 The adjacent TPM contract also provides a typed 256-bit quote challenge with canonical digesting and OS randomness. The challenge gate runs before the platform verifier, so an outdated or mis-bound quote cannot reach cryptographic appraisal under the wrong freshness context.
 
-TCG TPM 2.0 defines `TPM_NT_COUNTER` as an 8-octet counter whose value is modified with `TPM2_NV_Increment()`. The deployment must separately establish the required persistence and lifecycle properties of the selected NV index; those properties are not inferred merely from the fact that the object is an NV counter. The TCG structures define `TPMS_NV_DIGEST_CERTIFY_INFO` as carrying the NV Index Name and a hash of the certified NV contents.
+TCG TPM 2.0 v185 defines `TPM_NT_COUNTER` as an 8-octet counter modified with `TPM2_NV_Increment()`. It also defines `TPMA_NV_ORDERLY` as allowing NV state to be saved only at orderly shutdown, while clearing that attribute requires the NV update to be persistent when the update command completes. Because the freshness anchor declares crash persistence as authoritative, the concrete adapter must reject an orderly counter unless an independent external mechanism supplies the missing crash-rollback guarantee. The TCG structures define `TPMS_NV_DIGEST_CERTIFY_INFO` as carrying the NV Index Name and a hash of the certified NV contents.
 
 A real adapter must still independently verify:
 
@@ -119,6 +119,7 @@ A real adapter must still independently verify:
 - NV certification carrying the same NV Index Name as the selected counter;
 - the certified NV contents digest matching the observed counter value;
 - the observed counter value;
+- synchronous persistence (rejecting `TPMA_NV_ORDERLY` for the authoritative path);
 - persistence semantics required by the deployment; and
 - the relationship between the counter value and the freshness recovery generation.
 
