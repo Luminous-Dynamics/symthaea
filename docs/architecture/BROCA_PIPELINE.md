@@ -861,3 +861,48 @@ error signals need not live at one level. Recent work reports prediction errors 
 higher linguistic levels while sensory sharpening operates at lower levels, supporting
 hierarchical rather than single-score feedback. The implementation therefore keeps semantic,
 phonological, and acoustic discrepancies separately inspectable.
+
+
+## Linguistic Formulation Boundary
+
+The speech-production path now makes the formulation stage explicit:
+
+    StructuredReadout + ThoughtChannels
+                |
+                v
+           SpeechPlan
+                |
+                v
+        LinguisticFrame
+                |
+                v
+       PhonologicalPlan
+                |
+                v
+      motor realization
+                |
+          +-----+-----+
+          |           |
+          v           v
+   semantic error   acoustic error
+
+LinguisticFrame is a conservative linearization skeleton over the canonical semantic
+roles already present in SpeechPlan. Its job is to make clause strategy, constituent
+ordering, focus attachment, and lexical-binding provenance explicit before phonological
+realization.
+
+It does not invent:
+- lexical words;
+- inflection or agreement;
+- omitted semantic arguments;
+- morphology that is not present in upstream state.
+
+This boundary matters because recent 2026 speech-production work reports distinct neural
+processes for speech planning and execution, with discrete planned syllable/phoneme units
+being dynamically integrated into continuous motor sequences. A separate 2026 production
+study also reports that morphosyntactic speech planning can influence phonetic realization
+under changes in syntactic boundary and speaking rate.
+
+For Symthaea, the engineering implication is not to imitate those neural mechanisms
+literally, but to preserve the same separability in software so semantic, linguistic,
+phonological, and motor evidence can be measured independently.
