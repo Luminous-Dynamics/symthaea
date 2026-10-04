@@ -39,6 +39,12 @@ pub const HDC_ONTOLOGY_EDGE_TARGET_PERMUTATION: usize = 1;
 /// N0 resource bounds for identity-aware graph reconstruction.
 pub const HDC_ONTOLOGY_MAX_NODES: usize = 256;
 pub const HDC_ONTOLOGY_MAX_EDGES: usize = 2048;
+/// Maximum local identity entries carried by a manifest.
+pub const HDC_ONTOLOGY_MAX_MANIFEST_CONCEPTS: usize = 4_096;
+pub const HDC_ONTOLOGY_MAX_MANIFEST_RELATIONS: usize = 4_096;
+/// Maximum frozen codebook candidates ranked by the receiver.
+pub const HDC_ONTOLOGY_MAX_CODEBOOK_CONCEPTS: usize = 4_096;
+pub const HDC_ONTOLOGY_MAX_CODEBOOK_RELATIONS: usize = 4_096;
 /// Hard ceiling on receiver-side edge candidates before ranking allocation.
 pub const HDC_ONTOLOGY_MAX_EDGE_CANDIDATES: usize = 1_000_000;
 /// Versioned HDC nonconformity score used by the isolated N1 conformal primitive.
@@ -81,7 +87,9 @@ impl HdcOntologyManifest {
             && !self.scheme_id.trim().is_empty()
             && !self.mapping_provenance_hash.trim().is_empty()
             && !self.concepts.is_empty()
+            && self.concepts.len() <= HDC_ONTOLOGY_MAX_MANIFEST_CONCEPTS
             && !self.relations.is_empty()
+            && self.relations.len() <= HDC_ONTOLOGY_MAX_MANIFEST_RELATIONS
             && !self.concepts.iter().any(|binding| {
                 binding.node_id.trim().is_empty()
                     || binding.concept_id.trim().is_empty()
@@ -191,7 +199,9 @@ impl HdcOntologyCodebookDescriptor {
             && !self.relation_manifest_hash.trim().is_empty()
             && !self.training_manifest_hash.trim().is_empty()
             && self.concept_count > 0
+            && self.concept_count <= HDC_ONTOLOGY_MAX_CODEBOOK_CONCEPTS
             && self.relation_count > 0
+            && self.relation_count <= HDC_ONTOLOGY_MAX_CODEBOOK_RELATIONS
     }
 
     pub fn codebook_hash(&self) -> String {
@@ -1481,6 +1491,31 @@ mod tests {
         representation.node_count = training.nodes.len();
         representation.edge_count = HDC_ONTOLOGY_MAX_EDGES + 1;
         assert!(!representation.validates());
+    }
+
+    #[test]
+    fn manifest_and_codebook_cardinality_are_bounded() {
+        let (training, training_manifest) = training_graph_and_manifest();
+        let mut oversized_manifest = training_manifest.clone();
+        oversized_manifest.concepts = (0..=HDC_ONTOLOGY_MAX_MANIFEST_CONCEPTS)
+            .map(|index| HdcConceptIdentityBinding {
+                node_id: format!("node-{index}"),
+                concept_id: format!("concept-{index}"),
+                kind: ConceptKind::Object,
+                grounding_ids: vec!["grounding".into()],
+            })
+            .collect();
+        assert!(!oversized_manifest.validates());
+
+        let codebook =
+            HdcOntologyCodebook::from_training_graphs(77, &[training], &training_manifest)
+                .unwrap();
+        let mut oversized_descriptor = codebook.descriptor().clone();
+        oversized_descriptor.concept_count = HDC_ONTOLOGY_MAX_CODEBOOK_CONCEPTS + 1;
+        assert!(!oversized_descriptor.validates());
+        oversized_descriptor.concept_count = codebook.descriptor().concept_count;
+        oversized_descriptor.relation_count = HDC_ONTOLOGY_MAX_CODEBOOK_RELATIONS + 1;
+        assert!(!oversized_descriptor.validates());
     }
 
     #[test]
