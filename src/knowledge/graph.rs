@@ -45,17 +45,8 @@ impl CanonicalAdmission {
         canonical_identity: impl Into<String>,
         provenance_family: Option<String>,
     ) -> Result<Self, &'static str> {
-        let canonical_identity = canonical_identity.into();
-        if canonical_identity.trim().is_empty() {
-            return Err("canonical identity must be non-empty");
-        }
-        if provenance_family
-            .as_deref()
-            .is_some_and(|family| family.trim().is_empty())
-        {
-            return Err("provenance family must be non-empty when present");
-        }
-        Ok(Self { canonical_identity, provenance_family, receipt: None })
+        let subject = CanonicalAdmissionSubject::new(canonical_identity, provenance_family)?;
+        Ok(Self::from_subject(subject))
     }
 
     pub fn from_subject(subject: CanonicalAdmissionSubject) -> Self {
@@ -1167,7 +1158,6 @@ fn contains_negation(text: &str) -> bool {
         assert!(admission.validate_structure().is_ok());
     }
 
-    #[test]
     #[test]
     fn test_canonical_admission_rejects_receipt_for_different_subject() {
         let relation = ProvenanceRelation {
