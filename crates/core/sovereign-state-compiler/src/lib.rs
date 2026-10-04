@@ -532,6 +532,60 @@ impl<'a> ConsumedAuthorization<'a> {
     pub fn consumed_at_ms(&self) -> u64 {
         self.consumed_at_ms
     }
+
+    /// Admit this consumed authorization for execution at `now_ms`.
+    ///
+    /// Revalidation here closes the gap between durable nonce consumption and
+    /// mutation start: an authorization that expires after consumption is
+    /// safely burned rather than executed late.
+    pub fn admit_execution(
+        self,
+        now_ms: u64,
+    ) -> Result<ExecutionAuthorization<'a>, PlanValidationError> {
+        if now_ms < self.consumed_at_ms {
+            return Err(PlanValidationError::AuthorizationConsumptionFromFuture {
+                consumed_at_ms: self.consumed_at_ms,
+                now_ms,
+            });
+        }
+        self.authorized.validate(now_ms)?;
+        Ok(ExecutionAuthorization {
+            authorized: self.authorized,
+            authorization_digest: self.authorization_digest,
+            consumed_at_ms: self.consumed_at_ms,
+            started_at_ms: now_ms,
+        })
+    }
+}
+/// Opaque execution admission for one exact, already-consumed authorization.
+///
+/// This handle carries the validated execution-start timestamp and exact
+/// authorization digest recorded by the durable consumption boundary. It is
+/// deliberately non-cloneable and non-serializable.
+#[derive(Debug)]
+pub struct ExecutionAuthorization<'a> {
+    authorized: &'a AuthorizedDeploymentPlan,
+    authorization_digest: ContentDigest,
+    consumed_at_ms: u64,
+    started_at_ms: u64,
+}
+
+impl<'a> ExecutionAuthorization<'a> {
+    pub fn authorized_plan(&self) -> &'a AuthorizedDeploymentPlan {
+        self.authorized
+    }
+
+    pub fn authorization_digest(&self) -> &ContentDigest {
+        &self.authorization_digest
+    }
+
+    pub fn consumed_at_ms(&self) -> u64 {
+        self.consumed_at_ms
+    }
+
+    pub fn started_at_ms(&self) -> u64 {
+        self.started_at_ms
+    }
 }
 /// Persistence/transaction boundary for one-shot authorization.
 ///
@@ -780,17 +834,15 @@ impl ExecutionReceipt {
 pub trait DeploymentExecutor {
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Execute the exact authorized plan whose nonce was atomically consumed.
+    /// Execute the exact authorized plan after durable consumption and
+    /// execution-time validity admission.
     ///
-    /// The consumed handoff owns a borrow of that exact plan, so an executor
-    /// cannot accidentally pair a consumption proof with another plan object.
-    /// The neutral SSC core intentionally does not provide the persistence
-    /// implementation: a process-local flag is insufficient across retries,
-    /// restarts, or concurrent executors.
+    /// `ExecutionAuthorization` owns a borrow of the exact plan and can only
+    /// be minted by `ConsumedAuthorization::admit_execution`, which revalidates
+    /// authorization at the execution-start timestamp.
     fn execute(
         &mut self,
-        consumed_authorization: ConsumedAuthorization<'_>,
-        now_ms: u64,
+        execution_authorization: ExecutionAuthorization<'_>,
     ) -> Result<ExecutionReceipt, Self::Error>;
 }
 
@@ -1215,6 +1267,8 @@ pub enum PlanValidationError {
     AuthorizationNotYetValid,
     #[error("authorization has expired")]
     AuthorizationExpired,
+    #[error("authorization was consumed at {consumed_at_ms} ms but execution time is {now_ms} ms")]
+    AuthorizationConsumptionFromFuture { consumed_at_ms: u64, now_ms: u64 },
     #[error("authorization must contain an explicit expiry")]
     AuthorizationMissingExpiry,
     #[error("unsupported Sovereign State Compiler schema version: {0}")]
@@ -1302,6 +1356,31 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Default)]
+    struct TestConsumptionStore {
+        consumed: BTreeSet<(String, String)>,
+    }
+
+    #[derive(Debug, Error, PartialEq, Eq)]
+    #[error("already consumed")]
+    struct TestConsumptionError;
+
+    impl AuthorizationConsumptionStore for TestConsumptionStore {
+        type Error = TestConsumptionError;
+
+        fn consume_once(
+            &mut self,
+            consumption: &AuthorizationConsumption,
+        ) -> Result<(), Self::Error> {
+            if !self
+                .consumed
+                .insert((consumption.authority_id.clone(), consumption.nonce.clone()))
+            {
+                return Err(TestConsumptionError);
+            }
+            Ok(())
+        }
+    }
     fn authorization_for(plan: &DeploymentPlan) -> AuthorizationEvidence {
         AuthorizationEvidence {
             authority_id: "owner".into(),
@@ -2234,6 +2313,38 @@ mod tests {
         );
     }
 
+    #[test]
+    fn consumed_authorization_requires_fresh_execution_admission() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+        let mut store = TestConsumptionStore::default();
+        let consumed =
+            consume_authorized_once(&mut store, &authorized, 151).expect("consumed");
+
+        let execution = consumed.admit_execution(152).expect("execution admission");
+        assert!(std::ptr::eq(execution.authorized_plan(), &authorized));
+        assert_eq!(execution.consumed_at_ms(), 151);
+        assert_eq!(execution.started_at_ms(), 152);
+    }
+
+    #[test]
+    fn consumed_authorization_cannot_start_before_consumption() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+        let mut store = TestConsumptionStore::default();
+        let consumed =
+            consume_authorized_once(&mut store, &authorized, 151).expect("consumed");
+
+        assert_eq!(
+            consumed.admit_execution(150),
+            Err(PlanValidationError::AuthorizationConsumptionFromFuture {
+                consumed_at_ms: 151,
+                now_ms: 150,
+            })
+        );
+    }
     #[test]
     fn consume_authorized_once_requires_the_durable_store_boundary() {
         #[derive(Default)]
