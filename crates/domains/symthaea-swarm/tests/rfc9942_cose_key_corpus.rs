@@ -125,6 +125,56 @@ fn indefinite_text_with_exact_chunk_cap(bytes: &[u8]) -> Vec<u8> {
 }
 
 
+fn oversized_inclusion_proof_wire() -> Vec<u8> {
+    let mut out = vec![0x83, 0x1b];
+    out.extend_from_slice(&u64::MAX.to_be_bytes());
+    out.extend_from_slice(&[0x00, 0x98, 0x40]);
+    for _ in 0..64 {
+        out.push(0x5f);
+        for _ in 0..32 {
+            out.extend_from_slice(&[0x41, 0x00]);
+        }
+        out.push(0xff);
+    }
+    out
+}
+
+#[test]
+fn rfc9942_vdp_accepts_proof_bstr_above_generic_skip_value_cap() {
+    let proof = oversized_inclusion_proof_wire();
+    assert!(proof.len() > 4096);
+
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof.clone()])
+        .expect("RFC9162 inclusion proof remains structurally valid above the generic opaque-value cap");
+    let wire = vdp.to_cbor();
+    let parsed = Rfc9942Vdp::from_cbor(&wire)
+        .expect("RFC9942 VDP proof bstr must use its protocol-specific 8 KiB bound");
+    assert_eq!(parsed.proofs()[0].len(), proof.len());
+}
+
+#[test]
+fn rfc9942_receipt_collection_accepts_receipt_bstr_above_generic_skip_value_cap() {
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+    let receipt = Rfc9942ReceiptEnvelope::new(
+        COSE_ES256_ALGORITHM_ID,
+        vdp,
+        Rfc9942ReceiptPayload::Attached([0u8; 32]),
+        vec![0u8; 4097],
+    ).unwrap();
+
+    let encoded = receipt.to_cbor();
+    assert!(encoded.len() > 4096);
+
+    let mut wire = vec![0x9f];
+    wire.extend_from_slice(&bstr(&encoded));
+    wire.push(0xff);
+
+    let parsed = Rfc9942ReceiptCollection::from_cbor(&wire)
+        .expect("RFC9942 receipt bstr must use its protocol-specific 4 MiB bound");
+    assert_eq!(parsed.receipts()[0].signature().len(), 4097);
+}
+
 #[test]
 fn cose_key_accepts_indefinite_map_root() {
     let parsed = Rfc9942Es256CoseKey::from_cbor(&cose_key_with_indefinite_root(0, true))
