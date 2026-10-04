@@ -109,6 +109,18 @@ fn held_out_graphs() -> Vec<GroundedConceptGraph> {
     ]
 }
 
+fn execution_revision() -> String {
+    std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|revision| revision.trim().to_string())
+        .filter(|revision| !revision.is_empty())
+        .unwrap_or_else(|| "local".into())
+}
+
 fn main() -> Result<(), String> {
     let training = training_graphs();
     let held_out = held_out_graphs();
@@ -116,7 +128,7 @@ fn main() -> Result<(), String> {
     let codebook = HdcSemanticCodebook::from_training_graphs(seed, &training)?;
     let codebook_hash = codebook.codebook_hash();
     let execution_revision =
-        std::env::var("GITHUB_SHA").unwrap_or_else(|_| "local".into());
+        execution_revision();
 
     let mut cases = Vec::with_capacity(held_out.len());
     for (index, expected) in held_out.iter().enumerate() {
