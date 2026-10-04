@@ -145,7 +145,7 @@ fn cose_key_accepts_exact_indefinite_map_entry_cap_before_break() {
 fn cose_key_accepts_unknown_label_with_nested_opaque_cbor_value() {
     let mut fields = valid_fields();
     let mut field = vec![0x18, 30];
-    field.extend_from_slice(&[0xa1, 0x41, 0x00]);
+    field.extend_from_slice(&[0xa1, 0x41, 0x00, 0x01]);
     fields.push(field);
 
     let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
@@ -165,7 +165,7 @@ fn receipt_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
         vec![0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01]
     };
     if protected_extension {
-        protected.extend_from_slice(&[0x18, 0x1e, 0xa1, 0x41, 0x00]);
+        protected.extend_from_slice(&[0x18, 0x1e, 0xa1, 0x41, 0x00, 0x01]);
     }
 
     let mut unprotected = if protected_extension {
@@ -175,7 +175,7 @@ fn receipt_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
     };
     unprotected.extend_from_slice(&vdp);
     if !protected_extension {
-        unprotected.extend_from_slice(&[0x18, 0x1e, 0xa1, 0x41, 0x00]);
+        unprotected.extend_from_slice(&[0x18, 0x1e, 0xa1, 0x41, 0x00, 0x01]);
     }
 
     let mut out = vec![0xd2, 0x84];
@@ -188,14 +188,14 @@ fn receipt_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
 
 fn outer_with_unknown_extension(protected_extension: bool) -> Vec<u8> {
     let protected = if protected_extension {
-        vec![0xa1, 0x18, 0x1e, 0xa1, 0x41, 0x00]
+        vec![0xa1, 0x18, 0x1e, 0xa1, 0x41, 0x00, 0x01]
     } else {
         vec![0xa0]
     };
     let unprotected = if protected_extension {
         vec![0xa0]
     } else {
-        vec![0xa1, 0x18, 0x1e, 0xa1, 0x41, 0x00]
+        vec![0xa1, 0x18, 0x1e, 0xa1, 0x41, 0x00, 0x01]
     };
 
     let mut out = vec![0xd2, 0x84];
