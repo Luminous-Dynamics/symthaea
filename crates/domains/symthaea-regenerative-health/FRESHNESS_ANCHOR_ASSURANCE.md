@@ -105,6 +105,8 @@ A concrete TPM backend may use protected NV state such as an NV Counter as the r
 
 The adjacent `freshness_anchor_tpm` module provides a deployment-neutral contract for TPM NV-counter evidence. It explicitly binds TPM identity, NV Index Name/public-area, authorization policy, attestation key, quote Handle, quote, PCR binding, and counter value. The structural gate requires the counter to equal the recovery generation, the typed TPM identity/NV-name fields to equal the generic evidence identity fields, and the quote Handle to equal the receipt Handle; cryptographic quote verification remains platform-specific.
 
+The adjacent TPM contract also provides a typed 256-bit quote challenge with canonical digesting and OS randomness. The challenge gate runs before the platform verifier, so an outdated or mis-bound quote cannot reach cryptographic appraisal under the wrong freshness context.
+
 TCG TPM 2.0 defines `TPM_NT_COUNTER` as an 8-octet counter whose value is modified with `TPM2_NV_Increment()`. The deployment must separately establish the required persistence and lifecycle properties of the selected NV index; those properties are not inferred merely from the fact that the object is an NV counter.
 
 A real adapter must still independently verify:
@@ -173,6 +175,7 @@ Implemented:
 - deterministic, domain-separated verification-receipt statement commitment;
 - concrete Ed25519 attestation-result protection over that commitment;
 - deployment-neutral TPM NV-counter evidence contract;
+- typed, randomized TPM quote challenge and pre-verifier Handle gate;
 - explicit verifier key/trust-anchor policy binding;
 - explicit recovery-policy and authority binding;
 - typed hardware/remote/quorum evidence envelope;
