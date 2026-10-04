@@ -569,6 +569,80 @@ pub struct ExecutionAuthorization<'a> {
     started_at_ms: u64,
 }
 
+/// Source of a fresh target snapshot for execution-time preflight.
+///
+/// Implementations are target-specific and are responsible for obtaining the
+/// snapshot from the live target rather than replaying portable evidence.
+pub trait ExecutionPreflightObserver {
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    fn observe(&mut self) -> Result<TargetSnapshot, Self::Error>;
+}
+
+#[derive(Debug, Error)]
+pub enum ExecutionPreflightError<E: std::error::Error + Send + Sync + 'static> {
+    #[error("execution preflight observation failed: {0}")]
+    Observation(E),
+    #[error("execution preflight target identity does not match authorization")]
+    TargetIdentityMismatch,
+    #[error("execution preflight target platform does not match authorization")]
+    TargetPlatformMismatch,
+    #[error("execution preflight target profile does not match authorization")]
+    TargetProfileMismatch,
+    #[error("execution preflight observation digest does not match authorized pre-state")]
+    ObservationDigestMismatch,
+    #[error("execution preflight is future-dated: observed at {observed_at_ms} ms but admission time is {now_ms} ms")]
+    ObservationFutureDated { observed_at_ms: u64, now_ms: u64 },
+    #[error("execution preflight was captured before execution admission")]
+    ObservationBeforeExecution {
+        observed_at_ms: u64,
+        started_at_ms: u64,
+    },
+    #[error("execution preflight target snapshot is stale: age {age_ms} ms exceeds maximum {max_age_ms} ms")]
+    SnapshotStale { age_ms: u64, max_age_ms: u64 },
+    #[error("execution preflight is missing an authorized target resource")]
+    MissingAuthorizedResource(ResourceRef),
+    #[error("execution preflight observation contains an invalid resource")]
+    InvalidResource,
+    #[error("execution preflight observation digest is incomplete")]
+    InvalidObservationDigest,
+    #[error("execution preflight target profile is incomplete")]
+    InvalidTargetProfile,
+}
+
+#[derive(Debug)]
+pub struct PreflightedExecutionAuthorization<'a> {
+    execution: ExecutionAuthorization<'a>,
+    observation_digest: ContentDigest,
+    observed_at_ms: u64,
+}
+
+impl<'a> PreflightedExecutionAuthorization<'a> {
+    pub fn authorized_plan(&self) -> &'a AuthorizedDeploymentPlan {
+        self.execution.authorized_plan()
+    }
+
+    pub fn authorization_digest(&self) -> &ContentDigest {
+        self.execution.authorization_digest()
+    }
+
+    pub fn consumed_at_ms(&self) -> u64 {
+        self.execution.consumed_at_ms()
+    }
+
+    pub fn started_at_ms(&self) -> u64 {
+        self.execution.started_at_ms()
+    }
+
+    pub fn preflight_observation_digest(&self) -> &ContentDigest {
+        &self.observation_digest
+    }
+
+    pub fn preflight_observed_at_ms(&self) -> u64 {
+        self.observed_at_ms
+    }
+}
+
 impl<'a> ExecutionAuthorization<'a> {
     pub fn authorized_plan(&self) -> &'a AuthorizedDeploymentPlan {
         self.authorized
@@ -584,6 +658,92 @@ impl<'a> ExecutionAuthorization<'a> {
 
     pub fn started_at_ms(&self) -> u64 {
         self.started_at_ms
+    }
+
+    /// Bind the execution authorization to a fresh target observation captured
+    /// after execution admission and before the real effect boundary.
+    ///
+    /// The observer is deliberately supplied by the target-specific layer:
+    /// SSC requires a fresh observation contract without knowing how a concrete
+    /// platform reads its live state.
+    pub fn preflight<O: ExecutionPreflightObserver>(
+        self,
+        observer: &mut O,
+        now_ms: u64,
+    ) -> Result<PreflightedExecutionAuthorization<'a>, ExecutionPreflightError<O::Error>> {
+        let snapshot = observer
+            .observe()
+            .map_err(ExecutionPreflightError::Observation)?;
+
+        if snapshot.profile.identity.0.is_empty() || snapshot.profile.platform.is_empty() {
+            return Err(ExecutionPreflightError::InvalidTargetProfile);
+        }
+        if !has_concrete_digest(Some(&snapshot.observation_digest)) {
+            return Err(ExecutionPreflightError::InvalidObservationDigest);
+        }
+        if snapshot
+            .resources
+            .iter()
+            .any(|resource| resource.kind.is_empty() || !has_concrete_digest(Some(&resource.identity)))
+        {
+            return Err(ExecutionPreflightError::InvalidResource);
+        }
+        if snapshot.profile.identity != self.authorized.plan.target_snapshot.profile.identity {
+            return Err(ExecutionPreflightError::TargetIdentityMismatch);
+        }
+        if snapshot.profile.platform != self.authorized.plan.target_snapshot.profile.platform {
+            return Err(ExecutionPreflightError::TargetPlatformMismatch);
+        }
+
+        let authorized_profile_digest = self
+            .authorized
+            .plan
+            .target_snapshot
+            .profile
+            .digest()
+            .map_err(ExecutionPreflightError::Observation)?;
+        let observed_profile_digest = snapshot
+            .profile
+            .digest()
+            .map_err(ExecutionPreflightError::Observation)?;
+        if observed_profile_digest != authorized_profile_digest {
+            return Err(ExecutionPreflightError::TargetProfileMismatch);
+        }
+
+        if snapshot.observation_digest != self.authorized.plan.target_snapshot.observation_digest {
+            return Err(ExecutionPreflightError::ObservationDigestMismatch);
+        }
+        if snapshot.observed_at_ms > now_ms {
+            return Err(ExecutionPreflightError::ObservationFutureDated {
+                observed_at_ms: snapshot.observed_at_ms,
+                now_ms,
+            });
+        }
+        if snapshot.observed_at_ms < self.started_at_ms {
+            return Err(ExecutionPreflightError::ObservationBeforeExecution {
+                observed_at_ms: snapshot.observed_at_ms,
+                started_at_ms: self.started_at_ms,
+            });
+        }
+        if let Some(max_age_ms) = self.authorized.plan.max_target_snapshot_age_ms {
+            let age_ms = now_ms - snapshot.observed_at_ms;
+            if age_ms > max_age_ms {
+                return Err(ExecutionPreflightError::SnapshotStale { age_ms, max_age_ms });
+            }
+        }
+        for resource in &self.authorized.plan.intent.required_resources {
+            if !snapshot.resources.contains(resource) {
+                return Err(ExecutionPreflightError::MissingAuthorizedResource(
+                    resource.clone(),
+                ));
+            }
+        }
+
+        Ok(PreflightedExecutionAuthorization {
+            execution: self,
+            observation_digest: snapshot.observation_digest,
+            observed_at_ms: snapshot.observed_at_ms,
+        })
     }
 }
 /// Persistence/transaction boundary for one-shot authorization.
@@ -829,15 +989,15 @@ impl ExecutionReceipt {
 pub trait DeploymentExecutor {
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Execute the exact authorized plan after durable consumption and
-    /// execution-time validity admission.
+    /// Execute the exact authorized plan after durable consumption, execution-time
+    /// validity admission, and fresh target-state preflight.
     ///
-    /// `ExecutionAuthorization` owns a borrow of the exact plan and can only
-    /// be minted by `ConsumedAuthorization::admit_execution`, which revalidates
-    /// authorization at the execution-start timestamp.
+    /// The required `PreflightedExecutionAuthorization` can only be minted from
+    /// `ExecutionAuthorization::preflight`. This makes a target observer a
+    /// structural prerequisite for crossing the execution boundary.
     fn execute(
         &mut self,
-        execution_authorization: ExecutionAuthorization<'_>,
+        execution_authorization: PreflightedExecutionAuthorization<'_>,
     ) -> Result<ExecutionReceipt, Self::Error>;
 }
 
@@ -2355,6 +2515,138 @@ mod tests {
         assert!(std::ptr::eq(execution.authorized_plan(), &authorized));
         assert_eq!(execution.consumed_at_ms(), 151);
         assert_eq!(execution.started_at_ms(), 152);
+    }
+
+    #[derive(Debug)]
+    struct TestPreflightObserver {
+        snapshot: TargetSnapshot,
+    }
+
+    impl ExecutionPreflightObserver for TestPreflightObserver {
+        type Error = TestConsumptionError;
+
+        fn observe(&mut self) -> Result<TargetSnapshot, Self::Error> {
+            Ok(self.snapshot.clone())
+        }
+    }
+
+    #[test]
+    fn execution_requires_fresh_matching_target_preflight() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+        let mut store = TestConsumptionStore::default();
+        let consumed = consume_authorized_once(&mut store, &authorized, 151).expect("consumed");
+        let execution = consumed.admit_execution(152).expect("execution admission");
+
+        let mut observer = TestPreflightObserver {
+            snapshot: TargetSnapshot {
+                profile: sample_profile(),
+                observed_at_ms: 153,
+                observation_digest: ContentDigest::blake3(b"hardware-observation"),
+                resources: [ResourceRef {
+                    kind: "block-device".into(),
+                    identity: ContentDigest::blake3(b"disk-serial-123"),
+                }]
+                .into_iter()
+                .collect(),
+            },
+        };
+
+        let preflight = execution
+            .preflight(&mut observer, 154)
+            .expect("fresh preflight");
+        assert_eq!(preflight.started_at_ms(), 152);
+        assert_eq!(preflight.preflight_observed_at_ms(), 153);
+        assert_eq!(
+            preflight.preflight_observation_digest(),
+            &ContentDigest::blake3(b"hardware-observation")
+        );
+        assert!(std::ptr::eq(preflight.authorized_plan(), &authorized));
+    }
+
+    #[test]
+    fn execution_preflight_rejects_state_drift() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+        let mut store = TestConsumptionStore::default();
+        let consumed = consume_authorized_once(&mut store, &authorized, 151).expect("consumed");
+        let execution = consumed.admit_execution(152).expect("execution admission");
+
+        let mut observer = TestPreflightObserver {
+            snapshot: TargetSnapshot {
+                profile: sample_profile(),
+                observed_at_ms: 153,
+                observation_digest: ContentDigest::blake3(b"changed-state"),
+                resources: [ResourceRef {
+                    kind: "block-device".into(),
+                    identity: ContentDigest::blake3(b"disk-serial-123"),
+                }]
+                .into_iter()
+                .collect(),
+            },
+        };
+
+        assert!(matches!(
+            execution.preflight(&mut observer, 154),
+            Err(ExecutionPreflightError::ObservationDigestMismatch)
+        ));
+    }
+
+    #[test]
+    fn execution_preflight_rejects_observation_before_admission() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+        let mut store = TestConsumptionStore::default();
+        let consumed = consume_authorized_once(&mut store, &authorized, 151).expect("consumed");
+        let execution = consumed.admit_execution(152).expect("execution admission");
+
+        let mut observer = TestPreflightObserver {
+            snapshot: TargetSnapshot {
+                profile: sample_profile(),
+                observed_at_ms: 151,
+                observation_digest: ContentDigest::blake3(b"hardware-observation"),
+                resources: [ResourceRef {
+                    kind: "block-device".into(),
+                    identity: ContentDigest::blake3(b"disk-serial-123"),
+                }]
+                .into_iter()
+                .collect(),
+            },
+        };
+
+        assert!(matches!(
+            execution.preflight(&mut observer, 154),
+            Err(ExecutionPreflightError::ObservationBeforeExecution { .. })
+        ));
+    }
+
+    #[test]
+    fn execution_preflight_rejects_stale_observation() {
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+        let mut store = TestConsumptionStore::default();
+        let consumed = consume_authorized_once(&mut store, &authorized, 151).expect("consumed");
+        let execution = consumed.admit_execution(152).expect("execution admission");
+
+        let mut observer = TestPreflightObserver {
+            snapshot: TargetSnapshot {
+                profile: sample_profile(),
+                observed_at_ms: 153,
+                observation_digest: ContentDigest::blake3(b"hardware-observation"),
+                resources: [ResourceRef {
+                    kind: "block-device".into(),
+                    identity: ContentDigest::blake3(b"disk-serial-123"),
+                }]
+                .into_iter()
+                .collect(),
+            },
+        };
+
+        assert!(execution.preflight(&mut observer, 354).is_err());
     }
 
     #[test]
