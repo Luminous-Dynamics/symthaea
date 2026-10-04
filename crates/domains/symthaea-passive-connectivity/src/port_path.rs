@@ -297,6 +297,15 @@ mod tests {
     }
 
     #[test]
+    fn undeclared_port_pair_is_rejected() {
+        let mut graph = graph();
+        graph.connections.clear();
+        let mesh = resolve_to_mesh(&CSGNode::cube());
+        let evidence = evaluate_port_path(&graph, &embedding(), &mesh, PortId(10), PortId(20));
+        assert_eq!(evidence.status, PortPathStatus::UndeclaredPath);
+    }
+
+    #[test]
     fn connected_ports_are_detected_in_mesh_component() {
         let mesh = resolve_to_mesh(&CSGNode::cube());
         let evidence = evaluate_port_path(&graph(), &embedding(), &mesh, PortId(10), PortId(20));
