@@ -835,6 +835,7 @@ impl LinearCodeFactorizationFiber {
     /// certificate is valid. A mask length mismatch is rejected.
     pub fn coefficients_for_mask(&self, mask: &[bool]) -> Option<Vec<bool>> {
         if mask.len() != self.kernel_basis.len()
+            || self.cardinality.exponent() != self.kernel_basis.len()
             || self
                 .kernel_basis
                 .iter()
@@ -863,15 +864,16 @@ impl LinearCodeFactorizationFiber {
         &self,
         max_fibers: usize,
     ) -> Option<LinearCodeFactorizationFiberIter<'_>> {
-        if self
-            .kernel_basis
-            .iter()
-            .any(|witness| witness.generator_coefficients.len() != self.representative_coefficients.len())
+        if self.cardinality.exponent() != self.kernel_basis.len()
+            || self
+                .kernel_basis
+                .iter()
+                .any(|witness| witness.generator_coefficients.len() != self.representative_coefficients.len())
         {
             return None;
         }
 
-        let shift = u32::try_from(self.kernel_basis.len()).ok()?;
+        let shift = u32::try_from(self.cardinality.exponent()).ok()?;
         let total = 1usize.checked_shl(shift)?;
         if total > max_fibers {
             return None;
