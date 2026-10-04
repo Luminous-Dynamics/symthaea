@@ -565,6 +565,30 @@ impl MemoryProvenance {
         self.provenance_family.as_deref()
     }
 
+    /// Project a persisted statement reference into a typed proposition identity.
+    ///
+    /// A local memory may legitimately carry a statement reference before canonical
+    /// admission; in that case the projection is absent. Once a canonical identity
+    /// exists, the typed value couples the proposition to that exact subject.
+    pub fn canonical_statement_identity(
+        &self,
+    ) -> Result<Option<CanonicalStatementIdentity>, &'static str> {
+        match (&self.canonical_identity, &self.statement_ref) {
+            (Some(canonical_identity), Some(statement_ref)) => {
+                let subject = CanonicalAdmissionSubject::new(
+                    canonical_identity.clone(),
+                    self.provenance_family.clone(),
+                )?;
+                Ok(Some(CanonicalStatementIdentity::new(
+                    subject,
+                    statement_ref.clone(),
+                )?))
+            }
+            (None, Some(_)) => Err("statement reference cannot be typed without canonical identity"),
+            _ => Ok(None),
+        }
+    }
+
     /// Structural validity only. This does not assert truth, reliability, or admission.
     pub fn validate_structure(&self) -> Result<(), &'static str> {
         if self.memory_id.trim().is_empty() {
@@ -766,6 +790,56 @@ mod tests {
         assert_eq!(
             CanonicalStatementIdentity::new(subject, "   ").unwrap_err(),
             "statement reference must be non-empty"
+        );
+    }
+
+    #[test]
+    fn persisted_statement_ref_projects_only_through_canonical_subject() {
+        let provenance = MemoryProvenance {
+            canonical_identity: Some("canonical:1".into()),
+            memory_id: "mem-1".into(),
+            memory_kind: MemoryKind::Semantic,
+            created_at: "cycle:1".into(),
+            source_event: None,
+            canonical_artifact_ref: None,
+            statement_ref: Some("statement:1".into()),
+            provenance_family: Some("family:1".into()),
+            epistemic_state: None,
+            claim_ceiling: None,
+            frontier_ref: None,
+            derivation_ref: None,
+            model_ref: None,
+            retrieval_index_ref: None,
+        };
+
+        let statement = provenance.canonical_statement_identity().unwrap().unwrap();
+        assert_eq!(statement.statement_ref(), "statement:1");
+        assert_eq!(statement.subject().canonical_identity(), "canonical:1");
+        assert_eq!(statement.subject().provenance_family(), Some("family:1"));
+    }
+
+    #[test]
+    fn persisted_statement_ref_without_canonical_identity_is_not_promoted() {
+        let provenance = MemoryProvenance {
+            canonical_identity: None,
+            memory_id: "mem-1".into(),
+            memory_kind: MemoryKind::Semantic,
+            created_at: "cycle:1".into(),
+            source_event: None,
+            canonical_artifact_ref: None,
+            statement_ref: Some("statement:1".into()),
+            provenance_family: Some("family:1".into()),
+            epistemic_state: None,
+            claim_ceiling: None,
+            frontier_ref: None,
+            derivation_ref: None,
+            model_ref: None,
+            retrieval_index_ref: None,
+        };
+
+        assert_eq!(
+            provenance.canonical_statement_identity().unwrap_err(),
+            "statement reference cannot be typed without canonical identity"
         );
     }
 
