@@ -4,7 +4,7 @@ use super::boundary::{PortBoundaryEvidence, PortBoundaryPolicy};
 use symthaea_fabrication_kernel::mesh::TriangleMesh;
 use symthaea_fabrication_kernel::validate::validate_mesh;
 use symthaea_passive_void_compiler::GeometryEmbedding;
-use symthaea_passive_void_graph::{FunctionalVoidGraph, PortId};
+use symthaea_passive_void_graph::{FunctionalVoidGraph, PortId, RegionId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PortPathStatus {
@@ -331,6 +331,40 @@ mod tests {
         let evidence = evaluate_port_path(&graph(), &embedding(), &mesh, PortId(10), PortId(20));
         assert_eq!(evidence.status, PortPathStatus::Connected);
         assert!(evidence.physical_transport_unproven);
+    }
+
+    #[test]
+    fn boundary_policy_can_admit_explicit_open_ports() {
+        let mut graph = FunctionalVoidGraph::new();
+        graph.add_region(symthaea_passive_void_graph::VoidRegion { id: RegionId(1), role: symthaea_passive_void_graph::VoidRegionRole::Inlet }).unwrap();
+        graph.add_region(symthaea_passive_void_graph::VoidRegion { id: RegionId(2), role: symthaea_passive_void_graph::VoidRegionRole::Outlet }).unwrap();
+        graph.add_port(symthaea_passive_void_graph::VoidPort { id: PortId(10), region: RegionId(1) }).unwrap();
+        graph.add_port(symthaea_passive_void_graph::VoidPort { id: PortId(20), region: RegionId(2) }).unwrap();
+        graph.connect(symthaea_passive_void_graph::VoidConnection { from: PortId(10), to: PortId(20), relation: symthaea_passive_void_graph::VoidRelation::FlowPath, bidirectional: false }).unwrap();
+        let mesh = TriangleMesh {
+            vertices: vec![[-0.5, -0.5, 0.0], [0.5, -0.5, 0.0], [0.0, 0.5, 0.0]],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        };
+        let embedding = GeometryEmbedding::default()
+            .with_port(PortId(10), PortAnchor { center_mm: [-0.5, -0.5, 0.0], radius_mm: 0.75 })
+            .with_port(PortId(20), PortAnchor { center_mm: [0.5, -0.5, 0.0], radius_mm: 0.75 });
+        let policy = PortBoundaryPolicy::closed()
+            .with_allowed_open_port(PortId(10))
+            .with_allowed_open_port(PortId(20));
+        let evidence = evaluate_port_path_with_boundary_policy(&graph, &embedding, &mesh, PortId(10), PortId(20), &policy);
+        assert_eq!(evidence.status, PortPathStatus::Connected);
+    }
+
+    #[test]
+    fn boundary_policy_rejects_unapproved_openings() {
+        let mesh = TriangleMesh {
+            vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        };
+        let evidence = evaluate_port_path_with_boundary_policy(&graph(), &embedding(), &mesh, PortId(10), PortId(20), &PortBoundaryPolicy::closed());
+        assert_eq!(evidence.status, PortPathStatus::BoundaryPolicyRejected);
     }
 
     #[test]
