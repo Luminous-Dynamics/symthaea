@@ -470,6 +470,7 @@ fn algebraic_multiplicity_ledger_is_exhaustively_self_consistent() {
     assert_eq!(pair_algebra.factorization_count_per_target.exponent(), 1);
     assert!(!pair_algebra.unique_factorization);
     assert_eq!(pair_algebra.dependency_order, Some(2));
+    assert!(pair_algebra.satisfies_conservation_law());
 
     let pair_targets = [shared.encode(&[false]), shared.encode(&[true])];
     for target in pair_targets {
@@ -521,6 +522,7 @@ fn algebraic_multiplicity_ledger_is_exhaustively_self_consistent() {
     assert_eq!(triple_algebra.factorization_count_per_target.exponent(), 1);
     assert!(!triple_algebra.unique_factorization);
     assert_eq!(triple_algebra.dependency_order, Some(3));
+    assert!(triple_algebra.satisfies_conservation_law());
 
     let mut triple_fibers: Vec<(BinaryCodeword, usize)> = Vec::new();
     for a in c1.enumerate() {
