@@ -189,6 +189,12 @@ The calibrated policy is:
 
 `calibrated threshold = max(existing conservative baseline, empirical clean floor)`
 
+The calibration artifact is also bound to exactly one frozen codebook hash. Clean
+metrics from a different decoder codebook cannot be mixed into the same calibration
+artifact, even though mixing them would tend to make the resulting thresholds
+more conservative. This keeps the empirical measurement attached to the exact
+representation space it is meant to characterize.
+
 Therefore calibration cannot silently weaken the current `0.20` score or `0.05`
 margin boundaries.
 
