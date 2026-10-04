@@ -168,7 +168,7 @@ impl NeurosemanticPacket {
             return Err("packet confidence must be finite and in [0, 1]".into());
         }
 
-        let expected_payload_hash = payload_hash(&self.payload)?;
+        validate_payload(&self.payload)?;\n        let expected_payload_hash = payload_hash(&self.payload)?;
         if self.payload_hash != expected_payload_hash {
             return Err("payload hash mismatch".into());
         }
@@ -243,6 +243,8 @@ impl AuthorizedNeurosemanticMessage {
 /// The tracker deliberately lives above packet integrity: integrity answers
 /// "was this packet altered?", while this tracker answers "have we already
 /// accepted this packet sequence in this consent epoch?".
+pub const NEUROSEMANTIC_PROTOCOL_VERSION: u16 = 1;
+pub const MAX_NEUROSEMANTIC_PAYLOAD_BYTES: usize = 1_048_576;
 pub const MAX_TRACKED_NEUROSEMANTIC_SESSIONS: usize = 4096;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -313,6 +315,27 @@ impl NeurosemanticReplayTracker {
                 "replay or sequence collision: latest={}, proposed={}",
                 state.sequence, message.packet.sequence
             )),
+        }
+    }
+}
+
+fn validate_payload(payload: &NeurosemanticPayload) -> Result<(), String> {
+    match payload {
+        NeurosemanticPayload::DerivedNeuralFeature(values)
+            if values.iter().any(|value| !value.is_finite()) =>
+        {
+            Err("derived neural features must be finite".into())
+        }
+        _ => {
+            let bytes = serde_json::to_vec(payload)
+                .map_err(|error| format!("payload serialization: {error}"))?;
+            if bytes.len() > MAX_NEUROSEMANTIC_PAYLOAD_BYTES {
+                return Err(format!(
+                    "neurosemantic payload exceeds {} bytes",
+                    MAX_NEUROSEMANTIC_PAYLOAD_BYTES
+                ));
+            }
+            Ok(())
         }
     }
 }
@@ -496,6 +519,61 @@ mod tests {
         };
 
         assert!(message.validate(&lease(), 150).is_err());
+    }
+
+    #[test]
+    #[test]
+    fn nonfinite_derived_features_are_rejected() {
+        let result = NeurosemanticPacket::new(
+            11,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            0.5,
+            NeurosemanticPayload::DerivedNeuralFeature(vec![0.1, f32::NAN]),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn unsupported_protocol_versions_are_rejected() {
+        let mut packet = NeurosemanticPacket::new(
+            12,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        packet.protocol_version += 1;
+        assert!(packet.validate_integrity().is_err());
+    }
+
+    #[test]
+    fn payload_size_is_bounded() {
+        let values = vec![1_i8; MAX_NEUROSEMANTIC_PAYLOAD_BYTES];
+        let result = NeurosemanticPacket::new(
+            13,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            0.5,
+            NeurosemanticPayload::Hypervector(values),
+        );
+        assert!(result.is_err());
     }
 
     #[test]
