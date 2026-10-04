@@ -608,6 +608,14 @@ The store contract requires an atomic check-and-record operation. The authority
 nonce is the one-shot uniqueness identity, while the stored authorization digest
 prevents the same nonce from being silently rebound to a different authorization.
 
+`consume_authorized_once` then returns an opaque, non-cloneable consumption handle
+to the executor boundary. The handle is intentionally not itself a credential or
+a cryptographic proof; it is a type-level sequencing token that can only be minted
+by the consumption helper after plan validation and successful store acceptance.
+This makes the intended lifecycle explicit:
+
+`AuthorizedDeploymentPlan -> durable consume -> ConsumedAuthorization -> execute`.
+
 The invariant is:
 
 `consume(authority, nonce) = success` at most once.
