@@ -1,0 +1,132 @@
+use std::collections::{BTreeMap, BTreeSet};
+
+use symthaea_communication::{
+    AuthorizedNeurosemanticMessage, CognitiveChannel, CognitiveConsentLease,
+    CognitiveSensitivity, CommunicationPurpose, ConceptKind, ConceptNode, GroundedConceptGraph,
+    ChannelDirection, ExpressionDecision, ExpressionPolicy, ExpressionTarget,
+    NeurosemanticPacket, NeurosemanticPayload, NeurosemanticReplayTracker, RepresentationFamily,
+    ReplayDecision,
+};
+
+fn main() -> Result<(), String> {
+    let graph = GroundedConceptGraph {
+        nodes: vec![
+            ConceptNode {
+                id: "event-1".into(),
+                kind: ConceptKind::Event,
+                label: Some("approach".into()),
+                grounded_by: vec!["obs-1".into()],
+                confidence: 0.99,
+            },
+            ConceptNode {
+                id: "agent-1".into(),
+                kind: ConceptKind::Agent,
+                label: Some("sender".into()),
+                grounded_by: vec!["obs-1".into()],
+                confidence: 0.99,
+            },
+            ConceptNode {
+                id: "object-1".into(),
+                kind: ConceptKind::Object,
+                label: Some("object".into()),
+                grounded_by: vec!["obs-1".into()],
+                confidence: 0.94,
+            },
+        ],
+        edges: vec![
+            symthaea_communication::ConceptEdge {
+                source: "agent-1".into(),
+                relation: "initiates".into(),
+                target: "event-1".into(),
+                evidence_ids: vec!["obs-1".into()],
+                confidence: 0.96,
+            },
+            symthaea_communication::ConceptEdge {
+                source: "event-1".into(),
+                relation: "targets".into(),
+                target: "object-1".into(),
+                evidence_ids: vec!["obs-1".into()],
+                confidence: 0.95,
+            },
+        ],
+    };
+
+    let graph_bytes = serde_json::to_vec(&graph).map_err(|e| e.to_string())?;
+    let decoded: GroundedConceptGraph =
+        serde_json::from_slice(&graph_bytes).map_err(|e| e.to_string())?;
+    let exact_roundtrip = decoded == graph;
+
+    let lease = CognitiveConsentLease {
+        lease_id: "n0-lease".into(),
+        subject_id: "subject".into(),
+        peer_id: "peer".into(),
+        purpose: CommunicationPurpose::HumanCollaboration,
+        read_scopes: BTreeSet::from([CognitiveChannel::Semantic]),
+        write_scopes: BTreeSet::from([CognitiveChannel::Semantic]),
+        issued_at_unix_s: 1_000,
+        expires_at_unix_s: 2_000,
+        consent_epoch: 4,
+        revoked: false,
+    };
+
+    let packet = NeurosemanticPacket::new(
+        1,
+        "peer",
+        "subject",
+        CommunicationPurpose::HumanCollaboration,
+        CognitiveChannel::Semantic,
+        ChannelDirection::Write,
+        RepresentationFamily::Custom("GroundedConceptGraph".into()),
+        CognitiveSensitivity::Private,
+        0.93,
+        NeurosemanticPayload::SemanticGraph(graph_bytes.clone()),
+    )?;
+
+    let message = AuthorizedNeurosemanticMessage {
+        packet,
+        consent_epoch: lease.consent_epoch,
+        lease_id: lease.lease_id.clone(),
+    };
+    message.validate(&lease, 1_500)?;
+
+    let mut replay = NeurosemanticReplayTracker::default();
+    let accepted = replay.observe(&message)?;
+    let duplicate = replay.observe(&message)?;
+
+    let mut tampered = message.clone();
+    if let NeurosemanticPayload::SemanticGraph(bytes) = &mut tampered.packet.payload {
+        bytes.push(0);
+    }
+    let tamper_detected = tampered.packet.validate_integrity().is_err();
+
+    let mut unauthorized = message.clone();
+    unauthorized.packet.channel = CognitiveChannel::Affective;
+    unauthorized.packet.refresh_hashes()?;
+    let unauthorized_blocked = unauthorized.validate(&lease, 1_500).is_err();
+
+    let expired_blocked = message.validate(&lease, 2_000).is_err();
+
+    let expression_blocked = matches!(
+        ExpressionPolicy.evaluate(
+            &ExpressionTarget::Human,
+            symthaea_communication::CapabilityLevel::Structure,
+            &[],
+            None,
+        ),
+        ExpressionDecision::Block(_)
+    );
+
+    let report = BTreeMap::from([
+        ("exact_graph_roundtrip", exact_roundtrip),
+        ("authorization_valid", true),
+        ("first_packet_accepted", accepted == ReplayDecision::Accept),
+        ("exact_replay_detected", duplicate == ReplayDecision::Duplicate),
+        ("tamper_detected", tamper_detected),
+        ("unauthorized_channel_blocked", unauthorized_blocked),
+        ("expired_lease_blocked", expired_blocked),
+        ("insufficient_capability_blocked", expression_blocked),
+    ]);
+
+    println!("{}", serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?);
+    Ok(())
+}
