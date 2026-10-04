@@ -61,8 +61,6 @@ pub enum SscObservationError {
     SystemProfileRealizationMismatch,
     #[error("authorized deployment requires an unobserved NixOS resource")]
     AuthorizedResourceMissing(ResourceRef),
-    #[error("authorized deployment requires an unavailable NixOS capability")]
-    AuthorizedCapabilityUnavailable(Capability),
 }
 
 impl From<std::io::Error> for SscObservationError {
@@ -174,12 +172,6 @@ impl NixSystemObservation {
         for resource in &authorized.plan.intent.required_resources {
             if !observed_resources.contains(resource) {
                 return Err(SscObservationError::AuthorizedResourceMissing(resource.clone()));
-            }
-        }
-
-        for capability in &authorized.authorization.granted_capabilities {
-            if !default_nixos_capabilities().contains(capability) {
-                return Err(SscObservationError::AuthorizedCapabilityUnavailable(*capability));
             }
         }
 
