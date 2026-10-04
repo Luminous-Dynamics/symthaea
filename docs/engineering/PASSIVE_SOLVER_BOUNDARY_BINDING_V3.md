@@ -40,6 +40,17 @@ The realized boundary identity carries:
 
 This makes a solver binding auditable without trusting an opaque solver patch name.
 
+## Complete binding sets
+
+`validate_binding_set` additionally enforces a one-to-one interface↔binding
+mapping and rejects duplicate solver-boundary identities. All bindings in a set
+must reference the same semantic candidate geometry and the same exact candidate
+mesh.
+
+`digest_binding_set` produces a deterministic order-independent identity for the
+validated set, committing to the common candidate identities and every
+per-binding digest.
+
 ## Why this matters
 
 Modern solver meshes bind boundary conditions to concrete boundary entities or
