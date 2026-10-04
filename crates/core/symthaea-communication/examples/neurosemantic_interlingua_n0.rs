@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
 use symthaea_communication::{
-    compare_graphs, drop_last_edge, duplicate_last_edge, graph_hash, rename_identifiers,
-    reorder_collections, ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph,
-    InterlinguaBenchmarkCase, InterlinguaPerturbation,
+    adjust_confidence, compare_graphs, drop_last_edge, duplicate_last_edge, graph_hash,
+    relabel_nodes, rename_identifiers, reorder_collections, ConceptEdge, ConceptKind,
+    ConceptNode, GroundedConceptGraph, InterlinguaBenchmarkCase, InterlinguaPerturbation,
 };
 
 fn fixture() -> GroundedConceptGraph {
@@ -84,6 +84,18 @@ fn main() -> Result<(), String> {
             InterlinguaPerturbation::DuplicateEdge,
             duplicate_last_edge(&expected),
         ),
+        (
+            "relabelled",
+            1006,
+            InterlinguaPerturbation::Relabeled,
+            relabel_nodes(&expected, " (paraphrase)"),
+        ),
+        (
+            "confidence-drift",
+            1007,
+            InterlinguaPerturbation::ConfidenceDrift,
+            adjust_confidence(&expected, 0.05),
+        ),
     ];
 
     let mut report = Vec::with_capacity(cases.len());
@@ -97,8 +109,32 @@ fn main() -> Result<(), String> {
         });
     }
 
-    let expected_hash = graph_hash(&expected)?;
+    let exact_ok = case_is(&report, "exact", |metrics| metrics.structural_equivalence);
+    let reordered_ok = case_is(&report, "reordered", |metrics| metrics.structural_equivalence);
+    let renamed_ok = case_is(&report, "renamed-identifiers", |metrics| metrics.structural_equivalence);
+    let missing_rejected = case_is(&report, "missing-edge", |metrics| {
+        !metrics.structural_equivalence && metrics.edge_recall < 1.0
+    });
+    let duplicate_rejected = case_is(&report, "duplicate-edge", |metrics| {
+        !metrics.structural_equivalence && metrics.edge_precision < 1.0
+    });
+    let relabelled_ok = case_is(&report, "relabelled", |metrics| metrics.structural_equivalence);
+    let confidence_ok = case_is(&report, "confidence-drift", |metrics| {
+        metrics.structural_equivalence && metrics.confidence_mae > 0.0
+    });
 
+    if !(exact_ok
+        && reordered_ok
+        && renamed_ok
+        && missing_rejected
+        && duplicate_rejected
+        && relabelled_ok
+        && confidence_ok)
+    {
+        return Err("interlingua N0 acceptance assertions failed".into());
+    }
+
+    let expected_hash = graph_hash(&expected)?;
     let mut summary = BTreeMap::new();
     summary.insert("benchmark_schema_version", 1_u32);
     summary.insert("cases", report.len() as u32);
@@ -110,15 +146,6 @@ fn main() -> Result<(), String> {
             .count() as u32,
     );
 
-    let exact_ok = report.iter().find(|case_| case_.case_id == "exact").map(|case_| case_.metrics.structural_equivalence).unwrap_or(false);
-    let reordered_ok = report.iter().find(|case_| case_.case_id == "reordered").map(|case_| case_.metrics.structural_equivalence).unwrap_or(false);
-    let renamed_ok = report.iter().find(|case_| case_.case_id == "renamed-identifiers").map(|case_| case_.metrics.structural_equivalence).unwrap_or(false);
-    let missing_rejected = report.iter().find(|case_| case_.case_id == "missing-edge").map(|case_| !case_.metrics.structural_equivalence && case_.metrics.edge_recall < 1.0).unwrap_or(false);
-    let duplicate_rejected = report.iter().find(|case_| case_.case_id == "duplicate-edge").map(|case_| !case_.metrics.structural_equivalence && case_.metrics.edge_precision < 1.0).unwrap_or(false);
-    if !(exact_ok && reordered_ok && renamed_ok && missing_rejected && duplicate_rejected) {
-        return Err("interlingua N0 acceptance assertions failed".into());
-    }
-
     let output = serde_json::json!({
         "benchmark": "neurosemantic-interlingua-n0",
         "claim_boundary": "synthetic_structural_preservation_only",
@@ -127,6 +154,21 @@ fn main() -> Result<(), String> {
         "cases": report,
     });
 
-    println!("{}", serde_json::to_string_pretty(&output).map_err(|e| e.to_string())?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&output).map_err(|e| e.to_string())?
+    );
     Ok(())
+}
+
+fn case_is(
+    report: &[InterlinguaBenchmarkCase],
+    case_id: &str,
+    predicate: impl Fn(&symthaea_communication::InterlinguaMetrics) -> bool,
+) -> bool {
+    report
+        .iter()
+        .find(|case_| case_.case_id == case_id)
+        .map(|case_| predicate(&case_.metrics))
+        .unwrap_or(false)
 }
