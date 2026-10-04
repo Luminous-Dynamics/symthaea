@@ -20,6 +20,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
 pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 1;
 
 /// Typed identifier for the verification relationship under which a verification
@@ -68,6 +69,7 @@ fn is_hex_digest(value: &str) -> bool {
 /// verify one claim while attaching evidence to another representation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationRequest {
+    pub schema_version: u16,
     pub claim_representation_digest: String,
     pub statement_digest: String,
     pub author: ClaimAuthorIdentity,
@@ -132,6 +134,7 @@ impl VerificationRequest {
             .digest();
 
         Ok(Self {
+            schema_version: VERIFICATION_REQUEST_SCHEMA_VERSION,
             claim_representation_digest: claim.canonical_digest(),
             statement_digest,
             author: claim.author.clone(),
@@ -157,6 +160,11 @@ impl VerificationRequest {
     }
 
     pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
+        if self.schema_version != VERIFICATION_REQUEST_SCHEMA_VERSION {
+            return Err(VerificationFailure::Structural(
+                "unsupported verification request schema version".into(),
+            ));
+        }
         if !is_hex_digest(&self.claim_representation_digest) {
             return Err(VerificationFailure::Structural(
                 "claim representation digest must be a 64-character hexadecimal digest".into(),
@@ -332,6 +340,7 @@ impl VerificationEvidence {
             ));
         }
         let request = VerificationRequest {
+            schema_version: VERIFICATION_REQUEST_SCHEMA_VERSION,
             claim_representation_digest: self.claim_representation_digest.clone(),
             statement_digest: self.statement_digest.clone(),
             author: self.author.clone(),
@@ -505,6 +514,7 @@ mod tests {
         )
         .unwrap();
 
+        assert_eq!(request.schema_version, VERIFICATION_REQUEST_SCHEMA_VERSION);
         assert_eq!(request.author.as_str(), "author:verification");
         assert_eq!(
             request.verification_method.as_str(),
@@ -629,6 +639,64 @@ mod tests {
     }
 
     #[test]
+    fn evidence_rejects_controller_document_controller_substitution() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+        )
+        .unwrap();
+
+        let result = VerificationEvidence::from_adapter_attestation(
+            &request,
+            "https://example.test/controller",
+            &"11".repeat(32),
+            ClaimControllerIdentity::new("https://example.test/other").unwrap(),
+            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            "assertionMethod",
+            "ed25519",
+            &"22".repeat(32),
+            &"33".repeat(32),
+        );
+
+        assert!(matches!(
+            result,
+            Err(VerificationFailure::ControllerMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn evidence_rejects_controller_document_method_substitution() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+        )
+        .unwrap();
+
+        let result = VerificationEvidence::from_adapter_attestation(
+            &request,
+            "https://example.test/controller",
+            &"11".repeat(32),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationMethod::new("https://example.test/controller#key-2").unwrap(),
+            "assertionMethod",
+            "ed25519",
+            &"22".repeat(32),
+            &"33".repeat(32),
+        );
+
+        assert!(matches!(
+            result,
+            Err(VerificationFailure::VerificationMethodMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn evidence_changes_when_controller_snapshot_or_claim_changes() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
@@ -655,6 +723,8 @@ mod tests {
             &request,
             "https://example.test/controller",
             &"44".repeat(32),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
