@@ -151,7 +151,10 @@ impl FreshnessAnchorProfile {
     /// capability changes.
     pub fn fingerprint(&self) -> Result<String, serde_json::Error> {
         let bytes = serde_json::to_vec(self)?;
-        Ok(blake3::hash(&bytes).to_hex().to_string())
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:freshness-anchor-profile:v1\\0");
+        hasher.update(&bytes);
+        Ok(hasher.finalize().to_hex().to_string())
     }
 
     pub fn new(
