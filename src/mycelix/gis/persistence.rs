@@ -89,6 +89,94 @@ fn take_len_prefixed(input: &str, cursor: &mut usize) -> Result<String, Persiste
     Ok(value)
 }
 
+fn serialize_resolution(resolution: &IgnoranceResolution) -> String {
+    let mut output = String::from(FRAME_REVISION_FORMAT_VERSION);
+    output.push('|');
+
+    let method = format!("{:?}", resolution.method);
+    let answer = resolution.answer.as_deref().unwrap_or("");
+    let resolved_at = resolution
+        .resolved_at
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        .to_string();
+    for value in [
+        method.as_str(),
+        answer,
+        resolution.confidence.to_string().as_str(),
+        resolution.source.as_str(),
+        resolved_at.as_str(),
+    ] {
+        push_len_prefixed(&mut output, value);
+    }
+    output
+}
+
+fn deserialize_resolution(encoded: &str) -> Result<IgnoranceResolution, PersistenceError> {
+    if let Some(payload) = encoded.strip_prefix("v2|") {
+        let mut cursor = 0usize;
+        let method = StoredIgnoranceRecord::parse_resolution_method(
+            &take_len_prefixed(payload, &mut cursor)?,
+        )?;
+        let answer = take_len_prefixed(payload, &mut cursor)?;
+        let confidence = take_len_prefixed(payload, &mut cursor)?
+            .parse::<f32>()
+            .map_err(|_| PersistenceError::Deserialization(
+                "resolution confidence is not numeric".into(),
+            ))?;
+        let source = take_len_prefixed(payload, &mut cursor)?;
+        let resolved_at = take_len_prefixed(payload, &mut cursor)?
+            .parse::<u64>()
+            .map_err(|_| PersistenceError::Deserialization(
+                "resolution timestamp is not numeric".into(),
+            ))?;
+        if cursor != payload.len() {
+            return Err(PersistenceError::Deserialization(
+                "resolution contains trailing bytes".into(),
+            ));
+        }
+        return Ok(IgnoranceResolution {
+            method,
+            answer: if answer.is_empty() { None } else { Some(answer) },
+            confidence,
+            source,
+            resolved_at: UNIX_EPOCH + Duration::from_secs(resolved_at),
+        });
+    }
+
+    // Legacy five-field format retained for records written before v2 persistence.
+    let parts: Vec<&str> = encoded.split('|').collect();
+    if parts.len() != 5 {
+        return Err(PersistenceError::Deserialization(
+            "legacy resolution has invalid field count".into(),
+        ));
+    }
+    let method = StoredIgnoranceRecord::parse_resolution_method(parts[0])?;
+    let confidence = parts[2]
+        .parse::<f32>()
+        .map_err(|_| PersistenceError::Deserialization(
+            "legacy resolution confidence is not numeric".into(),
+        ))?;
+    let resolved_at = parts[4]
+        .parse::<u64>()
+        .map_err(|_| PersistenceError::Deserialization(
+            "legacy resolution timestamp is not numeric".into(),
+        ))?;
+
+    Ok(IgnoranceResolution {
+        method,
+        answer: if parts[1].is_empty() {
+            None
+        } else {
+            Some(parts[1].to_string())
+        },
+        confidence,
+        source: parts[3].to_string(),
+        resolved_at: UNIX_EPOCH + Duration::from_secs(resolved_at),
+    })
+}
+
 fn serialize_frame_revision(revision: &EpistemicFrameRevision) -> String {
     let mut output = String::from(FRAME_REVISION_FORMAT_VERSION);
     output.push('|');
@@ -285,7 +373,7 @@ pub struct StoredIgnoranceRecord {
     pub domain: String,
     pub eig: f32,
     pub status: String,
-    /// Serialized resolution: "method|answer|confidence|source|timestamp"
+    /// Versioned lossless resolution encoding; legacy five-field records remain readable.
     pub resolution_serialized: Option<String>,
     /// Stable frame identity and revision used to qualify the detection.
     pub frame_id: String,
@@ -316,18 +404,7 @@ impl StoredIgnoranceRecord {
             .as_secs();
 
         // Serialize resolution if present
-        let resolution_serialized = record.resolution.as_ref().map(|r| {
-            let method = format!("{:?}", r.method);
-            let answer = r.answer.clone().unwrap_or_default();
-            let confidence = r.confidence;
-            let source = r.source.clone();
-            let resolved_at = r
-                .resolved_at
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            format!("{method}|{answer}|{confidence}|{source}|{resolved_at}")
-        });
+        let resolution_serialized = record.resolution.as_ref().map(serialize_resolution);
 
         Self {
             id: record.id.clone(),
@@ -368,29 +445,11 @@ impl StoredIgnoranceRecord {
         let updated_at = UNIX_EPOCH + Duration::from_secs(self.updated_at);
 
         // Deserialize resolution if present
-        let resolution = self.resolution_serialized.as_ref().and_then(|s| {
-            let parts: Vec<&str> = s.split('|').collect();
-            if parts.len() >= 5 {
-                let method = Self::parse_resolution_method(parts[0]).ok()?;
-                let answer = if parts[1].is_empty() {
-                    None
-                } else {
-                    Some(parts[1].to_string())
-                };
-                let confidence = parts[2].parse().ok()?;
-                let source = parts[3].to_string();
-                let resolved_at = UNIX_EPOCH + Duration::from_secs(parts[4].parse().ok()?);
-                Some(IgnoranceResolution {
-                    method,
-                    answer,
-                    confidence,
-                    source,
-                    resolved_at,
-                })
-            } else {
-                None
-            }
-        });
+        let resolution = self
+            .resolution_serialized
+            .as_deref()
+            .map(deserialize_resolution)
+            .transpose()?;
 
         let detection = IgnoranceDetection {
             query: self.query.clone(),
@@ -1176,6 +1235,32 @@ mod tests {
         assert!(!impact.causal_model);
         assert!(impact.exclusions);
         assert!(impact.blind_spots);
+    }
+
+    #[test]
+    fn test_resolution_serialization_is_lossless_and_versioned() {
+        let mut record = create_test_record("resolution_delimiter", "Resolved", 0.7);
+        record.resolution = Some(IgnoranceResolution {
+            method: ResolutionMethod::UserProvided,
+            answer: Some("answer|with|pipes".to_string()),
+            confidence: 0.91,
+            source: "source|with|pipes".to_string(),
+            resolved_at: UNIX_EPOCH + Duration::from_secs(42),
+        });
+
+        let stored = StoredIgnoranceRecord::from_record(&record);
+        assert!(stored.resolution_serialized.as_deref().unwrap().starts_with("v2|"));
+        let restored = stored.to_record().unwrap();
+        assert_eq!(restored.resolution, record.resolution);
+    }
+
+    #[test]
+    fn test_corrupt_v2_resolution_fails_closed() {
+        let mut record = create_test_record("corrupt_resolution", "Corrupt", 0.4);
+        record.resolution_serialized = Some("v2|6:Unknown".to_string());
+
+        let error = record.to_record().unwrap_err();
+        assert!(matches!(error, PersistenceError::Deserialization(_)));
     }
 
     #[test]
