@@ -234,6 +234,16 @@ The research API records these quantities as first-class fields:
 Cardinalities are stored symbolically as exact powers of two, so large search spaces are never truncated by machine integer overflow. The target-specific multiplicity API returns the same fiber cardinality for every representable target and returns no factorization for a target outside the union span.
 
 ### Kernel-basis ambiguity certificate
+### Affine-fiber certificate
+
+For a representable target, `factorization_affine_fiber` now packages one deterministic coefficient representative, the complete kernel basis, and the exact fiber cardinality in one object. Any alternate factorization is obtained by XORing the representative with a GF(2) mask over the kernel basis.
+
+This makes the theorem boundary explicit in the API itself:
+
+`target in image` -> `affine fiber exists` -> `fiber cardinality = 2^d` -> `kernel basis gives the d ambiguity directions`.
+
+The certificate does not enumerate the exponentially large fiber by default. Bounded qualification tests may enumerate it explicitly; paper-scale qualification remains symbolic while still committing the certificate geometry into the deterministic digest.
+
 
 The comparator now exposes the complete kernel basis of the factor-to-bound map, not only its dimension or a single dependency witness.
 
