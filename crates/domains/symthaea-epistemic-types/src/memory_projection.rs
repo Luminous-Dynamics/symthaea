@@ -113,11 +113,14 @@ impl CanonicalAdmissionReceipt {
         if frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
             return Err("frontier reference must be non-empty when present");
         }
-        if provenance_snapshot_digest.trim().is_empty() {
-            return Err("provenance snapshot digest must be non-empty");
+        if !is_hex_digest(&provenance_snapshot_digest) {
+            return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
         }
-        if validator_version.trim().is_empty() {
-            return Err("validator version must be non-empty");
+        if validator_version != PROVENANCE_VALIDATOR_VERSION {
+            return Err("admission receipt validator version mismatch");
+        }
+        if snapshot_schema_version != PROVENANCE_SNAPSHOT_SCHEMA_VERSION {
+            return Err("admission receipt snapshot schema version mismatch");
         }
         Ok(Self {
             admission_event,
@@ -612,6 +615,22 @@ mod tests {
             Err("provenance validator version mismatch")
         );
         assert!(!receipt.binds_validation(&forged_validator));
+
+        assert!(CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            Some("frontier:1".into()),
+            validation.snapshot_digest.clone(),
+            "attacker-defined-v999",
+            PROVENANCE_SNAPSHOT_SCHEMA_VERSION,
+        ).is_err());
+
+        assert!(CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            Some("frontier:1".into()),
+            validation.snapshot_digest.clone(),
+            PROVENANCE_VALIDATOR_VERSION,
+            PROVENANCE_SNAPSHOT_SCHEMA_VERSION + 1,
+        ).is_err());
 
         let mut forged_receipt = receipt.clone();
         forged_receipt.validator_version = "attacker-defined-v999".into();
