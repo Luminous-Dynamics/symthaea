@@ -475,25 +475,21 @@ pub struct AuthorizationConsumption {
 }
 
 impl AuthorizationConsumption {
-    /// Derive the exact consumption record from validated authorization
-    /// evidence. This constructor performs no persistence and consumes nothing.
-    pub fn for_authorization(
-        authorization: &AuthorizationEvidence,
+    /// Derive the exact consumption record from a validated authorized plan.
+    /// This constructor performs validation but no persistence and consumes nothing.
+    pub fn for_authorized_plan(
+        authorized: &AuthorizedDeploymentPlan,
         consumed_at_ms: u64,
     ) -> Result<Self, PlanValidationError> {
-        if authorization.authority_id.is_empty() {
-            return Err(PlanValidationError::EmptyAuthority);
-        }
-        if authorization.nonce.is_empty() {
-            return Err(PlanValidationError::EmptyNonce);
-        }
+        authorized.validate(consumed_at_ms)?;
 
         Ok(Self {
-            authorization_digest: authorization
+            authorization_digest: authorized
+                .authorization
                 .digest()
                 .map_err(PlanValidationError::Serialization)?,
-            authority_id: authorization.authority_id.clone(),
-            nonce: authorization.nonce.clone(),
+            authority_id: authorized.authorization.authority_id.clone(),
+            nonce: authorized.authorization.nonce.clone(),
             consumed_at_ms,
         })
     }
@@ -2171,8 +2167,9 @@ mod tests {
     fn authorization_consumption_binds_exact_digest_and_nonce() {
         let plan = sample_plan();
         let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth.clone(), 150).expect("authorized plan");
         let consumption =
-            AuthorizationConsumption::for_authorization(&auth, 151).expect("consumption");
+            AuthorizationConsumption::for_authorized_plan(&authorized, 151).expect("consumption");
         assert_eq!(consumption.authority_id, auth.authority_id);
         assert_eq!(consumption.nonce, auth.nonce);
         assert_eq!(consumption.authorization_digest, auth.digest().expect("auth digest"));
@@ -2185,15 +2182,32 @@ mod tests {
         let mut auth = authorization_for(&plan);
         auth.nonce.clear();
         assert_eq!(
-            AuthorizationConsumption::for_authorization(&auth, 151),
+            plan.clone().authorize(auth.clone(), 151),
             Err(PlanValidationError::EmptyNonce)
         );
 
         auth.nonce = "nonce-1".into();
         auth.authority_id.clear();
         assert_eq!(
-            AuthorizationConsumption::for_authorization(&auth, 151),
+            plan.authorize(auth, 151),
             Err(PlanValidationError::EmptyAuthority)
+        );
+    }
+
+    #[test]
+    fn authorization_consumption_requires_current_valid_authorization() {
+        let mut plan = sample_plan();
+        plan.expires_at_ms = Some(150);
+        let auth = authorization_for(&plan);
+        let authorized = plan
+            .authorize(auth, 150)
+            .expect("authorization at exact expiry");
+        assert!(
+            AuthorizationConsumption::for_authorized_plan(&authorized, 150).is_ok()
+        );
+        assert_eq!(
+            AuthorizationConsumption::for_authorized_plan(&authorized, 151),
+            Err(PlanValidationError::IntentExpired)
         );
     }
 
@@ -2239,8 +2253,9 @@ mod tests {
 
         let plan = sample_plan();
         let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth.clone(), 150).expect("authorized plan");
         let consumption =
-            AuthorizationConsumption::for_authorization(&auth, 151).expect("consumption");
+            AuthorizationConsumption::for_authorized_plan(&authorized, 151).expect("consumption");
 
         let mut store = InMemoryStore::default();
         assert!(store.consume_once(&consumption).is_ok());
@@ -2249,10 +2264,10 @@ mod tests {
             Err(StoreError::AlreadyConsumed)
         );
 
-        let mut altered = auth.clone();
-        altered.valid_from_ms = Some(149);
+        let mut altered = authorized.clone();
+        altered.authorization.valid_from_ms = Some(149);
         let altered_consumption =
-            AuthorizationConsumption::for_authorization(&altered, 151).expect("altered");
+            AuthorizationConsumption::for_authorized_plan(&altered, 151).expect("altered");
         assert_ne!(
             altered_consumption.authorization_digest,
             consumption.authorization_digest
