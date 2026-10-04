@@ -9,7 +9,7 @@
 use symthaea_swarm::semantic_evidence_vds::{
     Rfc9942Es256CoseKey, Rfc9942ReceiptEnvelope, Rfc9942ReceiptPayload,
     Rfc9942SignaturePayload, Rfc9942SignatureWithReceipts, Rfc9942Vdp,
-    Rfc9942ProofKind, Rfc9942VdpError, Rfc9162InclusionProof,
+    Rfc9942ProofKind, Rfc9942VdpError, Rfc9942ReceiptCollection, Rfc9162InclusionProof,
     COSE_ES256_ALGORITHM_ID, MAX_CBOR_BSTR_CHUNKS, MAX_CBOR_TSTR_CHUNKS,
 };
 
@@ -309,7 +309,7 @@ fn receipt_accepts_unknown_unprotected_extension_and_round_trips() {
 
 #[test]
 fn outer_cose_accepts_large_tagged_opaque_extension_and_round_trips() {
-    let payload = vec![0x5a, 0x00, 0x00, 0x10, 0x01];
+    let mut payload = vec![0x5a, 0x00, 0x00, 0x10, 0x01];
     payload.extend_from_slice(&[0xaa; 4097]);
     let protected = vec![0xa0];
     let mut unprotected = vec![0xa1, 0x18, 0x1e, 0xd8, 0x18];
