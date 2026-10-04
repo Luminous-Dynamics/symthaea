@@ -451,6 +451,28 @@ mod tests {
     }
 
     #[test]
+    fn combined_governed_evidence_rejects_incomplete_capability_projection() {
+        let properties = concat!(
+            "Id=nginx.service\n",
+            "Names=nginx.service\n",
+            "LoadState=loaded\n",
+            "ActiveState=active\n",
+            "SubState=running\n",
+            "UnitFileState=enabled\n",
+            "CanStart=yes\n",
+            "CanStop=yes\n",
+        );
+
+        let error = ServiceManager::parse_governed_observation_with_evidence(
+            "nginx.service",
+            properties,
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("CanReload"));
+    }
+
+    #[test]
     fn combined_governed_evidence_commits_to_one_pre_state() {
         let properties = concat!(
             "Id=nginx.service\n",
