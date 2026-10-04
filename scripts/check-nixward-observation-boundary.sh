@@ -401,6 +401,12 @@ run_self_test() {
     return 1
   fi
 
+  printf '%s\n' 'pub(super) fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-super-parser.rs"
+  if rg -n --pcre2 "${OBSERVATION_CRATE_WIDE_FACTORY_PATTERN}" "${tmp}/observed-state-super-parser.rs"; then
+    echo "ERROR: CROSS-027 self-test falsely rejected pub(super) observation parser visibility" >&2
+    return 1
+  fi
+
   printf '%s\n' 'pub(crate) fn parse_systemd_properties(...) {}' > "${tmp}/observed-state-crate-wide-parser.rs"
   if rg -n --pcre2 "${OBSERVATION_CRATE_WIDE_FACTORY_PATTERN}" "${tmp}/observed-state-crate-wide-parser.rs"; then :; else
     echo "ERROR: CROSS-027 self-test failed to detect crate-wide observation parser visibility" >&2
