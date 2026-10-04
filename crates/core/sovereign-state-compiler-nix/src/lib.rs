@@ -384,6 +384,9 @@ impl TargetAdapter for NixOSTargetAdapter {
         {
             return Err(NixOSAdapterError::ApplicationMutationScopeRequired);
         }
+        if home_manager {
+            return Err(NixOSAdapterError::HomeManagerMutationScopeRequired);
+        }
         let reboot = Self::property_bool(intent, REBOOT_KEY)?.unwrap_or(false);
         let rollback_requested = Self::property_bool(intent, ROLLBACK_KEY)?.unwrap_or(false);
         let rollback_generation = Self::property_u64(intent, ROLLBACK_GENERATION_KEY)?;
@@ -538,8 +541,7 @@ impl TargetAdapter for NixOSTargetAdapter {
         // has no prior deployment state to compensate, and a rollback plan
         // must not self-authorize an additional rollback capability.
         let rollback_eligible = !rollback_requested
-            && (activation_mode.is_some_and(NixActivationMode::mutates_target_state)
-                || home_manager);
+            && activation_mode.is_some_and(NixActivationMode::mutates_target_state);
         let rollback_allowed = rollback_eligible
             && self
                 .snapshot
@@ -612,6 +614,8 @@ pub enum NixOSAdapterError {
     ArtifactsRequireRealization,
     #[error("application mutation requires an explicit user-profile resource binding")]
     ApplicationMutationScopeRequired,
+    #[error("Home Manager mutation requires an explicit user-profile resource binding")]
+    HomeManagerMutationScopeRequired,
     #[error("requested NixOS transition has ambiguous post-state semantics")]
     ConflictingTransitionSemantics,
     #[error("compiled plan violates neutral compiler invariants: {0}")]
@@ -1309,6 +1313,19 @@ mod tests {
         );
     }
 
+    #[test]
+    fn home_manager_mutation_requires_user_profile_scope() {
+        let mut intent = DeploymentIntent::new("home-manager-scope", "host-01");
+        intent
+            .desired_state
+            .properties
+            .insert(HOME_MANAGER_KEY.into(), StateValue::Bool(true));
+
+        assert_eq!(
+            adapter().compile(&intent),
+            Err(NixOSAdapterError::HomeManagerMutationScopeRequired)
+        );
+    }
     #[test]
     fn activation_modes_reject_ambiguous_compositions() {
         let mut dry = DeploymentIntent::new("dry-install", "host-01");
