@@ -668,6 +668,8 @@ fn basis_rank_counted(
 pub struct LinearCodeDependencyWitness {
     pub generator_coefficients: Vec<bool>,
     pub factor_support: Vec<usize>,
+    /// The first generator index whose addition created this kernel witness.
+    pub dependent_generator_index: usize,
 }
 
 impl LinearCodeDependencyWitness {
@@ -698,6 +700,8 @@ impl LinearCodeDependencyWitness {
         let total_rank = factors.iter().map(|factor| factor.rank()).sum::<usize>();
         if self.generator_coefficients.len() != total_rank
             || self.generator_coefficients.iter().all(|bit| !*bit)
+            || self.dependent_generator_index >= total_rank
+            || !self.generator_coefficients[self.dependent_generator_index]
         {
             return false;
         }
@@ -830,6 +834,7 @@ pub fn factorization_kernel_basis(
                 let witness = LinearCodeDependencyWitness {
                     generator_coefficients: coefficients,
                     factor_support,
+                    dependent_generator_index: current_index,
                 };
                 if !witness.verifies_against(factors) {
                     return None;
@@ -953,6 +958,7 @@ mod tests {
         let witness = &first[0];
         assert_eq!(witness.generator_coefficients, vec![true, true, true]);
         assert_eq!(witness.factor_support, vec![0, 1, 2]);
+        assert_eq!(witness.dependent_generator_index, 2);
         assert_eq!(witness.generator_support_size(), 3);
         assert_eq!(witness.factor_support_size(), 3);
         assert!(witness.verifies_against(&factors));
