@@ -42,6 +42,7 @@ use super::{
 // ============================================================================
 
 const FRAME_REVISION_FORMAT_VERSION: &str = "v2";
+const RESOLUTION_FORMAT_VERSION: &str = "v2";
 
 fn push_len_prefixed(output: &mut String, value: &str) {
     use std::fmt::Write as _;
@@ -90,7 +91,7 @@ fn take_len_prefixed(input: &str, cursor: &mut usize) -> Result<String, Persiste
 }
 
 fn serialize_resolution(resolution: &IgnoranceResolution) -> String {
-    let mut output = String::from(FRAME_REVISION_FORMAT_VERSION);
+    let mut output = String::from(RESOLUTION_FORMAT_VERSION);
     output.push('|');
 
     let method = format!("{:?}", resolution.method);
