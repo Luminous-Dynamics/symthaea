@@ -755,7 +755,7 @@ mod tests {
                         NodeKind::Group { id } if id.as_deref() == Some(wanted)
                     )
                 })
-                .unwrap_or_else(|| panic!("missing group {wanted}"))
+                .unwrap_or_else(move || panic!("missing group {wanted}"))
         };
 
         assert!(
