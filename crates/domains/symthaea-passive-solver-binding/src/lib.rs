@@ -760,6 +760,10 @@ pub fn select_boundary_patch(
     if !tolerance_mm.is_finite() || tolerance_mm < 0.0 {
         return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
     }
+    let radius_mm = interface.radius_mm() as f64;
+    if !radius_mm.is_finite() || radius_mm <= 0.0 || tolerance_mm >= radius_mm {
+        return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
+    }
 
     let report = symthaea_fabrication_kernel::validate::validate_mesh(candidate);
     if !report.is_valid() {
@@ -1695,6 +1699,21 @@ mod tests {
 
         assert_eq!(
             select_boundary_patch(&interface, &mesh, 0.0001),
+            Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface)
+        );
+    }
+
+    #[test]
+    fn aperture_tolerance_cannot_equal_or_exceed_aperture_radius() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+
+        assert_eq!(
+            select_boundary_patch(&interface, &candidate, 2.0),
+            Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface)
+        );
+        assert_eq!(
+            select_boundary_patch(&interface, &candidate, 2.0001),
             Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface)
         );
     }
