@@ -8,6 +8,7 @@ use symthaea_passive_void_graph::{FunctionalVoidGraph, PortId};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PortPathStatus {
     InvalidMesh,
+    UndeclaredPath,
     AnchorNotRepresented(PortId),
     AmbiguousAnchor(PortId),
     Disconnected,
@@ -38,6 +39,15 @@ pub fn evaluate_port_path(
             physical_transport_unproven: true,
         };
     }
+    if !graph.declares_path(from, to, symthaea_passive_void_graph::VoidRelation::FlowPath) {
+        return PortPathEvidence {
+            status: PortPathStatus::UndeclaredPath,
+            from_component: None,
+            to_component: None,
+            physical_transport_unproven: true,
+        };
+    }
+
     let report = validate_mesh(candidate);
     if !report.is_valid() || !report.is_watertight {
         return PortPathEvidence {
@@ -228,6 +238,7 @@ fn _keep_report_type(_: &ValidationReport, _: &ConnectivityStatus) {}
 mod tests {
     use super::*;
     use symthaea_fabrication_kernel::csg::{CSGNode, Transform3D};
+    use symthaea_fabrication_kernel::mesh::resolve_to_mesh;
     use symthaea_passive_void_compiler::{GeometryEmbedding, PortAnchor};
 
     fn graph() -> FunctionalVoidGraph {
@@ -321,3 +332,4 @@ mod tests {
         assert_eq!(evidence.status, PortPathStatus::Disconnected);
     }
 }
+
