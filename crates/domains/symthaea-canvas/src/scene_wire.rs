@@ -19,6 +19,7 @@ const MAX_PATH_BYTES: usize = 12 * 1024;
 const MAX_SCENE_BYTES: usize = 128 * 1024;
 const MAX_ABS_COORDINATE: f32 = 1_000_000.0;
 const MAX_ABS_SCALE: f32 = 8.0;
+const MIN_RENDERABLE_LINE_LENGTH: f64 = 1e-6;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct WireTransform {
@@ -338,7 +339,7 @@ fn validate_node(node: &WireNode, depth: usize, count: &mut usize) -> bool {
                 && valid_coordinate(*y1)
                 && valid_coordinate(*x2)
                 && valid_coordinate(*y2)
-                && (*x1 != *x2 || *y1 != *y2)
+                && line_is_renderable(*x1, *y1, *x2, *y2)
         }
         WirePrimitive::Polygon { points, closed } => {
             ((!*closed && points.len() >= 2) || (*closed && points.len() >= 3))
@@ -573,6 +574,13 @@ fn valid_positive(value: f32) -> bool {
     valid_nonnegative(value) && value > 0.0
 }
 
+fn line_is_renderable(x1: f32, y1: f32, x2: f32, y2: f32) -> bool {
+    let dx = f64::from(x2) - f64::from(x1);
+    let dy = f64::from(y2) - f64::from(y1);
+    let length = dx.mul_add(dx, dy * dy).sqrt();
+    length.is_finite() && length > MIN_RENDERABLE_LINE_LENGTH
+}
+
 fn valid_color(color: Color) -> bool {
     [color.r, color.g, color.b, color.a]
         .into_iter()
@@ -722,6 +730,25 @@ mod tests {
             },
         };
         assert!(!zero_line.is_supported());
+
+        let tiny_line = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Line {
+                    x1: 0.0,
+                    y1: 0.0,
+                    x2: 1e-7,
+                    y2: 0.0,
+                },
+                transform: WireTransform::default(),
+                style: WireStyle {
+                    stroke: Some(Color::rgb(1.0, 1.0, 1.0)),
+                    ..WireStyle::default()
+                },
+                children: Vec::new(),
+            },
+        };
+        assert!(!tiny_line.is_supported());
 
         let zero_rect = RemoteScene {
             version: RemoteScene::VERSION,
