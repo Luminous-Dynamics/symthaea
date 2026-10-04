@@ -24,6 +24,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Pull requests run evidence against the immutable PR head, not GitHub's synthetic merge ref.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       - uses: dtolnay/rust-toolchain@1.96.0
       - uses: Swatinem/rust-cache@v2
       - name: Test communication contracts and execute N0 evidence labs
