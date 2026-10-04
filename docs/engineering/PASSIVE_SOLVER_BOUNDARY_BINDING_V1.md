@@ -10,9 +10,9 @@ or another vendor API.
 A concrete adapter implements SolverBoundaryBindingAdapter and must:
 
 1. receive the exact PortInterface;
-2. resolve that interface against the exact candidate geometry artifact;
+2. inspect the exact candidate mesh supplied to the adapter;
 3. select the actual solver boundary entity or patch;
-4. return the solver-specific external handle;
+4. resolve the selected geometry to the solver-specific boundary entity;
 5. return a digest of the exact realized boundary selection.
 
 The resulting SolverBoundaryBinding records:
