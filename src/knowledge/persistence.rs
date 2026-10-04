@@ -273,8 +273,13 @@ impl KnowledgeSnapshotValidationReceipt {
         if self.validation_event.trim().is_empty() {
             return Err("Snapshot validation event must be non-empty".into());
         }
-        if self.snapshot_digest_hex.trim().is_empty() {
-            return Err("Snapshot validation digest must be non-empty".into());
+        if self.generation == 0 {
+            return Err("Snapshot validation generation must be positive".into());
+        }
+        if !is_hex_digest(&self.snapshot_digest_hex) {
+            return Err(
+                "Snapshot validation digest must be a 64-character hexadecimal digest".into(),
+            );
         }
         if self.validator_ref.trim().is_empty() {
             return Err("Snapshot validator reference must be non-empty".into());
@@ -7871,6 +7876,34 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_validation_receipt_rejects_invalid_snapshot_digest() {
+        let mut validation = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:snapshot-digest".into(),
+            generation: 0,
+            snapshot_digest_hex: "a".repeat(64),
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: None,
+        };
+
+        let err = validation.validate_input().unwrap_err();
+        assert_eq!(err, "Snapshot validation generation must be positive");
+
+        validation.generation = 1;
+        validation.snapshot_digest_hex = "g".repeat(64);
+        let err = validation.validate_input().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot validation digest must be a 64-character hexadecimal digest"
+        );
+
+        validation.snapshot_digest_hex = "a".repeat(64);
+        assert!(validation.validate_input().is_ok());
     }
 
     #[test]
