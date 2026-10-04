@@ -3253,6 +3253,63 @@ mod tests {
     }
 
     #[test]
+    fn report_with_context_cannot_rebind_execution_identity() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let report = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        )
+        .verify_report(&envelope, &receipt);
+
+        let mut supplied = VerificationContext::from_report(&report)
+            .with_evaluator_identity_fingerprint("evaluator-1")
+            .with_trust_root_fingerprint("trust-root-1")
+            .with_authorization_policy_fingerprint("authz-policy-1");
+        supplied.policy_fingerprint = "attacker-policy".into();
+        supplied.verifier_id = "attacker-verifier";
+        supplied.environment_fingerprint = "attacker-environment".into();
+        supplied.procedure_fingerprint = "attacker-procedure".into();
+        supplied.evaluated_at_unix_ns = 999;
+
+        let evaluation = EvidenceEvaluation::from_report_with_context(&report, supplied);
+
+        assert_eq!(
+            evaluation.context.policy_fingerprint,
+            report.policy_fingerprint
+        );
+        assert_eq!(
+            evaluation.context.verifier_id,
+            VERIFIER_IMPLEMENTATION_ID
+        );
+        assert_eq!(
+            evaluation.context.environment_fingerprint,
+            report.environment_fingerprint
+        );
+        assert_eq!(
+            evaluation.context.procedure_fingerprint,
+            report.procedure_fingerprint
+        );
+        assert_eq!(
+            evaluation.context.evaluated_at_unix_ns,
+            report.evaluated_at_unix_ns
+        );
+        assert_eq!(
+            evaluation.context.evaluator_identity_fingerprint.as_deref(),
+            Some("evaluator-1")
+        );
+        assert_eq!(
+            evaluation.context.trust_root_fingerprint.as_deref(),
+            Some("trust-root-1")
+        );
+        assert_eq!(
+            evaluation.context.authorization_policy_fingerprint.as_deref(),
+            Some("authz-policy-1")
+        );
+        assert!(evaluation.is_consistent_with_report(&report));
+    }
+
+    #[test]
     fn evidence_evaluation_self_validation_rejects_internal_mutation() {
         let (envelope, signing_key, receipt) = envelope_and_key();
         let report = Ed25519ReceiptVerifier::new(
