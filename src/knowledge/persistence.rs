@@ -2117,7 +2117,7 @@ fn verify_table_column_contract(
     for (column, expected_type, expected_pk) in expected {
         let (_, actual_type, actual_pk) = actual
             .iter()
-            .find(|(name, _, _, _)| name == column)
+            .find(|(name, _, _)| name == column)
             .ok_or_else(|| {
                 format!("Schema integrity check failed: missing column {column} on {table}")
             })?;
