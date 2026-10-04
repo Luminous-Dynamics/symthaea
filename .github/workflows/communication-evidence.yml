@@ -40,6 +40,7 @@ jobs:
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_n0.json
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_generalization_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_generalization_n0.json
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_adversarial_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_adversarial_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_calibration_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_calibration_n0.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -103,6 +104,22 @@ jobs:
               assert case["edge_recall"] == 1.0
               assert case["node_selection_margin"] >= 0.05
               assert case["edge_selection_margin"] >= 0.05
+
+          calibration_identity = json.loads(Path("target/communication-evidence/neurosemantic_hdc_grounded_identity_calibration_n0.json").read_text())
+          assert calibration_identity["benchmark_schema_version"] == 1
+          assert calibration_identity["execution_revision"] != ""
+          assert calibration_identity["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
+          assert calibration_identity["claim_boundary"] == "empirical_clean_calibration_disjoint_evaluation_and_null_abstention_only"
+          assert calibration_identity["calibration"]["cases"] == 3
+          assert calibration_identity["calibration"]["lower_quantile"] == 0.10
+          assert calibration_identity["calibration"]["calibrated_min_score"] >= calibration_identity["calibration"]["baseline_min_score"]
+          assert calibration_identity["calibration"]["calibrated_min_margin"] >= calibration_identity["calibration"]["baseline_min_margin"]
+          assert calibration_identity["evaluation"]["cases"] == 2
+          assert calibration_identity["evaluation"]["all_exact"] is True
+          assert calibration_identity["null_test"]["samples"] == 12
+          assert calibration_identity["null_test"]["abstentions"] == 12
+          assert calibration_identity["null_test"]["accepted"] == 0
+          assert calibration_identity["guarantee_boundary"] == "empirical_only; no distribution_free_or_conformal_coverage_claim"
 
           grounded_identity = json.loads(Path("target/communication-evidence/neurosemantic_hdc_grounded_identity_n0.json").read_text())
           assert grounded_identity["benchmark_schema_version"] == 1
