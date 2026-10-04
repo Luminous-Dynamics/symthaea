@@ -163,6 +163,18 @@ fn oversized_inclusion_proof_wire() -> Vec<u8> {
 }
 
 #[test]
+fn rfc9942_vdp_accepts_more_than_generic_64_item_array_cap() {
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let proofs = (0..65).map(|_| proof.clone()).collect::<Vec<_>>();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, proofs)
+        .expect("65 proofs are within the RFC9942 implementation bound");
+    let wire = vdp.to_cbor();
+    let parsed = Rfc9942Vdp::from_cbor(&wire)
+        .expect("VDP proof array must not inherit the generic 64-item opaque array cap");
+    assert_eq!(parsed.proofs().len(), 65);
+}
+
+#[test]
 fn rfc9942_vdp_accepts_proof_bstr_above_generic_skip_value_cap() {
     let proof = oversized_inclusion_proof_wire();
     assert!(proof.len() > 4096);
