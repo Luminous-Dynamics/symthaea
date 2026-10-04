@@ -13,8 +13,10 @@ The key distinction is:
 The relay `probe_hardware` currently reports:
 
 - `tpm2_available`, based on `/dev/tpmrm0` presence;
+- `tpm2_spec_major`, when the TPM sysfs version observation is readable;
 - EFI availability;
 - Secure Boot state;
+- `measured_uki`, when `bootctl` reports a measured UKI;
 - firmware Setup Mode;
 - architecture and other hardware observations.
 
@@ -56,6 +58,7 @@ A useful future normalized handoff is an observation bundle containing:
 - TPM specification major version;
 - Secure Boot state;
 - measured-UKI state;
+- EFI availability and firmware Setup Mode;
 - TPM event-log availability;
 - selected TPM device path;
 - explicit deployment policy for the expected attestation key and NV counter.
