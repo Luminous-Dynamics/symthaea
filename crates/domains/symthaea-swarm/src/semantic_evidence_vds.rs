@@ -2120,13 +2120,19 @@ impl<'a> CborReader<'a> {
         self.offset+=1;
         if initial>>5!=5 { return Err(Rfc9162ProofDecodeError::InvalidEncoding); }
         let ai=initial&0x1f;
+        let header_limit_end = map_start
+            .saturating_add(max_total_bytes)
+            .min(self.bytes.len());
+        if self.offset > header_limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
         let count=match ai {
             31 => None,
             0..=23 => Some(ai as usize),
-            24 => Some(usize::try_from(self.read_uint(1,24)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
-            25 => Some(usize::try_from(self.read_uint(2,256)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
-            26 => Some(usize::try_from(self.read_uint(4,65_536)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
-            27 => Some(usize::try_from(self.read_uint(8,4_294_967_296)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            24 => Some(usize::try_from(self.read_uint_bounded(1,header_limit_end)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            25 => Some(usize::try_from(self.read_uint_bounded(2,header_limit_end)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            26 => Some(usize::try_from(self.read_uint_bounded(4,header_limit_end)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
+            27 => Some(usize::try_from(self.read_uint_bounded(8,header_limit_end)?).map_err(|_|Rfc9162ProofDecodeError::InvalidStructure)?),
             _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
         };
 
@@ -3961,6 +3967,30 @@ mod tests {
             .chain([0x33; 32])
             .collect::<Vec<_>>();
         assert_eq!(consistency.to_cbor(), expected);
+    }
+
+    #[test]
+    fn cbor_bounded_map_counts_length_header_against_aggregate_limit() {
+        // 0xb8 0x00 is a valid definite-length empty map whose count uses one
+        // additional length byte. A one-byte aggregate budget covers only the
+        // initial map byte and must therefore fail closed.
+        let wire = vec![0xb8, 0x00];
+
+        let mut rejected = CborReader::new(&wire);
+        assert_eq!(
+            rejected.read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 1),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+        assert_eq!(rejected.offset, 1);
+
+        let mut accepted = CborReader::new(&wire);
+        assert!(
+            accepted
+                .read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 2)
+                .unwrap()
+                .is_empty()
+        );
+        accepted.finish().unwrap();
     }
 
     #[test]
