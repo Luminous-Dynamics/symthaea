@@ -622,18 +622,16 @@ impl InMemoryPersistence {
             .cloned()
             .unwrap_or_default();
         ids.iter()
-            .filter_map(|id| self.get_ignorance_record(id).ok())
-            .collect::<Vec<_>>()
-            .pipe(Ok)
+            .map(|id| self.get_ignorance_record(id))
+            .collect::<Result<Vec<_>, _>>()
     }
 
     /// Query records by status
     pub fn query_by_status(&self, status: &str) -> Result<Vec<IgnoranceRecord>, PersistenceError> {
         let ids = self.status_index.get(status).cloned().unwrap_or_default();
         ids.iter()
-            .filter_map(|id| self.get_ignorance_record(id).ok())
-            .collect::<Vec<_>>()
-            .pipe(Ok)
+            .map(|id| self.get_ignorance_record(id))
+            .collect::<Result<Vec<_>, _>>()
     }
 
     /// Query records by EIG range
@@ -645,18 +643,16 @@ impl InMemoryPersistence {
         self.ignorance_records
             .values()
             .filter(|r| r.eig >= min && r.eig <= max)
-            .filter_map(|r| r.to_record().ok())
-            .collect::<Vec<_>>()
-            .pipe(Ok)
+            .map(StoredIgnoranceRecord::to_record)
+            .collect::<Result<Vec<_>, _>>()
     }
 
     /// Get all records
     pub fn get_all_records(&self) -> Result<Vec<IgnoranceRecord>, PersistenceError> {
         self.ignorance_records
             .values()
-            .filter_map(|r| r.to_record().ok())
-            .collect::<Vec<_>>()
-            .pipe(Ok)
+            .map(StoredIgnoranceRecord::to_record)
+            .collect::<Result<Vec<_>, _>>()
     }
 
     /// Count records by status
@@ -1017,6 +1013,35 @@ mod tests {
         let mid = db.query_by_eig_range(0.3, 0.7).unwrap();
         assert_eq!(mid.len(), 1);
         assert_eq!(mid[0].id, "mid_1");
+    }
+
+    #[test]
+    fn test_corrupt_persisted_record_is_visible_to_queries() {
+        let mut db = InMemoryPersistence::new();
+        let record = create_test_record("corrupt_query", "Corrupt query", 0.5);
+        db.store_ignorance_record(&record).unwrap();
+
+        db.ignorance_records
+            .get_mut("corrupt_query")
+            .unwrap()
+            .frame_revisions_serialized = vec!["v2|4:gis-default".to_string()];
+
+        assert!(matches!(
+            db.query_by_category("General").unwrap_err(),
+            PersistenceError::Deserialization(_)
+        ));
+        assert!(matches!(
+            db.query_by_status("Active").unwrap_err(),
+            PersistenceError::Deserialization(_)
+        ));
+        assert!(matches!(
+            db.query_by_eig_range(0.0, 1.0).unwrap_err(),
+            PersistenceError::Deserialization(_)
+        ));
+        assert!(matches!(
+            db.get_all_records().unwrap_err(),
+            PersistenceError::Deserialization(_)
+        ));
     }
 
     #[test]
