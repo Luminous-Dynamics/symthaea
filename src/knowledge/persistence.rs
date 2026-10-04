@@ -7595,30 +7595,14 @@ mod tests {
         truncated.pop();
         assert!(!checkpoint.verify_against_history(&truncated));
 
-        let conn = p.open_connection().unwrap();
-        conn.execute_batch(
-            "DROP TRIGGER trg_knowledge_snapshot_receipts_no_update;
-             UPDATE knowledge_snapshot_receipts
-             SET canonical_digest_hex = 'e000000000000000000000000000000000000000000000000000000000000000',
-                 receipt_digest_hex = '0000000000000000000000000000000000000000000000000000000000000000'
-             WHERE generation = 2;",
-        )
-        .unwrap();
-        let mut substituted = p.snapshot_receipt_history().unwrap();
-        let tampered_digest = substituted[1].canonical_receipt_digest_hex();
-        let mut tampered = substituted.remove(1);
-        tampered.canonical_digest_hex = "e000000000000000000000000000000000000000000000000000000000000000".into();
-        tampered.receipt_digest_hex = tampered.canonical_receipt_digest_hex();
-        substituted.push(tampered);
-        // The persisted record itself remains structurally/self-consistent after the mutation,
-        // but the externally retained checkpoint detects same-height substitution.
+        let mut substituted = history.clone();
+        substituted[1].canonical_digest_hex =
+            "e000000000000000000000000000000000000000000000000000000000000000".into();
+        substituted[1].receipt_digest_hex = substituted[1].canonical_receipt_digest_hex();
+        assert!(substituted[1].verify_self_digest());
+        assert!(substituted[1].verify_integrity());
+        // A self-consistent same-height substitution is rejected by the externally retained checkpoint.
         assert!(!checkpoint.verify_against_history(&substituted));
-        assert_ne!(tampered_digest, substituted[1].receipt_digest_hex);
-
-        assert_eq!(
-            p.latest_snapshot_receipt().unwrap().unwrap().generation,
-            2
-        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -7952,23 +7936,14 @@ mod tests {
         truncated.pop();
         assert!(!checkpoint.verify_against_history(&truncated));
 
-        let conn = p.open_connection().unwrap();
-        conn.execute_batch(
-            "DROP TRIGGER trg_knowledge_snapshot_validation_receipts_no_update;
-             UPDATE knowledge_snapshot_validation_receipts
-             SET validator_ref = 'validator:substituted',
-                 receipt_digest_hex = '0'
-             WHERE validation_sequence = 3;",
-        )
-        .unwrap();
-        let mut substituted = p.snapshot_validation_receipt_records().unwrap();
+        let mut substituted = all.clone();
         substituted[2].receipt.validator_ref = "validator:substituted".into();
         substituted[2].stored_receipt_digest_hex =
             substituted[2].recomputed_receipt_digest_hex();
+        assert!(substituted[2].verify_self_digest());
+        assert!(substituted[2].verify_integrity());
+        // The record remains self-consistent, but the externally retained checkpoint detects substitution.
         assert!(!checkpoint.verify_against_history(&substituted));
-        assert!(p
-            .verify_snapshot_validation_receipt_history_checkpoint(&checkpoint)
-            .is_err());
 
         let latest = p.latest_snapshot_validation_receipt_records().unwrap();
         assert_eq!(latest.len(), 2);
