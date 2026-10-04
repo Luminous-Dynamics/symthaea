@@ -809,17 +809,15 @@ mod tests {
     }
 
     #[test]
-    fn non_finite_values_are_sanitized() {
+    fn non_finite_values_fail_closed_after_sanitization() {
         let scene = SceneNode::circle(f32::NAN, f32::INFINITY, f32::NEG_INFINITY);
         let wire = RemoteScene::from_scene(&scene);
-        match wire.root.primitive {
-            WirePrimitive::Circle { cx, cy, r } => {
-                assert_eq!(cx, 0.0);
-                assert_eq!(cy, 0.0);
-                assert_eq!(r, 0.0);
-            }
-            _ => panic!("unexpected primitive"),
-        }
+        assert!(matches!(wire.root.primitive, WirePrimitive::Group));
+        assert!(
+            wire.root.children.is_empty(),
+            "sanitized degenerate primitive must be replaced by an inert root"
+        );
+        assert!(wire.is_supported());
     }
 
     #[test]
