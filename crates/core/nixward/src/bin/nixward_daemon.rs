@@ -1226,7 +1226,7 @@ impl DaemonState {
                                                 "nixward-daemon: refusing invalid typed service action for {}: {:?}",
                                                 target_name_clone, error
                                             );
-                                            return (free_energy, None);
+                                            return (dynamic_threshold, None);
                                         }
                                     }
                                 },
@@ -1243,7 +1243,7 @@ impl DaemonState {
                                         "nixward-daemon: no supported command mapping for action category {:?}; refusing implicit service operation",
                                         best_action.action
                                     );
-                                    return (free_energy, None);
+                                    return (dynamic_threshold, None);
                                 },
                             };
                             let (bin, args) = default_cmd.to_command();
@@ -1307,7 +1307,7 @@ impl DaemonState {
                                     self.local_approval_consumed = None;
                                 }
                                 self.pending_action = Some(cmd_str.clone());
-                                self.pending_action_intent_digest = intent_digest.clone();
+                                self.pending_action_intent_digest = Some(intent_digest.clone());
 
                                 let intent = match NixActionIntentV1::from_command(
                                     "nixward:daemon",
@@ -1373,7 +1373,7 @@ impl DaemonState {
                                         intent_digest
                                     );
                                     self.pending_action = Some(cmd_str.clone());
-                                    self.pending_action_intent_digest = intent_digest.clone();
+                                    self.pending_action_intent_digest = Some(intent_digest.clone());
                                     self.pending_local_approval = None;
                                     self.local_approval_consumed = None;
                                     self.watchdog_status = None;
@@ -1923,7 +1923,7 @@ fn build_anomaly_prompt(unit: &str, reason: &str, message: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+mod intent_tests {
     use super::*;
     use nixward::action::executor::{NixOSCommand, SafetyLevel};
 
@@ -3638,20 +3638,20 @@ mod tests {
 
         let mut state = DaemonState::new(&test_config());
 
-        let (line, path, value) = state
+        let (line, path, value, _expected_config_digest) = state
             .generate_nixos_hardening_patch("clickhouse-server.service")
             .expect("clickhouse hardening patch should be generated against a fresh {} config");
         assert_eq!(path, "services.clickhouse.extraConfig");
         assert!(value.contains("max_server_memory_usage"));
         assert!(line.contains(&path));
 
-        let (_, path, value) = state
+        let (_, path, value, _expected_config_digest) = state
             .generate_nixos_hardening_patch("postgresql.service")
             .expect("postgresql hardening patch should be generated");
         assert_eq!(path, "services.postgresql.settings.shared_buffers");
         assert_eq!(value, "\"512MB\"");
 
-        let (_, path, _) = state
+        let (_, path, _, _expected_config_digest) = state
             .generate_nixos_hardening_patch("some-other-thing.service")
             .expect("generic hardening patch should be generated for unknown units");
         assert_eq!(
@@ -3704,7 +3704,7 @@ mod tests {
             command,
             nixward::action::executor::NixOSCommand::Service {
                 operation: NixServiceOperationKindV1::Enable,
-                unit,
+                ref unit,
             } if unit == "nginx.service"
         ));
         let (bin, args) = command.to_command();
