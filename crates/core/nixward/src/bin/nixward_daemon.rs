@@ -2470,7 +2470,7 @@ mod tests {
         };
         assert_eq!(
             nixward::action::operator_visible_action_for_command(&patch),
-            "PATCH /etc/nixos/configuration.nix: services.nginx.enable = true"
+            "PATCH /etc/nixos/configuration.nix: services.nginx.enable = true [expected-config-digest=abababababababababababababababababababababababababababababababab]"
         );
     }
 
