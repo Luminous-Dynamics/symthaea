@@ -13,6 +13,7 @@
 //! approver evidence so that "what was displayed" cannot silently diverge from
 //! "what was approved".
 
+use super::approver_evidence::RequiredApprovalProfileV1;
 use super::local_approval::{digest_display, LocalApprovalErrorV1, PendingNixApprovalRequestV1};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
@@ -123,6 +124,8 @@ impl PendingNixApprovalProjectionV1 {
         validate_digest(&self.exact_action_intent_digest, "exact action intent digest")?;
         validate_identifier(&self.machine_target_ref, "machine target ref")?;
         validate_identifier(&self.required_approval_profile, "required approval profile")?;
+        RequiredApprovalProfileV1::parse_ref(&self.required_approval_profile)
+            .map_err(|_| LocalApprovalProjectionErrorV1::InvalidField("required approval profile"))?;
         if self.operator_visible_action.trim().is_empty() {
             return Err(LocalApprovalProjectionErrorV1::EmptyOperatorVisibleAction);
         }
@@ -290,6 +293,21 @@ mod tests {
             serde_json::from_str(&serde_json::to_string(&projection).unwrap()).unwrap();
         assert_eq!(projection, restored);
         assert_eq!(projection.projection_digest, restored.compute_digest().unwrap());
+    }
+
+    #[test]
+    fn unknown_required_approval_profile_is_rejected_by_projection_validation() {
+        let request = request();
+        let mut projection =
+            PendingNixApprovalProjectionV1::from_request(&request, "nixos-rebuild switch --flake .#workstation")
+                .unwrap();
+        projection.required_approval_profile = "unknown-profile-v99".to_string();
+        projection.projection_digest = projection.compute_digest().unwrap();
+
+        assert_eq!(
+            projection.validate().unwrap_err(),
+            LocalApprovalProjectionErrorV1::InvalidField("required approval profile")
+        );
     }
 
     #[test]
