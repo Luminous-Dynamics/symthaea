@@ -4149,7 +4149,7 @@ fn validate_native_authority_pin_set(
                     tx.prepare(
                         "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
                          FROM authorization_leases
-                         WHERE state IN ('prepared','dispatch_pending','invoked')
+                         WHERE state IN ('dispatch_pending','invoked')
                            AND boundary_id=?1",
                     )?,
                     vec![boundary_filter.unwrap().to_owned()],
@@ -9245,6 +9245,72 @@ mod tests {
         let receipt=boundary_a.reconcile_indeterminate_bound_verified(&record,&verified_evidence(&record,ExecutionOutcome::Succeeded),&TestProviderVerifier).unwrap();
         assert_eq!(receipt.outcome,ExecutionOutcome::Succeeded);
         assert_eq!(receipt.authorization_instance,"approval-boundary");
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn boundary_bulk_recovery_does_not_convert_prepared_to_indeterminate() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-boundary-bulk-prepared-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open(&path).unwrap();
+        let action=EpistemicAction::new(
+            "boundary-bulk-prepared",
+            "intervention",
+            super::super::ActionRisk::Critical
+        );
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"approval-bulk-prepared".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:10:00Z".into(),
+            expires_at:Some("2026-10-05T07:10:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt-bulk-prepared",
+            "boundary-bulk-prepared"
+        ).unwrap();
+
+        assert_eq!(
+            store.recover_incomplete_attempts_for_boundary("boundary-bulk-prepared").unwrap(),
+            0
+        );
+        assert_eq!(
+            store.connection().unwrap().query_row::<String,_,_>(
+                "SELECT state FROM authorization_leases
+                 WHERE authorization_instance=?1",
+                params![witness.authorization_instance.as_str()],
+                |row| row.get(0)
+            ).unwrap(),
+            "prepared"
+        );
+        assert_eq!(
+            store.connection().unwrap().query_row::<i64,_,_>(
+                "SELECT COUNT(*) FROM authorization_receipts
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![witness.authorization_instance.as_str(),"attempt-bulk-prepared"],
+                |row| row.get(0)
+            ).unwrap(),
+            0
+        );
         let _=std::fs::remove_file(path);
     }
 
