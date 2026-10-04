@@ -342,12 +342,9 @@ else
   # A TPM resource-manager node is only a capability signal. Confirm the
   # observed TCG specification major before issuing a TPM2 enrollment request.
   TPM2_SPEC_MAJOR=""
-  for version_path in /sys/class/tpm/tpm*/tpm_version_major; do
-    if [ -r "$version_path" ]; then
-      TPM2_SPEC_MAJOR=$(cat "$version_path")
-      break
-    fi
-  done
+  if [ -r /sys/class/tpm/tpm0/tpm_version_major ]; then
+    TPM2_SPEC_MAJOR=$(cat /sys/class/tpm/tpm0/tpm_version_major)
+  fi
   if [ "$TPM2_SPEC_MAJOR" != "2" ]; then
     echo "WARNING: TPM specification major is not confirmed as 2. Skipping TPM2 enrollment."
     echo "A passphrase remains the recovery path; retry after first boot when TPM2 is confirmed."
@@ -3265,9 +3262,7 @@ echo "$TPM2_AVAILABLE"
 
 echo ',"tpm2_spec_major":'
 if [ "$TPM2_AVAILABLE" = true ]; then
-  TPM2_SPEC_MAJOR=$(for tpm in /sys/class/tpm/tpm*; do
-    [ -r "$tpm/tpm_version_major" ] && cat "$tpm/tpm_version_major" && break
-  done)
+  TPM2_SPEC_MAJOR=$(cat /sys/class/tpm/tpm0/tpm_version_major 2>/dev/null || true)
   case "$TPM2_SPEC_MAJOR" in
     ''|*[!0-9]*) echo 'null' ;;
     *) echo "$TPM2_SPEC_MAJOR" ;;
@@ -5548,7 +5543,11 @@ mod tests {
         assert!(script.contains("echo \"  TPM2 enrollment command succeeded.\""));
         assert!(script.contains("echo \"WARNING: TPM2 enrollment failed. Installed configuration was not modified.\""));
         assert!(script.contains("if grep -q 'boot.initrd.luks.devices.\\"cryptroot\\"'"));
-        assert!(script.contains("TPM2_SPEC_MAJOR"));\n        assert!(script.contains("TPM specification major is not confirmed as 2"));\n        assert!(script.contains("TPM2_PCRS=\"0+7\""));
+        assert!(script.contains("TPM2_SPEC_MAJOR"));
+        assert!(script.contains("/sys/class/tpm/tpm0/tpm_version_major"));
+        assert!(!script.contains("/sys/class/tpm/tpm*/tpm_version_major"));
+        assert!(script.contains("TPM specification major is not confirmed as 2"));
+        assert!(script.contains("TPM2_PCRS=\"0+7\""));
         assert!(script.contains("This is LUKS key-release policy, not regenerative-health attestation."));
     }
 
