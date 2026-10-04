@@ -116,6 +116,10 @@ The current tss-esapi 7.7.0 release provides typed NvPublic accessors for the NV
 
 That means the adapter should keep a narrow unsafe/FFI boundary around the missing high-level certification operation rather than weakening the domain contract or approximating certification with nv_read.
 
+The high-level Context API in tss-esapi 7.7.0 provides Context::new(TctiNameConf), nv_read_public, nv_increment, nv_read, and quote. TctiNameConf supports both a real device TCTI and an Swtpm network TCTI.
+The corresponding tss-esapi-sys 0.6.0 layer exposes Esys_NV_Certify, which is the appropriate narrow FFI seam for the one command the high-level wrapper does not currently expose.
+The adapter should isolate that unsafe call in one module and convert its TPM2B_ATTEST and TPMT_SIGNATURE outputs into deployment-neutral evidence only after independently verifying all structural bindings.
+
 ## Explicit non-goals
 
 This adapter contract does not claim:
