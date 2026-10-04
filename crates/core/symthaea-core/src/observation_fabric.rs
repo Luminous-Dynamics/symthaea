@@ -1478,12 +1478,12 @@ impl ObservationGraph {
                 write_canonical_string_bytes(&mut bytes, &parent_id);
             }
             if let Some(activity) = &observation.provenance.processing_activity {
+                // The bounded independence predicate consumes only activity_id.
+                // Process/configuration/timing/agent/execution realization fields
+                // are validated provenance, but are not read by this predicate and
+                // therefore must remain outside this scope identity.
                 bytes.push(1);
                 write_canonical_string_bytes(&mut bytes, &activity.activity_id);
-                write_canonical_string_bytes(
-                    &mut bytes,
-                    activity.execution_fingerprint.as_deref().unwrap_or(""),
-                );
             } else {
                 bytes.push(0);
             }
@@ -3080,6 +3080,66 @@ mod tests {
             graph.assess_independence("obs-001", "obs-002")
         );
     }
+    #[test]
+    fn independence_scope_identity_excludes_valid_unread_processing_activity_fields() {
+        let mut source = fixture();
+        source.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec![],
+            output_observation_ids: vec!["obs-001".into()],
+            derivations: Vec::new(),
+        });
+
+        let mut target = fixture();
+        target.id = "obs-002".into();
+        target.provenance.source.sensor_id = "camera-2".into();
+
+        let graph = ObservationGraph {
+            observations: vec![source, target],
+            relations: vec![],
+        };
+        let baseline = graph
+            .independence_verification_scope_fingerprint()
+            .expect("baseline scope");
+
+        let mut mutated = graph.clone();
+        let activity = mutated.observations[0]
+            .provenance
+            .processing_activity
+            .as_mut()
+            .expect("processing activity");
+        activity.process_id = "transform-v2".into();
+        activity.process_definition_fingerprint = Some("process-definition-v2".into());
+        activity.started_at_unix_ns = Some(10);
+        activity.ended_at_unix_ns = Some(20);
+        activity.agent_id = Some("worker-7".into());
+        activity.activity_fingerprint = Some("activity-config-v2".into());
+        activity.execution_fingerprint = Some(
+            activity
+                .compute_execution_fingerprint()
+                .expect("mutated execution fingerprint"),
+        );
+
+        assert!(mutated.validate().is_ok());
+        assert_eq!(
+            mutated
+                .independence_verification_scope_fingerprint()
+                .expect("mutated scope"),
+            baseline
+        );
+        assert_eq!(
+            mutated.assess_independence("obs-001", "obs-002"),
+            graph.assess_independence("obs-001", "obs-002")
+        );
+    }
+
     #[test]
     fn independence_scope_canonical_bytes_are_the_fingerprint_preimage() {
         let mut second = fixture();
