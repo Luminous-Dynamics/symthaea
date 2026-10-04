@@ -354,10 +354,7 @@ impl LinearCodeAlgebra {
     ///
     /// Both identities are exact because the factor-to-bound map is linear over GF(2).
     pub const fn satisfies_conservation_law(self) -> bool {
-        let Some(rank_sum) = self
-            .union_generator_rank
-            .checked_add(self.kernel_dimension)
-        else {
+        let Some(rank_sum) = self.union_generator_rank.checked_add(self.kernel_dimension) else {
             return false;
         };
         let Some(exponent_sum) = self
