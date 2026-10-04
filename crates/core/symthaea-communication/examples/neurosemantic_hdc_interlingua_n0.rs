@@ -206,16 +206,7 @@ fn main() -> Result<(), String> {
             "relation_names": codebook.relation_names(),
         },
         "codec_id": "symthaea.hdc.continuous-sign-v1",
-        "summary": {
-            "training_graphs": training.len(),
-            "held_out_graphs": held_out.len(),
-            "all_structurally_equivalent": true,
-            "same_codebook_for_all_cases": true,
-            "reordered_representation_exact": reordered_representation_exact,
-            "lexical_invariance_exact": lexical_invariance_exact,
-            "identifier_invariance_exact": identifier_invariance_exact,
-            "wrong_codebook_rejected": wrong_codebook_rejected
-        },
+        "summary": summary,
         "cases": cases,
         "negative_controls": negative_controls,
         "transport_corruption": corruption_observations,
