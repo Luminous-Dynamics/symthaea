@@ -4167,11 +4167,31 @@ fn validate_native_authority_pin_set(
         let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
 
         // Phase 1: validate the frozen dispatch contract without retaining a
-        // write lock across the external provider verification call.
+        // write lock across the external provider verification call. A durable
+        // terminal receipt is an established historical result, so replay reads
+        // its bound evidence without re-running foreign verifier code.
         {
             let mut connection = self.connection()?;
             let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
-            self.validate_persisted_dispatch_record(&tx, record)?;
+            let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
+            if matches!(persisted_state, "succeeded" | "failed") {
+                if let Some(receipt) =
+                    load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")?
+                {
+                    validate_persisted_terminal_evidence(
+                        self,
+                        &tx,
+                        record,
+                        &receipt,
+                        &pinned_verifier,
+                    )?;
+                    return Ok(receipt);
+                }
+                return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+            }
+            if persisted_state != "indeterminate" {
+                return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+            }
             tx.commit()?;
         }
 
@@ -6202,6 +6222,75 @@ mod tests {
         }
 
         let replay=store.commit_bound_verified(&record,&evidence,&RefusingVerifier).unwrap();
+        assert_eq!(replay,first);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reconciliation_terminal_receipt_replay_does_not_reinvoke_external_verifier() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-reconcile-terminal-replay-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=ActionEffectBinding::new(
+            "target-reconcile-terminal-replay","prod","adapter-reconcile-terminal-replay"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"reconcile-terminal-replay".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:10:00Z".into(),
+            expires_at:Some("2026-10-05T07:10:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,&action,"frame@1",
+            "attempt-reconcile-terminal-replay",
+            "boundary-reconcile-terminal-replay"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt-reconcile-terminal-replay",
+            &action,
+            &effect,
+            "boundary-reconcile-terminal-replay",
+            "operation:reconcile-terminal-replay",
+            "native-reconcile-terminal-replay"
+        ).unwrap();
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let first=store.commit_bound_verified(&record,&evidence,&TestProviderVerifier).unwrap();
+
+        struct RefusingVerifier;
+        impl ProviderEvidenceVerifier for RefusingVerifier {
+            fn verify(
+                &self,
+                _purpose:ProviderVerificationPurpose,
+                _record:&DurableDispatchRecord,
+                _evidence:&ProviderTerminalEvidence,
+            ) -> Result<VerifiedProviderOutcome,ProviderVerificationError> {
+                Err(ProviderVerificationError::VerificationFailed)
+            }
+        }
+
+        let replay=store.reconcile_indeterminate_bound_verified(
+            &record,&evidence,&RefusingVerifier
+        ).unwrap();
         assert_eq!(replay,first);
         let _=std::fs::remove_file(path);
     }
