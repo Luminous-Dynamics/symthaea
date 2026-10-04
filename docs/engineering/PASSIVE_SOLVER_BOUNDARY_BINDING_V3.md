@@ -82,6 +82,17 @@ The mesh-side selection is the interface rim on the candidate surface. It is not
 by itself, a claim that the solver's own face/patch topology is identical; the
 solver-specific external handle remains a separate adapter mapping.
 
+## Solver-side entity attestation
+
+The neutral core now has an explicit evidence ladder:
+
+- `AdapterAttested`: the sealed binder accepted the adapter's mapping draft after independent candidate/interface-rim checks.
+- `SolverEntityAttested`: a live-capable adapter additionally returned a non-empty solver-entity fingerprint and a mapping digest cryptographically bound to the exact interface, semantic candidate, exact mesh, realized rim, and external handle.
+
+`SolverEntityAttested` is still an adapter provenance claim. The neutral core can verify that the receipt refers to the exact binding it is promoting, but it cannot independently inspect vendor-specific solver state. A concrete OpenFOAM/Fluent/etc. adapter must only issue this stronger receipt after performing its own solver-side entity introspection.
+
+The transition is sealed by `promote_solver_entity_attestation` and `bind_with_adapter_and_entity_attestation`; callers cannot directly construct a stronger binding by setting an evidence flag.
+
 
 same intended geometry
 → same exact mesh
