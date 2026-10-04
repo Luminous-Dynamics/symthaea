@@ -372,6 +372,23 @@ mod tests {
     }
 
     #[test]
+    fn low_confidence_becomes_qualified_and_more_deliberate() {
+        let genesis = GenesisSeed::from_phrase("broca-speech-plan-qualified");
+        let decoder = StructuredDecoder::new(&genesis);
+        let mut channels = ThoughtChannels::with_intent(4);
+        channels.set_epistemic(2.0);
+        channels.set_consciousness(0.5, 0.5, 0.4);
+
+        let readout = decoder.decode(&channels);
+        let plan = SpeechPlan::from_readout(&channels, &readout);
+
+        assert_eq!(plan.epistemic_delivery, EpistemicDelivery::Qualified);
+        assert_eq!(plan.clause_mode, ClauseMode::Statement);
+        assert!(plan.prosody.pause_weight > 0.2);
+        assert!(plan.monitor.repair_threshold > 0.4);
+    }
+
+    #[test]
     fn planning_is_sensitive_to_time_pressure_and_arousal() {
         let genesis = GenesisSeed::from_phrase("broca-speech-plan-prosody");
         let decoder = StructuredDecoder::new(&genesis);
