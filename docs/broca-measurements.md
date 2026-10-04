@@ -88,3 +88,23 @@ metrics are recorded in `checkpoint-compare.json` but do not fail promotion.
 - `BROCA_BASELINE_ARTIFACT_DIR`: compare candidate artifacts against a baseline.
 - `BROCA_FAIL_ON_REGRESSION`: make comparison failures exit nonzero.
 - `BROCA_REQUIRE_ALL_COMPARISON_METRICS`: fail if expected metrics are missing.
+
+
+## Typed production-contract audit
+
+The fast Broca measurement loop now also runs `broca-production-contract-audit`.
+It exercises the 8 supported intent states × 4 epistemic inputs (32 deterministic cases)
+and writes `production-contract-audit.json`.
+
+The audit verifies, per case:
+
+- role-only phonological plans reject bound segments;
+- explicit phonological segments bind successfully;
+- lexical binding requires non-empty provenance;
+- exact semantic delivery passes;
+- deliberate clause-mode mismatches are detected;
+- repeated speech-plan grounding is deterministic.
+
+This artifact is a contract/invariant measurement, not a speech-naturalness score. It exists
+to make architectural regressions visible in CI without relying on stochastic generation or
+human judgment.
