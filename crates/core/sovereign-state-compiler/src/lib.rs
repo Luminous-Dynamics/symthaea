@@ -372,6 +372,19 @@ impl DeploymentPlan {
             return Err(PlanValidationError::VerificationStepNotFinal);
         }
 
+        let has_state_change = self.steps.iter().any(|step| {
+            matches!(
+                step.kind,
+                PlanStepKind::StageArtifacts
+                    | PlanStepKind::ApplyDesiredState
+                    | PlanStepKind::Reboot
+                    | PlanStepKind::Rollback
+            )
+        });
+        if has_state_change && self.max_target_snapshot_age_ms.is_none() {
+            return Err(PlanValidationError::TargetSnapshotFreshnessRequired);
+        }
+
         let mut expected_sequence = 0u32;
         for step in &self.steps {
             if step.sequence != expected_sequence {
@@ -1021,6 +1034,8 @@ pub enum PlanValidationError {
     MissingVerificationStep,
     #[error("verification step must be the final lifecycle step")]
     VerificationStepNotFinal,
+    #[error("state-changing plans must declare a maximum target-snapshot age")]
+    TargetSnapshotFreshnessRequired,
     #[error("plan step {kind:?} must explicitly require semantic capability {capability:?}")]
     StepMissingSemanticCapability {
         kind: PlanStepKind,
@@ -1728,6 +1743,83 @@ mod tests {
 
     #[test]
     fn accepts_mutating_step_with_effect_capability() {
+        let plan = sample_plan();
+        assert!(plan.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_state_change_without_snapshot_freshness_window() {
+        let mut plan = sample_plan();
+        plan.max_target_snapshot_age_ms = None;
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::TargetSnapshotFreshnessRequired)
+        );
+    }
+
+    #[test]
+    fn accepts_read_only_plan_without_snapshot_freshness_window() {
+        let mut plan = sample_plan();
+        plan.intent.required_capabilities.clear();
+        plan.intent.required_resources.clear();
+        plan.steps = vec![
+            PlanStep {
+                sequence: 0,
+                kind: PlanStepKind::Observe,
+                required_capabilities: [Capability::ObserveState].into_iter().collect(),
+                description: "observe target".into(),
+            },
+            PlanStep {
+                sequence: 1,
+                kind: PlanStepKind::Verify,
+                required_capabilities: [Capability::ObserveState].into_iter().collect(),
+                description: "verify observation".into(),
+            },
+        ];
+        plan.verification = VerificationPolicy::new(
+            DesiredState::default(),
+            DeploymentDisposition::Unchanged,
+            false,
+        );
+        plan.rollback = RollbackPolicy::default();
+        plan.max_target_snapshot_age_ms = None;
+
+        assert!(plan.validate().is_ok());
+    }
+
+    #[test]
+    fn reboot_also_requires_snapshot_freshness_window() {
+        let mut plan = sample_plan();
+        plan.steps = vec![
+            PlanStep {
+                sequence: 0,
+                kind: PlanStepKind::Reboot,
+                required_capabilities: [Capability::Reboot].into_iter().collect(),
+                description: "reboot target".into(),
+            },
+            PlanStep {
+                sequence: 1,
+                kind: PlanStepKind::Verify,
+                required_capabilities: [Capability::ObserveState].into_iter().collect(),
+                description: "verify target".into(),
+            },
+        ];
+        plan.intent.required_capabilities =
+            [Capability::Reboot].into_iter().collect();
+        plan.intent.required_resources.clear();
+        plan.target_snapshot.profile.capabilities.insert(Capability::Reboot);
+        plan.verification.disposition = DeploymentDisposition::Rebooted;
+        plan.max_target_snapshot_age_ms = None;
+
+        assert_eq!(
+            plan.validate(),
+            Err(PlanValidationError::TargetSnapshotFreshnessRequired)
+        );
+    }
+
+    #[test]
+    fn state_change_with_freshness_window_remains_valid() {
         let plan = sample_plan();
         assert!(plan.validate().is_ok());
     }
