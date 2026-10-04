@@ -96,6 +96,16 @@ Consumers that require replayable/auditable resolution evidence SHOULD require a
 
 A valid snapshot proves only that the verifier recorded a particular resolver state or durable state reference.
 
+### 6.1. Snapshot identity is not freshness proof
+
+A resolver snapshot identifier MUST NOT be treated as a proof-of-freshness value unless the resolver contract explicitly defines freshness semantics for that identifier.
+
+Likewise, the report's `evaluated_at_unix_ns` records the verifier's evaluation time; it is not, by itself, evidence that the attestation or resolver state was fresh at that instant. Replay-sensitive deployments SHOULD use an independently bound freshness mechanism, such as a verifier-originated challenge/nonce, an authenticated epoch, or a synchronized-clock validity rule, and SHOULD preserve the evidence needed to validate that mechanism during later audit.
+
+This distinction follows the current RATS direction: multi-verifier appraisal calls for freshness mechanisms such as synchronized clocks, epoch IDs, or nonces, while AR4SI treats claim freshness as a distinct category from identity and trustworthiness claims. RFC 9943 likewise emphasizes retaining enough evidence to reproduce checks that were applicable at the time a statement was accepted.
+
+A resolver snapshot can therefore provide strong **state identity** without providing **state freshness**. Consumers MUST keep those properties separate.
+
 It does not establish:
 
 - truth of the attested observation;
