@@ -113,6 +113,14 @@ fn serialize_resolution(resolution: &IgnoranceResolution) -> String {
 }
 
 fn deserialize_resolution(encoded: &str) -> Result<IgnoranceResolution, PersistenceError> {
+    if encoded.split('|').next().is_some_and(|prefix| prefix.starts_with('v')) {
+        if !encoded.starts_with("v2|") {
+            return Err(PersistenceError::Deserialization(
+                "resolution has an unsupported format version".into(),
+            ));
+        }
+    }
+
     if let Some(payload) = encoded.strip_prefix("v2|") {
         let mut cursor = 0usize;
         let method = StoredIgnoranceRecord::parse_resolution_method(
@@ -283,6 +291,11 @@ fn parse_frame_revision_v2(encoded: &str) -> Result<EpistemicFrameRevision, Pers
 fn deserialize_frame_revision(encoded: &str) -> Result<EpistemicFrameRevision, PersistenceError> {
     if encoded.starts_with("v2|") {
         return parse_frame_revision_v2(encoded);
+    }
+    if encoded.split('|').next().is_some_and(|prefix| prefix.starts_with('v')) {
+        return Err(PersistenceError::Deserialization(
+            "frame revision has an unsupported format version".into(),
+        ));
     }
 
     // Legacy six-field format retained for existing persisted records written by
@@ -1264,6 +1277,18 @@ mod tests {
     }
 
     #[test]
+    fn test_unknown_resolution_format_version_fails_closed() {
+        let mut record = create_test_record("unknown_resolution_version", "Unknown version", 0.4);
+        record.resolution_serialized = Some(
+            "v99|12:UserProvided".to_string(),
+        );
+
+        let error = record.to_record().unwrap_err();
+        assert!(matches!(error, PersistenceError::Deserialization(_)));
+        assert!(error.to_string().contains("unsupported format version"));
+    }
+
+    #[test]
     fn test_corrupt_v2_resolution_fails_closed() {
         let mut record = create_test_record("corrupt_resolution", "Corrupt", 0.4);
         record.resolution_serialized = Some("v2|6:Unknown".to_string());
@@ -1358,6 +1383,18 @@ mod tests {
         assert!(
             error.to_string().contains("affected-conclusion count exceeds payload capacity")
         );
+    }
+
+    #[test]
+    fn test_unknown_frame_revision_format_version_fails_closed() {
+        let mut record = create_test_record("unknown_frame_version", "Unknown version", 0.4);
+        record.frame_revisions_serialized = vec![
+            "v99|gis-default;gis-default@2;trigger;;scope;c1".to_string(),
+        ];
+
+        let error = record.to_record().unwrap_err();
+        assert!(matches!(error, PersistenceError::Deserialization(_)));
+        assert!(error.to_string().contains("unsupported format version"));
     }
 
     #[test]
