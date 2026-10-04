@@ -371,6 +371,10 @@ impl LinearCodeAlgebra {
             && self.raw_factor_tuple_count.exponent() == exponent_sum
             && self.unique_factorization == (self.kernel_dimension == 0)
             && self.factorization_count_per_target.is_one() == self.unique_factorization
+            && match self.dependency_order {
+                None => self.kernel_dimension == 0,
+                Some(order) => self.kernel_dimension > 0 && order >= 2,
+            }
     }
 
     pub const fn raw_factor_tuple_exponent(self) -> usize {
@@ -1357,6 +1361,33 @@ mod tests {
             dependency_order: Some(3),
         };
         assert!(!inconsistent.satisfies_conservation_law());
+    }
+
+    #[test]
+    fn conservation_law_rejects_impossible_dependency_order_metadata() {
+        let none_with_kernel = LinearCodeAlgebra {
+            factor_dimension_sum: 3,
+            union_generator_rank: 2,
+            kernel_dimension: 1,
+            raw_factor_tuple_count: ExactPowerOfTwo::new(3),
+            reachable_target_count: ExactPowerOfTwo::new(2),
+            factorization_count_per_target: ExactPowerOfTwo::new(1),
+            unique_factorization: false,
+            dependency_order: None,
+        };
+        assert!(!none_with_kernel.satisfies_conservation_law());
+
+        let singleton_dependency = LinearCodeAlgebra {
+            factor_dimension_sum: 3,
+            union_generator_rank: 2,
+            kernel_dimension: 1,
+            raw_factor_tuple_count: ExactPowerOfTwo::new(3),
+            reachable_target_count: ExactPowerOfTwo::new(2),
+            factorization_count_per_target: ExactPowerOfTwo::new(1),
+            unique_factorization: false,
+            dependency_order: Some(1),
+        };
+        assert!(!singleton_dependency.satisfies_conservation_law());
     }
 
     #[test]
