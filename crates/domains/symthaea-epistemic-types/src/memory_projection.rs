@@ -184,7 +184,7 @@ impl ProvenanceRelation {
 
 /// Version of the local structural provenance validator. Bump when validation
 /// semantics change; this is intentionally independent of epistemic truth assessment.
-pub const PROVENANCE_VALIDATOR_VERSION: &str = "melothaea-provenance-structural-v1";
+pub const PROVENANCE_VALIDATOR_VERSION: &str = "symthaea-provenance-structural-v1";
 /// Version of the canonical provenance snapshot encoding used by the digest.
 pub const PROVENANCE_SNAPSHOT_SCHEMA_VERSION: u16 = 1;
 
@@ -335,6 +335,19 @@ impl MemoryProvenance {
                 return Err("canonical_identity must be non-empty when present");
             }
         }
+        for reference in [
+            self.source_event.as_deref(),
+            self.canonical_artifact_ref.as_deref(),
+            self.statement_ref.as_deref(),
+            self.frontier_ref.as_deref(),
+            self.derivation_ref.as_deref(),
+            self.model_ref.as_deref(),
+            self.retrieval_index_ref.as_deref(),
+        ] {
+            if reference.is_some_and(|value| value.trim().is_empty()) {
+                return Err("provenance reference must be non-empty when present");
+            }
+        }
         Ok(())
     }
 }
@@ -436,6 +449,25 @@ mod tests {
 
         p.memory_id.clear();
         assert_eq!(p.validate_structure(), Err("memory_id must be non-empty"));
+
+        p.memory_id = "mem-1".into();
+        macro_rules! assert_blank_optional_rejected {
+            ($field:ident) => {
+                p.$field = Some("   ".into());
+                assert_eq!(
+                    p.validate_structure(),
+                    Err("provenance reference must be non-empty when present")
+                );
+                p.$field = None;
+            };
+        }
+        assert_blank_optional_rejected!(source_event);
+        assert_blank_optional_rejected!(canonical_artifact_ref);
+        assert_blank_optional_rejected!(statement_ref);
+        assert_blank_optional_rejected!(frontier_ref);
+        assert_blank_optional_rejected!(derivation_ref);
+        assert_blank_optional_rejected!(model_ref);
+        assert_blank_optional_rejected!(retrieval_index_ref);
     }
 
     #[test]
