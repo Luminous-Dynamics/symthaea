@@ -17,7 +17,7 @@ use gloo_net::websocket::Message;
 use gloo_net::websocket::futures::WebSocket;
 use serde_json::Value;
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::JsFuture;
 
@@ -74,23 +74,47 @@ async fn parse_service_response(resp: gloo_net::http::Response) -> Result<Value,
         let mut bytes = Vec::new();
 
         loop {
-            let result = JsFuture::from(reader.read())
-                .await
-                .map_err(|error| format!("failed to read response chunk: {error:?}"))?;
-            let done = web_sys::js_sys::Reflect::get(&result, &JsValue::from_str("done"))
-                .map_err(|error| format!("failed to inspect response chunk: {error:?}"))?
-                .as_bool()
-                .ok_or_else(|| "response stream returned a non-boolean done flag".to_string())?;
+            let result = match JsFuture::from(reader.read()).await {
+                Ok(result) => result,
+                Err(error) => {
+                    let _ = JsFuture::from(reader.cancel()).await;
+                    reader.release_lock();
+                    return Err(format!("failed to read response chunk: {error:?}"));
+                }
+            };
+            let done_value = match web_sys::js_sys::Reflect::get(&result, &JsValue::from_str("done")) {
+                Ok(value) => value,
+                Err(error) => {
+                    let _ = JsFuture::from(reader.cancel()).await;
+                    reader.release_lock();
+                    return Err(format!("failed to inspect response chunk: {error:?}"));
+                }
+            };
+            let done = match done_value.as_bool() {
+                Some(done) => done,
+                None => {
+                    let _ = JsFuture::from(reader.cancel()).await;
+                    reader.release_lock();
+                    return Err("response stream returned a non-boolean done flag".to_string());
+                }
+            };
             if done {
                 break;
             }
 
-            let value = web_sys::js_sys::Reflect::get(&result, &JsValue::from_str("value"))
-                .map_err(|error| format!("failed to inspect response chunk value: {error:?}"))?;
-            if value.is_null() || value.is_undefined() {
-                return Err("response stream returned a missing chunk value".to_string());
-            }
-            let chunk = web_sys::js_sys::Uint8Array::new(&value);
+            let value = match web_sys::js_sys::Reflect::get(&result, &JsValue::from_str("value")) {
+                Ok(value) => value,
+                Err(error) => {
+                    let _ = JsFuture::from(reader.cancel()).await;
+                    reader.release_lock();
+                    return Err(format!("failed to inspect response chunk value: {error:?}"));
+                }
+            };
+            let Some(chunk) = value.dyn_ref::<web_sys::js_sys::Uint8Array>() else {
+                let _ = JsFuture::from(reader.cancel()).await;
+                reader.release_lock();
+                return Err("response stream returned a non-Uint8Array chunk".to_string());
+            };
             let chunk_len = chunk.length() as usize;
             let next_len = bytes
                 .len()
