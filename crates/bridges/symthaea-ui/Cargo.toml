@@ -7,7 +7,7 @@ description = "Unified Leptos web UI for symthaea-service — Converse + Observe
 
 [features]
 default = []
-browser-qualification = []
+browser-qualification = ["symthaea-canvas/browser-qualification"]
 
 [dependencies]
 leptos = { version = "0.8", features = ["csr"] }
