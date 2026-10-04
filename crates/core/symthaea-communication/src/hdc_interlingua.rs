@@ -440,11 +440,7 @@ impl HdcSemanticCodebook {
         expected: &GroundedConceptGraph,
         seed: u64,
     ) -> Result<HdcSemanticNegativeControls, String> {
-        let (node_binary, edge_binary) = (
-            representation.node_frame.to_binary()?,
-            representation.edge_frame.to_binary()?,
-        );
-        let edge_bundle = edge_binary.to_continuous();
+        let edge_bundle = representation.edge_frame.to_binary()?.to_continuous();
 
         let unrelated = derive_atom_vector(seed, "negative", "unrelated");
         let unrelated_node_max_similarity = self
@@ -474,8 +470,8 @@ impl HdcSemanticCodebook {
             .ok_or_else(|| "negative controls require at least one edge".to_string())?;
         let source_key = node_key_for_id(expected, &first_edge.source)?;
         let target_key = node_key_for_id(expected, &first_edge.target)?;
-        let true_edge = self.edge_vector(source_key, &first_edge.relation, target_key)?;
-        let swapped_edge = self.edge_vector(target_key, &first_edge.relation, source_key)?;
+        let true_edge = self.edge_vector(&source_key, &first_edge.relation, &target_key)?;
+        let swapped_edge = self.edge_vector(&target_key, &first_edge.relation, &source_key)?;
 
         let controls = HdcSemanticNegativeControls {
             schema_version: HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
