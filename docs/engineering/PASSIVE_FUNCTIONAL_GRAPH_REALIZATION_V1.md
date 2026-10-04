@@ -20,6 +20,7 @@ port-path observation:
 The aggregate status is:
 
 - AllDeclaredPathsConnected
+- TopologyDivergence
 - PartialRealization
 - NoDeclaredPathsConnected
 - NoFlowPathsDeclared
@@ -76,3 +77,14 @@ Current inverse-design research increasingly uses graph/topology as an explicit 
 representation while retaining physics as a separate validation layer. This report
 implements the corresponding realization side: intent topology is compared with
 realized geometry before expensive physical evaluation.
+
+
+## Topology divergence
+
+TopologyDivergence is emitted when every declared FlowPath is geometrically connected
+but the candidate also connects at least one represented port pair that the functional
+graph does not connect in either direction.
+
+This is intentionally stricter than endpoint reachability alone: a candidate can satisfy
+all requested paths while still realizing too much connectivity. That can matter for
+isolation, valves, barriers, cavities, and networks whose topology is itself functional.
