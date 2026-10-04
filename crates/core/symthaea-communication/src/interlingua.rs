@@ -395,6 +395,15 @@ mod tests {
     }
 
     #[test]
+    fn structural_hash_detects_duplicate_node() {
+        let expected = fixture();
+        let observed = duplicate_last_node(&expected);
+        let expected_hash = structural_hash(&expected).unwrap();
+        let observed_hash = structural_hash(&observed).unwrap();
+        assert_ne!(expected_hash, observed_hash);
+    }
+
+    #[test]
     fn structural_hash_detects_missing_edge() {
         let expected = fixture();
         let observed = drop_last_edge(&expected);
