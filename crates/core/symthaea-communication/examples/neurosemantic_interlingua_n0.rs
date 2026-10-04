@@ -109,10 +109,15 @@ fn main() -> Result<(), String> {
             .filter(|case_| case_.metrics.structural_equivalence)
             .count() as u32,
     );
-    summary.insert(
-        "expected_node_recall_percent",
-        100_u32,
-    );
+
+    let exact_ok = report.iter().find(|case_| case_.case_id == "exact").map(|case_| case_.metrics.structural_equivalence).unwrap_or(false);
+    let reordered_ok = report.iter().find(|case_| case_.case_id == "reordered").map(|case_| case_.metrics.structural_equivalence).unwrap_or(false);
+    let renamed_ok = report.iter().find(|case_| case_.case_id == "renamed-identifiers").map(|case_| case_.metrics.structural_equivalence).unwrap_or(false);
+    let missing_rejected = report.iter().find(|case_| case_.case_id == "missing-edge").map(|case_| !case_.metrics.structural_equivalence && case_.metrics.edge_recall < 1.0).unwrap_or(false);
+    let duplicate_rejected = report.iter().find(|case_| case_.case_id == "duplicate-edge").map(|case_| !case_.metrics.structural_equivalence && case_.metrics.edge_precision < 1.0).unwrap_or(false);
+    if !(exact_ok && reordered_ok && renamed_ok && missing_rejected && duplicate_rejected) {
+        return Err("interlingua N0 acceptance assertions failed".into());
+    }
 
     let output = serde_json::json!({
         "benchmark": "neurosemantic-interlingua-n0",
