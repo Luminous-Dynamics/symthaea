@@ -265,6 +265,9 @@ impl KnowledgeSnapshotValidationReceipt {
 pub struct KnowledgeSnapshotValidationReceiptRecord {
     pub validation_sequence: u64,
     pub receipt: KnowledgeSnapshotValidationReceipt,
+    /// The self-digest stored in SQLite. Audit callers can compare this value with
+    /// the digest recomputed from `receipt` and `validation_sequence` without raw SQL.
+    pub stored_receipt_digest_hex: String,
 }
 
 impl KnowledgePersistenceSnapshot {
@@ -1153,7 +1156,7 @@ impl KnowledgePersistence {
         let query = format!(
             "SELECT v.validation_sequence, v.validation_event, v.generation, v.snapshot_digest_hex,
                     v.validator_ref, v.validator_version, v.validation_profile, v.conforms,
-                    v.report_digest_hex
+                    v.report_digest_hex, v.receipt_digest_hex
              FROM knowledge_snapshot_validation_receipts v
              WHERE v.generation = (
                  SELECT generation
@@ -1188,6 +1191,7 @@ impl KnowledgePersistence {
                         conforms: row.get(7)?,
                         report_digest_hex: row.get(8)?,
                     },
+                    stored_receipt_digest_hex: row.get(9)?,
                 })
             })
             .map_err(|e| format!("Query latest snapshot validations: {e}"))?
@@ -7289,6 +7293,12 @@ mod tests {
         assert_eq!(audit_records.len(), 1);
         assert_eq!(audit_records[0].validation_sequence, 1);
         assert_eq!(audit_records[0].receipt, validation);
+        assert_eq!(
+            audit_records[0].stored_receipt_digest_hex,
+            audit_records[0]
+                .receipt
+                .canonical_digest_hex_for_sequence(audit_records[0].validation_sequence)
+        );
 
         let second = KnowledgeSnapshotValidationReceipt {
             validation_event: "validation:event-2".into(),
@@ -7311,6 +7321,14 @@ mod tests {
         );
         assert_eq!(audit_records[0].receipt.validation_event, "validation:event-1");
         assert_eq!(audit_records[1].receipt.validation_event, "validation:event-2");
+        for record in &audit_records {
+            assert_eq!(
+                record.stored_receipt_digest_hex,
+                record
+                    .receipt
+                    .canonical_digest_hex_for_sequence(record.validation_sequence)
+            );
+        }
 
         let _ = std::fs::remove_dir_all(&dir);
     }
