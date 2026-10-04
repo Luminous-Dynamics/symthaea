@@ -382,6 +382,7 @@ impl SolverBoundaryEntityAttestation {
 /// and external solver handle.
 pub fn solver_entity_mapping_digest(
     interface: &PortInterface,
+    adapter_id: &str,
     candidate_geometry_digest: [u8; 32],
     candidate_mesh_digest: [u8; 32],
     boundary_patch_digest: [u8; 32],
@@ -389,8 +390,10 @@ pub fn solver_entity_mapping_digest(
     solver_entity_fingerprint: [u8; 32],
 ) -> [u8; 32] {
     let mut hasher = Hasher::new();
-    hasher.update(b"passive-solver-entity-mapping:v1");
+    hasher.update(b"passive-solver-entity-mapping:v2");
     hasher.update(&interface.digest());
+    hasher.update(adapter_id.as_bytes());
+    hasher.update(&[0]);
     hasher.update(&candidate_geometry_digest);
     hasher.update(&candidate_mesh_digest);
     hasher.update(&boundary_patch_digest);
@@ -431,6 +434,7 @@ pub fn promote_solver_entity_attestation(
 
     let expected_mapping_digest = solver_entity_mapping_digest(
         interface,
+        &binding.adapter_id,
         candidate_geometry_digest,
         digest_triangle_mesh(candidate),
         binding.realized_boundary.boundary_patch_digest(),
@@ -1387,6 +1391,7 @@ mod tests {
             let fingerprint = [0x42; 32];
             let mapping_digest = solver_entity_mapping_digest(
                 interface,
+                &binding.adapter_id,
                 binding.realized_boundary.candidate_geometry_digest(),
                 digest_triangle_mesh(candidate),
                 binding.realized_boundary.boundary_patch_digest(),
@@ -1470,6 +1475,41 @@ mod tests {
             ),
             Err(SolverBindingError::SolverEntityHandleMismatch)
         );
+    }
+
+    #[test]
+    fn entity_mapping_digest_is_adapter_specific() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let binding = bind_with_adapter(
+            &FixtureAdapter,
+            &interface,
+            &candidate,
+            [7; 32],
+            0.05,
+        )
+        .unwrap();
+
+        let from_a = solver_entity_mapping_digest(
+            &interface,
+            "fixture-adapter/v1",
+            [7; 32],
+            digest_triangle_mesh(&candidate),
+            binding.realized_boundary.boundary_patch_digest(),
+            &binding.external_boundary_handle,
+            [0x42; 32],
+        );
+        let from_b = solver_entity_mapping_digest(
+            &interface,
+            "another-adapter/v1",
+            [7; 32],
+            digest_triangle_mesh(&candidate),
+            binding.realized_boundary.boundary_patch_digest(),
+            &binding.external_boundary_handle,
+            [0x42; 32],
+        );
+
+        assert_ne!(from_a, from_b);
     }
 
     #[test]
