@@ -267,8 +267,13 @@ impl KnowledgeSnapshotValidationReceipt {
         if self.validation_profile.trim().is_empty() {
             return Err("Snapshot validation profile must be non-empty".into());
         }
-        if self.report_digest_hex.as_deref().is_some_and(|d| d.trim().is_empty()) {
-            return Err("Snapshot validation report digest must be non-empty when present".into());
+        if let Some(report_digest) = self.report_digest_hex.as_deref() {
+            if !is_hex_digest(report_digest) {
+                return Err(
+                    "Snapshot validation report digest must be a 64-character hexadecimal digest when present"
+                        .into(),
+                );
+            }
         }
         Ok(())
     }
@@ -2210,6 +2215,9 @@ impl KnowledgePersistence {
                   OR trim(NEW.validation_profile) = ''
                   OR NEW.conforms IS NULL
                   OR NEW.conforms NOT IN (0, 1)
+                  OR (NEW.report_digest_hex IS NOT NULL
+                      AND (length(NEW.report_digest_hex) <> 64
+                           OR NEW.report_digest_hex GLOB '*[^0-9A-Fa-f]*'))
                   OR NEW.receipt_digest_hex IS NULL
                   OR length(NEW.receipt_digest_hex) <> 64
                   OR NEW.receipt_digest_hex GLOB '*[^0-9A-Fa-f]*'
@@ -2536,6 +2544,9 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
                 "new.validation_profile is null",
                 "new.conforms is null",
                 "new.conforms not in (0, 1)",
+                "new.report_digest_hex is not null",
+                "length(new.report_digest_hex) <> 64",
+                "new.report_digest_hex glob '*[^0-9a-fa-f]*'",
                 "new.receipt_digest_hex is null",
                 "length(new.receipt_digest_hex) <> 64",
                 "raise(abort, 'knowledge_snapshot_validation_receipts requires valid identity, digest, validator, outcome, and positive sequence')",
@@ -4379,6 +4390,24 @@ mod tests {
 
         let conn = p.open_connection().unwrap();
         p.ensure_schema(&conn).unwrap();
+
+        let validation_report_digest_err = conn
+            .execute(
+                "INSERT INTO knowledge_snapshot_validation_receipts
+                 (validation_event, validation_sequence, generation, snapshot_digest_hex,
+                  validator_ref, validator_version, validation_profile, conforms,
+                  report_digest_hex, receipt_digest_hex)
+                 VALUES ('bad-report-digest', 999, 1,
+                         '0000000000000000000000000000000000000000000000000000000000000000',
+                         'validator', 'v1', 'profile', 1,
+                         'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg',
+                         '0000000000000000000000000000000000000000000000000000000000000000')",
+                [],
+            )
+            .unwrap_err();
+        assert!(validation_report_digest_err.to_string().contains(
+            "knowledge_snapshot_validation_receipts requires valid identity, digest, validator, outcome, and positive sequence"
+        ));
 
         let snapshot_err = conn
             .execute(
@@ -7367,7 +7396,7 @@ mod tests {
             validator_version: "structural-validator-v1".into(),
             validation_profile: "epf-011-knowledge-snapshot".into(),
             conforms: true,
-            report_digest_hex: Some("report-digest-1".into()),
+            report_digest_hex: Some("b".repeat(64)),
         };
         p.record_snapshot_validation(validation.clone()).unwrap();
 
@@ -7479,7 +7508,7 @@ mod tests {
             validator_version: "v1".into(),
             validation_profile: "profile:test".into(),
             conforms: false,
-            report_digest_hex: Some("report-history-two".into()),
+            report_digest_hex: Some("c".repeat(64)),
         })
         .unwrap();
         p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
@@ -7655,6 +7684,30 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_validation_receipt_rejects_non_hex_report_digest() {
+        let mut validation = KnowledgeSnapshotValidationReceipt {
+            validation_event: "validation:report-digest".into(),
+            generation: 1,
+            snapshot_digest_hex: "a".repeat(64),
+            validator_ref: "validator:test".into(),
+            validator_version: "v1".into(),
+            validation_profile: "profile:test".into(),
+            conforms: true,
+            report_digest_hex: Some("g".repeat(64)),
+        };
+
+        let err = validation.validate_input().unwrap_err();
+        assert_eq!(
+            err,
+            "Snapshot validation report digest must be a 64-character hexadecimal digest when present"
+        );
+
+        validation.report_digest_hex = Some("d".repeat(64));
+        assert!(validation.validate_input().is_ok());
+
     }
 
     #[test]
