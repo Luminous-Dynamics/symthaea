@@ -59,8 +59,6 @@ if (URL.startsWith('http://127.0.0.1:') || URL.startsWith('http://localhost:')) 
   );
 }
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
 async function canvasPngHash(page, selector) {
   const dataUrl = await page.$eval(selector, canvas => {
     if (!(canvas instanceof HTMLCanvasElement)) {
@@ -263,6 +261,35 @@ async function waitForQualificationReady(page, selector) {
   }
 }
 
+async function waitForFallbackPaint(page) {
+  try {
+    await page.waitForFunction(
+      () => {
+        const canvas = document.querySelector('#canvas2d-movie-fallback');
+        const image = document.querySelector('img.portrait');
+        if (!(canvas instanceof HTMLCanvasElement) || !image) return false;
+        if (getComputedStyle(canvas).display === 'none' || getComputedStyle(image).display === 'none') {
+          return false;
+        }
+        const ctx = canvas.getContext('2d');
+        if (!ctx || canvas.width < 32 || canvas.height < 24) return false;
+        const pixels = ctx.getImageData(31, 23, 1, 1).data;
+        return pixels[0] === 255
+          && pixels[1] === 255
+          && pixels[2] === 255
+          && pixels[3] === 255
+          && image.getAttribute('src')?.startsWith('data:image/svg+xml;base64,');
+      },
+      { timeout: 30_000 },
+    );
+  } catch (error) {
+    throw new QualificationError(
+      `Canvas2D/SVG fallback did not report its expected painted state: ${error instanceof Error ? error.message : String(error)}`,
+      'fallback',
+    );
+  }
+}
+
 async function waitForVisible(page, selector, classification = 'fallback') {
   try {
     await page.waitForFunction(
@@ -448,7 +475,7 @@ async function runMode(mode) {
 
     await waitForProjection(page, '#canvas2d-movie-fallback', 'block');
     await waitForVisible(page, 'img.portrait');
-    await sleep(100);
+    await waitForFallbackPaint(page);
     failOnPageErrors('forced fallback render');
 
     const fallback = await page.evaluate(() => {
@@ -504,7 +531,7 @@ async function runMode(mode) {
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
     await waitForProjection(page, '#canvas2d-movie-fallback', 'block');
     await waitForVisible(page, 'img.portrait');
-    await sleep(100);
+    await waitForFallbackPaint(page);
     failOnPageErrors('forced fallback deterministic repeat render');
 
     const repeatFallbackCanvasHash = await canvasPngHash(page, '#canvas2d-movie-fallback');
