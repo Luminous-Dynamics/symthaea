@@ -137,6 +137,18 @@ fn stable_edge_set(
         .collect()
 }
 
+fn execution_revision() -> String {
+    std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|revision| revision.trim().to_string())
+        .filter(|revision| !revision.is_empty())
+        .unwrap_or_else(|| "local".into())
+}
+
 fn main() -> Result<(), String> {
     let provenance_hash =
         symthaea_communication::content_hash(MAPPING_PROVENANCE.as_bytes());
@@ -399,7 +411,7 @@ fn main() -> Result<(), String> {
         .fold(f64::INFINITY, f64::min);
 
     let execution_revision =
-        std::env::var("GITHUB_SHA").unwrap_or_else(|_| "local".into());
+        execution_revision();
 
     let output = json!({
         "benchmark": "neurosemantic-hdc-grounded-identity-generalization-n0",
