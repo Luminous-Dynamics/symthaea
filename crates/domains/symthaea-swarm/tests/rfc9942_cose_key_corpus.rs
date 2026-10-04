@@ -141,6 +141,18 @@ fn cose_key_accepts_exact_indefinite_map_entry_cap_before_break() {
 }
 
 #[test]
+fn cose_key_accepts_unknown_label_with_nested_opaque_cbor_value() {
+    let mut fields = valid_fields();
+    let mut field = vec![0x18, 30];
+    field.extend_from_slice(&[0xa1, 0x41, 0x00]);
+    fields.push(field);
+
+    let parsed = Rfc9942Es256CoseKey::from_cbor(&key(&fields))
+        .expect("an unknown COSE label must consume its complete arbitrary CBOR value");
+    assert_eq!(parsed.kid(), Some(b"rfc9052-c7.1".as_slice()));
+}
+
+#[test]
 fn cose_key_rejects_indefinite_map_entry_count_above_cap() {
     let extra = 33 - valid_fields().len();
     assert_eq!(
