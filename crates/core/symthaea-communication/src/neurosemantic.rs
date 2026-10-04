@@ -5,7 +5,16 @@
 
 use crate::{content_hash, RepresentationFamily};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Stable neurosemantic protocol version.
+pub const NEUROSEMANTIC_PROTOCOL_VERSION: u16 = 1;
+
+/// Maximum encoded payload size before content hashing.
+pub const MAX_NEUROSEMANTIC_PAYLOAD_BYTES: usize = 1_048_576;
+
+/// Maximum number of replay-tracker keys retained in memory.
+pub const MAX_TRACKED_NEUROSEMANTIC_SESSIONS: usize = 4096;
 
 /// Representation channel used for routing and authorization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -18,10 +27,12 @@ pub enum CognitiveChannel {
     Sensory,
 }
 
-/// Direction of information flow.
+/// Direction of information flow from the subject's perspective.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChannelDirection {
+    /// Subject -> peer.
     Read,
+    /// Peer -> subject.
     Write,
 }
 
@@ -44,7 +55,7 @@ pub enum NeurosemanticPayload {
 }
 
 /// Sensitivity class for policy and data minimization.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum CognitiveSensitivity {
     Public,
     Contextual,
@@ -134,12 +145,16 @@ impl NeurosemanticPacket {
         confidence: f32,
         payload: NeurosemanticPayload,
     ) -> Result<Self, String> {
+        if sequence == 0 {
+            return Err("packet sequence must be non-zero".into());
+        }
         if !confidence.is_finite() || !(0.0..=1.0).contains(&confidence) {
             return Err("confidence must be finite and in [0, 1]".into());
         }
+        validate_payload(&payload)?;
 
         let mut packet = Self {
-            protocol_version: 1,
+            protocol_version: NEUROSEMANTIC_PROTOCOL_VERSION,
             sequence,
             sender_id: sender_id.into(),
             recipient_id: recipient_id.into(),
@@ -158,17 +173,21 @@ impl NeurosemanticPacket {
     }
 
     pub fn validate_integrity(&self) -> Result<(), String> {
-        if self.protocol_version == 0
+        if self.protocol_version != NEUROSEMANTIC_PROTOCOL_VERSION
             || self.sender_id.trim().is_empty()
             || self.recipient_id.trim().is_empty()
         {
             return Err("packet identity or protocol version is invalid".into());
         }
+        if self.sequence == 0 {
+            return Err("packet sequence must be non-zero".into());
+        }
         if !self.confidence.is_finite() || !(0.0..=1.0).contains(&self.confidence) {
             return Err("packet confidence must be finite and in [0, 1]".into());
         }
 
-        validate_payload(&self.payload)?;\n        let expected_payload_hash = payload_hash(&self.payload)?;
+        validate_payload(&self.payload)?;
+        let expected_payload_hash = payload_hash(&self.payload)?;
         if self.payload_hash != expected_payload_hash {
             return Err("payload hash mismatch".into());
         }
@@ -184,6 +203,7 @@ impl NeurosemanticPacket {
     }
 
     pub fn refresh_hashes(&mut self) -> Result<(), String> {
+        validate_payload(&self.payload)?;
         self.payload_hash = payload_hash(&self.payload)?;
         let mut canonical = self.clone();
         canonical.packet_hash.clear();
@@ -220,7 +240,8 @@ impl AuthorizedNeurosemanticMessage {
             ChannelDirection::Write => (lease.peer_id.as_str(), lease.subject_id.as_str()),
         };
 
-        if self.packet.sender_id != expected_sender || self.packet.recipient_id != expected_recipient {
+        if self.packet.sender_id != expected_sender || self.packet.recipient_id != expected_recipient
+        {
             return Err("packet endpoints do not match the consent direction".into());
         }
 
@@ -243,13 +264,9 @@ impl AuthorizedNeurosemanticMessage {
 /// The tracker deliberately lives above packet integrity: integrity answers
 /// "was this packet altered?", while this tracker answers "have we already
 /// accepted this packet sequence in this consent epoch?".
-pub const NEUROSEMANTIC_PROTOCOL_VERSION: u16 = 1;
-pub const MAX_NEUROSEMANTIC_PAYLOAD_BYTES: usize = 1_048_576;
-pub const MAX_TRACKED_NEUROSEMANTIC_SESSIONS: usize = 4096;
-
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NeurosemanticReplayTracker {
-    latest: std::collections::BTreeMap<(String, String, String, u64), ReplayState>,
+    latest: BTreeMap<(String, String, String, u64), ReplayState>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -533,7 +550,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn nonfinite_derived_features_are_rejected() {
         let result = NeurosemanticPacket::new(
             11,
@@ -588,6 +604,22 @@ mod tests {
     }
 
     #[test]
+    fn zero_sequence_is_rejected_at_construction() {
+        let result = NeurosemanticPacket::new(
+            0,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        );
+        assert!(result.is_err());
+    }
+
     #[test]
     fn authorized_replay_path_requires_active_consent() {
         let base = lease();
@@ -616,7 +648,9 @@ mod tests {
         );
         let mut revoked = base.clone();
         revoked.revoked = true;
-        assert!(tracker.observe_authorized(&message, &revoked, 150).is_err());
+        assert!(tracker
+            .observe_authorized(&message, &revoked, 150)
+            .is_err());
     }
 
     #[test]
