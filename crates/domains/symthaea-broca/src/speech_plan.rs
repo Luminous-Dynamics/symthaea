@@ -206,11 +206,119 @@ impl SpeechPlan {
         )
     }
 
+    /// Validate persisted/deserialized cross-field invariants before realization.
+    pub fn validate(&self) -> Result<(), SpeechPlanError> {
+        if self.version != SPEECH_PLAN_VERSION {
+            return Err(SpeechPlanError::InvalidVersion);
+        }
+        if self.intent.trim().is_empty() {
+            return Err(SpeechPlanError::EmptyIntent);
+        }
+
+        for (name, value) in [
+            ("confidence", self.confidence),
+            ("warmth", self.warmth),
+            ("arousal", self.arousal),
+            ("social_context", self.social_context),
+            ("time_pressure", self.time_pressure),
+        ] {
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return Err(SpeechPlanError::InvalidUnitValue(name));
+            }
+        }
+
+        for (name, value) in [
+            ("rate", self.prosody.rate),
+            ("pitch_range", self.prosody.pitch_range),
+            ("prominence", self.prosody.prominence),
+            ("pause_weight", self.prosody.pause_weight),
+            ("repair_threshold", self.monitor.repair_threshold),
+        ] {
+            if !value.is_finite() {
+                return Err(SpeechPlanError::NonFiniteValue(name));
+            }
+        }
+        if !(0.55..=1.35).contains(&self.prosody.rate)
+            || !(0.65..=1.45).contains(&self.prosody.pitch_range)
+            || !(0.0..=1.0).contains(&self.prosody.prominence)
+            || !(0.0..=1.0).contains(&self.prosody.pause_weight)
+            || !(0.2..=0.9).contains(&self.monitor.repair_threshold)
+        {
+            return Err(SpeechPlanError::InvalidProsodyRange);
+        }
+
+        if self
+            .roles
+            .iter()
+            .enumerate()
+            .any(|(_, role)| role.role.trim().is_empty() || role.prime.trim().is_empty() || !role.salience.is_finite() || !(0.0..=1.0).contains(&role.salience))
+        {
+            return Err(SpeechPlanError::InvalidRole);
+        }
+
+        if let Some(focus) = self.focus_role.as_deref() {
+            if !self.roles.iter().any(|role| role.role == focus) {
+                return Err(SpeechPlanError::FocusRoleNotRepresented);
+            }
+        }
+
+        if matches!(self.clause_mode, ClauseMode::Abstention)
+            && !matches!(self.epistemic_delivery, EpistemicDelivery::NonAssertive)
+        {
+            return Err(SpeechPlanError::AbstentionRequiresNonAssertive);
+        }
+        if matches!(self.epistemic_delivery, EpistemicDelivery::NonAssertive)
+            && !matches!(self.clause_mode, ClauseMode::Abstention)
+        {
+            return Err(SpeechPlanError::NonAssertiveRequiresAbstention);
+        }
+        if matches!(self.clause_mode, ClauseMode::Question)
+            && !matches!(self.prosody.intonation, IntonationIntent::Question)
+        {
+            return Err(SpeechPlanError::QuestionRequiresQuestionIntonation);
+        }
+
+        Ok(())
+    }
+
     /// True when this plan explicitly refuses an assertive answer.
     pub fn is_non_assertive(&self) -> bool {
         matches!(self.epistemic_delivery, EpistemicDelivery::NonAssertive)
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SpeechPlanError {
+    InvalidVersion,
+    EmptyIntent,
+    InvalidUnitValue(&'static str),
+    NonFiniteValue(&'static str),
+    InvalidProsodyRange,
+    InvalidRole,
+    FocusRoleNotRepresented,
+    AbstentionRequiresNonAssertive,
+    NonAssertiveRequiresAbstention,
+    QuestionRequiresQuestionIntonation,
+}
+
+impl std::fmt::Display for SpeechPlanError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidVersion => write!(f, "speech plan version is unsupported"),
+            Self::EmptyIntent => write!(f, "speech plan intent must be non-empty"),
+            Self::InvalidUnitValue(name) => write!(f, "{name} must be finite and within [0, 1]"),
+            Self::NonFiniteValue(name) => write!(f, "{name} must be finite"),
+            Self::InvalidProsodyRange => write!(f, "speech plan prosody value is outside its supported range"),
+            Self::InvalidRole => write!(f, "speech plan contains an invalid role"),
+            Self::FocusRoleNotRepresented => write!(f, "focus role must be represented in speech-plan roles"),
+            Self::AbstentionRequiresNonAssertive => write!(f, "abstention requires non-assertive delivery"),
+            Self::NonAssertiveRequiresAbstention => write!(f, "non-assertive delivery requires abstention"),
+            Self::QuestionRequiresQuestionIntonation => write!(f, "question clause mode requires question intonation"),
+        }
+    }
+}
+
+impl std::error::Error for SpeechPlanError {}
 
 fn epistemic_delivery(ordinal: f32, confidence: f32) -> EpistemicDelivery {
     let ordinal = if ordinal.is_finite() {
