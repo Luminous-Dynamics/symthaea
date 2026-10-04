@@ -1150,6 +1150,36 @@ mod tests {
         );
     }
     #[test]
+    fn algebra_is_factor_order_invariant_but_kernel_certificate_is_presentation_bound() {
+        let c1 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b01])])
+            .expect("c1");
+        let c2 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b10])])
+            .expect("c2");
+        let c3 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b11])])
+            .expect("c3");
+
+        let forward = [&c1, &c2, &c3];
+        let reverse = [&c3, &c2, &c1];
+        let a = factorization_algebra(&forward).expect("forward algebra");
+        let b = factorization_algebra(&reverse).expect("reverse algebra");
+
+        assert_eq!(a.factor_dimension_sum, b.factor_dimension_sum);
+        assert_eq!(a.union_generator_rank, b.union_generator_rank);
+        assert_eq!(a.kernel_dimension, b.kernel_dimension);
+        assert_eq!(a.raw_factor_tuple_count, b.raw_factor_tuple_count);
+        assert_eq!(a.reachable_target_count, b.reachable_target_count);
+        assert_eq!(a.factorization_count_per_target, b.factorization_count_per_target);
+        assert_eq!(a.unique_factorization, b.unique_factorization);
+        assert_eq!(a.dependency_order, b.dependency_order);
+
+        let forward_kernel = factorization_kernel_basis(&forward).expect("forward kernel");
+        let reverse_kernel = factorization_kernel_basis(&reverse).expect("reverse kernel");
+        assert_eq!(forward_kernel.len(), reverse_kernel.len());
+        assert!(forward_kernel.iter().all(|witness| witness.verifies_against(&forward)));
+        assert!(reverse_kernel.iter().all(|witness| witness.verifies_against(&reverse)));
+        assert_ne!(forward_kernel, reverse_kernel);
+    }
+    #[test]
     fn independent_factors_have_no_dependency_witness() {
         let (_, left, right) =
             RandomLinearCode::generate_direct_sum(32, 3, 4, 0x51A7).expect("valid direct sum");
