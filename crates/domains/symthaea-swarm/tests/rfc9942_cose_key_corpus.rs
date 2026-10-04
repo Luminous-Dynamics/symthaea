@@ -35,6 +35,29 @@ fn bstr(bytes: &[u8]) -> Vec<u8> {
     out.extend_from_slice(bytes);
     out
 }
+fn bstr_large(bytes: &[u8]) -> Vec<u8> {
+    let mut out = match bytes.len() {
+        0..=23 => vec![0x40 + bytes.len() as u8],
+        24..=255 => vec![0x58, bytes.len() as u8],
+        256..=65_535 => {
+            let len = bytes.len() as u16;
+            vec![0x59, (len >> 8) as u8, len as u8]
+        }
+        65_536..=u32::MAX as usize => {
+            let len = bytes.len() as u32;
+            vec![
+                0x5a,
+                (len >> 24) as u8,
+                (len >> 16) as u8,
+                (len >> 8) as u8,
+                len as u8,
+            ]
+        }
+        _ => panic!("fixture bstr exceeds CBOR 32-bit length form"),
+    };
+    out.extend_from_slice(bytes);
+    out
+}
 fn uint_field(label: u8, value: u8) -> Vec<u8> {
     vec![label, value]
 }
@@ -167,7 +190,7 @@ fn rfc9942_receipt_collection_accepts_receipt_bstr_above_generic_skip_value_cap(
     assert!(encoded.len() > 4096);
 
     let mut wire = vec![0x9f];
-    wire.extend_from_slice(&bstr(&encoded));
+    wire.extend_from_slice(&bstr_large(&encoded));
     wire.push(0xff);
 
     let parsed = Rfc9942ReceiptCollection::from_cbor(&wire)
