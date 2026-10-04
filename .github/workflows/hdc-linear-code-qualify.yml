@@ -77,9 +77,11 @@ jobs:
           SOURCE_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/src/hdc/linear_code.rs" | cut -d" " -f1)"
           TEST_SHA256="$(sha256sum "$GITHUB_WORKSPACE/crates/core/symthaea-core/tests/linear_code_ambiguity.rs" | cut -d" " -f1)"
           WORKFLOW_SHA256="$(sha256sum "$GITHUB_WORKSPACE/.github/workflows/hdc-linear-code-qualify.yml" | cut -d" " -f1)"
+          TOOLCHAIN_FILE_SHA256="$(sha256sum "$GITHUB_WORKSPACE/rust-toolchain.toml" | cut -d" " -f1)"
           echo "source_sha256=$SOURCE_SHA256" >> "$GITHUB_OUTPUT"
           echo "test_sha256=$TEST_SHA256" >> "$GITHUB_OUTPUT"
           echo "workflow_sha256=$WORKFLOW_SHA256" >> "$GITHUB_OUTPUT"
+          echo "toolchain_file_sha256=$TOOLCHAIN_FILE_SHA256" >> "$GITHUB_OUTPUT"
 
       - name: Focused formatting
         id: format
@@ -324,6 +326,7 @@ jobs:
           source_sha256=${{ steps.provenance.outputs.source_sha256 }}
           integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
           qualification_workflow_sha256=${{ steps.provenance.outputs.workflow_sha256 }}
+          rust_toolchain_file_sha256=${{ steps.provenance.outputs.toolchain_file_sha256 }}
           cargo_version=${{ steps.harness.outputs.cargo_version }}
           rustc_version=${{ steps.harness.outputs.rustc_version }}
           dependency_lock_sha256=${{ steps.harness.outputs.lock_sha256 }}
