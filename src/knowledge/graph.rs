@@ -1148,6 +1148,37 @@ fn contains_negation(text: &str) -> bool {
 // ── Tests ──────────────────────────────────────────────────────────────────
 
     #[test]
+    fn test_canonical_admission_rejects_receipt_for_different_subject() {
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let validation = ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation));
+        let receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            Some("frontier:1".into()),
+            "canonical:other",
+            Some("family:1".into()),
+            validation.snapshot_digest.clone(),
+            validation.validator_version.clone(),
+            validation.snapshot_schema_version,
+        ).unwrap();
+
+        let admission = CanonicalAdmission::new(
+            "canonical:1",
+            Some("family:1".into()),
+        ).unwrap().with_receipt(receipt);
+
+        assert_eq!(
+            admission.validate_structure(),
+            Err("admission receipt must bind canonical subject")
+        );
+    }
+
+    #[test]
+    #[test]
     fn test_domain_distribution_is_restore_order_invariant() {
         let records = [
             super::persistence::FactRecord {
