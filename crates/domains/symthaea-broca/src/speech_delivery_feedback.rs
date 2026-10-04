@@ -223,6 +223,24 @@ mod tests {
     }
 
     #[test]
+    fn fresh_receipt_validates_and_tampered_error_fails() {
+        let plan = plan();
+        let mut receipt = SpeechDeliveryReceipt::new(
+            &plan,
+            SpeechDeliveryObservation {
+                clause_mode: Some(ClauseMode::Question),
+                ..Default::default()
+            },
+        );
+        assert!(receipt.validate().is_ok());
+        receipt.error.mismatched_features = 0;
+        assert_eq!(
+            receipt.validate().expect_err("tampered cached error"),
+            SpeechDeliveryReceiptError::ErrorMismatch
+        );
+    }
+
+    #[test]
     fn receipt_lineage_matches_exact_plan() {
         let plan = plan();
         let receipt = SpeechDeliveryReceipt::new(&plan, SpeechDeliveryObservation::default());
