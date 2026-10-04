@@ -3586,6 +3586,94 @@ mod tests {
         assert_eq!(receipt.verify_inclusion_with_detached_payload(b"a",&head.root()).unwrap(),head);
     }
     #[test]
+    fn rfc9942_outer_accepts_indefinite_protected_header_map() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA;64]).unwrap();
+        let collection=Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
+
+        let mut protected=Vec::new();
+        protected.push(0xbf);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected,-7);
+        cbor_int(&mut protected,RFC9942_RECEIPTS_HEADER_LABEL);
+        protected.extend_from_slice(&collection.to_cbor());
+        protected.push(0xff);
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,0);
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes,&[0xBB;64]);
+
+        let decoded=Rfc9942SignatureWithReceipts::from_cbor(&bytes)
+            .expect("an indefinite protected-header map is valid COSE/CBOR");
+        assert_eq!(decoded.to_cbor(),bytes);
+        assert!(decoded.protected_receipts().is_some());
+    }
+
+    #[test]
+    fn rfc9942_outer_accepts_indefinite_unprotected_header_map() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA;64]).unwrap();
+        let collection=Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
+
+        let mut protected=Vec::new();
+        cbor_map_len(&mut protected,1);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected,-7);
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        bytes.push(0xbf);
+        cbor_int(&mut bytes,RFC9942_RECEIPTS_HEADER_LABEL);
+        bytes.extend_from_slice(&collection.to_cbor());
+        cbor_int(&mut bytes,7);
+        cbor_uint(&mut bytes,1);
+        bytes.push(0xff);
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes,&[0xBB;64]);
+
+        let decoded=Rfc9942SignatureWithReceipts::from_cbor(&bytes)
+            .expect("an indefinite unprotected-header map is valid COSE/CBOR");
+        assert_eq!(decoded.to_cbor(),bytes);
+        assert!(decoded.unprotected_receipts().is_some());
+    }
+
+    #[test]
+    fn rfc9942_outer_rejects_unterminated_indefinite_protected_header_map() {
+        let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
+        let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
+        let receipt=Rfc9942ReceiptEnvelope::new(-7,vdp,Rfc9942ReceiptPayload::Detached,vec![0xAA;64]).unwrap();
+        let collection=Rfc9942ReceiptCollection::new(vec![receipt]).unwrap();
+
+        let mut protected=Vec::new();
+        protected.push(0xbf);
+        cbor_int(&mut protected,COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected,-7);
+        cbor_int(&mut protected,RFC9942_RECEIPTS_HEADER_LABEL);
+        protected.extend_from_slice(&collection.to_cbor());
+
+        let mut bytes=Vec::new();
+        cbor_tag(&mut bytes,COSE_SIGN1_TAG);
+        cbor_array_len(&mut bytes,4);
+        cbor_bytes(&mut bytes,&protected);
+        cbor_map_len(&mut bytes,0);
+        bytes.push(0xf6);
+        cbor_bytes(&mut bytes,&[0xBB;64]);
+
+        assert_eq!(
+            Rfc9942SignatureWithReceipts::from_cbor(&bytes),
+            Err(Rfc9942VdpError::InvalidEncoding)
+        );
+    }
+
+    #[test]
     fn rfc9942_receipt_collection_preserves_priority_order_and_wire_shape() {
         let proof=Rfc9162InclusionProof::new(2,0,vec![[0x11;32]]).to_cbor();
         let vdp=Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion,vec![proof]).unwrap();
