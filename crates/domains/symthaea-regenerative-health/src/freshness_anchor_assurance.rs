@@ -273,6 +273,7 @@ pub enum FreshnessAnchorAssuranceError {
     InvalidProfile,
     InvalidReceipt,
     ProfileBindingMismatch,
+    SubjectBindingMismatch,
     EvidenceVerificationFailed,
     InsufficientCapabilities {
         missing: Vec<FreshnessAnchorCapability>,
