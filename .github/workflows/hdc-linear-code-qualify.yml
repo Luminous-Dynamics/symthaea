@@ -2,6 +2,9 @@ name: HDC Linear-Code Recovery Qualification
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - "research/hdc-resonator-cleanup-rules-v1"
   push:
     branches:
       - "research/hdc-linear-code-recovery-design-v1"
