@@ -128,6 +128,18 @@ fn concept_identity_map(
         .collect()
 }
 
+fn execution_revision() -> String {
+    std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|revision| revision.trim().to_string())
+        .filter(|revision| !revision.is_empty())
+        .unwrap_or_else(|| "local".into())
+}
+
 fn main() -> Result<(), String> {
     let scheme_id = "scheme:example-v1";
     let mapping_provenance_hash = symthaea_communication::content_hash(
@@ -334,7 +346,7 @@ fn main() -> Result<(), String> {
         return Err("grounded identity N0 acceptance gates failed".into());
     }
 
-    let execution_revision = std::env::var("GITHUB_SHA").unwrap_or_else(|_| "local".into());
+    let execution_revision = execution_revision();
     let output = serde_json::json!({
         "benchmark": "neurosemantic-hdc-grounded-identity-n0",
         "benchmark_schema_version": HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
