@@ -37,3 +37,7 @@ required-features = ["hdc-codec"]
 [[example]]
 name = "neurosemantic_hdc_grounded_identity_generalization_n0"
 required-features = ["hdc-codec"]
+
+[[example]]
+name = "neurosemantic_hdc_grounded_identity_adversarial_n0"
+required-features = ["hdc-codec"]
