@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+fn is_hex_digest(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 pub const MEMORY_PROJECTION_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -583,6 +587,51 @@ mod tests {
                 &[a, b],
                 PROVENANCE_SNAPSHOT_SCHEMA_VERSION + 1,
             )
+        );
+    }
+
+    #[test]
+    fn validation_report_rejects_deserialized_metadata_drift() {
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let valid = ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation));
+
+        let mut wrong_digest = valid.clone();
+        wrong_digest.snapshot_digest = "not-a-digest".into();
+        assert_eq!(
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), wrong_digest).unwrap_err(),
+            "provenance snapshot digest must be a 64-character hexadecimal digest"
+        );
+
+        let mut wrong_count = valid.clone();
+        wrong_count.relation_count = 0;
+        assert_eq!(
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), wrong_count).unwrap_err(),
+            "provenance validation relation count mismatch"
+        );
+
+        let mut blank_validator = valid.clone();
+        blank_validator.validator_version.clear();
+        assert_eq!(
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), blank_validator).unwrap_err(),
+            "provenance validator version must be non-empty"
+        );
+
+        let mut mismatched_outcome = valid.clone();
+        mismatched_outcome.conforms = true;
+        mismatched_outcome.violations.push(ProvenanceValidationViolation {
+            code: "test".into(),
+            source_memory_id: None,
+            target_memory_id: None,
+            message: "invalid".into(),
+        });
+        assert_eq!(
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), mismatched_outcome).unwrap_err(),
+            "provenance validation outcome does not match violations"
         );
     }
 
