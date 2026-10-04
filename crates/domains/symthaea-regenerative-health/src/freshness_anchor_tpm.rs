@@ -249,6 +249,68 @@ impl TpmNvCounterEvidence {
     }
 }
 
+/// Exact verifier-side trust roots for one authoritative TPM NV counter.
+///
+/// These values are configuration, not evidence. They are therefore never copied
+/// from an incoming attestation before comparison. A concrete verifier must derive
+/// them from its pre-authorized deployment profile and reject any evidence whose
+/// signed NV identity or other trusted binding differs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TpmNvCounterTrustPolicy {
+    pub tpm_identity_digest: String,
+    pub nv_index_name_digest: String,
+    pub nv_public_digest: String,
+    pub auth_policy_digest: String,
+    pub attestation_key_id_digest: String,
+    pub pcr_binding_digest: String,
+}
+
+impl TpmNvCounterTrustPolicy {
+    pub fn validate_structure(&self) -> bool {
+        [
+            &self.tpm_identity_digest,
+            &self.nv_index_name_digest,
+            &self.nv_public_digest,
+            &self.auth_policy_digest,
+            &self.attestation_key_id_digest,
+            &self.pcr_binding_digest,
+        ]
+        .iter()
+        .all(|value| !value.trim().is_empty())
+    }
+
+    pub fn binding_digest(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:freshness-tpm-nv-counter-trust-policy:v1\\0");
+        fn write_string(hasher: &mut blake3::Hasher, value: &str) {
+            hasher.update(&(value.len() as u64).to_le_bytes());
+            hasher.update(value.as_bytes());
+        }
+        write_string(&mut hasher, &self.tpm_identity_digest);
+        write_string(&mut hasher, &self.nv_index_name_digest);
+        write_string(&mut hasher, &self.nv_public_digest);
+        write_string(&mut hasher, &self.auth_policy_digest);
+        write_string(&mut hasher, &self.attestation_key_id_digest);
+        write_string(&mut hasher, &self.pcr_binding_digest);
+        hasher.finalize().to_hex().to_string()
+    }
+
+    pub fn matches_evidence(&self, evidence: &TpmNvCounterEvidence) -> bool {
+        self.validate_structure()
+            && evidence.tpm_identity_digest == self.tpm_identity_digest
+            && evidence.nv_index_name_digest == self.nv_index_name_digest
+            && evidence.nv_public_digest == self.nv_public_digest
+            && evidence.auth_policy_digest == self.auth_policy_digest
+            && evidence.attestation_key_id_digest == self.attestation_key_id_digest
+            && evidence.nv_certify_attestation_key_id_digest == self.attestation_key_id_digest
+            && evidence.nv_certify_index_name_digest == self.nv_index_name_digest
+            && evidence.pcr_binding_digest == self.pcr_binding_digest
+            && evidence.nv_public_data_size == 8
+            && evidence.nv_certify_offset == 0
+            && evidence.nv_certify_size == 8
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TpmNvCounterVerificationError {
     InvalidEvidence,
@@ -259,6 +321,7 @@ pub enum TpmNvCounterVerificationError {
     EvidenceDigestMismatch,
     NvCertificationBindingMismatch,
     CounterPersistenceMismatch,
+    TrustPolicyMismatch,
     QuoteVerificationFailed,
     ChallengeDigestMismatch,
 }
@@ -328,6 +391,26 @@ pub fn verify_tpm_nv_counter<V: TpmNvCounterEvidenceVerifier>(
 
     verifier.verify(evidence, profile, receipt)?;
     Ok(evidence.as_evidence_kind())
+}
+
+/// Authoritative verification requires an independent, pre-authorized trust
+/// policy for the exact TPM/NV object and attestation bindings.
+///
+/// This is intentionally separate from verify_tpm_nv_counter, whose existing
+/// signature remains useful for structural/adapter qualification. Callers must
+/// use this policy-bound entry point before treating the returned evidence kind
+/// as eligible for authoritative freshness.
+pub fn verify_tpm_nv_counter_with_trust_policy<V: TpmNvCounterEvidenceVerifier>(
+    evidence: &TpmNvCounterEvidence,
+    policy: &TpmNvCounterTrustPolicy,
+    profile: &FreshnessAnchorProfile,
+    receipt: &FreshnessAnchorVerificationReceipt,
+    verifier: &V,
+) -> Result<FreshnessAnchorEvidenceKind, TpmNvCounterVerificationError> {
+    if !policy.validate_structure() || !policy.matches_evidence(evidence) {
+        return Err(TpmNvCounterVerificationError::TrustPolicyMismatch);
+    }
+    verify_tpm_nv_counter(evidence, profile, receipt, verifier)
 }
 
 pub fn verify_tpm_nv_counter_with_challenge<V: TpmNvCounterEvidenceVerifier>(
@@ -418,6 +501,80 @@ mod tests {
         ) -> Result<(), TpmNvCounterVerificationError> {
             Ok(())
         }
+    }
+
+    #[test]
+    fn trusted_policy_rejects_decoy_nv_identity_before_external_verifier() {
+        let evidence = evidence(7);
+        let policy = TpmNvCounterTrustPolicy {
+            tpm_identity_digest: "tpm-identity".into(),
+            nv_index_name_digest: "trusted-nv-name".into(),
+            nv_public_digest: "nv-public".into(),
+            auth_policy_digest: "auth-policy".into(),
+            attestation_key_id_digest: "ak-id".into(),
+            pcr_binding_digest: "pcr-binding".into(),
+        };
+
+        struct MustNotRun;
+        impl TpmNvCounterEvidenceVerifier for MustNotRun {
+            fn verify(
+                &self,
+                _: &TpmNvCounterEvidence,
+                _: &FreshnessAnchorProfile,
+                _: &FreshnessAnchorVerificationReceipt,
+            ) -> Result<(), TpmNvCounterVerificationError> {
+                panic!("external verifier must not run before trusted NV identity validation");
+            }
+        }
+
+        assert_eq!(
+            verify_tpm_nv_counter_with_trust_policy(
+                &evidence,
+                &policy,
+                &profile(),
+                &receipt(7),
+                &MustNotRun,
+            )
+            .unwrap_err(),
+            TpmNvCounterVerificationError::TrustPolicyMismatch
+        );
+    }
+
+    #[test]
+    fn trusted_policy_accepts_exact_nv_identity_and_bindings() {
+        let evidence = evidence(7);
+        let policy = TpmNvCounterTrustPolicy {
+            tpm_identity_digest: "tpm-identity".into(),
+            nv_index_name_digest: "nv-name".into(),
+            nv_public_digest: "nv-public".into(),
+            auth_policy_digest: "auth-policy".into(),
+            attestation_key_id_digest: "ak-id".into(),
+            pcr_binding_digest: "pcr-binding".into(),
+        };
+        assert!(verify_tpm_nv_counter_with_trust_policy(
+            &evidence,
+            &policy,
+            &profile(),
+            &receipt(7),
+            &Accept,
+        ).is_ok());
+    }
+
+    #[test]
+    fn trust_policy_binding_digest_is_stable_and_identity_sensitive() {
+        let policy = TpmNvCounterTrustPolicy {
+            tpm_identity_digest: "tpm-identity".into(),
+            nv_index_name_digest: "nv-name".into(),
+            nv_public_digest: "nv-public".into(),
+            auth_policy_digest: "auth-policy".into(),
+            attestation_key_id_digest: "ak-id".into(),
+            pcr_binding_digest: "pcr-binding".into(),
+        };
+        let original = policy.binding_digest();
+        assert_eq!(original, policy.binding_digest());
+        let mut changed = policy.clone();
+        changed.nv_index_name_digest = "other-nv-name".into();
+        assert_ne!(original, changed.binding_digest());
     }
 
     #[test]
