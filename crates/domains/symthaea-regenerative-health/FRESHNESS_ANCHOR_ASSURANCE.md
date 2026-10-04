@@ -103,7 +103,9 @@ Epoch freshness remains a separate receiver state machine. An unavailable or sta
 
 A concrete TPM backend may use protected NV state such as an NV Counter as the rollback-resistant primitive.
 
-The TCG TPM 2.0 architecture specifies that an NV Counter is modified through increment semantics, cannot move backward when read, and cannot be rolled back by deleting and recreating the counter at a lower lifetime value.
+The adjacent `freshness_anchor_tpm` module provides a deployment-neutral contract for TPM NV-counter evidence. It explicitly binds TPM identity, NV Index Name/public-area, authorization policy, attestation key, quote Handle, quote, PCR binding, and counter value. The structural gate requires the counter to equal the recovery generation and the quote Handle to equal the receipt Handle; cryptographic quote verification remains platform-specific.
+
+TCG TPM 2.0 defines `TPM_NT_COUNTER` as an 8-octet counter whose value is modified with `TPM2_NV_Increment()`. The deployment must separately establish the required persistence and lifecycle properties of the selected NV index; those properties are not inferred merely from the fact that the object is an NV counter.
 
 A real adapter must still independently verify:
 
@@ -170,6 +172,7 @@ Implemented:
 - evidence-bound verification receipt;
 - deterministic, domain-separated verification-receipt statement commitment;
 - concrete Ed25519 attestation-result protection over that commitment;
+- deployment-neutral TPM NV-counter evidence contract;
 - explicit verifier key/trust-anchor policy binding;
 - explicit recovery-policy and authority binding;
 - typed hardware/remote/quorum evidence envelope;
@@ -186,6 +189,7 @@ Not yet implemented:
 - remote-authority protocol;
 - quorum/consensus adapter;
 - production platform evidence parser/attestation verifier;
+- production TPM quote/NV-public-area verification adapter;
 - deployment-specific verifier-key/trust-anchor resolution.
 
 This separation is intentional: platform-specific evidence verification must remain an independently reviewable trust boundary.
