@@ -613,12 +613,29 @@ impl EvaluationTrace {
         } else {
             false
         };
+        let procedure = if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
+            EvaluationProcedure::attestation_ed25519_v1()
+        } else {
+            EvaluationProcedure::attestation_ed25519()
+        };
         matches_trace
             && self.terminal_outcome() == Some(report.outcome)
-            && self
-                .results
-                .iter()
-                .all(|result| result.check.stage(report) == result.stage)
+            && self.results.iter().all(|result| {
+                result.check.stage(report) == result.stage
+            })
+            // The stage projection is itself public, serializable state. Do not
+            // permit a caller to append "Passed" to a stage that the captured
+            // execution trace never reached. Absent trace entries must remain
+            // NotEvaluated, otherwise EvaluationBoundary could over-establish
+            // claims that were never executed.
+            && procedure.checks.iter().enumerate().all(|(index, check)| {
+                let expected = self
+                    .results
+                    .get(index)
+                    .map(|result| result.stage)
+                    .unwrap_or(VerificationStage::NotEvaluated);
+                check.stage(report) == expected
+            })
     }
 
     /// Return the aggregate outcome represented by this trace.
@@ -3719,6 +3736,40 @@ mod tests {
             .not_established
             .retain(|claim| *claim != EvaluationClaim::EvaluatorIndependence);
         assert!(!tampered.is_well_formed());
+    }
+
+    #[test]
+    fn report_rejects_post_failure_stage_inflation() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            200,
+        );
+        let mut report = verifier.verify_report(&envelope, &receipt);
+
+        assert_eq!(
+            report.outcome,
+            ReceiptAttestationVerificationOutcome::Expired
+        );
+        assert_eq!(
+            report.execution_trace.results.last().map(|result| result.check),
+            Some(EvaluationCheck::TemporalValidity)
+        );
+        assert!(report.is_well_formed());
+
+        // The captured trace stopped at temporal validity. Mutating a later
+        // stage to Passed must not make the report internally coherent.
+        report.cryptosuite = VerificationStage::Passed;
+        assert!(!report.is_well_formed());
+
+        let mut evaluation = report.to_evidence_evaluation();
+        assert!(evaluation
+            .boundary
+            .not_established
+            .contains(&EvaluationClaim::CryptosuiteConformance));
+        evaluation.boundary.established = vec![EvaluationClaim::CryptosuiteConformance];
+        assert!(!evaluation.is_well_formed());
     }
 
     #[test]
