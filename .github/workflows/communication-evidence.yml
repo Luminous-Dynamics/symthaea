@@ -78,6 +78,9 @@ jobs:
           assert grounded_identity["training_manifest_hash"] != grounded_identity["held_out_manifest_hash"]
           assert grounded_identity["summary"]["same_codebook_for_held_out_groundings"] is True
           assert grounded_identity["summary"]["same_hdc_frames_for_same_stable_structure"] is True
+          assert grounded_identity["summary"]["source_groundings_preserved"] is True
+          assert grounded_identity["summary"]["receiver_local_ids_used"] is True
+          assert grounded_identity["summary"]["source_manifest_differs_from_receiver"] is True
           assert grounded_identity["summary"]["concept_identity_exact"] is True
           assert grounded_identity["summary"]["relation_identity_exact"] is True
           assert grounded_identity["summary"]["structurally_equivalent"] is True
