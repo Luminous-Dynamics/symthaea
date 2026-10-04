@@ -1573,9 +1573,15 @@ impl EvaluationBoundary {
             .map(|result| result.stage)
             .unwrap_or(VerificationStage::NotEvaluated);
         match receipt_stage {
-            VerificationStage::Passed => boundary.established.push(EvaluationClaim::ReceiptIntegrity),
-            VerificationStage::Failed(_) => boundary.not_established.push(EvaluationClaim::ReceiptIntegrity),
-            VerificationStage::NotEvaluated => boundary.indeterminate.push(EvaluationClaim::ReceiptIntegrity),
+            VerificationStage::Passed => boundary
+                .established
+                .push(EvaluationClaim::ReceiptIntegrity),
+            VerificationStage::Failed(_) => boundary
+                .not_established
+                .push(EvaluationClaim::ReceiptIntegrity),
+            VerificationStage::NotEvaluated => boundary
+                .indeterminate
+                .push(EvaluationClaim::ReceiptIntegrity),
         }
         boundary
     }
@@ -1587,8 +1593,27 @@ impl EvaluationBoundary {
             self.not_established.iter().copied().collect();
         let indeterminate: std::collections::BTreeSet<_> =
             self.indeterminate.iter().copied().collect();
-        let all_claims: std::collections::BTreeSet<_> =
+        let current_all_claims: std::collections::BTreeSet<_> =
             EvaluationClaim::ALL.iter().copied().collect();
+        let legacy_all_claims: std::collections::BTreeSet<_> = [
+            EvaluationClaim::ReceiptIntegrity,
+            EvaluationClaim::AttestationAuthenticity,
+            EvaluationClaim::TemporalValidity,
+            EvaluationClaim::CryptosuiteConformance,
+            EvaluationClaim::VerificationMethodResolution,
+            EvaluationClaim::VerificationMethodLifecycle,
+            EvaluationClaim::ProofPurposeAuthorization,
+            EvaluationClaim::ProofPolicyConformance,
+            EvaluationClaim::CryptographicProofValidity,
+            EvaluationClaim::UnderlyingObservationTruth,
+            EvaluationClaim::SemanticValidity,
+            EvaluationClaim::ExternalWorldCorrespondence,
+            EvaluationClaim::AttesterIntent,
+            EvaluationClaim::EvaluatorIndependence,
+            EvaluationClaim::EnvelopeStructuralValidity,
+        ]
+        .into_iter()
+        .collect();
 
         let mut present = established.clone();
         present.extend(not_established.iter().copied());
@@ -1600,7 +1625,7 @@ impl EvaluationBoundary {
             && established.is_disjoint(&not_established)
             && established.is_disjoint(&indeterminate)
             && not_established.is_disjoint(&indeterminate)
-            && present == all_claims
+            && (present == current_all_claims || present == legacy_all_claims)
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -1675,7 +1700,9 @@ impl EvidenceEvaluation {
             execution_trace,
             verification_report_fingerprint: report.fingerprint(),
             outcome: report.outcome,
-            boundary: EvaluationBoundary::from_report(report),
+            // EvidenceEvaluation is current v8 even when materialized from a legacy report;
+            // derive the boundary from the authoritative trace using current claim semantics.
+            boundary: EvaluationBoundary::from_execution_trace(&execution_trace),
         }
     }
 
@@ -1746,7 +1773,7 @@ impl EvidenceEvaluation {
             && self.boundary == if self.evaluation_version == LEGACY_EVIDENCE_EVALUATION_VERSION {
                 EvaluationBoundary::from_execution_trace_v7(&self.execution_trace)
             } else {
-                EvaluationBoundary::from_report(report)
+                EvaluationBoundary::from_execution_trace(&self.execution_trace)
             }
             && self.boundary.is_well_formed()
     }
