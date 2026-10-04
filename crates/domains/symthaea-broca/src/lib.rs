@@ -143,7 +143,7 @@ pub use phonological_plan::{
 };
 pub use speech_delivery_feedback::{
     ObservedFocus, SpeechDeliveryError, SpeechDeliveryObservation, SpeechDeliveryReceipt,
-    SpeechDeliveryTarget, SPEECH_DELIVERY_FEEDBACK_VERSION,
+    SpeechDeliveryReceiptError, SpeechDeliveryTarget, SPEECH_DELIVERY_FEEDBACK_VERSION,
 };
 pub use speech_feedback::{
     SpeechFeedbackError, SpeechFeedbackReceipt, SpeechFeedbackReceiptError,
