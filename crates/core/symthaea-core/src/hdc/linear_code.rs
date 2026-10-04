@@ -1011,7 +1011,9 @@ impl LinearCodeFactorizationFiber {
         }
 
         let expected_source_fingerprint = factorization_source_fingerprint(target, factors);
-        if self.source_fingerprint != expected_source_fingerprint || !self.integrity_is_valid() {
+        if self.source_fingerprint != expected_source_fingerprint
+            || !self.basis_is_well_formed()
+        {
             return false;
         }
 
@@ -1128,7 +1130,9 @@ pub fn factorization_kernel_basis(
         })
         .collect::<Vec<_>>();
     if basis_rank(&coefficient_basis, total_rank) != expected_kernel_dimension
-        || kernel_basis.iter().any(|witness| !witness.verifies_against(factors))
+        || kernel_basis
+            .iter()
+            .any(|witness| !witness.verifies_against(factors))
     {
         return None;
     }
