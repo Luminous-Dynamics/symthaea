@@ -234,7 +234,8 @@ fn main() -> Result<(), String> {
         .flat_map(|(_, edges)| stable_edge_set(edges))
         .collect::<BTreeSet<_>>();
 
-    // Increasing graph load with known identities and unseen stable triples.
+    // Increasing graph load and topology shifts with known identities and unseen stable triples.
+    // The first four cases stress load; the next four isolate distinct topology families.
     let held_out_cases = [
         (
             "load-3x2",
@@ -275,6 +276,54 @@ fn main() -> Result<(), String> {
                 (8, 0, 9),
                 (9, 1, 5),
                 (5, 2, 2),
+            ][..],
+        ),
+        (
+            "topology-out-star",
+            &[0, 1, 2, 3, 4, 5, 6][..],
+            &[
+                (0, 1, 2),
+                (0, 2, 3),
+                (0, 3, 4),
+                (0, 1, 5),
+                (0, 2, 6),
+                (0, 3, 1),
+            ][..],
+        ),
+        (
+            "topology-in-star",
+            &[1, 2, 3, 4, 5, 6, 7][..],
+            &[
+                (2, 0, 1),
+                (3, 1, 1),
+                (4, 2, 1),
+                (5, 3, 1),
+                (6, 0, 1),
+                (7, 2, 1),
+            ][..],
+        ),
+        (
+            "topology-merge-branch",
+            &[0, 2, 3, 5, 7, 8, 9][..],
+            &[
+                (0, 1, 2),
+                (3, 2, 7),
+                (5, 3, 7),
+                (8, 0, 7),
+                (9, 2, 7),
+                (2, 3, 7),
+            ][..],
+        ),
+        (
+            "topology-cycle",
+            &[0, 1, 4, 6, 7, 8, 9][..],
+            &[
+                (0, 1, 4),
+                (4, 2, 6),
+                (6, 0, 7),
+                (7, 1, 8),
+                (8, 2, 9),
+                (9, 3, 0),
             ][..],
         ),
     ];
@@ -398,6 +447,7 @@ fn main() -> Result<(), String> {
             "node_selection_margin": metrics.node_selection_margin,
             "edge_min_selected_score": metrics.edge_min_selected_score,
             "edge_selection_margin": metrics.edge_selection_margin,
+            "family": if case_id.starts_with("topology-") { "topology" } else { "load" },
         }));
     }
 
@@ -418,7 +468,7 @@ fn main() -> Result<(), String> {
         "benchmark_schema_version": HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
         "execution_revision": execution_revision,
         "adapter_id": HDC_ONTOLOGY_ADAPTER_ID,
-        "claim_boundary": "held_out_known_identity_unseen_composition_and_distractor_load_only",
+        "claim_boundary": "held_out_known_identity_unseen_composition_distractor_load_and_topology_only",
         "codebook": {
             "hash": codebook.codebook_hash(),
             "concept_count": codebook.concept_ids().len(),
@@ -427,6 +477,8 @@ fn main() -> Result<(), String> {
         "mapping_provenance_hash": provenance_hash,
         "summary": {
             "cases": matrix.len(),
+            "load_cases": 4,
+            "topology_cases": 4,
             "all_clean_structurally_equivalent": true,
             "all_concept_identity_exact": true,
             "all_relation_identity_exact": true,
