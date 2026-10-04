@@ -63,6 +63,19 @@ impl TpmQuoteChallenge {
 
 
 
+
+/// Persistence semantics required by an authoritative TPM freshness counter.
+///
+/// `Synchronous` corresponds to an NV index whose update is required to be
+/// persistent when the update command completes. `Orderly` permits the TPM
+/// to defer persistence until an orderly shutdown and is therefore not
+/// sufficient for crash-persistent freshness authority on its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TpmNvCounterPersistenceMode {
+    Synchronous,
+    Orderly,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TpmNvCounterEvidence {
     /// Stable TPM/attesting-environment identity commitment.
@@ -88,6 +101,8 @@ pub struct TpmNvCounterEvidence {
     pub nv_certify_index_name_digest: String,
     /// Digest of the NV contents certified by NV_Certify.
     pub nv_certify_contents_digest: String,
+    /// Persistence semantics asserted for the selected NV counter.
+    pub persistence_mode: TpmNvCounterPersistenceMode,
     /// Digest binding the quote to the measured platform state required by policy.
     pub pcr_binding_digest: String,
     /// Counter value read from the exact NV counter described above.
@@ -135,6 +150,7 @@ impl TpmNvCounterEvidence {
         receipt: &FreshnessAnchorVerificationReceipt,
     ) -> bool {
         self.validate_structure()
+            && matches!(self.persistence_mode, TpmNvCounterPersistenceMode::Synchronous)
             && matches!(profile.backing, FreshnessAnchorBacking::HardwareProtected)
             && matches!(
                 &receipt.evidence_kind,
@@ -180,6 +196,10 @@ impl TpmNvCounterEvidence {
         write_string(&mut hasher, &self.nv_certify_nonce_digest);
         write_string(&mut hasher, &self.nv_certify_index_name_digest);
         write_string(&mut hasher, &self.nv_certify_contents_digest);
+        hasher.update(&[match self.persistence_mode {
+            TpmNvCounterPersistenceMode::Synchronous => 0,
+            TpmNvCounterPersistenceMode::Orderly => 1,
+        }]);
         write_string(&mut hasher, &self.pcr_binding_digest);
         hasher.update(&self.counter_value.to_le_bytes());
         hasher.finalize().to_hex().to_string()
@@ -195,6 +215,7 @@ pub enum TpmNvCounterVerificationError {
     EvidenceIdentityMismatch,
     EvidenceDigestMismatch,
     NvCertificationBindingMismatch,
+    CounterPersistenceMismatch,
     QuoteVerificationFailed,
     ChallengeDigestMismatch,
 }
@@ -220,6 +241,12 @@ pub fn verify_tpm_nv_counter<V: TpmNvCounterEvidenceVerifier>(
     }
     if !matches!(profile.backing, FreshnessAnchorBacking::HardwareProtected) {
         return Err(TpmNvCounterVerificationError::BackingMismatch);
+    }
+    if !matches!(
+        evidence.persistence_mode,
+        TpmNvCounterPersistenceMode::Synchronous
+    ) {
+        return Err(TpmNvCounterVerificationError::CounterPersistenceMismatch);
     }
     if receipt.generation != evidence.counter_value
         || receipt.evidence_kind.observed_sequence() != evidence.counter_value
@@ -296,6 +323,7 @@ mod tests {
             nv_certify_nonce_digest: "quote-handle".into(),
             nv_certify_index_name_digest: "nv-name".into(),
             nv_certify_contents_digest: "nv-contents".into(),
+            persistence_mode: TpmNvCounterPersistenceMode::Synchronous,
             pcr_binding_digest: "pcr-binding".into(),
             counter_value,
         }
@@ -564,6 +592,16 @@ mod tests {
         let mut changed = evidence;
         changed.nv_certify_contents_digest = "different-contents".into();
         assert_ne!(original, changed.binding_digest());
+    }
+
+    #[test]
+    fn orderly_persistence_cannot_back_authoritative_counter() {
+        let mut evidence = evidence(7);
+        evidence.persistence_mode = TpmNvCounterPersistenceMode::Orderly;
+        assert_eq!(
+            verify_tpm_nv_counter(&evidence, &profile(), &receipt(7), &Accept).unwrap_err(),
+            TpmNvCounterVerificationError::CounterPersistenceMismatch
+        );
     }
 
     #[test]
