@@ -5,7 +5,7 @@
 //! semantics. It describes what a federation adapter must carry and structurally
 //! validate when transporting an explicitly admitted claim.
 
-use crate::{sha256_hex, CanonicalAdmissionReceipt, ProvenanceRelation, ProvenanceRelationKind, ProvenanceValidationReport, ProvenanceView};
+use crate::{ClaimRepresentationIdentity, CanonicalAdmissionReceipt, CanonicalAdmissionSubject, ProvenanceRelation, ProvenanceRelationKind, ProvenanceValidationReport, ProvenanceView, sha256_hex};
 
 pub const FEDERATED_CLAIM_SCHEMA_VERSION: u16 = 1;
 /// Version of the canonical federated-envelope digest encoding. Bump whenever
@@ -65,6 +65,20 @@ pub struct FederatedClaim {
 }
 
 impl FederatedClaim {
+    /// Typed projection of the canonical admission subject.
+    /// This is intentionally separate from the claim/representation identity.
+    pub fn admission_subject(&self) -> Result<CanonicalAdmissionSubject, &'static str> {
+        CanonicalAdmissionSubject::new(
+            self.canonical_identity.clone(),
+            Some(self.provenance_family.clone()),
+        )
+    }
+
+    /// Typed projection of this exported representation's local identity.
+    pub fn representation_identity(&self) -> Result<ClaimRepresentationIdentity, &'static str> {
+        ClaimRepresentationIdentity::new(self.claim_identity.clone())
+    }
+
     pub fn new(
         claim_identity: impl Into<String>,
         canonical_identity: impl Into<String>,
@@ -453,6 +467,35 @@ mod tests {
             validation.snapshot_schema_version,
         ).unwrap();
         (receipt, validation)
+    }
+
+    #[test]
+    fn federated_claim_exposes_distinct_typed_identity_projections() {
+        let (receipt, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view = ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            view,
+            receipt,
+        ).unwrap();
+
+        assert_eq!(claim.admission_subject().unwrap().canonical_identity(), "canonical:1");
+        assert_eq!(claim.admission_subject().unwrap().provenance_family(), Some("family:1"));
+        assert_eq!(claim.representation_identity().unwrap().as_str(), "claim:1");
+        assert_ne!(
+            claim.admission_subject().unwrap().digest(),
+            sha256_hex(claim.representation_identity().unwrap().as_str().as_bytes())
+        );
     }
 
     #[test]
