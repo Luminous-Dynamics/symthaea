@@ -879,10 +879,55 @@ impl KnowledgePersistence {
         Ok(())
     }
 
+    /// Load the complete append-only history of committed snapshot receipts.
+    ///
+    /// Every returned receipt is self-digest verified in the same SQLite transaction.
+    /// Historical receipt digests identify the exact snapshot representation committed
+    /// at each generation; they do not reconstruct historical projection contents.
+    pub fn snapshot_receipt_history(&mut self) -> Result<Vec<KnowledgeSnapshotReceipt>, String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Begin snapshot receipt history verification: {e}"))?;
+        verify_snapshot_receipts_in_tx(&tx)?;
+
+        let mut stmt = tx
+            .prepare(
+                "SELECT generation, canonical_digest_hex, receipt_digest_hex
+                 FROM knowledge_snapshot_receipts
+                 ORDER BY generation ASC",
+            )
+            .map_err(|e| format!("Prepare snapshot receipt history: {e}"))?;
+        let receipts = stmt
+            .query_map([], |row| {
+                let generation = row.get::<_, i64>(0)?;
+                Ok(KnowledgeSnapshotReceipt {
+                    generation: u64::try_from(generation).map_err(|_| {
+                        rusqlite::Error::IntegralValueOutOfRange(0, generation)
+                    })?,
+                    canonical_digest_hex: row.get(1)?,
+                    receipt_digest_hex: row.get(2)?,
+                })
+            })
+            .map_err(|e| format!("Query snapshot receipt history: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load snapshot receipt history row: {e}"))?;
+
+        tx.commit()
+            .map_err(|e| format!("Commit snapshot receipt history verification: {e}"))?;
+        Ok(receipts)
+    }
+
     /// Load the latest committed complete-snapshot receipt.
     ///
     /// This receipt is append-only and is only advanced by successful
-    /// `save_snapshot` transactions. Individual-domain save methods do not
+    /// save_snapshot transactions. Individual-domain save methods do not
     /// create receipts because they do not establish a complete snapshot boundary.
     pub fn latest_snapshot_receipt(&mut self) -> Result<Option<KnowledgeSnapshotReceipt>, String> {
         if !self.is_configured() {
@@ -7250,6 +7295,57 @@ mod tests {
         assert_eq!(
             err,
             "Snapshot receipt self-digest mismatch: generation 11"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_receipt_history_exports_all_generations() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_receipt_history_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let first = FactRecord {
+            memory_id: "snapshot-history-one".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x91; BinaryHV::BYTES],
+            source_text: "snapshot history one".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&first), &[], &[], &[])
+            .unwrap();
+
+        let second = FactRecord {
+            memory_id: "snapshot-history-two".into(),
+            source_text: "snapshot history two".into(),
+            cycle: 2,
+            ..first
+        };
+        p.save_snapshot(std::slice::from_ref(&second), &[], &[], &[])
+            .unwrap();
+
+        let history = p.snapshot_receipt_history().unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(
+            history
+                .iter()
+                .map(|receipt| receipt.generation)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+        assert!(history.iter().all(KnowledgeSnapshotReceipt::verify_self_digest));
+        assert_eq!(
+            p.latest_snapshot_receipt().unwrap().unwrap(),
+            history[1]
         );
 
         let _ = std::fs::remove_dir_all(&dir);
