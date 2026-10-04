@@ -1544,6 +1544,26 @@ impl KnowledgePersistence {
         let tx = rusqlite::Transaction::new_unchecked(conn, TransactionBehavior::Immediate)
             .map_err(|e| format!("Begin schema migration transaction: {e}"))?;
 
+        // Re-read after acquiring the write lock. Another opener may have completed the
+        // migration between the initial user_version check and BEGIN IMMEDIATE; in that case,
+        // attest the now-current schema without rerunning repair-style migration.
+        let transaction_user_version: i64 = tx
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .map_err(|e| format!("Schema transaction user-version check: {e}"))?;
+        if transaction_user_version == CURRENT_SCHEMA_USER_VERSION {
+            verify_initialized_schema_integrity(conn)?;
+            tx.commit()
+                .map_err(|e| format!("Commit schema verification transaction: {e}"))?;
+            self.initialized = true;
+            return Ok(());
+        }
+        if transaction_user_version != 0 {
+            return Err(format!(
+                "Unsupported knowledge SQLite schema user_version {}; expected 0 for legacy or {} for current",
+                transaction_user_version, CURRENT_SCHEMA_USER_VERSION
+            ));
+        }
+
         tx.execute_batch(
             "CREATE TABLE IF NOT EXISTS knowledge_facts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -6027,6 +6047,11 @@ mod tests {
         assert!(!validation_columns
             .iter()
             .any(|column| column == "receipt_digest_hex"));
+
+        let user_version: i64 = conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(user_version, 0);
 
         let null_receipt_digests: i64 = conn
             .query_row(
