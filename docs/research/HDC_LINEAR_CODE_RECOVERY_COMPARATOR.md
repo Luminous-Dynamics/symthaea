@@ -251,7 +251,8 @@ The iterator covers every kernel mask exactly once, so bounded qualification can
 - kernel-basis masks do not collapse to duplicate coefficient tuples.
 
 `coefficients_for_mask` also rejects malformed certificate dimensions before applying a kernel direction. This keeps the affine-fiber object fail-closed even when its public fields are modified in a test fixture.
-This makes the theorem boundary explicit in the API itself:
+
+The fiber API additionally validates the kernel certificate structurally before enumeration: every declared dependent-generator coordinate must be in range and asserted in its witness, those coordinates must be distinct, and the witness coefficient vectors must have full rank equal to the declared kernel dimension. Thus the bounded iterator is backed by the same linear-independence invariant that makes the `2^d` mask construction bijective.This makes the theorem boundary explicit in the API itself:
 
 `target in image` -> `affine fiber exists` -> `fiber cardinality = 2^d` -> `kernel basis gives the d ambiguity directions`.
 
