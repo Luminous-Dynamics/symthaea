@@ -360,6 +360,55 @@ mod tests {
     }
 
     #[test]
+    fn request_creation_rejects_command_intent_substitution() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let mut stop_command = restart_command("nginx.service");
+        stop_command.operation = crate::action::NixServiceOperationKindV1::Stop;
+
+        assert_eq!(
+            runtime
+                .create_pending_request(
+                    &intent("nginx.service"),
+                    &stop_command,
+                    "systemctl stop nginx.service",
+                    "same-uid-process-v1",
+                    UnixMillisV1::new(now.saturating_sub(1_000)),
+                    UnixMillisV1::new(now + 60_000),
+                )
+                .unwrap_err()
+                .to_string(),
+            "approval intent action does not match the typed command"
+        );
+        assert_eq!(runtime.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn request_creation_rejects_display_substitution() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let command = restart_command("nginx.service");
+
+        assert_eq!(
+            runtime
+                .create_pending_request(
+                    &intent("nginx.service"),
+                    &command,
+                    "systemctl stop nginx.service",
+                    "same-uid-process-v1",
+                    UnixMillisV1::new(now.saturating_sub(1_000)),
+                    UnixMillisV1::new(now + 60_000),
+                )
+                .unwrap_err()
+                .to_string(),
+            "operator-visible approval text does not match the typed command rendering"
+        );
+        assert_eq!(runtime.pending_count().unwrap(), 0);
+    }
+
+    #[test]
     fn projection_currentness_is_live_observation_not_authority() {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
