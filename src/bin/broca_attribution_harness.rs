@@ -312,25 +312,12 @@ fn capture(
                 &context,
             );
 
-            if !frame.f0.is_finite()
-                || !frame.energy.is_finite()
-                || !frame.f1.is_finite()
-                || !frame.f2.is_finite()
-            {
-                frames.push(FrameCapture {
-                    f0: frame.f0,
-                    energy: frame.energy,
-                    f1: frame.f1,
-                    f2: frame.f2,
-                });
-            } else {
-                frames.push(FrameCapture {
-                    f0: frame.f0,
-                    energy: frame.energy,
-                    f1: frame.f1,
-                    f2: frame.f2,
-                });
-            }
+            frames.push(FrameCapture {
+                f0: frame.f0,
+                energy: frame.energy,
+                f1: frame.f1,
+                f2: frame.f2,
+            });
 
             if global_index % 20 == 19 {
                 if let Some(result) = pipeline.last_fep_result() {
@@ -354,7 +341,7 @@ fn capture(
 fn neutral_context(
     utterance_progress: f32,
     phoneme_progress: f32,
-    stress: u8,
+    _stress: u8,
     syllable_progress: f32,
     is_syllable_onset: bool,
 ) -> ProsodyContext {
