@@ -1073,6 +1073,7 @@ mod tests {
     #[test]
     fn binding_set_rejects_duplicate_binding_port() {
         let a = interface(PortId(10), 7);
+        let b = interface(PortId(20), 8);
         let candidate = candidate();
         let first = SolverBoundaryBinding::verified(
             &a,
@@ -1096,8 +1097,8 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            validate_binding_set(&[a], &[first, second]),
-            Err(SolverBindingError::BindingCountMismatch)
+            validate_binding_set(&[a, b], &[first, second]),
+            Err(SolverBindingError::DuplicateBindingPort(PortId(10)))
         );
     }
 
