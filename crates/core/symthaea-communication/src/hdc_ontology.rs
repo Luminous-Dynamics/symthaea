@@ -257,6 +257,7 @@ pub struct HdcOntologyDecodePolicy {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HdcOntologyEmpiricalCalibration {
     pub baseline: HdcOntologyDecodePolicy,
+    pub codebook_hash: String,
     pub quantile: f64,
     pub calibrated_min_score: f64,
     pub calibrated_min_margin: f64,
@@ -294,6 +295,17 @@ impl HdcOntologyEmpiricalCalibration {
             return Err("empirical calibration accepts only clean exact calibration metrics".into());
         }
 
+        let codebook_hash = calibration_metrics[0].codebook_hash.clone();
+        if codebook_hash.trim().is_empty()
+            || calibration_metrics
+                .iter()
+                .any(|metrics| metrics.codebook_hash != codebook_hash)
+        {
+            return Err(
+                "empirical calibration requires one consistent decoder codebook hash".into(),
+            );
+        }
+
         fn lower_empirical_quantile(values: &[f64], q: f64) -> f64 {
             let mut values = values.to_vec();
             values.sort_by(f64::total_cmp);
@@ -318,6 +330,7 @@ impl HdcOntologyEmpiricalCalibration {
 
         Ok(Self {
             baseline,
+            codebook_hash,
             quantile: lower_quantile,
             calibrated_min_score: baseline.min_score.max(score_floor),
             calibrated_min_margin: baseline.min_margin.max(margin_floor),
@@ -334,6 +347,7 @@ impl HdcOntologyEmpiricalCalibration {
 
     pub fn validates(&self) -> bool {
         self.baseline.validates()
+            && !self.codebook_hash.trim().is_empty()
             && self.quantile.is_finite()
             && (0.0..=1.0).contains(&self.quantile)
             && self.calibrated_min_score.is_finite()
@@ -1268,6 +1282,41 @@ mod tests {
         assert!(calibration.validates());
         assert!(calibration.policy().min_score >= 0.20);
         assert!(calibration.policy().min_margin >= 0.05);
+    }
+
+    #[test]
+    fn empirical_calibration_rejects_mixed_codebooks() {
+        let baseline = HdcOntologyDecodePolicy::conservative_default();
+        let mut first = HdcOntologyRoundtripMetrics {
+            schema_version: HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
+            adapter_id: HDC_ONTOLOGY_ADAPTER_ID.into(),
+            codebook_hash: "codebook-a".into(),
+            source_manifest_hash: "manifest-a".into(),
+            concept_identity_exact: true,
+            relation_identity_exact: true,
+            node_precision: 1.0,
+            node_recall: 1.0,
+            edge_precision: 1.0,
+            edge_recall: 1.0,
+            structural_equivalence: true,
+            confidence_mae: 0.0,
+            node_min_selected_score: 0.4,
+            node_selection_margin: 0.1,
+            edge_min_selected_score: 0.4,
+            edge_selection_margin: 0.1,
+        };
+        let mut second = first.clone();
+        second.codebook_hash = "codebook-b".into();
+        first.source_manifest_hash = "manifest-a2".into();
+
+        assert!(
+            HdcOntologyEmpiricalCalibration::from_clean_metrics(
+                baseline,
+                &[first, second],
+                0.1
+            )
+            .is_err()
+        );
     }
 
     #[test]
