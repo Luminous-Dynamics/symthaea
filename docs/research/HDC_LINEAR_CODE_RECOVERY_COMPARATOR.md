@@ -270,7 +270,7 @@ The qualification test exhausts this identity on a small repeated-factor constru
 
 The comparator now exposes the complete kernel basis of the factor-to-bound map, not only its dimension or a single dependency witness.
 
-During the ordered maximal-independent-subset construction, every generator that fails span extension yields one dependency witness by solving that generator against the already-retained independent basis. Each such witness has a distinct dependent-generator coordinate, so these witnesses are linearly independent. Their count is exactly Delta-r and therefore they form a basis of the full kernel.
+During the ordered maximal-independent-subset construction, every generator that fails span extension yields one dependency witness by solving that generator against the already-retained independent basis. Each such witness has a distinct dependent-generator coordinate, so these witnesses are linearly independent. Their count is exactly Delta-r and therefore they form a basis of the full kernel. The public `factorization_kernel_basis` constructor now also self-audits the returned witness family: it checks the complete coefficient-space rank and re-verifies every witness against the supplied factor presentation before returning. This turns the claimed basis invariant into an executable postcondition rather than only a property inferred from the construction argument.
 
 This gives a constructive interpretation of the multiplicity theorem: once one valid factor tuple is known, adding any GF(2) combination of the kernel-basis witnesses produces another valid coefficient tuple for the same target. The evidence therefore distinguishes:
 
