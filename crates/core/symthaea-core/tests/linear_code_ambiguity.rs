@@ -1824,7 +1824,7 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
         expected,
         coefficients.len(),
     );
-
+}
 
 #[test]
 fn affine_fiber_certificate_is_bound_to_target_factor_order_and_basis_presentation() {
@@ -1880,5 +1880,4 @@ fn affine_fiber_certificate_is_bound_to_target_factor_order_and_basis_presentati
         !fiber.verifies_against(&target, &[&reordered_left, &right]),
         "a certificate must not transplant across basis presentations"
     );
-}
 }
