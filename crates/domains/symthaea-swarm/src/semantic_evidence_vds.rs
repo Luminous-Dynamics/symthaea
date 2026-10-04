@@ -1792,7 +1792,10 @@ impl Rfc9942Vdp {
 
         let mut value_reader=CborReader::new(value_bytes);
         let items=value_reader.read_array_items_bounded(MAX_RFC9942_PROOFS)
-            .map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+            .map_err(|error|match error {
+                Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::ResourceLimitExceeded,
+                _=>Rfc9942VdpError::InvalidEncoding,
+            })?;
         value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         if items.is_empty(){return Err(Rfc9942VdpError::EmptyProofCollection);}
 
