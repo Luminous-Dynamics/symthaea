@@ -1,8 +1,9 @@
 use blake3::Hasher;
 use symthaea_core::hdc::linear_code::{
     BinaryCodeword, LinearCodeWork, RandomLinearCode, basis_rank,
-    factorization_algebra, factorization_count_for_target, factorization_dependency_witness,
-    factorization_kernel_basis, recover_direct_sum_bound, recover_independent_bound,
+    factorization_affine_fiber, factorization_algebra, factorization_count_for_target,
+    factorization_dependency_witness, factorization_kernel_basis, recover_direct_sum_bound,
+    recover_independent_bound,
     recover_linear_bound, recover_linear_bound_with_work, solve_linear_combination,
 };
 
@@ -732,6 +733,19 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                         target_multiplicity.exponent(),
                         algebra.kernel_dimension,
                         "every representable target must have the algebraic fiber cardinality"
+                    );
+
+                    let affine_fiber =
+                        factorization_affine_fiber(&target, &factors)
+                            .expect("representable target must expose an affine fiber");
+                    assert_eq!(affine_fiber.cardinality.exponent(), algebra.kernel_dimension);
+                    assert_eq!(
+                        affine_fiber.kernel_basis.len(),
+                        algebra.kernel_dimension
+                    );
+                    assert_eq!(
+                        affine_fiber.representative_coefficients.len(),
+                        algebra.factor_dimension_sum
                     );
 
                     let jointly_independent = algebra.unique_factorization;
