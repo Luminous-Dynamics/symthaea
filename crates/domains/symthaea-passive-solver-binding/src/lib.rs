@@ -229,31 +229,71 @@ mod tests {
         .unwrap()
     }
 
-    fn realized(tag: u8) -> RealizedBoundaryIdentity {
-        RealizedBoundaryIdentity {
-            candidate_geometry_digest: [tag; 32],
-            boundary_patch_digest: [tag.wrapping_add(1); 32],
+    fn candidate() -> TriangleMesh {
+        TriangleMesh {
+            vertices: vec![
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+            ],
+            normals: vec![[0.0, 0.0, 1.0]; 3],
+            indices: vec![[0, 1, 2]],
+        }
+    }
+
+    struct FixtureAdapter;
+
+    impl SolverBoundaryBindingAdapter for FixtureAdapter {
+        fn adapter_id(&self) -> &str {
+            "fixture-adapter/v1"
+        }
+
+        fn bind(
+            &self,
+            interface: &PortInterface,
+            candidate: &TriangleMesh,
+            candidate_geometry_digest: [u8; 32],
+        ) -> Result<SolverBoundaryBinding, SolverBindingError> {
+            SolverBoundaryBinding::verified(
+                interface,
+                self.adapter_id(),
+                "fixture:boundary-7",
+                candidate_geometry_digest,
+                candidate,
+                [9; 32],
+            )
         }
     }
 
     #[test]
-    fn adapter_contract_binds_against_the_actual_candidate_mesh() {
+    fn adapter_contract_binds_against_actual_candidate_mesh() {
         let interface = interface(PortId(10), 7);
+        let candidate = candidate();
         let binding = FixtureAdapter
-            .bind(&interface, &candidate(), [7; 32])
+            .bind(&interface, &candidate, [7; 32])
             .unwrap();
 
         assert_eq!(binding.port, PortId(10));
         assert_eq!(binding.external_boundary_handle, "fixture:boundary-7");
-        assert_eq!(binding.realized_boundary.candidate_geometry_digest, [7; 32]);
+        assert_eq!(
+            binding.realized_boundary.candidate_mesh_digest,
+            digest_triangle_mesh(&candidate)
+        );
     }
 
     #[test]
     fn verified_binding_carries_exact_interface_identity() {
         let interface = interface(PortId(10), 7);
-        let binding =
-            SolverBoundaryBinding::verified(&interface, "test-adapter/v1", "patch:inlet", realized(1))
-                .unwrap();
+        let candidate = candidate();
+        let binding = SolverBoundaryBinding::verified(
+            &interface,
+            "test-adapter/v1",
+            "patch:inlet",
+            [3; 32],
+            &candidate,
+            [2; 32],
+        )
+        .unwrap();
 
         assert!(binding.validate_against(&interface).is_ok());
         assert!(binding.solver_binding_verified);
@@ -261,11 +301,66 @@ mod tests {
     }
 
     #[test]
+    fn candidate_mesh_drift_is_rejected() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let binding = SolverBoundaryBinding::verified(
+            &interface,
+            "test-adapter/v1",
+            "patch:inlet",
+            [3; 32],
+            &candidate,
+            [2; 32],
+        )
+        .unwrap();
+
+        let mut changed = candidate.clone();
+        changed.vertices[0][0] += 0.125;
+
+        assert_eq!(
+            binding.validate_against_candidate(&interface, [3; 32], &changed),
+            Err(SolverBindingError::CandidateMeshDigestMismatch)
+        );
+        assert!(
+            binding
+                .validate_against_candidate(&interface, [3; 32], &candidate)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn candidate_geometry_identity_drift_is_rejected() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+        let binding = SolverBoundaryBinding::verified(
+            &interface,
+            "test-adapter/v1",
+            "patch:inlet",
+            [3; 32],
+            &candidate,
+            [2; 32],
+        )
+        .unwrap();
+
+        assert_eq!(
+            binding.validate_against_candidate(&interface, [4; 32], &candidate),
+            Err(SolverBindingError::CandidateGeometryDigestMismatch)
+        );
+    }
+
+    #[test]
     fn interface_drift_is_rejected() {
         let interface = interface(PortId(10), 7);
-        let binding =
-            SolverBoundaryBinding::verified(&interface, "test-adapter/v1", "patch:inlet", realized(1))
-                .unwrap();
+        let candidate = candidate();
+        let binding = SolverBoundaryBinding::verified(
+            &interface,
+            "test-adapter/v1",
+            "patch:inlet",
+            [3; 32],
+            &candidate,
+            [2; 32],
+        )
+        .unwrap();
 
         let drifted = interface(PortId(10), 8);
         assert_eq!(
@@ -278,11 +373,26 @@ mod tests {
     fn duplicate_external_handle_is_rejected() {
         let a = interface(PortId(10), 7);
         let b = interface(PortId(20), 8);
+        let candidate = candidate();
         let bindings = vec![
-            SolverBoundaryBinding::verified(&a, "test-adapter/v1", "patch:shared", realized(1))
-                .unwrap(),
-            SolverBoundaryBinding::verified(&b, "test-adapter/v1", "patch:shared", realized(2))
-                .unwrap(),
+            SolverBoundaryBinding::verified(
+                &a,
+                "test-adapter/v1",
+                "patch:shared",
+                [3; 32],
+                &candidate,
+                [2; 32],
+            )
+            .unwrap(),
+            SolverBoundaryBinding::verified(
+                &b,
+                "test-adapter/v1",
+                "patch:shared",
+                [4; 32],
+                &candidate,
+                [3; 32],
+            )
+            .unwrap(),
         ];
         assert_eq!(
             validate_binding_set(&[a, b], &bindings),
@@ -293,15 +403,32 @@ mod tests {
     }
 
     #[test]
-    fn binding_set_rejects_wrong_solver_identity() {
-        let a = interface(PortId(10), 7);
-        let binding =
-            SolverBoundaryBinding::verified(&a, "test-adapter/v1", "patch:inlet", realized(1))
-                .unwrap();
-        let b = interface(PortId(10), 8);
+    fn zero_digests_are_rejected() {
+        let interface = interface(PortId(10), 7);
+        let candidate = candidate();
+
         assert_eq!(
-            binding.validate_against(&b),
-            Err(SolverBindingError::InterfaceDigestMismatch)
+            SolverBoundaryBinding::verified(
+                &interface,
+                "test-adapter/v1",
+                "patch:inlet",
+                [0; 32],
+                &candidate,
+                [2; 32],
+            ),
+            Err(SolverBindingError::EmptyCandidateGeometryDigest)
+        );
+
+        assert_eq!(
+            SolverBoundaryBinding::verified(
+                &interface,
+                "test-adapter/v1",
+                "patch:inlet",
+                [3; 32],
+                &candidate,
+                [0; 32],
+            ),
+            Err(SolverBindingError::EmptyBoundaryPatchDigest)
         );
     }
 }
