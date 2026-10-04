@@ -91,7 +91,7 @@ pub struct LexemeBinding {
 
 /// Generic typed feature pair so language-specific morphology can be represented without
 /// pretending the core contract supports a fixed inventory of languages.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct MorphologicalFeature {
     pub category: String,
     pub value: String,
