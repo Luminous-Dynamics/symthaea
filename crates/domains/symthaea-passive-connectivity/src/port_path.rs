@@ -1,11 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use symthaea_fabrication_kernel::mesh::TriangleMesh;
-use symthaea_fabrication_kernel::validate::{validate_mesh, ValidationReport};
-use symthaea_passive_void_compiler::{GeometryEmbedding, PortAnchor};
+use symthaea_fabrication_kernel::validate::validate_mesh;
+use symthaea_passive_void_compiler::GeometryEmbedding;
 use symthaea_passive_void_graph::{FunctionalVoidGraph, PortId};
-
-use crate::ConnectivityStatus;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PortPathStatus {
@@ -40,7 +38,7 @@ pub fn evaluate_port_path(
         };
     }
     let report = validate_mesh(candidate);
-    if !report.is_valid() || !report.is_watertight() {
+    if !report.is_valid() || !report.is_watertight {
         return PortPathEvidence {
             status: PortPathStatus::InvalidMesh,
             from_component: None,
@@ -69,8 +67,14 @@ pub fn evaluate_port_path(
             to_component: Some(b),
             physical_transport_unproven: true,
         },
-        (None, _) | (_, None) => PortPathEvidence {
+        (None, _) => PortPathEvidence {
             status: PortPathStatus::AnchorNotRepresented(from),
+            from_component,
+            to_component,
+            physical_transport_unproven: true,
+        },
+        (_, None) => PortPathEvidence {
+            status: PortPathStatus::AnchorNotRepresented(to),
             from_component,
             to_component,
             physical_transport_unproven: true,
