@@ -266,6 +266,7 @@ impl Rfc9942Es256CoseKey {
                                     b"unwrapKey" => CborLabelKey::Integer(6),
                                     b"deriveKey" => CborLabelKey::Integer(7),
                                     b"deriveBits" => CborLabelKey::Integer(8),
+                                    b"verify" => CborLabelKey::Integer(COSE_KEY_OP_VERIFY),
                                     _ => CborLabelKey::Text(value),
                                 }
                             }
@@ -2212,10 +2213,6 @@ impl<'a> CborReader<'a> {
         }
     }
 
-    fn skip_label(&mut self) -> Result<(), Rfc9162ProofDecodeError> {
-        self.read_cose_label_key().map(|_|())
-    }
-
     fn read_cose_label_key(&mut self) -> Result<CborLabelKey, Rfc9162ProofDecodeError> {
         match self.peek_major_type()? {
             0 => {
@@ -2246,13 +2243,6 @@ impl<'a> CborReader<'a> {
             },
             3 => self.read_text_bounded(256).map(CborLabelKey::Text),
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
-        }
-    }
-
-    fn read_cose_label(&mut self) -> Result<Option<i64>, Rfc9162ProofDecodeError> {
-        match self.read_cose_label_key()? {
-            CborLabelKey::Integer(value) => Ok(Some(value)),
-            CborLabelKey::Unsigned(_) | CborLabelKey::Negative(_) | CborLabelKey::Text(_) => Ok(None),
         }
     }
 
