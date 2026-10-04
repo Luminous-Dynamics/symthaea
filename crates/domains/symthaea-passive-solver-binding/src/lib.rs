@@ -169,6 +169,9 @@ impl SolverBoundaryBinding {
         if !self.physical_transport_unproven {
             return Err(SolverBindingError::InvalidEvidenceState);
         }
+        if !self.evidence_level.is_verified() {
+            return Err(SolverBindingError::InvalidEvidenceState);
+        }
         if self.port != interface.port {
             return Err(SolverBindingError::PortMismatch);
         }
