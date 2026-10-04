@@ -32,7 +32,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for cmd in swtpm swtpm_setup tpm2_startup tpm2_getcap tpm2_nvdefine tpm2_nvincrement tpm2_nvreadpublic tpm2_nvread tpm2_createprimary tpm2_readpublic tpm2_quote tpm2_checkquote tpm2_nvcertify tpm2_verifysignature tpm2_nvundefine tpm2_print; do
+for cmd in swtpm swtpm_setup tpm2_startup tpm2_shutdown tpm2_getcap tpm2_nvdefine tpm2_nvincrement tpm2_nvreadpublic tpm2_nvread tpm2_createprimary tpm2_readpublic tpm2_quote tpm2_checkquote tpm2_nvcertify tpm2_verifysignature tpm2_nvundefine tpm2_print od sha256sum tr grep; do
   command -v "$cmd" >/dev/null || { echo "missing required command: $cmd" >&2; exit 2; }
 done
 
