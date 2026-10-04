@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use symthaea_communication::{
-    adjust_confidence, compare_graphs, drop_last_edge, duplicate_last_edge, duplicate_last_node, graph_hash,
+    adjust_confidence, compare_graphs, drop_last_edge, duplicate_last_edge, duplicate_last_node, graph_hash, structural_hash,
     relabel_nodes, rename_identifiers, reorder_collections, ConceptEdge, ConceptKind,
     ConceptNode, GroundedConceptGraph, InterlinguaBenchmarkCase, InterlinguaPerturbation,
 };
