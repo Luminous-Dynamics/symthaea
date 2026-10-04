@@ -3849,7 +3849,12 @@ mod tests {
         report.cryptosuite = VerificationStage::Passed;
         assert!(!report.is_well_formed());
 
-        let mut evaluation = report.to_evidence_evaluation();
+        // The evaluation must also refuse to become self-consistent from the
+        // inflated stage projection when its source report is not retained.
+        let evaluation = report.to_evidence_evaluation();
+        assert!(!evaluation.is_well_formed());
+
+        let mut evaluation = evaluation;
         assert!(evaluation
             .boundary
             .not_established
