@@ -211,6 +211,20 @@ no distribution-free coverage, false-accept, or adversarial-robustness guarantee
 A future higher evidence tier can introduce a formally specified conformity score
 and calibration/test protocol without changing the current fail-closed baseline.
 
+## Reconstruction resource boundary
+
+The identity-aware decoder has an explicit N0 resource ceiling independent of
+the 1 MiB transport payload bound. A representation may request at most 256
+decoded nodes and 2048 decoded edges. Before allocating edge candidates, the
+decoder also checks the Cartesian candidate budget and fails closed above
+1,000,000 candidates. This prevents a small authenticated frame from inducing
+unbounded receiver-side combinatorial work.
+
+These are implementation safety bounds, not evidence of scalability. Raising
+them should require a new benchmark tranche that measures runtime, memory, and
+retrieval margins at the larger operating point rather than silently widening
+the accepted domain.
+
 ## Evidence ladder
 
 The accompanying executable N0 lab demonstrates:
