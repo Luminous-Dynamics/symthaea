@@ -6,6 +6,21 @@ A verification report that records a resolver snapshot must bind the resolved ve
 
 The snapshot is evidence about the resolver state consulted by verification. It is not a claim that the underlying attestation, observation, or external-world fact is true.
 
+## Attestation payload binding
+
+Current v5 verification reports also bind a fingerprint of the exact attestation payload whose detached proof was evaluated.
+
+The report MUST therefore identify:
+
+- the underlying receipt;
+- the complete attestation payload;
+- the verification procedure and policy;
+- and the resolver state used for method lifecycle and authorization
+
+rather than treating the receipt fingerprint alone as the identity of the attested statement.
+
+Two distinct signed attestation envelopes over the same receipt MUST produce distinct current report identities whenever their canonical payloads differ. This prevents metadata changes such as domain, challenge, attester identity, or validity interval from disappearing behind an otherwise identical receipt-level subject.
+
 ## Required semantics
 
 ### 1. Resolution and snapshot are one evidence unit
