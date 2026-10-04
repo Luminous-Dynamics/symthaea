@@ -211,6 +211,18 @@ fn main() -> Result<(), String> {
     ];
 
     let policy = HdcOntologyDecodePolicy::conservative_default();
+
+    let mut tampered_source = held_out_manifest.clone();
+    tampered_source.concepts[0].grounding_ids = vec!["tampered-source-grounding".into()];
+    let source_manifest_hash_rejected = codebook
+        .decode_graph_with_policy(
+            &held_out_representation,
+            &tampered_source,
+            &receiver_manifest,
+            policy,
+        )
+        .is_err();
+
     let decoded = codebook.decode_graph_with_policy(
         &held_out_representation,
         &held_out_manifest,
@@ -311,6 +323,7 @@ fn main() -> Result<(), String> {
         || metrics.edge_precision != 1.0
         || metrics.edge_recall != 1.0
         || !new_grounding_allowed_without_recodebook
+        || !source_manifest_hash_rejected
         || !source_groundings_preserved
         || !receiver_local_ids_used
         || !novel_oov_rejected
@@ -337,6 +350,7 @@ fn main() -> Result<(), String> {
         "summary": {
             "same_codebook_for_held_out_groundings": new_grounding_allowed_without_recodebook,
             "same_hdc_frames_for_same_stable_structure": same_hdc_frames,
+            "source_manifest_hash_rejected": source_manifest_hash_rejected,
             "source_groundings_preserved": source_groundings_preserved,
             "receiver_local_ids_used": receiver_local_ids_used,
             "source_manifest_differs_from_receiver": held_out_manifest.manifest_hash() != receiver_manifest.manifest_hash(),
