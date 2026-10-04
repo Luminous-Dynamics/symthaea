@@ -393,7 +393,8 @@ pub use package::{
 };
 pub use passive_design::{
     NoMovingPartsPolicy, PassiveDesignEvidence, PassiveFunctionContract, PassiveInput,
-    PassiveMechanism, PassiveOutput, PassiveValidationReport, PassiveViolation,
+    PassiveMechanism, PassiveObjectiveObservation, PassiveObjectiveWeights, PassiveOutput,
+    PassiveValidationReport, PassiveViolation,
 };
 pub use policy_migration::{
     AuthorizedPolicyMigration, PolicyBinding, PolicyInvariantBinding, PolicyInvariantDisposition,
