@@ -1526,6 +1526,111 @@ impl KnowledgePersistence {
             .map(|records| records.into_iter().map(|record| record.receipt).collect())
     }
 
+    /// Atomically verify snapshot and validation history checkpoints against one SQLite view.
+    ///
+    /// This closes a TOCTOU boundary that would exist if callers verified the two ledgers in
+    /// separate transactions. The validation history is also cross-checked against the snapshot
+    /// history so every recorded generation/digest pair is present in the same observed ledger.
+    pub fn verify_snapshot_and_validation_receipt_history_checkpoints(
+        &mut self,
+        snapshot_checkpoint: &KnowledgeSnapshotReceiptHistoryCheckpoint,
+        validation_checkpoint: &KnowledgeSnapshotValidationReceiptHistoryCheckpoint,
+    ) -> Result<(), String> {
+        if !self.is_configured() {
+            return Err("No database path configured".into());
+        }
+
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Begin cross-ledger checkpoint verification: {e}"))?;
+
+        verify_snapshot_receipts_in_tx(&tx)?;
+        verify_snapshot_validation_receipts_in_tx(&tx)?;
+
+        let snapshot_history = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT generation, canonical_digest_hex, receipt_digest_hex
+                     FROM knowledge_snapshot_receipts
+                     ORDER BY generation ASC",
+                )
+                .map_err(|e| format!("Prepare snapshot history checkpoint verification: {e}"))?;
+            stmt.query_map([], |row| {
+                let generation = u64::try_from(row.get::<_, i64>(0)?).map_err(|_| {
+                    rusqlite::Error::IntegralValueOutOfRange(0, row.get::<_, i64>(0)?)
+                })?;
+                Ok(KnowledgeSnapshotReceipt {
+                    generation,
+                    canonical_digest_hex: row.get(1)?,
+                    receipt_digest_hex: row.get(2)?,
+                })
+            })
+            .map_err(|e| format!("Query snapshot history checkpoint verification: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load snapshot history checkpoint row: {e}"))?
+        };
+
+        let validation_history = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT validation_sequence, validation_event, generation, snapshot_digest_hex,
+                            validator_ref, validator_version, validation_profile, conforms,
+                            report_digest_hex, receipt_digest_hex
+                     FROM knowledge_snapshot_validation_receipts
+                     ORDER BY validation_sequence ASC",
+                )
+                .map_err(|e| {
+                    format!("Prepare validation history checkpoint verification: {e}")
+                })?;
+            stmt.query_map([], |row| {
+                let validation_sequence =
+                    u64::try_from(row.get::<_, i64>(0)?).map_err(|_| {
+                        rusqlite::Error::IntegralValueOutOfRange(
+                            0,
+                            row.get::<_, i64>(0)?,
+                        )
+                    })?;
+                let generation = u64::try_from(row.get::<_, i64>(2)?).map_err(|_| {
+                    rusqlite::Error::IntegralValueOutOfRange(
+                        2,
+                        row.get::<_, i64>(2)?,
+                    )
+                })?;
+                Ok(KnowledgeSnapshotValidationReceiptRecord {
+                    validation_sequence,
+                    receipt: KnowledgeSnapshotValidationReceipt {
+                        validation_event: row.get(1)?,
+                        generation,
+                        snapshot_digest_hex: row.get(3)?,
+                        validator_ref: row.get(4)?,
+                        validator_version: row.get(5)?,
+                        validation_profile: row.get(6)?,
+                        conforms: row.get(7)?,
+                        report_digest_hex: row.get(8)?,
+                    },
+                    stored_receipt_digest_hex: row.get(9)?,
+                })
+            })
+            .map_err(|e| format!("Query validation history checkpoint verification: {e}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Load validation history checkpoint row: {e}"))?
+        };
+
+        if !validation_checkpoint.verify_against_snapshot_history(
+            &validation_history,
+            snapshot_checkpoint,
+            &snapshot_history,
+        ) {
+            return Err("Snapshot/validation history checkpoint mismatch".into());
+        }
+
+        tx.commit()
+            .map_err(|e| format!("Commit cross-ledger checkpoint verification: {e}"))?;
+        Ok(())
+    }
+
     /// Load every append-only validation receipt in ledger sequence order.
     ///
     /// Unlike the latest-generation API, this exposes historical validation records as well,
@@ -8172,6 +8277,11 @@ mod tests {
 
         p.verify_snapshot_validation_receipt_history_checkpoint(&checkpoint)
             .unwrap();
+        p.verify_snapshot_and_validation_receipt_history_checkpoints(
+            &snapshot_checkpoint,
+            &checkpoint,
+        )
+        .unwrap();
 
         let prefix_checkpoint =
             KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(&all[..2]).unwrap();
