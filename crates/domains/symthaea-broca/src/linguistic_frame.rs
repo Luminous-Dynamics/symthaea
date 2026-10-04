@@ -47,7 +47,7 @@ pub struct ConstituentSlot {
 }
 
 /// Linguistic formulation frame produced without lexical hallucination.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinguisticFrame {
     pub version: String,
     pub binding_status: LinguisticBindingStatus,
@@ -89,6 +89,7 @@ impl LinguisticFrame {
         Self {
             version: LINGUISTIC_FRAME_VERSION.to_string(),
             binding_status: LinguisticBindingStatus::RoleStructureOnly,
+            lexical_provenance: None,
             source_intent: plan.intent.clone(),
             strategy,
             epistemic_delivery: plan.epistemic_delivery,
