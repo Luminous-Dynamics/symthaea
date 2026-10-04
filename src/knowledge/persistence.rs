@@ -2466,16 +2466,96 @@ fn verify_initialized_schema_integrity(conn: &rusqlite::Connection) -> Result<()
         }
     }
 
-    verify_receipt_trigger_behavior(conn)?;
+    verify_persistence_trigger_behavior(conn)?;
 
     Ok(())
 }
 
-fn verify_receipt_trigger_behavior(conn: &rusqlite::Connection) -> Result<(), String> {
+fn verify_persistence_trigger_behavior(conn: &rusqlite::Connection) -> Result<(), String> {
     conn.execute_batch("SAVEPOINT epf011_trigger_attestation;")
         .map_err(|e| format!("Schema integrity trigger probe savepoint: {e}"))?;
 
     let result = (|| {
+        let fact_memory_id = "__epf011_trigger_probe_fact";
+        conn.execute(
+            "INSERT INTO knowledge_facts
+             (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+             VALUES (?1, ?2, 'trigger probe', 0.5, 1, 0)",
+            rusqlite::params![fact_memory_id, vec![0x2Au8; BinaryHV::BYTES]],
+        )
+        .map_err(|e| format!("Schema integrity trigger probe fact insert: {e}"))?;
+
+        if conn
+            .execute(
+                "INSERT INTO knowledge_facts
+                 (memory_id, vector_blob, source_text, confidence, cycle, is_causal)
+                 VALUES ('   ', ?1, 'trigger probe malformed', 0.5, 1, 0)",
+                [vec![0x2Bu8; BinaryHV::BYTES]],
+            )
+            .is_ok()
+        {
+            return Err(
+                "Schema integrity check failed: fact identity trigger did not reject blank insert"
+                    .into(),
+            );
+        }
+        if conn
+            .execute(
+                "UPDATE knowledge_facts
+                 SET memory_id = ' '
+                 WHERE memory_id = ?1",
+                [fact_memory_id],
+            )
+            .is_ok()
+        {
+            return Err(
+                "Schema integrity check failed: fact identity trigger did not reject blank update"
+                    .into(),
+            );
+        }
+
+        conn.execute(
+            "INSERT INTO knowledge_provenance_relations
+             (source_memory_id, target_memory_id, kind, created_at)
+             VALUES ('__epf011_trigger_probe_source', '__epf011_trigger_probe_target',
+                     'derived_from', 'event:trigger-probe')",
+            [],
+        )
+        .map_err(|e| format!("Schema integrity trigger probe provenance insert: {e}"))?;
+
+        if conn
+            .execute(
+                "INSERT INTO knowledge_provenance_relations
+                 (source_memory_id, target_memory_id, kind, created_at)
+                 VALUES ('__epf011_trigger_probe_source', '__epf011_trigger_probe_target',
+                         'unknown_kind', 'event:trigger-probe-bad')",
+                [],
+            )
+            .is_ok()
+        {
+            return Err(
+                "Schema integrity check failed: provenance trigger did not reject unknown kind"
+                    .into(),
+            );
+        }
+        if conn
+            .execute(
+                "UPDATE knowledge_provenance_relations
+                 SET source_memory_id = ' '
+                 WHERE source_memory_id = '__epf011_trigger_probe_source'
+                   AND target_memory_id = '__epf011_trigger_probe_target'
+                   AND kind = 'derived_from'
+                   AND created_at = 'event:trigger-probe'",
+                [],
+            )
+            .is_ok()
+        {
+            return Err(
+                "Schema integrity check failed: provenance trigger did not reject blank update"
+                    .into(),
+            );
+        }
+
         let snapshot_generation: i64 = conn
             .query_row(
                 "SELECT COALESCE(MAX(generation), 0) FROM knowledge_snapshot_receipts",
@@ -3753,6 +3833,71 @@ mod tests {
             err,
             "Schema integrity check failed: missing column memory_id on knowledge_facts"
         );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_schema_trigger_attestation_rejects_comment_only_fact_and_provenance_guards() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_comment_core_trigger_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        p.save_facts(&[FactRecord {
+            memory_id: "comment-core-trigger".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x62; BinaryHV::BYTES],
+            source_text: "comment core trigger".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "DROP TRIGGER trg_knowledge_facts_memory_id_required_insert;
+                 CREATE TRIGGER trg_knowledge_facts_memory_id_required_insert
+                 BEFORE INSERT ON knowledge_facts
+                 WHEN 1
+                 BEGIN
+                     /* before insert on knowledge_facts
+                        new.memory_id is null or trim(new.memory_id) = ''
+                        raise(abort, 'knowledge_facts memory_id must be non-empty') */
+                     SELECT 1;
+                 END;
+                 DROP TRIGGER trg_knowledge_provenance_relation_required_insert;
+                 CREATE TRIGGER trg_knowledge_provenance_relation_required_insert
+                 BEFORE INSERT ON knowledge_provenance_relations
+                 WHEN 1
+                 BEGIN
+                     /* before insert on knowledge_provenance_relations
+                        new.source_memory_id is null
+                        new.target_memory_id is null
+                        new.source_memory_id = new.target_memory_id
+                        new.created_at is null
+                        new.kind not in (
+                            'derived_from', 'revised_from', 'supersedes',
+                            'contradicts', 'corroborates', 'representation_of'
+                        )
+                        raise(abort, 'knowledge_provenance_relations requires valid identities, timestamp, and stable kind') */
+                     SELECT 1;
+                 END;",
+            )
+            .unwrap();
+        }
+
+        let conn = p.open_connection().unwrap();
+        let err = p.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains("fact memory"));
+        assert!(err.contains("did not reject blank insert") || err.contains("trigger"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
