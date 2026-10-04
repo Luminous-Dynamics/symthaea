@@ -22,6 +22,42 @@ use crate::freshness_anchor_assurance::{
 };
 
 pub const SCHEMA_VERSION: &str = "0.1";
+pub const TPM_QUOTE_NONCE_BYTES: usize = 32;
+
+/// Fresh verifier-generated nonce used as TPM2_Quote qualifying data.
+///
+/// The nonce is deliberately 256 bits so it exceeds the freshness entropy
+/// floor used by current RATS interaction guidance. It is never serialized
+/// into the freshness receipt itself; only its domain-separated digest is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TpmQuoteChallenge {
+    pub nonce: [u8; TPM_QUOTE_NONCE_BYTES],
+}
+
+impl TpmQuoteChallenge {
+    pub fn new(nonce: [u8; TPM_QUOTE_NONCE_BYTES]) -> Option<Self> {
+        if nonce.iter().all(|byte| *byte == 0) {
+            None
+        } else {
+            Some(Self { nonce })
+        }
+    }
+
+    pub fn generate() -> Result<Self, getrandom::Error> {
+        let mut nonce = [0u8; TPM_QUOTE_NONCE_BYTES];
+        getrandom::getrandom(&mut nonce)?;
+        Self::new(nonce).ok_or(getrandom::Error::UNSUPPORTED)
+    }
+
+    pub fn digest(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:freshness-tpm-quote-challenge:v1\\0");
+        hasher.update(&self.nonce);
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TpmNvCounterEvidence {
@@ -66,6 +102,15 @@ impl TpmNvCounterEvidence {
     /// This is structural only. It does not verify the TPM quote signature,
     /// PCR values, authorization policy, or device identity; those remain the
     /// concrete platform verifier's responsibility.
+    pub fn validate_challenge(
+        &self,
+        challenge: &TpmQuoteChallenge,
+        receipt: &FreshnessAnchorVerificationReceipt,
+    ) -> bool {
+        self.quote_nonce_digest == challenge.digest()
+            && receipt.freshness_handle_digest == challenge.digest()
+    }
+
     pub fn validate_against_receipt(
         &self,
         profile: &FreshnessAnchorProfile,
@@ -122,6 +167,7 @@ pub enum TpmNvCounterVerificationError {
     HandleMismatch,
     EvidenceIdentityMismatch,
     QuoteVerificationFailed,
+    ChallengeDigestMismatch,
 }
 
 pub trait TpmNvCounterEvidenceVerifier {
@@ -171,6 +217,20 @@ pub fn verify_tpm_nv_counter<V: TpmNvCounterEvidenceVerifier>(
 
     verifier.verify(evidence, profile, receipt)?;
     Ok(evidence.as_evidence_kind())
+}
+
+pub fn verify_tpm_nv_counter_with_challenge<V: TpmNvCounterEvidenceVerifier>(
+    evidence: &TpmNvCounterEvidence,
+    challenge: &TpmQuoteChallenge,
+    profile: &FreshnessAnchorProfile,
+    receipt: &FreshnessAnchorVerificationReceipt,
+    verifier: &V,
+) -> Result<FreshnessAnchorEvidenceKind, TpmNvCounterVerificationError> {
+    let result = verify_tpm_nv_counter(evidence, profile, receipt, verifier)?;
+    if !evidence.validate_challenge(challenge, receipt) {
+        return Err(TpmNvCounterVerificationError::ChallengeDigestMismatch);
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -238,6 +298,55 @@ mod tests {
         ) -> Result<(), TpmNvCounterVerificationError> {
             Ok(())
         }
+    }
+
+    #[test]
+    fn nonzero_challenge_has_stable_digest() {
+        let challenge = TpmQuoteChallenge::new([7u8; TPM_QUOTE_NONCE_BYTES]).unwrap();
+        assert_eq!(challenge.digest().len(), 64);
+        assert_eq!(challenge.digest(), challenge.digest());
+    }
+
+    #[test]
+    fn zero_challenge_is_rejected() {
+        assert!(TpmQuoteChallenge::new([0u8; TPM_QUOTE_NONCE_BYTES]).is_none());
+    }
+
+    #[test]
+    fn challenge_must_bind_quote_and_receipt_handles() {
+        let evidence = evidence(7);
+        let receipt = receipt(7);
+        let challenge = TpmQuoteChallenge::new([9u8; TPM_QUOTE_NONCE_BYTES]).unwrap();
+        assert!(!evidence.validate_challenge(&challenge, &receipt));
+        assert_eq!(
+            verify_tpm_nv_counter_with_challenge(
+                &evidence,
+                &challenge,
+                &profile(),
+                &receipt,
+                &Accept
+            )
+            .unwrap_err(),
+            TpmNvCounterVerificationError::ChallengeDigestMismatch
+        );
+    }
+
+    #[test]
+    fn matching_challenge_allows_tpm_evidence_verification() {
+        let challenge = TpmQuoteChallenge::new([7u8; TPM_QUOTE_NONCE_BYTES]).unwrap();
+        let mut evidence = evidence(7);
+        let digest = challenge.digest();
+        evidence.quote_nonce_digest = digest.clone();
+        let mut receipt = receipt(7);
+        receipt.freshness_handle_digest = digest;
+
+        assert!(verify_tpm_nv_counter_with_challenge(
+            &evidence,
+            &challenge,
+            &profile(),
+            &receipt,
+            &Accept,
+        ).is_ok());
     }
 
     #[test]
