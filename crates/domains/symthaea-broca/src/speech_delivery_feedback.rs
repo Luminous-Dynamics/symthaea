@@ -139,7 +139,6 @@ impl SpeechDeliveryReceipt {
         }
     }
 
-
     pub fn validate_against_plan(
         &self,
         plan: &SpeechPlan,
@@ -150,7 +149,8 @@ impl SpeechDeliveryReceipt {
             return Err(SpeechDeliveryReceiptError::PlanMismatch);
         }
         Ok(())
-    }}
+    }
+}
 
 impl SpeechDeliveryTarget {
     pub fn from_plan(plan: &SpeechPlan) -> Self {
