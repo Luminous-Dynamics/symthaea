@@ -1297,6 +1297,17 @@
     layoutDiv.style.cssText = 'text-align:center; margin-top:1.2rem; max-width:550px; margin-left:auto; margin-right:auto;';
     var hasExistingOS = hwData && hwData.detected_os && hwData.detected_os.length > 0;
     var hasTpm = hwData && hwData.tpm2_available;
+    var tpmSpecMajor = hwData && hwData.tpm2_spec_major;
+    var measuredUki = hwData && hwData.measured_uki;
+    var tpmObservation = '';
+    if (hasTpm) {
+      var tpmVersionText = tpmSpecMajor != null ? ' TPM spec v' + tpmSpecMajor + '.' : '';
+      tpmObservation = '<p style="font-size:0.75rem; color:var(--leaf-green); margin-top:0.3rem;">TPM 2.0 detected —' +
+        tpmVersionText +
+        ' available for key protection (presence is not attestation).' +
+        (measuredUki ? ' Measured UKI reported.' : '') +
+        '</p>';
+    }
     layoutDiv.innerHTML =
       '<label style="font-size:0.82rem; color:var(--fg-dim);">Install Layout' +
       '<select id="layout-select" style="width:100%;padding:0.5rem;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-family:monospace;margin-top:0.3rem;">' +
@@ -1311,13 +1322,13 @@
       '  <option value="vps">VPS — minimal cloud install</option>' +
       '</select></label>' +
       (hasExistingOS ? '<p style="font-size:0.75rem; color:var(--solar-gold); margin-top:0.3rem;">Existing OS detected — "Alongside" layout available</p>' : '') +
-      (hasTpm ? '<p style="font-size:0.75rem; color:var(--leaf-green); margin-top:0.3rem;">TPM 2.0 detected — encrypted install recommended</p>' : '') +
+      tpmObservation +
       '<div style="margin-top:0.8rem; display:flex; gap:1.5rem; justify-content:center;">' +
       '  <label style="font-size:0.82rem; color:var(--fg-dim); cursor:pointer;">' +
       '    <input type="checkbox" id="secure-boot-toggle"' + (hwData && hwData.setup_mode ? ' checked' : '') + '> Enable Secure Boot (lanzaboote)' +
       '  </label>' +
       (hasTpm ? '  <label style="font-size:0.82rem; color:var(--fg-dim); cursor:pointer;">' +
-      '    <input type="checkbox" id="tpm2-toggle" checked> TPM2 auto-unlock (no passphrase at boot)' +
+      '    <input type="checkbox" id="tpm2-toggle" checked> TPM2 auto-unlock (passphrase fallback retained)' +
       '  </label>' : '') +
       '</div>' +
       (hwData && hwData.secure_boot ? '<p style="font-size:0.75rem; color:var(--teal); margin-top:0.3rem;">Secure Boot currently enabled — lanzaboote will maintain it</p>' : '') +
