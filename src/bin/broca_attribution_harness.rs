@@ -616,6 +616,72 @@ fn compare_captures(
     (exact, max_delta)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn proxy(mean_f0: f32, f0_span: f32, mean_energy: f32) -> FrameProxy {
+        FrameProxy {
+            mean_f0,
+            f0_min: 0.0,
+            f0_max: f0_span,
+            f0_span,
+            mean_energy,
+            energy_span: 0.0,
+            mean_f1: 0.0,
+            mean_f2: 0.0,
+            total_f0_variation: 0.0,
+            total_formant_variation: 0.0,
+            nonfinite_fields: 0,
+            frames: 1,
+        }
+    }
+
+    #[test]
+    fn interaction_delta_is_zero_for_additive_composition() {
+        let neutral = proxy(100.0, 10.0, 0.50);
+        let vocal = proxy(110.0, 12.0, 0.55);
+        let broca = proxy(105.0, 11.0, 0.52);
+        let composed = proxy(115.0, 13.0, 0.57);
+
+        let delta = interaction_delta(&composed, &vocal, &broca, &neutral);
+        assert_eq!(delta.mean_f0_delta, 0.0);
+        assert_eq!(delta.f0_span_delta, 0.0);
+        assert_eq!(delta.mean_energy_delta, 0.0);
+    }
+
+    #[test]
+    fn capture_comparison_detects_frame_change() {
+        let first = vec![FrameCapture {
+            f0: 100.0,
+            energy: 0.5,
+            f1: 500.0,
+            f2: 1500.0,
+        }];
+        let second = vec![FrameCapture {
+            f0: 100.25,
+            ..first[0]
+        }];
+
+        let (exact, max_delta) = compare_captures(&first, &second);
+        assert!(!exact);
+        assert_eq!(max_delta, 0.25);
+    }
+
+    #[test]
+    fn condition_factorization_is_explicit() {
+        assert!(!AttributionCondition::Neutral.vocal_tract_factor());
+        assert!(!AttributionCondition::Neutral.broca_factor());
+        assert!(AttributionCondition::VocalTractOnly.vocal_tract_factor());
+        assert!(!AttributionCondition::VocalTractOnly.broca_factor());
+        assert!(!AttributionCondition::BrocaOnly.vocal_tract_factor());
+        assert!(AttributionCondition::BrocaOnly.broca_factor());
+        assert!(AttributionCondition::ComposedWithFeedback.vocal_tract_factor());
+        assert!(AttributionCondition::ComposedWithFeedback.broca_factor());
+        assert!(AttributionCondition::ComposedWithFeedback.feedback_enabled());
+    }
+}
+
 fn parse_json_out() -> Option<PathBuf> {
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
