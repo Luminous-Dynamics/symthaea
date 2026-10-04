@@ -39,6 +39,7 @@ jobs:
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_interlingua_n0 | tee target/communication-evidence/neurosemantic_hdc_interlingua_n0.json
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_n0.json
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_generalization_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_generalization_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_adversarial_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_adversarial_n0.json
           python - <<'PY'
           import json
           from pathlib import Path
