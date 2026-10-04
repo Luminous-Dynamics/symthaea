@@ -22,7 +22,9 @@ use super::authorization::{NixActionDescriptorV1, NixActionIntentV1};
 use super::approver_evidence::RequiredApprovalProfileV1;
 use super::executor::NixOSCommand;
 use super::daemon_incarnation::{DaemonApprovalContextErrorV1, LiveDaemonIncarnationV1};
-use super::local_approval::PendingNixApprovalRequestV1;
+use super::local_approval::{
+    PendingNixApprovalRequestV1, operator_visible_action_for_command,
+};
 use super::local_approval_projection::PendingNixApprovalProjectionV1;
 use super::local_approval_socket::{
     LocalApprovalSocketErrorV1, LocalApprovalSocketServerV1,
@@ -271,31 +273,6 @@ impl std::fmt::Debug for LocalApprovalRuntimeV1 {
             )
             .field("pending_count", &self.request_store.pending_count().ok())
             .finish_non_exhaustive()
-    }
-}
-
-/// Canonical operator-facing rendering for a typed Nixward command.
-///
-/// This is presentation data, not execution authority. Keeping the renderer in
-/// the approval runtime prevents the daemon and approval ceremony from silently
-/// developing different textual representations of the same typed command.
-pub fn operator_visible_action_for_command(command: &NixOSCommand) -> String {
-    match command {
-        NixOSCommand::ConfigPatch {
-            option_path,
-            value,
-            expected_config_digest,
-        } => format!(
-            "PATCH /etc/nixos/configuration.nix: {option_path} = {value} [expected-config-digest={expected_config_digest}]"
-        ),
-        _ => {
-            let (bin, args) = command.to_command();
-            if args.is_empty() {
-                bin
-            } else {
-                format!("{} {}", bin, args.join(" "))
-            }
-        }
     }
 }
 
