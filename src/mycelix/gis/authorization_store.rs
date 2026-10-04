@@ -4728,6 +4728,12 @@ fn validate_persisted_terminal_evidence(
         ExecutionOutcome::Indeterminate => "indeterminate",
     };
 
+    store.validate_native_authority_pin_set_snapshot(
+        tx,
+        pin_set.0.as_deref(),
+        pin_set.1.as_deref(),
+    )?;
+
     if operation_id != record.operation_id
         || native_replay_identity != record.native_replay_identity
         || native_issuer.as_deref() != Some(record.native_issuer.as_str())
@@ -6164,6 +6170,92 @@ mod tests {
             0
         );
         assert_eq!(first.outcome,ExecutionOutcome::Succeeded);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_receipt_replay_rejects_missing_pin_set_snapshot() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-terminal-replay-pin-snapshot-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-terminal-replay-pin-snapshot",
+            "prod",
+            "adapter-terminal-replay-pin-snapshot"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"terminal-replay-pin-snapshot".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:20:00Z".into(),
+            expires_at:Some("2026-10-05T07:20:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt-terminal-replay-pin-snapshot",
+            "boundary-terminal-replay-pin-snapshot"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt-terminal-replay-pin-snapshot",
+            &action,
+            &effect,
+            "boundary-terminal-replay-pin-snapshot",
+            "operation:terminal-replay-pin-snapshot",
+            "native-terminal-replay-pin-snapshot"
+        ).unwrap();
+
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        store.commit_bound_verified(
+            &record,
+            &evidence,
+            &TestProviderVerifier
+        ).unwrap();
+
+        let deleted=store.connection().unwrap().execute(
+            "DELETE FROM authorization_native_authority_pin_sets
+             WHERE pin_set_id=?1 AND pin_set_digest=?2",
+            params![
+                record_native_pin_set_id_for_test(&store,&record),
+                record_native_pin_set_digest_for_test(&store,&record)
+            ],
+        ).unwrap();
+        assert_eq!(deleted,1);
+
+        let calls=Arc::new(AtomicUsize::new(0));
+        let err=store.commit_bound_verified(
+            &record,
+            &evidence,
+            &CountingProviderVerifier { calls:calls.clone() },
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidNativeReplayProvenance
+            )
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst),0);
+
         let _=std::fs::remove_file(path);
     }
 
