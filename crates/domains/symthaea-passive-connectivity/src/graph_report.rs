@@ -50,7 +50,7 @@ pub struct FunctionalGraphRealizationReport {
     pub path_results: Vec<ConnectionRealization>,
     /// Port pairs that the realized mesh connects even though the functional graph
     /// declares no FlowPath in either direction.
-    pub unexpected_connectivity: Vec<UnexpectedConnectivity>,
+    pub unexpected_flow_connectivity: Vec<UnexpectedFlowConnectivity>,
     /// Geometry/topology evidence only; transport remains unproven.
     pub physical_transport_unproven: bool,
 }
