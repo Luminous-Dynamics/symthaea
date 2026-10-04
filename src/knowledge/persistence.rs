@@ -258,6 +258,14 @@ impl KnowledgeSnapshotReceiptHistoryCheckpoint {
         }
         self.history_digest_hex == KnowledgeSnapshotReceipt::canonical_history_digest_hex(history)
     }
+
+    /// Whether the checkpoint exactly matches the prefix of a structurally valid, longer receipt history.
+    pub fn verify_prefix_against_history(&self, history: &[KnowledgeSnapshotReceipt]) -> bool {
+        if self.receipt_count > history.len() as u64 {
+            return false;
+        }
+        self.verify_against_history(&history[..self.receipt_count as usize])
+    }
 }
 
 /// Immutable record that a named validator evaluated the currently committed
@@ -469,6 +477,17 @@ impl KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
 
         self.history_digest_hex
             == KnowledgeSnapshotValidationReceiptRecord::canonical_history_digest_hex(history)
+    }
+
+    /// Whether the checkpoint exactly matches the prefix of a structurally valid, longer validation history.
+    pub fn verify_prefix_against_history(
+        &self,
+        history: &[KnowledgeSnapshotValidationReceiptRecord],
+    ) -> bool {
+        if self.receipt_count > history.len() as u64 {
+            return false;
+        }
+        self.verify_against_history(&history[..self.receipt_count as usize])
     }
 }
 
@@ -1119,6 +1138,19 @@ impl KnowledgePersistence {
         }
     }
 
+    /// Verify that the current snapshot-receipt history is a valid append-only extension of an external checkpoint.
+    pub fn verify_snapshot_receipt_history_checkpoint_prefix(
+        &mut self,
+        checkpoint: &KnowledgeSnapshotReceiptHistoryCheckpoint,
+    ) -> Result<(), String> {
+        let history = self.snapshot_receipt_history()?;
+        if checkpoint.verify_prefix_against_history(&history) {
+            Ok(())
+        } else {
+            Err("Snapshot receipt history checkpoint prefix mismatch".into())
+        }
+    }
+
     /// Load the latest committed complete-snapshot receipt.
     ///
     /// This receipt is append-only and is only advanced by successful
@@ -1444,6 +1476,19 @@ impl KnowledgePersistence {
             Ok(())
         } else {
             Err("Snapshot validation receipt history checkpoint mismatch".into())
+        }
+    }
+
+    /// Verify that the current validation-receipt history is a valid append-only extension of an external checkpoint.
+    pub fn verify_snapshot_validation_receipt_history_checkpoint_prefix(
+        &mut self,
+        checkpoint: &KnowledgeSnapshotValidationReceiptHistoryCheckpoint,
+    ) -> Result<(), String> {
+        let history = self.snapshot_validation_receipt_records()?;
+        if checkpoint.verify_prefix_against_history(&history) {
+            Ok(())
+        } else {
+            Err("Snapshot validation receipt history checkpoint prefix mismatch".into())
         }
     }
 
@@ -7583,6 +7628,12 @@ mod tests {
         p.verify_snapshot_receipt_history_checkpoint(&checkpoint)
             .unwrap();
 
+        let prefix_checkpoint =
+            KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&history[..1]);
+        assert!(prefix_checkpoint.verify_prefix_against_history(&history));
+        p.verify_snapshot_receipt_history_checkpoint_prefix(&prefix_checkpoint)
+            .unwrap();
+
         let mut reordered = history.clone();
         reordered.swap(0, 1);
         assert_ne!(
@@ -7924,6 +7975,12 @@ mod tests {
         assert_eq!(checkpoint.latest_generation, 2);
         assert!(checkpoint.verify_against_history(&all));
         p.verify_snapshot_validation_receipt_history_checkpoint(&checkpoint)
+            .unwrap();
+
+        let prefix_checkpoint =
+            KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(&all[..2]);
+        assert!(prefix_checkpoint.verify_prefix_against_history(&all));
+        p.verify_snapshot_validation_receipt_history_checkpoint_prefix(&prefix_checkpoint)
             .unwrap();
 
         let mut reordered = all.clone();
