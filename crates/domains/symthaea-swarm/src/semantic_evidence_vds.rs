@@ -304,7 +304,9 @@ impl Rfc9942Es256CoseKey {
                 CborLabelKey::Integer(-4) => {
                     return Err(Rfc9942VdpError::Es256PrivateKeyMaterial);
                 }
-                _ => {}
+                _ => {
+                    value_reader.skip_value(0).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
+                }
             }
             value_reader.finish().map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
         }
