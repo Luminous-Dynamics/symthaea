@@ -269,21 +269,12 @@ impl ServiceManager {
     ), std::io::Error> {
         let unit = Self::validated_governed_unit(service)?;
         let properties = observe_service_properties(&unit)?;
-        let state = NixServiceObservedStateV1::parse_systemd_observation(&unit, &properties)
-            .map_err(|error| std::io::Error::other(format!(
-                "invalid governed systemd observation for '{}': {error}",
-                unit
-            )))?;
-        let capabilities = NixServiceOperationCapabilitiesV1::from_observed_state(
-            &state,
-            state.can_start(),
-            state.can_stop(),
-            state.can_reload(),
-        )
-        .map_err(|error| std::io::Error::other(format!(
-            "invalid governed capability evidence for '{}': {error}",
-            unit
-        )))?;
+        let (state, capabilities) =
+            NixServiceObservedStateV1::parse_systemd_observation(&unit, &properties)
+                .map_err(|error| std::io::Error::other(format!(
+                    "invalid governed systemd observation for '{}': {error}",
+                    unit
+                )))?;
         let enablement = NixServiceEnablementEvidenceV1::from_observed_state(&state)
             .map_err(|error| std::io::Error::other(format!(
                 "invalid governed enablement evidence for '{}': {error}",
