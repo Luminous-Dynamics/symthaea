@@ -30,6 +30,7 @@ pub enum OpenFoamBoundaryObservationError {
     InvalidNumericField { patch: String, field: &'static str },
     InvalidPatchType(String),
     ArithmeticOverflow,
+    InvalidTolerance,
     InvalidSolverBinding(SolverBindingError),
 }
 
@@ -272,7 +273,7 @@ impl OpenFoamPassiveBoundaryAdapter {
             return Err(OpenFoamBoundaryObservationError::PatchNotFound(patch_name));
         }
         if !tolerance_mm.is_finite() || tolerance_mm < 0.0 {
-            return Err(OpenFoamBoundaryObservationError::ArithmeticOverflow);
+            return Err(OpenFoamBoundaryObservationError::InvalidTolerance);
         }
         Ok(Self {
             source_bytes: source_bytes.into(),
@@ -327,7 +328,11 @@ impl symthaea_passive_solver_binding::SolverBoundaryInputEntityObserver
             &self.source_bytes,
             &self.patch_name,
         )
-        .map_err(symthaea_passive_solver_binding::SolverBindingError::from)?;
+        .map_err(|error| {
+            symthaea_passive_solver_binding::SolverBindingError::ExternalObservation(
+                format!("{error:?}"),
+            )
+        })?;
 
         let mapping_digest =
             symthaea_passive_solver_binding::solver_entity_mapping_digest(
