@@ -168,6 +168,23 @@ fn rfc8392_es256_known_answer_detached_payload_requires_and_binds_external_bytes
 }
 
 #[test]
+fn rfc8392_es256_accepts_nonminimal_message_bstr_lengths() {
+    // RFC 9052 constrains deterministic encoding of Sig_structure, not the
+    // surrounding COSE message. Re-encode the 80-byte payload length with a
+    // longer definite-length form; the payload bytes and protected bytes remain
+    // identical, so the fixed RFC 8392 signature must still verify.
+    let mut encoded = RFC8392_SIGNED_CWT.to_vec();
+    assert_eq!(&encoded[27..29], &[0x58, 0x50]);
+    encoded.splice(27..29, [0x59, 0x00, 0x50]);
+
+    let message = Rfc9942SignatureWithReceipts::from_cbor(&encoded)
+        .expect("valid non-minimal COSE message bstr length must parse");
+    message
+        .verify_es256(&sec1_public_key(), &[], None)
+        .expect("non-minimal message encoding must not change the authenticated payload");
+}
+
+#[test]
 fn rfc8392_es256_known_answer_rejects_external_payload_for_attached_content() {
     const PAYLOAD_START: usize = 29;
     const PAYLOAD_END: usize = 109;
