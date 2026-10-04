@@ -129,6 +129,9 @@ impl PendingNixApprovalProjectionV1 {
         if self.operator_visible_action.len() > MAX_OPERATOR_VISIBLE_ACTION_BYTES {
             return Err(LocalApprovalProjectionErrorV1::OversizedOperatorVisibleAction);
         }
+        if self.operator_visible_action.chars().any(char::is_control) {
+            return Err(LocalApprovalProjectionErrorV1::ControlCharacterInOperatorVisibleAction);
+        }
         validate_digest(
             &self.operator_visible_action_digest,
             "operator visible action digest",
@@ -151,6 +154,8 @@ pub enum LocalApprovalProjectionErrorV1 {
     EmptyOperatorVisibleAction,
     #[error("operator-visible action exceeds projection size ceiling")]
     OversizedOperatorVisibleAction,
+    #[error("operator-visible action contains a control character")]
+    ControlCharacterInOperatorVisibleAction,
     #[error("operator-visible action does not match the request display digest")]
     DisplayedActionDigestMismatch,
     #[error("unsupported approval projection schema version")]
@@ -285,6 +290,19 @@ mod tests {
             serde_json::from_str(&serde_json::to_string(&projection).unwrap()).unwrap();
         assert_eq!(projection, restored);
         assert_eq!(projection.projection_digest, restored.compute_digest().unwrap());
+    }
+
+    #[test]
+    fn control_character_in_operator_visible_action_is_rejected() {
+        let request = request();
+        assert_eq!(
+            PendingNixApprovalProjectionV1::from_request(
+                &request,
+                "nixos-rebuild switch --flake .#workstation\n[APPROVED]",
+            )
+            .unwrap_err(),
+            LocalApprovalProjectionErrorV1::ControlCharacterInOperatorVisibleAction
+        );
     }
 
     #[test]
