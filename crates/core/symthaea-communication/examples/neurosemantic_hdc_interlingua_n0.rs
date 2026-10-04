@@ -1,10 +1,8 @@
 use symthaea_communication::hdc_interlingua::{
     HdcSemanticCodebook, HDC_SEMANTIC_INTERLINGUA_SCHEMA_VERSION,
 };
-use symthaea_communication::{
-    relabel_nodes, rename_identifiers, reorder_collections, ConceptEdge, ConceptKind, ConceptNode,
-    GroundedConceptGraph,
-};
+use symthaea_communication::hdc_interlingua::{relabel_nodes, rename_identifiers, reorder_collections};
+use symthaea_communication::{ConceptEdge, ConceptKind, ConceptNode, GroundedConceptGraph};
 fn node(id: &str, kind: ConceptKind, grounding: &str, confidence: f32) -> ConceptNode {
     ConceptNode {
         id: id.into(),
@@ -245,7 +243,6 @@ fn main() -> Result<(), String> {
         "wrong_codebook_rejected": wrong_codebook_rejected,
     });
 
-    let _: Value = output.clone();
     println!(
         "{}",
         serde_json::to_string_pretty(&output).map_err(|error| error.to_string())?
