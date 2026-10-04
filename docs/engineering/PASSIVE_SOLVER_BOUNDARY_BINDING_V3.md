@@ -29,6 +29,7 @@ The checked constructor then independently verifies that:
 - the selection is one connected closed boundary loop;
 - the resulting patch digest is derived from interface identity, exact mesh identity,
   selected edges, perimeter, and geometric residuals.
+- distinct mesh-topology edges cannot silently collapse onto the same 1 µm portable edge identity; such quantization collisions fail closed.
 
 ## Evidence recorded
 
@@ -88,11 +89,13 @@ solver-specific external handle remains a separate adapter mapping.
 The neutral core now has an explicit evidence ladder:
 
 - `AdapterAttested`: the sealed binder accepted the adapter's mapping draft after independent candidate/interface-rim checks.
-- `SolverEntityAttested`: a live-capable adapter additionally returned a non-empty solver-entity fingerprint and a mapping digest cryptographically bound to the exact interface, semantic candidate, exact mesh, realized rim, and external handle.
+- `SolverEntityAttested`: a live-capable adapter additionally returned a non-empty solver-entity fingerprint, a non-empty observation digest, and a mapping digest cryptographically bound to the exact interface, semantic candidate, exact mesh, realized rim, adapter identity, external handle, and observation.
 
 `SolverEntityAttested` is still an adapter provenance claim. The neutral core can verify that the receipt refers to the exact binding it is promoting, but it cannot independently inspect vendor-specific solver state. A concrete OpenFOAM/Fluent/etc. adapter must only issue this stronger receipt after performing its own solver-side entity introspection.
 
 The transition is sealed by `promote_solver_entity_attestation` and `bind_with_adapter_and_entity_attestation`; callers cannot directly construct a stronger binding by setting an evidence flag.
+
+The solver-entity mapping digest is versioned as `passive-solver-entity-mapping:v3` and includes the adapter-owned observation digest, so the receipt is anchored to a specific introspection record rather than only an asserted entity fingerprint.
 
 
 same intended geometry
