@@ -1394,9 +1394,8 @@ mod tests {
             BinaryCodeword::from_words(3, vec![0b100]),
         ])
         .expect("c2");
-        let c3 =
-            RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b100])])
-                .expect("c3");
+        let c3 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(3, vec![0b100])])
+            .expect("c3");
 
         let forward = [&c1, &c2, &c3];
         let reverse = [&c3, &c2, &c1];
