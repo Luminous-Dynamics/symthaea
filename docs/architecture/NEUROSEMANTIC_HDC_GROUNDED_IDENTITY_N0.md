@@ -169,6 +169,30 @@ separately. CI requires zero confident-wrong accepts while retaining at least on
 clean correct decode. The existing fixed `0.20 / 0.05` score/margin policy is not
 relaxed to accommodate corruption.
 
+## Empirical calibration boundary
+
+
+`HdcOntologyEmpiricalCalibration` provides a conservative empirical calibration
+layer over the existing fixed decoder policy. It consumes only successful clean
+calibration metrics and derives lower-quantile floors for selected score and
+selection margin.
+
+The calibrated policy is:
+
+`calibrated threshold = max(existing conservative baseline, empirical clean floor)`
+
+Therefore calibration cannot silently weaken the current `0.20` score or `0.05`
+margin boundaries.
+
+The executable calibration N0 lab keeps the calibration and evaluation cases
+disjoint, verifies exact reconstruction on the evaluation split, and separately
+runs deterministic random null frames. CI requires all null samples to abstain.
+
+This is intentionally **not** conformal prediction. The calibration layer makes
+no distribution-free coverage, false-accept, or adversarial-robustness guarantee.
+A future higher evidence tier can introduce a formally specified conformity score
+and calibration/test protocol without changing the current fail-closed baseline.
+
 ## Evidence ladder
 
 The accompanying executable N0 lab demonstrates:
