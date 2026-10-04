@@ -73,6 +73,8 @@ jobs:
             EXPECTED_COUNT=6
             test "$ACTUAL_COUNT" -eq "$EXPECTED_COUNT"
           fi
+          printf "scope_base_sha=%s\n" "$BASE_SHA" >> "$GITHUB_OUTPUT"
+          printf "scope_head_sha=%s\n" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
           printf "changed_paths=" >> "$GITHUB_OUTPUT"
           paste -sd "|" "$CHANGED_PATHS" >> "$GITHUB_OUTPUT"
 
@@ -342,6 +344,7 @@ jobs:
           HDC Linear-Code Recovery Qualification
           ======================================
           receipt_schema=hdc-linear-code-qualification-v3
+          event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
           runner_os=${{ steps.runner.outputs.runner_os }}
           runner_arch=${{ steps.runner.outputs.runner_arch }}
@@ -354,6 +357,8 @@ jobs:
           integration_test_sha256=${{ steps.provenance.outputs.test_sha256 }}
           qualification_workflow_sha256=${{ steps.provenance.outputs.workflow_sha256 }}
           research_surface_status=${{ (github.event_name == 'pull_request' || github.event_name == 'push') && steps.scope.outcome || 'not-applicable' }}
+          research_surface_base_sha=${{ steps.scope.outputs.scope_base_sha }}
+          research_surface_head_sha=${{ steps.scope.outputs.scope_head_sha }}
           research_surface_paths=${{ steps.scope.outputs.changed_paths }}
           rust_toolchain_file_sha256=${{ steps.provenance.outputs.toolchain_file_sha256 }}
           cargo_version=${{ steps.harness.outputs.cargo_version }}
