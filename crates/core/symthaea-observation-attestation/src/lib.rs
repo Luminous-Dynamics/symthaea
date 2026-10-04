@@ -2074,6 +2074,13 @@ impl Ed25519ReceiptVerifier {
         self
     }
 
+    /// Require the envelope to carry this exact challenge value.
+    ///
+    /// This binds the appraisal to the verifier-configured challenge and therefore
+    /// makes the challenge part of the policy identity. It does not prove that the
+    /// challenge is unique, previously unused, or consumed only once; replay protection
+    /// requires an external challenge issuance/consumption mechanism or another
+    /// independently bound freshness mechanism.
     pub fn with_expected_challenge(mut self, challenge: impl Into<String>) -> Self {
         self.expected_challenge = Some(challenge.into());
         self.policy_inputs.expected_challenge_fingerprint = self
@@ -2135,7 +2142,8 @@ impl Ed25519ReceiptVerifier {
     ///
     /// This is intentionally narrower than Evidence Fabric evaluation: it can establish
     /// the cryptographic proof under this verifier's configured policy inputs, but it does
-    /// not establish resolver-backed method lifecycle or authorization semantics.
+    /// not establish resolver-backed method lifecycle or authorization semantics. A matching
+    /// expected challenge is an equality check only; it is not a replay-consumption check.
     pub fn verify_detached_proof(
         &self,
         envelope: &ReceiptAttestationEnvelope,
