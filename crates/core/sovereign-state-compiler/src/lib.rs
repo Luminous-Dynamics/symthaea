@@ -2329,6 +2329,25 @@ mod tests {
     }
 
     #[test]
+    fn consumed_authorization_cannot_execute_after_expiry() {
+        let mut plan = sample_plan();
+        let auth = authorization_for(&plan);
+        plan.intent.expires_at_ms = Some(200);
+        let mut auth = auth;
+        auth.intent_digest = plan.intent.digest().expect("intent digest");
+        auth.valid_until_ms = Some(160);
+        auth.plan_digest = plan.digest().expect("plan digest");
+        let authorized = plan.authorize(auth, 150).expect("authorized plan");
+        let mut store = TestConsumptionStore::default();
+        let consumed =
+            consume_authorized_once(&mut store, &authorized, 159).expect("consumed");
+
+        assert_eq!(
+            consumed.admit_execution(161),
+            Err(PlanValidationError::AuthorizationExpired)
+        );
+    }
+    #[test]
     fn consumed_authorization_cannot_start_before_consumption() {
         let plan = sample_plan();
         let auth = authorization_for(&plan);
