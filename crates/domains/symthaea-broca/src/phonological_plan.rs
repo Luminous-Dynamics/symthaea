@@ -146,6 +146,26 @@ impl PhonologicalPlan {
         }
     }
 
+    /// Validate this persisted phonological plan against its exact upstream linguistic frame.
+    ///
+    /// Bound segment/lexical state may be added downstream; source-derived fields may not drift.
+    pub fn validate_against_frame(
+        &self,
+        frame: &LinguisticFrame,
+    ) -> Result<(), PhonologicalPlanError> {
+        self.validate()?;
+        if !self.source_intent.is_empty()
+            && (self.source_intent != frame.source_intent
+                || self.focus_role != frame.focus_role
+                || self.intonation != frame.prosody.intonation
+                || self.rate != sanitize_rate(frame.prosody.rate)
+                || self.pause_weight != sanitize_unit(frame.prosody.pause_weight))
+        {
+            return Err(PhonologicalPlanError::UpstreamMismatch);
+        }
+        Ok(())
+    }
+
     /// Compatibility wrapper for callers that have only a SpeechPlan.
     pub fn from_speech_plan(plan: &SpeechPlan) -> Self {
         let frame = LinguisticFrame::from_speech_plan(plan);
@@ -298,6 +318,7 @@ pub enum PhonologicalPlanError {
     InvalidPauseWeight,
     FocusRoleWithoutSegments,
     FocusSegmentsWithoutRole,
+    UpstreamMismatch,
     ConflictingSyllableStress { syllable_index: usize },
     MixedSyllableFocus { syllable_index: usize },
     MultipleSyllableOnsets { syllable_index: usize },
@@ -322,6 +343,7 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::InvalidPauseWeight => write!(f, "phonological plan pause weight is outside [0, 1]"),
             Self::FocusRoleWithoutSegments => write!(f, "a focus role requires focused phonemes"),
             Self::FocusSegmentsWithoutRole => write!(f, "focused phonemes require a focus role"),
+            Self::UpstreamMismatch => write!(f, "phonological plan no longer matches its upstream linguistic frame"),
             Self::ConflictingSyllableStress { syllable_index } => write!(f, "syllable {syllable_index} contains conflicting stress annotations"),
             Self::MixedSyllableFocus { syllable_index } => write!(f, "syllable {syllable_index} contains mixed focus annotations"),
             Self::MultipleSyllableOnsets { syllable_index } => write!(f, "syllable {syllable_index} contains multiple onset markers"),
