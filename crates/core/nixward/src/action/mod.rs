@@ -35,6 +35,7 @@ pub mod temporal;
 
 pub use approver_evidence::{
     ApproverEvidenceErrorV1, ApproverEvidenceProfileV1, ApproverEvidenceRefV1,
+    RequiredApprovalProfileV1,
     LocalUnixPeerCredentialEvidenceV1, VerifiedLocalUnixPeerCredentialV1,
     xenia_evidence_ref_v1,
 };
