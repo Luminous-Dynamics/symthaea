@@ -1145,6 +1145,34 @@ CanReload=yes
     }
 
     #[test]
+    fn evidence_digest_domains_are_distinct_from_pre_state() {
+        let (state, capabilities) = NixServiceObservedStateV1::parse_systemd_observation(
+            "nginx",
+            concat!(
+                "Id=nginx.service\n",
+                "Names=nginx.service\n",
+                "LoadState=loaded\n",
+                "ActiveState=active\n",
+                "SubState=running\n",
+                "UnitFileState=enabled\n",
+                "CanStart=yes\n",
+                "CanStop=yes\n",
+                "CanReload=yes\n",
+            ),
+        )
+        .unwrap();
+        let enablement =
+            NixServiceEnablementEvidenceV1::from_observed_state(&state).unwrap();
+
+        let state_digest = state.digest().unwrap();
+        assert_eq!(capabilities.pre_state_digest(), state_digest);
+        assert_eq!(enablement.pre_state_digest(), state_digest);
+        assert_ne!(capabilities.digest().unwrap(), state_digest);
+        assert_ne!(enablement.digest().unwrap(), state_digest);
+        assert_ne!(capabilities.digest().unwrap(), enablement.digest().unwrap());
+    }
+
+    #[test]
     fn rejects_partial_observation() {
         assert_eq!(
             NixServiceObservedStateV1::parse_systemd_properties(
