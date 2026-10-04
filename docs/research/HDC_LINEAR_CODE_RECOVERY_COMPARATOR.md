@@ -34,7 +34,7 @@ This is a useful boundary for this comparator: the exact GF(2) span solver here 
 
 ## Reproducibility contract
 
-Fixture generation uses the explicitly named `rand_chacha` `ChaCha12Rng` algorithm with a recorded `u64` seed, rather than `StdRng`, whose algorithm is intentionally non-portable. The qualification harness pins `rand_chacha` to `0.3.1`, records the resolved `Cargo.lock` hash, and records the exact source/test hashes and PR head. This makes fixture identity explicit as **seed + RNG algorithm + dependency lock + source/test revision**, rather than treating a seed alone as a permanent byte-level identity.
+Fixture generation uses the explicitly named `rand_chacha` `ChaCha12Rng` algorithm with a recorded `u64` seed, rather than `StdRng`, whose algorithm is intentionally non-portable. The qualification harness pins Rust to `1.96.1`, pins `rand_chacha` to `0.3.1`, records the resolved `Cargo.lock` hash, and records the exact source/test hashes and PR head. This makes fixture identity explicit as **seed + RNG algorithm + dependency lock + source/test revision**, rather than treating a seed alone as a permanent byte-level identity.
 
 ## Research boundary
 
