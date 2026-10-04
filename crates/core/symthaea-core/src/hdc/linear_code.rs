@@ -958,6 +958,18 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.len(), algebra.kernel_dimension);
         assert_eq!(first.len(), 1);
+        let dependent_indices = first
+            .iter()
+            .map(|witness| witness.dependent_generator_index)
+            .collect::<Vec<_>>();
+        for witness in &first {
+            for index in &dependent_indices {
+                assert_eq!(
+                    witness.generator_coefficients[*index],
+                    *index == witness.dependent_generator_index
+                );
+            }
+        }
 
         let witness = &first[0];
         assert_eq!(witness.generator_coefficients, vec![true, true, true]);
