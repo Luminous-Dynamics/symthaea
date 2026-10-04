@@ -619,6 +619,8 @@ mod tests {
         let receipt = CanonicalAdmissionReceipt::new(
             "admission:event-1",
             Some("frontier:1".into()),
+            "canonical:1",
+            Some("family:1".into()),
             validation.snapshot_digest.clone(),
             validation.validator_version.clone(),
             validation.snapshot_schema_version,
@@ -661,6 +663,8 @@ mod tests {
         assert!(CanonicalAdmissionReceipt::new(
             "admission:event-1",
             Some("frontier:1".into()),
+            "canonical:1",
+            Some("family:1".into()),
             validation.snapshot_digest.clone(),
             "attacker-defined-v999",
             PROVENANCE_SNAPSHOT_SCHEMA_VERSION,
@@ -669,6 +673,8 @@ mod tests {
         assert!(CanonicalAdmissionReceipt::new(
             "admission:event-1",
             Some("frontier:1".into()),
+            "canonical:1",
+            Some("family:1".into()),
             validation.snapshot_digest.clone(),
             PROVENANCE_VALIDATOR_VERSION,
             PROVENANCE_SNAPSHOT_SCHEMA_VERSION + 1,
@@ -681,6 +687,14 @@ mod tests {
             Err("admission receipt validator version mismatch")
         );
         assert!(!forged_receipt.binds_validation(&validation));
+
+        let mut subject = receipt.clone();
+        subject.admitted_subject_digest = "0".repeat(64);
+        assert_eq!(
+            subject.binds_subject("canonical:1", Some("family:1")),
+            false
+        );
+        assert!(!subject.binds_validation(&validation));
     }
 
     #[test]
