@@ -22,6 +22,7 @@ pub enum GraphRealizationStatus {
     InvalidGraph,
     NoFlowPathsDeclared,
     AllDeclaredPathsConnected,
+    TopologyDivergence,
     PartialRealization,
     NoDeclaredPathsConnected,
 }
@@ -132,8 +133,14 @@ impl FunctionalGraphRealizationReport {
         }
 
         let declared_flow_paths = path_results.len();
+        let unexpected_connectivity =
+            Self::find_unexpected_connectivity(graph, embedding, candidate);
         let status = if connected_paths == declared_flow_paths {
-            GraphRealizationStatus::AllDeclaredPathsConnected
+            if unexpected_connectivity.is_empty() {
+                GraphRealizationStatus::AllDeclaredPathsConnected
+            } else {
+                GraphRealizationStatus::TopologyDivergence
+            }
         } else if connected_paths == 0 {
             GraphRealizationStatus::NoDeclaredPathsConnected
         } else {
@@ -147,9 +154,7 @@ impl FunctionalGraphRealizationReport {
             disconnected_paths,
             invalid_paths,
             path_results,
-            unexpected_connectivity: Self::find_unexpected_connectivity(
-                graph, embedding, candidate,
-            ),
+            unexpected_connectivity,
             physical_transport_unproven: true,
         }
     }
@@ -392,7 +397,7 @@ mod tests {
         let mesh = resolve_to_mesh(&CSGNode::cube());
         let report = FunctionalGraphRealizationReport::evaluate(&graph, &embedding, &mesh);
 
-        assert_eq!(report.status, GraphRealizationStatus::AllDeclaredPathsConnected);
+        assert_eq!(report.status, GraphRealizationStatus::TopologyDivergence);
         assert!(report.has_topology_leakage());
         assert!(!report.is_geometrically_complete());
         assert!(report
