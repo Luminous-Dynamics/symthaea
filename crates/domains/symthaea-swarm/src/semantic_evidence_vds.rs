@@ -1925,7 +1925,24 @@ impl<'a> CborReader<'a> {
         let ai=initial&0x1f;
         match ai { 0..=23 => Ok(ai as u64), 24 => self.read_uint(1,24), 25=>self.read_uint(2,256), 26=>self.read_uint(4,65536), 27=>self.read_uint(8,4294967296), _=>Err(Rfc9162ProofDecodeError::InvalidEncoding) }
     }
-    fn read_uint(&mut self,n:usize,min:u64)->Result<u64,Rfc9162ProofDecodeError>{ if self.offset+n>self.bytes.len(){return Err(Rfc9162ProofDecodeError::UnexpectedEof)} let mut v=0u64; for b in &self.bytes[self.offset..self.offset+n]{v=(v<<8)|*b as u64;} self.offset+=n; if v<min{return Err(Rfc9162ProofDecodeError::InvalidEncoding)} Ok(v) }
+    /// Decode a definite-length CBOR argument without imposing deterministic
+    /// encoding requirements on the enclosing COSE message.
+    ///
+    /// RFC 9052 restricts minimal/definite encoding for Sig_structure,
+    /// Enc_structure, and MAC_structure. Incoming COSE messages may therefore
+    /// use longer-but-valid integer/length encodings; those bytes are retained
+    /// where they participate in authentication.
+    fn read_uint(&mut self, n: usize, _minimal_value: u64) -> Result<u64, Rfc9162ProofDecodeError> {
+        if self.offset + n > self.bytes.len() {
+            return Err(Rfc9162ProofDecodeError::UnexpectedEof);
+        }
+        let mut v = 0u64;
+        for b in &self.bytes[self.offset..self.offset + n] {
+            v = (v << 8) | *b as u64;
+        }
+        self.offset += n;
+        Ok(v)
+    }
     fn read_i64(&mut self) -> Result<i64, Rfc9162ProofDecodeError> {
         let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
         let major=initial>>5;
