@@ -1002,8 +1002,11 @@ impl ReceiptAttestationEnvelope {
     /// Evaluate the declared temporal validity at an explicit Unix-nanosecond instant.
     ///
     /// Expiry is an exclusive boundary: an envelope is expired at the
-    /// declared expiry instant. This method intentionally does not consult
-    /// wall-clock time, revocation registries, or external trust policy.
+    /// declared expiry instant. This method intentionally does not establish
+    /// freshness or anti-replay status: a timestamped envelope can remain valid
+    /// while still being a replay of previously accepted evidence. Freshness
+    /// must be supplied by an independently bound mechanism such as a verifier
+    /// challenge/nonce, epoch identifier, or synchronized-clock policy.
     pub fn temporal_status_at(&self, now_unix_ns: i128) -> ReceiptAttestationTemporalStatus {
         if now_unix_ns < self.created_at_unix_ns {
             ReceiptAttestationTemporalStatus::NotYetValid
