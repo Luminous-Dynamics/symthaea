@@ -46,7 +46,7 @@ impl Default for PortBoundaryPolicy {
             allowed_open_ports: BTreeSet::new(),
             required_open_ports: BTreeSet::new(),
             typed_interfaces: BTreeMap::new(),
-            tolerance_micrometers: 50_000,
+            tolerance_micrometers: 50,
         }
     }
 }
@@ -554,6 +554,14 @@ mod tests {
             &policy,
         );
         assert_eq!(evidence.status, BoundaryValidationStatus::MissingPortOpening(PortId(10)));
+    }
+
+    #[test]
+    fn default_tolerance_is_fifty_micrometers() {
+        assert_eq!(
+            PortBoundaryPolicy::closed().tolerance_micrometers,
+            50
+        );
     }
 
     #[test]
