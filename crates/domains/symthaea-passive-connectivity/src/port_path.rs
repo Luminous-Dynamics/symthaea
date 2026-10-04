@@ -9,6 +9,7 @@ use symthaea_passive_void_graph::{FunctionalVoidGraph, PortId};
 pub enum PortPathStatus {
     InvalidMesh,
     AnchorNotRepresented(PortId),
+    AmbiguousAnchor(PortId),
     Disconnected,
     Connected,
 }
@@ -54,6 +55,26 @@ pub fn evaluate_port_path(
     let labels = triangle_components(candidate);
     let from_component = nearest_component(candidate, &labels, from_point);
     let to_component = nearest_component(candidate, &labels, to_point);
+
+    if matches!(from_component, AnchorResolution::Ambiguous) {
+        return PortPathEvidence {
+            status: PortPathStatus::AmbiguousAnchor(from),
+            from_component: None,
+            to_component: component_value(to_component),
+            physical_transport_unproven: true,
+        };
+    }
+    if matches!(to_component, AnchorResolution::Ambiguous) {
+        return PortPathEvidence {
+            status: PortPathStatus::AmbiguousAnchor(to),
+            from_component: component_value(from_component),
+            to_component: None,
+            physical_transport_unproven: true,
+        };
+    }
+
+    let from_component = component_value(from_component);
+    let to_component = component_value(to_component);
     match (from_component, to_component) {
         (Some(a), Some(b)) if a == b => PortPathEvidence {
             status: PortPathStatus::Connected,
@@ -128,7 +149,20 @@ fn triangle_components(mesh: &TriangleMesh) -> Vec<usize> {
     (0..mesh.indices.len()).map(|i| find(&mut parent, i)).collect()
 }
 
-fn nearest_component(mesh: &TriangleMesh, labels: &[usize], point: [f32;3]) -> Option<usize> {
+enum AnchorResolution {
+    Missing,
+    Ambiguous,
+    Found(usize),
+}
+
+fn component_value(resolution: AnchorResolution) -> Option<usize> {
+    match resolution {
+        AnchorResolution::Found(component) => Some(component),
+        AnchorResolution::Missing | AnchorResolution::Ambiguous => None,
+    }
+}
+
+fn nearest_component(mesh: &TriangleMesh, labels: &[usize], point: [f32;3]) -> AnchorResolution {
     let mut vertex_component: HashMap<[i64;3], HashSet<usize>> = HashMap::new();
     for (tri_index, tri) in mesh.indices.iter().enumerate() {
         if !tri.iter().all(|i| (*i as usize) < mesh.vertices.len()) { continue; }
@@ -137,17 +171,44 @@ fn nearest_component(mesh: &TriangleMesh, labels: &[usize], point: [f32;3]) -> O
             vertex_component.entry(quantize(mesh.vertices[*vertex as usize])).or_default().insert(label);
         }
     }
-    let mut best: Option<(f64, usize)> = None;
+    let mut best: Option<(f64, Vec<usize>)> = None;
     for (vertex, components) in vertex_component {
         let dx = vertex[0] as f64 / 1_000_000.0 - point[0] as f64;
         let dy = vertex[1] as f64 / 1_000_000.0 - point[1] as f64;
         let dz = vertex[2] as f64 / 1_000_000.0 - point[2] as f64;
-        let distance = dx*dx + dy*dy + dz*dz;
-        if let Some(&component) = components.iter().next() {
-            if best.map(|(d, _)| distance < d).unwrap_or(true) { best = Some((distance, component)); }
+        let distance = dx * dx + dy * dy + dz * dz;
+        let mut component_ids = components.into_iter().collect::<Vec<_>>();
+        component_ids.sort_unstable();
+
+        match &mut best {
+            Some((best_distance, best_components)) if distance < *best_distance - 1.0e-18 => {
+                *best_distance = distance;
+                *best_components = component_ids;
+            }
+            Some((best_distance, best_components))
+                if (distance - *best_distance).abs() <= 1.0e-18 =>
+            {
+                for component in component_ids {
+                    if !best_components.contains(&component) {
+                        best_components.push(component);
+                    }
+                }
+                best_components.sort_unstable();
+            }
+            None => {
+                best = Some((distance, component_ids));
+            }
+            _ => {}
         }
     }
-    best.map(|(_, component)| component)
+
+    match best {
+        None => AnchorResolution::Missing,
+        Some((_, components)) if components.len() == 1 => {
+            AnchorResolution::Found(components[0])
+        }
+        Some(_) => AnchorResolution::Ambiguous,
+    }
 }
 
 fn quantize(point: [f32;3]) -> [i64;3] {
@@ -162,3 +223,101 @@ pub(crate) fn embedding_port(_embedding: &GeometryEmbedding, _port: PortId) -> O
 
 #[allow(dead_code)]
 fn _keep_report_type(_: &ValidationReport, _: &ConnectivityStatus) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use symthaea_fabrication_kernel::csg::{CSGNode, Transform3D};
+    use symthaea_passive_void_compiler::{GeometryEmbedding, PortAnchor};
+
+    fn graph() -> FunctionalVoidGraph {
+        let mut graph = FunctionalVoidGraph::new();
+        graph
+            .add_region(symthaea_passive_void_graph::VoidRegion {
+                id: RegionId(1),
+                role: symthaea_passive_void_graph::VoidRegionRole::Inlet,
+            })
+            .unwrap();
+        graph
+            .add_region(symthaea_passive_void_graph::VoidRegion {
+                id: RegionId(2),
+                role: symthaea_passive_void_graph::VoidRegionRole::Outlet,
+            })
+            .unwrap();
+        graph
+            .add_port(symthaea_passive_void_graph::VoidPort {
+                id: PortId(10),
+                region: RegionId(1),
+            })
+            .unwrap();
+        graph
+            .add_port(symthaea_passive_void_graph::VoidPort {
+                id: PortId(20),
+                region: RegionId(2),
+            })
+            .unwrap();
+        graph
+            .connect(symthaea_passive_void_graph::VoidConnection {
+                from: PortId(10),
+                to: PortId(20),
+                relation: symthaea_passive_void_graph::VoidRelation::FlowPath,
+                bidirectional: false,
+            })
+            .unwrap();
+        graph
+    }
+
+    fn embedding() -> GeometryEmbedding {
+        GeometryEmbedding::default()
+            .with_port(
+                PortId(10),
+                PortAnchor {
+                    center_mm: [-0.5, -0.5, -0.5],
+                    radius_mm: 1.0,
+                },
+            )
+            .with_port(
+                PortId(20),
+                PortAnchor {
+                    center_mm: [0.5, 0.5, 0.5],
+                    radius_mm: 1.0,
+                },
+            )
+    }
+
+    #[test]
+    fn connected_ports_are_detected_in_mesh_component() {
+        let mesh = resolve_to_mesh(&CSGNode::cube());
+        let evidence = evaluate_port_path(&graph(), &embedding(), &mesh, PortId(10), PortId(20));
+        assert_eq!(evidence.status, PortPathStatus::Connected);
+        assert!(evidence.physical_transport_unproven);
+    }
+
+    #[test]
+    fn disconnected_ports_are_detected() {
+        let mut left = resolve_to_mesh(&CSGNode::cube());
+        let right = resolve_to_mesh(&CSGNode::cube().with_transform(Transform3D {
+            translate: [3.0, 0.0, 0.0],
+            ..Default::default()
+        }));
+        left.merge(&right);
+
+        let e = GeometryEmbedding::default()
+            .with_port(
+                PortId(10),
+                PortAnchor {
+                    center_mm: [-0.5, -0.5, -0.5],
+                    radius_mm: 1.0,
+                },
+            )
+            .with_port(
+                PortId(20),
+                PortAnchor {
+                    center_mm: [2.5, 0.5, 0.5],
+                    radius_mm: 1.0,
+                },
+            );
+        let evidence = evaluate_port_path(&graph(), &e, &left, PortId(10), PortId(20));
+        assert_eq!(evidence.status, PortPathStatus::Disconnected);
+    }
+}
