@@ -37,7 +37,7 @@ done
 
 mkdir -p "$TPM_STATE"
 swtpm_setup --tpm2 --tpmstate "$TPM_STATE" --overwrite >/dev/null
-swtpm socket --tpm2 --tpmstate "dir=$TPM_STATE,fsync" --ctrl "type=tcp,port=$CTRL_PORT" --server "type=tcp,port=$TPM_PORT" --flags not-need-init >/dev/null 2>&1 &
+swtpm socket --tpm2 --tpmstate "dir=$TPM_STATE,fsync" --ctrl "type=tcp,port=$CTRL_PORT,bindaddr=127.0.0.1" --server "type=tcp,port=$TPM_PORT,bindaddr=127.0.0.1" --flags not-need-init >/dev/null 2>&1 &
 SWTPM_PID=$!
 
 for _ in $(seq 1 50); do
@@ -121,6 +121,14 @@ tpm2_nvcertify -Q -C "$ROOT/ak-after-restart.ctx" -c "$NV_INDEX" -p "$NV_AUTH" -
 test -s "$ROOT/nv.attest"
 test -s "$ROOT/nv.sig"
 tpm2_print -Q -t TPMS_ATTEST "$ROOT/nv.attest" > "$ROOT/nv.yaml"
+NV_EXTRA_DATA=$(awk '$1 == "extraData:" { print $2; exit }' "$ROOT/nv.yaml")
+[ "$NV_EXTRA_DATA" = "$POST_RESTART_CHALLENGE" ] || {
+  echo "ERROR: NV_Certify attestation did not bind the fresh challenge" >&2
+  exit 1
+}
+grep -Fq "index: $NV_INDEX" "$ROOT/nv.yaml"
+grep -Fq "offset: 0" "$ROOT/nv.yaml"
+printf 'nv_certification_challenge_binding=verified\\n' >> "$EVIDENCE_FILE"
 tpm2_verifysignature -Q -c "$ROOT/ak-after-restart.ctx" -g sha256 -m "$ROOT/nv.attest" -s "$ROOT/nv.sig" -f rsassa
 
 # The TPM will also certify a partial range. This is a negative domain fixture:
