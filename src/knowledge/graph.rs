@@ -16,7 +16,7 @@ use super::encoding::FactEncoding;
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
 use symthaea_epistemic_types::{
-    CanonicalAdmissionReceipt, MemoryKind, MemoryProvenance, ProvenanceRelation, ProvenanceRelationKind,
+    CanonicalAdmissionReceipt, CanonicalAdmissionSubject, MemoryKind, MemoryProvenance, ProvenanceRelation, ProvenanceRelationKind,
     ProvenanceValidationReport, ProvenanceValidationViolation,
     ProvenanceView,
 };
@@ -56,6 +56,14 @@ impl CanonicalAdmission {
             return Err("provenance family must be non-empty when present");
         }
         Ok(Self { canonical_identity, provenance_family, receipt: None })
+    }
+
+    pub fn from_subject(subject: CanonicalAdmissionSubject) -> Self {
+        Self {
+            canonical_identity: subject.canonical_identity().to_owned(),
+            provenance_family: subject.provenance_family().map(str::to_owned),
+            receipt: None,
+        }
     }
 
     /// Validate the capability envelope before it crosses the local admission boundary.
@@ -1147,6 +1155,19 @@ fn contains_negation(text: &str) -> bool {
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
+    #[test]
+    fn test_canonical_admission_from_typed_subject_preserves_namespace() {
+        let subject = CanonicalAdmissionSubject::new(
+            "canonical:typed",
+            Some("family:typed".into()),
+        ).unwrap();
+        let admission = CanonicalAdmission::from_subject(subject.clone());
+        assert_eq!(admission.canonical_identity, subject.canonical_identity());
+        assert_eq!(admission.provenance_family.as_deref(), subject.provenance_family());
+        assert!(admission.validate_structure().is_ok());
+    }
+
+    #[test]
     #[test]
     fn test_canonical_admission_rejects_receipt_for_different_subject() {
         let relation = ProvenanceRelation {
