@@ -3244,8 +3244,26 @@ echo ',"setup_mode":'
 bootctl status 2>/dev/null | grep -q "Setup Mode: setup" && echo 'true' || echo 'false'
 
 # TPM
+TPM2_AVAILABLE=false
+[ -e /dev/tpmrm0 ] && TPM2_AVAILABLE=true
 echo ',"tpm2_available":'
-[ -e /dev/tpmrm0 ] && echo 'true' || echo 'false'
+echo "$TPM2_AVAILABLE"
+
+echo ',"tpm2_spec_major":'
+if [ "$TPM2_AVAILABLE" = true ]; then
+  TPM2_SPEC_MAJOR=$(for tpm in /sys/class/tpm/tpm*; do
+    [ -r "$tpm/tpm_version_major" ] && cat "$tpm/tpm_version_major" && break
+  done)
+  case "$TPM2_SPEC_MAJOR" in
+    ''|*[!0-9]*) echo 'null' ;;
+    *) echo "$TPM2_SPEC_MAJOR" ;;
+  esac
+else
+  echo 'null'
+fi
+
+echo ',"measured_uki":'
+bootctl status 2>/dev/null | grep -q "Measured UKI: yes" && echo 'true' || echo 'false'
 
 # Architecture (for Apple Silicon detection)
 echo ',"arch": "'$(uname -m)'"'
