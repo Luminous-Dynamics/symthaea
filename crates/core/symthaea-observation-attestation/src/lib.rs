@@ -2590,7 +2590,7 @@ mod tests {
         );
         assert!(report.matches_attestation_envelope(&envelope));
 
-        let mut changed = envelope;
+        let mut changed = envelope.clone();
         changed.domain = Some("different-domain".into());
         assert!(!report.matches_attestation_envelope(&changed));
 
