@@ -224,17 +224,7 @@ impl ProvenanceView {
         relations: &[ProvenanceRelation],
         validation: ProvenanceValidationReport,
     ) -> Result<Self, &'static str> {
-        if validation.snapshot_schema_version != PROVENANCE_SNAPSHOT_SCHEMA_VERSION {
-            return Err("provenance view schema version mismatch");
-        }
-        let expected_digest =
-            ProvenanceValidationReport::snapshot_digest_for(
-                relations,
-                validation.snapshot_schema_version,
-            );
-        if expected_digest != validation.snapshot_digest {
-            return Err("provenance view validation digest mismatch");
-        }
+        validation.validate_against_relations(relations)?;
         Ok(Self {
             validator_version: validation.validator_version.clone(),
             snapshot_schema_version: validation.snapshot_schema_version,
@@ -309,6 +299,52 @@ impl ProvenanceValidationReport {
         self.conforms = violations.is_empty();
         self.violations = violations;
         self
+    }
+
+    /// Defensive structural validation for a report that may have come from
+    /// deserialization rather than from from_relations.
+    ///
+    /// This binds report metadata to the concrete relation slice presented to a
+    /// ProvenanceView, preventing a mismatched digest/count/schema/version from
+    /// crossing the read-only provenance boundary.
+    pub fn validate_against_relations(
+        &self,
+        relations: &[ProvenanceRelation],
+    ) -> Result<(), &'static str> {
+        if self.validator_version.trim().is_empty() {
+            return Err("provenance validator version must be non-empty");
+        }
+        if self.snapshot_schema_version != PROVENANCE_SNAPSHOT_SCHEMA_VERSION {
+            return Err("provenance validation schema version mismatch");
+        }
+        if !is_hex_digest(&self.snapshot_digest) {
+            return Err("provenance snapshot digest must be a 64-character hexadecimal digest");
+        }
+        if self.relation_count != relations.len() {
+            return Err("provenance validation relation count mismatch");
+        }
+        let expected_digest = Self::snapshot_digest_for(relations, self.snapshot_schema_version);
+        if expected_digest != self.snapshot_digest {
+            return Err("provenance view validation digest mismatch");
+        }
+        if self.conforms != self.violations.is_empty() {
+            return Err("provenance validation outcome does not match violations");
+        }
+
+        let mut seen = std::collections::HashSet::with_capacity(relations.len());
+        for relation in relations {
+            relation.validate()?;
+            let key = (
+                relation.source_memory_id.as_str(),
+                relation.target_memory_id.as_str(),
+                relation.kind.stable_code(),
+                relation.created_at.as_str(),
+            );
+            if !seen.insert(key) {
+                return Err("provenance relations must be unique");
+            }
+        }
+        Ok(())
     }
 }
 
