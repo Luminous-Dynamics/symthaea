@@ -41,6 +41,8 @@ pub const HDC_ONTOLOGY_MAX_NODES: usize = 256;
 pub const HDC_ONTOLOGY_MAX_EDGES: usize = 2048;
 /// Hard ceiling on receiver-side edge candidates before ranking allocation.
 pub const HDC_ONTOLOGY_MAX_EDGE_CANDIDATES: usize = 1_000_000;
+/// Versioned HDC nonconformity score used by the isolated N1 conformal primitive.
+pub const HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION: &str = "cosine-nonconformity-v1";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HdcConceptIdentityBinding {
@@ -272,6 +274,8 @@ pub struct HdcOntologyConformalCalibration {
     pub threshold: f64,
     pub calibration_case_count: usize,
     pub codebook_hash: String,
+    /// Exact nonconformity definition used to produce `threshold`.
+    pub score_revision: String,
 }
 
 impl HdcOntologyConformalCalibration {
@@ -315,7 +319,44 @@ impl HdcOntologyConformalCalibration {
             threshold: sorted[rank - 1],
             calibration_case_count: n,
             codebook_hash,
+            score_revision: HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION.into(),
         })
+    }
+
+    /// Convert bounded cosine similarity into a [0, 1] nonconformity score.
+    /// Similarity +1 is perfect conformity and -1 is maximal nonconformity.
+    pub fn nonconformity_from_cosine(similarity: f64) -> Result<f64, String> {
+        if !similarity.is_finite() || !(-1.0..=1.0).contains(&similarity) {
+            return Err("HDC cosine similarity must be finite and within [-1, 1]".into());
+        }
+        Ok((1.0 - similarity) / 2.0)
+    }
+
+    /// Return the conformal prediction set over a deterministic candidate pool.
+    /// The caller must establish the calibration/test exchangeability assumptions
+    /// and bind the calibration to the same frozen codebook.
+    pub fn prediction_set(
+        &self,
+        candidates: &[HdcOntologyRetrievalCandidate],
+    ) -> Result<Vec<String>, String> {
+        if !self.validates() {
+            return Err("invalid HDC ontology conformal calibration".into());
+        }
+        let mut ids = BTreeSet::new();
+        let mut selected = Vec::new();
+        for candidate in candidates {
+            if candidate.stable_id.trim().is_empty()
+                || !ids.insert(candidate.stable_id.clone())
+            {
+                return Err("conformal candidate stable IDs must be unique and non-empty".into());
+            }
+            let nonconformity = Self::nonconformity_from_cosine(candidate.score)?;
+            if self.accepts(nonconformity) {
+                selected.push(candidate.stable_id.clone());
+            }
+        }
+        selected.sort();
+        Ok(selected)
     }
 
     pub fn accepts(&self, nonconformity: f64) -> bool {
@@ -338,6 +379,7 @@ impl HdcOntologyConformalCalibration {
             && (0.0..=1.0).contains(&self.threshold)
             && self.calibration_case_count > 0
             && !self.codebook_hash.trim().is_empty()
+            && self.score_revision == HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION
     }
 }
 
@@ -1464,7 +1506,25 @@ mod tests {
         assert!(calibration.validates());
     }
 
+        fn conformal_cosine_nonconformity_is_bounded_and_monotone() {
+        assert_eq!(
+            HdcOntologyConformalCalibration::nonconformity_from_cosine(1.0).unwrap(),
+            0.0
+        );
+        assert_eq!(
+            HdcOntologyConformalCalibration::nonconformity_from_cosine(-1.0).unwrap(),
+            1.0
+        );
+        assert!(
+            HdcOntologyConformalCalibration::nonconformity_from_cosine(0.8).unwrap()
+                < HdcOntologyConformalCalibration::nonconformity_from_cosine(0.2).unwrap()
+        );
+        assert!(HdcOntologyConformalCalibration::nonconformity_from_cosine(f64::NAN).is_err());
+        assert!(HdcOntologyConformalCalibration::nonconformity_from_cosine(1.01).is_err());
+    }
+
     #[test]
+#[test]
     fn conformal_non_max_threshold_requires_enough_calibration_cases() {
         assert_eq!(
             HdcOntologyConformalCalibration::minimum_cases_for_non_max_threshold(0.10)
@@ -1478,7 +1538,46 @@ mod tests {
         );
     }
 
+        fn conformal_prediction_set_is_thresholded_and_deterministic() {
+        let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
+            "codebook",
+            &[0.0, 0.1, 0.2, 0.3],
+            0.50,
+        )
+        .unwrap();
+        assert_eq!(calibration.threshold, 0.1);
+        assert_eq!(calibration.score_revision, HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION);
+        let candidates = vec![
+            HdcOntologyRetrievalCandidate { stable_id: "z".into(), score: 0.8 },
+            HdcOntologyRetrievalCandidate { stable_id: "a".into(), score: 1.0 },
+            HdcOntologyRetrievalCandidate { stable_id: "m".into(), score: 0.6 },
+            HdcOntologyRetrievalCandidate { stable_id: "q".into(), score: -1.0 },
+        ];
+        assert_eq!(calibration.prediction_set(&candidates).unwrap(), vec!["a", "m"]);
+    }
+
     #[test]
+    fn conformal_prediction_set_rejects_ambiguous_candidates() {
+        let calibration = HdcOntologyConformalCalibration::from_nonconformity_scores(
+            "codebook",
+            &[0.1, 0.2, 0.3],
+            0.10,
+        )
+        .unwrap();
+        let duplicate = vec![
+            HdcOntologyRetrievalCandidate { stable_id: "x".into(), score: 1.0 },
+            HdcOntologyRetrievalCandidate { stable_id: "x".into(), score: 0.9 },
+        ];
+        assert!(calibration.prediction_set(&duplicate).is_err());
+        let invalid = vec![HdcOntologyRetrievalCandidate {
+            stable_id: "x".into(),
+            score: f64::NAN,
+        }];
+        assert!(calibration.prediction_set(&invalid).is_err());
+    }
+
+    #[test]
+#[test]
     fn conformal_calibration_rejects_invalid_scores_and_alpha() {
         assert!(HdcOntologyConformalCalibration::from_nonconformity_scores(
             "codebook",
