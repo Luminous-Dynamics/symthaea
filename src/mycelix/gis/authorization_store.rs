@@ -789,6 +789,123 @@ fn compute_attempt_binding_digest(
     format!("sha256:{}", hex::encode(Sha256::digest(material)))
 }
 
+fn load_persisted_dispatch_record(
+    tx: &Transaction<'_>,
+    authorization_instance: &str,
+    attempt_id: &str,
+    boundary_id: &str,
+) -> Result<(DurableDispatchRecord, String), AuthorizationStoreError> {
+    if authorization_instance.is_empty() || attempt_id.is_empty() || boundary_id.is_empty() {
+        return Err(AuthorizationConsumptionError::InvalidBinding.into());
+    }
+
+    let row = tx
+        .query_row(
+            "SELECT operation_id,native_replay_identity,native_issuer,native_authority_namespace,
+                    native_authorization_id,native_replay_derivation_digest,
+                    status_identifier,status_source_digest,status_observed_at,status_valid_until,
+                    status_evidence_digest,action_id,action_digest,provider_idempotency_key,
+                    target_identity,audience,adapter,adapter_revision,
+                    adapter_implementation_digest,boundary_id,attempt_binding_digest,state
+             FROM authorization_dispatches
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+            params![authorization_instance, attempt_id, boundary_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, Option<String>>(8)?,
+                    row.get::<_, Option<String>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
+                    row.get::<_, String>(11)?,
+                    row.get::<_, String>(12)?,
+                    row.get::<_, String>(13)?,
+                    row.get::<_, String>(14)?,
+                    row.get::<_, String>(15)?,
+                    row.get::<_, String>(16)?,
+                    row.get::<_, Option<String>>(17)?,
+                    row.get::<_, Option<String>>(18)?,
+                    row.get::<_, String>(19)?,
+                    row.get::<_, String>(20)?,
+                    row.get::<_, String>(21)?,
+                ))
+            },
+        )
+        .optional()?
+        .ok_or_else(|| AuthorizationStoreError::NotFound(attempt_id.to_owned()))?;
+
+    let (
+        operation_id,
+        native_replay_identity,
+        native_issuer,
+        native_authority_namespace,
+        native_authorization_id,
+        native_replay_derivation_digest,
+        status_identifier,
+        status_source_digest,
+        status_observed_at,
+        status_valid_until,
+        status_evidence_digest,
+        action_id,
+        action_digest,
+        provider_idempotency_key,
+        target_identity,
+        audience,
+        adapter,
+        adapter_revision,
+        adapter_implementation_digest,
+        stored_boundary_id,
+        attempt_binding_digest,
+        state,
+    ) = row;
+
+    if stored_boundary_id != boundary_id {
+        return Err(AuthorizationConsumptionError::InvalidBinding.into());
+    }
+
+    let require_non_empty = |value: Option<String>| {
+        value
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding,
+            ))
+    };
+
+    let record = DurableDispatchRecord {
+        authorization_instance: authorization_instance.to_owned(),
+        attempt_id: attempt_id.to_owned(),
+        operation_id,
+        native_replay_identity,
+        native_issuer: require_non_empty(native_issuer)?,
+        native_authority_namespace: require_non_empty(native_authority_namespace)?,
+        native_authorization_id: require_non_empty(native_authorization_id)?,
+        native_replay_derivation_digest: require_non_empty(native_replay_derivation_digest)?,
+        status_identifier: require_non_empty(status_identifier)?,
+        status_source_digest: require_non_empty(status_source_digest)?,
+        status_observed_at: require_non_empty(status_observed_at)?,
+        status_valid_until: require_non_empty(status_valid_until)?,
+        status_evidence_digest: require_non_empty(status_evidence_digest)?,
+        action_id,
+        action_digest,
+        provider_idempotency_key,
+        target_identity,
+        audience,
+        adapter,
+        adapter_revision: require_non_empty(adapter_revision)?,
+        adapter_implementation_digest: require_non_empty(adapter_implementation_digest)?,
+        boundary_id: stored_boundary_id,
+        attempt_binding_digest,
+    };
+
+    Ok((record, state))
+}
+
 impl DurableDispatchRecord {
     pub fn new(
         authorization_instance: impl Into<String>,
@@ -4135,7 +4252,7 @@ fn validate_native_authority_pin_set(
             let (mut stmt, query_params) = match (boundary_filter, attempt_filter) {
                 (Some(_), Some(_)) => (
                     tx.prepare(
-                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
+                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id, state
                          FROM authorization_leases
                          WHERE state IN ('dispatch_pending','invoked')
                            AND boundary_id=?1 AND attempt_id=?2",
@@ -4147,7 +4264,7 @@ fn validate_native_authority_pin_set(
                 ),
                 (Some(_), None) => (
                     tx.prepare(
-                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
+                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id, state
                          FROM authorization_leases
                          WHERE state IN ('dispatch_pending','invoked')
                            AND boundary_id=?1",
@@ -4156,7 +4273,7 @@ fn validate_native_authority_pin_set(
                 ),
                 (None, Some(_)) => (
                     tx.prepare(
-                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
+                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id, state
                          FROM authorization_leases
                          WHERE state IN ('dispatch_pending','invoked')
                            AND boundary_id IS NULL AND attempt_id=?1",
@@ -4165,7 +4282,7 @@ fn validate_native_authority_pin_set(
                 ),
                 (None, None) => (
                     tx.prepare(
-                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id
+                        "SELECT authorization_instance, action_id, attempt_id, action_digest, authority_epoch, boundary_id, state
                          FROM authorization_leases
                          WHERE state IN ('dispatch_pending','invoked')
                            AND boundary_id IS NULL",
@@ -4181,6 +4298,7 @@ fn validate_native_authority_pin_set(
                     row.get::<_, String>(3)?,
                     row.get::<_, i64>(4)? as u64,
                     row.get::<_, Option<String>>(5)?,
+                    row.get::<_, String>(6)?,
                 ))
             })?;
             for row in rows {
@@ -4188,15 +4306,26 @@ fn validate_native_authority_pin_set(
             }
         }
 
-        for (instance, action_id, attempt_id, action_digest, authority_epoch, lease_boundary) in &recovered {
-            if let Some(boundary_id) = lease_boundary.as_deref() {
+        for (instance, action_id, attempt_id, action_digest, authority_epoch, lease_boundary, lease_state) in &recovered {
+            let persisted_bound_record = if let Some(boundary_id) = lease_boundary.as_deref() {
                 match dispatch_boundary(&tx, instance, attempt_id)? {
                     Some(dispatch_boundary_id) if dispatch_boundary_id == boundary_id => {}
                     Some(_) => return Err(AuthorizationConsumptionError::InvalidBinding.into()),
                     None => return Err(AuthorizationConsumptionError::InvalidBinding.into()),
                 }
-            }
-            tx.execute(
+                let (record, dispatch_state) =
+                    load_persisted_dispatch_record(&tx, instance, attempt_id, boundary_id)?;
+                if dispatch_state != lease_state
+                    || dispatch_state != "dispatch_pending" && dispatch_state != "invoked"
+                {
+                    return Err(AuthorizationConsumptionError::InvalidBinding.into());
+                }
+                self.validate_persisted_dispatch_record(&tx, &record)?;
+                Some(record)
+            } else {
+                None
+            };
+            let changed = tx.execute(
                 "UPDATE authorization_leases
                  SET state='indeterminate', attempt_id=?2
                  WHERE authorization_instance=?1
@@ -4204,14 +4333,11 @@ fn validate_native_authority_pin_set(
                    AND attempt_id=?2",
                 params![instance, attempt_id],
             )?;
-            let recovered_provider_key: String = if lease_boundary.is_some() {
-                tx.query_row(
-                    "SELECT provider_idempotency_key
-                     FROM authorization_dispatches
-                     WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
-                    params![instance, attempt_id, lease_boundary.as_deref()],
-                    |row| row.get(0),
-                )?
+            if changed != 1 {
+                return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+            }
+            let recovered_provider_key: String = if let Some(record) = persisted_bound_record.as_ref() {
+                record.provider_idempotency_key.clone()
             } else {
                 let lease = AuthorizationLease::new_with_instance(
                     instance.clone(),
@@ -4233,13 +4359,16 @@ fn validate_native_authority_pin_set(
                 authority_epoch: *authority_epoch,
                 outcome: ExecutionOutcome::Indeterminate,
             };
-            tx.execute(
+            let dispatch_changed = tx.execute(
                 "UPDATE authorization_dispatches SET state='indeterminate'
                  WHERE authorization_instance=?1 AND attempt_id=?2
                    AND state IN ('dispatch_pending','invoked')
                    AND (?3 IS NULL OR boundary_id=?3)",
                 params![instance, attempt_id, lease_boundary],
             )?;
+            if lease_boundary.is_some() && dispatch_changed != 1 {
+                return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+            }
             tx.execute(
                 "INSERT OR IGNORE INTO authorization_receipts
                  (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,
@@ -9951,6 +10080,71 @@ mod tests {
                 AuthorizationConsumptionError::IndeterminateRequiresReconciliation
             ))
         ));
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn crash_recovery_rejects_tampered_bound_dispatch_provenance() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-recovery-provenance-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-recovery").unwrap();
+        let effect=ActionEffectBinding::new("target-recovery","prod","adapter-recovery");
+        let action=EpistemicAction::new(
+            "recovery-provenance-action","effect",super::super::ActionRisk::Critical
+        ).with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            action_id:action.id.clone(),
+            authorization_instance:"recovery-provenance-approval".into(),
+            action_digest:digest.clone(),
+            frame:"frame@1".into(),
+            support_digest:"sha256:support".into(),
+            policy:"policy-v1".into(),
+            decision:"execute".into(),
+            issued_at:"2026-10-03T10:00:00Z".into(),
+            expires_at:Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            "recovery-provenance-approval",action.id.clone(),digest.clone(),
+            "sha256:support","policy-v1",1,1
+        )).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,"recovery-provenance-approval","attempt-recovery",
+            &action,&effect,"boundary-recovery","operation-recovery","native-recovery"
+        ).unwrap();
+
+        {
+            let mut connection=store.connection().unwrap();
+            let tx=connection.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+            tx.execute(
+                "UPDATE authorization_dispatches
+                 SET provider_idempotency_key='forged-provider-key'
+                 WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+                params![
+                    record.authorization_instance,
+                    record.attempt_id,
+                    record.boundary_id,
+                ],
+            ).unwrap();
+            tx.commit().unwrap();
+        }
+
+        let err=store.recover_incomplete_attempts_for_boundary("boundary-recovery").unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(AuthorizationConsumptionError::InvalidBinding)
+        ));
+
+        let connection=store.connection().unwrap();
+        let state:String=connection.query_row(
+            "SELECT state FROM authorization_leases
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(state,"dispatch_pending");
         let _=std::fs::remove_file(path);
     }
 
