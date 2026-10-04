@@ -197,6 +197,7 @@ The branch is ready for an evidence-producing benchmark only when:
 - explicit two-way overlap and three-way dependency fixtures distinguish pairwise independence from global uniqueness;
 - the paper-scale result digest commits to the algebraic geometry fields and representative-selection boundary.
 - dependent fixtures expose and verify a complete kernel basis with exactly `kernel_dimension` witnesses.
+- bounded fiber enumeration is explicitly capped and its exhaustiveness is qualified on the d=4 ambiguity fixture.
 
 ## Why this is the next step
 
@@ -240,6 +241,16 @@ Factor ordering is deliberately separated from algebraic identity. Reordering th
 
 For a representable target, `factorization_affine_fiber` now packages one deterministic coefficient representative, the complete kernel basis, and the exact fiber cardinality in one object. Any alternate factorization is obtained by XORing the representative with a GF(2) mask over the kernel basis.
 
+### Bounded affine-fiber enumeration
+`LinearCodeFactorizationFiber::iter_bounded(max_fibers)` now provides an explicit exhaustive validation path without weakening the symbolic default. The iterator is created only when the exact `2^d` fiber cardinality fits in `usize` and is no larger than the caller's stated bound; otherwise it returns no iterator. This prevents a paper-scale or high-nullity fixture from accidentally expanding an exponential search space merely because a certificate exists.
+
+The iterator covers every kernel mask exactly once, so bounded qualification can independently verify three properties at once:
+
+- the declared fiber cardinality is attained exactly;
+- each enumerated coefficient tuple maps back to the same target;
+- kernel-basis masks do not collapse to duplicate coefficient tuples.
+
+`coefficients_for_mask` also rejects malformed certificate dimensions before applying a kernel direction. This keeps the affine-fiber object fail-closed even when its public fields are modified in a test fixture.
 This makes the theorem boundary explicit in the API itself:
 
 `target in image` -> `affine fiber exists` -> `fiber cardinality = 2^d` -> `kernel basis gives the d ambiguity directions`.
