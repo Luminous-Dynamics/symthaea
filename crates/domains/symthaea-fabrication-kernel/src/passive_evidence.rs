@@ -250,6 +250,14 @@ impl PassiveEvidenceExtractor {
 
         if !extraction.conflicts.is_empty() {
             report.compliant = false;
+            report
+                .violations
+                .extend(
+                    std::iter::repeat_n(
+                        crate::passive_design::PassiveViolation::EvidenceConflict,
+                        extraction.conflicts.len(),
+                    ),
+                );
         }
 
         report
