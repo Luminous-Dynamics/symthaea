@@ -4775,6 +4775,7 @@ fn validate_persisted_terminal_evidence(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mycelix::gis::{ActionEffectBinding, NativeReplayDerivation};
     use std::{
         sync::{
             atomic::{AtomicUsize, Ordering},
@@ -5126,7 +5127,7 @@ mod tests {
             "symthaea-gis-auth-malformed-effect-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
-        let effect=super::super::ActionEffectBinding::new("","prod","adapter-A");
+        let effect=ActionEffectBinding::new("","prod","adapter-A");
         let action=EpistemicAction::new(
             "malformed-effect","intervention",super::super::ActionRisk::Critical
         ).with_effect_binding(effect.clone());
@@ -5183,7 +5184,7 @@ mod tests {
             "symthaea-gis-auth-effect-prepare-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=EpistemicAction::new(
             "effect-bound-prepare","intervention",super::super::ActionRisk::Critical
         ).with_effect_binding(effect);
@@ -5230,7 +5231,7 @@ mod tests {
             evidence_profile_digest:"sha256:test-evidence-profile".into(),
         }).unwrap();
 
-        let effect=super::super::ActionEffectBinding::new("target-order","prod","adapter-order");
+        let effect=ActionEffectBinding::new("target-order","prod","adapter-order");
         store.pin_provider_adapter_configuration(
             &super::ProviderAdapterConfiguration::new(
                 "adapter-order","test-adapter/v1","sha256:test-adapter-implementation"
@@ -5296,7 +5297,7 @@ mod tests {
             evidence_profile_digest:"sha256:test-evidence-profile".into(),
         }).unwrap();
 
-        let effect=super::super::ActionEffectBinding::new("target-reconcile-order","prod","adapter-reconcile-order");
+        let effect=ActionEffectBinding::new("target-reconcile-order","prod","adapter-reconcile-order");
         store.pin_provider_adapter_configuration(
             &super::ProviderAdapterConfiguration::new(
                 "adapter-reconcile-order","test-adapter/v1","sha256:test-adapter-implementation"
@@ -5356,7 +5357,7 @@ mod tests {
             "symthaea-gis-auth-verifier-pin-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-verifier-pin","prod","adapter-verifier-pin"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -5412,7 +5413,7 @@ mod tests {
         let reconcile_err=store.reconcile_indeterminate_bound_verified(
             &record,
             &verified_evidence(&record,ExecutionOutcome::Succeeded),
-            &WrongConfigVerifier
+            &TestProviderVerifierForRp { relying_party_id: "wrong-rp".into() }
         ).unwrap_err();
         assert!(matches!(
             reconcile_err,
@@ -5464,7 +5465,7 @@ mod tests {
             std::process::id()
         ));
         let store = SqliteAuthorizationStore::open(&path).unwrap();
-        let effect = super::super::ActionEffectBinding::new(
+        let effect = ActionEffectBinding::new(
             "target-adapter-stale",
             "prod",
             "adapter-adapter-stale",
@@ -5625,7 +5626,7 @@ mod tests {
             "symthaea-gis-auth-adapter-preentry-tamper-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-adapter-preentry","prod","adapter-adapter-preentry"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -5685,7 +5686,7 @@ mod tests {
             "symthaea-gis-auth-adapter-tamper-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-adapter-tamper","prod","adapter-adapter-tamper"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -5837,7 +5838,7 @@ mod tests {
             "symthaea-gis-auth-verifier-implementation-drift-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-verifier-implementation-drift","prod","adapter-verifier-drift"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -5892,7 +5893,7 @@ mod tests {
             "symthaea-gis-auth-verifier-external-drift-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-verifier-external-drift","prod","adapter-verifier-external-drift"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -6006,7 +6007,7 @@ mod tests {
             "symthaea-gis-auth-terminal-replay-no-verifier-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-terminal-replay-no-verifier","prod","adapter-terminal-replay-no-verifier"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -6074,7 +6075,7 @@ mod tests {
             "symthaea-gis-auth-terminal-replay-missing-evidence-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-terminal-replay-missing-evidence",
             "prod",
             "adapter-terminal-replay-missing-evidence"
@@ -6179,7 +6180,7 @@ mod tests {
             "symthaea-gis-auth-terminal-replay-pin-snapshot-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-terminal-replay-pin-snapshot",
             "prod",
             "adapter-terminal-replay-pin-snapshot"
@@ -6269,7 +6270,7 @@ mod tests {
             "symthaea-gis-auth-terminal-replay-epoch-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-terminal-replay-epoch",
             "prod",
             "adapter-terminal-replay-epoch"
@@ -6353,7 +6354,7 @@ mod tests {
             "symthaea-gis-auth-reconcile-verifier-external-drift-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-reconcile-verifier-external-drift",
             "prod",
             "adapter-reconcile-verifier-external-drift"
@@ -6483,7 +6484,7 @@ mod tests {
             "symthaea-gis-auth-verifier-config-mismatch-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-verifier-config","prod","adapter-verifier-config"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -6559,7 +6560,7 @@ mod tests {
             "symthaea-gis-auth-terminal-insert-only-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-terminal-insert-only","prod","adapter-terminal"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -6632,7 +6633,7 @@ mod tests {
             "symthaea-gis-native-issuer-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-native-issuer","prod","adapter-native-issuer"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -6690,7 +6691,7 @@ mod tests {
             "symthaea-gis-auth-terminal-adapter-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-terminal-adapter","prod","adapter-terminal"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -6846,7 +6847,7 @@ mod tests {
         let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-pin-snapshot").unwrap();
         store.pin_native_authority_namespace("issuer-a","authority/v1").unwrap();
 
-        let effect=super::super::ActionEffectBinding::new("target-pin-snapshot","prod","adapter");
+        let effect=ActionEffectBinding::new("target-pin-snapshot","prod","adapter");
         let action=EpistemicAction::new(
             "pin-snapshot-action","intervention",super::super::ActionRisk::Critical
         ).with_effect_binding(effect.clone());
@@ -6973,7 +6974,7 @@ mod tests {
             policy,
         ).unwrap();
 
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-trusted-clock","prod","adapter"
         );
         let action=EpistemicAction::new(
@@ -7066,7 +7067,7 @@ mod tests {
         let store=SqliteAuthorizationStore::open_with_relying_party(
             &path,"rp-validity-immutable"
         ).unwrap();
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-validity-immutable","prod","adapter"
         );
         let action=EpistemicAction::new(
@@ -7135,7 +7136,7 @@ mod tests {
         let store=SqliteAuthorizationStore::open_with_relying_party(
             &path,"rp-validity-dispatch"
         ).unwrap();
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-validity-dispatch","prod","adapter"
         );
         let action=EpistemicAction::new(
@@ -7211,7 +7212,7 @@ mod tests {
             "symthaea-gis-auth-validity-admission-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-validity").unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-validity","prod","adapter");
+        let effect=ActionEffectBinding::new("target-validity","prod","adapter");
         let action=EpistemicAction::new(
             "validity-admission","intervention",super::super::ActionRisk::Critical
         ).with_effect_binding(effect);
@@ -7250,7 +7251,7 @@ mod tests {
             "symthaea-gis-auth-validity-preentry-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-validity-preentry").unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-validity-preentry","prod","adapter");
+        let effect=ActionEffectBinding::new("target-validity-preentry","prod","adapter");
         let action=EpistemicAction::new(
             "validity-preentry","intervention",super::super::ActionRisk::Critical
         ).with_effect_binding(effect.clone());
@@ -7313,7 +7314,7 @@ mod tests {
             "symthaea-gis-auth-legacy-fence-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
 
         assert!(matches!(
@@ -7354,7 +7355,7 @@ mod tests {
     fn pre_entry_lookup_cannot_be_used_as_terminal_outcome() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-verifier-kind-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
             authorization_instance:"verifier-kind".into(),
@@ -7395,7 +7396,7 @@ mod tests {
             "symthaea-gis-auth-terminal-binding-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new("target-terminal-binding","prod","adapter-terminal");
+        let effect=ActionEffectBinding::new("target-terminal-binding","prod","adapter-terminal");
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
@@ -7448,7 +7449,7 @@ mod tests {
     fn verified_terminal_evidence_is_exact_attempt_and_sink_bound() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-verifier-binding-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
             authorization_instance:"verifier-binding".into(),
@@ -7487,7 +7488,7 @@ mod tests {
     fn reconciled_receipt_preserves_native_derived_provider_identity() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-reconcile-key-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
             authorization_instance:"reconcile-key".into(), action_id:action.id.clone(),
@@ -7522,7 +7523,7 @@ mod tests {
     fn provider_idempotency_key_is_derived_from_native_replay_identity() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-provider-key-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
             authorization_instance:"provider-key-fence".into(),
@@ -7563,7 +7564,7 @@ mod tests {
 
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-provider-key-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
             authorization_instance:"provider-key-fence".into(),
@@ -7607,7 +7608,7 @@ mod tests {
     fn native_authority_entry_derives_replay_identity_at_boundary() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-native-derived-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
             authorization_instance:"native-derived".into(),action_id:action.id.clone(),
@@ -7673,7 +7674,7 @@ mod tests {
     fn verifier_configuration_cannot_cross_relying_party_domain() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-verifier-rp-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-A").unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-verifier-rp","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-verifier-rp","prod","adapter-A");
         let action=EpistemicAction::new("verifier-rp","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
@@ -7737,7 +7738,7 @@ mod tests {
             store.mark_dispatch_pending_bound_from_pinned_native_authority(
                 "missing","attempt-missing",
                 &EpistemicAction::new("missing-action","intervention",super::super::ActionRisk::Critical),
-                &super::super::ActionEffectBinding::new("target-missing","prod","adapter"),
+                &ActionEffectBinding::new("target-missing","prod","adapter"),
                 "boundary","operation","issuer.unpinned","native-auth",
                 "status:missing",&TestProviderStatusVerifier
             ),
@@ -7759,7 +7760,7 @@ mod tests {
             Err(AuthorizationStoreError::InvalidState(_))
         ));
 
-        let effect=super::super::ActionEffectBinding::new("target-pin","prod","adapter-pin");
+        let effect=ActionEffectBinding::new("target-pin","prod","adapter-pin");
         let action=EpistemicAction::new("native-pin-action","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
@@ -7794,7 +7795,7 @@ mod tests {
     fn operation_and_native_replay_identity_tampering_is_rejected() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-identity-fence-{}.db",std::process::id()));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let witness=ActionAuthorizationWitness {
             authorization_instance:"identity-fence".into(),
@@ -7927,7 +7928,7 @@ mod tests {
     fn bound_dispatch_record_freezes_effect_and_boundary_identity() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-bound-dispatch-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=EpistemicAction::new("bound-dispatch-action","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
@@ -7973,7 +7974,7 @@ mod tests {
     fn fresh_native_authority_cannot_bypass_same_action_in_flight() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-action-fence-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=EpistemicAction::new("same-action-fence","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
@@ -8118,7 +8119,7 @@ mod tests {
             )
         ).unwrap();
 
-        let effect=super::super::ActionEffectBinding::new("target-status-drift","prod","adapter-status-drift");
+        let effect=ActionEffectBinding::new("target-status-drift","prod","adapter-status-drift");
         let action=EpistemicAction::new(
             "status-verifier-drift","intervention",super::super::ActionRisk::Critical
         ).with_effect_binding(effect.clone());
@@ -8247,7 +8248,7 @@ mod tests {
             ))
             .unwrap();
 
-        let effect = super::super::ActionEffectBinding::new(
+        let effect = ActionEffectBinding::new(
             "target-native-admission",
             "prod",
             "adapter-native-admission",
@@ -8405,7 +8406,7 @@ mod tests {
             ))
             .unwrap();
 
-        let effect = super::super::ActionEffectBinding::new(
+        let effect = ActionEffectBinding::new(
             "target-source-admission",
             "prod",
             "adapter-source-admission",
@@ -8560,7 +8561,7 @@ mod tests {
             ))
             .unwrap();
 
-        let effect = super::super::ActionEffectBinding::new(
+        let effect = ActionEffectBinding::new(
             "target-source-drift",
             "prod",
             "adapter-source-drift",
@@ -8723,7 +8724,7 @@ mod tests {
             "issuer.ordering","issuer.ordering/authority/v1"
         ).unwrap();
 
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-status-ordering","prod","adapter"
         );
         let action=EpistemicAction::new(
@@ -8750,7 +8751,7 @@ mod tests {
             &witness,&action,"frame@1","attempt-status-ordering","boundary-status"
         ).unwrap();
 
-        let wrong_effect=super::super::ActionEffectBinding::new(
+        let wrong_effect=ActionEffectBinding::new(
             "target-different","prod","adapter"
         );
         assert!(matches!(
@@ -8803,7 +8804,7 @@ mod tests {
             "issuer.status-admission","issuer.status-admission/authority/v1"
         ).unwrap();
 
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-status-admission-failure","prod","adapter"
         );
         let action=EpistemicAction::new(
@@ -8886,7 +8887,7 @@ mod tests {
         ).unwrap();
         store.pin_native_authority_namespace("issuer.status","issuer.status/authority/v1").unwrap();
 
-        let effect=super::super::ActionEffectBinding::new("target-status-failure","prod","adapter");
+        let effect=ActionEffectBinding::new("target-status-failure","prod","adapter");
         let action=EpistemicAction::new(
             "status-failure","intervention",super::super::ActionRisk::Critical
         ).with_effect_binding(effect.clone());
@@ -8916,7 +8917,7 @@ mod tests {
         ).unwrap();
 
         assert!(matches!(
-            store.mark_invoked_bound(&record,&PreEntryStatusFailsVerifier),
+            store.mark_invoked_bound(&record,&AdmissionStatusFailsVerifier),
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::ProviderStatusVerificationRequired
             ))
@@ -8951,7 +8952,7 @@ mod tests {
             "sha256:test-status-verifier-config")).unwrap();
         store.pin_native_authority_namespace("issuer.closed","issuer.closed/authority/v1").unwrap();
 
-        let effect=super::super::ActionEffectBinding::new("target-closed","prod","adapter-closed");
+        let effect=ActionEffectBinding::new("target-closed","prod","adapter-closed");
         let action=EpistemicAction::new("closed-action","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
@@ -9009,7 +9010,7 @@ mod tests {
     fn native_replay_identity_cannot_be_reserved_twice() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-native-replay-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
 
         let action_a=EpistemicAction::new("native-a","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
@@ -9053,7 +9054,7 @@ mod tests {
     fn legacy_transitions_cannot_bypass_boundary_owned_attempts() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-legacy-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=EpistemicAction::new("boundary-legacy-fence","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
@@ -9151,7 +9152,7 @@ mod tests {
         let action=EpistemicAction::new(
             "operation-recovery","intervention",super::super::ActionRisk::Critical
         );
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=action.with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
         let witness=ActionAuthorizationWitness {
@@ -9248,7 +9249,7 @@ mod tests {
 
         let old_attempt=mark_dispatch_pending_bound_for_test(&store,
             &witness.authorization_instance,"attempt-pre",&action,
-            &super::super::ActionEffectBinding::new("target-A","prod","adapter-A"),
+            &ActionEffectBinding::new("target-A","prod","adapter-A"),
             "boundary-A"
         ,
             format!("operation:{}", "attempt-pre"),
@@ -9344,7 +9345,7 @@ mod tests {
     fn pre_dispatch_recovery_cannot_release_after_dispatch_pending() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-pre-recovery-after-dispatch-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=EpistemicAction::new("pre-recovery-after-dispatch","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
@@ -9391,7 +9392,7 @@ mod tests {
     fn boundary_scoped_recovery_cannot_claim_another_boundary() {
         let path=std::env::temp_dir().join(format!("symthaea-gis-auth-boundary-recovery-{}.db",std::process::id()));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-A","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","prod","adapter-A");
         let action=EpistemicAction::new("boundary-recovery-action","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
@@ -9554,7 +9555,7 @@ mod tests {
         assert!(matches!(
             mark_dispatch_pending_bound_for_test(&reopened,
                 &witness.authorization_instance,"attempt-prepared",&action,
-                &super::super::ActionEffectBinding::new("target-A","prod","adapter-A"),
+                &ActionEffectBinding::new("target-A","prod","adapter-A"),
                 "boundary-A"
             ,
             format!("operation:{}", "attempt-prepared"),
@@ -9725,7 +9726,7 @@ mod tests {
             "symthaea-gis-auth-cross-table-boundary-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-cross-table").unwrap();
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-cross","audience-cross","adapter-cross"
         );
         let action=EpistemicAction::new(
@@ -9794,7 +9795,7 @@ mod tests {
             let store=SqliteAuthorizationStore::open_with_relying_party(
                 &path,"rp-cross-table-startup"
             ).unwrap();
-            let effect=super::super::ActionEffectBinding::new(
+            let effect=ActionEffectBinding::new(
                 "target-cross-startup","audience-cross-startup","adapter-cross-startup"
             );
             let action=EpistemicAction::new(
@@ -9872,7 +9873,7 @@ mod tests {
             "symthaea-gis-attempt-scope-tamper-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open_with_relying_party(&path,"rp-scope").unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-scope","prod","adapter-scope");
+        let effect=ActionEffectBinding::new("target-scope","prod","adapter-scope");
         let action=EpistemicAction::new("attempt-scope-action","effect",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
@@ -10011,7 +10012,7 @@ mod tests {
         let path_b=std::env::temp_dir().join(format!("symthaea-gis-auth-rp-b-{}.db",std::process::id()));
         let store_a=SqliteAuthorizationStore::open_with_relying_party(&path_a,"rp-A").unwrap();
         let store_b=SqliteAuthorizationStore::open_with_relying_party(&path_b,"rp-B").unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-cross-rp","prod","adapter-A");
+        let effect=ActionEffectBinding::new("target-cross-rp","prod","adapter-A");
         let action=EpistemicAction::new("rp-scoped-action","intervention",super::super::ActionRisk::Critical)
             .with_effect_binding(effect.clone());
         let digest=action.canonical_action_digest();
@@ -10193,7 +10194,7 @@ mod tests {
             std::process::id()
         ));
         let (store, action, witness) = fixture(&path);
-        let effect = super::super::ActionEffectBinding::new(
+        let effect = ActionEffectBinding::new(
             "target-operation",
             "prod",
             "adapter-A",
@@ -10244,7 +10245,7 @@ mod tests {
             "symthaea-gis-auth-receipt-provider-key-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-receipt-provider-key","prod","adapter-receipt"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -10304,7 +10305,7 @@ mod tests {
             "symthaea-gis-auth-receipt-tamper-{}.db",std::process::id()
         ));
         let (store,action,witness)=fixture(&path);
-        let effect=super::super::ActionEffectBinding::new(
+        let effect=ActionEffectBinding::new(
             "target-receipt-tamper","prod","adapter-receipt-tamper"
         );
         let action=action.with_effect_binding(effect.clone());
@@ -10513,7 +10514,7 @@ mod tests {
             "symthaea-gis-auth-attempt-binding-tamper-{}.db",std::process::id()
         ));
         let store=SqliteAuthorizationStore::open(&path).unwrap();
-        let effect=super::super::ActionEffectBinding::new("target-A","audience-A","adapter-A");
+        let effect=ActionEffectBinding::new("target-A","audience-A","adapter-A");
         let record=DurableDispatchRecord {
             authorization_instance:"auth".into(),
             attempt_id:"attempt".into(),
