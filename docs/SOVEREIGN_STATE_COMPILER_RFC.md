@@ -555,10 +555,13 @@ The compiler validates:
 
 `required_resources ⊆ observed_resources`
 
-and requires at least one explicit resource whenever a resource-bound capability
-(`InstallApplication`, `RemoveApplication`, `ReplaceOs`, `ModifyBootChain`,
-`ConfigureSecureBoot`, or `EncryptStorage`) is present in the intent or plan
-steps. Exact resource kinds and cardinality remain adapter-specific.
+and requires at least one explicit resource whenever a genuinely
+resource-bound capability (`InstallApplication`, `RemoveApplication`,
+`ReplaceOs`, `ConfigureSecureBoot`, or `EncryptStorage`) is present in the
+intent or plan steps. Target-scoped lifecycle capabilities such as
+`ModifyBootChain` are not forced into a fake resource identity; adapters may
+introduce a concrete boot-resource binding when their platform semantics require
+it. Exact resource kinds and cardinality remain adapter-specific.
 
 and the compiled plan digest binds the complete resource set. This prevents a
 generic capability such as `EncryptStorage` from silently widening into
