@@ -139,10 +139,6 @@ fn pitch_accent_for(prosody: &ProsodicIntent, position: BrocaFramePosition) -> P
     }
 }
 
-fn focus_matches(position: BrocaFramePosition, plan: &SpeechPlan) -> bool {
-    position.is_focus && plan.focus_role.is_some()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
