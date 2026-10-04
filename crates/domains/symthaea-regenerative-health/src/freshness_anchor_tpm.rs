@@ -138,6 +138,7 @@ pub struct TpmNvCounterEvidence {
 impl TpmNvCounterEvidence {
     pub fn validate_structure(&self) -> bool {
         [
+            &self.profile_fingerprint,
             &self.tpm_identity_digest,
             &self.nv_index_name_digest,
             &self.nv_public_digest,
@@ -217,6 +218,7 @@ impl TpmNvCounterEvidence {
             hasher.update(&(value.len() as u64).to_le_bytes());
             hasher.update(value.as_bytes());
         }
+        write_string(&mut hasher, &self.profile_fingerprint);
         write_string(&mut hasher, &self.tpm_identity_digest);
         write_string(&mut hasher, &self.nv_index_name_digest);
         write_string(&mut hasher, &self.nv_public_digest);
@@ -257,6 +259,8 @@ impl TpmNvCounterEvidence {
 /// signed NV identity or other trusted binding differs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TpmNvCounterTrustPolicy {
+    /// Exact FreshnessAnchorProfile this trust policy is authorized for.
+    pub profile_fingerprint: String,
     pub tpm_identity_digest: String,
     pub nv_index_name_digest: String,
     pub nv_public_digest: String,
@@ -295,8 +299,13 @@ impl TpmNvCounterTrustPolicy {
         hasher.finalize().to_hex().to_string()
     }
 
-    pub fn matches_evidence(&self, evidence: &TpmNvCounterEvidence) -> bool {
+    pub fn matches_profile_and_evidence(
+        &self,
+        profile: &FreshnessAnchorProfile,
+        evidence: &TpmNvCounterEvidence,
+    ) -> bool {
         self.validate_structure()
+            && self.profile_fingerprint == profile.fingerprint()
             && evidence.tpm_identity_digest == self.tpm_identity_digest
             && evidence.nv_index_name_digest == self.nv_index_name_digest
             && evidence.nv_public_digest == self.nv_public_digest
@@ -407,7 +416,7 @@ pub fn verify_tpm_nv_counter_with_trust_policy<V: TpmNvCounterEvidenceVerifier>(
     receipt: &FreshnessAnchorVerificationReceipt,
     verifier: &V,
 ) -> Result<FreshnessAnchorEvidenceKind, TpmNvCounterVerificationError> {
-    if !policy.validate_structure() || !policy.matches_evidence(evidence) {
+    if !policy.validate_structure() || !policy.matches_profile_and_evidence(profile, evidence) {
         return Err(TpmNvCounterVerificationError::TrustPolicyMismatch);
     }
     verify_tpm_nv_counter(evidence, profile, receipt, verifier)
@@ -529,6 +538,7 @@ mod tests {
     fn trusted_policy_rejects_decoy_nv_identity_before_external_verifier() {
         let evidence = evidence(7);
         let policy = TpmNvCounterTrustPolicy {
+            profile_fingerprint: profile().fingerprint(),
             tpm_identity_digest: "tpm-identity".into(),
             nv_index_name_digest: "trusted-nv-name".into(),
             nv_public_digest: "nv-public".into(),
@@ -566,6 +576,7 @@ mod tests {
     fn challenge_and_trust_policy_gate_rejects_stale_evidence_before_verifier() {
         let evidence = evidence(7);
         let policy = TpmNvCounterTrustPolicy {
+            profile_fingerprint: profile().fingerprint(),
             tpm_identity_digest: "tpm-identity".into(),
             nv_index_name_digest: "nv-name".into(),
             nv_public_digest: "nv-public".into(),
@@ -614,6 +625,7 @@ mod tests {
         receipt.evidence_digest = evidence.binding_digest();
 
         let policy = TpmNvCounterTrustPolicy {
+            profile_fingerprint: profile().fingerprint(),
             tpm_identity_digest: "tpm-identity".into(),
             nv_index_name_digest: "nv-name".into(),
             nv_public_digest: "nv-public".into(),
@@ -634,9 +646,48 @@ mod tests {
     }
 
     #[test]
+    fn trust_policy_profile_binding_rejects_cross_profile_use() {
+        let evidence = evidence(7);
+        let policy = TpmNvCounterTrustPolicy {
+            profile_fingerprint: "different-profile".into(),
+            tpm_identity_digest: "tpm-identity".into(),
+            nv_index_name_digest: "nv-name".into(),
+            nv_public_digest: "nv-public".into(),
+            auth_policy_digest: "auth-policy".into(),
+            attestation_key_id_digest: "ak-id".into(),
+            pcr_binding_digest: "pcr-binding".into(),
+        };
+
+        struct MustNotRun;
+        impl TpmNvCounterEvidenceVerifier for MustNotRun {
+            fn verify(
+                &self,
+                _: &TpmNvCounterEvidence,
+                _: &FreshnessAnchorProfile,
+                _: &FreshnessAnchorVerificationReceipt,
+            ) -> Result<(), TpmNvCounterVerificationError> {
+                panic!("external verifier must not run for a cross-profile trust policy");
+            }
+        }
+
+        assert_eq!(
+            verify_tpm_nv_counter_with_trust_policy(
+                &evidence,
+                &policy,
+                &profile(),
+                &receipt(7),
+                &MustNotRun,
+            )
+            .unwrap_err(),
+            TpmNvCounterVerificationError::TrustPolicyMismatch
+        );
+    }
+
+    #[test]
     fn trusted_policy_accepts_exact_nv_identity_and_bindings() {
         let evidence = evidence(7);
         let policy = TpmNvCounterTrustPolicy {
+            profile_fingerprint: profile().fingerprint(),
             tpm_identity_digest: "tpm-identity".into(),
             nv_index_name_digest: "nv-name".into(),
             nv_public_digest: "nv-public".into(),
@@ -656,6 +707,7 @@ mod tests {
     #[test]
     fn trust_policy_binding_digest_is_stable_and_identity_sensitive() {
         let policy = TpmNvCounterTrustPolicy {
+            profile_fingerprint: profile().fingerprint(),
             tpm_identity_digest: "tpm-identity".into(),
             nv_index_name_digest: "nv-name".into(),
             nv_public_digest: "nv-public".into(),
