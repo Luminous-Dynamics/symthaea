@@ -127,7 +127,7 @@ silently selecting a label.
 A second executable N0 lab evaluates the frozen identity codebook under increasing
 composition load rather than testing only one held-out graph.
 
-The matrix uses four cases:
+The matrix uses eight cases:
 
 | Case | Nodes | Edges | Distractor concepts | Stable edge triples seen during training |
 | --- | ---: | ---: | ---: | ---: |
