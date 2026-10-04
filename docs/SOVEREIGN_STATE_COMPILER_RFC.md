@@ -370,7 +370,7 @@ parallel provenance semantics.
 
 ## New invariants in the v0.3 prototype
 
-The current v0.3 preview adds the neutral `ObserveState` semantic capability, explicit verification-policy construction, future-dated observation rejection, and receipt-side attestation evidence validation. These changes alter serialized capability values and therefore intentionally advance the schema from v0.2 to v0.3.
+The current v0.4 preview adds execution-time binding for the final target observation: receipts now carry the final snapshot observation timestamp and require it to fall within the execution interval. Alongside the v0.3 `ObserveState` semantic capability, explicit verification-policy construction, future-dated observation rejection, and receipt-side attestation evidence validation, this intentionally advances the schema from v0.3 to v0.4.
 
 Authorization validation now requires:
 
@@ -396,7 +396,8 @@ Authorization validation now requires:
 - an `Unproven` outcome remains representable without proof, and a mechanical `Succeeded` receipt is not treated as verified success unless the postcondition is `Satisfied`;
 - execution receipts bind the exact authorized plan, pre-execution snapshot, and
   post-execution observation;
-- receipt timestamps must remain within the authorization validity window.
+- receipt timestamps must remain within the authorization validity window;
+- the final target snapshot observation timestamp must fall between execution start and finish, so stale or future evidence cannot be claimed as post-state proof.
 - pre-execution target observations must not be future-dated relative to authorization;
 - receipt execution must not begin before the target snapshot it claims to execute against;
 - neutral Observe/Verify lifecycle steps must explicitly require ObserveState.
