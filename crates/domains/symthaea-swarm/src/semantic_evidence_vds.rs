@@ -2919,7 +2919,10 @@ impl<'a> CborReader<'a> {
         if let Some(count)=count {
             items.reserve(count);
             for _ in 0..count {
-                let item=self.read_bstr_bounded(max_item_len)?;
+                let remaining_total = max_total_len
+                    .checked_sub(total_len)
+                    .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+                let item=self.read_bstr_bounded(max_item_len.min(remaining_total))?;
                 total_len=total_len
                     .checked_add(item.len())
                     .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
@@ -2939,7 +2942,10 @@ impl<'a> CborReader<'a> {
             if items.len()>=max_items {
                 return Err(Rfc9162ProofDecodeError::InvalidStructure);
             }
-            let item=self.read_bstr_bounded(max_item_len)?;
+            let remaining_total = max_total_len
+                .checked_sub(total_len)
+                .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+            let item=self.read_bstr_bounded(max_item_len.min(remaining_total))?;
             total_len=total_len
                 .checked_add(item.len())
                 .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
@@ -3821,6 +3827,19 @@ mod tests {
             .chain([0x33; 32])
             .collect::<Vec<_>>();
         assert_eq!(consistency.to_cbor(), expected);
+    }
+
+    #[test]
+    fn cbor_bstr_array_applies_aggregate_budget_before_member_allocation() {
+        let wire = vec![0x82, 0x44, 0xaa, 0xbb, 0xcc, 0xdd, 0x41, 0xee];
+        let mut reader = CborReader::new(&wire);
+        assert_eq!(
+            reader.read_bstr_items_bounded(2, 4, 4),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+        // The second member's payload byte remains unread: the aggregate
+        // budget is checked from the declared length before copying it.
+        assert_eq!(reader.offset, 7);
     }
 
     #[test]
