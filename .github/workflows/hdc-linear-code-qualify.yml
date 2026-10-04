@@ -331,10 +331,25 @@ jobs:
           test -n "$NOISY_LIST_LEDGER"
           MAX_CANDIDATES="$(printf '%s\n' "$NOISY_LIST_LEDGER" | sed -n 's/.*max_candidate_codewords=\([0-9][0-9]*\);.*/\1/p')"
           AMBIGUOUS="$(printf '%s\n' "$NOISY_LIST_LEDGER" | sed -n 's/.*ambiguous_codeword_observations=\([0-9][0-9]*\);.*/\1/p')"
+          UNIQUE_RADIUS="$(printf '%s\n' "$NOISY_LIST_LEDGER" | sed -n 's/.*unique_radius=\([0-9][0-9]*\);.*/\1/p')"
+          SUBHALF="$(printf '%s\n' "$NOISY_LIST_LEDGER" | sed -n 's/.*subhalf_observations=\([0-9][0-9]*\);.*/\1/p')"
+          SUBHALF_SINGLETON="$(printf '%s\n' "$NOISY_LIST_LEDGER" | sed -n 's/.*subhalf_singleton_observations=\([0-9][0-9]*\);.*/\1/p')"
+          BOUNDARY="$(printf '%s\n' "$NOISY_LIST_LEDGER" | sed -n 's/.*boundary_observations=\([0-9][0-9]*\);.*/\1/p')"
+          BOUNDARY_AMBIGUOUS="$(printf '%s\n' "$NOISY_LIST_LEDGER" | sed -n 's/.*boundary_ambiguous_observations=\([0-9][0-9]*\);.*/\1/p')"
           test -n "$MAX_CANDIDATES"
           test -n "$AMBIGUOUS"
+          test -n "$UNIQUE_RADIUS"
+          test -n "$SUBHALF"
+          test -n "$SUBHALF_SINGLETON"
+          test -n "$BOUNDARY"
+          test -n "$BOUNDARY_AMBIGUOUS"
           test "$MAX_CANDIDATES" -ge 2
           test "$AMBIGUOUS" -gt 0
+          test "$UNIQUE_RADIUS" -eq 1
+          test "$SUBHALF" -eq 9
+          test "$SUBHALF_SINGLETON" -eq "$SUBHALF"
+          test "$BOUNDARY" -eq 28
+          test "$BOUNDARY_AMBIGUOUS" -eq 12
           printf 'noisy_list_ledger=%s\n' "$NOISY_LIST_LEDGER" >> "$GITHUB_OUTPUT"
       - name: Capture higher-order dependency stress
         id: higher_order
@@ -369,7 +384,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-qualification.txt <<EOF
           HDC Linear-Code Recovery Qualification
           ======================================
-          receipt_schema=hdc-linear-code-qualification-v5
+          receipt_schema=hdc-linear-code-qualification-v6
           event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
           runner_os=${{ steps.runner.outputs.runner_os }}
@@ -442,7 +457,7 @@ jobs:
           affine_fiber_enumeration_schema=linear-code-affine-fiber-enumeration-v1
           affine_fiber_enumeration_status=${{ steps.affine_fiber.outcome }}
           affine_fiber_enumeration=${{ steps.affine_fiber.outputs.affine_fiber_enumeration }}
-          noisy_list_ledger_schema=linear-code-noisy-list-v1
+          noisy_list_ledger_schema=linear-code-noisy-list-v2
           noisy_list_ledger_status=${{ steps.noisy_list.outcome }}
           noisy_list_ledger=${{ steps.noisy_list.outputs.noisy_list_ledger }}
           rng_algorithm=rand_chacha::ChaCha12Rng
