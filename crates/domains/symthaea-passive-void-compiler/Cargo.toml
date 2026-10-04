@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-passive-void-compiler"
+version = "0.1.0"
+edition = "2024"
+description = "Compile embedded passive void-graph intent into candidate CSG void geometry"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+serde = { workspace = true }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel" }
+symthaea-passive-void-graph = { path = "../symthaea-passive-void-graph" }
