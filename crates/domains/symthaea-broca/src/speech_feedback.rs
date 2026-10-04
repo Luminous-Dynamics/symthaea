@@ -143,7 +143,55 @@ impl SpeechFeedbackReceipt {
     pub fn is_unobserved(&self) -> bool {
         self.error.compared_features == 0
     }
+
+    /// Validate the persisted receipt, including its cached derived error.
+    pub fn validate(&self) -> Result<(), SpeechFeedbackReceiptError> {
+        if self.version != SPEECH_FEEDBACK_VERSION {
+            return Err(SpeechFeedbackReceiptError::InvalidVersion);
+        }
+        if self.plan_surface.trim().is_empty() {
+            return Err(SpeechFeedbackReceiptError::EmptyPlanSurface);
+        }
+        if !self.target.pitch_range.is_finite()
+            || !(0.65..=1.45).contains(&self.target.pitch_range)
+            || !self.target.prominence.is_finite()
+            || !(0.0..=1.0).contains(&self.target.prominence)
+            || !self.target.rate.is_finite()
+            || !(0.55..=1.35).contains(&self.target.rate)
+            || !self.target.pause_weight.is_finite()
+            || !(0.0..=1.0).contains(&self.target.pause_weight)
+        {
+            return Err(SpeechFeedbackReceiptError::InvalidTarget);
+        }
+
+        let expected = SpeechFeedbackError::compare(self.target, self.observation);
+        if expected != self.error {
+            return Err(SpeechFeedbackReceiptError::ErrorMismatch);
+        }
+        Ok(())
+    }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpeechFeedbackReceiptError {
+    InvalidVersion,
+    EmptyPlanSurface,
+    InvalidTarget,
+    ErrorMismatch,
+}
+
+impl std::fmt::Display for SpeechFeedbackReceiptError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidVersion => write!(f, "speech feedback receipt version is unsupported"),
+            Self::EmptyPlanSurface => write!(f, "speech feedback receipt requires a plan grounding surface"),
+            Self::InvalidTarget => write!(f, "speech feedback receipt target is outside supported ranges"),
+            Self::ErrorMismatch => write!(f, "speech feedback receipt error does not match its target and observation"),
+        }
+    }
+}
+
+impl std::error::Error for SpeechFeedbackReceiptError {}
 
 fn finite(value: Option<f32>) -> Option<f32> {
     value.filter(|v| v.is_finite())
@@ -166,6 +214,40 @@ mod tests {
     use crate::decoder::StructuredDecoder;
     use crate::encoder::ThoughtChannels;
     use symthaea_core::genesis::GenesisSeed;
+
+    #[test]
+    fn receipt_validation_accepts_fresh_receipts() {
+        let genesis = GenesisSeed::from_phrase("broca-feedback-validation");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(4);
+        let readout = decoder.decode(&channels);
+        let plan = SpeechPlan::from_readout(&channels, &readout);
+        let receipt = SpeechFeedbackReceipt::new(&plan, SpeechSensoryObservation::default());
+
+        assert!(receipt.validate().is_ok());
+    }
+
+    #[test]
+    fn tampered_cached_error_is_rejected() {
+        let genesis = GenesisSeed::from_phrase("broca-feedback-tamper");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(4);
+        let readout = decoder.decode(&channels);
+        let plan = SpeechPlan::from_readout(&channels, &readout);
+        let mut receipt = SpeechFeedbackReceipt::new(
+            &plan,
+            SpeechSensoryObservation {
+                rate: Some(plan.prosody.rate * 1.2),
+                ..Default::default()
+            },
+        );
+        receipt.error.mean_error = 0.0;
+
+        assert_eq!(
+            receipt.validate().expect_err("tampered error"),
+            SpeechFeedbackReceiptError::ErrorMismatch
+        );
+    }
 
     #[test]
     fn receipt_binds_target_to_exact_plan_surface() {
