@@ -720,6 +720,7 @@ pub struct ReceiptAttestationVerificationReport {
     ///
     /// This binds the appraisal result to the complete attestation envelope payload,
     /// not merely to the underlying receipt. Legacy v3 reports did not carry this field.
+    #[serde(default)]
     pub attestation_payload_fingerprint: String,
     pub evaluated_at_unix_ns: i128,
     pub policy_inputs: VerificationPolicyInputs,
