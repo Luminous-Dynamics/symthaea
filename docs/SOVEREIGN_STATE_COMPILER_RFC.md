@@ -471,6 +471,8 @@ These are distinct state transitions even when they originate from the same desi
 
 Rollback requires stronger identity binding than a bare generation number. A rollback request MUST identify both the requested generation ordinal and the exact observed system-profile/store realization. The adapter binds that pair into the observed resource identity:
 
+Rollback authority is likewise scoped to compensation: a reboot-only plan does not gain rollback permission merely because the target supports rollback, and a rollback-target plan does not self-authorize a second rollback. The compiled policy therefore enables rollback only for a genuinely rollback-eligible forward mutation (such as a real NixOS activation or explicitly supported Home Manager transition).
+
 `required_resources ⊇ { nixos-generation(generation, realization) }`
 
 The realization identity is content-addressed and is included in the authorized plan digest. This prevents a later executor from interpreting an otherwise identical authorization as permission to operate on a different store realization even when the generation ordinal is reused or independently derived.
