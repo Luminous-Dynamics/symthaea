@@ -397,11 +397,12 @@ const fn domain_byte(domain: BoundaryConditionDomain) -> u8 {
 }
 
 
-/// Canonicalized selection of boundary edges that make up one solver patch.
+/// Canonicalized selection of candidate-surface boundary edges forming one
+/// typed interface rim.
 ///
-/// Coordinates are quantized to 1 µm before identity comparison. This is a
-/// topology-level identity, not a solver face-number identity, so it remains
-/// portable across solver implementations.
+/// Coordinates are quantized to 1 µm for identity comparison. This is a
+/// geometry-side identity, not a solver face-number identity; the solver's
+/// opaque boundary handle is carried separately by the binding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundaryPatchSelection {
     edges: Vec<BoundaryEdgeKey>,
@@ -459,7 +460,7 @@ struct QuantizedBoundaryEdge {
     length_mm: f64,
 }
 
-/// Independently derived boundary-patch evidence.
+/// Independently derived candidate-surface interface-rim evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BoundaryPatchCertificate {
     pub patch_digest: [u8; 32],
