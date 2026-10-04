@@ -46,6 +46,9 @@ const CHECKED_OUT_SHA = (() => {
   }
 })();
 const EXPECTED_CHECKED_OUT_SHA = process.env.EXPECTED_CHECKED_OUT_SHA || null;
+if (process.env.GITHUB_EVENT_NAME === 'pull_request' && !EXPECTED_CHECKED_OUT_SHA) {
+  throw new Error('qualification missing EXPECTED_CHECKED_OUT_SHA for pull_request run');
+}
 if (EXPECTED_CHECKED_OUT_SHA && CHECKED_OUT_SHA !== EXPECTED_CHECKED_OUT_SHA) {
   throw new Error(
     `qualification checkout identity mismatch: expected ${EXPECTED_CHECKED_OUT_SHA}, got ${CHECKED_OUT_SHA}`,
@@ -605,7 +608,7 @@ try {
     chromium: CHROMIUM,
     headed_under_xvfb: HEADLESS === false,
     modes: MODES,
-    git_sha: process.env.GITHUB_SHA || null,
+    workflow_sha: process.env.GITHUB_SHA || null,
     checked_out_sha: CHECKED_OUT_SHA,
     expected_pr_head_sha: EXPECTED_CHECKED_OUT_SHA,
     run_id: process.env.GITHUB_RUN_ID || null,
