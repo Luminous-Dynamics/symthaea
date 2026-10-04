@@ -49,3 +49,16 @@ design variable and explanatory signal. citeturn134657search0turn134657
 
 This is not a fluid solver, an accessibility solver, or a manufacturability certificate.
 It is deliberately a low-cost geometric/topological evidence gate before those stages.
+
+## Explicit boundary-policy path evaluation
+
+The default port-path evaluator remains watertight-only.
+
+For intentional inlet/outlet openings, callers may use
+evaluate_port_path_with_boundary_policy with a PortBoundaryPolicy. That path still
+requires the general mesh validity checks, but replaces the blanket watertight
+requirement with a narrower rule that every boundary edge must be explained by an
+explicit allowed port anchor.
+
+A boundary-policy rejection is evidence of a topology/boundary mismatch, not proof that
+the candidate is physically impossible.
