@@ -88,6 +88,6 @@ jobs:
         with:
           name: symthaea-ui-webgpu-qualification
           path: |
-            webgpu-qualification.json
-            webgpu-qualification-screenshots/
+            ${{ github.workspace }}/crates/bridges/symthaea-ui/webgpu-qualification.json
+            ${{ github.workspace }}/crates/bridges/symthaea-ui/webgpu-qualification-screenshots/
           if-no-files-found: error
