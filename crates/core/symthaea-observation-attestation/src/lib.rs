@@ -1558,30 +1558,23 @@ impl EvaluationBoundary {
     /// for the stronger intrinsic receipt-integrity check.
     fn from_execution_trace_v7(trace: &EvaluationTrace) -> Self {
         let mut boundary = Self::from_execution_trace(trace);
+        // Remove only the v8-only indeterminate integrity marker; replace the
+        // existing commitment claim in-place so v7 vector ordering is preserved.
+        boundary
+            .indeterminate
+            .retain(|claim| *claim != EvaluationClaim::ReceiptIntegrity);
         for claims in [
             &mut boundary.established,
             &mut boundary.not_established,
             &mut boundary.indeterminate,
         ] {
-            claims.retain(|claim| *claim != EvaluationClaim::ReceiptCommitment);
-            claims.retain(|claim| *claim != EvaluationClaim::ReceiptIntegrity);
-        }
-        let receipt_stage = trace
-            .results
-            .iter()
-            .find(|result| result.check == EvaluationCheck::ReceiptCommitment)
-            .map(|result| result.stage)
-            .unwrap_or(VerificationStage::NotEvaluated);
-        match receipt_stage {
-            VerificationStage::Passed => boundary
-                .established
-                .push(EvaluationClaim::ReceiptIntegrity),
-            VerificationStage::Failed(_) => boundary
-                .not_established
-                .push(EvaluationClaim::ReceiptIntegrity),
-            VerificationStage::NotEvaluated => boundary
-                .indeterminate
-                .push(EvaluationClaim::ReceiptIntegrity),
+            if let Some(index) = claims
+                .iter()
+                .position(|claim| *claim == EvaluationClaim::ReceiptCommitment)
+            {
+                claims[index] = EvaluationClaim::ReceiptIntegrity;
+                break;
+            }
         }
         boundary
     }
