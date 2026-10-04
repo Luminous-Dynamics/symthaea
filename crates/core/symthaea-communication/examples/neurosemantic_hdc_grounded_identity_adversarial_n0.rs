@@ -159,6 +159,18 @@ fn verify_result(
     observed_edges == expected_edges
 }
 
+fn execution_revision() -> String {
+    std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|revision| revision.trim().to_string())
+        .filter(|revision| !revision.is_empty())
+        .unwrap_or_else(|| "local".into())
+}
+
 fn main() -> Result<(), String> {
     let scheme_id = "scheme:adversarial-n0-v1";
     let provenance_hash =
@@ -320,7 +332,7 @@ fn main() -> Result<(), String> {
     let output = serde_json::json!({
         "benchmark": "neurosemantic-hdc-grounded-identity-adversarial-n0",
         "benchmark_schema_version": HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION,
-        "execution_revision": std::env::var("GITHUB_SHA").unwrap_or_else(|_| "local".into()),
+        "execution_revision": execution_revision(),
         "adapter_id": HDC_ONTOLOGY_ADAPTER_ID,
         "claim_boundary": "identity_confusion_red_team_with_random_bit_corruption_only",
         "policy": {
