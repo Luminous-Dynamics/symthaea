@@ -590,7 +590,7 @@ pub fn recover_independent_bound(
         return None;
     }
 
-    let total_rank = factors.iter().map(|factor| factor.rank()).sum::<usize>();
+    let total_rank = checked_factor_dimension_sum(factors)?;
     let mut basis = Vec::with_capacity(total_rank);
     for factor in factors {
         basis.extend(factor.basis().iter().cloned());
@@ -605,7 +605,7 @@ pub fn recover_independent_bound(
     let mut recovered = Vec::with_capacity(factors.len());
 
     for factor in factors {
-        let end = offset + factor.rank();
+        let end = offset.checked_add(factor.rank())?;
         recovered.push(factor.encode(&coefficients[offset..end]));
         offset = end;
     }
@@ -696,7 +696,9 @@ impl LinearCodeDependencyWitness {
         if factors.iter().any(|factor| factor.dimension() != dimension) {
             return false;
         }
-        let total_rank = factors.iter().map(|factor| factor.rank()).sum::<usize>();
+        let Some(total_rank) = checked_factor_dimension_sum(factors) else {
+            return false;
+        };
         if self.generator_coefficients.len() != total_rank
             || self.generator_coefficients.iter().all(|bit| !*bit)
             || self.dependent_generator_index >= total_rank
@@ -1156,7 +1158,14 @@ pub fn factorization_dependency_witness(
     factorization_kernel_basis(factors)?.into_iter().next()
 }
 
+fn checked_factor_dimension_sum(factors: &[&RandomLinearCode]) -> Option<usize> {
+    factors
+        .iter()
+        .try_fold(0usize, |sum, factor| sum.checked_add(factor.rank()))
+}
+
 fn factor_offsets(factors: &[&RandomLinearCode]) -> Vec<usize> {
+    debug_assert!(checked_factor_dimension_sum(factors).is_some());
     let mut offsets = Vec::with_capacity(factors.len() + 1);
     offsets.push(0);
     for factor in factors {
@@ -1264,12 +1273,14 @@ fn has_dependent_factor_subset(
     chosen: &mut Vec<usize>,
 ) -> bool {
     if chosen.len() == subset_size {
-        let mut rank_sum = 0usize;
+        let Some(rank_sum) = chosen.iter().try_fold(0usize, |sum, &index| {
+            sum.checked_add(factors[index].rank())
+        }) else {
+            return false;
+        };
         let mut basis = Vec::new();
         for &index in chosen.iter() {
-            let factor = factors[index];
-            rank_sum += factor.rank();
-            basis.extend(factor.basis().iter().cloned());
+            basis.extend(factors[index].basis().iter().cloned());
         }
         return basis_rank(&basis, factors[0].dimension()) < rank_sum;
     }
