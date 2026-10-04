@@ -996,7 +996,8 @@ mod tests {
                 "patch:shared",
                 [4; 32],
                 &candidate,
-                [3; 32],
+                select_boundary_patch(&b, &candidate, 0.05).unwrap(),
+                0.05,
             )
             .unwrap(),
         ];
