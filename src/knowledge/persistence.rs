@@ -553,6 +553,33 @@ impl KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
             == KnowledgeSnapshotValidationReceiptRecord::canonical_history_digest_hex(history)
     }
 
+    /// Verify the validation checkpoint together with the snapshot checkpoint and
+    /// the cross-ledger bindings carried by every validation record.
+    ///
+    /// This is the portable equivalent of the database-side join between validation
+    /// receipts and snapshot receipts. It proves that the exported validation history
+    /// only references snapshot generations/digests present in the separately retained
+    /// snapshot history; it does not provide authenticity beyond the external anchors.
+    pub fn verify_against_snapshot_history(
+        &self,
+        validation_history: &[KnowledgeSnapshotValidationReceiptRecord],
+        snapshot_checkpoint: &KnowledgeSnapshotReceiptHistoryCheckpoint,
+        snapshot_history: &[KnowledgeSnapshotReceipt],
+    ) -> bool {
+        if !self.verify_against_history(validation_history)
+            || !snapshot_checkpoint.verify_against_history(snapshot_history)
+        {
+            return false;
+        }
+
+        validation_history.iter().all(|record| {
+            snapshot_history.iter().any(|snapshot| {
+                snapshot.generation == record.receipt.generation
+                    && snapshot.canonical_digest_hex == record.receipt.snapshot_digest_hex
+            })
+        })
+    }
+
     /// Whether the checkpoint exactly matches the prefix of a structurally valid, longer validation history.
     pub fn verify_prefix_against_history(
         &self,
@@ -8122,6 +8149,27 @@ mod tests {
         assert_eq!(checkpoint.latest_generation, 2);
         assert!(checkpoint.verify_against_history(&all));
         assert!(!checkpoint.verify_prefix_against_history(&all));
+
+        let snapshot_history = p.snapshot_receipt_history().unwrap();
+        let snapshot_checkpoint = p.snapshot_receipt_history_checkpoint().unwrap();
+        assert!(checkpoint.verify_against_snapshot_history(
+            &all,
+            &snapshot_checkpoint,
+            &snapshot_history
+        ));
+
+        let mut cross_ledger_substitution = all.clone();
+        cross_ledger_substitution[2].receipt.snapshot_digest_hex =
+            snapshot_history[0].canonical_digest_hex.clone();
+        cross_ledger_substitution[2].stored_receipt_digest_hex =
+            cross_ledger_substitution[2].recomputed_receipt_digest_hex();
+        assert!(cross_ledger_substitution[2].verify_integrity());
+        assert!(!checkpoint.verify_against_snapshot_history(
+            &cross_ledger_substitution,
+            &snapshot_checkpoint,
+            &snapshot_history
+        ));
+
         p.verify_snapshot_validation_receipt_history_checkpoint(&checkpoint)
             .unwrap();
 
