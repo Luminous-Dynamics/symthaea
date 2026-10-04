@@ -3023,6 +3023,40 @@ mod tests {
         );
     }
     #[test]
+    fn independence_scope_identity_excludes_valid_unread_relation_edges() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let baseline = graph
+            .independence_verification_scope_fingerprint()
+            .expect("baseline scope");
+
+        let with_relation = ObservationGraph {
+            observations: graph.observations.clone(),
+            relations: vec![ObservationRelation {
+                source_observation_id: "obs-001".into(),
+                target_observation_id: "obs-002".into(),
+                kind: ObservationRelationKind::Supports,
+                independence: EvidenceIndependence::Unknown,
+            }],
+        };
+        assert!(with_relation.validate().is_ok());
+        assert_eq!(
+            with_relation
+                .independence_verification_scope_fingerprint()
+                .expect("relation scope"),
+            baseline
+        );
+        assert_eq!(
+            with_relation.assess_independence("obs-001", "obs-002"),
+            graph.assess_independence("obs-001", "obs-002")
+        );
+    }
+    #[test]
     fn independence_receipt_is_attestation_ready() {
         let mut second = fixture();
         second.id = "obs-002".into();
