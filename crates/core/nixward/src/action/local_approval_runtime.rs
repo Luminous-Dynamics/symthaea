@@ -364,8 +364,10 @@ mod tests {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
         let now = wall_ms();
-        let mut stop_command = restart_command("nginx.service");
-        stop_command.operation = crate::action::NixServiceOperationKindV1::Stop;
+        let stop_command = NixOSCommand::Service {
+            operation: crate::action::NixServiceOperationKindV1::Stop,
+            unit: "nginx.service".to_string(),
+        };
 
         assert_eq!(
             runtime
