@@ -57,6 +57,13 @@ jobs:
           assert provenance["checked_out_revision"] == expected_revision
           assert provenance["checked_out_revision"] != ""
 
+          for report_path in sorted(Path("target/communication-evidence").glob("*.json")):
+              if report_path.name == "execution-provenance.json":
+                  continue
+              report = json.loads(report_path.read_text())
+              if "execution_revision" in report:
+                  assert report["execution_revision"] == provenance["checked_out_revision"], report_path
+
           codec_report = json.loads(Path("target/communication-evidence/neurosemantic_hdc_codec_n0.json").read_text())
           assert codec_report["binary_frame_roundtrip_exact"] is True
           assert codec_report["deterministic_repeat_exact"] is True
@@ -168,7 +175,7 @@ jobs:
           assert adversarial["benchmark_schema_version"] == 1
           assert adversarial["execution_revision"] != ""
           assert adversarial["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
-          assert adversarial["claim_boundary"] == "identity_confusion_red_team_with_random_bit_corruption_only"
+          assert adversarial["claim_boundary"] == "identity_confusion_red_team_with_random_bit_corruption_and_boundary_interpolation_only"
           assert adversarial["summary"]["node_correct_accepts"] >= 1
           assert adversarial["summary"]["edge_correct_accepts"] >= 1
           assert adversarial["summary"]["confident_wrong_accepts"] == 0
