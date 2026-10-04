@@ -65,6 +65,8 @@ The typed evidence mechanism records one of:
 
 The mechanism type must match the declared backing category before the evidence verifier is invoked. This prevents a proof envelope from silently changing mechanism class.
 
+The Handle, verifier policy, reference values, and verifier trust-anchor set are also explicit inputs to the evidence appraisal boundary. They are not treated as decorative metadata.
+
 VerifiedFreshnessAnchor is deliberately non-serializable and can only be minted after a verifier accepts that exact profile/receipt pair.
 
 The authoritative recovery path then compares the verified profile and verified subject against the runtime store and recovery record.
