@@ -19,7 +19,9 @@
 use std::collections::HashSet;
 use std::path::Path;
 use std::time::Duration;
+
 use rusqlite::{OptionalExtension, TransactionBehavior};
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::unified_hv::BinaryHV;
 use symthaea_epistemic_types::{ProvenanceRelation, ProvenanceRelationKind};
 
@@ -222,7 +224,7 @@ impl KnowledgeSnapshotReceipt {
 
 /// A non-persistent evidence checkpoint for an externally anchored snapshot-receipt
 /// history. The checkpoint does not assert truth or authenticity by itself.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KnowledgeSnapshotReceiptHistoryCheckpoint {
     pub receipt_count: u64,
     pub latest_generation: u64,
@@ -425,7 +427,7 @@ impl KnowledgeSnapshotValidationReceiptRecord {
 
 /// A non-persistent evidence checkpoint for an externally anchored validation-receipt
 /// history. The checkpoint does not assert truth, validator authority, or authenticity by itself.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
     pub receipt_count: u64,
     pub latest_validation_sequence: u64,
@@ -7622,6 +7624,10 @@ mod tests {
         );
 
         let checkpoint = p.snapshot_receipt_history_checkpoint().unwrap();
+        let checkpoint_json = serde_json::to_string(&checkpoint).unwrap();
+        let checkpoint_round_trip: KnowledgeSnapshotReceiptHistoryCheckpoint =
+            serde_json::from_str(&checkpoint_json).unwrap();
+        assert_eq!(checkpoint_round_trip, checkpoint);
         assert_eq!(checkpoint.receipt_count, 2);
         assert_eq!(checkpoint.latest_generation, 2);
         assert!(checkpoint.verify_against_history(&history));
@@ -7970,6 +7976,10 @@ mod tests {
         );
 
         let checkpoint = p.snapshot_validation_receipt_history_checkpoint().unwrap();
+        let checkpoint_json = serde_json::to_string(&checkpoint).unwrap();
+        let checkpoint_round_trip: KnowledgeSnapshotValidationReceiptHistoryCheckpoint =
+            serde_json::from_str(&checkpoint_json).unwrap();
+        assert_eq!(checkpoint_round_trip, checkpoint);
         assert_eq!(checkpoint.receipt_count, 3);
         assert_eq!(checkpoint.latest_validation_sequence, 3);
         assert_eq!(checkpoint.latest_generation, 2);
