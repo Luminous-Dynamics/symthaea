@@ -274,7 +274,7 @@ impl KnowledgeSnapshotReceiptHistoryCheckpoint {
 
     /// Whether the checkpoint exactly matches the prefix of a structurally valid, longer receipt history.
     pub fn verify_prefix_against_history(&self, history: &[KnowledgeSnapshotReceipt]) -> bool {
-        if self.receipt_count > history.len() as u64 {
+        if self.receipt_count >= history.len() as u64 {
             return false;
         }
         self.verify_against_history(&history[..self.receipt_count as usize])
@@ -513,7 +513,7 @@ impl KnowledgeSnapshotValidationReceiptHistoryCheckpoint {
         &self,
         history: &[KnowledgeSnapshotValidationReceiptRecord],
     ) -> bool {
-        if self.receipt_count > history.len() as u64 {
+        if self.receipt_count >= history.len() as u64 {
             return false;
         }
         self.verify_against_history(&history[..self.receipt_count as usize])
@@ -7653,6 +7653,17 @@ mod tests {
         );
 
         let checkpoint = p.snapshot_receipt_history_checkpoint().unwrap();
+        let mut invalid_history = history.clone();
+        invalid_history[0].receipt_digest_hex = invalid_history[0].canonical_receipt_digest_hex();
+        assert!(KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&invalid_history).is_ok());
+
+        let malformed_history = vec![KnowledgeSnapshotReceipt {
+            generation: 2,
+            canonical_digest_hex: "a".repeat(64),
+            receipt_digest_hex: "b".repeat(64),
+        }];
+        assert!(KnowledgeSnapshotReceiptHistoryCheckpoint::from_history(&malformed_history).is_err());
+
         let checkpoint_json = serde_json::to_string(&checkpoint).unwrap();
         let checkpoint_round_trip: KnowledgeSnapshotReceiptHistoryCheckpoint =
             serde_json::from_str(&checkpoint_json).unwrap();
@@ -7660,6 +7671,7 @@ mod tests {
         assert_eq!(checkpoint.receipt_count, 2);
         assert_eq!(checkpoint.latest_generation, 2);
         assert!(checkpoint.verify_against_history(&history));
+        assert!(!checkpoint.verify_prefix_against_history(&history));
         p.verify_snapshot_receipt_history_checkpoint(&checkpoint)
             .unwrap();
 
@@ -8005,6 +8017,16 @@ mod tests {
         );
 
         let checkpoint = p.snapshot_validation_receipt_history_checkpoint().unwrap();
+        let malformed_history = vec![KnowledgeSnapshotValidationReceiptRecord {
+            validation_sequence: 2,
+            receipt: all[0].receipt.clone(),
+            stored_receipt_digest_hex: all[0].stored_receipt_digest_hex.clone(),
+        }];
+        assert!(KnowledgeSnapshotValidationReceiptHistoryCheckpoint::from_history(
+            &malformed_history
+        )
+        .is_err());
+
         let checkpoint_json = serde_json::to_string(&checkpoint).unwrap();
         let checkpoint_round_trip: KnowledgeSnapshotValidationReceiptHistoryCheckpoint =
             serde_json::from_str(&checkpoint_json).unwrap();
@@ -8013,6 +8035,7 @@ mod tests {
         assert_eq!(checkpoint.latest_validation_sequence, 3);
         assert_eq!(checkpoint.latest_generation, 2);
         assert!(checkpoint.verify_against_history(&all));
+        assert!(!checkpoint.verify_prefix_against_history(&all));
         p.verify_snapshot_validation_receipt_history_checkpoint(&checkpoint)
             .unwrap();
 
