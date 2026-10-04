@@ -658,6 +658,27 @@ fn basis_rank_counted(
     rank
 }
 
+/// Deterministic non-zero GF(2) dependency witness for an ordered factor basis presentation.
+///
+/// The coefficients are aligned with the concatenation of factor generators in factor order.
+/// `factor_support` records exactly which factor groups participate. The witness is canonical
+/// relative to that ordered presentation: the first generator that fails maximal-independent
+/// extension is selected, then solved against the preceding independent generators.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinearCodeDependencyWitness {
+    pub generator_coefficients: Vec<bool>,
+    pub factor_support: Vec<usize>,
+}
+
+impl LinearCodeDependencyWitness {
+    pub fn generator_support_size(&self) -> usize {
+        self.generator_coefficients.iter().filter(|bit| **bit).count()
+    }
+
+    pub fn factor_support_size(&self) -> usize {
+        self.factor_support.len()
+    }
+}
 /// Compute exact rank/nullity and multiplicity structure for a factor tuple.
 ///
 /// The factor coefficient spaces form a linear domain of dimension Delta = sum(k_i).
@@ -701,6 +722,93 @@ pub fn factorization_algebra(factors: &[&RandomLinearCode]) -> Option<LinearCode
 
 /// Return the exact fiber cardinality for a target in the factor-span.
 /// None means that the target is not representable by the supplied factors.
+/// Return a deterministic non-zero dependency witness when the factor spaces are globally dependent.
+///
+/// The returned witness is a coefficient vector in the concatenated generator presentation whose
+/// XOR evaluates to zero. It is not claimed to have minimum generator weight; its canonicality is
+/// defined by the ordered maximal-independent-prefix construction described on the type.
+pub fn factorization_dependency_witness(
+    factors: &[&RandomLinearCode],
+) -> Option<LinearCodeDependencyWitness> {
+    if factors.is_empty() {
+        return None;
+    }
+
+    let dimension = factors[0].dimension();
+    if factors.iter().any(|factor| factor.dimension() != dimension) {
+        return None;
+    }
+
+    let total_rank = factors
+        .iter()
+        .try_fold(0usize, |sum, factor| sum.checked_add(factor.rank()))?;
+    let mut independent_basis = Vec::with_capacity(total_rank);
+    let mut independent_indices = Vec::with_capacity(total_rank);
+    let mut current_index = 0usize;
+
+    for (factor_index, factor) in factors.iter().enumerate() {
+        for generator in factor.basis() {
+            if extends_span(&independent_basis, generator) {
+                independent_indices.push(current_index);
+                independent_basis.push(generator.clone());
+            } else {
+                let combination = solve_linear_combination(generator, &independent_basis)?;
+                let mut coefficients = vec![false; total_rank];
+                for (&coefficient, &original_index) in
+                    combination.iter().zip(independent_indices.iter())
+                {
+                    coefficients[original_index] = coefficient;
+                }
+                coefficients[current_index] = true;
+
+                let factor_offsets = factor_offsets(factors);
+                let factor_support = factors
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, _)| {
+                        let start = factor_offsets[index];
+                        let end = factor_offsets[index + 1];
+                        coefficients[start..end].iter().any(|bit| *bit).then_some(index)
+                    })
+                    .collect::<Vec<_>>();
+
+                if coefficients.iter().all(|bit| !*bit) || factor_support.len() < 2 {
+                    return None;
+                }
+
+                let mut witness_sum = BinaryCodeword::zero(dimension);
+                for (&coefficient, generator) in coefficients.iter().zip(
+                    factors.iter().flat_map(|factor| factor.basis().iter()),
+                ) {
+                    if coefficient {
+                        witness_sum.xor_assign(generator);
+                    }
+                }
+                if witness_sum != BinaryCodeword::zero(dimension) {
+                    return None;
+                }
+
+                let _ = factor_index;
+                return Some(LinearCodeDependencyWitness {
+                    generator_coefficients: coefficients,
+                    factor_support,
+                });
+            }
+            current_index += 1;
+        }
+    }
+
+    None
+}
+
+fn factor_offsets(factors: &[&RandomLinearCode]) -> Vec<usize> {
+    let mut offsets = Vec::with_capacity(factors.len() + 1);
+    offsets.push(0);
+    for factor in factors {
+        offsets.push(offsets.last().copied().unwrap_or(0) + factor.rank());
+    }
+    offsets
+}
 pub fn factorization_count_for_target(
     target: &BinaryCodeword,
     factors: &[&RandomLinearCode],
@@ -773,6 +881,41 @@ fn has_dependent_factor_subset(
 mod tests {
     use super::*;
 
+    #[test]
+    fn dependency_witness_is_deterministic_and_zero_sum() {
+        let c1 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b01])])
+            .expect("c1");
+        let c2 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b10])])
+            .expect("c2");
+        let c3 = RandomLinearCode::from_basis(vec![BinaryCodeword::from_words(2, vec![0b11])])
+            .expect("c3");
+        let factors = [&c1, &c2, &c3];
+
+        let first = factorization_dependency_witness(&factors).expect("dependency exists");
+        let second = factorization_dependency_witness(&factors).expect("dependency exists");
+        assert_eq!(first, second);
+        assert_eq!(first.generator_coefficients, vec![true, true, true]);
+        assert_eq!(first.factor_support, vec![0, 1, 2]);
+        assert_eq!(first.generator_support_size(), 3);
+        assert_eq!(first.factor_support_size(), 3);
+
+        let mut sum = BinaryCodeword::zero(2);
+        for (&coefficient, generator) in first.generator_coefficients.iter().zip(
+            factors.iter().flat_map(|factor| factor.basis().iter()),
+        ) {
+            if coefficient {
+                sum.xor_assign(generator);
+            }
+        }
+        assert_eq!(sum, BinaryCodeword::zero(2));
+    }
+
+    #[test]
+    fn independent_factors_have_no_dependency_witness() {
+        let (_, left, right) =
+            RandomLinearCode::generate_direct_sum(32, 3, 4, 0x51A7).expect("valid direct sum");
+        assert!(factorization_dependency_witness(&[&left, &right]).is_none());
+    }
     #[test]
     fn factorization_algebra_reports_unique_direct_sum() {
         let (parent, left, right) =
