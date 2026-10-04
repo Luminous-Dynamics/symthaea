@@ -2201,7 +2201,7 @@ impl Ed25519ReceiptVerifier {
         let resolved = resolved_snapshot.resolved;
         if resolved.verification_method != method {
             return ReceiptAttestationVerificationReport::failed_with_resolution_snapshot(
-                ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable,
+                ReceiptAttestationVerificationOutcome::VerificationMethodMismatch,
                 EvaluationCheck::VerificationMethodResolution,
                 receipt.fingerprint(),
                 Some(method.to_string()),
@@ -5359,7 +5359,7 @@ mod tests {
 
         assert_eq!(
             report.outcome,
-            ReceiptAttestationVerificationOutcome::VerificationMethodUnavailable
+            ReceiptAttestationVerificationOutcome::VerificationMethodMismatch
         );
         assert_eq!(
             report.resolved_verification_method.as_deref(),
