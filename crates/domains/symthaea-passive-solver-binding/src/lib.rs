@@ -12,6 +12,7 @@
 //! This crate does not run a solver and does not certify physical transport.
 
 use blake3::Hasher;
+use symthaea_fabrication_kernel::mesh::TriangleMesh;
 use symthaea_passive_void_compiler::{BoundaryConditionDomain, PortInterface, SolverBoundaryIdentity};
 use symthaea_passive_void_graph::PortId;
 
@@ -123,6 +124,7 @@ pub trait SolverBoundaryBindingAdapter {
     fn bind(
         &self,
         interface: &PortInterface,
+        candidate: &TriangleMesh,
         candidate_geometry_digest: [u8; 32],
     ) -> Result<SolverBoundaryBinding, SolverBindingError>;
 }
@@ -182,6 +184,8 @@ pub enum SolverBindingError {
     EmptyExternalBoundaryHandle,
     UnverifiedBinding,
     InvalidEvidenceState,
+    EmptyCandidateGeometryDigest,
+    EmptyBoundaryPatchDigest,
     PortMismatch,
     InterfaceDigestMismatch,
     SolverBoundaryMismatch,
