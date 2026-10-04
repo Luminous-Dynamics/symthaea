@@ -5834,6 +5834,136 @@ mod tests {
     }
 
     #[test]
+    fn reconciliation_verifier_pin_drift_after_external_verification_is_rejected() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-reconcile-verifier-external-drift-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-reconcile-verifier-external-drift",
+            "prod",
+            "adapter-reconcile-verifier-external-drift"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"reconcile-verifier-external-drift".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-04T06:45:00Z".into(),
+            expires_at:Some("2026-10-05T06:45:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt-reconcile-verifier-external-drift",
+            "boundary-reconcile-verifier-external-drift"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt-reconcile-verifier-external-drift",
+            &action,
+            &effect,
+            "boundary-reconcile-verifier-external-drift",
+            "operation:reconcile-verifier-external-drift",
+            "native-reconcile-verifier-external-drift"
+        ).unwrap();
+        store.commit_bound(&record,ExecutionOutcome::Indeterminate).unwrap();
+
+        struct MutatingTerminalVerifier { path: std::path::PathBuf }
+        impl ProviderEvidenceVerifier for MutatingTerminalVerifier {
+            fn verify(
+                &self,
+                purpose: ProviderVerificationPurpose,
+                _record: &DurableDispatchRecord,
+                evidence: &ProviderTerminalEvidence,
+            ) -> Result<VerifiedProviderOutcome,ProviderVerificationError> {
+                if !matches!(purpose,ProviderVerificationPurpose::TerminalOutcome) {
+                    return Err(ProviderVerificationError::VerificationFailed);
+                }
+                let connection=Connection::open(&self.path)
+                    .map_err(|_| ProviderVerificationError::VerificationFailed)?;
+                connection.execute(
+                    "UPDATE authorization_store_metadata
+                     SET value='sha256:tampered-reconcile-verifier-external'
+                     WHERE key='provider_evidence_verifier_implementation_digest'",
+                    [],
+                ).map_err(|_| ProviderVerificationError::VerificationFailed)?;
+
+                Ok(VerifiedProviderOutcome {
+                    evidence:evidence.clone(),
+                    configuration:ProviderVerifierConfiguration {
+                        relying_party_id:"legacy-local".into(),
+                        verifier_id:"test-verifier/v1".into(),
+                        verifier_revision:"test-verifier/rev1".into(),
+                        verifier_implementation_id:"test-verifier".into(),
+                        verifier_implementation_digest:"sha256:test-verifier-implementation".into(),
+                        verifier_config_digest:"sha256:test-verifier-config".into(),
+                        trust_anchor_digest:"sha256:test-trust-anchors".into(),
+                        evidence_profile_digest:"sha256:test-evidence-profile".into(),
+                    },
+                    verification_digest:"sha256:test-verification".into(),
+                })
+            }
+        }
+
+        let err=store.reconcile_indeterminate_bound_verified(
+            &record,
+            &verified_evidence(&record,ExecutionOutcome::Succeeded),
+            &MutatingTerminalVerifier { path:path.clone() },
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
+            )
+        ));
+
+        let persisted:String=store.connection().unwrap().query_row(
+            "SELECT value FROM authorization_store_metadata
+             WHERE key='provider_evidence_verifier_implementation_digest'",
+            [],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(persisted,"sha256:tampered-reconcile-verifier-external");
+        assert_eq!(
+            store.connection().unwrap().query_row::<i64,_,_>(
+                "SELECT COUNT(*) FROM authorization_terminal_evidence
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![record.authorization_instance,record.attempt_id],
+                |r| r.get(0)
+            ).unwrap(),
+            0
+        );
+        assert_eq!(
+            store.connection().unwrap().query_row::<String,_,_>(
+                "SELECT state FROM authorization_dispatches
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![record.authorization_instance,record.attempt_id],
+                |r| r.get(0)
+            ).unwrap(),
+            "indeterminate"
+        );
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn terminal_verifier_configuration_mismatch_is_rejected() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-verifier-config-mismatch-{}.db",std::process::id()
