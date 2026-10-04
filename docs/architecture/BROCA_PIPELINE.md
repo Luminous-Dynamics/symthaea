@@ -586,6 +586,38 @@ between conceptual message formation, linguistic formulation, articulation, and
 monitoring, while avoiding the stronger claim that the software reproduces the anatomy
 or exact function of human Broca's area.
 
+## Closed-Loop Speech Feedback
+
+Broca also exposes an implementation-neutral feedback contract:
+
+```
+SpeechPlan
+   |
+   v
+SpeechSensoryTarget
+   |
+   v
+downstream realization
+   |
+   v
+SpeechSensoryObservation
+   |
+   v
+SpeechFeedbackError
+   |
+   +----> repair / adaptation
+```
+
+The observation type uses optional values deliberately: an unavailable pitch,
+rate, prominence, or pause measurement is **missing evidence**, not a measured
+zero. The resulting receipt retains the exact deterministic plan surface,
+target, observation, per-feature discrepancies, and aggregate error.
+
+This creates the software equivalent of a forward-model boundary without
+pretending that an acoustic mismatch proves a particular anatomical mechanism.
+The target is realization-neutral so vocal-tract, neural TTS, or external
+synthesizers can each provide their own measurement adapter.
+
 ## Translation Engine (Broca's Area)
 
 The `LLMOrgan` (`src/language/llm_organ.rs`) implements the translation interface.
