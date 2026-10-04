@@ -1750,7 +1750,7 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
     }
 
     assert!(fiber.iter_bounded(expected - 1).is_none());
-    assert_eq!(fiber.iter_bounded(0), None);
+    assert!(fiber.iter_bounded(0).is_none());
 
     let mut tampered = fiber.clone();
     tampered.cardinality = ExactPowerOfTwo::new(algebra.kernel_dimension - 1);
