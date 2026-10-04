@@ -243,11 +243,9 @@ impl ServiceManager {
     ) -> Result<(NixServiceObservedStateV1, NixServiceOperationCapabilitiesV1), std::io::Error> {
         let unit = Self::validated_governed_unit(service)?;
         let properties = observe_service_properties(&unit)?;
-        NixServiceObservedStateV1::parse_systemd_observation(&unit, &properties)
-            .map_err(|error| std::io::Error::other(format!(
-                "invalid governed systemd observation for '{}': {error}",
-                unit
-            )))
+        let (state, capabilities, _enablement) =
+            Self::parse_governed_observation_with_evidence(&unit, &properties)?;
+        Ok((state, capabilities))
     }
 
     /// Observe lifecycle capabilities and unit-file enablement evidence
@@ -269,8 +267,19 @@ impl ServiceManager {
     ), std::io::Error> {
         let unit = Self::validated_governed_unit(service)?;
         let properties = observe_service_properties(&unit)?;
+        Self::parse_governed_observation_with_evidence(&unit, &properties)
+    }
+
+    fn parse_governed_observation_with_evidence(
+        unit: &str,
+        properties: &str,
+    ) -> Result<(
+        NixServiceObservedStateV1,
+        NixServiceOperationCapabilitiesV1,
+        NixServiceEnablementEvidenceV1,
+    ), std::io::Error> {
         let (state, capabilities) =
-            NixServiceObservedStateV1::parse_systemd_observation(&unit, &properties)
+            NixServiceObservedStateV1::parse_systemd_observation(unit, properties)
                 .map_err(|error| std::io::Error::other(format!(
                     "invalid governed systemd observation for '{}': {error}",
                     unit
@@ -437,6 +446,39 @@ mod tests {
         let (bin, args) = cmd.to_command();
         assert_eq!(bin, "systemctl");
         assert_eq!(args, vec!["restart", "nginx.service"]);
+    }
+
+    #[test]
+    fn combined_governed_evidence_commits_to_one_pre_state() {
+        let properties = concat!(
+            "Id=nginx.service\n",
+            "Names=nginx.service\n",
+            "LoadState=loaded\n",
+            "ActiveState=active\n",
+            "SubState=running\n",
+            "UnitFileState=enabled\n",
+            "CanStart=yes\n",
+            "CanStop=yes\n",
+            "CanReload=yes\n",
+        );
+
+        let (state, capabilities, enablement) =
+            ServiceManager::parse_governed_observation_with_evidence(
+                "nginx.service",
+                properties,
+            )
+            .unwrap();
+
+        let state_digest = state.digest().unwrap();
+        assert_eq!(capabilities.pre_state_digest(), state_digest);
+        assert_eq!(enablement.pre_state_digest(), state_digest);
+        assert_eq!(
+            enablement.unit_file_state(),
+            super::super::service_state::ServiceUnitFileStateV1::Enabled
+        );
+        assert!(capabilities.can_start());
+        assert!(capabilities.can_stop());
+        assert!(capabilities.can_reload());
     }
 
     #[test]
