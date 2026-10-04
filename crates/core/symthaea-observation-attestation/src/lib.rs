@@ -1687,6 +1687,10 @@ impl EvidenceEvaluation {
     }
 
     /// Stable content identity of the execution evidence referenced by this evaluation.
+    ///
+    /// This fingerprints the historical execution trace only. It is not a fingerprint
+    /// of the current ObservationGraph and does not establish current graph correspondence;
+    /// consumers requiring that property must revalidate the receipt against the authoritative graph.
     pub fn execution_trace_fingerprint(&self) -> String {
         self.execution_trace.fingerprint()
     }
