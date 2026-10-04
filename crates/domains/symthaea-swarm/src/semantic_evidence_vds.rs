@@ -2365,6 +2365,147 @@ impl<'a> CborReader<'a> {
         Ok(())
     }
 
+    fn take_bounded(
+        &mut self,
+        n: usize,
+        limit_end: usize,
+    ) -> Result<&[u8], Rfc9162ProofDecodeError> {
+        let end = self
+            .offset
+            .checked_add(n)
+            .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+        if end > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        self.take(n)
+    }
+
+    fn read_uint_bounded(
+        &mut self,
+        n: usize,
+        limit_end: usize,
+    ) -> Result<u64, Rfc9162ProofDecodeError> {
+        let end = self
+            .offset
+            .checked_add(n)
+            .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+        if end > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        self.read_uint(n, n as u64)
+    }
+
+    fn skip_integer_bounded(
+        &mut self,
+        limit_end: usize,
+    ) -> Result<(), Rfc9162ProofDecodeError> {
+        let initial = *self
+            .bytes
+            .get(self.offset)
+            .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        self.offset += 1;
+        if self.offset > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        match initial & 0x1f {
+            0..=23 => Ok(()),
+            24 => {
+                self.read_uint_bounded(1, limit_end)?;
+                Ok(())
+            }
+            25 => {
+                self.read_uint_bounded(2, limit_end)?;
+                Ok(())
+            }
+            26 => {
+                self.read_uint_bounded(4, limit_end)?;
+                Ok(())
+            }
+            27 => {
+                self.read_uint_bounded(8, limit_end)?;
+                Ok(())
+            }
+            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        }
+    }
+
+    fn read_array_len_bounded(
+        &mut self,
+        limit_end: usize,
+    ) -> Result<usize, Rfc9162ProofDecodeError> {
+        let initial = *self
+            .bytes
+            .get(self.offset)
+            .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        self.offset += 1;
+        if initial >> 5 != 4 {
+            return Err(Rfc9162ProofDecodeError::InvalidEncoding);
+        }
+        if self.offset > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        let value = match initial & 0x1f {
+            0..=23 => (initial & 0x1f) as u64,
+            24 => self.read_uint_bounded(1, limit_end)?,
+            25 => self.read_uint_bounded(2, limit_end)?,
+            26 => self.read_uint_bounded(4, limit_end)?,
+            27 => self.read_uint_bounded(8, limit_end)?,
+            _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        };
+        usize::try_from(value).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)
+    }
+
+    fn read_map_len_bounded(
+        &mut self,
+        limit_end: usize,
+    ) -> Result<usize, Rfc9162ProofDecodeError> {
+        let initial = *self
+            .bytes
+            .get(self.offset)
+            .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        self.offset += 1;
+        if initial >> 5 != 5 {
+            return Err(Rfc9162ProofDecodeError::InvalidEncoding);
+        }
+        if self.offset > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        let value = match initial & 0x1f {
+            0..=23 => (initial & 0x1f) as u64,
+            24 => self.read_uint_bounded(1, limit_end)?,
+            25 => self.read_uint_bounded(2, limit_end)?,
+            26 => self.read_uint_bounded(4, limit_end)?,
+            27 => self.read_uint_bounded(8, limit_end)?,
+            _ => return Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        };
+        usize::try_from(value).map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)
+    }
+
+    fn read_tag_bounded(
+        &mut self,
+        limit_end: usize,
+    ) -> Result<u64, Rfc9162ProofDecodeError> {
+        let initial = *self
+            .bytes
+            .get(self.offset)
+            .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+        self.offset += 1;
+        if initial >> 5 != 6 {
+            return Err(Rfc9162ProofDecodeError::InvalidEncoding);
+        }
+        if self.offset > limit_end {
+            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+        }
+        match initial & 0x1f {
+            0..=23 => Ok((initial & 0x1f) as u64),
+            24 => self.read_uint_bounded(1, limit_end),
+            25 => self.read_uint_bounded(2, limit_end),
+            26 => self.read_uint_bounded(4, limit_end),
+            27 => self.read_uint_bounded(8, limit_end),
+            _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
+        }
+    }
+
     fn skip_value_inner(
         &mut self,
         depth: usize,
@@ -2377,13 +2518,7 @@ impl<'a> CborReader<'a> {
         }
         let major = self.peek_major_type()?;
         match major {
-            0 | 1 => {
-                self.skip_integer()?;
-                if self.offset > limit_end {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
-                }
-                Ok(())
-            }
+            0 | 1 => self.skip_integer_bounded(limit_end),
             2 => self.skip_bstr_value(max_bstr_len, limit_end),
             3 => self.skip_text_value(4096, limit_end),
             4 => {
@@ -2413,7 +2548,7 @@ impl<'a> CborReader<'a> {
                         items += 1;
                     }
                 }
-                let n = self.read_array_len()?;
+                let n = self.read_array_len_bounded(limit_end)?;
                 if self.offset > limit_end || n > max_array_items {
                     return Err(Rfc9162ProofDecodeError::InvalidStructure);
                 }
@@ -2469,7 +2604,7 @@ impl<'a> CborReader<'a> {
                         entries += 1;
                     }
                 }
-                let n = self.read_map_len()?;
+                let n = self.read_map_len_bounded(limit_end)?;
                 if self.offset > limit_end || n > 64 {
                     return Err(Rfc9162ProofDecodeError::InvalidStructure);
                 }
@@ -2496,10 +2631,7 @@ impl<'a> CborReader<'a> {
                 Ok(())
             }
             6 => {
-                self.read_tag()?;
-                if self.offset > limit_end {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
-                }
+                self.read_tag_bounded(limit_end)?;
                 self.skip_value_inner(
                     depth + 1,
                     max_bstr_len,
@@ -2519,26 +2651,22 @@ impl<'a> CborReader<'a> {
                     }
                     0xf8 => {
                         self.offset += 1;
-                        let value = *self
-                            .bytes
-                            .get(self.offset)
-                            .ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
+                        let value = self.take_bounded(1, limit_end)?[0];
                         if value < 0x20 {
                             return Err(Rfc9162ProofDecodeError::InvalidEncoding);
                         }
-                        self.offset += 1;
                         Ok(())
                     }
                     0xf9 => {
-                        self.take(3)?;
+                        self.take_bounded(3, limit_end)?;
                         Ok(())
                     }
                     0xfa => {
-                        self.take(5)?;
+                        self.take_bounded(5, limit_end)?;
                         Ok(())
                     }
                     0xfb => {
-                        self.take(9)?;
+                        self.take_bounded(9, limit_end)?;
                         Ok(())
                     }
                     _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
@@ -3870,6 +3998,25 @@ mod tests {
         // The second member's payload byte remains unread: the aggregate
         // budget is checked from the declared length before copying it.
         assert_eq!(reader.offset, 7);
+    }
+
+    #[test]
+    fn cbor_skip_value_rejects_primitive_payload_past_aggregate_limit() {
+        // A uint64 value needs one initial byte plus eight argument bytes.
+        // With only the initial byte left in the aggregate budget, the scanner
+        // must reject before consuming the eight-byte payload.
+        let mut wire = vec![0xa1, 0x01, 0x1b];
+        wire.extend_from_slice(&[0u8; 8]);
+
+        let mut reader = CborReader::new(&wire);
+        assert_eq!(
+            reader.read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 3),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+        assert_eq!(
+            reader.offset, 3,
+            "primitive payload must not be consumed past the aggregate boundary"
+        );
     }
 
     #[test]
