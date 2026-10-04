@@ -277,8 +277,23 @@ impl ProvenanceView {
             .collect()
     }
 
+    /// Validate a view even when it originated from deserialization rather than
+    /// from the constructor. This keeps the read-only boundary fail-closed.
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        if self.validator_version != self.validation.validator_version {
+            return Err("provenance view validator version must match validation report");
+        }
+        if self.snapshot_schema_version != self.validation.snapshot_schema_version {
+            return Err("provenance view schema version must match validation report");
+        }
+        if self.snapshot_digest != self.validation.snapshot_digest {
+            return Err("provenance view digest must match validation report");
+        }
+        self.validation.validate_against_relations(&self.relations)
+    }
+
     pub fn is_structurally_conforming(&self) -> bool {
-        self.validation.conforms
+        self.validate_structure().is_ok() && self.validation.conforms
     }
 }
 
@@ -711,6 +726,34 @@ mod tests {
             view.snapshot_schema_version,
             view.validation.snapshot_schema_version
         );
+    }
+
+    #[test]
+    fn deserialized_provenance_view_rejects_envelope_drift() {
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let validation = ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation));
+        let mut view = ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+
+        view.snapshot_digest = "f".repeat(64);
+        assert_eq!(
+            view.validate_structure(),
+            Err("provenance view digest must match validation report")
+        );
+        assert!(!view.is_structurally_conforming());
+
+        let validation = ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation));
+        let mut view = ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        view.relations[0].target_memory_id = "tampered".into();
+        assert_eq!(
+            view.validate_structure(),
+            Err("provenance view validation digest mismatch")
+        );
+        assert!(!view.is_structurally_conforming());
     }
 
     #[test]
