@@ -37,6 +37,8 @@ That is useful for LUKS key release, but it is not equivalent to freshness attes
 
 Current systemd guidance describes PCR 7, PCR 11, and PCR 14 as common policy inputs for encrypted volumes and specifically cautions that direct firmware PCRs such as PCR 0 can be brittle across updates. For measured UKIs, PCR 11 covers the kernel/UKI measurement path. This is a LUKS policy concern, not by itself a regenerative-health freshness proof.
 
+The installer must not infer the final installed system's measured-UKI PCR policy from the live installer environment. A future policy-aware enrollment step should inspect the target's finalized boot artifacts and explicitly record the chosen PCR policy before enrollment.
+
 ## Nixward handoff
 
 Nixward currently receives a `HardwareProfile` with `has_tpm`, `has_secure_boot`, and related deployment facts, and can reason about TPM2 configuration.
