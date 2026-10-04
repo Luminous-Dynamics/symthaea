@@ -615,6 +615,7 @@ impl FederatedClaim {
 
     pub fn authorship_binding_is_valid(&self) -> bool {
         self.authorship
+            .as_ref()
             .map(|authorship| {
                 authorship.validate_structure().is_ok()
                     && authorship.author() == &self.author
