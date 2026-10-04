@@ -350,8 +350,8 @@ mod tests {
             .with_port(PortId(10), PortAnchor { center_mm: [-0.5, -0.5, 0.0], radius_mm: 2.0 })
             .with_port(PortId(20), PortAnchor { center_mm: [0.5, -0.5, 0.0], radius_mm: 2.0 });
         let policy = PortBoundaryPolicy::closed()
-            .with_allowed_open_port(PortId(10))
-            .with_allowed_open_port(PortId(20));
+            .with_required_open_port(PortId(10))
+            .with_required_open_port(PortId(20));
         let evidence = evaluate_port_path_with_boundary_policy(&graph, &embedding, &mesh, PortId(10), PortId(20), &policy);
         assert_eq!(evidence.status, PortPathStatus::Connected);
     }
