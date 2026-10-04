@@ -3547,11 +3547,36 @@ mod tests {
             decision: LocalApprovalDecisionKindV1::Approved,
             decided_at_unix_ms: now_secs().saturating_mul(1_000),
         };
-        submit_local_approval_v2(
-            state.local_approval_runtime.as_ref().unwrap().socket_path(),
-            &submission,
-        )
-        .unwrap();
+        // The socket listener is intentionally non-reentrant from the test thread:
+        // the client waits for its ACK, while the daemon must poll/consume the
+        // connection. Drive both ends concurrently rather than racing a direct
+        // blocking client call against the listener.
+        let socket_path = state.local_approval_runtime.as_ref().unwrap().socket_path().to_owned();
+        let submission_for_thread = submission.clone();
+        let submitter = std::thread::spawn(move || {
+            submit_local_approval_v2(&socket_path, &submission_for_thread)
+        });
+
+        // Consume the exact request through the same non-blocking poll seam used
+        // by the daemon runtime. A brief bounded retry absorbs scheduler ordering
+        // without weakening the test's semantic assertion.
+        let mut consumed = None;
+        for _ in 0..100 {
+            if let Some(token) = state
+                .local_approval_runtime
+                .as_ref()
+                .unwrap()
+                .try_accept_and_consume()
+                .unwrap()
+            {
+                consumed = Some(token);
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let ack = submitter.join().unwrap().unwrap();
+        assert_eq!(ack.status, nixward::action::LocalApprovalAckStatusV1::DecisionConsumed);
+        assert!(consumed.is_some(), "Expected exact approval to be consumed");
 
         // Remove the planning candidate before the next daemon cycle. The socket
         // approval may be valid and consumed, but it must not survive as authority
