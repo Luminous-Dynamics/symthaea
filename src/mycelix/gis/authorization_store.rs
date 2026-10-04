@@ -5778,7 +5778,16 @@ mod tests {
 
                 Ok(VerifiedProviderOutcome {
                     evidence:evidence.clone(),
-                    configuration:TestProviderVerifier.configuration(),
+                    configuration:ProviderVerifierConfiguration {
+                        relying_party_id:"legacy-local".into(),
+                        verifier_id:"test-verifier/v1".into(),
+                        verifier_revision:"test-verifier/rev1".into(),
+                        verifier_implementation_id:"test-verifier".into(),
+                        verifier_implementation_digest:"sha256:test-verifier-implementation".into(),
+                        verifier_config_digest:"sha256:test-verifier-config".into(),
+                        trust_anchor_digest:"sha256:test-trust-anchors".into(),
+                        evidence_profile_digest:"sha256:test-evidence-profile".into(),
+                    },
                     verification_digest:"sha256:test-verification".into(),
                 })
             }
