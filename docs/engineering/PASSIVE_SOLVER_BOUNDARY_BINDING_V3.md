@@ -10,7 +10,11 @@ A concrete adapter implements `SolverBoundaryBindingAdapter` and must:
 2. inspect the exact `TriangleMesh` supplied to the adapter;
 3. select the actual solver boundary entity or patch;
 4. translate that entity to the portable `BoundaryEdgeKey` representation;
-5. construct the binding through the checked constructor.
+5. return a draft to the core binder.
+
+The public `bind_with_adapter` orchestration function is the only path that
+stamps `solver_binding_verified=true`. Direct struct construction is sealed by
+an internal evidence field, and `verified` construction is private to the crate.
 
 `select_boundary_patch` provides a deterministic reference selector for adapters
 whose solver boundary maps directly to the candidate mesh. An adapter may instead
@@ -36,9 +40,13 @@ The realized boundary identity carries:
 - boundary edge count;
 - boundary perimeter in micrometers;
 - maximum interface-plane residual in micrometers;
-- maximum aperture-radial residual in micrometers.
+- maximum aperture-radial residual in micrometers;
+- evidence level: `AdapterAttested`.
 
 This makes a solver binding auditable without trusting an opaque solver patch name.
+`AdapterAttested` means the adapter returned a mapping draft and the core binder
+accepted it after the independent candidate/interface checks. It does not mean
+the external solver has accepted, executed, or numerically validated the boundary.
 
 ## Complete binding sets
 
