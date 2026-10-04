@@ -140,6 +140,7 @@ jobs:
           assert grounded_identity["summary"]["wrong_scheme_rejected"] is True
           assert grounded_identity["summary"]["wrong_mapping_provenance_rejected"] is True
           assert grounded_identity["summary"]["ambiguous_receiver_rejected"] is True
+          assert grounded_identity["summary"]["ambiguous_receiver_relation_rejected"] is True
           assert grounded_identity["metrics"]["node_precision"] == 1.0
           assert grounded_identity["metrics"]["node_recall"] == 1.0
           assert grounded_identity["metrics"]["edge_precision"] == 1.0
