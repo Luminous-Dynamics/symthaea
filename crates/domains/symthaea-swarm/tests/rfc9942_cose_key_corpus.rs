@@ -355,6 +355,14 @@ fn receipt_accepts_unknown_unprotected_extension_and_round_trips() {
 }
 
 #[test]
+fn receipt_accepts_large_unknown_unprotected_extension_and_round_trips() {
+    let bytes = receipt_with_large_unprotected_extension(4097);
+    let parsed = Rfc9942ReceiptEnvelope::from_cbor(&bytes)
+        .expect("receipt extension bstrs above the generic 4 KiB scanner cap must use the protocol-specific bound");
+    assert_eq!(parsed.to_cbor(), bytes);
+}
+
+#[test]
 fn outer_cose_accepts_large_tagged_opaque_extension_and_round_trips() {
     let mut payload = vec![0x5a, 0x00, 0x00, 0x10, 0x01];
     payload.extend_from_slice(&[0xaa; 4097]);
