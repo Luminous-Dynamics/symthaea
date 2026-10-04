@@ -278,6 +278,14 @@ impl FederatedClaim {
         if self.admission_receipt.frontier_ref != self.frontier_ref {
             return Err("claim frontier must match admission receipt");
         }
+        // Force the proposition through the typed identity constructor at the
+        // structural boundary, so a serialized/raw statement reference cannot
+        // bypass the subject relationship.
+        let statement = self.statement_identity()?;
+        let subject = self.admission_subject()?;
+        if statement.subject() != &subject {
+            return Err("statement identity must bind canonical subject");
+        }
         // `derivation_refs` is a set at the wire-contract level: ordering is
         // canonicalized for digesting, while duplicate references are rejected rather
         // than silently changing the representation identity.
@@ -536,6 +544,40 @@ mod tests {
             claim.admission_subject().unwrap().digest(),
             sha256_hex(claim.representation_identity().unwrap().as_str().as_bytes())
         );
+    }
+
+    #[test]
+    fn mutating_statement_reference_changes_proposition_identity_not_subject_admission() {
+        let (receipt, validation) = receipt();
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        let view =
+            ProvenanceView::from_relations(std::slice::from_ref(&relation), validation).unwrap();
+        let mut claim = FederatedClaim::new(
+            "claim:1",
+            "canonical:1",
+            "family:1",
+            "author:1",
+            "statement:1",
+            view,
+            receipt,
+        )
+        .unwrap();
+
+        let original_statement = claim.statement_identity().unwrap();
+        claim.statement_ref = "statement:2".into();
+        let changed_statement = claim.statement_identity().unwrap();
+
+        assert_ne!(original_statement.digest(), changed_statement.digest());
+        assert_eq!(changed_statement.subject(), &claim.admission_subject().unwrap());
+        assert!(claim.validate_structure().is_ok());
+        // The existing receipt remains a subject-level admission, not admission
+        // of whichever proposition happens to be placed in statement_ref.
+        assert!(claim.is_subject_admission_bound(&claim.provenance_validation));
     }
 
     #[test]
