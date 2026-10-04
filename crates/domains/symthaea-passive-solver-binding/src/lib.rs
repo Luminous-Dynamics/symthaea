@@ -554,7 +554,7 @@ pub fn certify_boundary_patch(
         }
         max_plane = max_plane.max(
             plane_distance(
-                dequantize_point(edge.key.a),
+                edge.a_mm,
                 interface.interface_plane.origin_mm,
                 interface.interface_plane.normal_unit,
             )
@@ -562,21 +562,17 @@ pub fn certify_boundary_patch(
         );
         max_plane = max_plane.max(
             plane_distance(
-                dequantize_point(edge.key.b),
+                edge.b_mm,
                 interface.interface_plane.origin_mm,
                 interface.interface_plane.normal_unit,
             )
             .abs(),
         );
         max_radial = max_radial.max(
-            (radial_distance(dequantize_point(edge.key.a), interface)
-                - interface.radius_mm() as f64)
-                .abs(),
+            (radial_distance(edge.a_mm, interface) - interface.radius_mm() as f64).abs(),
         );
         max_radial = max_radial.max(
-            (radial_distance(dequantize_point(edge.key.b), interface)
-                - interface.radius_mm() as f64)
-                .abs(),
+            (radial_distance(edge.b_mm, interface) - interface.radius_mm() as f64).abs(),
         );
         perimeter_mm += edge.length_mm;
     }
@@ -759,14 +755,6 @@ fn quantize_point(point: [f32; 3]) -> [i64; 3] {
         (point[0] as f64 * 1_000_000.0).round() as i64,
         (point[1] as f64 * 1_000_000.0).round() as i64,
         (point[2] as f64 * 1_000_000.0).round() as i64,
-    ]
-}
-
-fn dequantize_point(point: [i64; 3]) -> [f64; 3] {
-    [
-        point[0] as f64 / 1_000_000.0,
-        point[1] as f64 / 1_000_000.0,
-        point[2] as f64 / 1_000_000.0,
     ]
 }
 
