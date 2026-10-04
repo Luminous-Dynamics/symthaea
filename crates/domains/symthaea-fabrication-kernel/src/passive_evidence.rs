@@ -95,6 +95,15 @@ impl PassiveEvidenceExtractor {
         let mut sources = Vec::new();
         let mut conflicts = Vec::new();
 
+        let mut moving = None;
+        let mut joints = None;
+        let mut active_power = None;
+        let mut actuators = None;
+        let mut external_control = None;
+        let mut fluid_motion = None;
+        let mut distributed_deformation = None;
+        let mut phase_change = None;
+
         for fact in facts {
             let source = match fact {
                 PassiveEvidenceFact::MovingSolidComponents { source, .. }
@@ -110,88 +119,108 @@ impl PassiveEvidenceExtractor {
 
             match *fact {
                 PassiveEvidenceFact::MovingSolidComponents { count, .. } => {
-                    if evidence.moving_solid_components != 0 && evidence.moving_solid_components != count
-                    {
-                        conflicts.push(PassiveEvidenceConflict::MovingSolidComponents {
-                            first: evidence.moving_solid_components,
-                            second: count,
-                        });
+                    if let Some(first) = moving {
+                        if first != count {
+                            conflicts.push(PassiveEvidenceConflict::MovingSolidComponents {
+                                first,
+                                second: count,
+                            });
+                        }
                     } else {
+                        moving = Some(count);
                         evidence.moving_solid_components = count;
                     }
                 }
                 PassiveEvidenceFact::MechanicalJoints { count, .. } => {
-                    if evidence.mechanical_joints != 0 && evidence.mechanical_joints != count {
-                        conflicts.push(PassiveEvidenceConflict::MechanicalJoints {
-                            first: evidence.mechanical_joints,
-                            second: count,
-                        });
+                    if let Some(first) = joints {
+                        if first != count {
+                            conflicts.push(PassiveEvidenceConflict::MechanicalJoints {
+                                first,
+                                second: count,
+                            });
+                        }
                     } else {
+                        joints = Some(count);
                         evidence.mechanical_joints = count;
                     }
                 }
                 PassiveEvidenceFact::ActivePowerWatts { watts, .. } => {
-                    if evidence.active_power_w != 0.0 && evidence.active_power_w != watts {
-                        conflicts.push(PassiveEvidenceConflict::ActivePowerWatts {
-                            first: evidence.active_power_w,
-                            second: watts,
-                        });
+                    if let Some(first) = active_power {
+                        if first != watts {
+                            conflicts.push(PassiveEvidenceConflict::ActivePowerWatts {
+                                first,
+                                second: watts,
+                            });
+                        }
                     } else {
+                        active_power = Some(watts);
                         evidence.active_power_w = watts;
                     }
                 }
                 PassiveEvidenceFact::CommandedActuators { count, .. } => {
-                    if evidence.commanded_actuators != 0 && evidence.commanded_actuators != count
-                    {
-                        conflicts.push(PassiveEvidenceConflict::CommandedActuators {
-                            first: evidence.commanded_actuators,
-                            second: count,
-                        });
+                    if let Some(first) = actuators {
+                        if first != count {
+                            conflicts.push(PassiveEvidenceConflict::CommandedActuators {
+                                first,
+                                second: count,
+                            });
+                        }
                     } else {
+                        actuators = Some(count);
                         evidence.commanded_actuators = count;
                     }
                 }
                 PassiveEvidenceFact::ExternalControlRequired { required, .. } => {
-                    if evidence.requires_external_control != required
-                        && evidence.requires_external_control
-                    {
-                        conflicts.push(PassiveEvidenceConflict::ExternalControlRequired {
-                            first: evidence.requires_external_control,
-                            second: required,
-                        });
+                    if let Some(first) = external_control {
+                        if first != required {
+                            conflicts.push(PassiveEvidenceConflict::ExternalControlRequired {
+                                first,
+                                second: required,
+                            });
+                        }
                     } else {
+                        external_control = Some(required);
                         evidence.requires_external_control = required;
                     }
                 }
                 PassiveEvidenceFact::FluidMotionUsed { used, .. } => {
-                    if evidence.uses_fluid_motion != used && evidence.uses_fluid_motion {
-                        conflicts.push(PassiveEvidenceConflict::FluidMotionUsed {
-                            first: evidence.uses_fluid_motion,
-                            second: used,
-                        });
+                    if let Some(first) = fluid_motion {
+                        if first != used {
+                            conflicts.push(PassiveEvidenceConflict::FluidMotionUsed {
+                                first,
+                                second: used,
+                            });
+                        }
                     } else {
+                        fluid_motion = Some(used);
                         evidence.uses_fluid_motion = used;
                     }
                 }
                 PassiveEvidenceFact::DistributedDeformationUsed { used, .. } => {
-                    if evidence.uses_distributed_deformation != used
-                        && evidence.uses_distributed_deformation
-                    {
-                        conflicts.push(PassiveEvidenceConflict::DistributedDeformationUsed {
-                            first: evidence.uses_distributed_deformation,
-                            second: used,
-                        });
+                    if let Some(first) = distributed_deformation {
+                        if first != used {
+                            conflicts.push(
+                                PassiveEvidenceConflict::DistributedDeformationUsed {
+                                    first,
+                                    second: used,
+                                },
+                            );
+                        }
                     } else {
+                        distributed_deformation = Some(used);
                         evidence.uses_distributed_deformation = used;
                     }
                 }
                 PassiveEvidenceFact::PhaseChangeUsed { used, .. } => {
-                    if evidence.uses_phase_change != used && evidence.uses_phase_change {
-                        conflicts.push(PassiveEvidenceConflict::PhaseChangeUsed {
-                            first: evidence.uses_phase_change,
-                            second: used,
-                        });
+                    if let Some(first) = phase_change {
+                        if first != used {
+                            conflicts.push(PassiveEvidenceConflict::PhaseChangeUsed {
+                                first,
+                                second: used,
+                            });
+                        }
                     } else {
+                        phase_change = Some(used);
                         evidence.uses_phase_change = used;
                     }
                 }
@@ -267,6 +296,47 @@ mod tests {
             },
             PassiveEvidenceFact::MovingSolidComponents {
                 count: 2,
+                source: PassiveEvidenceSource::SimulationDeclaration,
+            },
+        ];
+        let extraction = PassiveEvidenceExtractor::extract(&facts);
+        assert_eq!(extraction.conflicts.len(), 1);
+        assert_eq!(
+            extraction.evidence.moving_solid_components,
+            0,
+            "first observed value remains the evidence value"
+        );
+    }
+
+    #[test]
+    fn zero_and_nonzero_facts_conflict() {
+        let facts = [
+            PassiveEvidenceFact::MechanicalJoints {
+                count: 0,
+                source: PassiveEvidenceSource::DesignDeclaration,
+            },
+            PassiveEvidenceFact::MechanicalJoints {
+                count: 1,
+                source: PassiveEvidenceSource::SimulationDeclaration,
+            },
+        ];
+        let extraction = PassiveEvidenceExtractor::extract(&facts);
+        assert_eq!(extraction.conflicts.len(), 1);
+        assert!(matches!(
+            extraction.conflicts[0],
+            PassiveEvidenceConflict::MechanicalJoints { first: 0, second: 1 }
+        ));
+    }
+
+    #[test]
+    fn false_and_true_facts_conflict() {
+        let facts = [
+            PassiveEvidenceFact::ExternalControlRequired {
+                required: false,
+                source: PassiveEvidenceSource::DesignDeclaration,
+            },
+            PassiveEvidenceFact::ExternalControlRequired {
+                required: true,
                 source: PassiveEvidenceSource::SimulationDeclaration,
             },
         ];
