@@ -379,7 +379,7 @@ fn dependency_witness_ledger_is_canonical_and_verifiable() {
         ),
         repeated_algebra.kernel_dimension
     );
-    assert!(repeated_algebra.factorization_count_per_target.is_one() == false);
+    assert!(!repeated_algebra.factorization_count_per_target.is_one());
     assert_eq!(
         factorization_count_for_target(&repeated.encode(&[true, false]), &repeated_factors)
             .expect("repeated target"),
