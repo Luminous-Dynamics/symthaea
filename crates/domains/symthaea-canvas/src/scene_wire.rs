@@ -361,7 +361,8 @@ fn validate_node(
                 && points
                     .iter()
                     .all(|point| valid_coordinate(point[0]) && valid_coordinate(point[1]))
-                && (!*closed || is_valid_closed_polygon(points))
+                && (!*closed || is_valid_closed_polygon(points, combined_scale_abs))
+                && (*closed || !node.style.stroke.is_some() || has_renderable_polygon_edge(points, false, combined_scale_abs))
         }
         WirePrimitive::Rect { x, y, w, h, rx } => {
             valid_coordinate(*x)
@@ -408,7 +409,7 @@ fn validate_node(
         .all(|child| validate_node(child, depth + 1, count, combined_scale_abs))
 }
 
-fn is_valid_closed_polygon(points: &[[f32; 2]]) -> bool {
+fn is_valid_closed_polygon(points: &[[f32; 2]], effective_scale_abs: f64) -> bool {
     let mut normalized = Vec::with_capacity(points.len());
     for (index, point) in points.iter().enumerate() {
         if normalized
@@ -433,9 +434,34 @@ fn is_valid_closed_polygon(points: &[[f32; 2]]) -> bool {
                 - f64::from(points[a][1]) * f64::from(points[b][0])
         })
         .sum::<f64>();
-    area2.is_finite()
-        && area2.abs() > 1e-6
+    let rendered_area2 = area2 * effective_scale_abs * effective_scale_abs;
+    rendered_area2.is_finite()
+        && rendered_area2.abs() > 1e-6
         && is_simple_polygon(points, &normalized)
+}
+
+fn has_renderable_polygon_edge(
+    points: &[[f32; 2]],
+    closed: bool,
+    effective_scale_abs: f64,
+) -> bool {
+    points.windows(2).any(|segment| {
+        line_is_renderable(
+            segment[0][0],
+            segment[0][1],
+            segment[1][0],
+            segment[1][1],
+            effective_scale_abs,
+        )
+    }) || (closed
+        && points.len() >= 2
+        && line_is_renderable(
+            points[points.len() - 1][0],
+            points[points.len() - 1][1],
+            points[0][0],
+            points[0][1],
+            effective_scale_abs,
+        ))
 }
 
 fn is_simple_polygon(points: &[[f32; 2]], polygon: &[usize]) -> bool {
@@ -993,6 +1019,49 @@ mod tests {
         assert!(wire.is_supported());
     }
 
+
+    #[test]
+    fn externally_constructed_open_polygon_rejects_non_renderable_segment() {
+        let scene = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Polygon {
+                    points: vec![[0.0, 0.0], [1e-7, 0.0]],
+                    closed: false,
+                },
+                transform: WireTransform::default(),
+                style: WireStyle {
+                    stroke: Some(Color::rgb(1.0, 1.0, 1.0)),
+                    ..WireStyle::default()
+                },
+                children: vec![],
+            },
+        };
+        assert!(!scene.is_supported());
+    }
+
+    #[test]
+    fn externally_constructed_closed_polygon_rejects_fill_lost_to_nested_scale() {
+        let scene = RemoteScene {
+            version: RemoteScene::VERSION,
+            root: WireNode {
+                primitive: WirePrimitive::Polygon {
+                    points: vec![[0.0, 0.0], [1.0, 0.0], [0.0, 2.0]],
+                    closed: true,
+                },
+                transform: WireTransform {
+                    scale: 5e-4,
+                    ..WireTransform::default()
+                },
+                style: WireStyle {
+                    fill: Some(Color::rgb(1.0, 0.2, 0.1)),
+                    ..WireStyle::default()
+                },
+                children: vec![],
+            },
+        };
+        assert!(!scene.is_supported());
+    }
     #[test]
     fn externally_constructed_closed_polygon_requires_three_vertices() {
         let scene = RemoteScene {
