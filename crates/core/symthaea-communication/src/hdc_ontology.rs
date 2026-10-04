@@ -581,13 +581,18 @@ impl HdcOntologyCodebook {
 
         let mut node_bindings_by_concept = BTreeMap::new();
         for concept_id in &selected_nodes {
-            let binding = receiver_manifest
+            let bindings = receiver_manifest
                 .concepts
                 .iter()
                 .filter(|binding| binding.concept_id == *concept_id)
-                .min_by(|a, b| a.node_id.cmp(&b.node_id))
-                .ok_or_else(|| format!("receiver manifest lacks concept {concept_id}"))?;
-            node_bindings_by_concept.insert(concept_id.clone(), binding);
+                .collect::<Vec<_>>();
+            if bindings.len() != 1 {
+                return Err(format!(
+                    "receiver identity manifest must contain exactly one node binding for stable concept {concept_id}, found {}",
+                    bindings.len()
+                ));
+            }
+            node_bindings_by_concept.insert(concept_id.clone(), bindings[0]);
         }
 
         let mut nodes = Vec::with_capacity(selected_nodes.len());
@@ -672,7 +677,11 @@ impl HdcOntologyCodebook {
             self.decode_graph_with_policy(representation, receiver_manifest, policy)?;
         let interlingua = compare_graphs(expected, &decoded.graph)?;
         let concept_identity_exact = decoded.concept_ids_by_node == *expected_concept_ids;
-        let relation_identity_exact = decoded.relation_ids_by_edge == expected_relation_ids;
+        let mut observed_relation_ids = decoded.relation_ids_by_edge.clone();
+        observed_relation_ids.sort();
+        let mut expected_relation_ids = expected_relation_ids.to_vec();
+        expected_relation_ids.sort();
+        let relation_identity_exact = observed_relation_ids == expected_relation_ids;
 
         let node_candidates = self.rank_nodes(representation)?;
         let edge_candidates = self.rank_edges(
@@ -1433,6 +1442,68 @@ mod tests {
         assert_eq!(a.codebook, b.codebook);
         assert_eq!(a.node_frame, b.node_frame);
         assert_eq!(a.edge_frame, b.edge_frame);
+    }
+
+    #[test]
+    fn receiver_manifest_ambiguity_is_fail_closed() {
+        let (training, training_manifest) = training_graph_and_manifest();
+        let codebook =
+            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
+                .unwrap();
+        let representation = codebook
+            .encode_graph(&training, &training_manifest)
+            .unwrap();
+
+        let mut ambiguous = training_manifest.clone();
+        ambiguous.concepts.push(HdcConceptIdentityBinding {
+            node_id: "alias-for-alice".into(),
+            concept_id: "concept:agent/alice".into(),
+            kind: ConceptKind::Agent,
+            grounding_ids: vec!["second-grounding".into()],
+        });
+
+        assert!(codebook
+            .decode_graph_with_policy(
+                &representation,
+                &ambiguous,
+                HdcOntologyDecodePolicy::conservative_default(),
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn relation_identity_exactness_is_order_independent() {
+        let (training, training_manifest) = training_graph_and_manifest();
+        let codebook =
+            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
+                .unwrap();
+        let representation = codebook
+            .encode_graph(&training, &training_manifest)
+            .unwrap();
+        let decoded = codebook
+            .decode_graph_with_policy(
+                &representation,
+                &training_manifest,
+                HdcOntologyDecodePolicy::conservative_default(),
+            )
+            .unwrap();
+
+        let expected_concepts = decoded.concept_ids_by_node.clone();
+        let mut relations = decoded.relation_ids_by_edge.clone();
+        relations.reverse();
+
+        let metrics = codebook
+            .measure_roundtrip(
+                &training,
+                &representation,
+                &training_manifest,
+                &expected_concepts,
+                &relations,
+                HdcOntologyDecodePolicy::conservative_default(),
+            )
+            .unwrap();
+
+        assert!(metrics.relation_identity_exact);
     }
 
     #[test]
