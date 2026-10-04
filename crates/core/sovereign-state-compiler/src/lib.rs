@@ -508,6 +508,7 @@ impl AuthorizationConsumption {
 #[derive(Debug)]
 pub struct ConsumedAuthorization<'a> {
     authorized: &'a AuthorizedDeploymentPlan,
+    authorization_digest: ContentDigest,
     consumed_at_ms: u64,
 }
 
@@ -516,8 +517,8 @@ impl<'a> ConsumedAuthorization<'a> {
         self.authorized
     }
 
-    pub fn authorization_digest(&self) -> Result<ContentDigest, serde_json::Error> {
-        self.authorized.authorization.digest()
+    pub fn authorization_digest(&self) -> &ContentDigest {
+        &self.authorization_digest
     }
 
     pub fn authority_id(&self) -> &str {
@@ -572,6 +573,7 @@ pub fn consume_authorized_once<'a, S: AuthorizationConsumptionStore>(
         .map_err(AuthorizationConsumptionError::Store)?;
     Ok(ConsumedAuthorization {
         authorized,
+        authorization_digest: consumption.authorization_digest,
         consumed_at_ms,
     })
 }
@@ -2269,10 +2271,7 @@ mod tests {
         let mut store = InMemoryStore::default();
         let consumed =
             consume_authorized_once(&mut store, &authorized, 151).expect("consumption");
-        assert_eq!(
-            consumed.authorization_digest().expect("digest"),
-            auth.digest().expect("digest")
-        );
+        assert_eq!(consumed.authorization_digest(), &auth.digest().expect("digest"));
         assert_eq!(consumed.authority_id(), "owner");
         assert_eq!(consumed.nonce(), "nonce-1");
         assert_eq!(consumed.consumed_at_ms(), 151);
