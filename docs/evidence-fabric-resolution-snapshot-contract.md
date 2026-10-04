@@ -106,6 +106,8 @@ It does not establish:
 
 Those remain separate epistemic boundaries in the Evidence Fabric.
 
+For consumers holding both a report and the original envelope, `ReceiptAttestationVerificationReport::matches_attestation_envelope()` provides the explicit report↔payload identity check. It verifies the current v5 payload fingerprint and receipt fingerprint match the supplied envelope; it does not replace detached proof verification or resolver validation.
+
 ## Replayability guidance
 
 For durable deployments, retaining only a resolver identifier may be insufficient if the referenced state can later disappear.
