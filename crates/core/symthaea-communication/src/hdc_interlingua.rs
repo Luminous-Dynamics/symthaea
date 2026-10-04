@@ -574,7 +574,8 @@ impl HdcSemanticCodebook {
                 for target in &selected_nodes {
                     let candidate = self.edge_vector(source, relation, target)?;
                     edge_candidates.push(HdcRetrievalCandidate {
-                        key: format!("{source}::{relation}::{target}"),
+                        key: serde_json::to_string(&(source, relation, target))
+                            .map_err(|error| error.to_string())?,
                         score: full_cosine_similarity(&edge_bundle, &candidate),
                     });
                 }
@@ -742,14 +743,8 @@ fn node_key_for_id(
 }
 
 fn parse_edge_candidate(value: &str) -> Result<(String, String, String), String> {
-    let mut parts = value.splitn(3, "::");
-    let source = parts.next().unwrap_or_default();
-    let relation = parts.next().unwrap_or_default();
-    let target = parts.next().unwrap_or_default();
-    if source.is_empty() || relation.is_empty() || target.is_empty() {
-        return Err(format!("invalid encoded edge candidate: {value}"));
-    }
-    Ok((source.into(), relation.into(), target.into()))
+    serde_json::from_str(value)
+        .map_err(|error| format!("invalid encoded edge candidate: {value}: {error}"))
 }
 
 fn selection_stats(
@@ -955,6 +950,17 @@ mod tests {
         let representation = codebook.encode_graph(&training[0]).unwrap();
 
         assert!(wrong.decode_graph(&representation).is_err());
+    }
+
+    #[test]
+    #[test]
+    fn edge_candidate_key_is_collision_safe_for_delimiters() {
+        let key = serde_json::to_string(&("a::source", "rel::type", "b::target")).unwrap();
+        let parsed = parse_edge_candidate(&key).unwrap();
+        assert_eq!(
+            parsed,
+            ("a::source".into(), "rel::type".into(), "b::target".into())
+        );
     }
 
     #[test]
