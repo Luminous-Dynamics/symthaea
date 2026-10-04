@@ -845,6 +845,10 @@ pub fn factorization_kernel_basis(
         }
     }
 
+    if kernel_basis.len() != total_rank - independent_basis.len() {
+        return None;
+    }
+
     Some(kernel_basis)
 }
 
