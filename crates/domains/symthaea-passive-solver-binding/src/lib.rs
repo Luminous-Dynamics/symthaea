@@ -416,6 +416,45 @@ pub struct BoundaryPatchCertificate {
     pub max_radial_residual_micrometers: u64,
 }
 
+/// Independently derive the complete boundary selection for a typed interface.
+///
+/// Adapters may use this helper when their solver boundary entity maps directly
+/// to the candidate boundary. Solver-specific adapters may instead translate
+/// their own selected entity back to BoundaryEdgeKey values and let
+/// certify_boundary_patch validate that translation.
+pub fn select_boundary_patch(
+    interface: &PortInterface,
+    candidate: &TriangleMesh,
+    tolerance_mm: f64,
+) -> Result<BoundaryPatchSelection, SolverBindingError> {
+    interface
+        .validate(0.001)
+        .map_err(|_| SolverBindingError::InvalidInterface)?;
+    if !tolerance_mm.is_finite() || tolerance_mm < 0.0 {
+        return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
+    }
+
+    let report = symthaea_fabrication_kernel::validate::validate_mesh(candidate);
+    if !report.is_valid() {
+        return Err(SolverBindingError::BoundaryPatchEdgeNotOnCandidate);
+    }
+
+    let all_boundary = collect_boundary_edge_records(candidate);
+    let expected: Vec<_> = all_boundary
+        .iter()
+        .filter(|edge| edge_matches_interface(edge, interface, tolerance_mm))
+        .map(|edge| edge.key)
+        .collect();
+
+    if expected.is_empty() {
+        return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
+    }
+
+    let selection = BoundaryPatchSelection::from_edges(expected)?;
+    validate_closed_single_loop(selection.edges())?;
+    Ok(selection)
+}
+
 /// Independently certify that the supplied selection is exactly the interface
 /// rim present in the candidate mesh. This closes the gap where an adapter could
 /// report a stale patch name or arbitrary digest.
@@ -447,23 +486,11 @@ pub fn certify_boundary_patch(
         }
     }
 
-    let mut expected: Vec<_> = all_boundary
-        .iter()
-        .filter(|edge| edge_matches_interface(edge, interface, tolerance_mm))
-        .map(|edge| edge.key)
-        .collect();
-    expected.sort();
-    expected.dedup();
+    let expected = select_boundary_patch(interface, candidate, tolerance_mm)?;
 
-    if expected.is_empty() {
-        return Err(SolverBindingError::BoundaryPatchDoesNotMatchInterface);
-    }
-
-    if selection.edges != expected {
+    if selection.edges != expected.edges {
         return Err(SolverBindingError::BoundaryPatchSelectionIncomplete);
     }
-
-    validate_closed_single_loop(&selection.edges)?;
 
     let mut max_plane = 0.0f64;
     let mut max_radial = 0.0f64;
@@ -764,8 +791,7 @@ mod tests {
                 "fixture:boundary-7",
                 candidate_geometry_digest,
                 candidate,
-                BoundaryPatchSelection::from_edges(boundary_edges(candidate))
-                    .expect("fixture boundary selection"),
+                select_boundary_patch(interface, candidate, 0.05),
                 0.05,
             )
         }
@@ -797,8 +823,7 @@ mod tests {
             "patch:inlet",
             [3; 32],
             &candidate,
-            BoundaryPatchSelection::from_edges(boundary_edges(&candidate))
-                .expect("fixture boundary selection"),
+            select_boundary_patch(&interface, &candidate, 0.05),
             0.05,
         )
         .unwrap();
@@ -818,8 +843,7 @@ mod tests {
             "patch:inlet",
             [3; 32],
             &candidate,
-            BoundaryPatchSelection::from_edges(boundary_edges(&candidate))
-                .expect("fixture boundary selection"),
+            select_boundary_patch(&interface, &candidate, 0.05),
             0.05,
         )
         .unwrap();
@@ -848,8 +872,7 @@ mod tests {
             "patch:inlet",
             [3; 32],
             &candidate,
-            BoundaryPatchSelection::from_edges(boundary_edges(&candidate))
-                .expect("fixture boundary selection"),
+            select_boundary_patch(&interface, &candidate, 0.05),
             0.05,
         )
         .unwrap();
@@ -870,8 +893,7 @@ mod tests {
             "patch:inlet",
             [3; 32],
             &candidate,
-            BoundaryPatchSelection::from_edges(boundary_edges(&candidate))
-                .expect("fixture boundary selection"),
+            select_boundary_patch(&interface, &candidate, 0.05),
             0.05,
         )
         .unwrap();
@@ -895,8 +917,7 @@ mod tests {
                 "patch:shared",
                 [3; 32],
                 &candidate,
-                BoundaryPatchSelection::from_edges(boundary_edges(&candidate))
-                .expect("fixture boundary selection"),
+                select_boundary_patch(&interface, &candidate, 0.05),
             0.05,
             )
             .unwrap(),
@@ -969,7 +990,7 @@ mod tests {
     fn boundary_patch_certificate_is_deterministic() {
         let interface = interface(PortId(10), 7);
         let candidate = candidate();
-        let selection = BoundaryPatchSelection::from_edges(boundary_edges(&candidate)).unwrap();
+        let selection = select_boundary_patch(&interface, &candidate, 0.05).unwrap();
 
         let a = certify_boundary_patch(&interface, &candidate, &selection, 0.05).unwrap();
         let b = certify_boundary_patch(&interface, &candidate, &selection, 0.05).unwrap();
@@ -1003,8 +1024,7 @@ mod tests {
                 "patch:inlet",
                 [3; 32],
                 &candidate,
-                BoundaryPatchSelection::from_edges(boundary_edges(&candidate))
-                    .expect("fixture boundary selection"),
+                select_boundary_patch(&interface, &candidate, 0.05),
                 0.05,
             ),
             Err(SolverBindingError::EmptyBoundaryPatchDigest)
