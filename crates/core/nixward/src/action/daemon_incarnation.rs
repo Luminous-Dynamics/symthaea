@@ -187,7 +187,7 @@ mod tests {
             .create_approval_request(
                 &intent(),
                 "nixos-rebuild switch --flake .#workstation",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(1_000),
                 UnixMillisV1::new(2_000),
             )
@@ -204,7 +204,7 @@ mod tests {
             .create_approval_request_with_nonce(
                 &intent(),
                 "nixos-rebuild switch --flake .#workstation",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(1_000),
                 UnixMillisV1::new(2_000),
                 [3; 32],
@@ -214,7 +214,7 @@ mod tests {
             .create_approval_request_with_nonce(
                 &intent(),
                 "nixos-rebuild switch --flake .#workstation",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(1_000),
                 UnixMillisV1::new(2_000),
                 [4; 32],
