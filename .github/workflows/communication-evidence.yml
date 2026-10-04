@@ -35,6 +35,7 @@ jobs:
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_codec_n0 | tee target/communication-evidence/neurosemantic_hdc_codec_n0.json
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_interlingua_n0 | tee target/communication-evidence/neurosemantic_hdc_interlingua_n0.json
           cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_n0.json
+          cargo run -p symthaea-communication --features hdc-codec --example neurosemantic_hdc_grounded_identity_generalization_n0 | tee target/communication-evidence/neurosemantic_hdc_grounded_identity_generalization_n0.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -69,6 +70,35 @@ jobs:
               assert 0.0 <= metrics["edge_precision"] <= 1.0
               assert 0.0 <= metrics["edge_recall"] <= 1.0
               assert metrics["confidence_mae"] >= 0.0
+
+          grounded_identity_generalization = json.loads(Path("target/communication-evidence/neurosemantic_hdc_grounded_identity_generalization_n0.json").read_text())
+          assert grounded_identity_generalization["benchmark_schema_version"] == 1
+          assert grounded_identity_generalization["execution_revision"] != ""
+          assert grounded_identity_generalization["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
+          assert grounded_identity_generalization["claim_boundary"] == "held_out_known_identity_unseen_composition_and_distractor_load_only"
+          assert grounded_identity_generalization["summary"]["cases"] == 4
+          assert grounded_identity_generalization["summary"]["max_nodes"] == 9
+          assert grounded_identity_generalization["summary"]["max_edges"] == 8
+          assert grounded_identity_generalization["summary"]["all_clean_structurally_equivalent"] is True
+          assert grounded_identity_generalization["summary"]["all_concept_identity_exact"] is True
+          assert grounded_identity_generalization["summary"]["all_relation_identity_exact"] is True
+          assert grounded_identity_generalization["summary"]["all_source_groundings_preserved"] is True
+          assert grounded_identity_generalization["summary"]["all_held_out_edges_unseen_in_training"] is True
+          assert grounded_identity_generalization["summary"]["minimum_node_selection_margin"] >= 0.05
+          assert grounded_identity_generalization["summary"]["minimum_edge_selection_margin"] >= 0.05
+          for case in grounded_identity_generalization["cases"]:
+              assert case["unseen_edge_fraction"] == 1.0
+              assert case["distractor_concepts"] > 0
+              assert case["concept_identity_exact"] is True
+              assert case["relation_identity_exact"] is True
+              assert case["source_groundings_preserved"] is True
+              assert case["structural_equivalence"] is True
+              assert case["node_precision"] == 1.0
+              assert case["node_recall"] == 1.0
+              assert case["edge_precision"] == 1.0
+              assert case["edge_recall"] == 1.0
+              assert case["node_selection_margin"] >= 0.05
+              assert case["edge_selection_margin"] >= 0.05
 
           grounded_identity = json.loads(Path("target/communication-evidence/neurosemantic_hdc_grounded_identity_n0.json").read_text())
           assert grounded_identity["benchmark_schema_version"] == 1
