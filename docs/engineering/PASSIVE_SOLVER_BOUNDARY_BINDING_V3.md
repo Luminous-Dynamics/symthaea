@@ -89,9 +89,13 @@ solver-specific external handle remains a separate adapter mapping.
 The neutral core now has an explicit evidence ladder:
 
 - `AdapterAttested`: the sealed binder accepted the adapter's mapping draft after independent candidate/interface-rim checks.
+- `SolverInputEntityAttested`: a concrete entity was established in the rendered solver-input artifact, without claiming live solver state.
 - `SolverEntityAttested`: a live-capable adapter additionally returned a non-empty solver-entity fingerprint, a non-empty observation digest, and a mapping digest cryptographically bound to the exact interface, semantic candidate, exact mesh, realized rim, adapter identity, external handle, and observation.
 
-`SolverEntityAttested` is still an adapter provenance claim. The neutral core can verify that the receipt refers to the exact binding it is promoting, but it cannot independently inspect vendor-specific solver state. A concrete OpenFOAM/Fluent/etc. adapter must only issue this stronger receipt after performing its own solver-side entity introspection.
+`SolverEntityAttested` is still an adapter provenance claim. The neutral core can verify that the receipt refers to the exact binding it is promoting, but it cannot independently inspect vendor-specific solver state. The OpenFOAM bridge now also exposes an evidence-only observer for `constant/polyMesh/boundary`.
+It canonicalizes patch name, type, startFace, and nFaces and records an exact source-file digest.
+That receipt belongs to `SolverInputEntityAttested`; it is not a claim that a live solver loaded or accepted the file.
+A live-capable adapter may still use the higher `SolverEntityAttested` rung after inspecting actual solver state.
 
 The transition is sealed by `promote_solver_entity_attestation` and `bind_with_adapter_and_entity_attestation`; callers cannot directly construct a stronger binding by setting an evidence flag.
 
