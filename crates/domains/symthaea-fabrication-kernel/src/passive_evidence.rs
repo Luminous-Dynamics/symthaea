@@ -368,16 +368,38 @@ mod tests {
     }
 
     #[test]
-    fn fluidic_state_change_remains_allowed() {
+    fn fluidic_state_change_remains_allowed_with_complete_evidence() {
         let contract = PassiveFunctionContract::strict(
             PassiveInput::Fluidic,
             PassiveOutput::Fluidic,
             PassiveMechanism::Geometry,
         );
-        let facts = [PassiveEvidenceFact::FluidMotionUsed {
-            used: true,
-            source: PassiveEvidenceSource::SimulationDeclaration,
-        }];
+        let facts = [
+            PassiveEvidenceFact::MovingSolidComponents {
+                count: 0,
+                source: PassiveEvidenceSource::DesignDeclaration,
+            },
+            PassiveEvidenceFact::MechanicalJoints {
+                count: 0,
+                source: PassiveEvidenceSource::DesignDeclaration,
+            },
+            PassiveEvidenceFact::ActivePowerWatts {
+                watts: 0.0,
+                source: PassiveEvidenceSource::SimulationDeclaration,
+            },
+            PassiveEvidenceFact::CommandedActuators {
+                count: 0,
+                source: PassiveEvidenceSource::DesignDeclaration,
+            },
+            PassiveEvidenceFact::ExternalControlRequired {
+                required: false,
+                source: PassiveEvidenceSource::DesignDeclaration,
+            },
+            PassiveEvidenceFact::FluidMotionUsed {
+                used: true,
+                source: PassiveEvidenceSource::SimulationDeclaration,
+            },
+        ];
         let report = PassiveEvidenceExtractor::validate(&contract, &facts);
         assert!(report.compliant);
     }
