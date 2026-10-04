@@ -8,6 +8,9 @@
 use crate::{sha256_hex, CanonicalAdmissionReceipt, ProvenanceRelation, ProvenanceRelationKind, ProvenanceValidationReport, ProvenanceView};
 
 pub const FEDERATED_CLAIM_SCHEMA_VERSION: u16 = 1;
+/// Version of the canonical federated-envelope digest encoding. Bump whenever
+/// fields included in canonical_digest() or their canonical encoding changes.
+pub const FEDERATED_CLAIM_DIGEST_VERSION: u16 = 2;
 
 /// A typed dependency identity exposed to a federation adapter.
 ///
@@ -116,8 +119,9 @@ impl FederatedClaim {
         }
 
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea:federated-claim:v1\0");
+        bytes.extend_from_slice(b"symthaea:federated-claim-digest:v2\0");
         bytes.extend_from_slice(&self.schema_version.to_be_bytes());
+        bytes.extend_from_slice(&FEDERATED_CLAIM_DIGEST_VERSION.to_be_bytes());
         field(&mut bytes, "claim_identity", Some(&self.claim_identity));
         field(&mut bytes, "canonical_identity", Some(&self.canonical_identity));
         field(&mut bytes, "provenance_family", Some(&self.provenance_family));
@@ -130,6 +134,15 @@ impl FederatedClaim {
         bytes.extend_from_slice(&self.provenance_validation.snapshot_schema_version.to_be_bytes());
         bytes.extend_from_slice(&(self.provenance_validation.relation_count as u64).to_be_bytes());
         bytes.push(self.provenance_validation.conforms as u8);
+
+        bytes.extend_from_slice(&(self.provenance_validation.violations.len() as u64).to_be_bytes());
+        for violation in &self.provenance_validation.violations {
+            field(&mut bytes, "violation_code", Some(&violation.code));
+            field(&mut bytes, "violation_source", violation.source_memory_id.as_deref());
+            field(&mut bytes, "violation_target", violation.target_memory_id.as_deref());
+            field(&mut bytes, "violation_message", Some(&violation.message));
+        }
+
         field(&mut bytes, "admission_event", Some(&self.admission_receipt.admission_event));
         field(&mut bytes, "receipt_frontier_ref", self.admission_receipt.frontier_ref.as_deref());
         field(
@@ -662,7 +675,7 @@ mod digest_tests {
         let claim = base_claim();
         assert_eq!(
             claim.canonical_digest(),
-            "3bb2d07d4fb897c836b9e65c551675560dc4a637e1206f12d8cc8f20bdc4cc96"
+            "PLACEHOLDER_GOLDEN"
         );
     }
 
@@ -674,6 +687,21 @@ mod digest_tests {
         b.relations.reverse();
         assert_eq!(a.canonical_digest(), b.canonical_digest());
         assert!(a.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn canonical_digest_covers_validation_violations() {
+        let mut a = base_claim();
+        a.provenance_validation.conforms = false;
+        a.provenance_validation.violations.push(ProvenanceValidationViolation {
+            code: "synthetic".into(),
+            source_memory_id: Some("source".into()),
+            target_memory_id: Some("target".into()),
+            message: "first".into(),
+        });
+        let mut b = a.clone();
+        b.provenance_validation.violations[0].message = "second".into();
+        assert_ne!(a.canonical_digest(), b.canonical_digest());
     }
 
     #[test]
