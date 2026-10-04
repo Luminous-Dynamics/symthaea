@@ -7433,6 +7433,166 @@ mod tests {
     }
 
     #[test]
+    fn native_authority_pin_drift_after_admission_verification_is_rejected() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-native-pin-admission-drift-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open_with_relying_party(
+            &path,
+            "rp-native-pin-admission",
+        )
+        .unwrap();
+        store
+            .pin_native_authority_namespace(
+                "issuer.native-admission",
+                "issuer.native-admission/authority/v1",
+            )
+            .unwrap();
+        store
+            .pin_provider_status_source_digest("sha256:test-status-source")
+            .unwrap();
+        store
+            .pin_provider_status_verifier_configuration(
+                &TestProviderStatusVerifier.configuration(),
+            )
+            .unwrap();
+        store
+            .pin_provider_adapter_configuration(&ProviderAdapterConfiguration::new(
+                "adapter-native-admission",
+                "test-adapter/v1",
+                "sha256:test-adapter-implementation",
+            ))
+            .unwrap();
+
+        let effect = super::super::ActionEffectBinding::new(
+            "target-native-admission",
+            "prod",
+            "adapter-native-admission",
+        );
+        let action = EpistemicAction::new(
+            "native-pin-admission",
+            "intervention",
+            super::super::ActionRisk::Critical,
+        )
+        .with_effect_binding(effect.clone());
+        let digest = action.canonical_action_digest();
+        let witness = ActionAuthorizationWitness {
+            action_id: action.id.clone(),
+            authorization_instance: "native-pin-admission".into(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "support".into(),
+            policy: "policy@1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T06:20:00Z".into(),
+            expires_at: Some("2026-10-04T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                digest,
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                1,
+                1,
+            ))
+            .unwrap();
+        store
+            .prepare_for_execution_bound(
+                &witness,
+                &action,
+                "frame@1",
+                "attempt-native-pin-admission",
+                "boundary-native-pin-admission",
+            )
+            .unwrap();
+
+        struct MutatingNativePinStatusVerifier {
+            path: std::path::PathBuf,
+        }
+
+        impl ProviderStatusVerifier for MutatingNativePinStatusVerifier {
+            fn configuration(&self) -> ProviderStatusVerifierConfiguration {
+                TestProviderStatusVerifier.configuration()
+            }
+
+            fn verify_current_status(
+                &self,
+                _purpose: ProviderStatusVerificationPurpose,
+                _issuer: &str,
+                _authority_namespace: &str,
+                native_authorization_id: &str,
+                status_identifier: &str,
+                _action_digest: &str,
+                _target_identity: &str,
+                _audience: &str,
+                _adapter: &str,
+                _expected_source_digest: Option<&str>,
+            ) -> Result<ProviderStatusEvidence, ProviderStatusVerificationError> {
+                let connection = Connection::open(&self.path)
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                connection
+                    .execute(
+                        "UPDATE authorization_native_authority_pins
+                         SET authority_namespace='issuer.native-admission/tampered'
+                         WHERE issuer='issuer.native-admission'",
+                        [],
+                    )
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                let observed = trusted_utc_now()
+                    .map_err(|_| ProviderStatusVerificationError::VerificationFailed)?;
+                Ok(ProviderStatusEvidence {
+                    status_identifier: status_identifier.to_owned(),
+                    status_source_digest: "sha256:test-status-source".into(),
+                    status_observed_at: observed.to_rfc3339_opts(SecondsFormat::Secs, true),
+                    status_valid_until: (observed + Duration::seconds(1800))
+                        .to_rfc3339_opts(SecondsFormat::Secs, true),
+                    status_evidence_digest: format!(
+                        "sha256:status:{native_authorization_id}"
+                    ),
+                })
+            }
+        }
+
+        let err = store
+            .mark_dispatch_pending_bound_from_pinned_native_authority(
+                &witness.authorization_instance,
+                "attempt-native-pin-admission",
+                &action,
+                &effect,
+                "boundary-native-pin-admission",
+                "operation:native-pin-admission",
+                "issuer.native-admission",
+                "native-native-pin-admission",
+                "status:native-native-pin-admission",
+                &MutatingNativePinStatusVerifier { path: path.clone() },
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidNativeReplayProvenance
+            )
+        ));
+        assert_eq!(
+            store
+                .connection()
+                .unwrap()
+                .query_row::<i64, _, _>(
+                    "SELECT COUNT(*) FROM authorization_dispatches",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap(),
+            0
+        );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn status_source_pin_drift_after_admission_verification_is_rejected() {
         let path = std::env::temp_dir().join(format!(
             "symthaea-gis-auth-status-source-admission-drift-{}.db",
