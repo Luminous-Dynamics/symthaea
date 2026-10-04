@@ -1178,7 +1178,6 @@ fn contains_negation(text: &str) -> bool {
     }
 
     #[test]
-    #[test]
     fn test_domain_distribution_is_restore_order_invariant() {
         let records = [
             super::persistence::FactRecord {
