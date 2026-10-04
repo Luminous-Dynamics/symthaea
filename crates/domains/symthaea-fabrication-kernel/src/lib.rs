@@ -398,7 +398,7 @@ pub use passive_design::{
     PassiveValidationReport, PassiveViolation,
 };
 pub use passive_evidence::{
-    PassiveEvidenceConflict, PassiveEvidenceExtraction, PassiveEvidenceFact,
+    PassiveEvidenceConflict, PassiveEvidenceExtraction, PassiveEvidenceFact, PassiveEvidenceField,
     PassiveEvidenceExtractor, PassiveEvidenceSource,
 };
 pub use policy_migration::{
