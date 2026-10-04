@@ -3467,6 +3467,22 @@ fn validate_native_authority_pin_set(
                 if let Some(receipt) =
                     load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")?
                 {
+                    let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
+                    let pin_set: (Option<String>, Option<String>) = tx.query_row(
+                        "SELECT native_authority_pin_set_id,native_authority_pin_set_digest
+                         FROM authorization_dispatches
+                         WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+                        params![record.authorization_instance, record.attempt_id, record.boundary_id],
+                        |r| Ok((r.get(0)?, r.get(1)?)),
+                    )?;
+                    self.validate_persisted_terminal_evidence(
+                        &tx,
+                        record,
+                        &receipt,
+                        &pinned_verifier,
+                        pin_set.0.as_deref(),
+                        pin_set.1.as_deref(),
+                    )?;
                     return Ok(receipt);
                 }
                 return Err(AuthorizationConsumptionError::AttemptMismatch.into());
@@ -3527,6 +3543,14 @@ fn validate_native_authority_pin_set(
         }
         if !matches!(row.0.as_str(), "dispatch_pending" | "invoked" | "indeterminate") {
             if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
+                self.validate_persisted_terminal_evidence(
+                    &tx,
+                    record,
+                    &receipt,
+                    &pinned_verifier,
+                    row.5.as_deref(),
+                    row.6.as_deref(),
+                )?;
                 return Ok(receipt);
             }
             return Err(AuthorizationConsumptionError::AttemptMismatch.into());
@@ -3552,6 +3576,14 @@ fn validate_native_authority_pin_set(
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
         if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")? {
+            self.validate_persisted_terminal_evidence(
+                &tx,
+                record,
+                &receipt,
+                &pinned_verifier,
+                row.5.as_deref(),
+                row.6.as_deref(),
+            )?;
             return Ok(receipt);
         }
         if let Some(receipt) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "indeterminate")? {
@@ -3923,6 +3955,32 @@ fn validate_native_authority_pin_set(
         )?;
 
         if let Some(r) = load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "reconciled")? {
+            self.validate_persisted_terminal_evidence(
+                &tx,
+                record,
+                &r,
+                &self.pinned_provider_evidence_verifier_configuration()?,
+                {
+                    let (id, _digest): (Option<String>, Option<String>) = tx.query_row(
+                        "SELECT native_authority_pin_set_id,native_authority_pin_set_digest
+                         FROM authorization_dispatches
+                         WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+                        params![record.authorization_instance, record.attempt_id, record.boundary_id],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )?;
+                    id.as_deref()
+                },
+                {
+                    let (_id, digest): (Option<String>, Option<String>) = tx.query_row(
+                        "SELECT native_authority_pin_set_id,native_authority_pin_set_digest
+                         FROM authorization_dispatches
+                         WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?3",
+                        params![record.authorization_instance, record.attempt_id, record.boundary_id],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )?;
+                    digest.as_deref()
+                },
+            )?;
             return Ok(r);
         }
 
@@ -3969,7 +4027,7 @@ fn validate_native_authority_pin_set(
             "INSERT INTO authorization_terminal_evidence
              (authorization_instance,attempt_id,operation_id,native_replay_identity,
               native_authority_namespace,native_authorization_id,native_replay_derivation_digest,
-              native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,boundary_id,attempt_scope_digest,
+              terminal_pin_set_id,terminal_pin_set_digest,relying_party_id,boundary_id,attempt_scope_digest,
                action_digest,provider_idempotency_key,target_identity,audience,adapter,
               adapter_revision,adapter_implementation_digest,outcome,evidence_id,
               evidence_digest,attempt_binding_digest,verifier_id,verifier_revision,verifier_implementation_id,
@@ -4614,6 +4672,106 @@ fn load_receipt(
         authority_epoch: authority_epoch as u64,
     }))
 }
+
+
+    fn validate_persisted_terminal_evidence(
+        &self,
+        tx: &Transaction<'_>,
+        record: &DurableDispatchRecord,
+        receipt: &ExecutionReceipt,
+        pinned_verifier: &ProviderVerifierConfiguration,
+        native_authority_pin_set_id: Option<&str>,
+        native_authority_pin_set_digest: Option<&str>,
+    ) -> Result<(), AuthorizationStoreError> {
+        let row: Option<(
+            String, String, Option<String>, Option<String>, Option<String>,
+            Option<String>, Option<String>, Option<String>, Option<String>,
+            String, Option<String>, String, String, String, String,
+            String, String, String, String, String, String, String,
+            String, String, String, String, String, String, String, String,
+        )> = tx.query_row(
+            "SELECT operation_id,native_replay_identity,native_issuer,native_authority_namespace,
+                    native_authorization_id,native_replay_derivation_digest,
+                    terminal_pin_set_id,terminal_pin_set_digest,relying_party_id,
+                    boundary_id,attempt_scope_digest,action_digest,provider_idempotency_key,
+                    target_identity,audience,adapter,adapter_revision,
+                    adapter_implementation_digest,outcome,evidence_id,evidence_digest,
+                    attempt_binding_digest,verifier_id,verifier_revision,verifier_implementation_id,
+                    verifier_implementation_digest,verifier_config_digest,trust_anchor_digest,
+                    evidence_profile_digest,verification_digest
+             FROM authorization_terminal_evidence
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance.as_str(), record.attempt_id.as_str()],
+            |r| Ok((
+                r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?,
+                r.get(5)?, r.get(6)?, r.get(7)?, r.get(8)?, r.get(9)?,
+                r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?, r.get(14)?,
+                r.get(15)?, r.get(16)?, r.get(17)?, r.get(18)?, r.get(19)?,
+                r.get(20)?, r.get(21)?, r.get(22)?, r.get(23)?, r.get(24)?,
+                r.get(25)?, r.get(26)?, r.get(27)?, r.get(28)?, r.get(29)?,
+            )),
+        ).optional()?;
+
+        let Some((
+            operation_id,native_replay_identity,native_issuer,native_authority_namespace,
+            native_authorization_id,native_replay_derivation_digest,
+            native_authority_pin_set_id,native_authority_pin_set_digest,relying_party_id,
+            boundary_id,attempt_scope_digest,action_digest,provider_idempotency_key,
+            target_identity,audience,adapter,adapter_revision,adapter_implementation_digest,
+            outcome,evidence_id,evidence_digest,attempt_binding_digest,
+            verifier_id,verifier_revision,verifier_implementation_id,
+            verifier_implementation_digest,verifier_config_digest,trust_anchor_digest,
+            evidence_profile_digest,verification_digest,
+        )) = row else {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        };
+
+        let expected_scope =
+            compute_attempt_scope_digest(&record.boundary_id, &record.attempt_id)?;
+        let expected_outcome = match receipt.outcome {
+            ExecutionOutcome::Succeeded => "succeeded",
+            ExecutionOutcome::Failed => "failed",
+            ExecutionOutcome::Indeterminate => "indeterminate",
+        };
+
+        if operation_id != record.operation_id
+            || native_replay_identity != record.native_replay_identity
+            || native_issuer.as_deref() != Some(record.native_issuer.as_str())
+            || native_authority_namespace.as_deref() != Some(record.native_authority_namespace.as_str())
+            || native_authorization_id.as_deref() != Some(record.native_authorization_id.as_str())
+            || native_replay_derivation_digest.as_deref() != Some(record.native_replay_derivation_digest.as_str())
+            || terminal_pin_set_id.as_deref() != native_authority_pin_set_id
+            || terminal_pin_set_digest.as_deref() != native_authority_pin_set_digest
+            || relying_party_id.as_deref() != Some(self.relying_party_id.as_str())
+            || boundary_id != record.boundary_id
+            || attempt_scope_digest.as_deref() != Some(expected_scope.as_str())
+            || action_digest != record.action_digest
+            || provider_idempotency_key != record.provider_idempotency_key
+            || target_identity != record.target_identity
+            || audience != record.audience
+            || adapter.as_deref() != Some(record.adapter.as_str())
+            || adapter_revision.as_deref() != Some(record.adapter_revision.as_str())
+            || adapter_implementation_digest.as_deref()
+                != Some(record.adapter_implementation_digest.as_str())
+            || outcome != expected_outcome
+            || evidence_id.is_empty()
+            || evidence_digest.is_empty()
+            || attempt_binding_digest != record.attempt_binding_digest
+            || verifier_id != pinned_verifier.verifier_id
+            || verifier_revision.as_deref() != Some(pinned_verifier.verifier_revision.as_str())
+            || verifier_implementation_id.as_deref()
+                != Some(pinned_verifier.verifier_implementation_id.as_str())
+            || verifier_implementation_digest.as_deref()
+                != Some(pinned_verifier.verifier_implementation_digest.as_str())
+            || verifier_config_digest != pinned_verifier.verifier_config_digest
+            || trust_anchor_digest != pinned_verifier.trust_anchor_digest
+            || evidence_profile_digest != pinned_verifier.evidence_profile_digest
+            || verification_digest.is_empty()
+        {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+        Ok(())
+    }
 
 #[cfg(test)]
 mod tests {
@@ -5908,6 +6066,111 @@ mod tests {
 
         let replay=store.commit_bound_verified(&record,&evidence,&RefusingVerifier).unwrap();
         assert_eq!(replay,first);
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn terminal_receipt_replay_rejects_missing_terminal_evidence() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-terminal-replay-missing-evidence-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let effect=super::super::ActionEffectBinding::new(
+            "target-terminal-replay-missing-evidence",
+            "prod",
+            "adapter-terminal-replay-missing-evidence"
+        );
+        let action=action.with_effect_binding(effect.clone());
+        let digest=action.canonical_action_digest();
+        let witness=ActionAuthorizationWitness {
+            authorization_instance:"terminal-replay-missing-evidence".into(),
+            action_id:action.id.clone(),
+            action_digest:digest.clone(),
+            frame:witness.frame,
+            support_digest:witness.support_digest,
+            policy:witness.policy,
+            decision:"execute".into(),
+            issued_at:"2026-10-04T07:05:00Z".into(),
+            expires_at:Some("2026-10-05T07:05:00Z".into()),
+            authority_epoch:1,
+        };
+        store.register_lease(&AuthorizationLease::new_with_instance(
+            witness.authorization_instance.clone(),
+            action.id.clone(),
+            digest,
+            witness.support_digest.clone(),
+            witness.policy.clone(),
+            1,
+            1
+        )).unwrap();
+        store.prepare_for_execution_bound(
+            &witness,
+            &action,
+            "frame@1",
+            "attempt-terminal-replay-missing-evidence",
+            "boundary-terminal-replay-missing-evidence"
+        ).unwrap();
+        let record=mark_dispatch_pending_bound_for_test(
+            &store,
+            &witness.authorization_instance,
+            "attempt-terminal-replay-missing-evidence",
+            &action,
+            &effect,
+            "boundary-terminal-replay-missing-evidence",
+            "operation:terminal-replay-missing-evidence",
+            "native-terminal-replay-missing-evidence"
+        ).unwrap();
+
+        let evidence=verified_evidence(&record,ExecutionOutcome::Succeeded);
+        let first=store.commit_bound_verified(&record,&evidence,&TestProviderVerifier).unwrap();
+        assert_eq!(
+            store.connection().unwrap().query_row::<i64,_,_>(
+                "SELECT COUNT(*) FROM authorization_terminal_evidence
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![record.authorization_instance,record.attempt_id],
+                |r| r.get(0)
+            ).unwrap(),
+            1
+        );
+        store.connection().unwrap().execute(
+            "DELETE FROM authorization_terminal_evidence
+             WHERE authorization_instance=?1 AND attempt_id=?2",
+            params![record.authorization_instance,record.attempt_id],
+        ).unwrap();
+
+        struct RefusingVerifier;
+        impl ProviderEvidenceVerifier for RefusingVerifier {
+            fn verify(
+                &self,
+                _purpose:ProviderVerificationPurpose,
+                _record:&DurableDispatchRecord,
+                _evidence:&ProviderTerminalEvidence,
+            ) -> Result<VerifiedProviderOutcome,ProviderVerificationError> {
+                Err(ProviderVerificationError::VerificationFailed)
+            }
+        }
+
+        let err=store.commit_bound_verified(
+            &record,
+            &evidence,
+            &RefusingVerifier,
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+        assert_eq!(
+            store.connection().unwrap().query_row::<i64,_,_>(
+                "SELECT COUNT(*) FROM authorization_terminal_evidence
+                 WHERE authorization_instance=?1 AND attempt_id=?2",
+                params![record.authorization_instance,record.attempt_id],
+                |r| r.get(0)
+            ).unwrap(),
+            0
+        );
+        assert_eq!(first.outcome,ExecutionOutcome::Succeeded);
         let _=std::fs::remove_file(path);
     }
 
