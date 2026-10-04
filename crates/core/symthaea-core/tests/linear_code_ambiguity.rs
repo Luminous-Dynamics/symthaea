@@ -1824,4 +1824,61 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
         expected,
         coefficients.len(),
     );
+
+
+#[test]
+fn affine_fiber_certificate_is_bound_to_target_factor_order_and_basis_presentation() {
+    let parent = RandomLinearCode::generate(8, 3, 0xA11CE);
+    let left =
+        RandomLinearCode::from_basis(parent.basis()[..2].to_vec()).expect("left subcode");
+    let right =
+        RandomLinearCode::from_basis(parent.basis()[1..].to_vec()).expect("right subcode");
+    let factors = [&left, &right];
+    let target = parent.basis()[0].clone();
+    let fiber = factorization_affine_fiber(&target, &factors).expect("original fiber");
+
+    assert!(!fiber.kernel_basis.is_empty());
+    assert!(fiber.verifies_against(&target, &factors));
+
+    let reversed_fiber =
+        factorization_affine_fiber(&target, &[&right, &left]).expect("reversed fiber");
+    assert_ne!(
+        fiber.fingerprint(),
+        reversed_fiber.fingerprint(),
+        "factor-order rebinding must change the certificate fingerprint"
+    );
+    assert!(
+        !fiber.verifies_against(&target, &[&right, &left]),
+        "a certificate must not transplant across factor ordering"
+    );
+
+    let alternate_target = parent.basis()[1].clone();
+    let alternate_fiber =
+        factorization_affine_fiber(&alternate_target, &factors).expect("alternate target fiber");
+    assert_ne!(
+        fiber.fingerprint(),
+        alternate_fiber.fingerprint(),
+        "target rebinding must change the certificate fingerprint"
+    );
+    assert!(
+        !fiber.verifies_against(&alternate_target, &factors),
+        "a certificate must not transplant across targets"
+    );
+
+    let mut reordered_left_basis = left.basis().to_vec();
+    reordered_left_basis.reverse();
+    let reordered_left =
+        RandomLinearCode::from_basis(reordered_left_basis).expect("reordered left subcode");
+    let reordered_fiber = factorization_affine_fiber(&target, &[&reordered_left, &right])
+        .expect("reordered-basis fiber");
+    assert_ne!(
+        fiber.fingerprint(),
+        reordered_fiber.fingerprint(),
+        "basis-presentation rebinding must change the certificate fingerprint"
+    );
+    assert!(
+        !fiber.verifies_against(&target, &[&reordered_left, &right]),
+        "a certificate must not transplant across basis presentations"
+    );
+}
 }
