@@ -566,13 +566,15 @@ pub fn App() -> impl IntoView {
 
     // Poll WebGPU device health so a static cognitive projection can
     // demote to its compatibility renderer even when no new scene arrives.
-    Effect::new(move |_| {
-        if !webgpu_ready.get() {
-            return;
-        }
-        let renderer = Rc::clone(&webgpu_renderer);
-        let init_started = Rc::clone(&webgpu_init_started);
-        spawn_local(async move {
+    {
+        let health_init_started = Rc::clone(&webgpu_init_started);
+        Effect::new(move |_| {
+            if !webgpu_ready.get() {
+                return;
+            }
+            let renderer = Rc::clone(&webgpu_renderer);
+            let init_started = Rc::clone(&health_init_started);
+            spawn_local(async move {
             loop {
                 if !webgpu_ready.get_untracked() {
                     break;
@@ -597,17 +599,19 @@ pub fn App() -> impl IntoView {
                 }
             }
         });
-    });
+        });
+    }
 
     // Poll the movie renderer independently for the same device-loss handoff.
     {
         let renderer = Rc::clone(&movie_webgpu_renderer);
+        let health_init_started = Rc::clone(&movie_webgpu_init_started);
         Effect::new(move |_| {
             if !movie_webgpu_ready.get() {
                 return;
             }
             let renderer = Rc::clone(&renderer);
-            let init_started = Rc::clone(&movie_webgpu_init_started);
+            let init_started = Rc::clone(&health_init_started);
             spawn_local(async move {
                 loop {
                     if !movie_webgpu_ready.get_untracked() {
@@ -633,6 +637,7 @@ pub fn App() -> impl IntoView {
                     }
                 }
             });
+        });
         });
     }
 
