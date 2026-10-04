@@ -51,6 +51,7 @@ struct AuditCase {
     case_id: String,
     speech_plan_valid: bool,
     acoustic_receipt_valid: bool,
+    acoustic_receipt_lineage_valid: bool,
     intent: String,
     epistemic_input: f32,
     plan_epistemic: String,
@@ -65,6 +66,7 @@ struct AuditCase {
     lexical_binding_succeeded: bool,
     lexical_missing_provenance_rejected: bool,
     semantic_exact_passed: bool,
+    semantic_receipt_lineage_valid: bool,
     semantic_mismatch_rejected: bool,
     semantic_partial_gate_rejected: bool,
     linguistic_to_phonological_preserved_intent: bool,
@@ -245,13 +247,23 @@ fn run() -> Result<()> {
                 },
             );
             let acoustic_receipt_valid = acoustic_receipt.validate().is_ok();
-            report.acoustic_receipt_checks += 1;
+            let acoustic_receipt_lineage_valid =
+                acoustic_receipt.validate_against_plan(&speech_plan).is_ok();
+            report.acoustic_receipt_checks += 2;
             if !acoustic_receipt_valid {
                 fail(
                     &mut report,
                     &case_id,
                     "acoustic_receipt_validation",
                     "fresh acoustic receipt failed persisted-state validation".to_string(),
+                );
+            }
+            if !acoustic_receipt_lineage_valid {
+                fail(
+                    &mut report,
+                    &case_id,
+                    "acoustic_receipt_lineage",
+                    "acoustic receipt did not validate against its source speech plan".to_string(),
                 );
             }
 
@@ -268,6 +280,16 @@ fn run() -> Result<()> {
             };
             let exact_receipt = SpeechDeliveryReceipt::new(&speech_plan, exact_observation);
             let semantic_exact_passed = exact_receipt.error.passes();
+            let semantic_receipt_lineage_valid =
+                exact_receipt.validate_against_plan(&speech_plan).is_ok();
+            if !semantic_receipt_lineage_valid {
+                fail(
+                    &mut report,
+                    &case_id,
+                    "semantic_receipt_lineage",
+                    "semantic receipt did not validate against its source speech plan".to_string(),
+                );
+            }
 
             let mismatching_clause = if speech_plan.clause_mode
                 == symthaea_broca::ClauseMode::Question
@@ -325,6 +347,7 @@ fn run() -> Result<()> {
 
             let case_ok = speech_plan_valid
                 && acoustic_receipt_valid
+                && acoustic_receipt_lineage_valid
                 && linguistic_valid
                 && linguistic_to_phonological_preserved_intent
                 && linguistic_lexical_binding_valid
@@ -334,6 +357,7 @@ fn run() -> Result<()> {
                 && lexical_binding_succeeded
                 && lexical_missing_provenance_rejected
                 && semantic_exact_passed
+                && semantic_receipt_lineage_valid
                 && semantic_mismatch_rejected
                 && semantic_partial_gate_rejected
                 && grounding_deterministic;
@@ -346,6 +370,7 @@ fn run() -> Result<()> {
                 case_id,
                 speech_plan_valid,
                 acoustic_receipt_valid,
+                acoustic_receipt_lineage_valid,
                 intent: (*intent_name).to_string(),
                 epistemic_input: epistemic,
                 plan_epistemic: format!("{:?}", speech_plan.epistemic_delivery),
@@ -360,6 +385,7 @@ fn run() -> Result<()> {
                 lexical_binding_succeeded,
                 lexical_missing_provenance_rejected,
                 semantic_exact_passed,
+                semantic_receipt_lineage_valid,
                 semantic_mismatch_rejected,
                 semantic_partial_gate_rejected,
                 linguistic_to_phonological_preserved_intent,
