@@ -61,10 +61,6 @@ impl RealizedBoundaryIdentity {
         })
     }
 
-    pub fn evidence_level(&self) -> SolverBoundaryEvidenceLevel {
-        self.evidence_level
-    }
-
     pub fn candidate_geometry_digest(&self) -> [u8; 32] {
         self.candidate_geometry_digest
     }
@@ -110,6 +106,8 @@ pub struct SolverBoundaryBinding {
     pub solver_binding_verified: bool,
     pub physical_transport_unproven: bool,
     evidence_level: SolverBoundaryEvidenceLevel,
+    solver_entity_fingerprint: Option<[u8; 32]>,
+    solver_entity_mapping_digest: Option<[u8; 32]>,
 }
 
 impl SolverBoundaryBinding {
@@ -155,7 +153,25 @@ impl SolverBoundaryBinding {
             solver_binding_verified: true,
             physical_transport_unproven: true,
             evidence_level: SolverBoundaryEvidenceLevel::AdapterAttested,
+            solver_entity_fingerprint: None,
+            solver_entity_mapping_digest: None,
         })
+    }
+
+    /// Evidence level attached by the sealed construction path.
+    pub fn evidence_level(&self) -> SolverBoundaryEvidenceLevel {
+        self.evidence_level
+    }
+
+    /// Solver-side entity fingerprint, present only after explicit entity attestation.
+    pub fn solver_entity_fingerprint(&self) -> Option<[u8; 32]> {
+        self.solver_entity_fingerprint
+    }
+
+    /// Digest binding the solver-side entity fingerprint to this exact interface,
+    /// semantic candidate, exact candidate mesh, and realized boundary patch.
+    pub fn solver_entity_mapping_digest(&self) -> Option<[u8; 32]> {
+        self.solver_entity_mapping_digest
     }
 
     /// Re-check that a binding still corresponds to the exact interface.
@@ -171,6 +187,11 @@ impl SolverBoundaryBinding {
         }
         if !self.evidence_level.is_verified() {
             return Err(SolverBindingError::InvalidEvidenceState);
+        }
+        match (self.evidence_level, self.solver_entity_fingerprint, self.solver_entity_mapping_digest) {
+            (SolverBoundaryEvidenceLevel::AdapterAttested, None, None)
+            | (SolverBoundaryEvidenceLevel::SolverEntityAttested, Some(_), Some(_)) => {}
+            _ => return Err(SolverBindingError::InvalidEvidenceState),
         }
         if self.port != interface.port {
             return Err(SolverBindingError::PortMismatch);
@@ -231,7 +252,10 @@ impl SolverBoundaryBinding {
         hasher.update(&[u8::from(self.physical_transport_unproven)]);
         hasher.update(&[match self.evidence_level {
             SolverBoundaryEvidenceLevel::AdapterAttested => 0,
+            SolverBoundaryEvidenceLevel::SolverEntityAttested => 1,
         }]);
+        hasher.update(&self.solver_entity_fingerprint.unwrap_or([0; 32]));
+        hasher.update(&self.solver_entity_mapping_digest.unwrap_or([0; 32]));
         *hasher.finalize().as_bytes()
     }
 }
@@ -295,13 +319,152 @@ impl SolverBoundaryBindingDraft {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SolverBoundaryEvidenceLevel {
+    /// Core accepted the adapter's mapping draft after independent candidate checks.
     AdapterAttested,
+    /// The adapter additionally reported a concrete solver-side entity fingerprint
+    /// and a digest binding that fingerprint to this exact candidate/interface rim.
+    SolverEntityAttested,
 }
 
 impl SolverBoundaryEvidenceLevel {
     pub fn is_verified(self) -> bool {
-        matches!(self, Self::AdapterAttested)
+        matches!(self, Self::AdapterAttested | Self::SolverEntityAttested)
     }
+}
+
+/// Solver-side entity evidence returned by a live-capable adapter.
+///
+/// This is intentionally a provenance claim, not an independent solver proof:
+/// the neutral core verifies the cryptographic binding to the exact candidate
+/// identity and realized rim, but cannot inspect vendor-specific solver state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SolverBoundaryEntityAttestation {
+    pub external_boundary_handle: String,
+    pub solver_entity_fingerprint: [u8; 32],
+    pub solver_entity_mapping_digest: [u8; 32],
+}
+
+impl SolverBoundaryEntityAttestation {
+    pub fn new(
+        external_boundary_handle: impl Into<String>,
+        solver_entity_fingerprint: [u8; 32],
+        solver_entity_mapping_digest: [u8; 32],
+    ) -> Result<Self, SolverBindingError> {
+        let external_boundary_handle = external_boundary_handle.into();
+        if external_boundary_handle.trim().is_empty() {
+            return Err(SolverBindingError::EmptyExternalBoundaryHandle);
+        }
+        if solver_entity_fingerprint == [0; 32] {
+            return Err(SolverBindingError::EmptySolverEntityFingerprint);
+        }
+        if solver_entity_mapping_digest == [0; 32] {
+            return Err(SolverBindingError::EmptySolverEntityMappingDigest);
+        }
+        Ok(Self {
+            external_boundary_handle,
+            solver_entity_fingerprint,
+            solver_entity_mapping_digest,
+        })
+    }
+}
+
+/// Canonical digest tying a solver-side entity fingerprint to the exact
+/// interface, semantic candidate, exact mesh, realized candidate-surface rim,
+/// and external solver handle.
+pub fn solver_entity_mapping_digest(
+    interface: &PortInterface,
+    candidate_geometry_digest: [u8; 32],
+    candidate_mesh_digest: [u8; 32],
+    boundary_patch_digest: [u8; 32],
+    external_boundary_handle: &str,
+    solver_entity_fingerprint: [u8; 32],
+) -> [u8; 32] {
+    let mut hasher = Hasher::new();
+    hasher.update(b"passive-solver-entity-mapping:v1");
+    hasher.update(&interface.digest());
+    hasher.update(&candidate_geometry_digest);
+    hasher.update(&candidate_mesh_digest);
+    hasher.update(&boundary_patch_digest);
+    hasher.update(external_boundary_handle.as_bytes());
+    hasher.update(&[0]);
+    hasher.update(&solver_entity_fingerprint);
+    *hasher.finalize().as_bytes()
+}
+
+/// Optional extension for adapters able to inspect the concrete solver-side
+/// boundary entity after the initial mapping has been created.
+pub trait SolverBoundaryEntityIntrospector {
+    fn attest_entity(
+        &self,
+        interface: &PortInterface,
+        candidate: &TriangleMesh,
+        binding: &SolverBoundaryBinding,
+    ) -> Result<SolverBoundaryEntityAttestation, SolverBindingError>;
+}
+
+/// Promote an adapter-attested binding only when a solver-entity attestation
+/// matches the exact binding handle and candidate identity.
+pub fn promote_solver_entity_attestation(
+    mut binding: SolverBoundaryBinding,
+    interface: &PortInterface,
+    candidate_geometry_digest: [u8; 32],
+    candidate: &TriangleMesh,
+    attestation: SolverBoundaryEntityAttestation,
+) -> Result<SolverBoundaryBinding, SolverBindingError> {
+    binding.validate_against_candidate(interface, candidate_geometry_digest, candidate)?;
+
+    if binding.evidence_level != SolverBoundaryEvidenceLevel::AdapterAttested {
+        return Err(SolverBindingError::InvalidEvidenceState);
+    }
+    if attestation.external_boundary_handle != binding.external_boundary_handle {
+        return Err(SolverBindingError::SolverEntityHandleMismatch);
+    }
+
+    let expected_mapping_digest = solver_entity_mapping_digest(
+        interface,
+        candidate_geometry_digest,
+        digest_triangle_mesh(candidate),
+        binding.realized_boundary.boundary_patch_digest(),
+        &attestation.external_boundary_handle,
+        attestation.solver_entity_fingerprint,
+    );
+    if attestation.solver_entity_mapping_digest != expected_mapping_digest {
+        return Err(SolverBindingError::SolverEntityMappingDigestMismatch);
+    }
+
+    binding.evidence_level = SolverBoundaryEvidenceLevel::SolverEntityAttested;
+    binding.solver_entity_fingerprint = Some(attestation.solver_entity_fingerprint);
+    binding.solver_entity_mapping_digest = Some(attestation.solver_entity_mapping_digest);
+
+    Ok(binding)
+}
+
+/// Complete construction path for adapters that can introspect the live solver
+/// entity they resolved.
+pub fn bind_with_adapter_and_entity_attestation<
+    A: SolverBoundaryBindingAdapter + SolverBoundaryEntityIntrospector,
+>(
+    adapter: &A,
+    interface: &PortInterface,
+    candidate: &TriangleMesh,
+    candidate_geometry_digest: [u8; 32],
+    tolerance_mm: f64,
+) -> Result<SolverBoundaryBinding, SolverBindingError> {
+    let binding = bind_with_adapter(
+        adapter,
+        interface,
+        candidate,
+        candidate_geometry_digest,
+        tolerance_mm,
+    )?;
+    let attestation = adapter.attest_entity(interface, candidate, &binding)?;
+    promote_solver_entity_attestation(
+        binding,
+        interface,
+        candidate_geometry_digest,
+        candidate,
+        attestation,
+    )
 }
 
 /// Contract implemented by concrete solver adapters.
@@ -388,6 +551,11 @@ pub fn validate_binding_set(
         if !binding.evidence_level.is_verified() {
             return Err(SolverBindingError::InvalidEvidenceState);
         }
+        match (binding.evidence_level, binding.solver_entity_fingerprint, binding.solver_entity_mapping_digest) {
+            (SolverBoundaryEvidenceLevel::AdapterAttested, None, None)
+            | (SolverBoundaryEvidenceLevel::SolverEntityAttested, Some(_), Some(_)) => {}
+            _ => return Err(SolverBindingError::InvalidEvidenceState),
+        }
         if let Some(expected) = candidate_geometry_digest {
             if expected != binding.realized_boundary.candidate_geometry_digest() {
                 return Err(SolverBindingError::CandidateGeometryDigestMismatch);
@@ -432,6 +600,10 @@ pub enum SolverBindingError {
     UnverifiedBinding,
     InvalidEvidenceState,
     EmptyCandidateGeometryDigest,
+    EmptySolverEntityFingerprint,
+    EmptySolverEntityMappingDigest,
+    SolverEntityHandleMismatch,
+    SolverEntityMappingDigestMismatch,
     PortMismatch,
     InterfaceDigestMismatch,
     SolverBoundaryMismatch,
