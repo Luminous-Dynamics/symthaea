@@ -883,6 +883,11 @@ impl WebGpuRenderer {
         self.device_lost.load(Ordering::Acquire)
     }
 
+    #[cfg(feature = "browser-qualification")]
+    pub fn qualification_force_device_loss(&self) {
+        self.device.destroy();
+    }
+
     pub fn render(&mut self, scene: &GpuScene) -> Result<(), String> {
         if self.device_lost.load(Ordering::Acquire) {
             return Err("WebGPU cognitive device was lost".to_string());
@@ -1165,6 +1170,11 @@ impl WebGpuMovieRenderer {
     /// Returns whether the device-lost callback has fired.
     pub fn is_device_lost(&self) -> bool {
         self.device_lost.load(Ordering::Acquire)
+    }
+
+    #[cfg(feature = "browser-qualification")]
+    pub fn qualification_force_device_loss(&self) {
+        self.device.destroy();
     }
 
     /// Upload one bounded RGBA frame and present it with nearest-neighbour sampling.
