@@ -7054,6 +7054,40 @@ mod tests {
     }
 
     #[test]
+    fn normalized_issuer_aliases_share_native_replay_identity_when_namespace_is_pinned() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-issuer-replay-alias-{}.db",std::process::id()
+        ));
+        let store=SqliteAuthorizationStore::open_with_relying_party(
+            &path,"rp-issuer-replay-alias"
+        ).unwrap();
+
+        store.pin_native_authority_namespace(
+            "HTTPS://Issuer.Example.:443/","authority/v1"
+        ).unwrap();
+
+        let namespace_a=store
+            .pinned_native_authority_namespace("HTTPS://Issuer.Example.:443/")
+            .unwrap();
+        let namespace_b=store
+            .pinned_native_authority_namespace("https:issuer.example")
+            .unwrap();
+
+        let replay_a=super::super::NativeReplayDerivation::derive(
+            namespace_a,"grant-1"
+        ).unwrap();
+        let replay_b=super::super::NativeReplayDerivation::derive(
+            namespace_b,"grant-1"
+        ).unwrap();
+
+        assert_eq!(namespace_a,namespace_b);
+        assert_eq!(replay_a.native_replay_identity,replay_b.native_replay_identity);
+        assert_eq!(replay_a.derivation_digest,replay_b.derivation_digest);
+
+        let _=std::fs::remove_file(path);
+    }
+
+    #[test]
     fn issuer_normalization_collisions_cannot_split_authority_namespace() {
         let path=std::env::temp_dir().join(format!(
             "symthaea-gis-auth-issuer-normalization-{}.db",std::process::id()
