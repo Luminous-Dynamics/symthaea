@@ -396,6 +396,9 @@ Authorization validation now requires:
 - an `Unproven` outcome remains representable without proof, and a mechanical `Succeeded` receipt is not treated as verified success unless the postcondition is `Satisfied`;
 - execution receipts bind the exact authorized plan, pre-execution snapshot, and
   post-execution observation;
+- receipt validation re-checks the authorization envelope at execution start;
+  a forged or incomplete public AuthorizedDeploymentPlan cannot make a receipt
+  valid merely by matching the receipt to its altered fields;
 - Nixward performs a fresh resource-identity preflight before mutation rather
   than trusting the original snapshot indefinitely;
 - receipt timestamps must remain within the authorization validity window;
