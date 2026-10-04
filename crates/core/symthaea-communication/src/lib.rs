@@ -14,6 +14,8 @@ pub mod animal;
 pub mod artifact;
 pub mod benchmark;
 pub mod human;
+#[cfg(feature = "hdc-codec")]
+pub mod hdc_codec;
 pub mod interlingua;
 pub mod metrics;
 pub mod neurosemantic;
