@@ -122,7 +122,11 @@ impl SpeechPlan {
     /// ThoughtChannels.
     pub fn from_readout(channels: &ThoughtChannels, readout: &StructuredReadout) -> Self {
         let intent = readout.intent.clone();
-        let epistemic_delivery = epistemic_delivery(channels.epistemic_ordinal(), readout.confidence);
+        let epistemic_delivery = if intent == "unknown" {
+            EpistemicDelivery::NonAssertive
+        } else {
+            epistemic_delivery(channels.epistemic_ordinal(), readout.confidence)
+        };
         let clause_mode = clause_mode_for(&intent, epistemic_delivery);
 
         let focus_role = focus_role_for(&intent, epistemic_delivery);
@@ -262,6 +266,11 @@ impl SpeechPlan {
             }
         }
 
+        if self.intent == "unknown"
+            && !matches!(self.epistemic_delivery, EpistemicDelivery::NonAssertive)
+        {
+            return Err(SpeechPlanError::UnknownRequiresNonAssertive);
+        }
         if matches!(self.clause_mode, ClauseMode::Abstention)
             && !matches!(self.epistemic_delivery, EpistemicDelivery::NonAssertive)
         {
@@ -296,6 +305,7 @@ pub enum SpeechPlanError {
     InvalidProsodyRange,
     InvalidRole,
     FocusRoleNotRepresented,
+    UnknownRequiresNonAssertive,
     AbstentionRequiresNonAssertive,
     NonAssertiveRequiresAbstention,
     QuestionRequiresQuestionIntonation,
@@ -311,6 +321,7 @@ impl std::fmt::Display for SpeechPlanError {
             Self::InvalidProsodyRange => write!(f, "speech plan prosody value is outside its supported range"),
             Self::InvalidRole => write!(f, "speech plan contains an invalid role"),
             Self::FocusRoleNotRepresented => write!(f, "focus role must be represented in speech-plan roles"),
+            Self::UnknownRequiresNonAssertive => write!(f, "unknown intent requires non-assertive delivery"),
             Self::AbstentionRequiresNonAssertive => write!(f, "abstention requires non-assertive delivery"),
             Self::NonAssertiveRequiresAbstention => write!(f, "non-assertive delivery requires abstention"),
             Self::QuestionRequiresQuestionIntonation => write!(f, "question clause mode requires question intonation"),
@@ -518,6 +529,21 @@ mod tests {
         assert_eq!(plan.clause_mode, ClauseMode::Question);
         assert_eq!(plan.prosody.intonation, IntonationIntent::Question);
         assert_eq!(plan.focus_role.as_deref(), Some("PATIENT"));
+    }
+
+    #[test]
+    fn unknown_is_terminally_non_assertive_even_with_low_epistemic_input() {
+        let genesis = GenesisSeed::from_phrase("broca-speech-plan-unknown-low-epistemic");
+        let decoder = StructuredDecoder::new(&genesis);
+        let mut channels = ThoughtChannels::with_intent(7);
+        channels.set_epistemic(0.0);
+        let readout = decoder.decode(&channels);
+        let plan = SpeechPlan::from_readout(&channels, &readout);
+
+        assert_eq!(plan.epistemic_delivery, EpistemicDelivery::NonAssertive);
+        assert_eq!(plan.clause_mode, ClauseMode::Abstention);
+        assert!(plan.monitor.fail_closed_on_unknown);
+        assert!(plan.validate().is_ok());
     }
 
     #[test]
