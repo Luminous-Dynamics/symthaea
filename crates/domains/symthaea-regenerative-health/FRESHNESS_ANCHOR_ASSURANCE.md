@@ -103,9 +103,11 @@ Epoch freshness remains a separate receiver state machine. An unavailable or sta
 
 A concrete TPM backend may use protected NV state such as an NV Counter as the rollback-resistant primitive.
 
-The adjacent `freshness_anchor_tpm` module provides a deployment-neutral contract for TPM NV-counter evidence. It explicitly binds TPM identity, NV Index Name/public-area, authorization policy, attestation key, quote Handle, quote, PCR binding, and counter value. The structural gate requires the counter to equal the recovery generation, the typed TPM identity/NV-name fields to equal the generic evidence identity fields, and the quote Handle to equal the receipt Handle; cryptographic quote verification remains platform-specific.
+The adjacent `freshness_anchor_tpm` module provides a deployment-neutral contract for TPM NV-counter evidence. It explicitly binds TPM identity, NV Index Name/public-area, authorization policy, attestation key, quote Handle, quote, PCR binding, and counter value. The structural gate requires the counter to equal the recovery generation, the typed TPM identity/NV-name fields to equal the generic evidence identity fields, the quote Handle to equal the receipt Handle, and `receipt.evidence_digest` to equal the canonical digest of the exact TPM evidence envelope; cryptographic quote verification remains platform-specific. This digest binding is checked before the external verifier, so a valid signature over a different evidence envelope cannot be spliced into the receipt. For a TPM NV counter, the contract also requires a distinct NV certification attestation digest: a PCR Quote alone authenticates selected PCR state, whereas NV certification is what can bind the attested NV Index Name and its contents to the TPM-generated attestation. The platform verifier must verify that NV certification against the same freshness challenge and expected counter object.
 
-TCG TPM 2.0 defines `TPM_NT_COUNTER` as an 8-octet counter whose value is modified with `TPM2_NV_Increment()`. The deployment must separately establish the required persistence and lifecycle properties of the selected NV index; those properties are not inferred merely from the fact that the object is an NV counter.
+The adjacent TPM contract also provides a typed 256-bit quote challenge with canonical digesting and OS randomness. The challenge gate runs before the platform verifier, so an outdated or mis-bound quote cannot reach cryptographic appraisal under the wrong freshness context.
+
+TCG TPM 2.0 v185 defines `TPM_NT_COUNTER` as an 8-octet counter modified with `TPM2_NV_Increment()`. It also defines `TPMA_NV_ORDERLY` as allowing NV state to be saved only at orderly shutdown, while clearing that attribute requires the NV update to be persistent when the update command completes. Because the freshness anchor declares crash persistence as authoritative, the concrete adapter must reject an orderly counter unless an independent external mechanism supplies the missing crash-rollback guarantee. The TCG structures define `TPMS_NV_CERTIFY_INFO` as carrying the NV Index Name, selected offset, and certified NV bytes, while `TPMS_NV_DIGEST_CERTIFY_INFO` carries the NV Index Name and a hash of the certified NV contents. For this eight-octet freshness counter, the contract deliberately requires the full-contents `TPM_ST_ATTEST_NV` form, with `offset = 0` and `size = 8`, so the verifier cannot silently downgrade the proof to a digest-only interpretation.
 
 A real adapter must still independently verify:
 
@@ -113,7 +115,14 @@ A real adapter must still independently verify:
 - counter type and relevant NV attributes;
 - authorization policy;
 - TPM identity/attestation binding;
+- full-contents NV certification mode (`TPM_ST_ATTEST_NV`);
+- NV certification qualifying data matching the verifier challenge;
+- NV certification carrying the same NV Index Name as the selected counter;
+- NV certification using the same attestation-key identity as the PCR Quote;
+- certification `offset = 0` and `size = 8`;
+- the certified NV contents digest matching the observed counter value;
 - the observed counter value;
+- synchronous persistence (rejecting `TPMA_NV_ORDERLY` for the authoritative path);
 - persistence semantics required by the deployment; and
 - the relationship between the counter value and the freshness recovery generation.
 
@@ -173,6 +182,7 @@ Implemented:
 - deterministic, domain-separated verification-receipt statement commitment;
 - concrete Ed25519 attestation-result protection over that commitment;
 - deployment-neutral TPM NV-counter evidence contract;
+- typed, randomized TPM quote challenge and pre-verifier Handle gate;
 - explicit verifier key/trust-anchor policy binding;
 - explicit recovery-policy and authority binding;
 - typed hardware/remote/quorum evidence envelope;

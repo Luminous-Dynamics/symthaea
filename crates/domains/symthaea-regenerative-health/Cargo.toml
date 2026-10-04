@@ -11,6 +11,7 @@ homepage = "https://luminousdynamics.org"
 
 [dependencies]
 ed25519-dalek = { workspace = true }
+getrandom = { workspace = true }
 hex = { workspace = true }
 blake3 = { workspace = true }
 serde = { workspace = true }
