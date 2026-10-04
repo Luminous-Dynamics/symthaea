@@ -83,7 +83,7 @@ impl BrocaProsodyAdapter {
             intonation: map_intonation(self.plan.prosody.intonation),
             phrase_index: position.phrase_index,
             phrase_progress: sanitize_unit(position.phrase_progress),
-            is_focus: position.is_focus || focus_matches(position, &self.plan),
+            is_focus: position.is_focus,
             pitch_accent: pitch_accent_for(&self.plan.prosody, position),
             is_syllable_onset: position.is_syllable_onset,
             syllable_progress: sanitize_unit(position.syllable_progress),
