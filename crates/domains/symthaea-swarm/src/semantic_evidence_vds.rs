@@ -2052,6 +2052,8 @@ impl<'a> CborReader<'a> {
             } else if self.bytes.get(self.offset).copied()==Some(0xff) {
                 self.offset+=1;
                 return Ok(entries);
+            } else if self.bytes.get(self.offset).is_none() {
+                return Err(Rfc9162ProofDecodeError::UnexpectedEof);
             }
 
             if entries.len()>=max_entries {
