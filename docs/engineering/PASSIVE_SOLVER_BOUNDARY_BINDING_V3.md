@@ -51,6 +51,11 @@ mesh.
 validated set, committing to the common candidate identities and every
 per-binding digest.
 
+`validate_binding_set_against_candidate` is the recommended pre-dispatch gate.
+It validates the set structure and then re-checks every binding against the same
+semantic candidate digest and exact `TriangleMesh`, making candidate drift a
+single explicit failure rather than a caller convention.
+
 ## Why this matters
 
 Modern solver meshes bind boundary conditions to concrete boundary entities or
