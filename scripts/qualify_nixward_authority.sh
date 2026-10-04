@@ -57,7 +57,7 @@ echo "-- config-writer currentness tests --"
 cargo test -p nixward --lib action::config_writer::tests
 
 echo "-- daemon approval-binding tests --"
-cargo test -p nixward --bin nixward_daemon
+cargo test -p nixward --features daemon --bin nixward-daemon
 
 echo "-- TUI approval-binding tests --"
 cargo test -p nixward --lib tui::app::tests
