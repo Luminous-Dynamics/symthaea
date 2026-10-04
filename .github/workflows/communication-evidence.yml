@@ -81,8 +81,10 @@ jobs:
           assert grounded_identity_generalization["benchmark_schema_version"] == 1
           assert grounded_identity_generalization["execution_revision"] != ""
           assert grounded_identity_generalization["adapter_id"] == "symthaea.hdc.grounded-ontology-interlingua-v1"
-          assert grounded_identity_generalization["claim_boundary"] == "held_out_known_identity_unseen_composition_and_distractor_load_only"
-          assert grounded_identity_generalization["summary"]["cases"] == 4
+          assert grounded_identity_generalization["claim_boundary"] == "held_out_known_identity_unseen_composition_distractor_load_and_topology_only"
+          assert grounded_identity_generalization["summary"]["cases"] == 8
+          assert grounded_identity_generalization["summary"]["load_cases"] == 4
+          assert grounded_identity_generalization["summary"]["topology_cases"] == 4
           assert grounded_identity_generalization["summary"]["max_nodes"] == 9
           assert grounded_identity_generalization["summary"]["max_edges"] == 8
           assert grounded_identity_generalization["summary"]["all_clean_structurally_equivalent"] is True
