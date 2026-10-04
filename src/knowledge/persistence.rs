@@ -443,6 +443,8 @@ impl Default for KnowledgePersistence {
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
+const CURRENT_SCHEMA_USER_VERSION: i64 = 1;
+
 impl KnowledgePersistence {
     /// Create a new persistence layer with the given database path.
     ///
@@ -1509,7 +1511,26 @@ impl KnowledgePersistence {
             // mutate SQLite schema objects after this instance has initialized them, so do
             // not let the fast path mask loss of the invariants that enforce stable identity,
             // append-only receipts, and validation sequencing.
+            verify_schema_user_version(conn)?;
             return verify_initialized_schema_integrity(conn);
+        }
+
+        // Once a database has completed the current migration, the user-version marker makes
+        // the schema state explicit across process restarts. Do not rerun repair-style migration
+        // against a marked current database: verify it fail-closed instead.
+        let user_version: i64 = conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .map_err(|e| format!("Schema user-version check: {e}"))?;
+        if user_version == CURRENT_SCHEMA_USER_VERSION {
+            verify_initialized_schema_integrity(conn)?;
+            self.initialized = true;
+            return Ok(());
+        }
+        if user_version != 0 {
+            return Err(format!(
+                "Unsupported knowledge SQLite schema user_version {}; expected 0 for legacy or {} for current",
+                user_version, CURRENT_SCHEMA_USER_VERSION
+            ));
         }
 
         // Serialize schema initialization across connections and keep the additive
@@ -2082,6 +2103,9 @@ impl KnowledgePersistence {
         )
         .map_err(|e| format!("Schema receipt immutability triggers: {e}"))?;
 
+        tx.execute_batch("PRAGMA user_version = 1;")
+            .map_err(|e| format!("Schema user-version migration: {e}"))?;
+
         // Validate the fully materialized schema while it is still inside the
         // migration transaction. This prevents a partially upgraded legacy database
         // from becoming visible as "initialized" before the same runtime attestation
@@ -2135,6 +2159,19 @@ fn verify_validation_receipt_foreign_key_contract(
         );
     }
 
+    Ok(())
+}
+
+fn verify_schema_user_version(conn: &rusqlite::Connection) -> Result<(), String> {
+    let user_version: i64 = conn
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(|e| format!("Schema user-version verification: {e}"))?;
+    if user_version != CURRENT_SCHEMA_USER_VERSION {
+        return Err(format!(
+            "Schema integrity check failed: unsupported knowledge SQLite user_version {}; expected {}",
+            user_version, CURRENT_SCHEMA_USER_VERSION
+        ));
+    }
     Ok(())
 }
 
@@ -4422,6 +4459,62 @@ mod tests {
         let err = p.ensure_schema(&conn).unwrap_err();
         assert!(err.contains("Schema integrity check failed"));
         assert!(err.contains("idx_facts_memory_id_unique"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_current_schema_does_not_repair_trigger_drift_after_restart() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_schema_restart_drift_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        p.save_facts(&[FactRecord {
+            memory_id: "restart-drift".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x93; BinaryHV::BYTES],
+            source_text: "restart drift".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        }])
+        .unwrap();
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            let version: i64 = conn
+                .query_row("PRAGMA user_version", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(version, CURRENT_SCHEMA_USER_VERSION);
+            conn.execute_batch(
+                "DROP TRIGGER trg_knowledge_snapshot_receipts_required_insert;",
+            )
+            .unwrap();
+        }
+
+        let mut restarted = KnowledgePersistence::new(&db_path);
+        let conn = restarted.open_connection().unwrap();
+        let err = restarted.ensure_schema(&conn).unwrap_err();
+        assert!(err.contains(
+            "trg_knowledge_snapshot_receipts_required_insert"
+        ));
+
+        let trigger_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master
+                 WHERE type = 'trigger'
+                   AND name = 'trg_knowledge_snapshot_receipts_required_insert'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(trigger_count, 0);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
