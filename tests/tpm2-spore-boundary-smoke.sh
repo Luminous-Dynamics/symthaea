@@ -174,8 +174,8 @@ tpm2_print -Q -t TPMS_ATTEST "$ROOT/nv-decoy.attest" > "$ROOT/nv-decoy.yaml"
 grep -Fq "type: 8014" "$ROOT/nv-decoy.yaml"
 grep -Fq "indexName:" "$ROOT/nv-decoy.yaml"
 grep -Fq "offset: 0" "$ROOT/nv-decoy.yaml"
-DECoy_CONTENTS=$(grep -m1 '^      nvContents:' "$ROOT/nv-decoy.yaml" | sed 's/^ *nvContents:[[:space:]]*//')
-[ "$DECoy_CONTENTS" = "0000000000000002" ] || {
+DECOY_CONTENTS=$(grep -m1 '^      nvContents:' "$ROOT/nv-decoy.yaml" | sed 's/^ *nvContents:[[:space:]]*//')
+[ "$DECOY_CONTENTS" = "0000000000000002" ] || {
   echo "ERROR: decoy NV certification did not certify its generation-2 counter" >&2
   exit 1
 }
