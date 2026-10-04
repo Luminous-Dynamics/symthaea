@@ -2247,12 +2247,12 @@ impl<'a> CborReader<'a> {
         let mut items=Vec::new();
         if ai==31 {
             loop {
-                if items.len()>=max_items {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
-                }
                 if self.bytes.get(self.offset).copied()==Some(0xff) {
                     self.offset+=1;
                     return Ok(items);
+                }
+                if items.len()>=max_items {
+                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
                 }
                 let start=self.offset;
                 self.skip_value(0)?;
@@ -2942,6 +2942,22 @@ mod tests {
         let decoded = Rfc9942ReceiptEnvelope::from_cbor(&wire).unwrap();
         assert_eq!(decoded.algorithm_id(), COSE_ES256_ALGORITHM_ID);
         assert_eq!(decoded.vds_id(), RFC9162_VDS_ID);
+    }
+
+    #[test]
+    fn rfc9942_indefinite_array_accepts_exact_resource_cap() {
+        let mut wire=vec![0x9f, 0x01, 0x02, 0xff];
+        let mut reader=CborReader::new(&wire);
+        let items=reader.read_array_items_bounded(2).unwrap();
+        assert_eq!(items, vec![vec![0x01], vec![0x02]]);
+        reader.finish().unwrap();
+
+        wire=vec![0x9f, 0x01, 0x02, 0x03, 0xff];
+        let mut reader=CborReader::new(&wire);
+        assert_eq!(
+            reader.read_array_items_bounded(2),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
     }
 
     #[test]
