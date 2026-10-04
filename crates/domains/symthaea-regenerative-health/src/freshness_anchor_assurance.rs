@@ -291,6 +291,14 @@ pub struct FreshnessAnchorVerificationReceipt {
     pub receiver_id: String,
     pub generation: u64,
     pub state_fingerprint: String,
+    /// Fingerprint of the freshness acceptance policy governing this recovery state.
+    pub recovery_policy_fingerprint: String,
+    /// Authority identity claimed by the rollbackable recovery record.
+    pub authority_reference: String,
+    /// Exact authority statement digest claimed by the recovery record.
+    pub authority_statement_digest: String,
+    /// Authentication binding claimed by the recovery record.
+    pub authentication_binding: String,
     pub verifier_reference: String,
     pub verifier_policy_digest: String,
     pub reference_values_digest: String,
@@ -299,6 +307,77 @@ pub struct FreshnessAnchorVerificationReceipt {
     pub evidence_reference: String,
     pub evidence_digest: String,
     pub evidence_kind: FreshnessAnchorEvidenceKind,
+}
+
+impl FreshnessAnchorVerificationReceipt {
+    /// Compute a domain-separated commitment over every security-relevant
+    /// field of the verification receipt. A deployment verifier can bind its
+    /// signed attestation result to this exact statement digest.
+    pub fn binding_digest(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:freshness-anchor-verification-receipt:v1\\0");
+
+        fn update_string(hasher: &mut blake3::Hasher, value: &str) {
+            hasher.update(&(value.len() as u64).to_le_bytes());
+            hasher.update(value.as_bytes());
+        }
+
+        update_string(&mut hasher, &self.schema_version);
+        update_string(&mut hasher, &self.profile_fingerprint);
+        update_string(&mut hasher, &self.receiver_id);
+        hasher.update(&self.generation.to_le_bytes());
+        update_string(&mut hasher, &self.state_fingerprint);
+        update_string(&mut hasher, &self.recovery_policy_fingerprint);
+        update_string(&mut hasher, &self.authority_reference);
+        update_string(&mut hasher, &self.authority_statement_digest);
+        update_string(&mut hasher, &self.authentication_binding);
+        update_string(&mut hasher, &self.verifier_reference);
+        update_string(&mut hasher, &self.verifier_policy_digest);
+        update_string(&mut hasher, &self.reference_values_digest);
+        update_string(&mut hasher, &self.trust_anchor_set_digest);
+        update_string(&mut hasher, &self.freshness_handle_digest);
+        update_string(&mut hasher, &self.evidence_reference);
+        update_string(&mut hasher, &self.evidence_digest);
+
+        match &self.evidence_kind {
+            FreshnessAnchorEvidenceKind::HardwareMonotonicCounter {
+                backend_identity_digest,
+                counter_namespace_digest,
+                observed_counter,
+            } => {
+                hasher.update(&[0]);
+                update_string(&mut hasher, backend_identity_digest);
+                update_string(&mut hasher, counter_namespace_digest);
+                hasher.update(&observed_counter.to_le_bytes());
+            }
+            FreshnessAnchorEvidenceKind::RemoteMonotonicSequence {
+                authority_identity_digest,
+                authority_namespace_digest,
+                observed_sequence,
+            } => {
+                hasher.update(&[1]);
+                update_string(&mut hasher, authority_identity_digest);
+                update_string(&mut hasher, authority_namespace_digest);
+                hasher.update(&observed_sequence.to_le_bytes());
+            }
+            FreshnessAnchorEvidenceKind::QuorumMonotonicSequence {
+                quorum_policy_digest,
+                member_set_digest,
+                threshold,
+                observed_sequence,
+                certificate_digest,
+            } => {
+                hasher.update(&[2]);
+                update_string(&mut hasher, quorum_policy_digest);
+                update_string(&mut hasher, member_set_digest);
+                hasher.update(&threshold.to_le_bytes());
+                hasher.update(&observed_sequence.to_le_bytes());
+                update_string(&mut hasher, certificate_digest);
+            }
+        }
+
+        hasher.finalize().to_hex().to_string()
+    }
 }
 
 pub trait FreshnessAnchorEvidenceVerifier {
@@ -328,6 +407,10 @@ impl VerifiedFreshnessAnchor {
             || receipt.profile_fingerprint.trim().is_empty()
             || receipt.receiver_id.trim().is_empty()
             || receipt.state_fingerprint.trim().is_empty()
+            || receipt.recovery_policy_fingerprint.trim().is_empty()
+            || receipt.authority_reference.trim().is_empty()
+            || receipt.authority_statement_digest.trim().is_empty()
+            || receipt.authentication_binding.trim().is_empty()
             || receipt.verifier_reference.trim().is_empty()
             || receipt.verifier_policy_digest.trim().is_empty()
             || receipt.reference_values_digest.trim().is_empty()
@@ -369,6 +452,26 @@ impl VerifiedFreshnessAnchor {
 
     pub fn state_fingerprint(&self) -> &str {
         &self.receipt.state_fingerprint
+    }
+
+    pub fn recovery_policy_fingerprint(&self) -> &str {
+        &self.receipt.recovery_policy_fingerprint
+    }
+
+    pub fn authority_reference(&self) -> &str {
+        &self.receipt.authority_reference
+    }
+
+    pub fn authority_statement_digest(&self) -> &str {
+        &self.receipt.authority_statement_digest
+    }
+
+    pub fn authentication_binding(&self) -> &str {
+        &self.receipt.authentication_binding
+    }
+
+    pub fn binding_digest(&self) -> String {
+        self.receipt.binding_digest()
     }
 }
 
