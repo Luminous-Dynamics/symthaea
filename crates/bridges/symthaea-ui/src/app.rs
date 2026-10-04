@@ -559,7 +559,13 @@ pub fn App() -> impl IntoView {
         let renderer = Rc::clone(&webgpu_renderer);
         spawn_local(async move {
             loop {
+                if !webgpu_ready.get_untracked() {
+                    break;
+                }
                 gloo_timers::future::TimeoutFuture::new(500).await;
+                if !webgpu_ready.get_untracked() {
+                    break;
+                }
                 let lost = renderer
                     .borrow()
                     .as_ref()
@@ -584,7 +590,13 @@ pub fn App() -> impl IntoView {
             let renderer = Rc::clone(&renderer);
             spawn_local(async move {
                 loop {
+                    if !movie_webgpu_ready.get_untracked() {
+                        break;
+                    }
                     gloo_timers::future::TimeoutFuture::new(500).await;
+                    if !movie_webgpu_ready.get_untracked() {
+                        break;
+                    }
                     let lost = renderer
                         .borrow()
                         .as_ref()
