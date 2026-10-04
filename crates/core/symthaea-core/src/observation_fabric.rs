@@ -810,7 +810,11 @@ pub struct ReceiptAttestationEnvelope {
     pub verifier_version: String,
     /// Provenance scope fingerprint committed by the receipt.
     pub examined_scope_fingerprint: String,
-    /// Opaque identity of the attester/issuer.
+    /// Opaque identity of the attester/issuer, included in the signed payload.
+    ///
+    /// This is authenticated as payload data, but the verifier does not infer
+    /// that this identifier controls `verification_method`; controller/identity
+    /// binding is an explicit downstream trust decision.
     pub attester_id: String,
     /// Purpose for which the proof was created; not a truth assertion.
     pub proof_purpose: String,
@@ -1699,6 +1703,21 @@ mod tests {
         let payload = envelope.payload_fingerprint();
         envelope.proof = Some(vec![1, 2, 3, 4]);
         assert_eq!(payload, envelope.payload_fingerprint());
+    }
+
+    #[test]
+    fn receipt_attestation_payload_binds_attester_identity() {
+        let receipt = fixture_receipt();
+        let envelope = ReceiptAttestationEnvelope::from_receipt(
+            &receipt,
+            "attester-1",
+            "assertion",
+            100,
+        );
+        let baseline = envelope.payload_fingerprint();
+        let mut changed_attester = envelope;
+        changed_attester.attester_id = "attester-2".into();
+        assert_ne!(baseline, changed_attester.payload_fingerprint());
     }
 
     #[test]
