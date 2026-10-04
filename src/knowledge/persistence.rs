@@ -1558,8 +1558,9 @@ impl KnowledgePersistence {
                 )
                 .map_err(|e| format!("Prepare snapshot history checkpoint verification: {e}"))?;
             stmt.query_map([], |row| {
-                let generation = u64::try_from(row.get::<_, i64>(0)?).map_err(|_| {
-                    rusqlite::Error::IntegralValueOutOfRange(0, row.get::<_, i64>(0)?)
+                let generation_i64 = row.get::<_, i64>(0)?;
+                let generation = u64::try_from(generation_i64).map_err(|_| {
+                    rusqlite::Error::IntegralValueOutOfRange(0, generation_i64)
                 })?;
                 Ok(KnowledgeSnapshotReceipt {
                     generation,
@@ -1585,18 +1586,13 @@ impl KnowledgePersistence {
                     format!("Prepare validation history checkpoint verification: {e}")
                 })?;
             stmt.query_map([], |row| {
-                let validation_sequence =
-                    u64::try_from(row.get::<_, i64>(0)?).map_err(|_| {
-                        rusqlite::Error::IntegralValueOutOfRange(
-                            0,
-                            row.get::<_, i64>(0)?,
-                        )
-                    })?;
-                let generation = u64::try_from(row.get::<_, i64>(2)?).map_err(|_| {
-                    rusqlite::Error::IntegralValueOutOfRange(
-                        2,
-                        row.get::<_, i64>(2)?,
-                    )
+                let validation_sequence_i64 = row.get::<_, i64>(0)?;
+                let validation_sequence = u64::try_from(validation_sequence_i64).map_err(|_| {
+                    rusqlite::Error::IntegralValueOutOfRange(0, validation_sequence_i64)
+                })?;
+                let generation_i64 = row.get::<_, i64>(2)?;
+                let generation = u64::try_from(generation_i64).map_err(|_| {
+                    rusqlite::Error::IntegralValueOutOfRange(2, generation_i64)
                 })?;
                 Ok(KnowledgeSnapshotValidationReceiptRecord {
                     validation_sequence,
