@@ -399,6 +399,7 @@ Authorization validation now requires:
 - Nixward performs a fresh resource-identity preflight before mutation rather
   than trusting the original snapshot indefinitely;
 - receipt timestamps must remain within the authorization validity window;
+- execution must begin within the target snapshot's declared maximum age window;
 - the final target snapshot observation timestamp must fall between execution start and finish, so stale or future evidence cannot be claimed as post-state proof.
 - pre-execution target observations must not be future-dated relative to authorization;
 - receipt execution must not begin before the target snapshot it claims to execute against;
@@ -508,11 +509,14 @@ other SSC/Nix digests so the same canonical JSON bytes cannot be confused with
 a digest from another protocol object.
 
 Before a previously authorized plan reaches mutation, a fresh Nixward
-observation can be checked against the authorization as a read-only preflight:
-every concrete resource named by the intent must still be present with the same
-identity. In particular, a generation rollback must still resolve to the exact
-generation-plus-realization resource that was authorized. Missing or drifted
-resources fail closed before execution.
+observation can be checked against the authorization as a read-only preflight.
+The complete observation digest must still match the observation digest bound by
+the authorized target snapshot, and every concrete resource named by the intent
+must still be present with the same identity. In particular, a generation
+rollback must still resolve to the exact generation-plus-realization resource
+that was authorized. Any observation drift or missing resource fails closed
+before execution. The preflight validates supplied fresh evidence; it does not
+itself acquire that evidence.
 
 The bridge also exposes one canonical read-only handoff:
 `NixSystemObservation::target_adapter(...)` validates the observation, constructs
