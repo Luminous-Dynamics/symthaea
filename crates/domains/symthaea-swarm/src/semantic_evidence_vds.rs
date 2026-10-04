@@ -248,14 +248,14 @@ impl Rfc9942Es256CoseKey {
                                 let value=reader.read_text_bounded(32).map_err(|_|Rfc9942VdpError::InvalidEncoding)?;
                                 match value.as_slice() {
                                     b"sign" => CborLabelKey::Integer(1),
-                                    b"verify" => CborLabelKey::Integer(COSE_KEY_OP_VERIFY),
                                     b"encrypt" => CborLabelKey::Integer(3),
                                     b"decrypt" => CborLabelKey::Integer(4),
                                     b"wrapKey" => CborLabelKey::Integer(5),
                                     b"unwrapKey" => CborLabelKey::Integer(6),
                                     b"deriveKey" => CborLabelKey::Integer(7),
                                     b"deriveBits" => CborLabelKey::Integer(8),
-                                    _ => CborLabelKey::Text(value),
+                                    b"verify" => CborLabelKey::Integer(COSE_KEY_OP_VERIFY),
+                                    _ => return Err(Rfc9942VdpError::InvalidEs256CoseKey),
                                 }
                             }
                             _ => return Err(Rfc9942VdpError::InvalidEs256CoseKey),
