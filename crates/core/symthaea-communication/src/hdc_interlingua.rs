@@ -175,6 +175,37 @@ impl HdcSemanticRoundtripMetrics {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HdcSemanticDecodePolicy {
+    pub node_min_score: f64,
+    pub node_min_margin: f64,
+    pub edge_min_score: f64,
+    pub edge_min_margin: f64,
+}
+
+impl HdcSemanticDecodePolicy {
+    pub fn conservative_default() -> Self {
+        Self {
+            node_min_score: 0.20,
+            node_min_margin: 0.05,
+            edge_min_score: 0.20,
+            edge_min_margin: 0.05,
+        }
+    }
+
+    pub fn validates(&self) -> bool {
+        self.node_min_score.is_finite()
+            && (-1.0..=1.0).contains(&self.node_min_score)
+            && self.node_min_margin.is_finite()
+            && self.node_min_margin >= 0.0
+            && self.edge_min_score.is_finite()
+            && (-1.0..=1.0).contains(&self.edge_min_score)
+            && self.edge_min_margin.is_finite()
+            && self.edge_min_margin >= 0.0
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HdcSemanticNegativeControls {
     pub schema_version: u16,
     pub unrelated_node_max_similarity: f64,
@@ -410,6 +441,32 @@ impl HdcSemanticCodebook {
         representation: &HdcSemanticRepresentation,
     ) -> Result<GroundedConceptGraph, String> {
         let decoded = self.decode_with_rankings(representation)?;
+        Ok(decoded.graph)
+    }
+
+    pub fn decode_graph_with_policy(
+        &self,
+        representation: &HdcSemanticRepresentation,
+        policy: HdcSemanticDecodePolicy,
+    ) -> Result<GroundedConceptGraph, String> {
+        if !policy.validates() {
+            return Err("invalid HDC semantic decode policy".into());
+        }
+
+        let decoded = self.decode_with_rankings(representation)?;
+        let (node_min_score, node_margin) =
+            selection_stats(&decoded.node_candidates, representation.node_count)?;
+        let (edge_min_score, edge_margin) =
+            selection_stats(&decoded.edge_candidates, representation.edge_count)?;
+
+        if node_min_score < policy.node_min_score
+            || node_margin < policy.node_min_margin
+            || edge_min_score < policy.edge_min_score
+            || edge_margin < policy.edge_min_margin
+        {
+            return Err("HDC semantic decoder abstained: insufficient retrieval evidence".into());
+        }
+
         Ok(decoded.graph)
     }
 
@@ -989,6 +1046,26 @@ mod tests {
             parsed,
             ("a::source".into(), "rel::type".into(), "b::target".into())
         );
+    }
+
+    #[test]
+    fn conservative_policy_abstains_on_unrelated_frames() {
+        let training = training_graphs();
+        let codebook = HdcSemanticCodebook::from_training_graphs(77, &training).unwrap();
+        let representation = codebook.encode_graph(&training[0]).unwrap();
+
+        let mut unrelated = representation.clone();
+        unrelated.node_frame =
+            HdcBinaryFrame::from_binary(&symthaea_core::hdc::binary_hv::BinaryHV::random(91));
+        unrelated.edge_frame =
+            HdcBinaryFrame::from_binary(&symthaea_core::hdc::binary_hv::BinaryHV::random(92));
+
+        assert!(codebook
+            .decode_graph_with_policy(
+                &unrelated,
+                HdcSemanticDecodePolicy::conservative_default()
+            )
+            .is_err());
     }
 
     #[test]
