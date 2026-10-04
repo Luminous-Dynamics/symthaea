@@ -3087,7 +3087,7 @@ fn verify_snapshot_validation_receipts_in_tx(
                     v.receipt_digest_hex, r.canonical_digest_hex
              FROM knowledge_snapshot_validation_receipts v
              LEFT JOIN knowledge_snapshot_receipts r ON r.generation = v.generation
-             ORDER BY v.rowid ASC",
+             ORDER BY v.validation_sequence ASC",
         )
         .map_err(|e| format!("Prepare validation receipt verification: {e}"))?;
 
@@ -7173,6 +7173,62 @@ mod tests {
             err,
             "Snapshot validation receipt self-digest mismatch: validation:sequence-bound"
         );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_snapshot_validation_verification_uses_sequence_not_rowid() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_snapshot_validation_sequence_order_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+
+        let fact = FactRecord {
+            memory_id: "validation-sequence-order".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0x92; BinaryHV::BYTES],
+            source_text: "sequence order".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+        p.save_snapshot(std::slice::from_ref(&fact), &[], &[], &[])
+            .unwrap();
+        let committed = p.latest_snapshot_receipt().unwrap().unwrap();
+
+        for event in ["validation:seq-order-1", "validation:seq-order-2"] {
+            p.record_snapshot_validation(KnowledgeSnapshotValidationReceipt {
+                validation_event: event.into(),
+                generation: committed.generation,
+                snapshot_digest_hex: committed.canonical_digest_hex.clone(),
+                validator_ref: "validator:test".into(),
+                validator_version: "v1".into(),
+                validation_profile: "profile:test".into(),
+                conforms: true,
+                report_digest_hex: None,
+            })
+            .unwrap();
+        }
+
+        let conn = p.open_connection().unwrap();
+        conn.execute_batch(
+            "DROP TRIGGER trg_knowledge_snapshot_validation_receipts_no_update;
+             UPDATE knowledge_snapshot_validation_receipts
+             SET rowid = 200
+             WHERE validation_event = 'validation:seq-order-1';
+             UPDATE knowledge_snapshot_validation_receipts
+             SET rowid = 100
+             WHERE validation_event = 'validation:seq-order-2';",
+        )
+        .unwrap();
+
+        p.verify_snapshot_validation_receipts().unwrap();
 
         let _ = std::fs::remove_dir_all(&dir);
     }
