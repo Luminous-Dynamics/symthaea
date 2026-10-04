@@ -200,7 +200,11 @@ impl KnowledgeSnapshotValidationReceipt {
     ///
     /// Version 2 binds the internal append sequence as well as the public receipt
     /// fields, so direct sequence mutation cannot remain self-consistent.
-    fn canonical_digest_hex_for_sequence(&self, validation_sequence: u64) -> String {
+    /// Recompute the sequence-bound v2 self-digest for this validation receipt.
+    ///
+    /// This exposes the exact canonical digest primitive used by persistence verification
+    /// so external evidence tooling can independently reproduce the stored digest.
+    pub fn canonical_digest_hex_for_sequence(&self, validation_sequence: u64) -> String {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"symthaea.epf-011.snapshot-validation-receipt.v2");
         digest_u64(&mut hasher, validation_sequence);
@@ -268,6 +272,19 @@ pub struct KnowledgeSnapshotValidationReceiptRecord {
     /// The self-digest stored in SQLite. Audit callers can compare this value with
     /// the digest recomputed from `receipt` and `validation_sequence` without raw SQL.
     pub stored_receipt_digest_hex: String,
+}
+
+impl KnowledgeSnapshotValidationReceiptRecord {
+    /// Recompute the self-digest from the persisted receipt fields and assigned sequence.
+    pub fn recomputed_receipt_digest_hex(&self) -> String {
+        self.receipt
+            .canonical_digest_hex_for_sequence(self.validation_sequence)
+    }
+
+    /// Whether the stored self-digest exactly matches the canonical v2 digest.
+    pub fn verify_self_digest(&self) -> bool {
+        self.stored_receipt_digest_hex == self.recomputed_receipt_digest_hex()
+    }
 }
 
 impl KnowledgePersistenceSnapshot {
@@ -7299,6 +7316,11 @@ mod tests {
                 .receipt
                 .canonical_digest_hex_for_sequence(audit_records[0].validation_sequence)
         );
+        assert_eq!(
+            audit_records[0].stored_receipt_digest_hex,
+            audit_records[0].recomputed_receipt_digest_hex()
+        );
+        assert!(audit_records[0].verify_self_digest());
 
         let second = KnowledgeSnapshotValidationReceipt {
             validation_event: "validation:event-2".into(),
