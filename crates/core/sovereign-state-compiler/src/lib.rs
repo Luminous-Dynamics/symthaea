@@ -495,6 +495,47 @@ impl AuthorizationConsumption {
     }
 }
 
+/// Opaque handoff proving that a durable authorization-consumption operation
+/// has successfully completed in the current authority/executor path.
+///
+/// This handle is deliberately non-cloneable and non-serializable. It is not a
+/// cryptographic credential; it is a type-level sequencing token produced only
+/// by `consume_authorized_once`.
+#[derive(Debug)]
+pub struct ConsumedAuthorization {
+    authorization_digest: ContentDigest,
+    authority_id: String,
+    nonce: String,
+    consumed_at_ms: u64,
+}
+
+impl ConsumedAuthorization {
+    pub fn authorization_digest(&self) -> &ContentDigest {
+        &self.authorization_digest
+    }
+
+    pub fn authority_id(&self) -> &str {
+        &self.authority_id
+    }
+
+    pub fn nonce(&self) -> &str {
+        &self.nonce
+    }
+
+    pub fn consumed_at_ms(&self) -> u64 {
+        self.consumed_at_ms
+    }
+
+    fn from_consumption(consumption: &AuthorizationConsumption) -> Self {
+        Self {
+            authorization_digest: consumption.authorization_digest.clone(),
+            authority_id: consumption.authority_id.clone(),
+            nonce: consumption.nonce.clone(),
+            consumed_at_ms: consumption.consumed_at_ms,
+        }
+    }
+}
+
 /// Persistence/transaction boundary for one-shot authorization.
 ///
 /// Implementations MUST make the check-and-record operation atomic with
@@ -506,6 +547,34 @@ pub trait AuthorizationConsumptionStore {
     type Error: std::error::Error + Send + Sync + 'static;
 
     fn consume_once(&mut self, consumption: &AuthorizationConsumption) -> Result<(), Self::Error>;
+}
+
+#[derive(Debug, Error)]
+pub enum AuthorizationConsumptionError<E: std::error::Error + Send + Sync + 'static> {
+    #[error("authorization is invalid for consumption: {0}")]
+    Validation(#[from] PlanValidationError),
+    #[error("durable authorization consumption failed: {0}")]
+    Store(E),
+}
+
+/// Validate an authorized plan, atomically consume its authorization nonce, and
+/// mint the one-shot execution handoff.
+///
+/// The store is the durable replay boundary. SSC remains stateless: this helper
+/// performs no implicit persistence beyond the store implementation supplied by
+/// the caller.
+pub fn consume_authorized_once<S: AuthorizationConsumptionStore>(
+    store: &mut S,
+    authorized: &AuthorizedDeploymentPlan,
+    consumed_at_ms: u64,
+) -> Result<ConsumedAuthorization, AuthorizationConsumptionError<S::Error>> {
+    authorized.validate(consumed_at_ms)?;
+    let consumption =
+        AuthorizationConsumption::for_authorized_plan(authorized, consumed_at_ms)?;
+    store
+        .consume_once(&consumption)
+        .map_err(AuthorizationConsumptionError::Store)?;
+    Ok(ConsumedAuthorization::from_consumption(&consumption))
 }
 
 /// Result of applying an authorized deployment plan.
@@ -719,6 +788,7 @@ pub trait DeploymentExecutor {
     fn execute(
         &mut self,
         plan: &AuthorizedDeploymentPlan,
+        consumed_authorization: ConsumedAuthorization,
         now_ms: u64,
     ) -> Result<ExecutionReceipt, Self::Error>;
 }
@@ -2163,6 +2233,55 @@ mod tests {
         );
     }
 
+    #[test]
+    fn consume_authorized_once_requires_the_durable_store_boundary() {
+        #[derive(Default)]
+        struct InMemoryStore {
+            consumed: BTreeMap<(String, String), ContentDigest>,
+        }
+
+        #[derive(Debug, Error, PartialEq, Eq)]
+        enum StoreError {
+            #[error("already consumed")]
+            AlreadyConsumed,
+        }
+
+        impl AuthorizationConsumptionStore for InMemoryStore {
+            type Error = StoreError;
+
+            fn consume_once(
+                &mut self,
+                consumption: &AuthorizationConsumption,
+            ) -> Result<(), Self::Error> {
+                let key = (consumption.authority_id.clone(), consumption.nonce.clone());
+                if self.consumed.contains_key(&key) {
+                    return Err(StoreError::AlreadyConsumed);
+                }
+                self.consumed
+                    .insert(key, consumption.authorization_digest.clone());
+                Ok(())
+            }
+        }
+
+        let plan = sample_plan();
+        let auth = authorization_for(&plan);
+        let authorized = plan.authorize(auth.clone(), 150).expect("authorized plan");
+
+        let mut store = InMemoryStore::default();
+        let consumed =
+            consume_authorized_once(&mut store, &authorized, 151).expect("consumption");
+        assert_eq!(consumed.authorization_digest(), &auth.digest().expect("digest"));
+        assert_eq!(consumed.authority_id(), "owner");
+        assert_eq!(consumed.nonce(), "nonce-1");
+        assert_eq!(consumed.consumed_at_ms(), 151);
+
+        assert_eq!(
+            consume_authorized_once(&mut store, &authorized, 152)
+                .expect_err("replay must fail")
+                .to_string(),
+            "durable authorization consumption failed: already consumed"
+        );
+    }
     #[test]
     fn authorization_consumption_binds_exact_digest_and_nonce() {
         let plan = sample_plan();
