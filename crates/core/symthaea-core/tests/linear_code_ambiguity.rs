@@ -1683,6 +1683,14 @@ fn bounded_affine_fiber_iterator_exhausts_declared_multiplicity() {
     assert!(tampered
         .coefficients_for_mask(&[false, false, false, false])
         .is_none());
+
+    let mut dependent_kernel = fiber.clone();
+    dependent_kernel.kernel_basis[1].generator_coefficients =
+        dependent_kernel.kernel_basis[0].generator_coefficients.clone();
+    assert!(dependent_kernel.iter_bounded(expected).is_none());
+    assert!(dependent_kernel
+        .coefficients_for_mask(&[false, false, false, false])
+        .is_none());
     assert!(fiber
         .coefficients_for_mask(&[false, false, false])
         .is_none());
