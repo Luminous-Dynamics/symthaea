@@ -424,6 +424,47 @@ fn cose_key_rejects_truncated_coordinate_bstr() {
 }
 
 #[test]
+fn receipt_rejects_duplicate_semantic_protected_label_with_nonminimal_integer_encoding() {
+    let proof = Rfc9162InclusionProof::new(2, 0, vec![[0u8; 32]]).to_cbor();
+    let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+    // Protected = {1: -7, 1: -7 using non-minimal uint label encoding, 395: 1}.
+    let protected = [
+        0xa3, 0x01, 0x26, 0x18, 0x01, 0x26,
+        0x19, 0x01, 0x8b, 0x01,
+    ];
+
+    let mut encoded = vec![0xd2, 0x84];
+    encoded.extend_from_slice(&bstr(&protected));
+    encoded.extend_from_slice(&[0xa1, 0x19, 0x01, 0x8c]);
+    encoded.extend_from_slice(&vdp.to_cbor());
+    encoded.extend_from_slice(&bstr(&[0u8; 32]));
+    encoded.extend_from_slice(&bstr(&[0u8; 64]));
+
+    assert_eq!(
+        Rfc9942ReceiptEnvelope::from_cbor(&encoded),
+        Err(Rfc9942VdpError::InvalidStructure)
+    );
+}
+
+#[test]
+fn outer_cose_rejects_duplicate_semantic_protected_label_with_nonminimal_integer_encoding() {
+    // Protected = {1: -7, 1: -7 using non-minimal uint label encoding}.
+    let protected = [0xa2, 0x01, 0x26, 0x18, 0x01, 0x26];
+
+    let mut encoded = vec![0xd2, 0x84];
+    encoded.extend_from_slice(&bstr(&protected));
+    encoded.push(0xa0);
+    encoded.push(0xf6);
+    encoded.extend_from_slice(&bstr(&[0u8; 64]));
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&encoded),
+        Err(Rfc9942VdpError::InvalidStructure)
+    );
+}
+
+#[test]
 fn cose_key_rejects_duplicate_labels() {
     let mut bytes = valid_key();
     bytes[0] = 0xa8;
