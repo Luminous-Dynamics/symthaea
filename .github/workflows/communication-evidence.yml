@@ -86,6 +86,11 @@ jobs:
           assert hdc_interlingua["summary"]["conservative_clean_decode"] is True
           assert hdc_interlingua["codebook"]["descriptor"]["role_revision"] == "source-relation-target-node-v2"
 
+          # Machine-readable neurosemantic data/inference policy schema is
+          # tested in Rust; these assertions ensure the N0 artifact explicitly
+          # remains below human neural-decoding claims.
+          assert hdc_interlingua["claim_boundary"] == "held_out_synthetic_graph_retrieval_and_reconstruction_only"
+
           assert hdc_interlingua["negative_controls"]["unrelated_node_max_similarity"] < 0.2
           assert hdc_interlingua["negative_controls"]["unrelated_edge_max_similarity"] < 0.2
           assert hdc_interlingua["negative_controls"]["true_edge_similarity"] > hdc_interlingua["negative_controls"]["swapped_edge_similarity"]
