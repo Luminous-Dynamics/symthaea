@@ -2130,6 +2130,12 @@ mod tests {
             .validates_calibration_scores(&[0.30, 0.10, 0.20])
             .is_ok());
 
+        let mut legacy_schema = artifact.clone();
+        legacy_schema.schema_version = 1;
+        assert!(!legacy_schema.validates());
+        let legacy_encoded = serde_json::to_vec(&legacy_schema).unwrap();
+        assert!(HdcOntologyConformalEvidenceArtifact::from_json_bytes(&legacy_encoded).is_err());
+
         let encoded = serde_json::to_vec(&artifact).unwrap();
         let decoded = HdcOntologyConformalEvidenceArtifact::from_json_bytes(&encoded).unwrap();
         assert_eq!(decoded, artifact);
