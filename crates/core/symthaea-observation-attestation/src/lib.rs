@@ -1547,6 +1547,12 @@ pub enum EvaluationLimitation {
     AttesterIntentNotEvaluated,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceEvaluationConstructionError {
+    InvalidReport,
+    InvalidSupplementalContext,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvidenceEvaluation {
     pub evaluation_version: &'static str,
@@ -1564,6 +1570,20 @@ pub struct EvidenceEvaluation {
 }
 
 impl EvidenceEvaluation {
+    /// Fallible construction for consumers that require report-level validation
+    /// before materializing an evaluation.
+    ///
+    /// The infallible from_report constructor remains for source compatibility,
+    /// but it is intentionally not a substitute for validating untrusted reports.
+    pub fn try_from_report(
+        report: &ReceiptAttestationVerificationReport,
+    ) -> Result<Self, EvidenceEvaluationConstructionError> {
+        if !report.is_well_formed() {
+            return Err(EvidenceEvaluationConstructionError::InvalidReport);
+        }
+        Ok(Self::from_report(report))
+    }
+
     pub fn from_report(report: &ReceiptAttestationVerificationReport) -> Self {
         let context = VerificationContext::from_report(report);
         let execution_trace = if report.verifier_version == LEGACY_REPORT_VERIFIER_VERSION {
@@ -1594,6 +1614,23 @@ impl EvidenceEvaluation {
     /// The context is part of the evaluation's evidence identity. Callers should
     /// only supply context that actually governed the evaluation; changing context
     /// after construction is intentionally not supported.
+    /// Fallible construction that validates the source report and the resulting
+    /// supplemental context before exposing the evaluation to callers.
+    pub fn try_from_report_with_context(
+        report: &ReceiptAttestationVerificationReport,
+        context: VerificationContext,
+    ) -> Result<Self, EvidenceEvaluationConstructionError> {
+        if !report.is_well_formed() {
+            return Err(EvidenceEvaluationConstructionError::InvalidReport);
+        }
+
+        let evaluation = Self::from_report_with_context(report, context);
+        evaluation
+            .is_well_formed()
+            .then_some(evaluation)
+            .ok_or(EvidenceEvaluationConstructionError::InvalidSupplementalContext)
+    }
+
     pub fn from_report_with_context(
         report: &ReceiptAttestationVerificationReport,
         context: VerificationContext,
@@ -1710,6 +1747,13 @@ impl EvidenceEvaluation {
 impl ReceiptAttestationVerificationReport {
     pub fn to_evidence_evaluation(&self) -> EvidenceEvaluation {
         EvidenceEvaluation::from_report(self)
+    }
+
+    /// Fallible evaluation materialization for consumers handling untrusted reports.
+    pub fn try_to_evidence_evaluation(
+        &self,
+    ) -> Result<EvidenceEvaluation, EvidenceEvaluationConstructionError> {
+        EvidenceEvaluation::try_from_report(self)
     }
 }
 
@@ -2970,6 +3014,47 @@ mod tests {
         assert!(report.is_well_formed());
         report.attestation_payload_fingerprint = "not-a-fingerprint".into();
         assert!(!report.is_well_formed());
+    }
+
+    #[test]
+    fn checked_evaluation_construction_rejects_malformed_report() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let mut report = verifier.verify_report(&envelope, &receipt);
+
+        assert!(report.is_well_formed());
+        assert!(report.try_to_evidence_evaluation().is_ok());
+
+        report.attestation_payload_fingerprint = "malformed".into();
+        assert_eq!(
+            report.try_to_evidence_evaluation(),
+            Err(EvidenceEvaluationConstructionError::InvalidReport)
+        );
+        // The compatibility constructor remains available, but the resulting
+        // evaluation is not allowed to masquerade as self-validating evidence.
+        assert!(!report.to_evidence_evaluation().is_well_formed());
+    }
+
+    #[test]
+    fn checked_context_construction_rejects_invalid_supplemental_identity() {
+        let (envelope, signing_key, receipt) = envelope_and_key();
+        let verifier = Ed25519ReceiptVerifier::new(
+            "did:example:attester-a#key-1",
+            signing_key.verifying_key(),
+            150,
+        );
+        let report = verifier.verify_report(&envelope, &receipt);
+        let mut supplied = VerificationContext::from_report(&report);
+        supplied.evaluator_identity_fingerprint = Some("".into());
+
+        assert_eq!(
+            EvidenceEvaluation::try_from_report_with_context(&report, supplied),
+            Err(EvidenceEvaluationConstructionError::InvalidSupplementalContext)
+        );
     }
 
     #[test]
