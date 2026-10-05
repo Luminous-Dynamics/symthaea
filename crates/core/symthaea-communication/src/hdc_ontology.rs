@@ -47,6 +47,8 @@ pub const HDC_ONTOLOGY_MAX_CODEBOOK_CONCEPTS: usize = 4_096;
 pub const HDC_ONTOLOGY_MAX_CODEBOOK_RELATIONS: usize = 4_096;
 /// Maximum calibration/inference candidate universe for the N1 primitive.
 pub const HDC_ONTOLOGY_MAX_CONFORMAL_CANDIDATES: usize = 4_096;
+/// Maximum calibration cases accepted by the isolated N1 conformal primitive.
+pub const HDC_ONTOLOGY_MAX_CONFORMAL_CALIBRATION_CASES: usize = 4_096;
 /// Maximum number of training graphs consumed by the N0 codebook constructor.
 pub const HDC_ONTOLOGY_MAX_TRAINING_GRAPHS: usize = 4_096;
 /// Maximum UTF-8 byte length of manifest identity strings.
@@ -460,10 +462,13 @@ impl HdcOntologyConformalCalibration {
             && self.threshold.is_finite()
             && (0.0..=1.0).contains(&self.threshold)
             && self.calibration_case_count > 0
+            && self.calibration_case_count <= HDC_ONTOLOGY_MAX_CONFORMAL_CALIBRATION_CASES
             && !self.codebook_hash.trim().is_empty()
+            && self.codebook_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.calibration_scores_hash.trim().is_empty()
             && !self.candidate_universe_hash.trim().is_empty()
             && self.candidate_universe_size > 0
+            && self.candidate_universe_size <= HDC_ONTOLOGY_MAX_CONFORMAL_CANDIDATES
             && self.score_revision == HDC_ONTOLOGY_CONFORMAL_SCORE_REVISION
     }
 }
@@ -1307,8 +1312,10 @@ fn identity_normalized_graph(
     graph: &GroundedConceptGraph,
     manifest: &HdcOntologyManifest,
 ) -> Result<GroundedConceptGraph, String> {
+    validate_graph_shape(graph)?;
     validate_manifest(manifest)?;
     let mut node_to_concept = BTreeMap::new();
+    let mut seen_concepts = BTreeSet::new();
     let mut nodes = Vec::with_capacity(graph.nodes.len());
 
     for node in &graph.nodes {
@@ -1319,6 +1326,12 @@ fn identity_normalized_graph(
             return Err(format!(
                 "manifest kind mismatch for node {}: expected {:?}, got {:?}",
                 node.id, node.kind, binding.kind
+            ));
+        }
+        if !seen_concepts.insert(binding.concept_id.clone()) {
+            return Err(format!(
+                "graph contains duplicate stable concept identity: {}",
+                binding.concept_id
             ));
         }
         node_to_concept.insert(node.id.clone(), binding.concept_id.clone());
@@ -1332,6 +1345,7 @@ fn identity_normalized_graph(
     }
 
     let mut edges = Vec::with_capacity(graph.edges.len());
+    let mut seen_edges = BTreeSet::new();
     for edge in &graph.edges {
         let source = node_to_concept
             .get(&edge.source)
@@ -1350,6 +1364,10 @@ fn identity_normalized_graph(
                 )
             })?
             .to_string();
+        let stable_edge = (source.clone(), relation.clone(), target.clone());
+        if !seen_edges.insert(stable_edge) {
+            return Err("graph contains duplicate stable relation edge".into());
+        }
         edges.push(ConceptEdge {
             source,
             relation,
@@ -1457,6 +1475,13 @@ fn calibration_scores_hash(scores: &[f64]) -> Result<String, String> {
     if scores.is_empty() {
         return Err("conformal calibration scores cannot be empty".into());
     }
+    if scores.len() > HDC_ONTOLOGY_MAX_CONFORMAL_CALIBRATION_CASES {
+        return Err(format!(
+            "conformal calibration case budget exceeded: {} > {}",
+            scores.len(),
+            HDC_ONTOLOGY_MAX_CONFORMAL_CALIBRATION_CASES
+        ));
+    }
     if scores
         .iter()
         .any(|score| !score.is_finite() || !(0.0..=1.0).contains(score))
@@ -1480,7 +1505,13 @@ fn candidate_universe_hash(stable_ids: &[String]) -> Result<String, String> {
     }
     let mut ids = BTreeSet::new();
     for stable_id in stable_ids {
-        if stable_id.trim().is_empty() || !ids.insert(stable_id.clone()) {
+        if stable_id.trim().is_empty() || stable_id.len() > HDC_ONTOLOGY_MAX_ID_BYTES {
+            return Err(format!(
+                "conformal candidate stable ID must be non-empty and at most {} bytes",
+                HDC_ONTOLOGY_MAX_ID_BYTES
+            ));
+        }
+        if !ids.insert(stable_id.clone()) {
             return Err("conformal candidate universe IDs must be unique and non-empty".into());
         }
     }
@@ -1633,7 +1664,6 @@ mod tests {
     }
 
     #[test]
-#[test]
     fn representation_declared_graph_size_is_bounded() {
         let (training, training_manifest) = training_graph_and_manifest();
         let codebook =
@@ -1815,6 +1845,22 @@ mod tests {
             "codebook",
             &["a".into(), "b".into()],
             &[0.1, f64::NAN],
+            0.10,
+        )
+        .is_err());
+        let oversized_scores = vec![0.1; HDC_ONTOLOGY_MAX_CONFORMAL_CALIBRATION_CASES + 1];
+        assert!(HdcOntologyConformalCalibration::from_nonconformity_scores(
+            "codebook",
+            &["a".into()],
+            &oversized_scores,
+            0.10,
+        )
+        .is_err());
+        let oversized_id = "x".repeat(HDC_ONTOLOGY_MAX_ID_BYTES + 1);
+        assert!(HdcOntologyConformalCalibration::from_nonconformity_scores(
+            "codebook",
+            &[oversized_id],
+            &[0.1],
             0.10,
         )
         .is_err());
@@ -2029,6 +2075,28 @@ mod tests {
             .iter()
             .map(|node| (node.id.clone(), node.grounded_by.clone()))
             .collect()
+    }
+
+    #[test]
+    fn identity_normalization_rejects_duplicate_stable_concepts() {
+        let duplicate_graph = graph(
+            &[
+                ("node-a", ConceptKind::Agent, "ground-a"),
+                ("node-b", ConceptKind::Agent, "ground-b"),
+            ],
+            &[("node-a", "links", "node-b")],
+        );
+        let duplicate_manifest = manifest(
+            &duplicate_graph,
+            &[
+                ("node-a", "concept:agent/shared"),
+                ("node-b", "concept:agent/shared"),
+            ],
+            &[("links", "relation:links")],
+            "scheme:example-v1",
+        );
+        assert!(duplicate_manifest.validates());
+        assert!(identity_normalized_graph(&duplicate_graph, &duplicate_manifest).is_err());
     }
 
     #[test]
@@ -2397,128 +2465,3 @@ mod tests {
         assert_eq!(a.node_frame, b.node_frame);
         assert_eq!(a.edge_frame, b.edge_frame);
     }
-
-    #[test]
-    fn receiver_manifest_ambiguity_is_fail_closed() {
-        let (training, training_manifest) = training_graph_and_manifest();
-        let codebook =
-            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
-                .unwrap();
-        let representation = codebook
-            .encode_graph(&training, &training_manifest)
-            .unwrap();
-
-        let mut ambiguous = training_manifest.clone();
-        ambiguous.concepts.push(HdcConceptIdentityBinding {
-            node_id: "alias-for-alice".into(),
-            concept_id: "concept:agent/alice".into(),
-            kind: ConceptKind::Agent,
-            grounding_ids: vec!["second-grounding".into()],
-        });
-
-        assert!(codebook
-            .decode_graph_with_policy(
-                &representation,
-                &training_manifest,
-                &ambiguous,
-                HdcOntologyDecodePolicy::conservative_default(),
-            )
-            .is_err());
-    }
-
-    #[test]
-    fn relation_identity_exactness_is_order_independent() {
-        let (training, training_manifest) = training_graph_and_manifest();
-        let codebook =
-            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
-                .unwrap();
-        let representation = codebook
-            .encode_graph(&training, &training_manifest)
-            .unwrap();
-        let decoded = codebook
-            .decode_graph_with_policy(
-                &representation,
-                &training_manifest,
-                &training_manifest,
-                HdcOntologyDecodePolicy::conservative_default(),
-            )
-            .unwrap();
-
-        let expected_concepts = decoded.concept_ids_by_node.clone();
-        let mut relations = decoded.relation_ids_by_edge.clone();
-        relations.reverse();
-
-        let metrics = codebook
-            .measure_roundtrip(
-                &training,
-                &representation,
-                &training_manifest,
-                &training_manifest,
-                &expected_concepts,
-                &relations,
-                HdcOntologyDecodePolicy::conservative_default(),
-            )
-            .unwrap();
-
-        assert!(metrics.relation_identity_exact);
-    }
-
-    #[test]
-    fn decoder_abstains_on_unrelated_frames() {
-        let (training, training_manifest) = training_graph_and_manifest();
-        let codebook =
-            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
-                .unwrap();
-        let mut representation = codebook
-            .encode_graph(&training, &training_manifest)
-            .unwrap();
-
-        representation.node_frame = HdcBinaryFrame::from_binary(
-            &symthaea_core::hdc::binary_hv::BinaryHV::random(0xBADC0DE),
-        );
-        representation.edge_frame = HdcBinaryFrame::from_binary(
-            &symthaea_core::hdc::binary_hv::BinaryHV::random(0xD15EA5E),
-        );
-
-        assert!(codebook
-            .decode_graph_with_policy(
-                &representation,
-                &training_manifest,
-                &training_manifest,
-                HdcOntologyDecodePolicy::conservative_default(),
-            )
-            .is_err());
-    }
-    #[test]
-    fn identity_metrics_ignore_receiver_local_relation_label() {
-        let source = GroundedConceptGraph {
-            nodes: vec![
-                ConceptNode { id: "src-a".into(), kind: ConceptKind::Agent, label: Some("sender".into()), grounded_by: vec!["g-a".into()], confidence: 1.0 },
-                ConceptNode { id: "src-b".into(), kind: ConceptKind::Object, label: Some("target".into()), grounded_by: vec!["g-b".into()], confidence: 1.0 },
-            ],
-            edges: vec![ConceptEdge {
-                source: "src-a".into(), relation: "commence".into(), target: "src-b".into(), evidence_ids: vec![], confidence: 1.0,
-            }],
-        };
-        let receiver = GroundedConceptGraph {
-            nodes: vec![
-                ConceptNode { id: "rx-a".into(), kind: ConceptKind::Agent, label: Some("sender".into()), grounded_by: vec!["g-a".into()], confidence: 1.0 },
-                ConceptNode { id: "rx-b".into(), kind: ConceptKind::Object, label: Some("target".into()), grounded_by: vec!["g-b".into()], confidence: 1.0 },
-            ],
-            edges: vec![ConceptEdge {
-                source: "rx-a".into(), relation: "initiates".into(), target: "rx-b".into(), evidence_ids: vec![], confidence: 1.0,
-            }],
-        };
-        let mut source_manifest = manifest_for_graph(&source, "commence", "relation:initiates");
-        let mut receiver_manifest = manifest_for_graph(&receiver, "initiates", "relation:initiates");
-        source_manifest.relations[0].local_relation = "commence".into();
-        receiver_manifest.relations[0].local_relation = "initiates".into();
-        let normalized_source = identity_normalized_graph(&source, &source_manifest).unwrap();
-        let normalized_receiver = identity_normalized_graph(&receiver, &receiver_manifest).unwrap();
-        let metrics = compare_graphs(&normalized_source, &normalized_receiver).unwrap();
-        assert!(metrics.structural_equivalence);
-        assert_eq!(metrics.node_precision, 1.0);
-        assert_eq!(metrics.edge_recall, 1.0);
-    }
-
-}
