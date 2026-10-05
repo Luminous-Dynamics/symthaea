@@ -911,9 +911,22 @@ impl IndependenceVerificationReceiptV3 {
         }
     }
 
+    fn compute_assessment_fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(INDEPENDENCE_ASSESSMENT_V3_DOMAIN_SEPARATOR);
+        write_canonical_string(&mut hasher, &self.source_observation_id);
+        write_canonical_string(&mut hasher, &self.target_observation_id);
+        write_canonical_string_vec(&mut hasher, &self.examined_observation_ids);
+        write_canonical_string(&mut hasher, &self.examined_scope_fingerprint);
+        write_canonical_string(&mut hasher, self.verifier_version);
+        write_canonical_independence(&mut hasher, &self.classification);
+        write_canonical_independence_basis(&mut hasher, &self.basis);
+        hasher.finalize().to_hex().to_string()
+    }
+
     /// Verify receipt integrity without re-running graph analysis.
     pub fn verify_integrity(&self) -> bool {
-        self.is_well_formed() && self.verify_fingerprint()
+        self.is_well_formed() && self.assessment_fingerprint == self.compute_assessment_fingerprint()
     }
 
     /// Verify that an independently produced canonical v3 scope witness
@@ -2368,16 +2381,7 @@ mod tests {
 
     impl V3ReceiptFingerprintForTesting for IndependenceVerificationReceiptV3 {
         fn fingerprint_for_testing(&self) -> String {
-            let mut hasher = blake3::Hasher::new();
-            hasher.update(INDEPENDENCE_ASSESSMENT_V3_DOMAIN_SEPARATOR);
-            write_canonical_string(&mut hasher, &self.source_observation_id);
-            write_canonical_string(&mut hasher, &self.target_observation_id);
-            write_canonical_string_vec(&mut hasher, &self.examined_observation_ids);
-            write_canonical_string(&mut hasher, &self.examined_scope_fingerprint);
-            write_canonical_string(&mut hasher, self.verifier_version);
-            write_canonical_independence(&mut hasher, &self.classification);
-            write_canonical_independence_basis(&mut hasher, &self.basis);
-            hasher.finalize().to_hex().to_string()
+            self.compute_assessment_fingerprint()
         }
     }
 
