@@ -433,6 +433,18 @@ async function rawWebGpuExecutionCanary(page) {
       return {
         supported: true,
         adapter_name: adapter.name || null,
+        adapter_info: (() => {
+          const info = adapter.info || device.adapterInfo || null;
+          return info ? {
+            vendor: info.vendor || null,
+            architecture: info.architecture || null,
+            device: info.device || null,
+            description: info.description || null,
+            is_fallback_adapter: info.isFallbackAdapter === true,
+            subgroup_min_size: Number.isInteger(info.subgroupMinSize) ? info.subgroupMinSize : null,
+            subgroup_max_size: Number.isInteger(info.subgroupMaxSize) ? info.subgroupMaxSize : null,
+          } : null;
+        })(),
         format: 'rgba8unorm',
         width,
         height,
@@ -587,6 +599,8 @@ async function rawWebGpuCanvasCanary(page) {
         width: canvas.width,
         height: canvas.height,
         pixel_count: canvas.width * canvas.height,
+        configuration_matches_preferred_format: configuration?.format === format,
+        configuration_has_opaque_alpha: configuration?.alphaMode === 'opaque',
         pixel,
         non_red_pixels: nonRedPixels,
         min_red: minRed,
@@ -623,12 +637,23 @@ async function capabilityPreflight(page) {
       }
       const device = await adapter.requestDevice();
       const features = [...adapter.features.values()].sort();
+      const info = adapter.info || device.adapterInfo || null;
+      const adapter_info = info ? {
+        vendor: info.vendor || null,
+        architecture: info.architecture || null,
+        device: info.device || null,
+        description: info.description || null,
+        is_fallback_adapter: info.isFallbackAdapter === true,
+        subgroup_min_size: Number.isInteger(info.subgroupMinSize) ? info.subgroupMinSize : null,
+        subgroup_max_size: Number.isInteger(info.subgroupMaxSize) ? info.subgroupMaxSize : null,
+      } : null;
       device.destroy();
       return {
         navigator_gpu: true,
         adapter: true,
         device: true,
         adapter_name: adapter.name || null,
+        adapter_info,
         features,
       };
     } catch (error) {
@@ -887,6 +912,13 @@ async function runMode(mode) {
       if (!diagnostics.raw_webgpu_execution_canary?.executed_red) {
         throw new QualificationError(
           `Raw WebGPU execution canary failed: ${JSON.stringify(diagnostics.raw_webgpu_execution_canary)}`,
+          'capability',
+        );
+      }
+      if (!diagnostics.raw_webgpu_canary?.configuration_matches_preferred_format
+        || !diagnostics.raw_webgpu_canary?.configuration_has_opaque_alpha) {
+        throw new QualificationError(
+          `Raw WebGPU canvas configuration is not self-consistent: ${JSON.stringify(diagnostics.raw_webgpu_canary)}`,
           'capability',
         );
       }
