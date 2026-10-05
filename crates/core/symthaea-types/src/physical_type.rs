@@ -77,16 +77,16 @@ impl PhysicalDimension {
 /// Exact rational scale to SI base units. Affine offsets are deliberately not
 /// modeled yet; absolute-vs-delta temperature semantics remain an adapter concern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct UnitScale {
+pub struct RationalScale {
     pub numerator: i64,
     pub denominator: i64,
 }
 
-impl UnitScale {
+impl RationalScale {
     pub const ONE: Self = Self { numerator: 1, denominator: 1 };
 
     pub const fn new(numerator: i64, denominator: i64) -> Option<Self> {
-        if denominator == 0 || numerator == 0 && denominator < 0 {
+        if denominator == 0 || denominator < 0 {
             None
         } else {
             Some(Self { numerator, denominator })
@@ -94,11 +94,33 @@ impl UnitScale {
     }
 }
 
-/// Named unit identity plus its exact multiplicative scale.
+/// Exact affine conversion to SI: si = value * scale + offset.
+/// Affine offsets are required for absolute temperature-like units.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct UnitTransform {
+    pub scale: RationalScale,
+    pub offset: RationalScale,
+}
+
+impl UnitTransform {
+    pub const IDENTITY: Self = Self {
+        scale: RationalScale::ONE,
+        offset: RationalScale { numerator: 0, denominator: 1 },
+    };
+
+    pub const fn new(scale: RationalScale, offset: RationalScale) -> Self {
+        Self { scale, offset }
+    }
+}
+
+/// Backward-compatible name for multiplicative units.
+pub type UnitScale = RationalScale;
+
+/// Named unit identity plus exact conversion to canonical SI semantics.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UnitRef {
     pub symbol: String,
-    pub scale_to_si: UnitScale,
+    pub transform_to_si: UnitTransform,
 }
 
 /// Physical quantity meaning, distinct from evidence about that meaning.
@@ -286,7 +308,20 @@ mod tests {
 
     #[test]
     fn unit_scale_rejects_zero_denominator() {
-        assert!(UnitScale::new(1, 0).is_none());
+        assert!(RationalScale::new(1, 0).is_none());
+        assert!(RationalScale::new(1, -1).is_none());
+    }
+
+    #[test]
+    fn affine_unit_transform_preserves_offset_semantics() {
+        let celsius = UnitRef {
+            symbol: "degC".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale::ONE,
+                RationalScale { numerator: 27315, denominator: 100 },
+            ),
+        };
+        assert_eq!(celsius.transform_to_si.offset.numerator, 27315);
     }
 
     #[test]
