@@ -167,7 +167,7 @@ No partnership or endorsement is implied by this RFC.
 
 ## First vertical slice
 
-Implemented on the RFC branch through exact head `2be0680b21480ac73d68f47410fdff5d06b61b13`:
+Implemented on the RFC branch through exact head `4d05209b226ea6a7738d1ad6587b88bad8302cbd`:
 
 1. Shared `symthaea-types::physical_type` kernel with `PhysicalType`.
 2. Quantity-kind enum separated from dimensional signature.
