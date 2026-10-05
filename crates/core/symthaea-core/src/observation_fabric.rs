@@ -2212,6 +2212,44 @@ impl ReceiptAttestationEnvelope {
         }
     }
 
+    /// Build an unsigned envelope from an exact v4 receipt.
+    pub fn from_receipt_v4(
+        receipt: &IndependenceVerificationReceiptV4,
+        attester_id: impl Into<String>,
+        proof_purpose: impl Into<String>,
+        created_at_unix_ns: i128,
+    ) -> Self {
+        Self {
+            receipt_fingerprint: receipt.fingerprint(),
+            verifier_version: receipt.verifier_version.to_string(),
+            examined_scope_fingerprint: receipt.examined_scope_fingerprint.clone(),
+            attester_id: attester_id.into(),
+            proof_purpose: proof_purpose.into(),
+            created_at_unix_ns,
+            expires_at_unix_ns: None,
+            verification_method: None,
+            cryptosuite: None,
+            domain: None,
+            challenge: None,
+            proof: None,
+        }
+    }
+
+    /// Verify that the envelope still names the exact v4 receipt it claims to attest.
+    pub fn verify_against_receipt_v4(&self, receipt: &IndependenceVerificationReceiptV4) -> bool {
+        self.receipt_fingerprint == receipt.fingerprint()
+            && self.verifier_version == receipt.verifier_version
+            && self.examined_scope_fingerprint == receipt.examined_scope_fingerprint
+    }
+
+    /// Verify the envelope against an intrinsically coherent v4 receipt.
+    pub fn verify_against_integral_receipt_v4(
+        &self,
+        receipt: &IndependenceVerificationReceiptV4,
+    ) -> bool {
+        receipt.verify_integrity() && self.verify_against_receipt_v4(receipt)
+    }
+
     /// Verify that the envelope still names the exact v3 receipt it claims to attest.
     pub fn verify_against_receipt_v3(&self, receipt: &IndependenceVerificationReceiptV3) -> bool {
         self.receipt_fingerprint == receipt.fingerprint()
@@ -4000,6 +4038,58 @@ mod tests {
             decoded.payload_fingerprint(),
             envelope.payload_fingerprint()
         );
+    }
+
+    #[test]
+    fn receipt_attestation_envelope_binds_v4_receipt_without_cross_version_aliasing() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        second.provenance.parent_observation_ids = vec!["obs-001".into()];
+
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed_v4("obs-001", "obs-002")
+            .expect("v4 assessment");
+        let receipt = IndependenceVerificationReceiptV4::from_assessment(&assessment);
+
+        assert!(receipt.verify_integrity());
+        assert_eq!(
+            receipt.classification,
+            EvidenceIndependence::SharedUpstream
+        );
+        assert_eq!(
+            receipt.basis,
+            IndependenceBasis::SharedAncestor {
+                observation_id: "obs-001".into()
+            }
+        );
+
+        let envelope = ReceiptAttestationEnvelope::from_receipt_v4(
+            &receipt,
+            "attester-v4",
+            "https://example.org/purpose/observation-independence",
+            1_700_000_000_000_000_000,
+        );
+
+        assert!(envelope.verify_against_receipt_v4(&receipt));
+        assert!(envelope.verify_against_integral_receipt_v4(&receipt));
+        assert!(!envelope.verify_against_receipt_v3(
+            &IndependenceVerificationReceiptV3 {
+                source_observation_id: receipt.source_observation_id.clone(),
+                target_observation_id: receipt.target_observation_id.clone(),
+                classification: receipt.classification.clone(),
+                basis: receipt.basis.clone(),
+                examined_observation_ids: receipt.examined_observation_ids.clone(),
+                verifier_version: "observation-fabric-independence-v3",
+                examined_scope_fingerprint: receipt.examined_scope_fingerprint.clone(),
+                assessment_fingerprint: receipt.assessment_fingerprint.clone(),
+            }
+        ));
+        assert_eq!(envelope.verifier_version, INDEPENDENCE_VERIFIER_VERSION_V4);
     }
 
     #[test]
