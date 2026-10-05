@@ -168,7 +168,9 @@ impl NixOSCommand {
 
             Self::CollectGarbage { .. } => SafetyLevel::Destructive,
 
-            Self::Custom { safety_level, .. } => *safety_level,
+            // Custom is deliberately ungoverned; never trust its embedded label
+            // for planning or confirmation metadata.
+            Self::Custom { .. } => SafetyLevel::Destructive,
         }
     }
 
@@ -679,6 +681,17 @@ impl NixOSExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_custom_safety_label_cannot_reduce_authority_tier() {
+        let custom = NixOSCommand::Custom {
+            command: "echo".into(),
+            args: vec!["hello".into()],
+            safety_level: SafetyLevel::ReadOnly,
+        };
+        assert_eq!(custom.safety_level(), SafetyLevel::Destructive);
+    }
+
 
     #[test]
     fn test_command_safety_levels() {
