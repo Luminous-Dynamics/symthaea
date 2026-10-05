@@ -26,7 +26,7 @@ pub use discovery_handoff::{
     InquirySelectionScope, ScientificHypothesisHandoff, ScientificHypothesisRevisionReceipt,
     ScientificInquirySelectionReceipt, scientific_hypothesis_set_digest, HYPOTHESIS_HANDOFF_SCHEMA,
 };
-pub use scientific_model::{EvidenceClass, ModelAssumption, ModelEvidenceRequirement, ModelNonClaim, QuantityRole, ScientificEquation, ScientificExpression, ScientificModel, ScientificQuantity, SolverIntent, SCIENTIFIC_MODEL_SCHEMA};
+pub use scientific_model::{EvidenceClass, ModelAssumption, ModelEvidenceRequirement, ModelNonClaim, ObligationDischarge, ObligationStatus, ProjectionEntry, ProjectionReport, ProjectionTreatment, QuantityRole, ScientificEquation, ScientificExpression, ScientificModel, ScientificQuantity, SemanticObligation, SolverIntent, SCIENTIFIC_MODEL_SCHEMA};
 pub use physical_type::{ModelMaturity, PhysicalDimension, PhysicalType, PhysicalTypeError, QuantityKind, RationalScale, Refinement, ScalarDomain, TypeJudgement, UnitRef, UnitScale, UnitTransform};
 
 /// Number of harmonies (Eight Harmonies including Sacred Stillness).
