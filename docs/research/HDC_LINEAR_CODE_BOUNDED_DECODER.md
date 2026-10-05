@@ -87,6 +87,16 @@ The observed aggregate is 100 uniquely nearest observations, 156 ambiguous
 observations, and 484 nearest-codeword incidences. This checks the multiplicity
 correspondence across the entire ambient Boolean space rather than only on the
 weight-2 boundary shell.
+    
+The qualification suite also explicitly separates this decoder ambiguity from
+factor-presentation ambiguity. Four one-dimensional factor presentations of the
+same [8,2,4] code have a two-dimensional factorization kernel, giving four
+representations of the zero target. The same code, treated purely as a code
+rather than as a factor presentation, has an observation whose nearest-codeword
+and minimum-syndrome multiplicities are both two. The certificate records both
+quantities and requires them to remain distinct rather than interpreting either
+count as the other kind of ambiguity.
+
 
 ## Why this is an independent algorithm
 

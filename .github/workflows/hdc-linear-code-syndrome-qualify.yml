@@ -231,6 +231,19 @@ jobs:
           test -n "$LEDGER"
           printf "minimum_syndrome_multiplicity_ledger=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
 
+      - name: Prove factorization ambiguity is separate
+        id: factor_separation
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            factorization_ambiguity_is_distinct_from_syndrome_ambiguity -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\\n' "$OUTPUT" | grep -c '^FACTOR_SYNDROME_SEPARATION=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\\n' "$OUTPUT" | sed -n 's/^FACTOR_SYNDROME_SEPARATION=//p')"
+          test -n "$LEDGER"
+          printf "factor_syndrome_separation=%s\\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Capture syndrome decoder ledger
         id: decoder_ledger
         run: |
@@ -284,7 +297,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v4
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v5
           event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
           event_head_ref=${{ steps.head.outputs.source_ref }}
@@ -313,12 +326,14 @@ jobs:
           syndrome_coset_ledger=${{ steps.coset_invariants.outputs.syndrome_coset_ledger }}
           minimum_syndrome_multiplicity_status=${{ steps.multiplicity_invariant.outcome }}
           minimum_syndrome_multiplicity_ledger=${{ steps.multiplicity_invariant.outputs.minimum_syndrome_multiplicity_ledger }}
+          factor_syndrome_separation_status=${{ steps.factor_separation.outcome }}
+          factor_syndrome_separation=${{ steps.factor_separation.outputs.factor_syndrome_separation }}
           syndrome_decoder_ledger_status=${{ steps.decoder_ledger.outcome }}
           runner_os=${{ steps.runner.outputs.runner_os }}
           runner_arch=${{ steps.runner.outputs.runner_arch }}
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}

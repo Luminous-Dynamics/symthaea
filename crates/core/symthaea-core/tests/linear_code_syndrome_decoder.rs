@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root.
 
-use symthaea_core::hdc::linear_code::{BinaryCodeword, RandomLinearCode, basis_rank};
+use symthaea_core::hdc::linear_code::{
+    BinaryCodeword, RandomLinearCode, basis_rank, factorization_affine_fiber,
+    factorization_algebra,
+};
 use symthaea_core::hdc::syndrome_decoder::{
     BoundedDistanceDecode, BoundedDistanceSyndromeDecoder, ParityCheckMatrix,
 };
@@ -424,6 +427,81 @@ fn minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_ex
 
     println!(
         "MIN_SYNDROME_MULTIPLICITY_LEDGER=observations={observations};bound=4;unique={unique};ambiguous={ambiguous};total_nearest_codewords={total_nearest_codewords};multiplicity_identity=true"
+    );
+}
+
+#[test]
+fn factorization_ambiguity_is_distinct_from_syndrome_ambiguity() {
+    let code = boundary_code();
+    let g1 = code.basis()[0].clone();
+    let g2 = code.basis()[1].clone();
+    let g12 = g1.bound(&g2);
+
+    // Four factor presentations span the same [8,2,4] code but add two
+    // independent presentation-level kernel dimensions:
+    // [g1], [g2], [g1+g2], [g1+g2].
+    let f1 = RandomLinearCode::from_basis(vec![g1]).expect("factor 1");
+    let f2 = RandomLinearCode::from_basis(vec![g2]).expect("factor 2");
+    let f3 = RandomLinearCode::from_basis(vec![g12.clone()]).expect("factor 3");
+    let f4 = RandomLinearCode::from_basis(vec![g12]).expect("factor 4");
+    let factors = [&f1, &f2, &f3, &f4];
+
+    let algebra = factorization_algebra(&factors).expect("factorization algebra");
+    assert_eq!(algebra.factor_dimension_sum, 4);
+    assert_eq!(algebra.union_generator_rank, code.rank());
+    assert_eq!(algebra.kernel_dimension, 2);
+    assert_eq!(algebra.factorization_count_per_target.exponent(), 2);
+    assert!(!algebra.unique_factorization);
+
+    let target = BinaryCodeword::zero(code.dimension());
+    let fiber = factorization_affine_fiber(&target, &factors).expect("target fiber");
+    assert!(fiber.verifies_against(&target, &factors));
+    let representations = fiber
+        .iter_bounded(4)
+        .expect("bounded factor fiber")
+        .collect::<Vec<_>>();
+    assert_eq!(representations.len(), 4);
+
+    let combined_basis = factors
+        .iter()
+        .flat_map(|factor| factor.basis())
+        .collect::<Vec<_>>();
+    for coefficients in &representations {
+        let mut reconstructed = BinaryCodeword::zero(code.dimension());
+        for (&coefficient, generator) in coefficients.iter().zip(&combined_basis) {
+            if coefficient {
+                reconstructed.xor_assign(generator);
+            }
+        }
+        assert_eq!(reconstructed, target);
+    }
+
+    // Ambient syndrome/coset ambiguity is a separate geometry. This observation
+    // has exactly two nearest codewords in the same [8,2,4] code.
+    let observation = error_from_mask(0b0000_0011, code.dimension());
+    let codewords = code.enumerate();
+    let (nearest_distance, nearest) = nearest_codewords(&observation, &codewords);
+    assert_eq!(nearest_distance, 2);
+    assert_eq!(nearest.len(), 2);
+
+    let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
+    let (result, work) = decoder.decode_with_work(&observation, 4);
+    assert_eq!(work.matching_error_patterns, nearest.len());
+    assert_eq!(
+        result,
+        BoundedDistanceDecode::Ambiguous {
+            distance: nearest_distance,
+            matching_error_patterns: nearest.len(),
+        }
+    );
+
+    assert_ne!(representations.len(), nearest.len());
+    println!(
+        "FACTOR_SYNDROME_SEPARATION=factorization_count={};kernel_dimension={};nearest_codeword_multiplicity={};syndrome_min_multiplicity={};counts_distinct=true",
+        representations.len(),
+        algebra.kernel_dimension,
+        nearest.len(),
+        work.matching_error_patterns,
     );
 }
 
