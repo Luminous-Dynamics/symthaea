@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 2;
+pub const SCHEMA_VERSION: u16 = 3;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-explicit-cohort-v2";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-v3";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -1534,10 +1534,47 @@ mod tests {
             .assess_at(&fixture_requirement(), &[c], None, Some(50))
             .unwrap();
         assert!(!valid.frontier_blockers.contains_key("expired"));
-        assert_eq!(
-            valid.candidates[0].constraints.iter().all(|c| c.status == ConstraintStatus::Pass),
-            true
+        assert!(
+            valid
+                .candidates[0]
+                .constraints
+                .iter()
+                .all(|c| c.status == ConstraintStatus::Pass)
         );
+        let timeless = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+        assert!(timeless.frontier_blockers.contains_key("expired"));
+    }
+
+    #[test]
+    fn inverted_evidence_validity_window_is_rejected() {
+        let mut c = candidate(
+            "invalid-validity",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "e1",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        c.evidence[0].valid_from_epoch_seconds = Some(200);
+        c.evidence[0].valid_until_epoch_seconds = Some(100);
+
+        let error = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            AssessmentError::InvalidEvidenceValidity {
+                from: 200,
+                until: 100
+            }
+        ));
     }
 
     #[test]
