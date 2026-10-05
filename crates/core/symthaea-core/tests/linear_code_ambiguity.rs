@@ -1402,7 +1402,8 @@ fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
         .expect("non-zero codeword exists");
     assert_eq!(min_distance, 4);
 
-    let clean = codewords[1].clone();
+    let clean = code.encode(&[true, false]);
+    assert!(codewords.contains(&clean));
     let mut observations = 0usize;
     let mut total_candidate_codewords = 0usize;
     let mut max_candidate_codewords = 0usize;
@@ -1427,6 +1428,7 @@ fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
                 error.set_bit(index, true);
             }
         }
+        let error_weight = error.weight();
         let observation = clean.bound(&error);
 
         let candidates: Vec<_> = codewords
@@ -1475,10 +1477,11 @@ fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
         }
     }
 
-    assert!(observations > 1);
-    assert!(singleton_codeword_observations > 0);
-    assert!(ambiguous_codeword_observations > 0);
-    assert!(max_candidate_codewords >= 2);
+    assert_eq!(observations, 37);
+    assert_eq!(total_candidate_codewords, 49);
+    assert_eq!(singleton_codeword_observations, 25);
+    assert_eq!(ambiguous_codeword_observations, 12);
+    assert_eq!(max_candidate_codewords, 2);
     assert!(subhalf_observations > 1);
     assert_eq!(subhalf_observations, 9);
     assert_eq!(subhalf_singleton_observations, subhalf_observations);
