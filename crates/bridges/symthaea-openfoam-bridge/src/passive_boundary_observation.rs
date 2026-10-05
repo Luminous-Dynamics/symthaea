@@ -3,9 +3,9 @@
 
 //! Conservative observation of an OpenFOAM constant/polyMesh/boundary artifact.
 //!
-//! This module proves only that the supplied boundary-file bytes contain one
-//! unambiguous patch record. It does not claim that a live solver loaded the
-//! file, that the solver mesh matches the candidate mesh, or that any physics ran.
+//! This module proves only conservative provenance facts about supplied OpenFOAM
+//! input artifacts. It does not claim that a live solver loaded the files, that
+//! solver geometry matches the candidate mesh, or that any physics ran.
 
 use blake3::Hasher;
 use symthaea_passive_solver_binding::{SolverBoundaryEntityObservation, SolverBindingError};
@@ -498,11 +498,13 @@ fn skip_value(tokens: &[Token], index: &mut usize) -> Result<(), OpenFoamBoundar
     }
 }
 
-/// OpenFOAM passive boundary adapter backed by an exact boundary-file artifact.
+/// OpenFOAM passive boundary adapter backed by exact mesh-input artifacts.
 ///
-/// The adapter establishes solver-input entity provenance only. It does not imply
-/// that a live solver loaded this file or that its mesh topology matches the
-/// candidate mesh.
+/// The adapter establishes solver-input entity provenance only. When a faces
+/// artifact is supplied through new_with_faces, it additionally proves that the
+/// boundary patch's declared face range lies within the declared global face list.
+/// It still does not imply that a live solver loaded the files, that the face
+/// geometry matches the candidate mesh, or that any physics ran.
 pub struct OpenFoamPassiveBoundaryAdapter {
     source_bytes: Vec<u8>,
     faces_source_bytes: Option<Vec<u8>>,
@@ -531,6 +533,8 @@ impl OpenFoamPassiveBoundaryAdapter {
         })
     }
 
+    /// Construct an input-evidence adapter that also checks the patch range
+    /// against the exact serialized constant/polyMesh/faces artifact.
     pub fn new_with_faces(
         source_bytes: impl Into<Vec<u8>>,
         faces_source_bytes: impl Into<Vec<u8>>,
