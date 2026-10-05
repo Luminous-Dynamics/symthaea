@@ -3756,7 +3756,7 @@ fn validate_native_authority_pin_set(
             ],
         )?;
         insert_receipt_with_boundary(&tx, &receipt, "final", Some(&record.boundary_id))?;
-        tx.execute(
+        let changed = tx.execute(
             "UPDATE authorization_dispatches SET state=?3
              WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?4
                AND state IN ('dispatch_pending','invoked','indeterminate')",
@@ -3764,6 +3764,9 @@ fn validate_native_authority_pin_set(
                 if matches!(evidence.outcome, ExecutionOutcome::Succeeded) { "succeeded" } else { "failed" },
                 record.boundary_id],
         )?;
+        if changed != 1 {
+            return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+        }
         tx.commit()?;
         Ok(receipt)
     }
@@ -3832,11 +3835,15 @@ fn validate_native_authority_pin_set(
             ExecutionOutcome::Failed => "failed",
             ExecutionOutcome::Indeterminate => "indeterminate",
         };
-        tx.execute(
+        let changed = tx.execute(
             "UPDATE authorization_dispatches SET state=?3
-             WHERE authorization_instance=?1 AND attempt_id=?2",
-            params![record.authorization_instance, record.attempt_id, dispatch_state],
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND boundary_id=?4
+               AND state IN ('dispatch_pending','invoked','indeterminate')",
+            params![record.authorization_instance, record.attempt_id, dispatch_state, record.boundary_id],
         )?;
+        if changed != 1 {
+            return Err(AuthorizationConsumptionError::AttemptMismatch.into());
+        }
         tx.commit()?;
         Ok(receipt)
     }
