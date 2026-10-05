@@ -412,6 +412,114 @@ where
     Ok(())
 }
 
+
+/// A semantic obligation is a declared requirement, not an evaluator result.
+/// Its status is intentionally restricted to pre-evaluation states here so a
+/// backend cannot write empirical/formal success into canonical model identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SemanticObligation {
+    pub id: String,
+    pub statement: String,
+    pub discharge: ObligationDischarge,
+    pub status: ObligationStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ObligationDischarge {
+    Type,
+    Formal,
+    Numerical,
+    Empirical,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ObligationStatus {
+    Unknown,
+    Unsupported,
+}
+
+impl SemanticObligation {
+    pub fn unknown(
+        id: impl Into<String>,
+        statement: impl Into<String>,
+        discharge: ObligationDischarge,
+    ) -> Result<Self, String> {
+        let obligation = Self {
+            id: id.into(),
+            statement: statement.into(),
+            discharge,
+            status: ObligationStatus::Unknown,
+        };
+        obligation.validate()?;
+        Ok(obligation)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        validate_identifier(&self.id)?;
+        if self.statement.trim().is_empty() {
+            return Err(format!("semantic obligation {:?} has an empty statement", self.id));
+        }
+        Ok(())
+    }
+}
+
+/// Explicit accounting of what a backend projection did to canonical meaning.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectionReport {
+    pub backend: String,
+    pub source_model_digest: String,
+    pub projection_digest: String,
+    pub entries: Vec<ProjectionEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectionEntry {
+    pub semantic_id: String,
+    pub treatment: ProjectionTreatment,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProjectionTreatment {
+    Preserved,
+    Transformed,
+    Approximated,
+    Externalized,
+    Unsupported,
+    Unproven,
+}
+
+impl ProjectionReport {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.backend.trim().is_empty() {
+            return Err("projection backend cannot be empty".into());
+        }
+        validate_digest_hex(&self.source_model_digest, "source model")?;
+        validate_digest_hex(&self.projection_digest, "projection")?;
+        let mut ids = std::collections::BTreeSet::new();
+        for entry in &self.entries {
+            validate_identifier(&entry.semantic_id)?;
+            if !ids.insert(&entry.semantic_id) {
+                return Err(format!("duplicate projection semantic ID {:?}", entry.semantic_id));
+            }
+            if entry.note.trim().is_empty() {
+                return Err(format!(
+                    "projection entry {:?} has an empty note",
+                    entry.semantic_id
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_digest_hex(value: &str, label: &str) -> Result<(), String> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(format!("{label} digest must be exactly 64 hexadecimal characters"));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
