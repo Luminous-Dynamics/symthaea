@@ -14,7 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::{Duration, DateTime, SecondsFormat, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use sha2::{Digest, Sha256};
-use url::Url;
+use reqwest::Url;
 
 use super::{
     ActionAuthorizationWitness, AuthorizationConsumptionError, AuthorizationLease,
@@ -3620,6 +3620,11 @@ fn validate_native_authority_pin_set(
         }
 
         let pinned_verifier = self.pinned_provider_evidence_verifier_configuration()?;
+        if !matches!(evidence.kind, ProviderEvidenceKind::TerminalOutcome)
+            || matches!(evidence.outcome, ExecutionOutcome::Indeterminate)
+        {
+            return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
+        }
         let verified = verifier
             .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
@@ -4216,6 +4221,11 @@ fn validate_native_authority_pin_set(
             tx.commit()?;
         }
 
+        if !matches!(evidence.kind, ProviderEvidenceKind::TerminalOutcome)
+            || matches!(evidence.outcome, ExecutionOutcome::Indeterminate)
+        {
+            return Err(AuthorizationConsumptionError::ProviderEvidenceVerificationRequired.into());
+        }
         let verified = verifier
             .verify(ProviderVerificationPurpose::TerminalOutcome, record, evidence)
             .map_err(|_| AuthorizationConsumptionError::ProviderEvidenceVerificationRequired)?;
@@ -7799,12 +7809,33 @@ mod tests {
             format!("native-replay:{}", &witness.authorization_instance)).unwrap();
         let mut evidence=verified_evidence(&record,ExecutionOutcome::Failed);
         evidence.kind=ProviderEvidenceKind::PreEntryLookup;
+        let calls=Arc::new(AtomicUsize::new(0));
         assert!(matches!(
-            store.commit_bound_verified(&record,&evidence,&TestProviderVerifier),
+            store.commit_bound_verified(
+                &record,
+                &evidence,
+                &CountingProviderVerifier { calls: calls.clone() }
+            ),
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
             ))
         ));
+        assert_eq!(calls.load(Ordering::SeqCst),0);
+
+        store.commit_bound(&record,ExecutionOutcome::Indeterminate).unwrap();
+        let calls=Arc::new(AtomicUsize::new(0));
+        assert!(matches!(
+            store.reconcile_indeterminate_bound_verified(
+                &record,
+                &evidence,
+                &CountingProviderVerifier { calls: calls.clone() }
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::ProviderEvidenceVerificationRequired
+            ))
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst),0);
+
         let _=std::fs::remove_file(path);
     }
 
