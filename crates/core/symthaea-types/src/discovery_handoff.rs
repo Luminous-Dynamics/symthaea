@@ -27,7 +27,9 @@ pub struct ScientificHypothesisHandoff {
     pub schema_revision: String,
     /// Digest of the canonical candidate/model representation.
     pub candidate_digest: String,
-    /// Canonical physical semantic identity.
+    /// Canonical physical semantics carried with the hypothesis.
+    pub physical_type: PhysicalType,
+    /// Digest binding the exact physical-type bytes.
     pub physical_type_digest: String,
     pub model_maturity: ModelMaturity,
     pub source_observation_digest: String,
@@ -60,6 +62,7 @@ impl ScientificHypothesisHandoff {
         Self {
             schema_revision: HYPOTHESIS_HANDOFF_SCHEMA.into(),
             candidate_digest: candidate_digest.into(),
+            physical_type: physical_type.clone(),
             physical_type_digest: physical_type.digest_hex(),
             model_maturity,
             source_observation_digest: source_observation_digest.into(),
@@ -99,6 +102,9 @@ impl ScientificHypothesisHandoff {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_revision != HYPOTHESIS_HANDOFF_SCHEMA {
             return Err("unsupported hypothesis handoff schema revision".into());
+        }
+        if self.physical_type_digest != self.physical_type.digest_hex() {
+            return Err("physical_type_digest does not match carried physical_type".into());
         }
         for (label, value) in [
             ("candidate_digest", self.candidate_digest.as_str()),
@@ -404,6 +410,22 @@ mod tests {
         assert!(h.validate().is_ok());
         assert!(h.verify_physical_type(&energy()));
         assert_eq!(h.digest_hex(), h.clone().digest_hex());
+    }
+
+    #[test]
+    fn physical_type_digest_binds_carried_type() {
+        let mut h = ScientificHypothesisHandoff::new(
+            "candidate-a", &energy(), ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        h.physical_type = PhysicalType::dimensionless();
+        assert!(h.validate().is_err());
     }
 
     #[test]
