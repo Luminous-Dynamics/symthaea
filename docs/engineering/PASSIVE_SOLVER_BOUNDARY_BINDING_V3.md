@@ -96,6 +96,12 @@ The neutral core now has an explicit evidence ladder:
 It canonicalizes patch name, type, startFace, and nFaces and records an exact source-file digest.
 That receipt belongs to `SolverInputEntityAttested`; it is not a claim that a live solver loaded or accepted the file.
 A live-capable adapter may still use the higher `SolverEntityAttested` rung after inspecting actual solver state.
+The OpenFOAM input observer is deliberately conservative: it accepts only the declared patch-list
+grammar it can parse, requires the declared patch count to equal the number of parsed patch entries,
+rejects duplicate patch names, and fails closed on unsupported directives/characters rather than guessing.
+This is important because the current OpenFOAM Foundation release is OpenFOAM 14, and its input
+language has continued to evolve; unsupported dictionary constructs must not silently become evidence.
+
 
 The transition is sealed by `promote_solver_entity_attestation` and `bind_with_adapter_and_entity_attestation`; callers cannot directly construct a stronger binding by setting an evidence flag.
 
