@@ -859,6 +859,31 @@ mod tests {
     }
 
     #[test]
+    fn strict_json_detects_duplicate_keys_after_unicode_escape_decoding() {
+        let request = vector_request();
+        let (resolution, resolved_method) = resolved_vector(&request);
+        let duplicate = br#"{"proof":{"type":"DataIntegrityProof"},"a":1,"\u0061":2}"#;
+
+        assert!(matches!(
+            verify_eddsa_jcs_2022_json(
+                &request,
+                &resolution,
+                &resolved_method,
+                duplicate,
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::Structural(message)
+            )) if message.contains("duplicate JSON object member name")
+        ));
+    }
+
+    #[test]
+    fn strict_json_accepts_valid_unicode_surrogate_pair() {
+        let value = parse_strict_json(br#""\uD800\uDEAD""#).unwrap();
+        assert_eq!(value.as_str(), Some("\u{101ad}"));
+    }
+
+    #[test]
     fn rejects_duplicate_wire_object_member_names() {
         let request = vector_request();
         let (resolution, resolved_method) = resolved_vector(&request);
