@@ -123,6 +123,8 @@ representation, or conformal artifact is outside this contract. Conformal artifa
 parsing validates structural state, but score-set verification must additionally
 recompute the threshold from the separately retained calibration scores and alpha.
 
+The repository now provides a machine-readable `HdcOntologyConformalEvidenceArtifact` binding around the isolated conformal primitive. It records the model hash, distinct calibration and evaluation split-manifest hashes, the declared coverage target, exchangeability-assumption statement, exact execution revision, and evidence-bundle identity. This binding is provenance infrastructure only: selecting `LabelConditional` as a declared target does not create a label-conditional theorem, and distinct split hashes do not by themselves prove that the underlying populations are exchangeable or disjoint.
+
 A conformal N1 artifact should bind at minimum:
 
 - exact codebook/model hash;
