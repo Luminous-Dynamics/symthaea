@@ -384,6 +384,7 @@ async function rawWebGpuExecutionCanary(page) {
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
       });
 
+      device.pushErrorScope('validation');
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginRenderPass({
         colorAttachments: [{
@@ -402,6 +403,7 @@ async function rawWebGpuExecutionCanary(page) {
 
       device.queue.submit([encoder.finish()]);
       await device.queue.onSubmittedWorkDone();
+      const validationError = await device.popErrorScope();
       await readback.mapAsync(GPUMapMode.READ);
 
       const bytes = new Uint8Array(readback.getMappedRange());
@@ -455,6 +457,10 @@ async function rawWebGpuExecutionCanary(page) {
         max_green: maxGreen,
         max_blue: maxBlue,
         executed_red: executedRed,
+        validation_error: validationError ? {
+          name: validationError.name || null,
+          message: validationError.message || null,
+        } : null,
         uncaptured_errors: uncapturedErrors,
         device_lost: deviceLost,
       };
@@ -528,6 +534,7 @@ async function rawWebGpuCanvasCanary(page) {
         alphaMode: 'opaque',
       });
 
+      device.pushErrorScope('validation');
       const encoder = device.createCommandEncoder();
       const view = context.getCurrentTexture().createView();
       const pass = encoder.beginRenderPass({
@@ -541,6 +548,7 @@ async function rawWebGpuCanvasCanary(page) {
       pass.end();
       device.queue.submit([encoder.finish()]);
       await device.queue.onSubmittedWorkDone();
+      const validationError = await device.popErrorScope();
       await new Promise(requestAnimationFrame);
       await new Promise(requestAnimationFrame);
 
@@ -607,6 +615,10 @@ async function rawWebGpuCanvasCanary(page) {
         max_green: maxGreen,
         max_blue: maxBlue,
         painted_red: nonRedPixels === 0,
+        validation_error: validationError ? {
+          name: validationError.name || null,
+          message: validationError.message || null,
+        } : null,
         uncaptured_errors: uncapturedErrors,
       };
     } catch (error) {
@@ -912,6 +924,16 @@ async function runMode(mode) {
       if (!diagnostics.raw_webgpu_execution_canary?.executed_red) {
         throw new QualificationError(
           `Raw WebGPU execution canary failed: ${JSON.stringify(diagnostics.raw_webgpu_execution_canary)}`,
+          'capability',
+        );
+      }
+      if (diagnostics.raw_webgpu_execution_canary?.validation_error
+        || diagnostics.raw_webgpu_canary?.validation_error) {
+        throw new QualificationError(
+          `Raw WebGPU validation scope reported an error: ${JSON.stringify({
+            execution: diagnostics.raw_webgpu_execution_canary?.validation_error || null,
+            presentation: diagnostics.raw_webgpu_canary?.validation_error || null,
+          })}`,
           'capability',
         );
       }
