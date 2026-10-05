@@ -244,7 +244,7 @@ impl LinguisticFrame {
     pub fn canonical_grounding_surface(&self) -> String {
         serde_json::to_string(self).unwrap_or_else(|_| {
             format!(
-                "{\\"version\\":\\"{}\\",\\"serialization\\":\\"failed\\"}",
+                r#"{{"version":"{}","serialization":"failed"}}"#,
                 self.version
             )
         })
