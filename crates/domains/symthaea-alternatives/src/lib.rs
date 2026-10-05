@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 19;
+pub const SCHEMA_VERSION: u16 = 20;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-v28";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-measurand-procedure-experimental-design-discrimination-unit-v29";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -440,7 +440,7 @@ impl MeasurementUncertaintyStatement {
                 coverage_factor,
             } => {
                 if !value.is_finite()
-                    || *value < 0.0
+                    || *value <= 0.0
                     || unit.is_empty()
                     || !coverage_factor.is_finite()
                     || *coverage_factor <= 0.0
@@ -549,6 +549,9 @@ impl EvidenceRecord {
             (Some(observation), _) => observation.validate()?,
             (None, true) => return Err(AssessmentError::MissingObservationProvenance(self.kind)),
             (None, false) => {}
+        }
+        if observation_required && self.unit.as_ref().is_none_or(String::is_empty) {
+            return Err(AssessmentError::MissingObservationUnit(self.kind));
         }
         match (&self.uncertainty, observation_required) {
             (Some(uncertainty), _) => {
@@ -1931,7 +1934,14 @@ impl ExperimentalDesignProvenance {
         }
         self.protocol.validate()?;
         self.stopping_criteria.validate()?;
-        self.comparison_basis.validate()
+        self.comparison_basis.validate()?;
+        if self.protocol.basis != self.comparison_basis {
+            return Err(AssessmentError::ExperimentalDesignBasisMismatch {
+                expected: self.comparison_basis.clone(),
+                actual: self.protocol.basis.clone(),
+            });
+        }
+        Ok(())
     }
 
     /// Validate this design against the exact functional/comparison context.
@@ -2192,6 +2202,8 @@ pub enum AssessmentError {
     InvalidObservationProvenance,
     /// A physical/operational observation lacks a measurement-uncertainty statement.
     MissingMeasurementUncertainty(EvidenceKind),
+    /// A physical/operational observation lacks an explicit unit.
+    MissingObservationUnit(EvidenceKind),
     /// Measurement-uncertainty reference is structurally incomplete.
     InvalidMeasurementUncertainty,
     /// Stated measurement uncertainty uses a different unit from the evidence.
@@ -2358,6 +2370,9 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::MissingMeasurementUncertainty(kind) => {
                 write!(f, "{kind:?} evidence is missing measurement uncertainty")
+            }
+            Self::MissingObservationUnit(kind) => {
+                write!(f, "{kind:?} evidence is missing its explicit measurement unit")
             }
             Self::InvalidMeasurementUncertainty => {
                 write!(f, "measurement uncertainty reference is incomplete")
@@ -4775,6 +4790,41 @@ mod tests {
     }
 
     #[test]
+    fn expanded_uncertainty_must_be_positive() {
+        let uncertainty = MeasurementUncertaintyRef {
+            uncertainty_id: "u".into(),
+            statement: MeasurementUncertaintyStatement::Expanded {
+                value: 0.0,
+                unit: "unit".into(),
+                coverage_factor: 2.0,
+            },
+            method_id: "method".into(),
+            component_refs: vec!["component".into()],
+            record_digest: "digest".into(),
+        };
+        assert_eq!(
+            uncertainty.validate().unwrap_err(),
+            AssessmentError::InvalidMeasurementUncertainty
+        );
+    }
+
+    #[test]
+    fn observed_evidence_requires_explicit_unit() {
+        let mut observation = evidence(
+            "obs-unit",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        observation.unit = None;
+        assert_eq!(
+            observation.validate().unwrap_err(),
+            AssessmentError::MissingObservationUnit(EvidenceKind::Observed)
+        );
+    }
+
+    #[test]
     fn simulated_evidence_requires_derivation_metadata() {
         let mut evidence = evidence(
             "simulated",
@@ -4997,7 +5047,7 @@ mod tests {
             hypothesis_id: "hypothesis:invalid".into(),
             hypothesis_statement: "Test.".into(),
             unresolved_uncertainty_refs: vec!["u".into()],
-            candidate_ids: vec!["does-not-exist".into()],
+            candidate_ids: vec!["does-not-exist".into(), "does-not-exist-2".into()],
             expected_discrimination: vec![ExperimentalDiscriminationTarget {
                 target_id: "invalid-target".into(),
                 left_candidate_id: "does-not-exist".into(),
