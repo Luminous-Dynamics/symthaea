@@ -5429,6 +5429,32 @@ mod tests {
     }
 
     #[test]
+    fn independence_v4_preserves_v3_classification_when_endpoint_ancestry_is_absent() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        second.asset = Some(AssetRef::blake3(b"other-frame"));
+
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let v3 = graph
+            .assess_independence_detailed_v3("obs-001", "obs-002")
+            .expect("v3 assessment");
+        let v4 = graph
+            .assess_independence_detailed_v4("obs-001", "obs-002")
+            .expect("v4 assessment");
+
+        assert_eq!(v4.classification, v3.classification);
+        assert_eq!(v4.basis, v3.basis);
+        assert_eq!(v4.examined_observation_ids, v3.examined_observation_ids);
+        assert_eq!(v4.examined_scope_fingerprint, v3.examined_scope_fingerprint);
+        assert_ne!(v4.assessment_fingerprint, v3.assessment_fingerprint);
+        assert_eq!(v4.verifier_version, INDEPENDENCE_VERIFIER_VERSION_V4);
+    }
+
+    #[test]
     fn independence_v4_receipt_is_version_separated_from_v3() {
         let mut source = fixture();
         source.provenance.source.sensor_id = "camera-source".into();
