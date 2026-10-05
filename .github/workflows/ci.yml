@@ -73,7 +73,8 @@ jobs:
             crates/core/nixward/src/action/service_manager.rs \
             crates/core/nixward/src/action/generation_manager.rs \
             crates/core/nixward/src/action/flake_ops.rs \
-            crates/core/nixward/src/bin/nixward_daemon.rs; then
+            crates/core/nixward/src/bin/nixward_daemon.rs \
+            crates/core/nixward/src/mind/active_inference.rs; then
             echo 'A migrated core producer still manufactures an ungoverned Custom effect.' >&2
             exit 1
           fi
