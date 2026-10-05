@@ -242,10 +242,10 @@ impl ProsodyContext {
         // Declination: F0 baseline drops 15% within each phrase
         let declination = 1.0 - 0.15 * self.phrase_progress;
 
-        // Pitch accent shapes: snapped to syllable onset for syllable-aligned prosody.
-        // When syllable_progress has been explicitly set (> 0), use it instead of
-        // phoneme_progress so accents span the entire syllable, not just one phoneme.
-        // Falls back to phoneme_progress for backward compatibility.
+        // Pitch accent shapes: use the explicit syllable trajectory whenever this
+        // context is marked as a syllable onset or carries non-zero syllable progress.
+        // Zero is meaningful at the onset; only non-onset contexts without syllable
+        // progress fall back to phoneme_progress for backward compatibility.
         let accent_progress = if self.is_syllable_onset || self.syllable_progress > 0.0 {
             // Zero is a meaningful value at the syllable onset. Do not treat it as
             // “unset”, or the first frame would fall back to mid-phoneme progress.
