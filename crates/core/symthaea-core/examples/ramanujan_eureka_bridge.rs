@@ -146,6 +146,7 @@ fn main() {
     // remains in the existing evidence/result infrastructure.
     let execution = ScientificInquiryExecutionReceipt::new(
         &selection,
+        &prediction_frame,
         "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         &prediction_frame,
