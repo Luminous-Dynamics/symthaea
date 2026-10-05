@@ -1374,3 +1374,24 @@ fn rfc9942_receipt_signature_resource_limit_is_typed() {
         Err(Rfc9942VdpError::ResourceLimitExceeded)
     );
 }
+
+
+#[test]
+fn rfc9942_outer_signature_resource_limit_is_typed() {
+    // Outer Signature_With_Receipt with a structurally valid four-element
+    // COSE_Sign1 shape and a detached payload; only the signature bstr exceeds
+    // the decoder's 64 KiB defensive bound.
+    let mut encoded = vec![
+        0xd2, 0x84,
+        0x41, 0xa0, // protected = {}
+        0xa0,       // unprotected = {}
+        0xf6,       // detached payload
+        0x5a, 0x00, 0x01, 0x00, 0x01,
+    ];
+    encoded.extend(std::iter::repeat_n(0x00, 65537));
+
+    assert_eq!(
+        Rfc9942SignatureWithReceipts::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
