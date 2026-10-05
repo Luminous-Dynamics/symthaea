@@ -10,6 +10,7 @@ on:
       - "crates/domains/symthaea-vocal-tract/**"
       - "src/voice/**"
       - ".github/workflows/broca-feature-matrix.yml"
+    # Changes to the qualification workflow itself must re-run the exact-head matrix.
   workflow_dispatch:
 
 concurrency:
