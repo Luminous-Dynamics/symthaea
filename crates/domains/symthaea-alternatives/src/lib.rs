@@ -1308,6 +1308,22 @@ mod tests {
                     )
                 })
                 .collect(),
+            performance_scales: BTreeMap::from([
+                (
+                    "service_life_years".into(),
+                    ComparisonScale {
+                        unit: "unit".into(),
+                        scope: "synthetic functional unit".into(),
+                    },
+                ),
+                (
+                    "throughput_per_hour".into(),
+                    ComparisonScale {
+                        unit: "unit".into(),
+                        scope: "synthetic functional unit".into(),
+                    },
+                ),
+            ]),
         }
     }
 
@@ -1320,8 +1336,24 @@ mod tests {
     ) -> CandidatePathway {
         let evidence_ids = evidence.iter().map(|e| e.id.as_str()).collect::<Vec<_>>();
         let mut performance = BTreeMap::new();
-        performance.insert("service_life_years".into(), 12.0);
-        performance.insert("throughput_per_hour".into(), 120.0);
+        performance.insert(
+            "service_life_years".into(),
+            PerformanceEstimate {
+                value: 12.0,
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+            },
+        );
+        performance.insert(
+            "throughput_per_hour".into(),
+            PerformanceEstimate {
+                value: 120.0,
+                unit: "unit".into(),
+                scope: "synthetic functional unit".into(),
+                evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
+            },
+        );
         let mut burdens = all_burdens(5.0, &evidence_ids);
         burdens.insert(
             Dimension::Hazard,
@@ -1349,6 +1381,60 @@ mod tests {
             burdens,
             evidence,
         }
+    }
+
+    #[test]
+    fn missing_performance_evidence_blocks_functional_constraint() {
+        let mut c = candidate(
+            "unverified-performance",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![],
+        );
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids.clear();
+        }
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::Hypothesis
+        );
+        assert!(matches!(
+            result.frontier_blockers["unverified-performance"][0],
+            FrontierBlocker::ConstraintUnresolved(_)
+        ));
+    }
+
+    #[test]
+    fn incompatible_performance_scale_blocks_candidate() {
+        let mut c = candidate(
+            "performance-scale-drift",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence("p1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9)],
+        );
+        c.performance.get_mut("throughput_per_hour").unwrap().unit = "other-unit".into();
+
+        let result = AlternativesEngine
+            .assess(&fixture_requirement(), &[c], None)
+            .unwrap();
+
+        assert!(result.frontier_blockers["performance-scale-drift"]
+            .iter()
+            .any(|blocker| matches!(
+                blocker,
+                FrontierBlocker::PerformanceIncompatibleScale {
+                    metric,
+                    ..
+                } if metric == "throughput_per_hour"
+            )));
+        assert!(!result.pareto_frontier.contains(&"performance-scale-drift".into()));
     }
 
     #[test]
