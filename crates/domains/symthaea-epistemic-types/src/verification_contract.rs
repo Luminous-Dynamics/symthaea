@@ -1155,11 +1155,6 @@ pub struct VerificationRequest {
     pub verification_method: ClaimVerificationMethod,
     pub expected_controller: ClaimControllerIdentity,
     pub expected_verification_relationship: ClaimVerificationRelationship,
-    /// Exact JCS-transformed representation digest that the request bound before
-    /// cryptographic verification. This makes the representation binding durable
-    /// alongside the cryptographic receipt.
-    #[serde(default)]
-    pub expected_transformed_document_digest: Option<String>,
     pub controller_document_integrity_policy: ControllerDocumentIntegrityPolicy,
     pub controller_document_network_policy: ControllerDocumentNetworkPolicy,
     pub freshness: VerificationFreshnessContext,
@@ -1398,6 +1393,9 @@ impl CryptographicVerificationReceipt {
             cryptosuite: cryptosuite.into(),
             proof_type: proof_type.into(),
             proof_purpose: request.proof_purpose.clone(),
+            expected_transformed_document_digest: request
+                .expected_transformed_document_digest
+                .clone(),
             verification_method: resolution.verification_method.clone(),
             verification_method_type: resolution.verification_method_type.clone(),
             verification_method_material_digest:
@@ -2678,6 +2676,9 @@ mod tests {
             proof_type: "DataIntegrityProof".into(),
 
             proof_purpose: request.proof_purpose.clone(),
+            expected_transformed_document_digest: request
+                .expected_transformed_document_digest
+                .clone(),
             verification_method: resolution.verification_method.clone(),
             verification_method_type: resolution.verification_method_type.clone(),
             verification_method_material_digest:
