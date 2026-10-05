@@ -306,7 +306,7 @@ pub struct FunctionalRequirement {
     pub performance_scales: BTreeMap<String, ComparisonScale>,
     /// Required operating envelope keyed by condition (for example temperature or pressure).
     pub operating_envelope: BTreeMap<String, OperatingRequirement>,
-
+}
 
 impl FunctionalRequirement {
     /// Validate identity, numeric bounds, and explicit comparison scales.
