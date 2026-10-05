@@ -345,7 +345,9 @@ pub enum ControllerDocumentResolutionSource {
 }
 
 impl ControllerDocumentResolutionSource {
-    pub fn validate_structure(&self) {}
+    pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
+        Ok(())
+    }
 }
 
 /// Adapter attestation for the concrete controller-document dereference performed
@@ -394,6 +396,7 @@ impl ControllerDocumentDereferenceAttestation {
         request: &VerificationRequest,
     ) -> Result<(), VerificationFailure> {
         request.controller_document_network_policy.validate_structure()?;
+        request.controller_document_integrity_policy.validate_structure()?;
         let expected_url = request.controller_document_ref()?;
         if self.requested_url != expected_url {
             return Err(VerificationFailure::ControllerDocumentMismatch {
@@ -435,6 +438,46 @@ impl ControllerDocumentDereferenceAttestation {
                 "controller document response media type must be non-empty".into(),
             ));
         }
+        parse_timestamp("controller document resolved at", &self.resolved_at)?;
+        if !is_hex_digest(&self.document_digest) {
+            return Err(VerificationFailure::Structural(
+                "controller document dereference digest must be a 64-character hexadecimal digest"
+                    .into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn validate_against_policy(
+        &self,
+        policy: &ControllerDocumentNetworkPolicy,
+        expected_url: &str,
+        expected_digest: &str,
+    ) -> Result<(), VerificationFailure> {
+        policy.validate_structure()?;
+        let requested = Url::parse(&self.requested_url)
+            .map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
+        let effective = Url::parse(&self.effective_url)
+            .map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
+
+        if self.requested_url != expected_url || self.document_digest != expected_digest {
+            return Err(VerificationFailure::ControllerDocumentDereferenceMismatch);
+        }
+        if !policy.allows_scheme(requested.scheme())
+            || !policy.allows_scheme(effective.scheme())
+        {
+            return Err(VerificationFailure::ControllerDocumentNetworkPolicyViolation);
+        }
+        if policy.require_effective_url_match && effective.as_str() != requested.as_str() {
+            return Err(VerificationFailure::ControllerDocumentEffectiveUrlMismatch);
+        }
+        if self.redirect_count > policy.max_redirects {
+            return Err(VerificationFailure::ControllerDocumentRedirectLimitExceeded);
+        }
+        if self.response_size_bytes > policy.max_response_bytes {
+            return Err(VerificationFailure::ControllerDocumentResponseTooLarge);
+        }
+        self.source.validate_structure()?;
         parse_timestamp("controller document resolved at", &self.resolved_at)?;
         if !is_hex_digest(&self.document_digest) {
             return Err(VerificationFailure::Structural(
@@ -725,6 +768,7 @@ pub struct VerificationMethodResolution {
     pub controller_document_integrity: ControllerDocumentIntegrityAttestation,
     pub verification_method_lifecycle: VerificationMethodLifecycle,
     pub controller_document_snapshot_scope: ControllerDocumentSnapshotScope,
+    pub controller_document_network_policy: ControllerDocumentNetworkPolicy,
     pub controller_document_dereference: Option<ControllerDocumentDereferenceAttestation>,
 }
 
@@ -851,6 +895,8 @@ impl VerificationMethodResolution {
             controller_document_integrity,
             verification_method_lifecycle,
             controller_document_snapshot_scope,
+            controller_document_network_policy:
+                request.controller_document_network_policy.clone(),
             controller_document_dereference: None,
         };
         resolution.verification_method_lifecycle.validate_for_use_at(
@@ -958,50 +1004,16 @@ impl VerificationMethodResolution {
         }
         self.verification_method_lifecycle.validate_structure()?;
         self.controller_document_snapshot_scope.validate_structure()?;
+        self.controller_document_network_policy.validate_structure()?;
         let dereference = self
             .controller_document_dereference
             .as_ref()
             .ok_or(VerificationFailure::MissingControllerDocumentDereference)?;
-        let policy = ControllerDocumentNetworkPolicy::strict_for_url(
+        dereference.validate_against_policy(
+            &self.controller_document_network_policy,
             &self.controller_document_ref,
+            &self.controller_document_digest,
         )?;
-        policy.validate_structure()?;
-        let requested =
-            Url::parse(&dereference.requested_url)
-                .map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
-        let effective =
-            Url::parse(&dereference.effective_url)
-                .map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
-        if dereference.requested_url != self.controller_document_ref
-            || dereference.document_digest != self.controller_document_digest
-        {
-            return Err(VerificationFailure::ControllerDocumentDereferenceMismatch);
-        }
-        if !policy.allows_scheme(requested.scheme())
-            || !policy.allows_scheme(effective.scheme())
-        {
-            return Err(VerificationFailure::ControllerDocumentNetworkPolicyViolation);
-        }
-        if policy.require_effective_url_match && effective.as_str() != requested.as_str() {
-            return Err(VerificationFailure::ControllerDocumentEffectiveUrlMismatch);
-        }
-        if dereference.redirect_count > policy.max_redirects {
-            return Err(VerificationFailure::ControllerDocumentRedirectLimitExceeded);
-        }
-        if dereference.response_size_bytes > policy.max_response_bytes {
-            return Err(VerificationFailure::ControllerDocumentResponseTooLarge);
-        }
-        dereference.source.validate_structure();
-        parse_timestamp(
-            "controller document resolved at",
-            &dereference.resolved_at,
-        )?;
-        if !is_hex_digest(&dereference.document_digest) {
-            return Err(VerificationFailure::Structural(
-                "controller document dereference digest must be a 64-character hexadecimal digest"
-                    .into(),
-            ));
-        }
         Ok(())
     }
 
@@ -1019,6 +1031,7 @@ impl VerificationMethodResolution {
             &self.controller_document_integrity,
             &self.verification_method_lifecycle,
             &self.controller_document_snapshot_scope,
+            &self.controller_document_network_policy,
             &self.controller_document_dereference,
         );
         let bytes = serde_json::to_vec(&encoded)
