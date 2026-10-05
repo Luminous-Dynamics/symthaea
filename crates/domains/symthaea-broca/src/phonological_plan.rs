@@ -13,7 +13,7 @@ use crate::linguistic_frame::LinguisticFrame;
 use crate::speech_plan::{IntonationIntent, SpeechPlan};
 
 /// Stable identity for the phonological-plan contract.
-pub const PHONOLOGICAL_PLAN_VERSION: &str = "broca-phonological-plan-v1";
+pub const PHONOLOGICAL_PLAN_VERSION: &str = "broca-phonological-plan-v2";
 
 /// How much linguistic content is actually bound to the production plan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
