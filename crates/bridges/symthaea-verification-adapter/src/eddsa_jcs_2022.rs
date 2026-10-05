@@ -68,6 +68,7 @@ pub fn verify_eddsa_jcs_2022(
 ) -> Result<CryptographicVerificationReceipt, SnapshotError> {
     request.validate_structure()?;
     resolution.validate_structure()?;
+    validate_strict_ijson_value(secured_document)?;
     if !resolution.matches_request(request) {
         return Err(SnapshotError::Verification(
             VerificationFailure::ResolutionRequestMismatch,
@@ -455,7 +456,41 @@ pub(crate) fn parse_strict_json(bytes: &[u8]) -> Result<Value, SnapshotError> {
 
 fn validate_strict_ijson_value(value: &Value) -> Result<(), SnapshotError> {
     match value {
-        Value::Null | Value::Bool(_) | Value::Number(_) => Ok(()),
+        Value::Null | Value::Bool(_) => Ok(()),
+        Value::Number(number) => {
+            if let Some(value) = number.as_i64() {
+                let round_tripped = value as f64;
+                if round_tripped as i64 != value {
+                    return Err(SnapshotError::Verification(
+                        VerificationFailure::Structural(
+                            "strict I-JSON parsing rejected an integer that cannot be represented exactly by IEEE-754 binary64"
+                                .into(),
+                        ),
+                    ));
+                }
+            } else if let Some(value) = number.as_u64() {
+                let round_tripped = value as f64;
+                if round_tripped as u64 != value {
+                    return Err(SnapshotError::Verification(
+                        VerificationFailure::Structural(
+                            "strict I-JSON parsing rejected an integer that cannot be represented exactly by IEEE-754 binary64"
+                                .into(),
+                        ),
+                    ));
+                }
+            } else if number
+                .as_f64()
+                .map(|value| !value.is_finite())
+                .unwrap_or(true)
+            {
+                return Err(SnapshotError::Verification(
+                    VerificationFailure::Structural(
+                        "strict I-JSON parsing rejected a non-finite JSON number".into(),
+                    ),
+                ));
+            }
+            Ok(())
+        },
         Value::String(text) => {
             if text.chars().any(is_ijson_forbidden_code_point) {
                 return Err(SnapshotError::Verification(
@@ -927,6 +962,28 @@ mod tests {
         .unwrap();
 
         assert_eq!(canonical_receipt, formatted_receipt);
+    }
+
+    #[test]
+    fn value_entry_point_rejects_non_ijson_unicode_and_unsafe_integers() {
+        let mut noncharacter_document = secured_document();
+        noncharacter_document["credentialSubject"]["alumniOf"] =
+            Value::String("\u{fdd0}".into());
+        assert!(matches!(
+            validate_strict_ijson_value(&noncharacter_document),
+            Err(SnapshotError::Verification(
+                VerificationFailure::Structural(message)
+            )) if message.contains("Unicode noncharacter")
+        ));
+
+        let unsafe_integer: Value =
+            serde_json::json!({"value": 9007199254740993u64});
+        assert!(matches!(
+            validate_strict_ijson_value(&unsafe_integer),
+            Err(SnapshotError::Verification(
+                VerificationFailure::Structural(message)
+            )) if message.contains("IEEE-754")
+        ));
     }
 
     #[test]
