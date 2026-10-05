@@ -2095,7 +2095,7 @@ mod tests {
             string(&mut bytes, &id);
             let role = roles[&id];
             bytes.push(role);
-            let observation = by_id[&id.as_str()];
+            let observation = by_id.get(id.as_str()).expect("validated observation");
 
             if role & 0b011 != 0 {
                 string(&mut bytes, &observation.provenance.source.sensor_id);
@@ -3544,6 +3544,29 @@ mod tests {
             baseline
         );
 
+        let mut direct_unread_change = graph.clone();
+        let source = direct_unread_change
+            .observations
+            .iter_mut()
+            .find(|observation| observation.id == "obs-001")
+            .expect("source");
+        source.provenance.processing_fingerprint = Some("proc-v2".into());
+        source.location = Some(ObservationLocation {
+            latitude_deg: 11.0,
+            longitude_deg: 21.0,
+            uncertainty_m: 5.0,
+        });
+        source.quality.confidence = 0.41;
+        assert_eq!(
+            direct_unread_change
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-001",
+                    "obs-002"
+                )
+                .expect("direct unread fields scope"),
+            baseline
+        );
+
         let mut ancestor_unread_change = graph.clone();
         let ancestor = ancestor_unread_change
             .observations
@@ -3553,6 +3576,13 @@ mod tests {
         ancestor.provenance.source.sensor_id = "camera-9".into();
         ancestor.provenance.coverage = ProvenanceCoverage::Partial;
         ancestor.provenance.source.platform_id = Some("platform-9".into());
+        ancestor.provenance.processing_fingerprint = Some("proc-v2".into());
+        ancestor.location = Some(ObservationLocation {
+            latitude_deg: 11.0,
+            longitude_deg: 21.0,
+            uncertainty_m: 5.0,
+        });
+        ancestor.quality.confidence = 0.41;
         ancestor.asset = Some(AssetRef::blake3(b"changed"));
         assert_eq!(
             ancestor_unread_change
