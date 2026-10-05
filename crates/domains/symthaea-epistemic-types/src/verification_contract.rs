@@ -786,7 +786,7 @@ pub struct VerificationMethodResolution {
 }
 
 impl VerificationMethodResolution {
-    pub const SCHEMA_VERSION: u16 = 4;
+    pub const SCHEMA_VERSION: u16 = 5;
 
     pub fn with_controller_document_dereference(
         mut self,
@@ -1826,6 +1826,8 @@ mod tests {
             "https://example.test/controller",
             ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
             request.verification_method.clone(),
+            "Multikey",
+            &"44".repeat(32),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             &[],
             &"11".repeat(32),
@@ -2053,6 +2055,8 @@ mod tests {
                 "https://example.test/controller",
                 ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
                 request.verification_method.clone(),
+                "Multikey",
+                &"44".repeat(32),
                 ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
                 &[request.verification_method.clone()],
                 &"11".repeat(32),
@@ -2188,6 +2192,8 @@ mod tests {
             "https://example.test/controller",
             ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
             request.verification_method.clone(),
+            "Multikey",
+            &"44".repeat(32),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             &[request.verification_method.clone()],
             &"11".repeat(32),
@@ -2221,6 +2227,8 @@ mod tests {
             "https://example.test/controller",
             ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
             request.verification_method.clone(),
+            "Multikey",
+            &"44".repeat(32),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             &[request.verification_method.clone()],
             &"11".repeat(32),
