@@ -75,6 +75,35 @@ fn action_intent_digest_for_command(
     intent.digest()
 }
 
+/// Bind modifying service intents to an exact fresh service observation, while
+/// retaining the existing NixOS-generation identity as a coarser host-state guard.
+/// Non-service commands preserve the legacy generation-only identity during migration.
+fn pre_state_identity_for_command(
+    command: &nixward::action::executor::NixOSCommand,
+    generation: Option<u64>,
+) -> Result<Option<String>, String> {
+    match command {
+        nixward::action::executor::NixOSCommand::Service { unit, .. } => {
+            let observed = ServiceManager::observed_state(unit)
+                .map_err(|error| format!("could not observe service pre-state: {error}"))?;
+            if observed.unit() != unit {
+                return Err(format!(
+                    "service observation canonical identity mismatch: requested={} observed={}",
+                    unit,
+                    observed.unit()
+                ));
+            }
+            observed
+                .execution_pre_state_identity(generation)
+                .map(Some)
+                .map_err(|error| {
+                    format!("could not construct service pre-state identity: {error}")
+                })
+        }
+        _ => Ok(generation.map(|generation| format!("generation:{generation}"))),
+    }
+}
+
 
 /// Mutable daemon state collected across cycles.
 struct DaemonState {
@@ -1270,14 +1299,29 @@ impl DaemonState {
 
                         if is_modifying {
                             // Typed V1 actions are approved by exact semantic identity,
-                            // not by a reusable global approval bit. Bind approval to the
-                            // current pre-state generation when one is available.
-                            let pre_state_identity = self
+                            // not by a reusable global approval bit. Service effects additionally
+                            // bind the exact fresh service observation digest.
+                            let generation = self
                                 .prev_snapshot
                                 .as_ref()
-                                .and_then(|snapshot| snapshot.generation.map(|generation| format!("generation:{generation}")));
+                                .and_then(|snapshot| snapshot.generation);
+                            let pre_state_identity = match pre_state_identity_for_command(&cmd, generation) {
+                                Ok(identity) => identity,
+                                Err(error) => {
+                                    eprintln!(
+                                        "nixward-daemon: refusing modifying command without fresh pre-state identity: {error}"
+                                    );
+                                    self.watchdog_status = None;
+                                    self.pending_action = None;
+                                    self.pending_action_intent_digest = None;
+                                    return (
+                                        dynamic_threshold,
+                                        Some(best_action.expected_free_energy),
+                                    );
+                                }
+                            };
                             let intent_digest = match action_intent_digest_for_command(
-                                pre_state_identity,
+                                pre_state_identity.clone(),
                                 &cmd,
                             ) {
                                 Ok(digest) => digest,
@@ -1323,11 +1367,7 @@ impl DaemonState {
 
                                 let intent = match NixActionIntentV1::from_command(
                                     "nixward:daemon",
-                                    self.prev_snapshot.as_ref().and_then(|snapshot| {
-                                        snapshot
-                                            .generation
-                                            .map(|generation| format!("generation:{generation}"))
-                                    }),
+                                    pre_state_identity.clone(),
                                     &cmd,
                                 ) {
                                     Ok(intent) => intent,
