@@ -18,3 +18,6 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 symthaea-epistemic-types = { path = "../../domains/symthaea-epistemic-types" }
 url = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.27"
