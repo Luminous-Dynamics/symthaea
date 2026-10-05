@@ -1145,7 +1145,10 @@ mod tests {
         assert!(switch.rollback_command().is_some());
         assert!(test.rollback_command().is_some());
         assert!(boot.rollback_command().is_some());
-        assert!(hm.rollback_command().is_some());
+        assert!(
+            hm.rollback_command().is_none(),
+            "Home Manager shell rollback must remain fail-closed until a typed operation exists"
+        );
         assert!(
             gc.rollback_command().is_none(),
             "GC should not have rollback"
