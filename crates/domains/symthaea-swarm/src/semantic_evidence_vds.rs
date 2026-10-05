@@ -836,7 +836,7 @@ impl Rfc9942ReceiptEnvelope {
         if vds_id!=RFC9162_VDS_ID{return Err(Rfc9942VdpError::VdsMismatch(vds_id));}
 
         let unprotected_start = reader.offset;
-        let unprotected_entries=reader.read_map_entries_bounded_with_limits_and_bytes(32, MAX_RFC9942_RECEIPT_BYTES, 64, MAX_RFC9942_RECEIPT_ENCODED_BYTES).map_err(|error|match error{
+        let unprotected_entries=reader.read_map_entries_bounded_with_resource_limits_and_bytes(32, MAX_RFC9942_RECEIPT_BYTES, 64, MAX_RFC9942_RECEIPT_ENCODED_BYTES).map_err(|error|match error{
             Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                 Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
             _=>Rfc9942VdpError::InvalidEncoding,
@@ -863,7 +863,7 @@ impl Rfc9942ReceiptEnvelope {
                 vdp=Some(parsed);
             }else{
                 unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
-                value_reader.skip_value_with_bstr_limit(0, MAX_RFC9942_RECEIPT_BYTES)
+                value_reader.skip_value_with_bstr_resource_limits(0, MAX_RFC9942_RECEIPT_BYTES)
                     .map_err(|error|match error {
                         Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                         _=>Rfc9942VdpError::InvalidEncoding,
@@ -1338,7 +1338,7 @@ impl Rfc9942SignatureWithReceipts {
         }
 
         let unprotected_start=reader.offset;
-        let unprotected_entries=reader.read_map_entries_bounded_with_limits_and_bytes(32, MAX_RFC9942_RECEIPT_BYTES, 64, MAX_RFC9942_RECEIPTS_ENCODED_BYTES_TOTAL)
+        let unprotected_entries=reader.read_map_entries_bounded_with_resource_limits_and_bytes(32, MAX_RFC9942_RECEIPT_BYTES, 64, MAX_RFC9942_RECEIPTS_ENCODED_BYTES_TOTAL)
             .map_err(|error|match error {
                 Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                 Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
@@ -1370,7 +1370,7 @@ impl Rfc9942SignatureWithReceipts {
                 unprotected_receipts=Some(Rfc9942ReceiptCollection::from_reader(&mut value_reader)?);
             } else {
                 unprotected_extensions.push(raw_key.iter().chain(raw_value.iter()).copied().collect());
-                value_reader.skip_value_with_bstr_limit(0, MAX_RFC9942_RECEIPT_BYTES)
+                value_reader.skip_value_with_bstr_resource_limits(0, MAX_RFC9942_RECEIPT_BYTES)
                     .map_err(|error|match error {
                         Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                         _=>Rfc9942VdpError::InvalidEncoding,
@@ -2465,6 +2465,16 @@ impl<'a> CborReader<'a> {
         max_bstr_len: usize,
     ) -> Result<(), Rfc9162ProofDecodeError> {
         self.skip_value_with_limits(depth, max_bstr_len, 64, usize::MAX)
+    }
+
+    fn skip_value_with_bstr_resource_limits(
+        &mut self,
+        depth: usize,
+        max_bstr_len: usize,
+    ) -> Result<(), Rfc9162ProofDecodeError> {
+        self.skip_value_with_limits_mode(
+            depth, max_bstr_len, 64, usize::MAX, true,
+        )
     }
 
     fn skip_value_with_limits(
@@ -4185,6 +4195,39 @@ mod tests {
     }
 
     #[test]
+    fn rfc9942_receipt_unprotected_text_extension_limit_is_typed() {
+        let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
+        let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
+
+        let mut protected = Vec::new();
+        cbor_map_len(&mut protected, 2);
+        cbor_int(&mut protected, COSE_ALG_HEADER_LABEL);
+        cbor_int(&mut protected, COSE_ES256_ALGORITHM_ID);
+        cbor_int(&mut protected, RFC9942_VDS_HEADER_LABEL);
+        cbor_uint(&mut protected, RFC9162_VDS_ID);
+
+        let mut extension = vec![0x7a, 0x00, 0x00, 0x10, 0x01];
+        extension.extend_from_slice(&vec![b'a'; 4097]);
+
+        let mut wire = Vec::new();
+        cbor_tag(&mut wire, COSE_SIGN1_TAG);
+        cbor_array_len(&mut wire, 4);
+        cbor_bytes(&mut wire, &protected);
+        cbor_map_len(&mut wire, 2);
+        cbor_int(&mut wire, 99);
+        wire.extend_from_slice(&extension);
+        cbor_int(&mut wire, RFC9942_VDP_HEADER_LABEL);
+        wire.extend_from_slice(&vdp.to_cbor());
+        cbor_bytes(&mut wire, &[0x22; 32]);
+        cbor_bytes(&mut wire, &[0xAA; 64]);
+
+        assert_eq!(
+            Rfc9942ReceiptEnvelope::from_cbor(&wire),
+            Err(Rfc9942VdpError::ResourceLimitExceeded)
+        );
+    }
+
+    #[test]
     fn rfc9942_receipt_rejects_malformed_indefinite_text_labels() {
         let proof = Rfc9162InclusionProof::new(2, 0, vec![[0x11; 32]]).to_cbor();
         let vdp = Rfc9942Vdp::new(Rfc9942ProofKind::Inclusion, vec![proof]).unwrap();
@@ -4397,6 +4440,12 @@ mod tests {
         assert_eq!(
             reader.offset, 5,
             "text payload must not be consumed when the declared bound is exceeded"
+        );
+
+        let mut generic_reader = CborReader::new(&wire);
+        assert_eq!(
+            generic_reader.skip_value_with_limits(0, 4096, 64, usize::MAX),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
         );
     }
 
