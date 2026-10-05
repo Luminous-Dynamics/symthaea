@@ -1054,21 +1054,35 @@ impl IndependenceScopeWitnessV3 {
         }
 
         let mut previous = None::<&str>;
-        let mut endpoint_count = 0usize;
+        let mut source_role_count = 0usize;
+        let mut target_role_count = 0usize;
         for record in &self.records {
-            if record.observation_id.trim().is_empty() {
-                return false;
-            }
-            if previous.is_some_and(|id| id >= record.observation_id.as_str()) {
+            if record.observation_id.trim().is_empty()
+                || previous.is_some_and(|id| id >= record.observation_id.as_str())
+            {
                 return false;
             }
             previous = Some(record.observation_id.as_str());
+
+            if !matches!(
+                record.role,
+                INDEPENDENCE_SCOPE_V3_SOURCE_ROLE
+                    | INDEPENDENCE_SCOPE_V3_TARGET_ROLE
+                    | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE
+                    | (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE)
+                    | (INDEPENDENCE_SCOPE_V3_TARGET_ROLE | INDEPENDENCE_SCOPE_V3_ANCESTOR_ROLE)
+            ) {
+                return false;
+            }
 
             let endpoint = record.role
                 & (INDEPENDENCE_SCOPE_V3_SOURCE_ROLE | INDEPENDENCE_SCOPE_V3_TARGET_ROLE)
                 != 0;
             if endpoint {
-                endpoint_count += 1;
+                source_role_count +=
+                    usize::from(record.role & INDEPENDENCE_SCOPE_V3_SOURCE_ROLE != 0);
+                target_role_count +=
+                    usize::from(record.role & INDEPENDENCE_SCOPE_V3_TARGET_ROLE != 0);
                 if record.sensor_id.as_deref().is_none_or(str::is_empty)
                     || record.coverage.is_none()
                 {
@@ -1083,17 +1097,19 @@ impl IndependenceScopeWitnessV3 {
             }
 
             let mut parents = HashSet::with_capacity(record.parent_observation_ids.len());
-            if record.parent_observation_ids.iter().any(|parent| {
-                parent.trim().is_empty()
-                    || parent == &record.observation_id
-                    || !parents.insert(parent.as_str())
-            }) {
+            if record.parent_observation_ids.windows(2).any(|pair| pair[0] >= pair[1])
+                || record.parent_observation_ids.iter().any(|parent| {
+                    parent.trim().is_empty()
+                        || parent == &record.observation_id
+                        || !parents.insert(parent.as_str())
+                })
+            {
                 return false;
             }
             if record
                 .processing_activity_id
                 .as_deref()
-                .is_some_and(str::is_empty)
+                .is_some_and(|id| id.trim().is_empty())
             {
                 return false;
             }
@@ -1106,8 +1122,7 @@ impl IndependenceScopeWitnessV3 {
             }
         }
 
-        endpoint_count == 2
-            || endpoint_count == 3
+        source_role_count == 1 && target_role_count == 1
     }
 
     pub fn observation_ids(&self) -> Vec<String> {
@@ -4581,6 +4596,59 @@ mod tests {
         let mut cross = receipt.clone();
         cross.assessment_fingerprint = v2_receipt.assessment_fingerprint;
         assert!(!cross.verify_integrity());
+    }
+
+    #[test]
+    fn independence_v3_scope_witness_round_trips_and_rejects_noncanonical_forms() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let bytes = graph
+            .independence_verification_reachable_scope_canonical_bytes_v3(
+                "obs-001",
+                "obs-002",
+            )
+            .expect("v3 scope bytes");
+        let witness = IndependenceScopeWitnessV3::from_canonical_bytes(&bytes)
+            .expect("decode canonical witness");
+
+        assert!(witness.is_well_formed());
+        assert_eq!(witness.canonical_bytes().expect("re-encode"), bytes);
+        assert_eq!(
+            witness.fingerprint().expect("witness fingerprint"),
+            graph
+                .independence_verification_reachable_scope_fingerprint_v3(
+                    "obs-001",
+                    "obs-002",
+                )
+                .expect("scope fingerprint"),
+        );
+
+        let mut trailing = bytes.clone();
+        trailing.push(0);
+        assert_eq!(
+            IndependenceScopeWitnessV3::from_canonical_bytes(&trailing),
+            Err(ObservationValidationError::InvalidIndependenceScopeWitnessV3)
+        );
+
+        let mut duplicated_header_id = bytes.clone();
+        // Replace only the first encoded observation-id in the header with the
+        // second identifier while retaining the original byte length.
+        // This preserves framing but breaks the header/record identity invariant.
+        let header_start = INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR.len() + 8;
+        assert!(duplicated_header_id.len() > header_start + 8);
+        let second_id = b"obs-002";
+        duplicated_header_id[header_start + 1..header_start + 1 + second_id.len()]
+            .copy_from_slice(second_id);
+        assert_eq!(
+            IndependenceScopeWitnessV3::from_canonical_bytes(&duplicated_header_id)
+                .expect_err("header/record mismatch"),
+            ObservationValidationError::InvalidIndependenceScopeWitnessV3
+        );
     }
 
     #[test]
