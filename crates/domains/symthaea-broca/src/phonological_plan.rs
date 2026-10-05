@@ -677,6 +677,76 @@ mod tests {
     }
 
     #[test]
+    fn lexical_bridge_binds_and_rejects_tampered_identity() {
+        let mut speech_plan = plan();
+        speech_plan.focus_role = None;
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+        let constituents = frame
+            .constituents
+            .iter()
+            .enumerate()
+            .map(|(position, slot)| LexemeBinding {
+                position,
+                source: LexicalSource::SemanticConstituent {
+                    role: slot.role.clone(),
+                    prime: slot.prime.clone(),
+                },
+                lemma: slot.prime.to_ascii_lowercase(),
+                lexeme_id: format!("fixture:lexeme:{position}"),
+                grammatical_function: GrammaticalFunction::Other("fixture".into()),
+                morphology: Vec::new(),
+                morphophonological_form: Some(slot.prime.to_ascii_lowercase()),
+                provenance: "fixture:lexicon:v1".into(),
+                semantic_payload: true,
+            })
+            .collect::<Vec<_>>();
+        let binding = LexicalMorphosyntacticBinding::new(
+            &frame,
+            LanguageRuleBinding {
+                language_tag: "en".into(),
+                status: LanguageRuleStatus::Bound,
+                rule_id: Some("fixture:rule:v1".into()),
+                provenance: Some("fixture:rules:v1".into()),
+                unbound_reason: None,
+            },
+            constituents,
+            Vec::new(),
+            Vec::new(),
+        )
+        .expect("fixture lexical binding must validate");
+
+        let mut phonological = PhonologicalPlan::from_linguistic_frame(&frame);
+        phonological
+            .bind_lexical_segments_from_binding(
+                &frame,
+                &binding,
+                vec![PhonemeSlot::new(
+                    "AH",
+                    0,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                )],
+            )
+            .expect("typed lexical-to-phonological bridge should bind");
+        assert!(
+            phonological
+                .validate_against_lexical_binding(&frame, &binding)
+                .is_ok()
+        );
+
+        let mut tampered = binding.clone();
+        tampered.constituents[0].lemma.push_str("-tampered");
+        assert_eq!(
+            phonological
+                .validate_against_lexical_binding(&frame, &tampered)
+                .expect_err("tampered lexical identity must be rejected"),
+            PhonologicalPlanError::LexicalBindingMismatch
+        );
+    }
+
+    #[test]
     fn explicit_segments_bind_without_fabricating_lexical_content() {
         let mut plan = PhonologicalPlan::from_speech_plan(&plan());
         let segments = vec![
