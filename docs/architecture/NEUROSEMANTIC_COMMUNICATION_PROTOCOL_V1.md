@@ -289,3 +289,17 @@ Consent leases separately authorize data classes and inference classes for read 
 Policy-bearing packets also bind the declared data class to the payload's intrinsic type. Typed semantic graphs/hypervectors authorize only `SemanticRepresentation`; typed decoded claims authorize only `DecodedClaim`; typed derived features authorize only `DerivedNeuralFeature`. The legacy opaque `StructuredRepresentation` variant remains deserializable but cannot cross a policy authorization boundary because its data class cannot be verified from the payload type alone.
 
 Recent iBCI governance work likewise distinguishes raw recordings, processed features, decoded inferences, and personalized model parameters, while identifying conflated consent and weak misuse guardrails as important gaps. (see Sandbrink & Young, *Communications Medicine*, 27 July 2026, DOI 10.1038/s43856-026-01797-y; Young et al., *Device*, available 11 August 2026, DOI 10.1016/j.device.2026.101271).
+
+
+## Serialized artifact trust boundary
+
+Untrusted wire or persisted JSON must enter the protocol through the bounded constructors
+`CognitiveConsentLease::from_json_bytes`, `NeurosemanticPacket::from_json_bytes`, or
+`AuthorizedNeurosemanticMessage::from_json_bytes`. Each rejects oversized raw JSON before
+`serde_json` materialization and then re-runs the relevant semantic, integrity, and
+authorization checks. The protocol currently caps serialized artifacts at 1 MiB and
+constructor/validator identifiers at 4096 bytes.
+
+Direct unbounded deserialization remains outside the protocol trust contract. A packet
+that is merely integrity-valid is not thereby authorization-valid: unknown or legacy
+data-policy state remains unable to cross the consent boundary.
