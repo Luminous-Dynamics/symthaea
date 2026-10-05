@@ -400,39 +400,46 @@ impl NixActiveInference {
         {
             use crate::action::executor::NixOSCommand;
             let cmd = match &action {
-                ActionCategory::Install => NixOSCommand::EnvInstall {
+                ActionCategory::Install => Some(NixOSCommand::EnvInstall {
                     packages: vec!["unknown".into()],
-                },
-                ActionCategory::Remove => NixOSCommand::EnvRemove {
+                }),
+                ActionCategory::Remove => Some(NixOSCommand::EnvRemove {
                     packages: vec!["unknown".into()],
-                },
-                ActionCategory::Rebuild => NixOSCommand::RebuildSwitch {
+                }),
+                ActionCategory::Rebuild => Some(NixOSCommand::RebuildSwitch {
                     flake: None,
                     extra_args: vec![],
-                },
-                ActionCategory::Rollback => NixOSCommand::EnvRollback,
-                ActionCategory::GarbageCollect => NixOSCommand::CollectGarbage {
+                }),
+                ActionCategory::Rollback => Some(NixOSCommand::EnvRollback),
+                ActionCategory::GarbageCollect => Some(NixOSCommand::CollectGarbage {
                     older_than_days: None,
                     delete_all: false,
-                },
-                ActionCategory::Update => NixOSCommand::Channel {
+                }),
+                ActionCategory::Update => Some(NixOSCommand::Channel {
                     operation: crate::action::executor::ChannelOperation::Update { channel: None },
-                },
-                _ => NixOSCommand::Custom {
-                    command: format!("{action:?}"),
-                    args: vec![],
-                    safety_level: crate::action::executor::SafetyLevel::ReadOnly,
-                },
+                }),
+                _ => None,
             };
 
-            self.episodic_memory.record_transition(
-                state_before.clone(),
-                &cmd,
-                state_after.clone(),
-                outcome.clone(),
-                phi,
-                prediction_error,
-            );
+            if let Some(cmd) = cmd {
+                self.episodic_memory.record_transition(
+                    state_before.clone(),
+                    &cmd,
+                    state_after.clone(),
+                    outcome.clone(),
+                    phi,
+                    prediction_error,
+                );
+            } else {
+                self.episodic_memory.record_action_label(
+                    state_before.clone(),
+                    &format!("{action:?}"),
+                    state_after.clone(),
+                    outcome.clone(),
+                    phi,
+                    prediction_error,
+                );
+            }
         }
         #[cfg(not(feature = "native"))]
         {
