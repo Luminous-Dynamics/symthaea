@@ -101,6 +101,7 @@ pub enum FlakeOperation {
     Lock { inputs: Vec<String> },
     Show,
     Check,
+    Init { template: Option<String> },
 }
 
 /// Safety levels for commands
@@ -183,6 +184,9 @@ impl NixOSCommand {
             } => SafetyLevel::UserModify,
             Self::Flake {
                 operation: FlakeOperation::Update { .. },
+            } => SafetyLevel::UserModify,
+            Self::Flake {
+                operation: FlakeOperation::Init { .. },
             } => SafetyLevel::UserModify,
             Self::Flake {
                 operation: FlakeOperation::Lock { .. },
@@ -364,6 +368,14 @@ impl NixOSCommand {
                     "nix".to_string(),
                     vec!["flake".to_string(), "check".to_string()],
                 ),
+                FlakeOperation::Init { template } => {
+                    let mut args = vec!["flake".to_string(), "init".to_string()];
+                    if let Some(template) = template {
+                        args.push("--template".to_string());
+                        args.push(template.clone());
+                    }
+                    ("nix".to_string(), args)
+                },
             },
             Self::HomeManagerSwitch { flake } => {
                 let cap = if flake.is_some() { 3 } else { 1 };
