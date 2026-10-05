@@ -88,3 +88,6 @@ An observation may then carry the resulting experimental_design_id, closing the 
 ExperimentalDesignProvenance uses typed discrimination targets rather than free-text pair descriptions. Each target identifies both candidate endpoints, the exact surface being discriminated (burden, performance metric, or operating condition), and a versioned decision-rule identity/digest. The target's surface must resolve to a declared requirement context and its comparison basis must exactly match the design and protocol basis.
 
 Observations linked to an experimental design must also carry that exact design identity. Observations carrying a design identity without a supplied design are rejected, as are observations carrying a different design identity. This makes proposal-to-observation lineage bidirectional at the Symthaea boundary rather than merely advisory.
+
+
+Experimental observations are now bound to the exact documented procedure prescribed by the experimental protocol. A design-bound observation must match the design's protocol procedure identity exactly; procedure drift fails closed. This keeps the planned protocol distinct from merely having an observation produced by some procedure.
