@@ -81,8 +81,24 @@ fn candidate(
         name: id.into(),
         kind,
         performance: BTreeMap::from([
-            ("service_life_years".into(), 12.0),
-            ("throughput_per_hour".into(), 120.0),
+            (
+                "service_life_years".into(),
+                PerformanceEstimate {
+                    value: 12.0,
+                    unit: "burden-unit".into(),
+                    scope: "benchmark:functional-unit-v1|global".into(),
+                    evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
+                },
+            ),
+            (
+                "throughput_per_hour".into(),
+                PerformanceEstimate {
+                    value: 120.0,
+                    unit: "burden-unit".into(),
+                    scope: "benchmark:functional-unit-v1|global".into(),
+                    evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
+                },
+            ),
         ]),
         burdens: burdens(
             &evidence_ids,
@@ -119,6 +135,22 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
                     )
                 })
                 .collect(),
+            performance_scales: BTreeMap::from([
+                (
+                    "service_life_years".into(),
+                    ComparisonScale {
+                        unit: "burden-unit".into(),
+                        scope: "benchmark:functional-unit-v1|global".into(),
+                    },
+                ),
+                (
+                    "throughput_per_hour".into(),
+                    ComparisonScale {
+                        unit: "burden-unit".into(),
+                        scope: "benchmark:functional-unit-v1|global".into(),
+                    },
+                ),
+            ]),
         },
         candidates: vec![
             // Intentionally shuffled: canonicalization must make output invariant
