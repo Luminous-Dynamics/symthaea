@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 
 use symthaea_core::hdc::ContinuousHV;
 
+use crate::action::executor::{ExecutionResult, NixOSExecutor, NixOSCommand};
 use crate::action::generation_manager::GenerationManager;
 use crate::encoding::{NixCodebook, SystemStateEncoder, SystemStateSnapshot};
 use crate::observe::SystemObserver;
@@ -203,28 +204,52 @@ impl Watchdog {
                             };
                         }
                         AutonomyLevel::FullAutonomous => {
-                            let cmd = GenerationManager::switch_to(pre_gen as u32);
-                            let (bin, args) = cmd.to_command();
-                            let result = std::process::Command::new(&bin).args(&args).status();
-                            match result {
-                                Ok(status) if status.success() => {
-                                    return WatchdogVerdict::Reverted { reason, pre_gen };
-                                }
-                                Ok(status) => {
+                            let generation = match u32::try_from(pre_gen) {
+                                Ok(generation) => generation,
+                                Err(_) => {
                                     return WatchdogVerdict::Degraded {
                                         reason: format!(
-                                            "{}; rollback failed (exit {})",
-                                            reason,
-                                            status.code().unwrap_or(-1)
+                                            "{}; rollback authority rejected: generation {} exceeds u32 range",
+                                            reason, pre_gen
                                         ),
                                         surprise: last_surprise,
                                         health: last_health,
                                         checks_performed,
                                     };
                                 }
-                                Err(e) => {
+                            };
+                            let cmd = NixOSCommand::SwitchGeneration { generation };
+                            let mut executor = NixOSExecutor::new();
+                            match executor.execute_confirmed_blocking(cmd, 0.0) {
+                                ExecutionResult::Success { .. } => {
+                                    return WatchdogVerdict::Reverted { reason, pre_gen };
+                                }
+                                ExecutionResult::Blocked { reason: block_reason, .. } => {
                                     return WatchdogVerdict::Degraded {
-                                        reason: format!("{}; rollback exec error: {}", reason, e),
+                                        reason: format!("{}; rollback authority rejected: {}", reason, block_reason),
+                                        surprise: last_surprise,
+                                        health: last_health,
+                                        checks_performed,
+                                    };
+                                }
+                                ExecutionResult::PendingConfirmation {
+                                    required_phi,
+                                    phi,
+                                    ..
+                                } => {
+                                    return WatchdogVerdict::Degraded {
+                                        reason: format!(
+                                            "{}; governed rollback unexpectedly pending confirmation (phi={:.3}, required={:.3})",
+                                            reason, phi, required_phi
+                                        ),
+                                        surprise: last_surprise,
+                                        health: last_health,
+                                        checks_performed,
+                                    };
+                                }
+                                other => {
+                                    return WatchdogVerdict::Degraded {
+                                        reason: format!("{}; governed rollback did not succeed: {:?}", reason, other),
                                         surprise: last_surprise,
                                         health: last_health,
                                         checks_performed,
@@ -264,6 +289,20 @@ impl Watchdog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn watchdog_rollback_rejects_generation_overflow() {
+        assert!(u32::try_from(u64::from(u32::MAX) + 1).is_err());
+    }
+
+    #[test]
+    fn watchdog_rollback_uses_typed_generation_switch_effect() {
+        let command = NixOSCommand::SwitchGeneration { generation: 42 };
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "nix-env");
+        assert_eq!(args[0], "--switch-generation");
+        assert_eq!(args[1], "42");
+    }
 
     #[test]
     fn test_watchdog_config_defaults() {
