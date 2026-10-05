@@ -2431,9 +2431,11 @@ mod tests {
             &[("links", "relation:links")],
             "scheme:example-v1",
         );
-        duplicate_grounding_manifest.concepts[0].grounding_ids.push(
-            duplicate_grounding_manifest.concepts[0].grounding_ids[0].clone(),
-        );
+        let duplicated_grounding =
+            duplicate_grounding_manifest.concepts[0].grounding_ids[0].clone();
+        duplicate_grounding_manifest.concepts[0]
+            .grounding_ids
+            .push(duplicated_grounding);
         assert!(!duplicate_grounding_manifest.validates());
     }
 
