@@ -211,6 +211,34 @@ use symthaea_types::ScientificInquirySelectionReceipt;
     }
 
     #[test]
+    fn selection_receipt_binds_the_chosen_experiment() {
+        let hypotheses = [0u8, 1u8];
+        let candidates = [1.0f64, 3.0f64];
+        let predict = |h: &u8, x: &f64| Some(if *h == 0 { *x } else { *x * 2.0 });
+        let (chosen, receipt) = select_most_informative_experiment_with_receipt(
+            &candidates,
+            &hypotheses,
+            predict,
+            "handoff-digest",
+            "hypothesis-set",
+            "challenge-space",
+            "selector-v1",
+            17,
+            |x| format!("experiment:{x:.1}"),
+        )
+        .unwrap()
+        .expect("candidate pool is non-empty");
+
+        assert_eq!(*chosen, 3.0);
+        assert!(receipt.validate().is_ok());
+        assert_eq!(
+            receipt.selected_challenge_digest,
+            "experiment:3.0"
+        );
+        assert!(receipt.predicted_information_gain() > 0.0);
+    }
+
+    #[test]
     fn selector_returns_none_on_empty_candidate_pool() {
         let hypotheses: Vec<fn(f64) -> f64> = vec![|x| x];
         let predict = |h: &fn(f64) -> f64, x: &f64| Some(h(*x));
