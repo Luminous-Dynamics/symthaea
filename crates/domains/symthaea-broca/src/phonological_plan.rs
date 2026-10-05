@@ -207,6 +207,35 @@ impl PhonologicalPlan {
         self.bind_lexical_segments(segments, binding.provenance_token())
     }
 
+    /// Re-validate a lexicalized plan against the concrete binding and retained witness.
+    ///
+    /// The witness is intentionally supplied explicitly because the current plan schema does not
+    /// persist its full lexical-to-segment mapping. This prevents the API from implying evidence
+    /// retention that the serialized plan does not actually provide.
+    pub fn validate_against_lexical_binding_and_witness(
+        &self,
+        frame: &LinguisticFrame,
+        binding: &LexicalMorphosyntacticBinding,
+        witness: &LexicalPhonologicalWitness,
+    ) -> Result<(), PhonologicalPlanError> {
+        binding
+            .validate_against_frame(frame)
+            .map_err(|_| PhonologicalPlanError::LexicalBindingMismatch)?;
+        self.validate_against_frame(frame)?;
+        witness
+            .validate_against_segments(binding, &self.segments)
+            .map_err(|_| PhonologicalPlanError::LexicalPhonologicalWitnessMismatch)?;
+
+        let expected_provenance = binding.provenance_token();
+        if self.content_binding != ContentBindingStatus::LexicallyBound
+            || self.lexical_provenance.as_deref() != Some(expected_provenance.as_str())
+        {
+            return Err(PhonologicalPlanError::LexicalBindingMismatch);
+        }
+
+        Ok(())
+    }
+
     /// Bind a lexicalized phonological plan only when an explicit realization witness
     /// validates the exact lexical-to-segment mapping.
     ///
@@ -797,6 +826,11 @@ mod tests {
         assert!(
             phonological
                 .validate_against_lexical_binding(&frame, &binding)
+                .is_ok()
+        );
+        assert!(
+            phonological
+                .validate_against_lexical_binding_and_witness(&frame, &binding, &witness)
                 .is_ok()
         );
 
