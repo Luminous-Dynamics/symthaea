@@ -72,6 +72,25 @@ fn valid(t: PhysicalType) -> TypeJudgement<PhysicalType> {
     TypeJudgement::Valid(t)
 }
 
+fn constant_type(value: f64) -> TypeJudgement<PhysicalType> {
+    if !value.is_finite() {
+        return TypeJudgement::Invalid(PhysicalTypeError {
+            operation: "constant".into(),
+            reason: "non-finite constant".into(),
+        });
+    }
+    let mut ty = PhysicalType::dimensionless();
+    if value > 0.0 {
+        ty.refinements.push(Refinement::Positive);
+        ty.refinements.push(Refinement::NonZero);
+    } else if value < 0.0 {
+        ty.refinements.push(Refinement::NonZero);
+    } else {
+        ty.refinements.push(Refinement::NonNegative);
+    }
+    valid(ty)
+}
+
 pub fn infer_expr_type(expr: &Expr, units: &UnitMap) -> TypeJudgement<PhysicalType> {
     infer_expr_type_with_lookup(expr, &|name| variable_type(name, units))
 }
@@ -96,7 +115,7 @@ where
 
     match expr {
         Expr::Var(name) => valid(lookup(name)),
-        Expr::Const(_) => valid(PhysicalType::dimensionless()),
+        Expr::Const(value) => constant_type(*value),
         Expr::Sum(body, _) => infer_expr_type_with_lookup(body, lookup),
 
         Expr::Func(function, arg) => {
@@ -143,16 +162,23 @@ where
                 }
                 UnaryFn::Sqrt => {
                     let a = dimension.as_array();
-                    if a.iter().all(|e| e % 2 == 0) {
+                    if !a.iter().all(|e| e % 2 == 0) {
+                        return TypeJudgement::Invalid(PhysicalTypeError {
+                            operation: "sqrt".into(),
+                            reason: "dimension exponents must be even".into(),
+                        });
+                    }
+                    if arg_ty.scalar == ScalarDomain::Complex
+                        || arg_ty.has_refinement(Refinement::NonNegative)
+                    {
                         valid(PhysicalType::with_kind(
                             Unknown,
                             PhysicalDimension::from_array(a.map(|e| e / 2)),
                         ))
                     } else {
-                        TypeJudgement::Invalid(PhysicalTypeError {
-                            operation: "sqrt".into(),
-                            reason: "dimension exponents must be even".into(),
-                        })
+                        TypeJudgement::Unknown(
+                            "real square-root requires a nonnegative domain refinement".into(),
+                        )
                     }
                 }
                 UnaryFn::Abs | UnaryFn::Floor => valid(arg_ty),
@@ -226,7 +252,7 @@ where
             let (Some(ld), Some(rd)) = (l.dimension, r.dimension) else {
                 return TypeJudgement::Unknown("division operand dimension is unknown".into());
             };
-            if r.kind == Unknown || r.has_refinement(Refinement::NonZero) {
+            if r.has_refinement(Refinement::NonZero) {
                 match ld.checked_sub(rd) {
                     Some(dimension) => valid(PhysicalType::with_kind(
                         derived_kind_div(l.kind, r.kind),
@@ -412,6 +438,38 @@ mod tests {
         assert!(matches!(
             infer_expr_type_with_variables(&expr, &variables),
             TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn nonzero_constant_can_be_a_division_denominator() {
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(2.0)),
+        );
+        assert!(matches!(infer_expr_type(&expr, &units()), TypeJudgement::Valid(_)));
+    }
+
+    #[test]
+    fn zero_constant_is_not_a_valid_division_denominator() {
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(0.0)),
+        );
+        assert!(matches!(
+            infer_expr_type(&expr, &units()),
+            TypeJudgement::Unknown(_)
+        ));
+    }
+
+    #[test]
+    fn square_root_requires_real_domain_refinement() {
+        let expr = Expr::Func(UnaryFn::Sqrt, Box::new(Expr::Var("E".into())));
+        assert!(matches!(
+            infer_expr_type(&expr, &units()),
+            TypeJudgement::Unknown(_)
         ));
     }
 
