@@ -292,7 +292,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn test_switch_to_is_typed_system_generation_operation() {
         let cmd = GenerationManager::switch_to(42);
         assert!(matches!(cmd, NixOSCommand::SwitchGeneration { generation: 42 }));
@@ -302,6 +301,7 @@ mod tests {
         assert!(args.contains(&"42".to_string()));
     }
 
+    #[test]
     fn test_rollback_command() {
         let cmd = GenerationManager::rollback();
         let (bin, args) = cmd.to_command();
