@@ -7,7 +7,7 @@
 //! Produces `NixOSCommand` values for anything that modifies state;
 //! read-only queries (list, diff) run directly.
 
-use super::executor::{NixOSCommand, SafetyLevel};
+use super::executor::NixOSCommand;
 use std::process::Command;
 
 /// Manages NixOS generations: switch, rollback, delete, and boot configuration.
@@ -73,16 +73,7 @@ impl GenerationManager {
 
     /// Generate a command to switch to a specific generation.
     pub fn switch_to(generation: u32) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "nix-env".to_string(),
-            args: vec![
-                "--switch-generation".to_string(),
-                generation.to_string(),
-                "-p".to_string(),
-                "/nix/var/nix/profiles/system".to_string(),
-            ],
-            safety_level: SafetyLevel::SystemCritical,
-        }
+        NixOSCommand::SwitchGeneration { generation }
     }
 
     /// Generate a rollback command (switch to previous generation).
