@@ -24,7 +24,7 @@ use url::Url;
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
 pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 9;
-pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 10;
+pub const VERIFICATION_EVIDENCE_DIGEST_VERSION: u16 = 11;
 pub const CRYPTOGRAPHIC_VERIFICATION_RECEIPT_SCHEMA_VERSION: u16 = 4;
 
 /// Typed identifier for the verification relationship under which a verification
