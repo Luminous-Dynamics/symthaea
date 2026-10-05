@@ -2492,3 +2492,81 @@ mod tests {
     #[test]
     fn same_concept_with_new_grounding_reuses_the_frozen_codebook() {
         let (training, training_manifest) = training_graph_and_manifest();
+        let codebook =
+            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
+                .unwrap();
+
+        let training_representation =
+            codebook.encode_graph(&training, &training_manifest).unwrap();
+
+        let mut held_out = training.clone();
+        for node in &mut held_out.nodes {
+            node.grounded_by = vec![format!("heldout-{}", node.id)];
+        }
+        let held_out_manifest = manifest(
+            &held_out,
+            &[
+                ("alice", "concept:agent/alice"),
+                ("event", "concept:event/approach"),
+                ("object", "concept:object/target"),
+            ],
+            &[
+                ("initiates", "relation:initiates"),
+                ("targets", "relation:targets"),
+            ],
+            "scheme:example-v1",
+        );
+
+        assert!(held_out_manifest.validates());
+        assert_ne!(
+            training_manifest.manifest_hash(),
+            held_out_manifest.manifest_hash()
+        );
+
+        let held_out_representation =
+            codebook.encode_graph(&held_out, &held_out_manifest).unwrap();
+
+        // Grounding is provenance, not HDC atom identity: the stable structure
+        // should reuse the exact frozen transport frames.
+        assert_eq!(
+            training_representation.node_frame,
+            held_out_representation.node_frame
+        );
+        assert_eq!(
+            training_representation.edge_frame,
+            held_out_representation.edge_frame
+        );
+        assert_ne!(
+            training_representation.source_manifest_hash,
+            held_out_representation.source_manifest_hash
+        );
+
+        let expected_concepts = BTreeMap::from([
+            ("alice".to_string(), "concept:agent/alice".to_string()),
+            ("event".to_string(), "concept:event/approach".to_string()),
+            ("object".to_string(), "concept:object/target".to_string()),
+        ]);
+        let metrics = codebook
+            .measure_roundtrip(
+                &held_out,
+                &held_out_representation,
+                &held_out_manifest,
+                &held_out_manifest,
+                &expected_concepts,
+                &[
+                    "relation:initiates".to_string(),
+                    "relation:targets".to_string(),
+                ],
+                HdcOntologyDecodePolicy::conservative_default(),
+            )
+            .unwrap();
+
+        assert!(metrics.concept_identity_exact);
+        assert!(metrics.relation_identity_exact);
+        assert!(metrics.structural_equivalence);
+        assert_eq!(metrics.node_precision, 1.0);
+        assert_eq!(metrics.node_recall, 1.0);
+        assert_eq!(metrics.edge_precision, 1.0);
+        assert_eq!(metrics.edge_recall, 1.0);
+    }
+}
