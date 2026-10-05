@@ -74,8 +74,12 @@ pub struct ProsodyContext {
     pub stress: u8,
     /// Base F0 for the utterance (from config or speaker profile).
     pub base_f0: f32,
-    /// Emotional arousal (0.0–1.0) — maps to F0 range expansion.
+    /// Emotional arousal (0.0–1.0) — independent speaker-state modulation of F0.
     pub arousal: f32,
+    /// Relative pitch-range multiplier for the planned intonation shape.
+    /// 1.0 preserves the existing contour; values below 1.0 compress and values above
+    /// 1.0 expand deviations from the neutral F0 multiplier. This never changes base_f0.
+    pub pitch_range: f32,
     /// Intonation contour type.
     pub intonation: Intonation,
     /// Phrase index (for declination reset). 0 = first phrase, increments at boundaries.
@@ -109,6 +113,7 @@ impl Default for ProsodyContext {
             stress: 0,
             base_f0: 120.0,
             arousal: 0.5,
+            pitch_range: 1.0,
             intonation: Intonation::Statement,
             phrase_index: 0,
             phrase_progress: 0.0,
@@ -237,11 +242,13 @@ impl ProsodyContext {
         // Declination: F0 baseline drops 15% within each phrase
         let declination = 1.0 - 0.15 * self.phrase_progress;
 
-        // Pitch accent shapes: snapped to syllable onset for syllable-aligned prosody.
-        // When syllable_progress has been explicitly set (> 0), use it instead of
-        // phoneme_progress so accents span the entire syllable, not just one phoneme.
-        // Falls back to phoneme_progress for backward compatibility.
-        let accent_progress = if self.syllable_progress > 0.0 {
+        // Pitch accent shapes: use the explicit syllable trajectory whenever this
+        // context is marked as a syllable onset or carries non-zero syllable progress.
+        // Zero is meaningful at the onset; only non-onset contexts without syllable
+        // progress fall back to phoneme_progress for backward compatibility.
+        let accent_progress = if self.is_syllable_onset || self.syllable_progress > 0.0 {
+            // Zero is a meaningful value at the syllable onset. Do not treat it as
+            // “unset”, or the first frame would fall back to mid-phoneme progress.
             self.syllable_progress
         } else {
             self.phoneme_progress
@@ -277,16 +284,21 @@ impl ProsodyContext {
             _ => 1.0,
         };
 
-        // Arousal maps to F0 range (more arousal = wider pitch swings)
-        let arousal_factor = 0.9 + 0.2 * self.arousal;
-
-        frame.f0 = self.base_f0
-            * contour
+        // Keep explicit plan pitch range separate from emotional arousal. The planned
+        // pitch range scales deviations of the composed contour around neutral (1.0), so
+        // the scheduler can attribute plan pitch_range independently of speaker-state arousal.
+        let pitch_shape = contour
             * declination
             * accent_contour
             * stress_f0_boost
-            * arousal_factor
             * focus_boost;
+        let pitch_range = self.pitch_range.clamp(0.65, 1.45);
+        let ranged_pitch_shape = 1.0 + (pitch_shape - 1.0) * pitch_range;
+
+        // Arousal remains an independent F0-range modulation from speaker state.
+        let arousal_factor = 0.9 + 0.2 * self.arousal;
+
+        frame.f0 = self.base_f0 * ranged_pitch_shape * arousal_factor;
 
         // Microprosody: consonants perturb F0 slightly
         let microprosody = match frame.source_type {
@@ -1085,11 +1097,98 @@ impl VocalTractPipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::controller::SpeakerProfile;
     use crate::encoder::VoiceCognitiveState;
     use crate::fep::VocalTractObservation;
     use crate::types::FormantFrame;
     use symthaea_core::genesis::GenesisSeed;
+
+    #[test]
+    fn test_syllable_onset_uses_zero_progress_for_pitch_accent() {
+        let base = FormantFrame {
+            f0: 0.0,
+            energy: 0.5,
+            ..FormantFrame::silent(0.0)
+        };
+
+        let onset = ProsodyContext {
+            utterance_progress: 0.0,
+            phoneme_progress: 0.5,
+            stress: 1,
+            base_f0: 200.0,
+            arousal: 0.5,
+            pitch_range: 1.0,
+            intonation: Intonation::Statement,
+            phrase_progress: 0.0,
+            is_focus: false,
+            pitch_accent: PitchAccent::High,
+            is_syllable_onset: true,
+            syllable_progress: 0.0,
+            ..Default::default()
+        };
+
+        let mut frame = base;
+        onset.apply_prosody(&mut frame);
+
+        // Statement contour at utterance start = 1.05, primary stress = 1.10,
+        // neutral high-accent contour at syllable progress 0 = 1.0, arousal = 1.0.
+        let expected = 200.0 * 1.05 * 1.10;
+        assert!(
+            (frame.f0 - expected).abs() < 1e-4,
+            "syllable onset must begin the accent at zero progress: expected {expected}, got {}",
+            frame.f0
+        );
+    }
+
+    #[test]
+    fn test_pitch_range_is_independent_of_arousal() {
+        let base = FormantFrame {
+            f0: 0.0,
+            energy: 0.5,
+            ..FormantFrame::silent(0.0)
+        };
+
+        let narrow = ProsodyContext {
+            utterance_progress: 0.0,
+            phoneme_progress: 0.5,
+            base_f0: 200.0,
+            arousal: 0.5,
+            pitch_range: 0.65,
+            ..Default::default()
+        };
+        let mut wide = narrow;
+        wide.pitch_range = 1.45;
+
+        let mut narrow_frame = base;
+        let mut wide_frame = base;
+        narrow.apply_prosody(&mut narrow_frame);
+        wide.apply_prosody(&mut wide_frame);
+
+        assert!(narrow_frame.f0.is_finite() && wide_frame.f0.is_finite());
+        assert!(wide_frame.f0 > narrow_frame.f0);
+
+        let narrow_a2 = ProsodyContext {
+            arousal: 0.2,
+            ..narrow
+        };
+        let narrow_b2 = ProsodyContext {
+            arousal: 0.8,
+            ..narrow
+        };
+        let mut frame_a2 = base;
+        let mut frame_b2 = base;
+        narrow_a2.apply_prosody(&mut frame_a2);
+        narrow_b2.apply_prosody(&mut frame_b2);
+
+        assert_ne!(frame_a2.f0, frame_b2.f0);
+        let pitch_shape_narrow_a = frame_a2.f0 / (narrow_a2.base_f0 * (0.9 + 0.2 * 0.2));
+        let pitch_shape_narrow_b = frame_b2.f0 / (narrow_b2.base_f0 * (0.9 + 0.2 * 0.8));
+        assert!(
+            (pitch_shape_narrow_a - pitch_shape_narrow_b).abs() < 1e-6,
+            "pitch range must not depend on arousal: a={pitch_shape_narrow_a}, b={pitch_shape_narrow_b}"
+        );
+    }
 
     #[test]
     fn test_pipeline_time_tracking() {

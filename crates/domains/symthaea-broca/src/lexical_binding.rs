@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use crate::linguistic_frame::{FormulationStrategy, LinguisticFrame};
 
 pub const LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION: &str =
-    "broca-lexical-morphosyntactic-binding-v1";
+    "broca-lexical-morphosyntactic-binding-v2";
 
 /// Whether a language-specific morphosyntactic rule has been explicitly supplied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,7 +150,7 @@ impl LexicalMorphosyntacticBinding {
         let binding = Self {
             version: LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION.to_string(),
             source_frame_version: frame.version.clone(),
-            source_frame_grounding: frame.grounding_surface(),
+            source_frame_grounding: frame.canonical_grounding_surface(),
             language,
             constituents,
             dependencies,
@@ -173,7 +173,7 @@ impl LexicalMorphosyntacticBinding {
         self.validate()?;
 
         if self.source_frame_version != frame.version
-            || self.source_frame_grounding != frame.grounding_surface()
+            || self.source_frame_grounding != frame.canonical_grounding_surface()
         {
             return Err(LexicalBindingError::UpstreamMismatch);
         }
@@ -183,8 +183,14 @@ impl LexicalMorphosyntacticBinding {
             .iter()
             .map(|slot| (slot.role.clone(), slot.prime.clone()))
             .collect();
+        let expected_source_order: Vec<(String, String)> = frame
+            .constituents
+            .iter()
+            .map(|slot| (slot.role.clone(), slot.prime.clone()))
+            .collect();
 
         let mut observed_sources = HashSet::new();
+        let mut observed_source_order = Vec::new();
         for constituent in &self.constituents {
             match &constituent.source {
                 LexicalSource::SemanticConstituent { role, prime } => {
@@ -200,6 +206,7 @@ impl LexicalMorphosyntacticBinding {
                             prime: prime.clone(),
                         });
                     }
+                    observed_source_order.push((role.clone(), prime.clone()));
                 }
                 LexicalSource::InsertedFunctionWord { .. } => {}
             }
@@ -218,6 +225,10 @@ impl LexicalMorphosyntacticBinding {
                 role: missing.0,
                 prime: missing.1,
             });
+        }
+
+        if observed_source_order != expected_source_order {
+            return Err(LexicalBindingError::SemanticSourceOrderMismatch);
         }
 
         Ok(())
@@ -493,6 +504,7 @@ pub enum LexicalBindingError {
     UnknownSemanticSource { role: String, prime: String },
     DuplicateSemanticSource { role: String, prime: String },
     MissingSemanticCoverage { role: String, prime: String },
+    SemanticSourceOrderMismatch,
     NoSemanticPayload,
     SemanticPayloadMismatch { position: usize },
     SemanticFunctionMismatch { position: usize },
@@ -533,6 +545,7 @@ impl std::fmt::Display for LexicalBindingError {
             Self::UnknownSemanticSource { role, prime } => write!(f, "lexical binding references unknown semantic source {role}:{prime}"),
             Self::DuplicateSemanticSource { role, prime } => write!(f, "semantic source {role}:{prime} is bound more than once"),
             Self::MissingSemanticCoverage { role, prime } => write!(f, "semantic source {role}:{prime} is not lexically covered"),
+            Self::SemanticSourceOrderMismatch => write!(f, "lexical semantic-source order no longer matches the linguistic frame"),
             Self::NoSemanticPayload => write!(f, "lexical binding must contain semantic payload"),
             Self::SemanticPayloadMismatch { position } => write!(f, "semantic-payload flag disagrees with lexical source at position {position}"),
             Self::SemanticFunctionMismatch { position } => write!(f, "semantic payload at position {position} cannot be classified as a function word"),
@@ -675,6 +688,47 @@ mod tests {
     }
 
     #[test]
+    fn legacy_binding_schema_fails_closed() {
+        let frame = statement_frame();
+        let mut binding = LexicalMorphosyntacticBinding::new(
+            &frame,
+            english_rule_binding(),
+            base_semantic_bindings(),
+            vec![],
+            vec![],
+        )
+        .expect("base lexical binding");
+        binding.version = "broca-lexical-morphosyntactic-binding-v1".into();
+
+        assert_eq!(
+            binding.validate().expect_err("legacy binding schema must fail closed"),
+            LexicalBindingError::InvalidVersion
+        );
+    }
+
+    #[test]
+    fn upstream_prosody_tampering_breaks_exact_lineage() {
+        let frame = statement_frame();
+        let binding = LexicalMorphosyntacticBinding::new(
+            &frame,
+            english_rule_binding(),
+            base_semantic_bindings(),
+            vec![],
+            vec![],
+        )
+        .expect("base lexical binding");
+        let mut tampered = frame.clone();
+        tampered.prosody.rate = if tampered.prosody.rate < 1.0 { 1.2 } else { 0.8 };
+
+        assert_eq!(
+            binding
+                .validate_against_frame(&tampered)
+                .expect_err("prosody mutation must invalidate lexical lineage"),
+            LexicalBindingError::UpstreamMismatch
+        );
+    }
+
+    #[test]
     fn explicit_semantic_coverage_and_lineage_pass() {
         let frame = statement_frame();
         let binding = LexicalMorphosyntacticBinding::new(
@@ -706,6 +760,23 @@ mod tests {
         assert!(binding.validate_against_frame(&frame).is_ok());
         assert!(binding.grounding_surface().contains(LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION));
         assert_eq!(binding.provenance_token().len(), 64);
+    }
+
+    #[test]
+    fn semantic_source_order_must_match_frame_linearization() {
+        let frame = statement_frame();
+        let mut bindings = base_semantic_bindings();
+        bindings.swap(0, 1);
+        let error = LexicalMorphosyntacticBinding::new(
+            &frame,
+            english_rule_binding(),
+            bindings,
+            vec![],
+            vec![],
+        )
+        .expect_err("semantic sources must preserve the already-authorized frame order");
+
+        assert_eq!(error, LexicalBindingError::SemanticSourceOrderMismatch);
     }
 
     #[test]

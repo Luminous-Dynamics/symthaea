@@ -7,7 +7,12 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/domains/symthaea-broca/**"
+      - "crates/domains/symthaea-vocal-tract/**"
+      - "crates/core/symthaea-core/**"
+      - "crates/core/symthaea-fep/**"
+      - "src/voice/**"
       - ".github/workflows/broca-feature-matrix.yml"
+    # Changes to the qualification workflow itself must re-run the exact-head matrix.
   workflow_dispatch:
 
 concurrency:
@@ -42,6 +47,10 @@ jobs:
             command: cargo test -p symthaea-broca --lib evaluation::tests::test_canonical_eval_dataset_loads
           - name: canonical-quality-gate
             command: cargo test -p symthaea-broca --lib evaluation::tests::test_quality_gate_thresholds_fail
+          - name: root-live-voice-ssm-language
+            # Root defaults enable `broca_lite`, which is mutually exclusive with `ssm_language`.
+            # Disable defaults so this leg actually exercises the native Broca voice path.
+            command: cargo test -p symthaea --no-default-features --features "live-voice,ssm_language" --lib voice::live_voice::tests
 
     steps:
       - uses: actions/checkout@v4
@@ -64,7 +73,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake
+          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake libasound2-dev
 
       - name: Run feature check
         run: ${{ matrix.command }}
