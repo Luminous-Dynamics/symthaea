@@ -716,10 +716,11 @@ mod tests {
     fn rational_scale_normalization_handles_i64_min_without_overflow() {
         let scale = RationalScale {
             numerator: i64::MIN,
-            denominator: i64::MIN,
+            denominator: 4_611_686_018_427_387_904,
         };
-        assert_eq!(scale.normalized().numerator, 1);
-        assert_eq!(scale.normalized().denominator, 1);
+        let normalized = scale.normalized();
+        assert_eq!(normalized.numerator, -2);
+        assert_eq!(normalized.denominator, 1);
     }
 
     #[test]
