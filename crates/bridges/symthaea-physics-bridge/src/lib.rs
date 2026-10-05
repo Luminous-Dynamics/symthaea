@@ -66,8 +66,9 @@ pub mod types;
 // Re-export primary API types.
 pub use bridge::PhysicsBridge;
 pub use lanyon::{
-    expr_to_lanyon_form, LanyonForm, LanyonPhysicalBinding, LanyonSemanticEnvelope,
-    LanyonSpecificationBundle, LanyonSystemSpec,
+    expr_to_lanyon_form, LanyonArtifactKind, LanyonForm, LanyonPhysicalBinding,
+    LanyonSemanticEnvelope, LanyonSpecificationBundle, LanyonSystemSpec,
+    LanyonVerificationArtifact, LanyonVerificationReceipt, LanyonVerificationStatus,
 };
 pub use catalog::PhysicsCatalog;
 pub use dimensional::DimensionalEncoder;
