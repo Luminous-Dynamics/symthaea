@@ -1059,6 +1059,11 @@ pub struct RequirementSetAssessment {
     pub receipt: AssessmentReceipt,
 }
 
+/// Schema version for multi-requirement assessment results.
+pub const REQUIREMENT_SET_SCHEMA_VERSION: u16 = 1;
+/// Algorithm version for multi-requirement intersection gating.
+pub const REQUIREMENT_SET_ALGORITHM_VERSION: &str = "multi-requirement-intersection-v1";
+
 /// Complete deterministic assessment.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AssessmentResult {
@@ -1359,15 +1364,15 @@ impl AlternativesEngine {
         }
 
         let mut result = RequirementSetAssessment {
-            schema_version: 1,
-            algorithm_version: "multi-requirement-intersection-v1".into(),
+            schema_version: REQUIREMENT_SET_SCHEMA_VERSION,
+            algorithm_version: REQUIREMENT_SET_ALGORITHM_VERSION.into(),
             assessments,
             jointly_eligible_candidate_ids,
             joint_qualification,
             blockers,
             receipt: AssessmentReceipt {
-                schema_version: 1,
-                algorithm_version: "multi-requirement-intersection-v1".into(),
+                schema_version: REQUIREMENT_SET_SCHEMA_VERSION,
+                algorithm_version: REQUIREMENT_SET_ALGORITHM_VERSION.into(),
                 payload_hash: String::new(),
             },
         };
