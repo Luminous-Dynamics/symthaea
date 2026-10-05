@@ -46,6 +46,7 @@ def main() -> int:
     exercism = load_json(artifact_dir / "exercism-bench.json") or {}
     compare = load_json(artifact_dir / "checkpoint-compare.json")
     attribution = load_json(artifact_dir / "attribution-harness.json")
+    lexical_binding = load_json(artifact_dir / "lexical-binding-audit.json")
     run_manifest = manifest(artifact_dir / "measurement-manifest.env")
 
     decoder_agg = decoder.get("aggregate", {})
@@ -110,6 +111,26 @@ def main() -> int:
             for condition in attribution_conditions
         )
         lines.append(f"- Rate target applied by current pipeline: `{fmt(rate_applied)}`")
+    if lexical_binding is not None:
+        lines += ["", "## Lexical / Morphosyntactic Binding", ""]
+        lines.append(f"- Evidence level: `{fmt(lexical_binding.get('evidence_level'))}`")
+        lines.append(f"- Corpus cases: {fmt(lexical_binding.get('corpus_cases'))}")
+        lines.append(f"- Positive passes: {fmt(lexical_binding.get('positive_passes'))}")
+        lines.append(f"- Negative passes: {fmt(lexical_binding.get('negative_passes'))}")
+        lines.append(f"- All negative cases pass: {fmt(lexical_binding.get('all_negative_cases_pass'))}")
+        lines.append(f"- Semantic coverage: {fmt(lexical_binding.get('semantic_coverage_pass'))}")
+        lines.append(f"- Provenance: {fmt(lexical_binding.get('provenance_pass'))}")
+        lines.append(f"- Grammar: {fmt(lexical_binding.get('grammar_pass'))}")
+        lines.append(f"- No-invention gate: {fmt(lexical_binding.get('no_invention_pass'))}")
+        lines.append(f"- Unsupported-rule gate: {fmt(lexical_binding.get('unsupported_rule_unbound_pass'))}")
+        lines.append(f"- Stable repeat: {fmt(lexical_binding.get('stable_repeat_pass'))}")
+        lines.append(f"- Lexical → phonological handoff: {fmt(lexical_binding.get('phonological_handoff_pass'))}")
+        for case in lexical_binding.get("cases") or []:
+            lines.append(
+                f"- `{case.get('name')}`: {fmt(case.get('passed'))}"
+                + (f" — {fmt(case.get('observed_error'))}" if case.get("observed_error") else "")
+            )
+
     if compare is not None:
         lines += [
             "",
