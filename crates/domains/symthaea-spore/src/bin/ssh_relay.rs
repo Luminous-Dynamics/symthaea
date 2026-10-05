@@ -39,6 +39,13 @@ struct CmdResult {
     pub exit_status: u32,
 }
 
+fn shell_single_quote(value: &str) -> String {
+    // POSIX single quotes preserve every character except a literal single
+    // quote. Represent that one byte by closing the quote, emitting an escaped
+    // quote, then reopening it.
+    format!("'{}'", value.replace(char::from(39), "'\\''"))
+}
+
 async fn run_cmd(cmd: &str) -> Result<CmdResult, std::io::Error> {
     // Use /bin/sh (POSIX, always available) as fallback if bash isn't in PATH
     let shell = if std::path::Path::new("/bin/bash").exists() {
@@ -1337,7 +1344,7 @@ echo "  Encrypted partition: $CRYPT_PART"
 echo "STAGE: Setting up encryption..."
 LUKS_KEYFILE=$(mktemp /tmp/.luks-key-XXXXXX)
 chmod 600 "$LUKS_KEYFILE"
-printf '%s' '{passphrase}' > "$LUKS_KEYFILE"
+printf '%s' {passphrase_literal} > "$LUKS_KEYFILE"
 cryptsetup luksFormat --type luks2 --label cryptroot \
   --pbkdf argon2id --iter-time 3000 "$CRYPT_PART" --key-file "$LUKS_KEYFILE"
 cryptsetup open "$CRYPT_PART" cryptroot --key-file "$LUKS_KEYFILE"
@@ -1377,7 +1384,7 @@ echo "STAGE: Generating configuration..."
 nixos-generate-config --root /mnt
 "#,
                 disk = msg.disk,
-                passphrase = passphrase
+                passphrase_literal = shell_single_quote(passphrase)
             );
 
             // Append configuration.nix (and optionally flake.nix) via heredoc.
@@ -5032,6 +5039,33 @@ echo '}'
     // Cleanup
     tracker.lock().await.release(&peer_addr);
     eprintln!("[{}] WebSocket disconnected", peer_addr);
+}
+
+#[cfg(test)]
+mod installer_shell_tests {
+    use super::shell_single_quote;
+
+    #[test]
+    fn shell_single_quote_preserves_shell_metacharacters_as_data() {
+        let value =
+            "a'b; $(touch /tmp/pwned) \n \\ " .to_string()
+                + "\u{60}echo pwned\u{60}";
+        let quoted = shell_single_quote(&value);
+        assert!(quoted.starts_with("'"));
+        assert!(quoted.ends_with("'"));
+        assert!(quoted.contains("'\\''"));
+        assert!(quoted.contains("$("));
+        assert!(quoted.contains(";"));
+        assert!(quoted.contains("\\"));
+    }
+
+    #[test]
+    fn shell_single_quote_keeps_whitespace_inside_one_literal() {
+        assert_eq!(
+            shell_single_quote("correct horse battery staple"),
+            "'correct horse battery staple'"
+        );
+    }
 }
 
 fn generate_auth_token() -> String {
