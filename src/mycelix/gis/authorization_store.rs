@@ -8998,14 +8998,17 @@ mod tests {
         assert_eq!(stored_operation.as_deref(),Some(record.operation_id.as_str()));
         assert_eq!(stored_provider_key.as_deref(),Some(record.provider_idempotency_key.as_str()));
 
-        let loaded=reopened.connection().unwrap();
-        let receipt = super::load_receipt(
-            &loaded.transaction_with_behavior(TransactionBehavior::Immediate).unwrap(),
+        let mut loaded=reopened.connection().unwrap();
+        let tx=loaded.transaction_with_behavior(TransactionBehavior::Immediate).unwrap();
+        let receipt=super::load_receipt(
+            &tx,
             &record.authorization_instance,
             &record.attempt_id,
             "indeterminate",
-        ).unwrap();
-        assert!(receipt.is_some());
+        ).unwrap().expect("bound restart receipt must remain loadable");
+        assert_eq!(receipt.operation_id.as_deref(),Some(record.operation_id.as_str()));
+        assert_eq!(receipt.provider_idempotency_key,record.provider_idempotency_key);
+        tx.commit().unwrap();
 
         let _=std::fs::remove_file(path);
     }
