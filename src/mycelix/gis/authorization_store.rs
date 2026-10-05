@@ -2463,22 +2463,67 @@ fn validate_native_authority_pin_set(
         if prior_owner.is_some() {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+        // Attempt and operation identifiers are lifecycle identities, not
+        // reusable caller labels. Active leases are covered by the checks below;
+        // historical dispatch/recovery records keep the identities consumed
+        // after the active lease is released.
+        let historical_attempt_owner: Option<String> = tx
+            .query_row(
+                "SELECT source
+                 FROM (
+                   SELECT 'authorization_leases' AS source
+                   FROM authorization_leases
+                   WHERE attempt_id=?1
+                     AND attempt_id IS NOT NULL
+                     AND attempt_id <> ''
+                   UNION ALL
+                   SELECT 'authorization_dispatches' AS source
+                   FROM authorization_dispatches
+                   WHERE attempt_id=?1
+                   UNION ALL
+                   SELECT 'authorization_recovery_markers' AS source
+                   FROM authorization_recovery_markers
+                   WHERE attempt_id=?1
+                 )
+                 LIMIT 1",
+                params![attempt_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if historical_attempt_owner.is_some() {
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
         if let Some(operation_id) = operation_id {
-            let prior_operation_owner: Option<String> = tx
+            let historical_operation_owner: Option<String> = tx
                 .query_row(
-                    "SELECT authorization_instance
-                     FROM authorization_leases
-                     WHERE operation_id=?1
-                       AND authorization_instance<>?2",
-                    params![operation_id, witness.authorization_instance.as_str()],
+                    "SELECT source
+                     FROM (
+                       SELECT 'authorization_leases' AS source
+                       FROM authorization_leases
+                       WHERE operation_id=?1
+                         AND operation_id IS NOT NULL
+                         AND operation_id <> ''
+                       UNION ALL
+                       SELECT 'authorization_dispatches' AS source
+                       FROM authorization_dispatches
+                       WHERE operation_id=?1
+                       UNION ALL
+                       SELECT 'authorization_recovery_markers' AS source
+                       FROM authorization_recovery_markers
+                       WHERE operation_id=?1
+                         AND operation_id IS NOT NULL
+                         AND operation_id <> ''
+                     )
+                     LIMIT 1",
+                    params![operation_id],
                     |row| row.get(0),
                 )
                 .optional()?;
-            if prior_operation_owner.is_some() {
+            if historical_operation_owner.is_some() {
                 return Err(AuthorizationConsumptionError::InvalidBinding.into());
             }
         }
-
 
         let mut lease = load_lease(&tx, &witness.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
@@ -10717,6 +10762,79 @@ mod tests {
         let _=std::fs::remove_file(path);
     }
 
+
+    #[test]
+    fn released_attempt_and_operation_ids_cannot_be_reused() {
+        let path=std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-identity-history-{}.db",std::process::id()
+        ));
+        let (store,action,witness)=fixture(&path);
+        let attempt_id="attempt-history";
+        let operation_id="operation:history";
+        store.prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            attempt_id,
+            "boundary-history",
+            operation_id,
+        ).unwrap();
+
+        let recovery=RecoveryAuthorizationWitness {
+            authorization_instance:witness.authorization_instance.clone(),
+            attempt_id:attempt_id.into(),
+            operation_id:operation_id.into(),
+            boundary_id:"boundary-history".into(),
+            action_digest:witness.action_digest.clone(),
+            policy:"recovery-policy-v1".into(),
+            authority_epoch:witness.authority_epoch,
+            issued_at:witness.issued_at.clone(),
+        };
+        assert!(store.recover_pre_dispatch_attempt(&recovery).unwrap());
+
+        let err=store.prepare_for_execution_bound_with_operation(
+            &witness,
+            &action,
+            "frame@1",
+            attempt_id,
+            "boundary-history",
+            operation_id,
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            )
+        ));
+
+        let new_attempt="attempt-history-new";
+        let new_operation="operation:history-new";
+        let mut fresh_witness=witness.clone();
+        fresh_witness.operation_id=Some(new_operation.into());
+        store.prepare_for_execution_bound_with_operation(
+            &fresh_witness,
+            &action,
+            "frame@1",
+            new_attempt,
+            "boundary-history",
+            new_operation,
+        ).unwrap();
+        assert!(matches!(
+            store.prepare_for_execution_bound_with_operation(
+                &fresh_witness,
+                &action,
+                "frame@1",
+                "attempt-history-second",
+                "boundary-history",
+                operation_id,
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+
+        let _=std::fs::remove_file(path);
+    }
 
     #[test]
     fn prepared_operation_id_cannot_be_reused_across_authorizations() {
