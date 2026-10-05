@@ -39,6 +39,8 @@ fn evidence(
         scope: "benchmark:functional-unit-v1|global".into(),
         unit: Some("burden-unit".into()),
         as_of: Some("benchmark-v1".into()),
+        valid_from_epoch_seconds: None,
+        valid_until_epoch_seconds: None,
     }
 }
 
