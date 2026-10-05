@@ -83,6 +83,17 @@ pub enum WatchdogVerdict {
 }
 
 /// Post-rebuild consciousness monitor.
+fn verify_active_generation(pre_gen: u64, observed: Result<u32, std::io::Error>) -> Result<(), String> {
+    match observed {
+        Ok(generation) if generation as u64 == pre_gen => Ok(()),
+        Ok(generation) => Err(format!(
+            "expected active generation {}, observed {}",
+            pre_gen, generation
+        )),
+        Err(error) => Err(format!("could not observe active generation: {}", error)),
+    }
+}
+
 pub struct Watchdog {
     config: WatchdogConfig,
     assessor: HealthAssessor,
@@ -224,7 +235,29 @@ impl Watchdog {
                                     let activate_result = executor.execute_confirmed(activate_cmd, 0.0).await;
                                     match activate_result {
                                         crate::action::executor::ExecutionResult::Success { .. } => {
-                                            return WatchdogVerdict::Reverted { reason, pre_gen };
+                                            let observed = tokio::task::spawn_blocking(
+                                                GenerationManager::current_generation,
+                                            )
+                                            .await
+                                            .map_err(|e| format!("generation observer join failed: {e}"))
+                                            .and_then(|result| result.map_err(|e| e.to_string()));
+
+                                            match verify_active_generation(pre_gen, observed) {
+                                                Ok(()) => {
+                                                    return WatchdogVerdict::Reverted { reason, pre_gen };
+                                                }
+                                                Err(observation_error) => {
+                                                    return WatchdogVerdict::Degraded {
+                                                        reason: format!(
+                                                            "{}; rollback commands succeeded but post-state verification failed: {}",
+                                                            reason, observation_error
+                                                        ),
+                                                        surprise: last_surprise,
+                                                        health: last_health,
+                                                        checks_performed,
+                                                    };
+                                                }
+                                            }
                                         }
                                         crate::action::executor::ExecutionResult::Blocked { reason: block_reason, .. }
                                         | crate::action::executor::ExecutionResult::FailedNoRollback {
@@ -304,6 +337,20 @@ impl Watchdog {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_post_rollback_generation_verification_is_fail_closed() {
+        assert!(verify_active_generation(42, Ok(42)).is_ok());
+        let mismatch = verify_active_generation(42, Ok(41)).unwrap_err();
+        assert!(mismatch.contains("expected active generation 42"));
+        assert!(mismatch.contains("observed 41"));
+        let unavailable = verify_active_generation(
+            42,
+            Err(std::io::Error::other("observer unavailable")),
+        )
+        .unwrap_err();
+        assert!(unavailable.contains("could not observe active generation"));
+    }
+
     use super::*;
 
     #[test]
