@@ -1344,6 +1344,15 @@ pub enum FrontierBlocker {
         /// Candidate comparison scope.
         actual_scope: String,
     },
+    /// A candidate and requirement use different comparison methodology identities.
+    ComparisonBasisMismatch {
+        /// Comparison context, such as a burden dimension, performance metric, or operating condition.
+        context: String,
+        /// Exact basis required by the assessment.
+        expected: ComparisonBasisRef,
+        /// Exact basis declared by the candidate.
+        actual: ComparisonBasisRef,
+    },
     /// A burden has explicit evidence references, but none are valid at assessment time.
     EvidenceUnavailable(Dimension),
     /// A required operating condition is not covered by the candidate.
@@ -1605,8 +1614,6 @@ pub enum AssessmentError {
     EmptyFreshnessPolicyIdentity,
     /// Comparison methodology/basis identity is incomplete.
     EmptyComparisonBasis,
-    /// A burden estimate and its requirement use different comparison bases.
-    ComparisonBasisMismatch(String),
     /// Freshness policy contains no rules.
     EmptyFreshnessPolicy,
     /// A freshness policy was supplied without an assessment timestamp.
@@ -1714,9 +1721,6 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::EmptyComparisonBasis => {
                 write!(f, "comparison basis identity is incomplete")
-            }
-            Self::ComparisonBasisMismatch(context) => {
-                write!(f, "comparison basis mismatch for {context}")
             }
             Self::InvalidSourceAdmissionValidity { from, until } => {
                 write!(f, "source admission validity [{from}, {until}] is inverted")
@@ -2297,6 +2301,14 @@ fn canonical_payload_hash(result: &AssessmentResult) -> Result<String, Assessmen
 mod tests {
     use super::*;
 
+    fn fixture_basis() -> ComparisonBasisRef {
+        ComparisonBasisRef {
+            basis_id: "fixture-comparison-basis".into(),
+            basis_revision: "v1".into(),
+            basis_digest: "fixture-comparison-basis-digest-v1".into(),
+        }
+    }
+
     fn all_burdens(base: f64, evidence_ids: &[&str]) -> BTreeMap<Dimension, BurdenEstimate> {
         Dimension::ALL
             .into_iter()
@@ -2306,7 +2318,8 @@ mod tests {
                     BurdenEstimate {
                         interval: Interval::point(base).unwrap(),
                         unit: "unit".into(),
-                        scope: "synthetic-global-v1".into(),
+                        scope: "synthetic functional unit".into(),
+                        basis: fixture_basis(),
                         evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
                     },
                 )
@@ -2372,6 +2385,7 @@ mod tests {
                         ComparisonScale {
                             unit: "unit".into(),
                             scope: "synthetic functional unit".into(),
+                            basis: fixture_basis(),
                         },
                     )
                 })
@@ -2399,6 +2413,7 @@ mod tests {
                         interval: Interval::new(-20.0, 80.0).unwrap(),
                         unit: "unit".into(),
                         scope: "synthetic functional unit".into(),
+                        basis: fixture_basis(),
                     },
                 ),
                 (
@@ -2407,6 +2422,7 @@ mod tests {
                         interval: Interval::new(0.5, 10.0).unwrap(),
                         unit: "unit".into(),
                         scope: "synthetic functional unit".into(),
+                        basis: fixture_basis(),
                     },
                 ),
             ]),
@@ -2428,6 +2444,7 @@ mod tests {
                 interval: Interval::point(12.0).unwrap(),
                 unit: "unit".into(),
                 scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
             },
         );
@@ -2437,6 +2454,7 @@ mod tests {
                 interval: Interval::point(120.0).unwrap(),
                 unit: "unit".into(),
                 scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
             },
         );
@@ -2448,6 +2466,7 @@ mod tests {
                     interval: Interval::new(-40.0, 120.0).unwrap(),
                     unit: "unit".into(),
                     scope: "synthetic functional unit".into(),
+                    basis: fixture_basis(),
                     evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
                 },
             ),
@@ -2457,6 +2476,7 @@ mod tests {
                     interval: Interval::new(0.1, 20.0).unwrap(),
                     unit: "unit".into(),
                     scope: "synthetic functional unit".into(),
+                    basis: fixture_basis(),
                     evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
                 },
             ),
@@ -2467,7 +2487,8 @@ mod tests {
             BurdenEstimate {
                 interval: Interval::point(hazard).unwrap(),
                 unit: "unit".into(),
-                scope: "synthetic-global-v1".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
             },
         );
@@ -2476,7 +2497,8 @@ mod tests {
             BurdenEstimate {
                 interval: Interval::point(water).unwrap(),
                 unit: "unit".into(),
-                scope: "synthetic-global-v1".into(),
+                scope: "synthetic functional unit".into(),
+                basis: fixture_basis(),
                 evidence_ids: evidence_ids.iter().map(|id| (*id).to_string()).collect(),
             },
         );
