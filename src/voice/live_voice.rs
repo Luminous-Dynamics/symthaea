@@ -1053,18 +1053,29 @@ mod tests {
         let decoder = StructuredDecoder::new(&genesis);
         let channels = ThoughtChannels::with_intent(2);
         let readout = decoder.decode(&channels);
-        let speech_plan = SpeechPlan::from_readout(&channels, &readout);
+        let mut speech_plan = SpeechPlan::from_readout(&channels, &readout);
+        speech_plan.prosody.pause_weight = 0.5;
         let frame = LinguisticFrame::from_speech_plan(&speech_plan);
         let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
         plan.bind_segments(
-            vec![PhonemeSlot::new(
-                "AH",
-                0,
-                SyllableStress::Primary,
-                true,
-                false,
-                true,
-            )],
+            vec![
+                PhonemeSlot::new(
+                    "AH",
+                    0,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                ),
+                PhonemeSlot::new(
+                    "SIL",
+                    1,
+                    SyllableStress::None,
+                    true,
+                    false,
+                    true,
+                ),
+            ],
             ContentBindingStatus::PhonologicallyBound,
         )
         .expect("explicit receipt fixture");
@@ -1075,6 +1086,12 @@ mod tests {
             .expect("plan-native receipt should be emitted");
 
         assert_eq!(receipt.schema_version, 2);
+        let mut legacy_receipt = receipt.clone();
+        legacy_receipt.schema_version = 1;
+        assert!(
+            legacy_receipt.verify_against_plan(&plan).is_err(),
+            "pre-schedule receipt schema must fail closed"
+        );
         assert_eq!(receipt.plan_version, plan.version);
         assert!(receipt.realization_authorized);
         assert_eq!(
@@ -1083,8 +1100,8 @@ mod tests {
                 .to_hex()
                 .to_string()
         );
-        assert_eq!(receipt.segment_count, 1);
-        assert_eq!(receipt.segment_frame_counts.len(), 1);
+        assert_eq!(receipt.segment_count, 2);
+        assert_eq!(receipt.segment_frame_counts.len(), 2);
         assert_eq!(
             receipt.sample_count,
             receipt.scheduler_frames * (receipt.sample_rate / FRAME_RATE) as usize
