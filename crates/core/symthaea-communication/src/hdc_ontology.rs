@@ -45,6 +45,10 @@ pub const HDC_ONTOLOGY_MAX_MANIFEST_RELATIONS: usize = 4_096;
 /// Maximum frozen codebook candidates ranked by the receiver.
 pub const HDC_ONTOLOGY_MAX_CODEBOOK_CONCEPTS: usize = 4_096;
 pub const HDC_ONTOLOGY_MAX_CODEBOOK_RELATIONS: usize = 4_096;
+/// Maximum calibration/inference candidate universe for the N1 primitive.
+pub const HDC_ONTOLOGY_MAX_CONFORMAL_CANDIDATES: usize = 4_096;
+/// Maximum number of training graphs consumed by the N0 codebook constructor.
+pub const HDC_ONTOLOGY_MAX_TRAINING_GRAPHS: usize = 4_096;
 /// Hard ceiling on receiver-side edge candidates before ranking allocation.
 pub const HDC_ONTOLOGY_MAX_EDGE_CANDIDATES: usize = 1_000_000;
 /// Versioned HDC nonconformity score used by the isolated N1 conformal primitive.
@@ -601,6 +605,13 @@ impl HdcOntologyCodebook {
         validate_manifest(training_manifest)?;
         if training_graphs.is_empty() {
             return Err("ontology HDC codebook requires training graphs".into());
+        }
+        if training_graphs.len() > HDC_ONTOLOGY_MAX_TRAINING_GRAPHS {
+            return Err(format!(
+                "ontology HDC training graph budget exceeded: {} > {}",
+                training_graphs.len(),
+                HDC_ONTOLOGY_MAX_TRAINING_GRAPHS
+            ));
         }
 
         let mut concepts = BTreeMap::<String, ConceptKind>::new();
@@ -1393,6 +1404,12 @@ fn candidate_universe_hash(stable_ids: &[String]) -> Result<String, String> {
     if stable_ids.is_empty() {
         return Err("conformal candidate universe cannot be empty".into());
     }
+    if stable_ids.len() > HDC_ONTOLOGY_MAX_CONFORMAL_CANDIDATES {
+        return Err(format!(
+            "conformal candidate universe exceeds {} candidates",
+            HDC_ONTOLOGY_MAX_CONFORMAL_CANDIDATES
+        ));
+    }
     let mut ids = BTreeSet::new();
     for stable_id in stable_ids {
         if stable_id.trim().is_empty() || !ids.insert(stable_id.clone()) {
@@ -1468,6 +1485,20 @@ fn validate_graph_shape(graph: &GroundedConceptGraph) -> Result<(), String> {
     if graph.nodes.is_empty() || graph.edges.is_empty() {
         return Err("ontology HDC interlingua requires at least one node and edge".into());
     }
+    if graph.nodes.len() > HDC_ONTOLOGY_MAX_NODES {
+        return Err(format!(
+            "ontology HDC node budget exceeded: {} > {}",
+            graph.nodes.len(),
+            HDC_ONTOLOGY_MAX_NODES
+        ));
+    }
+    if graph.edges.len() > HDC_ONTOLOGY_MAX_EDGES {
+        return Err(format!(
+            "ontology HDC edge budget exceeded: {} > {}",
+            graph.edges.len(),
+            HDC_ONTOLOGY_MAX_EDGES
+        ));
+    }
 
     let mut ids = BTreeSet::new();
     for node in &graph.nodes {
@@ -1510,7 +1541,31 @@ fn kind_tag(kind: &ConceptKind) -> &'static str {
 mod tests {
     use super::*;
 
+        fn graph_and_training_budgets_fail_closed_before_encoding() {
+        let (training, training_manifest) = training_graph_and_manifest();
+        let mut oversized_graph = training.clone();
+        oversized_graph.nodes.extend(
+            (0..=(HDC_ONTOLOGY_MAX_NODES - training.nodes.len()))
+                .map(|index| ConceptNode {
+                    id: format!("extra-{index}"),
+                    kind: ConceptKind::Object,
+                    label: None,
+                    grounded_by: vec![format!("grounding-extra-{index}")],
+                    confidence: 1.0,
+                }),
+        );
+        assert!(validate_graph_shape(&oversized_graph).is_err());
+
+        let codebook_error = HdcOntologyCodebook::from_training_graphs(
+            77,
+            &vec![training; HDC_ONTOLOGY_MAX_TRAINING_GRAPHS + 1],
+            &training_manifest,
+        );
+        assert!(codebook_error.is_err());
+    }
+
     #[test]
+#[test]
     fn representation_declared_graph_size_is_bounded() {
         let (training, training_manifest) = training_graph_and_manifest();
         let codebook =
@@ -1637,6 +1692,13 @@ mod tests {
             HdcOntologyRetrievalCandidate { stable_id: "z".into(), score: 0.8 },
         ];
         assert!(calibration.prediction_set(&wrong_universe).is_err());
+        let oversized = (0..=HDC_ONTOLOGY_MAX_CONFORMAL_CANDIDATES)
+            .map(|index| HdcOntologyRetrievalCandidate {
+                stable_id: format!("candidate-{index}"),
+                score: 1.0,
+            })
+            .collect::<Vec<_>>();
+        assert!(calibration.prediction_set(&oversized).is_err());
     }
 
     #[test]
