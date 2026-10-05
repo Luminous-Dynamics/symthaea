@@ -251,19 +251,18 @@ pub struct ScientificInquirySelectionReceipt {
     pub selected_challenge_digest: String,
     pub selector_revision: String,
     pub selection_seed: u64,
+    /// Digest of the exact physical prediction frame used for comparison.
+    pub prediction_frame_digest: String,
     /// Prediction-disagreement score used to select the challenge; this is not realized evidence.
-    ///
-    /// Stored as the exact IEEE-754 bit pattern so the receipt remains deterministic.
     pub predicted_disagreement_score_bits: u64,
     /// Number of hypotheses that produced finite predictions for the selected challenge.
-    ///
-    /// Active inquiry is only admissible when at least two hypotheses are directly
-    /// comparable at the selected challenge.
     pub prediction_count: u32,
+    /// Number of hypotheses presented to the strict selector.
+    pub hypothesis_count: u32,
 }
 
 impl ScientificInquirySelectionReceipt {
-    pub const SCHEMA_REVISION: &'static str = "SCIENTIFIC_INQUIRY_SELECTION.v2";
+    pub const SCHEMA_REVISION: &'static str = "SCIENTIFIC_INQUIRY_SELECTION.v3";
 
     pub fn new(
         hypothesis_handoff_digest: impl Into<String>,
@@ -272,14 +271,19 @@ impl ScientificInquirySelectionReceipt {
         selected_challenge_digest: impl Into<String>,
         selector_revision: impl Into<String>,
         selection_seed: u64,
+        prediction_frame_digest: impl Into<String>,
         predicted_disagreement_score: f64,
         prediction_count: u32,
+        hypothesis_count: u32,
     ) -> Result<Self, String> {
         if !predicted_disagreement_score.is_finite() || predicted_disagreement_score < 0.0 {
             return Err("predicted disagreement score must be finite and non-negative".into());
         }
-        if prediction_count < 2 {
-            return Err("inquiry selection requires at least two finite hypothesis predictions".into());
+        if hypothesis_count < 2 {
+            return Err("inquiry selection requires at least two hypotheses".into());
+        }
+        if prediction_count != hypothesis_count {
+            return Err("strict inquiry selection requires complete hypothesis prediction coverage".into());
         }
         let receipt = Self {
             schema_revision: Self::SCHEMA_REVISION.into(),
@@ -290,8 +294,10 @@ impl ScientificInquirySelectionReceipt {
             selected_challenge_digest: selected_challenge_digest.into(),
             selector_revision: selector_revision.into(),
             selection_seed,
+            prediction_frame_digest: prediction_frame_digest.into(),
             predicted_disagreement_score_bits: predicted_disagreement_score.to_bits(),
             prediction_count,
+            hypothesis_count,
         };
         receipt.validate()?;
         Ok(receipt)
@@ -340,6 +346,7 @@ impl ScientificInquirySelectionReceipt {
             ("hypothesis_set_digest", self.hypothesis_set_digest.as_str()),
             ("challenge_space_digest", self.challenge_space_digest.as_str()),
             ("selected_challenge_digest", self.selected_challenge_digest.as_str()),
+            ("prediction_frame_digest", self.prediction_frame_digest.as_str()),
         ] {
             validate_digest(label, value)?;
         }
@@ -350,8 +357,11 @@ impl ScientificInquirySelectionReceipt {
         if !predicted.is_finite() || predicted < 0.0 {
             return Err("predicted disagreement score is invalid".into());
         }
-        if self.prediction_count < 2 {
-            return Err("inquiry selection requires at least two finite hypothesis predictions".into());
+        if self.hypothesis_count < 2 {
+            return Err("inquiry selection requires at least two hypotheses".into());
+        }
+        if self.prediction_count != self.hypothesis_count {
+            return Err("strict inquiry selection requires complete hypothesis prediction coverage".into());
         }
         Ok(())
     }
@@ -359,6 +369,23 @@ impl ScientificInquirySelectionReceipt {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn inquiry_selection_rejects_partial_prediction_coverage() {
+        let result = ScientificInquirySelectionReceipt::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "selector-v3",
+            9,
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            2.5,
+            2,
+            3,
+        );
+        assert!(result.is_err());
+    }
+
     #[test]
     fn handoff_rejects_internally_incoherent_physical_type() {
         let malformed =
