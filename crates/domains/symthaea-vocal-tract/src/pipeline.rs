@@ -74,8 +74,12 @@ pub struct ProsodyContext {
     pub stress: u8,
     /// Base F0 for the utterance (from config or speaker profile).
     pub base_f0: f32,
-    /// Emotional arousal (0.0–1.0) — maps to F0 range expansion.
+    /// Emotional arousal (0.0–1.0) — independent speaker-state modulation of F0.
     pub arousal: f32,
+    /// Relative pitch-range multiplier for the planned intonation shape.
+    /// 1.0 preserves the existing contour; values below 1.0 compress and values above
+    /// 1.0 expand deviations from the neutral F0 multiplier. This never changes base_f0.
+    pub pitch_range: f32,
     /// Intonation contour type.
     pub intonation: Intonation,
     /// Phrase index (for declination reset). 0 = first phrase, increments at boundaries.
@@ -109,6 +113,7 @@ impl Default for ProsodyContext {
             stress: 0,
             base_f0: 120.0,
             arousal: 0.5,
+            pitch_range: 1.0,
             intonation: Intonation::Statement,
             phrase_index: 0,
             phrase_progress: 0.0,
@@ -277,16 +282,21 @@ impl ProsodyContext {
             _ => 1.0,
         };
 
-        // Arousal maps to F0 range (more arousal = wider pitch swings)
-        let arousal_factor = 0.9 + 0.2 * self.arousal;
-
-        frame.f0 = self.base_f0
-            * contour
+        // Keep explicit plan pitch range separate from emotional arousal. The planned
+        // pitch range scales deviations of the composed contour around neutral (1.0), so
+        // the scheduler can attribute plan pitch_range independently of speaker-state arousal.
+        let pitch_shape = contour
             * declination
             * accent_contour
             * stress_f0_boost
-            * arousal_factor
             * focus_boost;
+        let pitch_range = self.pitch_range.clamp(0.65, 1.45);
+        let ranged_pitch_shape = 1.0 + (pitch_shape - 1.0) * pitch_range;
+
+        // Arousal remains an independent F0-range modulation from speaker state.
+        let arousal_factor = 0.9 + 0.2 * self.arousal;
+
+        frame.f0 = self.base_f0 * ranged_pitch_shape * arousal_factor;
 
         // Microprosody: consonants perturb F0 slightly
         let microprosody = match frame.source_type {
