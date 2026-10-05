@@ -5266,6 +5266,87 @@ mod tests {
         );
     }
     #[test]
+    fn independence_v4_corrects_endpoint_ancestry_in_both_directions() {
+        let mut source = fixture();
+        source.provenance.source.sensor_id = "camera-source".into();
+        source.asset = Some(AssetRef::blake3(b"source-frame"));
+
+        let mut target = fixture();
+        target.id = "obs-002".into();
+        target.provenance.source.sensor_id = "camera-target".into();
+        target.asset = Some(AssetRef::blake3(b"target-frame"));
+        target.provenance.parent_observation_ids = vec!["obs-001".into()];
+
+        let graph_forward = ObservationGraph {
+            observations: vec![source.clone(), target.clone()],
+            relations: vec![],
+        };
+        let forward = graph_forward
+            .assess_independence_detailed_v4("obs-001", "obs-002")
+            .expect("forward v4 assessment");
+        assert_eq!(forward.classification, EvidenceIndependence::SharedUpstream);
+        assert_eq!(
+            forward.basis,
+            IndependenceBasis::SharedAncestor {
+                observation_id: "obs-001".into()
+            }
+        );
+
+        let forward_witness = IndependenceScopeWitnessV3::from_canonical_bytes(
+            &graph_forward
+                .independence_verification_reachable_scope_canonical_bytes_v3(
+                    "obs-001",
+                    "obs-002",
+                )
+                .expect("forward scope"),
+        )
+        .expect("forward witness");
+        assert_eq!(
+            forward_witness
+                .assess_independence_v4()
+                .expect("forward witness appraisal"),
+            (forward.classification.clone(), forward.basis.clone())
+        );
+
+        let mut reverse_source = fixture();
+        reverse_source.id = "obs-001".into();
+        reverse_source.provenance.source.sensor_id = "camera-target".into();
+        reverse_source.asset = Some(AssetRef::blake3(b"reverse-source"));
+
+        let mut reverse_target = fixture();
+        reverse_target.id = "obs-002".into();
+        reverse_target.provenance.source.sensor_id = "camera-source".into();
+        reverse_target.provenance.parent_observation_ids = Vec::new();
+        reverse_target.asset = Some(AssetRef::blake3(b"reverse-target"));
+        reverse_source.provenance.parent_observation_ids = vec!["obs-002".into()];
+
+        let graph_reverse = ObservationGraph {
+            observations: vec![reverse_source, reverse_target],
+            relations: vec![],
+        };
+        let reverse = graph_reverse
+            .assess_independence_detailed_v4("obs-001", "obs-002")
+            .expect("reverse v4 assessment");
+        assert_eq!(reverse.classification, EvidenceIndependence::SharedUpstream);
+        assert_eq!(
+            reverse.basis,
+            IndependenceBasis::SharedAncestor {
+                observation_id: "obs-002".into()
+            }
+        );
+
+        assert_ne!(
+            forward.assessment_fingerprint,
+            graph_forward
+                .assess_independence_detailed_v3("obs-001", "obs-002")
+                .expect("v3 forward assessment")
+                .assessment_fingerprint
+        );
+        assert!(forward.verify_fingerprint());
+        assert!(reverse.verify_fingerprint());
+    }
+
+    #[test]
     fn independence_v3_endpoint_ancestry_semantics_are_version_locked() {
         let mut source = fixture();
         source.provenance.source.sensor_id = "camera-source".into();
@@ -5312,6 +5393,50 @@ mod tests {
         );
         assert!(IndependenceVerificationReceiptV3::from_assessment(&v3)
             .verify_against_scope_witness(&scope));
+    }
+
+    #[test]
+    fn independence_v4_receipt_is_version_separated_from_v3() {
+        let mut source = fixture();
+        source.provenance.source.sensor_id = "camera-source".into();
+
+        let mut target = fixture();
+        target.id = "obs-002".into();
+        target.provenance.source.sensor_id = "camera-target".into();
+        target.provenance.parent_observation_ids = vec!["obs-001".into()];
+
+        let graph = ObservationGraph {
+            observations: vec![source, target],
+            relations: vec![],
+        };
+        let v3 = graph
+            .assess_independence_detailed_v3("obs-001", "obs-002")
+            .expect("v3 assessment");
+        let v4 = graph
+            .assess_independence_detailed_v4("obs-001", "obs-002")
+            .expect("v4 assessment");
+        let v3_receipt = IndependenceVerificationReceiptV3::from_assessment(&v3);
+        let v4_receipt = IndependenceVerificationReceiptV4::from_assessment(&v4);
+
+        assert_ne!(v3_receipt.fingerprint(), v4_receipt.fingerprint());
+        assert_ne!(
+            IndependenceVerificationReceiptV3::DOMAIN_SEPARATOR,
+            IndependenceVerificationReceiptV4::DOMAIN_SEPARATOR
+        );
+        assert!(v3_receipt.verify_integrity());
+        assert!(v4_receipt.verify_integrity());
+        assert_eq!(
+            v4_receipt.verify_against_graph_detailed(&graph),
+            Ok(ReceiptVerificationOutcome::VerifiedAgainstGraph)
+        );
+
+        let scope = graph
+            .independence_verification_reachable_scope_canonical_bytes_v3(
+                "obs-001",
+                "obs-002",
+            )
+            .expect("shared v3/v4 scope");
+        assert!(v4_receipt.verify_against_scope_witness(&scope));
     }
 
     #[test]
