@@ -374,10 +374,19 @@ fn minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_ex
     let codewords = code.enumerate();
     let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
 
+    let mut covering_radius = 0usize;
+    for mask in 0..(1usize << 8) {
+        let observation = error_from_mask(mask, 8);
+        let (nearest_distance, _) = nearest_codewords(&observation, &codewords);
+        covering_radius = covering_radius.max(nearest_distance);
+    }
+    assert_eq!(covering_radius, 4);
+
     let mut observations = 0usize;
     let mut unique = 0usize;
     let mut ambiguous = 0usize;
     let mut total_nearest_codewords = 0usize;
+    let mut maximum_nearest_multiplicity = 0usize;
 
     // The [8,2,4] fixture has covering radius 4, so bound=4 reaches the
     // minimum possible distance for every ambient observation.
@@ -385,12 +394,28 @@ fn minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_ex
         let observation = error_from_mask(mask, 8);
         let (nearest_distance, nearest) = nearest_codewords(&observation, &codewords);
         let (result, work) = decoder.decode_with_work(&observation, 4);
+        let listed = decoder.decode_with_minimum_list(&observation, 4, 8);
 
+        assert!(listed.list_complete);
+        assert_eq!(listed.minimum_errors.len(), nearest.len());
+        assert_eq!(listed.nearest_codewords.len(), nearest.len());
+        for codeword in &listed.nearest_codewords {
+            assert!(
+                nearest.iter().any(|&index| codewords[index] == *codeword),
+                "listed codeword was not nearest for observation={mask:#x}"
+            );
+        }
+        assert_eq!(
+            listed.outcome,
+            result,
+            "list-valued and scalar decoder outcomes diverged for observation={mask:#x}"
+        );
         assert_eq!(
             work.matching_error_patterns,
             nearest.len(),
             "minimum syndrome multiplicity must equal nearest-codeword multiplicity for observation={mask:#x}"
         );
+        maximum_nearest_multiplicity = maximum_nearest_multiplicity.max(nearest.len());
 
         match result {
             BoundedDistanceDecode::Unique {
@@ -426,7 +451,7 @@ fn minimum_weight_syndrome_multiplicity_matches_nearest_codeword_multiplicity_ex
     assert_eq!(total_nearest_codewords, 484);
 
     println!(
-        "MIN_SYNDROME_MULTIPLICITY_LEDGER=observations={observations};bound=4;unique={unique};ambiguous={ambiguous};total_nearest_codewords={total_nearest_codewords};multiplicity_identity=true"
+        "MIN_SYNDROME_MULTIPLICITY_LEDGER=observations={observations};bound=4;covering_radius={covering_radius};unique={unique};ambiguous={ambiguous};total_nearest_codewords={total_nearest_codewords};maximum_nearest_multiplicity={maximum_nearest_multiplicity};list_cap=8;list_complete=true;multiplicity_identity=true"
     );
 }
 
@@ -502,6 +527,34 @@ fn factorization_ambiguity_is_distinct_from_syndrome_ambiguity() {
         algebra.kernel_dimension,
         nearest.len(),
         work.matching_error_patterns,
+    );
+}
+
+#[test]
+fn minimum_syndrome_list_truncation_is_explicit_and_fail_closed() {
+    let code = boundary_code();
+    let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
+    let observation = error_from_mask(0b0000_0011, code.dimension());
+
+    let complete = decoder.decode_with_minimum_list(&observation, 4, 8);
+    assert!(complete.list_complete);
+    assert_eq!(complete.minimum_errors.len(), 2);
+    assert_eq!(complete.nearest_codewords.len(), 2);
+
+    let truncated = decoder.decode_with_minimum_list(&observation, 4, 1);
+    assert!(!truncated.list_complete);
+    assert_eq!(truncated.minimum_errors.len(), 1);
+    assert_eq!(truncated.nearest_codewords.len(), 1);
+    assert_eq!(truncated.outcome, complete.outcome);
+
+    let empty = decoder.decode_with_minimum_list(&observation, 4, 0);
+    assert!(!empty.list_complete);
+    assert!(empty.minimum_errors.is_empty());
+    assert!(empty.nearest_codewords.is_empty());
+    assert_eq!(empty.outcome, complete.outcome);
+
+    println!(
+        "MIN_SYNDROME_LIST_CAPTURE=full_count=2;cap_8_complete=true;cap_1_complete=false;cap_0_complete=false;truncation_explicit=true"
     );
 }
 

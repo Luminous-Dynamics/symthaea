@@ -231,6 +231,19 @@ jobs:
           test -n "$LEDGER"
           printf "minimum_syndrome_multiplicity_ledger=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
 
+      - name: Verify explicit minimum-syndrome list truncation
+        id: minimum_list_capture
+        run: |
+          OUTPUT="$(cargo +1.96.1 test --locked \
+            --manifest-path "${{ steps.harness.outputs.path }}/Cargo.toml" \
+            --test linear_code_syndrome_decoder \
+            minimum_syndrome_list_truncation_is_explicit_and_fail_closed -- --nocapture 2>&1)"
+          COUNT="$(printf '%s\n' "$OUTPUT" | grep -c '^MIN_SYNDROME_LIST_CAPTURE=')"
+          test "$COUNT" -eq 1
+          LEDGER="$(printf '%s\n' "$OUTPUT" | sed -n 's/^MIN_SYNDROME_LIST_CAPTURE=//p')"
+          test -n "$LEDGER"
+          printf "minimum_syndrome_list_capture=%s\n" "$LEDGER" >> "$GITHUB_OUTPUT"
+
       - name: Prove factorization ambiguity is separate
         id: factor_separation
         run: |
@@ -297,7 +310,7 @@ jobs:
           cat > hdc-linear-code-evidence/hdc-linear-code-bounded-decoder-qualification.txt <<EOF
           HDC Linear-Code Bounded Decoder Qualification
           =============================================
-          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v5
+          receipt_schema=hdc-linear-code-bounded-decoder-qualification-v6
           event_name=${{ github.event_name }}
           exact_head=${{ steps.head.outputs.sha }}
           event_head_ref=${{ steps.head.outputs.source_ref }}
@@ -328,12 +341,14 @@ jobs:
           minimum_syndrome_multiplicity_ledger=${{ steps.multiplicity_invariant.outputs.minimum_syndrome_multiplicity_ledger }}
           factor_syndrome_separation_status=${{ steps.factor_separation.outcome }}
           factor_syndrome_separation=${{ steps.factor_separation.outputs.factor_syndrome_separation }}
+          minimum_syndrome_list_capture_status=${{ steps.minimum_list_capture.outcome }}
+          minimum_syndrome_list_capture=${{ steps.minimum_list_capture.outputs.minimum_syndrome_list_capture }}
           syndrome_decoder_ledger_status=${{ steps.decoder_ledger.outcome }}
           runner_os=${{ steps.runner.outputs.runner_os }}
           runner_arch=${{ steps.runner.outputs.runner_arch }}
           runner_image=${{ steps.runner.outputs.runner_image }}
           runner_image_version=${{ steps.runner.outputs.runner_image_version }}
-          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
+          qualification_status=${{ steps.head.outcome == 'success' && steps.scope.outcome == 'success' && steps.toolchain_install.outcome == 'success' && steps.toolchain.outcome == 'success' && steps.provenance.outcome == 'success' && steps.format.outcome == 'success' && steps.harness.outcome == 'success' && steps.unit_tests.outcome == 'success' && steps.inherited_tests.outcome == 'success' && steps.decoder_tests.outcome == 'success' && steps.coset_invariants.outcome == 'success' && steps.multiplicity_invariant.outcome == 'success' && steps.factor_separation.outcome == 'success' && steps.minimum_list_capture.outcome == 'success' && steps.decoder_ledger.outcome == 'success' && steps.random_sweep.outcome == 'success' && steps.beyond_radius.outcome == 'success' && steps.clippy.outcome == 'success' && 'passed' || 'failed' }}
           syndrome_decoder_ledger=${{ steps.decoder_ledger.outputs.syndrome_decoder_ledger }}
           random_syndrome_sweep_status=${{ steps.random_sweep.outcome }}
           random_syndrome_sweep=${{ steps.random_sweep.outputs.random_syndrome_sweep }}

@@ -59,6 +59,20 @@ pub enum BoundedDistanceDecode {
     },
 }
 
+/// Minimum-weight syndrome representatives captured as a deterministic bounded list.
+///
+/// The underlying decoder outcome remains authoritative for whether the minimum is
+/// unique or ambiguous. The list is an evidence surface: callers specify a maximum
+/// capture size, and list_complete=false explicitly reports truncation rather than
+/// silently presenting a partial list as exhaustive.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedDistanceDecodeList {
+    pub outcome: BoundedDistanceDecode,
+    pub minimum_errors: Vec<BinaryCodeword>,
+    pub nearest_codewords: Vec<BinaryCodeword>,
+    pub list_complete: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParityCheckMatrix {
     /// Rows of H, each of length n.
@@ -215,6 +229,90 @@ impl BoundedDistanceSyndromeDecoder {
         &self.parity_check
     }
 
+    /// Return a deterministic bounded list of all minimum-weight syndrome matches.
+    ///
+    /// The decoder still performs the complete bounded search, so the scalar outcome
+    /// contains the exact minimum multiplicity. This method additionally captures up
+    /// to max_list_size concrete minimum-weight errors and their corresponding
+    /// nearest codewords. list_complete is false when the requested cap is smaller
+    /// than the true minimum-syndrome multiplicity.
+    pub fn decode_with_minimum_list(
+        &self,
+        observation: &BinaryCodeword,
+        max_error_weight: usize,
+        max_list_size: usize,
+    ) -> BoundedDistanceDecodeList {
+        let (outcome, _) = self.decode_with_work(observation, max_error_weight);
+
+        let mut result = BoundedDistanceDecodeList {
+            outcome: outcome.clone(),
+            minimum_errors: Vec::new(),
+            nearest_codewords: Vec::new(),
+            list_complete: true,
+        };
+
+        let distance = match &result.outcome {
+            BoundedDistanceDecode::Unique { distance, .. }
+            | BoundedDistanceDecode::Ambiguous { distance, .. } => *distance,
+            BoundedDistanceDecode::NoMatchWithinBound { .. }
+            | BoundedDistanceDecode::InvalidObservationDimension { .. }
+            | BoundedDistanceDecode::InvalidBound { .. } => return result,
+        };
+
+        if let BoundedDistanceDecode::Unique { error, .. } = &result.outcome {
+            if max_list_size > 0 {
+                result.minimum_errors.push(error.clone());
+                let mut codeword = observation.clone();
+                codeword.xor_assign(error);
+                result.nearest_codewords.push(codeword);
+                result.list_complete = true;
+            } else {
+                result.list_complete = false;
+            }
+            return result;
+        }
+
+        let observed_syndrome = self
+            .parity_check
+            .syndrome(observation)
+            .expect("validated observation dimension");
+
+        let mut selected = Vec::with_capacity(distance);
+        let mut running_syndrome =
+            BinaryCodeword::zero(self.parity_check.syndrome_dimension());
+        let mut matching_errors = 0usize;
+
+        collect_exact_weight_matches(
+            &self.parity_check.columns,
+            &observed_syndrome,
+            distance,
+            0,
+            &mut selected,
+            &mut running_syndrome,
+            &mut matching_errors,
+            max_list_size,
+            &mut result.minimum_errors,
+        );
+
+        let expected_matches = match &result.outcome {
+            BoundedDistanceDecode::Ambiguous {
+                matching_error_patterns,
+                ..
+            } => *matching_error_patterns,
+            _ => unreachable!("unique outcome returned above"),
+        };
+        debug_assert_eq!(matching_errors, expected_matches);
+        result.list_complete = result.minimum_errors.len() == matching_errors;
+
+        for error in &result.minimum_errors {
+            let mut codeword = observation.clone();
+            codeword.xor_assign(error);
+            result.nearest_codewords.push(codeword);
+        }
+
+        result
+    }
+
     pub fn decode(
         &self,
         observation: &BinaryCodeword,
@@ -311,6 +409,58 @@ impl BoundedDistanceSyndromeDecoder {
             BoundedDistanceDecode::NoMatchWithinBound { max_error_weight },
             work,
         )
+    }
+}
+
+fn collect_exact_weight_matches(
+    columns: &[BinaryCodeword],
+    observed_syndrome: &BinaryCodeword,
+    target_weight: usize,
+    start: usize,
+    selected: &mut Vec<usize>,
+    running_syndrome: &mut BinaryCodeword,
+    matching_errors: &mut usize,
+    max_list_size: usize,
+    output: &mut Vec<BinaryCodeword>,
+) {
+    if selected.len() == target_weight {
+        if *running_syndrome == *observed_syndrome {
+            *matching_errors += 1;
+            if output.len() < max_list_size {
+                let mut error = BinaryCodeword::zero(columns.len());
+                for &index in selected.iter() {
+                    error.set_bit(index, true);
+                }
+                output.push(error);
+            }
+        }
+        return;
+    }
+
+    let remaining = target_weight - selected.len();
+    if remaining == 0 || start >= columns.len() {
+        return;
+    }
+
+    let last_start = columns.len() - remaining;
+    for index in start..=last_start {
+        running_syndrome.xor_assign(&columns[index]);
+        selected.push(index);
+
+        collect_exact_weight_matches(
+            columns,
+            observed_syndrome,
+            target_weight,
+            index + 1,
+            selected,
+            running_syndrome,
+            matching_errors,
+            max_list_size,
+            output,
+        );
+
+        selected.pop();
+        running_syndrome.xor_assign(&columns[index]);
     }
 }
 

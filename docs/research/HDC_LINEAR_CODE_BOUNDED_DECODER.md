@@ -98,6 +98,26 @@ quantities and requires them to remain distinct rather than interpreting either
 count as the other kind of ambiguity.
 
 
+## Deterministic bounded minimum-syndrome lists
+
+The decoder exposes a list-valued evidence surface in addition to the scalar
+unique/ambiguous outcome. Callers provide both an error-weight bound and a
+maximum capture size. The search still determines the exact minimum-syndrome
+multiplicity; list_complete is false whenever the concrete list was truncated.
+
+For the [8,2,4] fixture, the exhaustive 256-observation qualification first
+computes the covering radius independently and requires it to equal 4. It then
+uses a capture cap of 8 and requires every concrete minimum-syndrome list to be
+complete and to match the nearest-codeword set from the independent distance
+oracle. Separate tests exercise caps of 1 and 0 and require truncation to remain
+explicit.
+
+This is the finite coset-leader perspective: minimum-weight errors are
+representatives of syndrome classes, while their multiplicity and captured list
+are distinct evidence fields. Work on computing coset leaders likewise treats
+complete leader sets and covering-radius structure as explicit finite-code
+properties.
+
 ## Why this is an independent algorithm
 
 The existing finite oracle enumerates codewords, computes Hamming distances, and
