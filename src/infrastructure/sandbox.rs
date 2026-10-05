@@ -14,6 +14,8 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::action::executor_command_requires_governed_authority;
+
 /// Sandbox for isolated command execution
 pub struct Sandbox {
     /// Sandbox root directory
@@ -153,6 +155,11 @@ impl Sandbox {
 
         if !self.real_execution_enabled {
             return Err(SandboxError::RealExecutionDisabled);
+        }
+
+        let owned_args: Vec<String> = args.iter().map(|arg| (*arg).to_string()).collect();
+        if executor_command_requires_governed_authority(command, &owned_args) {
+            return Err(SandboxError::AuthorityRequiresGovernedExecution(command.to_string()));
         }
 
         let result = self.run_command_with_timeout(command, args, start)?;
@@ -479,6 +486,8 @@ pub enum SandboxError {
     ExecutionFailed(String),
     /// Real execution is disabled (simulation only)
     RealExecutionDisabled,
+    /// Command belongs to an authority-sensitive execution family and must use governed execution.
+    AuthorityRequiresGovernedExecution(String),
     /// Timeout exceeded
     Timeout,
     /// Cleanup failed
@@ -492,6 +501,10 @@ impl std::fmt::Display for SandboxError {
             Self::CommandNotAllowed(cmd) => write!(f, "Command not allowed: {cmd}"),
             Self::ExecutionFailed(e) => write!(f, "Execution failed: {e}"),
             Self::RealExecutionDisabled => write!(f, "Real execution disabled"),
+            Self::AuthorityRequiresGovernedExecution(cmd) => write!(
+                f,
+                "Authority-sensitive command requires governed execution: {cmd}"
+            ),
             Self::Timeout => write!(f, "Sandbox operation timed out"),
             Self::CleanupFailed(e) => write!(f, "Cleanup failed: {e}"),
         }
@@ -718,6 +731,7 @@ mod tests {
             SandboxError::CommandNotAllowed("dangerous-cmd".to_string()),
             SandboxError::ExecutionFailed("exec reason".to_string()),
             SandboxError::RealExecutionDisabled,
+            SandboxError::AuthorityRequiresGovernedExecution("systemctl".to_string()),
             SandboxError::Timeout,
             SandboxError::CleanupFailed("cleanup reason".to_string()),
         ];
@@ -735,6 +749,7 @@ mod tests {
             SandboxError::CommandNotAllowed("clone test".to_string()),
             SandboxError::ExecutionFailed("clone test".to_string()),
             SandboxError::RealExecutionDisabled,
+            SandboxError::AuthorityRequiresGovernedExecution("systemctl".to_string()),
             SandboxError::Timeout,
             SandboxError::CleanupFailed("clone test".to_string()),
         ];
@@ -763,11 +778,15 @@ mod tests {
         let not_allowed = format!("{}", SandboxError::CommandNotAllowed("x".to_string()));
         let exec = format!("{}", SandboxError::ExecutionFailed("x".to_string()));
         let disabled = format!("{}", SandboxError::RealExecutionDisabled);
+        let authority = format!(
+            "{}",
+            SandboxError::AuthorityRequiresGovernedExecution("systemctl".to_string())
+        );
         let timeout = format!("{}", SandboxError::Timeout);
         let cleanup = format!("{}", SandboxError::CleanupFailed("x".to_string()));
 
         // All error messages should be unique
-        let messages = [&init, &not_allowed, &exec, &disabled, &timeout, &cleanup];
+        let messages = [&init, &not_allowed, &exec, &disabled, &authority, &timeout, &cleanup];
         for (i, a) in messages.iter().enumerate() {
             for (j, b) in messages.iter().enumerate() {
                 if i != j {
@@ -796,6 +815,43 @@ mod tests {
         let mut sandbox = Sandbox::new();
         let err = sandbox.run("nix", &["--version"]).unwrap_err();
         assert!(matches!(err, SandboxError::RealExecutionDisabled));
+    }
+
+    #[test]
+    fn test_real_execution_rejects_authority_sensitive_commands_before_spawn() {
+        let root = tempfile::tempdir().unwrap();
+        let marker = root.path().join("authority-bypass-marker");
+        let marker_str = marker.to_string_lossy().to_string();
+
+        let mut sandbox = SandboxConfig::new()
+            .root(root.path())
+            .enable_real_execution()
+            .build();
+
+        let err = sandbox
+            .run("nix-env", &["--uninstall", "package-that-does-not-exist"])
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SandboxError::AuthorityRequiresGovernedExecution(ref cmd) if cmd == "nix-env"
+        ));
+
+        let err = sandbox
+            .run("nix-shell", &["--run", "touch", &marker_str])
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SandboxError::AuthorityRequiresGovernedExecution(ref cmd) if cmd == "nix-shell"
+        ));
+
+        let err = sandbox
+            .run("find", &[root.path().to_str().unwrap(), "-exec", "touch", &marker_str, ";"])
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SandboxError::AuthorityRequiresGovernedExecution(ref cmd) if cmd == "find"
+        ));
+        assert!(!marker.exists(), "authority-sensitive commands must not spawn");
     }
 
     #[test]
