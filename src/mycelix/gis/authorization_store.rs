@@ -3938,12 +3938,9 @@ fn validate_native_authority_pin_set(
 
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let mut lease = load_lease(&tx, &witness.authorization_instance)?
+        let lease = load_lease(&tx, &witness.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
 
-        if !witness.is_bound_to(&lease) {
-            return Err(AuthorizationConsumptionError::InvalidBinding.into());
-        }
         validate_attempt_boundary_consistency_for_attempt(
             &tx,
             &witness.authorization_instance,
@@ -3951,27 +3948,44 @@ fn validate_native_authority_pin_set(
             &witness.boundary_id,
         )?;
 
-        if let Some((boundary_id, action_digest, stored_scope)) = tx
+        if let Some((marker_operation_id, boundary_id, action_digest, authority_epoch, stored_scope)) = tx
             .query_row(
-                "SELECT boundary_id,action_digest,attempt_scope_digest
+                "SELECT operation_id,boundary_id,action_digest,authority_epoch,attempt_scope_digest
                  FROM authorization_recovery_markers
                  WHERE authorization_instance=?1 AND attempt_id=?2 AND marker='not_entered'",
                 params![witness.authorization_instance.as_str(), witness.attempt_id.as_str()],
                 |row| Ok((
-                    row.get::<_,String>(0)?,
+                    row.get::<_,Option<String>>(0)?,
                     row.get::<_,String>(1)?,
-                    row.get::<_,Option<String>>(2)?,
+                    row.get::<_,String>(2)?,
+                    row.get::<_,i64>(3)?,
+                    row.get::<_,Option<String>>(4)?,
                 )),
             )
             .optional()?
         {
-            let expected_scope=compute_attempt_scope_digest(&witness.boundary_id,&witness.attempt_id)?;
-            if boundary_id == witness.boundary_id
+            let expected_scope = compute_attempt_scope_digest(
+                &witness.boundary_id,
+                &witness.attempt_id,
+            )?;
+            let stored_operation_id = marker_operation_id.as_deref().unwrap_or("");
+            if lease.authorization_instance == witness.authorization_instance
+                && lease.action_digest == witness.action_digest
+                && lease.policy == witness.policy
+                && lease.authority_epoch == witness.authority_epoch
+                && stored_operation_id == witness.operation_id
+                && boundary_id == witness.boundary_id
                 && action_digest == witness.action_digest
+                && authority_epoch >= 0
+                && authority_epoch as u64 == witness.authority_epoch
                 && stored_scope.as_deref() == Some(expected_scope.as_str())
             {
                 return Ok(false);
             }
+            return Err(AuthorizationConsumptionError::InvalidBinding.into());
+        }
+
+        if !witness.is_bound_to(&lease) {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
 
@@ -4003,11 +4017,12 @@ fn validate_native_authority_pin_set(
 
         tx.execute(
             "INSERT INTO authorization_recovery_markers
-             (authorization_instance,attempt_id,boundary_id,action_digest,authority_epoch,marker,attempt_scope_digest)
-             VALUES (?1,?2,?3,?4,?5,'not_entered',?6)",
+             (authorization_instance,attempt_id,operation_id,boundary_id,action_digest,authority_epoch,marker,attempt_scope_digest)
+             VALUES (?1,?2,NULLIF(?3,''),?4,?5,?6,'not_entered',?7)",
             params![
                 witness.authorization_instance.as_str(),
                 witness.attempt_id.as_str(),
+                witness.operation_id.as_str(),
                 witness.boundary_id.as_str(),
                 witness.action_digest.as_str(),
                 witness.authority_epoch as i64,
@@ -8609,6 +8624,109 @@ mod tests {
         ).unwrap();
         assert_eq!(reconciled.outcome,ExecutionOutcome::Succeeded);
         let _=std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn strict_pre_dispatch_recovery_is_idempotent_with_operation_binding() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-gis-auth-pre-dispatch-recovery-operation-{}.db",
+            std::process::id()
+        ));
+        let store = SqliteAuthorizationStore::open_with_relying_party(
+            &path,
+            "rp-pre-dispatch-recovery-operation",
+        )
+        .unwrap();
+        let action = EpistemicAction::new(
+            "pre-dispatch-operation-recovery",
+            "effect",
+            super::super::ActionRisk::Critical,
+        );
+        let digest = action.canonical_action_digest();
+        let operation_id = "operation:pre-dispatch-recovery";
+        let boundary_id = "boundary:pre-dispatch-recovery";
+        let attempt_id = "attempt:pre-dispatch-recovery";
+        let witness = ActionAuthorizationWitness {
+            operation_id: Some(operation_id.into()),
+            authorization_instance: "pre-dispatch-operation-recovery".into(),
+            action_id: action.id.clone(),
+            action_digest: digest.clone(),
+            frame: "frame@1".into(),
+            support_digest: "support".into(),
+            policy: "policy@1".into(),
+            decision: "execute".into(),
+            issued_at: "2026-10-03T11:00:00Z".into(),
+            expires_at: Some("2026-10-03T12:00:00Z".into()),
+            authority_epoch: 1,
+        };
+
+        store
+            .register_lease(&AuthorizationLease::new_with_instance(
+                witness.authorization_instance.clone(),
+                action.id.clone(),
+                digest,
+                witness.support_digest.clone(),
+                witness.policy.clone(),
+                witness.authority_epoch,
+                1,
+            ))
+            .unwrap();
+        store
+            .prepare_for_execution_bound_with_operation(
+                &witness,
+                &action,
+                "frame@1",
+                attempt_id,
+                boundary_id,
+                operation_id,
+            )
+            .unwrap();
+
+        assert_eq!(
+            store.recover_pre_dispatch_attempt(&RecoveryAuthorizationWitness {
+                authorization_instance: witness.authorization_instance.clone(),
+                attempt_id: attempt_id.into(),
+                operation_id: operation_id.into(),
+                boundary_id: boundary_id.into(),
+                action_digest: witness.action_digest.clone(),
+                policy: witness.policy.clone(),
+                authority_epoch: witness.authority_epoch,
+                issued_at: "2026-10-03T11:30:00Z".into(),
+            })
+            .unwrap(),
+            true
+        );
+
+        let marker_operation_id: Option<String> = store
+            .connection()
+            .unwrap()
+            .query_row(
+                "SELECT operation_id
+                 FROM authorization_recovery_markers
+                 WHERE authorization_instance=?1 AND attempt_id=?2 AND marker='not_entered'",
+                params![witness.authorization_instance.as_str(), attempt_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(marker_operation_id.as_deref(), Some(operation_id));
+
+        assert_eq!(
+            store
+                .recover_pre_dispatch_attempt(&RecoveryAuthorizationWitness {
+                    authorization_instance: witness.authorization_instance,
+                    attempt_id: attempt_id.into(),
+                    operation_id: operation_id.into(),
+                    boundary_id: boundary_id.into(),
+                    action_digest: witness.action_digest,
+                    policy: witness.policy,
+                    authority_epoch: witness.authority_epoch,
+                    issued_at: "2026-10-03T11:45:00Z".into(),
+                })
+                .unwrap(),
+            false
+        );
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
