@@ -102,6 +102,26 @@ fn candidate(
                 },
             ),
         ]),
+        operating_capabilities: BTreeMap::from([
+            (
+                "temperature".into(),
+                PerformanceEstimate {
+                    interval: Interval::new(-40.0, 120.0).unwrap(),
+                    unit: "burden-unit".into(),
+                    scope: "benchmark:functional-unit-v1|global".into(),
+                    evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
+                },
+            ),
+            (
+                "pressure".into(),
+                PerformanceEstimate {
+                    interval: Interval::new(0.1, 20.0).unwrap(),
+                    unit: "burden-unit".into(),
+                    scope: "benchmark:functional-unit-v1|global".into(),
+                    evidence_ids: evidence_ids.iter().map(|id| (*id).into()).collect(),
+                },
+            ),
+        ]),
         burdens: burdens(
             &evidence_ids,
             Interval::new(hazard.0, hazard.1).unwrap(),
@@ -116,7 +136,7 @@ fn candidate(
 /// and elimination.
 pub fn five_pathway_adversarial_case() -> BenchmarkCase {
     BenchmarkCase {
-        id: "industrial-alternatives/five-pathway-v2",
+        id: "industrial-alternatives/five-pathway-v3",
         purpose: "regrettable substitution + epistemic uncertainty + functional alternatives",
         requirement: FunctionalRequirement {
             id: "seal-v1".into(),
@@ -148,6 +168,24 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
                 (
                     "throughput_per_hour".into(),
                     ComparisonScale {
+                        unit: "burden-unit".into(),
+                        scope: "benchmark:functional-unit-v1|global".into(),
+                    },
+                ),
+            ]),
+            operating_envelope: BTreeMap::from([
+                (
+                    "temperature".into(),
+                    OperatingRequirement {
+                        interval: Interval::new(-20.0, 80.0).unwrap(),
+                        unit: "burden-unit".into(),
+                        scope: "benchmark:functional-unit-v1|global".into(),
+                    },
+                ),
+                (
+                    "pressure".into(),
+                    OperatingRequirement {
+                        interval: Interval::new(0.5, 10.0).unwrap(),
                         unit: "burden-unit".into(),
                         scope: "benchmark:functional-unit-v1|global".into(),
                     },
