@@ -45,7 +45,7 @@ jobs:
           - name: canonical-quality-gate
             command: cargo test -p symthaea-broca --lib evaluation::tests::test_quality_gate_thresholds_fail
           - name: root-live-voice-ssm-language
-            command: cargo test -p symthaea --features "live-voice,ssm_language" --lib voice::live_voice::tests::test_phonological_plan_rate_reaches_real_scheduler
+            command: cargo test -p symthaea --features "live-voice,ssm_language" --lib voice::live_voice::tests
 
     steps:
       - uses: actions/checkout@v4
