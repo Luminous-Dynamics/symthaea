@@ -310,10 +310,10 @@ impl LiveVoice {
                     utterance_progress: utterance_progress.clamp(0.0, 1.0),
                     phoneme_progress: progress,
                     stress: segment.stress.ordinal(),
-                    // StreamingVocalTract::new() uses the default speaker profile (120 Hz).
                     // Broca's pitch_range widens/narrows F0 excursion via the existing
-                    // arousal channel rather than overwriting the speaker's base pitch.
-                    base_f0: 120.0,
+                    // arousal channel rather than overwriting the speaker's authoritative
+                    // base pitch from the vocal-tract controller.
+                    base_f0: self.streaming.base_f0(),
                     arousal: {
                         let normalized = state.emotional_arousal.clamp(0.0, 1.0);
                         let range = plan.pitch_range.clamp(0.65, 1.45);
@@ -916,6 +916,7 @@ mod tests {
             receipt.sample_count,
             receipt.scheduler_frames * (receipt.sample_rate / FRAME_RATE) as usize
         );
+        assert_eq!(receipt.sample_rate, voice.sample_rate());
         assert_eq!(receipt.sample_rate, 24_000);
         assert_eq!(receipt.rate, plan.rate);
         assert_eq!(receipt.pitch_range, plan.pitch_range);
