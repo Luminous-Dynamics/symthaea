@@ -67,6 +67,8 @@ The wire and programmatic entry points enforce the same strict JSON/JCS input bo
 
 The implementation deliberately does not claim conformance to the complete W3C Verifiable Credential Data Integrity processing model. It implements the specified `eddsa-jcs-2022` cryptographic core and keeps the controller-document/admission/replay boundaries explicit.
 
+The temporal profile is intentionally narrower than XML Schema 1.1 `dateTime`: lifecycle and freshness timestamps currently require the RFC3339 lexical subset accepted by the core's time parser. This is a fail-closed interoperability profile, not a claim that every XML Schema 1.1 timestamp form is accepted.
+
 The optional `digestMultibase` receipt artifact is aligned with the W3C Verifiable Credential Data Integrity 1.1 Working Draft resource-integrity property. The current implementation intentionally emits one SHA-256 Multibase/Multihash value and binds it to the independently recorded SHA-256 document digest.
 
 ## CI
