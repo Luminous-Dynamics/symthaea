@@ -59,7 +59,9 @@ jobs:
         run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs
 
       - name: Run Custom authority regressions
-        run: cargo test -p nixward custom_command_cannot_mint_authority --lib
+        run: |
+          cargo test -p nixward custom_command_cannot_mint_authority --lib
+          cargo test -p nixward test_custom_safety_label_cannot_reduce_authority_tier --lib
 
   governance:
     name: Governance Check (Class A/B Changes)
