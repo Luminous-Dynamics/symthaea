@@ -440,7 +440,53 @@ fn sha256_multibase(hex_digest: &str) -> Result<String, SnapshotError> {
     Ok(format!("z{}", bs58::encode(multihash).into_string()))
 }
 
-pub(crate) fn verification_method_material_digest(
+pub(crate) fn validate_public_jwk_shape(
+    public_object: &serde_json::Map<String, Value>,
+) -> Result<(), SnapshotError> {
+    let kty = public_object.get("kty").and_then(Value::as_str).ok_or_else(|| {
+        SnapshotError::Malformed(
+            "public JWK verification material requires a string kty".into(),
+        )
+    })?;
+
+    let require_string = |field: &str| {
+        public_object
+            .get(field)
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                SnapshotError::Malformed(format!(
+                    "public JWK verification material with kty {kty} requires a non-empty {field}"
+                ))
+            })
+    };
+
+    match kty {
+        "EC" => {
+            require_string("crv")?;
+            require_string("x")?;
+            require_string("y")?;
+        }
+        "OKP" => {
+            require_string("crv")?;
+            require_string("x")?;
+        }
+        "RSA" => {
+            require_string("n")?;
+            require_string("e")?;
+        }
+        "oct" => {
+            return Err(SnapshotError::Malformed(
+                "JsonWebKey verification material must not use a symmetric oct key".into(),
+            ));
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn verification_method_material_digest(
     method_id: &ClaimVerificationMethod,
     method_type: &str,
     object: &serde_json::Map<String, Value>,
@@ -495,16 +541,7 @@ pub(crate) fn verification_method_material_digest(
                     ));
                 }
             }
-            let kty = public_object.get("kty").and_then(Value::as_str).ok_or_else(|| {
-                SnapshotError::Malformed(
-                    "public JWK verification material requires a string kty".into(),
-                )
-            })?;
-            if kty == "oct" {
-                return Err(SnapshotError::Malformed(
-                    "JsonWebKey verification material must not use a symmetric oct key".into(),
-                ));
-            }
+            validate_public_jwk_shape(public_object)?;
 
             let canonical_jwk: std::collections::BTreeMap<String, Value> = public_object
                 .iter()
@@ -1313,6 +1350,34 @@ mod tests {
             adapter.resolve_snapshot(&request, snapshot),
             Err(SnapshotError::Malformed(message))
                 if message.contains("multiple public verification material formats")
+        ));
+    }
+
+    #[test]
+    fn public_jwk_requires_key_type_specific_parameters() {
+        let request = request();
+        let mut snapshot = snapshot();
+        snapshot.document = r##"{
+            "id": "https://example.test/controller",
+            "verificationMethod": [{
+                "id": "https://example.test/controller#jwk-1",
+                "type": "JsonWebKey",
+                "controller": "https://example.test/controller",
+                "publicKeyJwk": {
+                    "kty": "OKP",
+                    "crv": "Ed25519"
+                }
+            }],
+            "assertionMethod": ["https://example.test/controller#jwk-1"]
+        }"##.into();
+        let reference = snapshot.snapshot_reference().unwrap();
+        let adapter =
+            JsonControllerDocumentSnapshotAdapter::new("/tmp/does-not-matter", reference).unwrap();
+
+        assert!(matches!(
+            adapter.resolve_snapshot(&request, snapshot),
+            Err(SnapshotError::Malformed(message))
+                if message.contains("requires a non-empty x")
         ));
     }
 
