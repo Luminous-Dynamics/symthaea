@@ -558,6 +558,7 @@ mod tests {
         let frame = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
             .with_unit(UnitRef {
                 symbol: "m".into(),
+                dimension: PhysicalDimension::LENGTH,
                 transform_to_si: UnitTransform::IDENTITY,
                 semantic_id: None,
             });
@@ -605,6 +606,7 @@ mod tests {
         )
         .with_unit(UnitRef {
             symbol: "ft".into(),
+            dimension: PhysicalDimension::LENGTH,
             transform_to_si: UnitTransform::new(
                 RationalScale { numerator: 3048, denominator: 10000 },
                 RationalScale { numerator: 0, denominator: 1 },
