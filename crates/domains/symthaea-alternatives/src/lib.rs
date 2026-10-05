@@ -147,6 +147,21 @@ pub enum EvidenceKind {
     ContinuouslyMonitored,
 }
 
+impl EvidenceKind {
+    /// All evidence kinds in deterministic enum order.
+    pub const ALL: [Self; 9] = [
+        Self::Observed,
+        Self::Reported,
+        Self::Simulated,
+        Self::Derived,
+        Self::LifecycleAssessed,
+        Self::Hypothesis,
+        Self::ManufacturingObserved,
+        Self::FieldObserved,
+        Self::ContinuouslyMonitored,
+    ];
+}
+
 /// Explicit decision-profile freshness semantics for evidence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvidenceFreshnessPolicy {
