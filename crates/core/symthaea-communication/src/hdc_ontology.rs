@@ -1667,7 +1667,8 @@ fn kind_tag(kind: &ConceptKind) -> &'static str {
 mod tests {
     use super::*;
 
-        fn graph_and_training_budgets_fail_closed_before_encoding() {
+    #[test]
+    fn graph_and_training_budgets_fail_closed_before_encoding() {
         let (training, training_manifest) = training_graph_and_manifest();
         let mut oversized_graph = training.clone();
         oversized_graph.nodes.extend(
