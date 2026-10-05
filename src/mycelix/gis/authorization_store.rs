@@ -9201,7 +9201,7 @@ mod tests {
             Err(AuthorizationStoreError::Consumption(
                 AuthorizationConsumptionError::InvalidBinding
             ))
-        );
+        ));
         store.connection().unwrap().execute(
             "UPDATE authorization_leases
              SET operation_id=?2
