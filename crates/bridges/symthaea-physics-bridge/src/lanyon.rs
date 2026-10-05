@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
-use symthaea_types::{PhysicalType, PhysicalTypeError};
+use symthaea_types::{PhysicalType, PhysicalTypeError, ScientificHypothesisHandoff};
 
 const ADAPTER_SCHEMA: &str = "LANYON_PUBLIC_SPEC_ADAPTER.v1";
 const ENVELOPE_SCHEMA: &str = "LANYON_SEMANTIC_ENVELOPE.v1";
@@ -329,6 +329,8 @@ pub struct LanyonSpecificationBundle {
     pub semantic_envelope: LanyonSemanticEnvelope,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_candidate_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_handoff_digest: Option<String>,
 }
 
 impl LanyonSpecificationBundle {
@@ -350,6 +352,7 @@ impl LanyonSpecificationBundle {
             specification,
             semantic_envelope,
             source_candidate_digest,
+            source_handoff_digest: None,
         };
         bundle.validate()?;
         Ok(bundle)
@@ -367,6 +370,21 @@ impl LanyonSpecificationBundle {
         )
     }
 
+    pub fn with_source_handoff(
+        specification: LanyonSystemSpec,
+        bindings: Vec<LanyonPhysicalBinding>,
+        handoff: &ScientificHypothesisHandoff,
+    ) -> Result<Self, String> {
+        handoff.validate()?;
+        let mut bundle = Self::new_with_candidate_digest(
+            specification,
+            bindings,
+            Some(handoff.candidate_digest.clone()),
+        )?;
+        bundle.source_handoff_digest = Some(handoff.digest_hex());
+        bundle.validate()?;
+        Ok(bundle)
+    }
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_revision != ADAPTER_SCHEMA {
             return Err("unsupported Lanyon adapter schema".into());
@@ -374,6 +392,9 @@ impl LanyonSpecificationBundle {
         self.specification.validate()?;
         self.semantic_envelope.validate()?;
         if let Some(digest) = &self.source_candidate_digest {
+            validate_digest(digest)?;
+        }
+        if let Some(digest) = &self.source_handoff_digest {
             validate_digest(digest)?;
         }
         if self.semantic_envelope.specification_digest != self.specification.digest_hex()? {
@@ -398,6 +419,10 @@ impl LanyonSpecificationBundle {
         let mut bytes = self.racket_source()?.into_bytes();
         bytes.push(b'\\n');
         if let Some(digest) = &self.source_candidate_digest {
+            bytes.extend_from_slice(digest.as_bytes());
+            bytes.push(b'\\n');
+        }
+        if let Some(digest) = &self.source_handoff_digest {
             bytes.extend_from_slice(digest.as_bytes());
             bytes.push(b'\\n');
         }
@@ -785,6 +810,37 @@ mod tests {
     fn sum_rejects_unsupported_ast() {
         let expr = Expr::Sum(Box::new(Expr::Var("f".into())), "k".into());
         assert!(expr_to_lanyon_form(&expr).is_err());
+    }
+
+    #[test]
+    fn source_handoff_binds_candidate_and_typed_provenance() {
+        let handoff = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY),
+            symthaea_types::ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            7,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            3,
+            "ramanujan",
+            vec!["not confirmation".into()],
+        );
+        let bundle = LanyonSpecificationBundle::with_source_handoff(
+            fixture(),
+            vec![],
+            &handoff,
+        )
+        .unwrap();
+        assert_eq!(
+            bundle.source_candidate_digest.as_deref(),
+            Some(handoff.candidate_digest.as_str()),
+        );
+        assert_eq!(
+            bundle.source_handoff_digest.as_deref(),
+            Some(handoff.digest_hex().as_str()),
+        );
+        assert!(bundle.validate().is_ok());
     }
 
     #[test]
