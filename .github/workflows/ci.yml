@@ -42,6 +42,29 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  nixward-known-customs-focused:
+    name: Nixward Known Custom Migration Focused
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Check known Custom migration formatting
+        run: cargo fmt --check -- crates/core/nixward/src/action/executor.rs crates/core/nixward/src/action/service_manager.rs crates/core/nixward/src/action/generation_manager.rs crates/core/nixward/src/bin/nixward_daemon.rs
+
+      - name: Run known Custom migration regressions
+        run: |
+          cargo test -p nixward test_typed_service_operations_are_system_modify --lib
+          cargo test -p nixward test_typed_generation_deletions_are_destructive --lib
+          cargo test -p nixward test_switch_generation_is_system_critical_and_typed --lib
+          cargo test -p nixward test_activate_generation_is_system_critical_and_typed --lib
+
   nixward-watchdog-typed-rollback-focused:
     name: Nixward Watchdog Typed Rollback Focused
     runs-on: ubuntu-latest

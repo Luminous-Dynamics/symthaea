@@ -994,7 +994,7 @@ impl DaemonState {
 
                 if let Some(best_action) = non_cooldown_action.or_else(|| plan.actions.first()) {
                     if self.active_healing {
-                        use nixward::action::executor::{NixOSCommand, NixOSExecutor, SafetyLevel};
+                        use nixward::action::executor::{NixOSCommand, NixOSExecutor, SafetyLevel, ServiceOperation};
                         let target_name_clone = target_name.clone();
 
                         // Try to generate a NixOS configuration AST hardening patch (Proposal 2)
@@ -1004,10 +1004,9 @@ impl DaemonState {
                             let command_str =
                                 format!("PATCH /etc/nixos/configuration.nix: {}", tweak);
                             (
-                                NixOSCommand::Custom {
-                                    command: "nixos-rebuild".into(),
-                                    args: vec!["switch".into()],
-                                    safety_level: SafetyLevel::SystemModify,
+                                NixOSCommand::RebuildSwitch {
+                                    flake: None,
+                                    extra_args: vec![],
                                 },
                                 command_str,
                                 true,
@@ -1023,20 +1022,20 @@ impl DaemonState {
                                     extra_args: vec![],
                                 },
                                 ActionCategory::Rollback => NixOSCommand::EnvRollback,
-                                ActionCategory::Enable => NixOSCommand::Custom {
-                                    command: "systemctl".into(),
-                                    args: vec!["enable".into(), target_name_clone.clone()],
-                                    safety_level: SafetyLevel::SystemModify,
+                                ActionCategory::Enable => NixOSCommand::Service {
+                                    operation: ServiceOperation::Enable {
+                                        name: target_name_clone.clone(),
+                                    },
                                 },
-                                ActionCategory::Disable => NixOSCommand::Custom {
-                                    command: "systemctl".into(),
-                                    args: vec!["disable".into(), target_name_clone.clone()],
-                                    safety_level: SafetyLevel::SystemModify,
+                                ActionCategory::Disable => NixOSCommand::Service {
+                                    operation: ServiceOperation::Disable {
+                                        name: target_name_clone.clone(),
+                                    },
                                 },
-                                _ => NixOSCommand::Custom {
-                                    command: "systemctl".into(),
-                                    args: vec!["restart".into(), target_name_clone.clone()],
-                                    safety_level: SafetyLevel::SystemModify,
+                                _ => NixOSCommand::Service {
+                                    operation: ServiceOperation::Restart {
+                                        name: target_name_clone.clone(),
+                                    },
                                 },
                             };
                             let (bin, args) = default_cmd.to_command();
