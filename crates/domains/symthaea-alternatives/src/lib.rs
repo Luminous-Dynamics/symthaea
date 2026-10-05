@@ -1286,7 +1286,7 @@ pub enum QualificationState {
     EvidenceSupported,
     /// Multiple distinct authority groups provide supported evidence.
     LifecycleQualified,
-    /// Multiple independent sources plus full dimension coverage exist.
+    /// Multiple distinct authority groups plus full manufacturing-scale dimension coverage exist.
     ManufacturingQualified,
     /// Field deployment has been observed.
     FieldQualified,
