@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 const SERVICE_STATE_DOMAIN_V1: &[u8] = b"nixward-service-observed-state-v1";
+const SERVICE_PRE_STATE_IDENTITY_PREFIX_V1: &str = "nixward-service-pre-state-v1";
 const MAX_SUB_STATE_BYTES: usize = 128;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -409,6 +410,22 @@ impl NixServiceObservedStateV1 {
             can_reload.ok_or(NixServiceStateErrorV1::MissingCanReload)?,
         )?;
         Ok((state, capabilities))
+    }
+    /// Build the canonical execution-bound pre-state identity for one exact
+    /// service observation. This is evidence/identity binding only; it does not
+    /// authorize the operation.
+    pub(crate) fn execution_pre_state_identity(
+        &self,
+        generation: Option<u64>,
+    ) -> Result<String, NixServiceStateErrorV1> {
+        let state_digest = self.digest()?;
+        let generation = generation
+            .map(|value| format!("generation={value}"))
+            .unwrap_or_else(|| "generation=none".to_string());
+        Ok(format!(
+            "{SERVICE_PRE_STATE_IDENTITY_PREFIX_V1}|{generation}|unit={}|state={state_digest}",
+            self.unit
+        ))
     }
     pub fn unit(&self) -> &str {
         &self.unit
