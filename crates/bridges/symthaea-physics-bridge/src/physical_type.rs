@@ -63,6 +63,16 @@ fn derived_kind_sub(a: QuantityKind, b: QuantityKind) -> QuantityKind {
     }
 }
 
+fn delta_unit_from_absolute(unit: &symthaea_types::UnitRef) -> symthaea_types::UnitRef {
+    let mut delta = unit.clone();
+    delta.symbol = format!("delta_{}", unit.symbol);
+    delta.transform_to_si.offset = symthaea_types::RationalScale {
+        numerator: 0,
+        denominator: 1,
+    };
+    delta
+}
+
 fn additive_result(
     left: &PhysicalType,
     right: &PhysicalType,
@@ -105,12 +115,23 @@ fn additive_result(
         PhysicalType::with_kind(result_kind, left_dimension)
     };
 
-    // Subtracting two absolute temperatures yields a temperature difference.
-    // Do not carry a Celsius/Fahrenheit affine offset into the delta result.
-    if result_kind == QuantityKind::TemperatureDifference
-        && (left.kind == QuantityKind::Temperature || right.kind == QuantityKind::Temperature)
-    {
-        result.unit = None;
+    // Preserve a usable scale for temperature differences, but remove any
+    // affine offset. Prefer the left operand's explicit absolute-temperature
+    // unit; when both operands are absolute temperatures in different units,
+    // the arithmetic value is interpreted through that selected left-unit frame.
+    if result_kind == QuantityKind::TemperatureDifference {
+        result.unit = left
+            .unit
+            .as_ref()
+            .filter(|unit| left.kind == QuantityKind::Temperature)
+            .map(delta_unit_from_absolute)
+            .or_else(|| {
+                right
+                    .unit
+                    .as_ref()
+                    .filter(|unit| right.kind == QuantityKind::Temperature)
+                    .map(delta_unit_from_absolute)
+            });
     }
 
     TypeJudgement::Valid(result)
@@ -502,6 +523,79 @@ mod tests {
         }
     }
 
+    #[test]
+    fn temperature_subtraction_preserves_delta_unit_scale() {
+        let celsius = PhysicalType::with_kind(
+            QuantityKind::Temperature,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "degC".into(),
+            dimension: PhysicalDimension::TEMPERATURE,
+            transform_to_si: UnitTransform::new(
+                UnitScale::ONE,
+                symthaea_types::RationalScale { numerator: 27315, denominator: 100 },
+            ),
+            semantic_id: None,
+        });
+        let variables = HashMap::from([
+            ("t1".into(), celsius.clone()),
+            ("t2".into(), celsius),
+        ]);
+        let expr = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::Var("t1".into())),
+            Box::new(Expr::Var("t2".into())),
+        );
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.kind, QuantityKind::TemperatureDifference);
+                let unit = result.unit.expect(
+                    "temperature subtraction should retain an explicit delta unit",
+                );
+                assert_eq!(unit.symbol, "delta_degC");
+                assert_eq!(unit.transform_to_si.offset.numerator, 0);
+                assert_eq!(unit.transform_to_si.scale, UnitScale::ONE);
+            }
+            other => panic!(
+                "unexpected temperature subtraction judgment: {other:?}",
+            ),
+        }
+    }
+
+    #[test]
+    fn delta_temperature_subtraction_retains_existing_delta_unit() {
+        let delta = PhysicalType::with_kind(
+            QuantityKind::TemperatureDifference,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "delta_degC".into(),
+            dimension: PhysicalDimension::TEMPERATURE,
+            transform_to_si: UnitTransform::IDENTITY,
+            semantic_id: None,
+        });
+        let variables = HashMap::from([
+            ("a".into(), delta.clone()),
+            ("b".into(), delta),
+        ]);
+        let expr = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::Var("a".into())),
+            Box::new(Expr::Var("b".into())),
+        );
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.kind, QuantityKind::TemperatureDifference);
+                assert_eq!(result.unit.as_ref().map(|u| u.symbol.as_str()), Some("delta_degC"));
+            }
+            other => panic!(
+                "unexpected delta-temperature subtraction judgment: {other:?}",
+            ),
+        }
+    }
     #[test]
     fn temperature_difference_minus_absolute_temperature_is_invalid() {
         let difference = PhysicalType::with_kind(
