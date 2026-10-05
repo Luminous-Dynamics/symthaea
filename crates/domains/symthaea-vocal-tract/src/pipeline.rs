@@ -246,7 +246,9 @@ impl ProsodyContext {
         // When syllable_progress has been explicitly set (> 0), use it instead of
         // phoneme_progress so accents span the entire syllable, not just one phoneme.
         // Falls back to phoneme_progress for backward compatibility.
-        let accent_progress = if self.syllable_progress > 0.0 {
+        let accent_progress = if self.is_syllable_onset || self.syllable_progress > 0.0 {
+            // Zero is a meaningful value at the syllable onset. Do not treat it as
+            // “unset”, or the first frame would fall back to mid-phoneme progress.
             self.syllable_progress
         } else {
             self.phoneme_progress
@@ -1101,6 +1103,43 @@ mod tests {
     use crate::fep::VocalTractObservation;
     use crate::types::FormantFrame;
     use symthaea_core::genesis::GenesisSeed;
+
+    #[test]
+    fn test_syllable_onset_uses_zero_progress_for_pitch_accent() {
+        let base = FormantFrame {
+            f0: 0.0,
+            energy: 0.5,
+            ..FormantFrame::silent(0.0)
+        };
+
+        let onset = ProsodyContext {
+            utterance_progress: 0.0,
+            phoneme_progress: 0.5,
+            stress: 1,
+            base_f0: 200.0,
+            arousal: 0.5,
+            pitch_range: 1.0,
+            intonation: Intonation::Statement,
+            phrase_progress: 0.0,
+            is_focus: false,
+            pitch_accent: PitchAccent::High,
+            is_syllable_onset: true,
+            syllable_progress: 0.0,
+            ..Default::default()
+        };
+
+        let mut frame = base;
+        onset.apply_prosody(&mut frame);
+
+        // Statement contour at utterance start = 1.05, primary stress = 1.10,
+        // neutral high-accent contour at syllable progress 0 = 1.0, arousal = 1.0.
+        let expected = 200.0 * 1.05 * 1.10;
+        assert!(
+            (frame.f0 - expected).abs() < 1e-4,
+            "syllable onset must begin the accent at zero progress: expected {expected}, got {}",
+            frame.f0
+        );
+    }
 
     #[test]
     fn test_pitch_range_is_independent_of_arousal() {
