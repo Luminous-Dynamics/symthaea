@@ -128,6 +128,36 @@ impl ControllerDocumentSnapshotFile {
 /// intentionally insufficient because path identity is mutable and portable
 /// copies can silently replace its contents.
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResolvedVerificationMethodMaterial {
+    Multikey { public_key_multibase: String },
+    JsonWebKey { public_key_jwk: Value },
+}
+
+impl ResolvedVerificationMethodMaterial {
+    pub fn method_type(&self) -> &'static str {
+        match self {
+            Self::Multikey { .. } => "Multikey",
+            Self::JsonWebKey { .. } => "JsonWebKey",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedVerificationMethod {
+    pub method: ClaimVerificationMethod,
+    pub controller: ClaimControllerIdentity,
+    pub material: ResolvedVerificationMethodMaterial,
+    pub material_digest: String,
+    pub lifecycle: VerificationMethodLifecycle,
+}
+
+impl ResolvedVerificationMethod {
+    pub fn method_type(&self) -> &'static str {
+        self.material.method_type()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsonControllerDocumentSnapshotAdapter {
     path: PathBuf,
     expected_snapshot_reference: String,
@@ -211,6 +241,26 @@ impl JsonControllerDocumentSnapshotAdapter {
         request: &VerificationRequest,
         snapshot: ControllerDocumentSnapshotFile,
     ) -> Result<VerificationMethodResolution, SnapshotError> {
+        self.resolve_snapshot_with_material(request, snapshot)
+            .map(|(resolution, _)| resolution)
+    }
+
+    /// Resolve a durable snapshot and return the exact public verification
+    /// material used to compute the material identity bound into the resolution.
+    ///
+    /// The returned material is public by definition; private/secret key
+    /// parameters are rejected before this value is produced.
+    pub fn resolve_snapshot_with_material(
+        &self,
+        request: &VerificationRequest,
+        snapshot: ControllerDocumentSnapshotFile,
+    ) -> Result<
+        (
+            VerificationMethodResolution,
+            ResolvedVerificationMethod,
+        ),
+        SnapshotError,
+    > {
         request.validate_structure()?;
         snapshot.validate_structure()?;
 
@@ -265,12 +315,12 @@ impl JsonControllerDocumentSnapshotAdapter {
             ));
         }
 
-        let (
-            resolved_method_controller,
-            verification_method_type,
-            verification_method_material_digest,
-            lifecycle,
-        ) = extract_verification_method(request, object)?;
+        let resolved_method = extract_verification_method(request, object)?;
+        let resolved_method_controller = resolved_method.controller.clone();
+        let verification_method_type = resolved_method.method_type().to_owned();
+        let verification_method_material_digest =
+            resolved_method.material_digest.clone();
+        let lifecycle = resolved_method.lifecycle.clone();
         let relationship_methods =
             extract_relationship_methods(request, object, &snapshot.controller_document_ref)?;
 
@@ -309,7 +359,7 @@ impl JsonControllerDocumentSnapshotAdapter {
 
         resolution = resolution.with_controller_document_dereference(dereference, request)?;
         resolution.validate_structure()?;
-        Ok(resolution)
+        Ok((resolution, resolved_method))
     }
 }
 
@@ -509,15 +559,7 @@ fn required_string<'a>(
 fn extract_verification_method(
     request: &VerificationRequest,
     document: &serde_json::Map<String, Value>,
-) -> Result<
-    (
-        ClaimControllerIdentity,
-        String,
-        String,
-        VerificationMethodLifecycle,
-    ),
-    SnapshotError,
-> {
+) -> Result<ResolvedVerificationMethod, SnapshotError> {
     let requested_id = request.verification_method.as_str();
     let mut candidates = Vec::new();
 
@@ -589,15 +631,7 @@ fn extract_verification_method(
 fn parse_verification_method_definition(
     expected_method: ClaimVerificationMethod,
     object: &serde_json::Map<String, Value>,
-) -> Result<
-    (
-        ClaimControllerIdentity,
-        String,
-        String,
-        VerificationMethodLifecycle,
-    ),
-    SnapshotError,
-> {
+) -> Result<ResolvedVerificationMethod, SnapshotError> {
     let id = required_string(object, "id")?.to_owned();
     let method_id = ClaimVerificationMethod::new(id.clone())
         .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
@@ -617,6 +651,27 @@ fn parse_verification_method_definition(
         object,
     )?;
 
+    let material = match method_type {
+        "Multikey" => ResolvedVerificationMethodMaterial::Multikey {
+            public_key_multibase: required_string(object, "publicKeyMultibase")?.to_owned(),
+        },
+        "JsonWebKey" => ResolvedVerificationMethodMaterial::JsonWebKey {
+            public_key_jwk: object
+                .get("publicKeyJwk")
+                .cloned()
+                .ok_or_else(|| {
+                    SnapshotError::Malformed(
+                        "JsonWebKey verification methods require publicKeyJwk".into(),
+                    )
+                })?,
+        },
+        other => {
+            return Err(SnapshotError::Malformed(format!(
+                "unsupported verification method type: {other}"
+            )));
+        }
+    };
+
     let controller = required_string(object, "controller")?;
     let controller = ClaimControllerIdentity::new(controller.to_owned())
         .map_err(|error| SnapshotError::Malformed(error.to_owned()))?;
@@ -624,12 +679,13 @@ fn parse_verification_method_definition(
     let revoked = optional_timestamp(object, "revoked")?;
     let lifecycle = VerificationMethodLifecycle::new(expires.as_deref(), revoked.as_deref())?;
 
-    Ok((
+    Ok(ResolvedVerificationMethod {
+        method: method_id,
         controller,
-        method_type.to_owned(),
+        material,
         material_digest,
         lifecycle,
-    ))
+    })
 }
 
 fn extract_relationship_methods(
@@ -699,8 +755,9 @@ fn extract_relationship_methods(
                 }
             }
             if relationship_expires.is_some() || relationship_revoked.is_some() {
-                let (method_controller, _, _, lifecycle) =
-                    extract_verification_method(request, document)?;
+                let resolved_method = extract_verification_method(request, document)?;
+                let method_controller = resolved_method.controller;
+                let lifecycle = resolved_method.lifecycle;
                 if let Some(expires) = relationship_expires {
                     if lifecycle.expires.as_deref() != Some(expires.as_str()) {
                         return Err(SnapshotError::Malformed(
