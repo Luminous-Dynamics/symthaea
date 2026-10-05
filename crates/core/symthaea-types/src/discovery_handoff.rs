@@ -371,6 +371,29 @@ impl ScientificInquirySelectionReceipt {
         Ok(())
     }
 
+    /// Validate the receipt against the complete hypothesis set.
+    ///
+    /// This closes the provenance gap where an arbitrary handoff digest could
+    /// otherwise be paired with a valid but unrelated set digest.
+    pub fn validate_against_hypothesis_set(
+        &self,
+        hypothesis_handoff: &ScientificHypothesisHandoff,
+        hypothesis_set: &[ScientificHypothesisHandoff],
+    ) -> Result<(), String> {
+        self.validate()?
+        ;
+        validate_scientific_hypothesis_set(hypothesis_set)?;
+        let computed_set_digest = scientific_hypothesis_set_digest(hypothesis_set);
+        self.validate_against(hypothesis_handoff, &computed_set_digest)?;
+        if !hypothesis_set
+            .iter()
+            .any(|candidate| candidate.digest_hex() == hypothesis_handoff.digest_hex())
+        {
+            return Err("inquiry selection anchor handoff is not a member of the hypothesis set".into());
+        }
+        Ok(())
+    }
+
     pub fn validate_against(
         &self,
         hypothesis_handoff: &ScientificHypothesisHandoff,
@@ -841,6 +864,10 @@ mod tests {
         assert!(receipt
             .validate_against(&h1, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
             .is_ok());
+        let actual_set = vec![h1.clone(), h2.clone()];
+        assert!(receipt
+            .validate_against_hypothesis_set(&h1, &actual_set)
+            .is_err());
         assert!(receipt
             .validate_against(&h2, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
             .is_err());
@@ -866,6 +893,63 @@ mod tests {
             "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             "same hypothesis",
         ).is_err());
+    }
+
+    #[test]
+    fn inquiry_selection_rejects_anchor_outside_hypothesis_set() {
+        let h1 = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let h2 = ScientificHypothesisHandoff::new(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            2,
+            "2222222222222222222222222222222222222222222222222222222222222222",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let outsider = ScientificHypothesisHandoff::new(
+            "3333333333333333333333333333333333333333333333333333333333333333",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "4444444444444444444444444444444444444444444444444444444444444444",
+            "5555555555555555555555555555555555555555555555555555555555555555",
+            3,
+            "6666666666666666666666666666666666666666666666666666666666666666",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let selection = ScientificInquirySelectionReceipt::new(
+            outsider.digest_hex(),
+            scientific_hypothesis_set_digest(&[h1.clone(), h2.clone()]),
+            "7777777777777777777777777777777777777777777777777777777777777777",
+            "8888888888888888888888888888888888888888888888888888888888888888",
+            "selector-v3",
+            7,
+            energy().digest_hex(),
+            1.0,
+            2,
+            2,
+        )
+        .unwrap();
+        assert!(selection
+            .validate_against_hypothesis_set(&outsider, &[h1, h2])
+            .is_err());
+        let _ = (h1, h2);
     }
 
     #[test]
