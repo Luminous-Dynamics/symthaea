@@ -70,6 +70,7 @@ pub enum OpenFoamBoundaryObservationError {
         face_count: u64,
     },
     InvalidPointScale,
+    InvalidArtifactCombination,
     PatchGeometryMismatch,
     UnexpectedPatchListEntry,
     InvalidTolerance,
@@ -1368,6 +1369,30 @@ pub struct OpenFoamPassiveBoundaryAdapter {
 }
 
 impl OpenFoamPassiveBoundaryAdapter {
+    fn validate_artifact_configuration(
+        &self,
+    ) -> Result<(), OpenFoamBoundaryObservationError> {
+        let has_faces = self.faces_source_bytes.is_some();
+        let has_points = self.points_source_bytes.is_some();
+        let has_neighbour = self.neighbour_source_bytes.is_some();
+        let has_owner = self.owner_source_bytes.is_some();
+        let has_scale = self.point_scale_mm_per_unit.is_some();
+
+        if has_points && (!has_faces || !has_scale) {
+            return Err(OpenFoamBoundaryObservationError::InvalidArtifactCombination);
+        }
+        if has_neighbour && (!has_faces || !has_points || !has_scale) {
+            return Err(OpenFoamBoundaryObservationError::InvalidArtifactCombination);
+        }
+        if has_owner && (!has_faces || !has_points || !has_neighbour || !has_scale) {
+            return Err(OpenFoamBoundaryObservationError::InvalidArtifactCombination);
+        }
+        if has_scale && !has_points {
+            return Err(OpenFoamBoundaryObservationError::InvalidArtifactCombination);
+        }
+        Ok(())
+    }
+
     pub fn new(
         source_bytes: impl Into<Vec<u8>>,
         patch_name: impl Into<String>,
@@ -1520,6 +1545,12 @@ impl symthaea_passive_solver_binding::SolverBoundaryInputEntityObserver
         symthaea_passive_solver_binding::SolverBoundaryEntityAttestation,
         symthaea_passive_solver_binding::SolverBindingError,
     > {
+        self.validate_artifact_configuration().map_err(|error| {
+            symthaea_passive_solver_binding::SolverBindingError::ExternalObservation(
+                format!("{error:?}"),
+            )
+        })?;
+
         let (_, observation) = match (
             &self.faces_source_bytes,
             &self.points_source_bytes,
@@ -2219,6 +2250,35 @@ mod tests {
             parse_neighbour_list_count(source),
             Err(OpenFoamBoundaryObservationError::InvalidNeighbourListEntry)
         ));
+    }
+
+    #[test]
+    fn inconsistent_optional_artifact_combinations_fail_closed() {
+        let mut adapter =
+            OpenFoamPassiveBoundaryAdapter::new(
+                BOUNDARY.to_vec(),
+                "inlet",
+                0.05,
+            )
+            .unwrap();
+        adapter.points_source_bytes = Some(Vec::new());
+        assert_eq!(
+            adapter.validate_artifact_configuration(),
+            Err(OpenFoamBoundaryObservationError::InvalidArtifactCombination)
+        );
+
+        let mut adapter =
+            OpenFoamPassiveBoundaryAdapter::new(
+                BOUNDARY.to_vec(),
+                "inlet",
+                0.05,
+            )
+            .unwrap();
+        adapter.owner_source_bytes = Some(Vec::new());
+        assert_eq!(
+            adapter.validate_artifact_configuration(),
+            Err(OpenFoamBoundaryObservationError::InvalidArtifactCombination)
+        );
     }
 
     #[test]
