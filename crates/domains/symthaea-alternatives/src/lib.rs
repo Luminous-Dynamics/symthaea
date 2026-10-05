@@ -1531,7 +1531,7 @@ mod tests {
         );
 
         let valid = AlternativesEngine
-            .assess_at(&fixture_requirement(), &[c], None, Some(50))
+            .assess_at(&fixture_requirement(), &[c.clone()], None, Some(50))
             .unwrap();
         assert!(!valid.frontier_blockers.contains_key("expired"));
         assert!(
