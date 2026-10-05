@@ -156,6 +156,12 @@ pub fn five_pathway_adversarial_case() -> BenchmarkCase {
         purpose: "regrettable substitution + epistemic uncertainty + functional alternatives",
         requirement: FunctionalRequirement {
             id: "seal-v1".into(),
+            subject: AssessmentSubjectRef {
+                subject_id: "benchmark-product".into(),
+                profile_id: "benchmark-product-profile".into(),
+                profile_revision: "v1".into(),
+                subject_digest: "benchmark-product-digest-v1".into(),
+            },
             description: "Provide a durable chemical-resistant seal.".into(),
             constraints: BTreeMap::from([
                 ("service_life_years".into(), RequirementBound::AtLeast(10.0)),
