@@ -141,6 +141,13 @@ impl PhonologicalPlanRealizationReceipt {
                 FRAME_RATE
             );
         }
+        if !self.sample_rate.is_multiple_of(FRAME_RATE) {
+            anyhow::bail!(
+                "realization receipt sample rate is not divisible by the motor-frame rate: {} % {} != 0",
+                self.sample_rate,
+                FRAME_RATE
+            );
+        }
         if self.sample_count != expected_samples || self.sample_count == 0 {
             anyhow::bail!("realization receipt sample accounting is inconsistent");
         }
@@ -367,6 +374,13 @@ fn progress_within_frame_span(global_frame: usize, start_frame: usize, end_frame
         if sample_rate < FRAME_RATE {
             anyhow::bail!(
                 "phonological plan realization requires sample rate >= {} Hz; got {}",
+                FRAME_RATE,
+                sample_rate
+            );
+        }
+        if !sample_rate.is_multiple_of(FRAME_RATE) {
+            anyhow::bail!(
+                "phonological plan realization requires sample rate divisible by {} Hz; got {}",
                 FRAME_RATE,
                 sample_rate
             );
@@ -1343,6 +1357,40 @@ mod tests {
             .synthesize_phonological_plan(&plan)
             .expect_err("a motor frame with zero output samples must fail closed");
         assert!(error.to_string().contains("sample rate >= 200 Hz"));
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_phonological_plan_rejects_non_divisible_sample_rate() {
+        use symthaea_broca::{
+            ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+            SyllableStress, ThoughtChannels,
+        };
+
+        let genesis = GenesisSeed::from_phrase("plan-native-nondivisible-sample-rate-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(2);
+        let readout = decoder.decode(&channels);
+        let frame = LinguisticFrame::from_speech_plan(&SpeechPlan::from_readout(&channels, &readout));
+        let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_segments(
+            vec![PhonemeSlot::new(
+                "AH",
+                0,
+                SyllableStress::Primary,
+                true,
+                false,
+                true,
+            )],
+            ContentBindingStatus::PhonologicallyBound,
+        )
+        .expect("explicit phonological fixture");
+
+        let mut voice = LiveVoice::new_headless_with_rate(&genesis, 22_050);
+        let error = voice
+            .synthesize_phonological_plan(&plan)
+            .expect_err("non-divisible sample rate must fail closed");
+        assert!(error.to_string().contains("sample rate divisible by 200 Hz"));
     }
 
     #[cfg(feature = "ssm_language")]
