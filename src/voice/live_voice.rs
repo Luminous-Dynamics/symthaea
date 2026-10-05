@@ -1451,6 +1451,55 @@ mod tests {
 
     #[cfg(feature = "ssm_language")]
     #[test]
+    fn test_receipt_rejects_unverified_lexical_bound_plan_after_hash_update() {
+        use symthaea_broca::{
+            ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+            SyllableStress, ThoughtChannels,
+        };
+
+        let genesis = GenesisSeed::from_phrase("plan-native-lexical-receipt-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(2);
+        let readout = decoder.decode(&channels);
+        let speech_plan = SpeechPlan::from_readout(&channels, &readout);
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+        let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+        plan.bind_segments(
+            vec![PhonemeSlot::new(
+                "AH",
+                0,
+                SyllableStress::Primary,
+                true,
+                false,
+                true,
+            )],
+            ContentBindingStatus::PhonologicallyBound,
+        )
+        .expect("fixture phonology should bind");
+
+        let mut voice = LiveVoice::new_headless(&genesis);
+        let mut receipt = voice
+            .speak_phonological_plan_with_receipt(&plan)
+            .expect("phonological receipt should be emitted");
+
+        plan.content_binding = ContentBindingStatus::LexicallyBound;
+        plan.lexical_provenance = Some(
+            blake3::hash(b"self-attested-lexical-binding")
+                .to_hex()
+                .to_string(),
+        );
+        receipt.plan_grounding_blake3 =
+            blake3::hash(plan.grounding_surface().as_bytes()).to_hex().to_string();
+
+        let error = receipt
+            .verify_against_plan(&plan)
+            .expect_err("receipt verification must reject an unverified lexical plan");
+
+        assert!(error.to_string().contains("validated lexical-binding realization"));
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
     fn test_role_only_phonological_plan_is_rejected() {
         use symthaea_broca::{LinguisticFrame, SpeechPlan, StructuredDecoder, ThoughtChannels};
 
