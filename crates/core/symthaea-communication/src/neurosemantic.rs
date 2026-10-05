@@ -1196,9 +1196,6 @@ mod tests {
         let fresh_binding = mutated
             .bind_policy_provenance_bytes(b"synthetic-policy-record-1")
             .unwrap();
-        assert!(!NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research)
-            .eq(&NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research)));
-
         let mut packet = NeurosemanticPacket::new_with_policy(
             18,
             "peer",
