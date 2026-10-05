@@ -636,7 +636,7 @@ rdp-x11 = ["rdp-server"]                   # X11 SHM capture + XTest injection (
 #   audio           → voice-tts + rodio playback
 #   vocal-tract     → articulatory synthesis (LTC-driven, independent of TTS)
 #   neural-vocoder  → vocal-tract + BigVGAN ONNX (Path A waveform generation)
-#   live-voice      → real-time cpal output + vocal-tract (UNTESTED in CI)
+#   live-voice      → real-time cpal output + vocal-tract (headless tests in CI)
 #   liquid-mamba    → SSM language center + pre-trained Mamba fusion (CPU; see ssm_language)
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
 voice-tts-gpu = ["voice-tts"]                         # GPU-accelerated Kokoro synthesis (CUDA execution provider) -- VERIFIED LIVE 2026-07-18 on an RTX 2070: RTF ~0.22 vs CPU's ~1.42 (~6x speedup, comfortably real-time), see kokoro_realtime_factor.rs. Requires ORT_DYLIB_PATH pointing at a CUDA-enabled onnxruntime build + KokoroConfig::use_gpu (or VoiceOutputConfig::use_gpu)

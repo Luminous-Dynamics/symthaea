@@ -103,7 +103,10 @@ fi
 # Broca-only, composed, and composed+feedback conditions.
 # The resulting JSON is also rendered by broca_measurement_summary.py for reviewer-facing evidence.
 if [[ "${BROCA_RUN_ATTRIBUTION_HARNESS:-1}" == "1" ]]; then
-  cargo run "${cargo_locked_args[@]}" --features "ssm_language,vocal-tract" --bin broca-attribution-harness -- \
+  # The root package defaults to `default-mind` -> `broca_lite`, which is mutually\
+  # exclusive with `ssm_language`. Keep this measurement path explicitly isolated\
+  # from the default mind bundle so the harness tests the intended native Broca stack.\
+  cargo run "${cargo_locked_args[@]}" --no-default-features --features "ssm_language,vocal-tract" --bin broca-attribution-harness -- \
     --json-out "$OUT_DIR/attribution-harness.json"
 else
   cat > "$OUT_DIR/attribution-harness.json" <<'JSON'

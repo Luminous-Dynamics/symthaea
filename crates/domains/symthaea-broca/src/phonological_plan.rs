@@ -13,7 +13,7 @@ use crate::linguistic_frame::LinguisticFrame;
 use crate::speech_plan::{IntonationIntent, SpeechPlan};
 
 /// Stable identity for the phonological-plan contract.
-pub const PHONOLOGICAL_PLAN_VERSION: &str = "broca-phonological-plan-v1";
+pub const PHONOLOGICAL_PLAN_VERSION: &str = "broca-phonological-plan-v2";
 
 /// How much linguistic content is actually bound to the production plan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -124,6 +124,11 @@ pub struct PhonologicalPlan {
     pub realization_authorized: bool,
     pub focus_role: Option<String>,
     pub intonation: IntonationIntent,
+    /// Relative pitch-range multiplier inherited from the speech-production plan.
+    /// 1.0 is neutral; the realization layer must not reinterpret it as speaker base F0.
+    pub pitch_range: f32,
+    /// Desired prominence of the focus constituent, inherited without re-inference.
+    pub prominence: f32,
     pub rate: f32,
     pub pause_weight: f32,
     pub segments: Vec<PhonemeSlot>,
@@ -142,6 +147,8 @@ impl PhonologicalPlan {
             realization_authorized: frame.ready_for_phonology(),
             focus_role: frame.focus_role.clone(),
             intonation: frame.prosody.intonation,
+            pitch_range: frame.prosody.pitch_range,
+            prominence: frame.prosody.prominence,
             rate: sanitize_rate(frame.prosody.rate),
             pause_weight: sanitize_unit(frame.prosody.pause_weight),
             segments: Vec::new(),
@@ -164,6 +171,8 @@ impl PhonologicalPlan {
             && (self.source_intent != frame.source_intent
                 || self.focus_role != frame.focus_role
                 || self.intonation != frame.prosody.intonation
+                || self.pitch_range != frame.prosody.pitch_range
+                || self.prominence != frame.prosody.prominence
                 || self.rate != sanitize_rate(frame.prosody.rate)
                 || self.pause_weight != sanitize_unit(frame.prosody.pause_weight)
             || self.realization_authorized != frame.ready_for_phonology())
@@ -217,6 +226,9 @@ impl PhonologicalPlan {
         if provenance.trim().is_empty() {
             return Err(PhonologicalPlanError::EmptyLexicalProvenance);
         }
+        if !is_blake3_token(&provenance) {
+            return Err(PhonologicalPlanError::InvalidLexicalProvenanceFormat);
+        }
         validate_segment_sequence(&segments)?;
         if segments.is_empty() {
             return Err(PhonologicalPlanError::LexicalBindingWithoutSegments);
@@ -237,6 +249,12 @@ impl PhonologicalPlan {
         if self.source_intent.trim().is_empty() {
             return Err(PhonologicalPlanError::EmptySourceIntent);
         }
+        if !self.pitch_range.is_finite() || !(0.65..=1.45).contains(&self.pitch_range) {
+            return Err(PhonologicalPlanError::InvalidPitchRange);
+        }
+        if !self.prominence.is_finite() || !(0.0..=1.0).contains(&self.prominence) {
+            return Err(PhonologicalPlanError::InvalidProminence);
+        }
         if !self.rate.is_finite() || !(0.55..=1.35).contains(&self.rate) {
             return Err(PhonologicalPlanError::InvalidRate);
         }
@@ -254,6 +272,10 @@ impl PhonologicalPlan {
             _ => {}
         }
 
+        if !self.realization_authorized && !self.segments.is_empty() {
+            return Err(PhonologicalPlanError::RealizationNotAuthorized);
+        }
+
         validate_binding_status(&self.segments, self.content_binding)?;
 
         match self.content_binding {
@@ -264,6 +286,9 @@ impl PhonologicalPlan {
                     .ok_or(PhonologicalPlanError::LexicalBindingWithoutProvenance)?;
                 if provenance.trim().is_empty() {
                     return Err(PhonologicalPlanError::EmptyLexicalProvenance);
+                }
+                if !is_blake3_token(provenance) {
+                    return Err(PhonologicalPlanError::InvalidLexicalProvenanceFormat);
                 }
             }
             ContentBindingStatus::RoleStructureOnly | ContentBindingStatus::PhonologicallyBound => {
@@ -308,12 +333,14 @@ impl PhonologicalPlan {
             .join("|");
 
         format!(
-            "{};binding={:?};intent={};focus={};intonation={:?};rate={:.4};pause={:.4};syllables={};lexical_provenance={};segments={}",
+            "{};binding={:?};intent={};focus={};intonation={:?};pitch={:.4};prominence={:.4};rate={:.4};pause={:.4};syllables={};lexical_provenance={};segments={}",
             self.version,
             self.content_binding,
             self.source_intent,
             self.focus_role.as_deref().unwrap_or("NONE"),
             self.intonation,
+            self.pitch_range,
+            self.prominence,
             self.rate,
             self.pause_weight,
             self.syllables.len(),
@@ -328,6 +355,8 @@ pub enum PhonologicalPlanError {
     InvalidVersion,
     EmptySourceIntent,
     InvalidRate,
+    InvalidPitchRange,
+    InvalidProminence,
     InvalidPauseWeight,
     FocusRoleWithoutSegments,
     FocusSegmentsWithoutRole,
@@ -342,6 +371,7 @@ pub enum PhonologicalPlanError {
     LexicalBindingWithoutSegments,
     LexicalBindingWithoutProvenance,
     EmptyLexicalProvenance,
+    InvalidLexicalProvenanceFormat,
     NonLexicalProvenance,
     SyllableSummaryMismatch,
     PhonologicalBindingWithoutSegments,
@@ -354,6 +384,8 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::InvalidVersion => write!(f, "phonological plan version is unsupported"),
             Self::EmptySourceIntent => write!(f, "phonological plan source intent must be non-empty"),
             Self::InvalidRate => write!(f, "phonological plan rate is outside the supported range"),
+            Self::InvalidPitchRange => write!(f, "phonological plan pitch range is outside the supported range"),
+            Self::InvalidProminence => write!(f, "phonological plan prominence is outside the supported range"),
             Self::InvalidPauseWeight => write!(f, "phonological plan pause weight is outside [0, 1]"),
             Self::FocusRoleWithoutSegments => write!(f, "a focus role requires focused phonemes"),
             Self::FocusSegmentsWithoutRole => write!(f, "focused phonemes require a focus role"),
@@ -380,6 +412,9 @@ impl std::fmt::Display for PhonologicalPlanError {
             }
             Self::EmptyLexicalProvenance => {
                 write!(f, "lexically bound plans require non-empty lexical provenance")
+            }
+            Self::InvalidLexicalProvenanceFormat => {
+                write!(f, "lexical provenance must be a 64-character BLAKE3 hexadecimal token")
             }
             Self::NonLexicalProvenance => {
                 write!(f, "non-lexical plans must not carry lexical provenance")
@@ -482,6 +517,10 @@ fn validate_segment_sequence(segments: &[PhonemeSlot]) -> Result<(), Phonologica
     Ok(())
 }
 
+fn is_blake3_token(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn derive_syllables(segments: &[PhonemeSlot]) -> Vec<SyllableSlot> {
     let mut syllables = Vec::new();
 
@@ -538,11 +577,77 @@ mod tests {
     }
 
     #[test]
+    fn legacy_schema_version_fails_closed() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.version = "broca-phonological-plan-v1".to_string();
+
+        assert_eq!(
+            plan.validate()
+                .expect_err("legacy phonological schema must be rejected"),
+            PhonologicalPlanError::InvalidVersion
+        );
+    }
+
+    #[test]
     fn unbound_plan_is_explicitly_not_ready() {
         let plan = PhonologicalPlan::from_speech_plan(&plan());
         assert_eq!(plan.content_binding, ContentBindingStatus::RoleStructureOnly);
         assert!(!plan.ready_for_realization());
         assert_eq!(plan.syllables.len(), 0);
+    }
+
+    
+    #[test]
+    fn pitch_range_is_carried_from_speech_plan_and_validated() {
+        let mut speech_plan = plan();
+        speech_plan.prosody.pitch_range = 1.25;
+
+        let mut phonological = PhonologicalPlan::from_speech_plan(&speech_plan);
+        assert!((phonological.pitch_range - 1.25).abs() < f32::EPSILON);
+
+        phonological.pitch_range = 2.0;
+        assert_eq!(
+            phonological
+                .validate()
+                .expect_err("out-of-range pitch must fail closed"),
+            PhonologicalPlanError::InvalidPitchRange
+        );
+    }
+
+    #[test]
+    fn prominence_is_carried_from_speech_plan_and_validated() {
+        let mut speech_plan = plan();
+        speech_plan.prosody.prominence = 0.73;
+
+        let mut phonological = PhonologicalPlan::from_speech_plan(&speech_plan);
+        assert!((phonological.prominence - 0.73).abs() < f32::EPSILON);
+
+        phonological.prominence = 1.5;
+        assert_eq!(
+            phonological
+                .validate()
+                .expect_err("out-of-range prominence must fail closed"),
+            PhonologicalPlanError::InvalidProminence
+        );
+    }
+
+    #[test]
+    fn pitch_range_mismatch_with_upstream_frame_is_rejected() {
+        let speech_plan = plan();
+        let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+        let mut phonological = PhonologicalPlan::from_linguistic_frame(&frame);
+        phonological.pitch_range = if phonological.pitch_range < 1.0 {
+            1.0
+        } else {
+            0.65
+        };
+
+        assert_eq!(
+            phonological
+                .validate_against_frame(&frame)
+                .expect_err("tampered pitch range must fail lineage validation"),
+            PhonologicalPlanError::UpstreamMismatch
+        );
     }
 
     #[test]
@@ -650,6 +755,7 @@ mod tests {
     #[test]
     fn lexical_binding_records_non_empty_provenance() {
         let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        let provenance = blake3::hash(b"lexeme:answer:v1").to_hex().to_string();
         plan.bind_lexical_segments(
             vec![PhonemeSlot::new(
                 "AE",
@@ -659,16 +765,59 @@ mod tests {
                 false,
                 true,
             )],
-            "lexeme:answer:v1",
+            provenance.clone(),
         )
-        .expect("explicit provenance should permit lexical binding");
+        .expect("explicit BLAKE3 provenance should permit lexical binding");
 
         assert_eq!(plan.content_binding, ContentBindingStatus::LexicallyBound);
-        assert_eq!(
-            plan.lexical_provenance.as_deref(),
-            Some("lexeme:answer:v1")
-        );
+        assert_eq!(plan.lexical_provenance.as_deref(), Some(provenance.as_str()));
         assert!(plan.grounding_surface().contains("lexical_provenance=true"));
+    }
+
+    #[test]
+    fn lexical_binding_rejects_non_blake3_provenance() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+
+        let error = plan
+            .bind_lexical_segments(
+                vec![PhonemeSlot::new(
+                    "AE",
+                    0,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                )],
+                "arbitrary-provenance",
+            )
+            .expect_err("arbitrary provenance must not elevate lexical binding");
+
+        assert_eq!(
+            error,
+            PhonologicalPlanError::InvalidLexicalProvenanceFormat
+        );
+    }
+
+    #[test]
+    fn persisted_lexical_binding_rejects_malformed_provenance() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.content_binding = ContentBindingStatus::LexicallyBound;
+        plan.segments = vec![PhonemeSlot::new(
+            "AE",
+            0,
+            SyllableStress::Primary,
+            true,
+            false,
+            true,
+        )];
+        plan.syllables = derive_syllables(&plan.segments);
+        plan.lexical_provenance = Some("arbitrary-persisted-provenance".to_string());
+
+        assert_eq!(
+            plan.validate()
+                .expect_err("persisted lexical provenance must be canonical"),
+            PhonologicalPlanError::InvalidLexicalProvenanceFormat
+        );
     }
 
     #[test]
@@ -680,6 +829,29 @@ mod tests {
             .expect_err("lexical binding cannot be asserted without phonology");
 
         assert_eq!(error, PhonologicalPlanError::LexicalBindingWithoutProvenance);
+    }
+
+    #[test]
+    fn unauthorized_deserialized_segments_fail_closed() {
+        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+        plan.realization_authorized = false;
+        plan.content_binding = ContentBindingStatus::PhonologicallyBound;
+        plan.segments = vec![PhonemeSlot::new(
+            "AH",
+            0,
+            SyllableStress::Primary,
+            true,
+            false,
+            true,
+        )];
+        plan.syllables = derive_syllables(&plan.segments);
+
+        let error = plan
+            .validate()
+            .expect_err("unauthorized segments must fail closed");
+
+        assert_eq!(error, PhonologicalPlanError::RealizationNotAuthorized);
+        assert!(!plan.ready_for_realization());
     }
 
     #[test]

@@ -19,6 +19,7 @@ pub mod checkpoint;
 pub mod code_analysis;
 pub mod cognitive_loop;
 pub mod linguistic_frame;
+pub mod lexical_binding;
 pub mod phonological_plan;
 pub mod compiler_trainer;
 pub mod consensus_engine;
@@ -133,6 +134,11 @@ pub use secure_dreaming::{SecureDreamResult, SecureDreamingEngine};
 pub use self_actualization::ReflectionEngine;
 pub use self_optimization::SelfOptimizationEngine;
 pub use species_learning::MemoryConsolidator;
+pub use lexical_binding::{
+    AgreementConstraint, ConstituentDependency, GrammaticalFunction, LanguageRuleBinding,
+    LanguageRuleStatus, LexemeBinding, LexicalBindingError, LexicalMorphosyntacticBinding,
+    LexicalSource, MorphologicalFeature, LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION,
+};
 pub use linguistic_frame::{
     ConstituentSlot, FormulationStrategy, LinguisticBindingStatus, LinguisticFrame,
     LinguisticFrameError, LINGUISTIC_FRAME_VERSION,

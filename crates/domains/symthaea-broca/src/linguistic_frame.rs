@@ -47,7 +47,7 @@ pub struct ConstituentSlot {
 }
 
 /// Linguistic formulation frame produced without lexical hallucination.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinguisticFrame {
     pub version: String,
     pub binding_status: LinguisticBindingStatus,
@@ -89,6 +89,7 @@ impl LinguisticFrame {
         Self {
             version: LINGUISTIC_FRAME_VERSION.to_string(),
             binding_status: LinguisticBindingStatus::RoleStructureOnly,
+            lexical_provenance: None,
             source_intent: plan.intent.clone(),
             strategy,
             epistemic_delivery: plan.epistemic_delivery,
@@ -150,6 +151,12 @@ impl LinguisticFrame {
         }
         if self.source_intent.trim().is_empty() {
             return Err(LinguisticFrameError::EmptySourceIntent);
+        }
+
+        if matches!(self.strategy, FormulationStrategy::Abstain)
+            && self.binding_status == LinguisticBindingStatus::LexicallyBound
+        {
+            return Err(LinguisticFrameError::AbstentionCannotBind);
         }
 
         match self.binding_status {
@@ -431,6 +438,22 @@ mod tests {
             .expect_err("abstention must remain non-realizable");
 
         assert_eq!(error, LinguisticFrameError::AbstentionCannotBind);
+    }
+
+    #[test]
+    fn persisted_lexical_frame_cannot_bind_abstention() {
+        let plan = plan_for(7, 4.0);
+        let mut frame = LinguisticFrame::from_speech_plan(&plan);
+
+        frame.binding_status = LinguisticBindingStatus::LexicallyBound;
+        frame.lexical_provenance = Some("persisted-lexical-provenance".into());
+
+        assert_eq!(
+            frame
+                .validate()
+                .expect_err("persisted abstention must remain non-realizable"),
+            LinguisticFrameError::AbstentionCannotBind
+        );
     }
 
     #[test]
