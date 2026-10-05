@@ -312,7 +312,7 @@ mod tests {
         assert_ne!(projection.compute_digest().unwrap(), original);
 
         projection.machine_target_ref = request.machine_target_ref.clone();
-        projection.required_approval_profile = "different-profile".to_string();
+        projection.required_approval_profile = "local-operator-group-v1".to_string();
         assert_ne!(projection.compute_digest().unwrap(), original);
     }
 
@@ -358,12 +358,19 @@ mod tests {
     #[test]
     fn control_character_in_operator_visible_action_is_rejected() {
         let request = request();
-        assert_eq!(
+        let mut projection =
             PendingNixApprovalProjectionV1::from_request(
                 &request,
-                "nixos-rebuild switch --flake .#workstation\n[APPROVED]",
+                "nixos-rebuild switch --flake .#workstation",
             )
-            .unwrap_err(),
+            .unwrap();
+        projection.operator_visible_action.push('\n');
+        projection.operator_visible_action_digest =
+            digest_display(&projection.operator_visible_action);
+        projection.projection_digest = projection.compute_digest().unwrap();
+
+        assert_eq!(
+            projection.validate().unwrap_err(),
             LocalApprovalProjectionErrorV1::ControlCharacterInOperatorVisibleAction
         );
     }
