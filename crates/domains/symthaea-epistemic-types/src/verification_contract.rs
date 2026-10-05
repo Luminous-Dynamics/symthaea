@@ -1850,6 +1850,38 @@ mod tests {
     }
 
     #[test]
+    fn deserialized_dereference_receipt_rechecks_policy_and_effective_url() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let resolution = resolved_method(&request);
+        let mut value = serde_json::to_value(&resolution).unwrap();
+        value["controller_document_dereference"]["effective_url"] =
+            serde_json::json!("https://other.example/controller");
+        let decoded: VerificationMethodResolution = serde_json::from_value(value).unwrap();
+        assert!(matches!(
+            decoded.validate_structure(),
+            Err(VerificationFailure::ControllerDocumentEffectiveUrlMismatch)
+        ));
+
+        let mut value = serde_json::to_value(&resolution).unwrap();
+        value["controller_document_network_policy"]["allowed_schemes"] =
+            serde_json::json!(["http"]);
+        let decoded: VerificationMethodResolution = serde_json::from_value(value).unwrap();
+        assert!(matches!(
+            decoded.validate_structure(),
+            Err(VerificationFailure::ControllerDocumentNetworkPolicyViolation)
+        ));
+    }
+
+    #[test]
     fn controller_document_integrity_policy_binds_the_resolved_snapshot() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
