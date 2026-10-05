@@ -20,6 +20,7 @@ pub mod code_analysis;
 pub mod cognitive_loop;
 pub mod linguistic_frame;
 pub mod lexical_binding;
+pub mod lexical_phonological_witness;
 pub mod phonological_plan;
 pub mod compiler_trainer;
 pub mod consensus_engine;
@@ -142,6 +143,10 @@ pub use lexical_binding::{
 pub use linguistic_frame::{
     ConstituentSlot, FormulationStrategy, LinguisticBindingStatus, LinguisticFrame,
     LinguisticFrameError, LINGUISTIC_FRAME_VERSION,
+};
+pub use lexical_phonological_witness::{
+    LexicalPhonologicalMapping, LexicalPhonologicalWitness, LexicalPhonologicalWitnessError,
+    LEXICAL_PHONOLOGICAL_WITNESS_VERSION,
 };
 pub use phonological_plan::{
     ContentBindingStatus, PhonemeSlot, PhonologicalPlan, PhonologicalPlanError, SyllableSlot,
