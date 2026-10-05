@@ -17,11 +17,12 @@ unique correction is guaranteed only through
 \[
 t=\left\lfloor\frac{d-1}{2}\right\rfloor.
 \]
-At the boundary \(2t=d\), a received word can have multiple equally-near
-codewords; the decoder therefore reports ambiguity rather than selecting one by
-an arbitrary tie-break. This is the semantics established by the finite
-qualification fixture, not an asymptotic claim about the random-linear-code
-family.
+At the first radius beyond guaranteed unique decoding, \(t+1=\lceil d/2\rceil\),
+a received word can have multiple equally-near codewords when the code geometry
+permits it; the decoder therefore reports ambiguity rather than selecting one by
+an arbitrary tie-break. For even \(d\), this is the half-distance radius
+\(d/2\). This is the semantics established by the finite qualification fixture,
+not an asymptotic claim about the random-linear-code family.
 
 ## Decoder construction
 
@@ -52,6 +53,31 @@ The implementation returns exactly one of:
 - **InvalidBound** — the requested error bound exceeds the block length.
 
 No candidate codeword enumeration occurs inside the decoder.
+
+## Kernel and syndrome/coset invariant
+
+For the canonical \([8,2,4]\) fixture, the qualification suite exhaustively
+enumerates all \(2^8=256\) ambient words and partitions them by their six-bit
+syndrome. It records 64 non-empty syndrome fibers, each of cardinality 4.
+
+The zero-syndrome fiber is checked element-for-element against the four codewords,
+establishing
+\[
+\ker(H)=C
+\]
+on the complete fixture. Every other fiber is checked in both directions:
+members of the same syndrome fiber differ by a codeword, and translating a
+representative by every codeword stays in that fiber. Thus, on the finite fixture,
+\[
+Hy^T=Hy'^T \iff y+y'\in C,
+\]
+so the syndrome classes are exactly the additive cosets of the code.
+
+This invariant matters for decoder semantics. A bounded syndrome search can only
+interpret a matched error pattern as a correction of a codeword because the
+syndrome kernel is exactly the code. The exhaustive finite proof therefore closes
+the representation-to-decoder boundary explicitly rather than inferring it from
+annihilation alone.
 
 ## Why this is an independent algorithm
 
@@ -171,6 +197,8 @@ No production integration, timing claim, or superiority claim is made here.
   https://errorcorrectionzoo.org/c/binary_linear
 - Error Correction Zoo, *Binary code*:
   https://errorcorrectionzoo.org/c/bits_into_bits
+- Berlekamp, McEliece and van Tilborg (1978), *On the inherent intractability of certain coding problems*:
+  https://doi.org/10.1109/TIT.1978.1055873
 - MathWorld, *Syndrome Decoding Problem*:
   https://mathworld.wolfram.com/SyndromeDecodingProblem.html
 
