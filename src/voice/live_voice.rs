@@ -321,6 +321,19 @@ impl LiveVoice {
         }
     }
 
+#[cfg(feature = "ssm_language")]
+fn progress_within_frame_span(global_frame: usize, start_frame: usize, end_frame: usize) -> f32 {
+    let span = end_frame.saturating_sub(start_frame);
+    if span <= 1 {
+        0.0
+    } else {
+        global_frame
+            .saturating_sub(start_frame)
+            .min(span.saturating_sub(1)) as f32
+            / (span.saturating_sub(1)) as f32
+    }
+}
+
     #[cfg(feature = "ssm_language")]
     fn synthesize_phonological_plan(
         &mut self,
@@ -424,6 +437,24 @@ impl LiveVoice {
                 .get(index)
                 .copied()
                 .unwrap_or(0);
+            let syllable_start = plan.segments[..=index]
+                .iter()
+                .rposition(|slot| slot.syllable_index != segment.syllable_index)
+                .map(|previous| previous + 1)
+                .unwrap_or(0);
+            let syllable_end = plan.segments[index..]
+                .iter()
+                .position(|slot| slot.syllable_index != segment.syllable_index)
+                .map(|offset| index + offset)
+                .unwrap_or(segment_count);
+            let syllable_start_frame = segment_frame_offsets
+                .get(syllable_start)
+                .copied()
+                .unwrap_or(0);
+            let syllable_end_frame = segment_frame_offsets
+                .get(syllable_end)
+                .copied()
+                .unwrap_or(total_frames);
             let intonation = match plan.intonation {
                 symthaea_broca::IntonationIntent::Statement => Intonation::Statement,
                 symthaea_broca::IntonationIntent::Question => Intonation::Question,
@@ -449,6 +480,11 @@ impl LiveVoice {
                     0.0
                 };
 
+                let syllable_progress = progress_within_frame_span(
+                    global_frame,
+                    syllable_start_frame,
+                    syllable_end_frame,
+                );
                 let prosody = ProsodyContext {
                     utterance_progress: utterance_progress.clamp(0.0, 1.0),
                     phoneme_progress: progress,
@@ -464,7 +500,7 @@ impl LiveVoice {
                     is_focus: segment.is_focus && plan.focus_role.is_some(),
                     pitch_accent: Self::pitch_accent_for_plan(segment.is_focus, plan.prominence),
                     is_syllable_onset: segment.is_syllable_onset,
-                    syllable_progress: progress,
+                    syllable_progress,
                     prev_source_type: None,
                     next_source_type: None,
                 };
@@ -962,6 +998,22 @@ mod tests {
                 "plan pitch range must remain observable at arousal {arousal}: absolute sample difference={difference}"
             );
         }
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_syllable_progress_spans_multiple_phonemes() {
+        let start = 10;
+        let end = 16;
+
+        assert!((progress_within_frame_span(start, start, end) - 0.0).abs() < f32::EPSILON);
+        assert!((progress_within_frame_span(12, start, end) - 0.4).abs() < f32::EPSILON);
+        assert!((progress_within_frame_span(15, start, end) - 1.0).abs() < f32::EPSILON);
+
+        let next_start = 16;
+        let next_end = 20;
+        assert!((progress_within_frame_span(next_start, next_start, next_end) - 0.0).abs() < f32::EPSILON);
+        assert!((progress_within_frame_span(19, next_start, next_end) - 1.0).abs() < f32::EPSILON);
     }
 
     #[cfg(feature = "ssm_language")]
