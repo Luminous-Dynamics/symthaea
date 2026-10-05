@@ -41,6 +41,19 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
+      - name: Diagnose locked Cargo resolution
+        run: |
+          before="$(mktemp)"
+          cp Cargo.lock "$before"
+          trap 'cp "$before" Cargo.lock' EXIT
+          cargo metadata --format-version=1 >/tmp/symthaea-cargo-metadata.json
+          if ! cmp -s "$before" Cargo.lock; then
+            echo "Cargo metadata would rewrite Cargo.lock under the current resolver."
+            diff -u "$before" Cargo.lock || true
+            exit 1
+          fi
+          echo "Cargo metadata left Cargo.lock unchanged."
+
       - name: Cache cargo registry and target
         uses: actions/cache@v4
         with:
