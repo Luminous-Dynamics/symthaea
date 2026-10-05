@@ -207,6 +207,9 @@ jobs:
               path.write_bytes(b64decode(encoded, validate=True))
 
           proof = b"\x83\x02\x00\x81\x58\x20" + (b"\x00" * 32)
+          # 65 proofs is valid under MAX_RFC9942_PROOFS=256; this guards
+          # against accidentally conflating the 64-hash inclusion-path cap
+          # with the 256-proof VDP container cap.
           vdp_65 = b"\xa1\x20\x98\x41" + b"".join(
               b"\x58\x26" + proof for _ in range(65)
           )
