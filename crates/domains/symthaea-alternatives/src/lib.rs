@@ -2391,7 +2391,6 @@ impl std::fmt::Display for AssessmentError {
             Self::MissingIncumbent(id) => write!(f, "incumbent {id} not found"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
             Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
-            Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
             Self::InvalidExperimentalDesign => write!(f, "experimental design provenance is incomplete"),
             Self::ExperimentalDesignSurfaceUndeclared(id) => write!(
                 f,
@@ -2418,6 +2417,12 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "evidence {evidence_id} references design {actual_design_id}, expected {expected_design_id}"
+            ),
+            Self::ExperimentalDesignBasisMismatch { expected, actual } => write!(
+                f,
+                "experimental design basis {} does not match required basis {}",
+                actual.basis_id,
+                expected.basis_id
             ),
             Self::EmptyAssessmentSubject => write!(f, "assessment subject identity is incomplete"),
             Self::EmptySourceAdmissionReference => {
@@ -5145,6 +5150,71 @@ mod tests {
                 .assess(&case.requirement, &[candidate], None)
                 .unwrap_err(),
             AssessmentError::OrphanedExperimentalDesignObservation("design:orphan".into())
+        );
+    }
+
+    #[test]
+    fn mismatched_experimental_design_observation_fails_closed() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidate = case.candidates[0].clone();
+        let evidence_id = candidate.evidence[0].id.clone();
+        candidate.evidence[0]
+            .observation
+            .as_mut()
+            .unwrap()
+            .experimental_design_id = Some("design:other".into());
+
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:expected".into(),
+            hypothesis_id: "hypothesis:water".into(),
+            hypothesis_statement: "Test water.".into(),
+            unresolved_uncertainty_refs: vec!["u1".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                target_uncertainty_width: None,
+            },
+            comparison_basis: basis,
+        };
+
+        let error = AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &case.candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            AssessmentError::ExperimentalDesignObservationMismatch {
+                evidence_id,
+                expected_design_id: "design:expected".into(),
+                actual_design_id: "design:other".into(),
+            }
         );
     }
 
