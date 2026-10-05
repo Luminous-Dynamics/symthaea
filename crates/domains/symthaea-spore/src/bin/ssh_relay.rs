@@ -24,7 +24,7 @@ use tokio_tungstenite::tungstenite::Message;
 // Security validators from the library (shared with fuzz targets)
 use symthaea_spore::security::{
     sanitize_heredoc, sanitize_input, token_eq, validate_disk_path,
-    validate_hostname as validate_hostname_relay,
+    validate_hostname as validate_hostname_relay, validate_username,
 };
 
 // TLS support
@@ -2772,10 +2772,14 @@ async fn handle_connection_ws<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + 
                         escaped_pw, pw_file, pw_file
                     ))
                     .await;
-                    let username = if client_msg.username.is_empty() {
-                        "user"
-                    } else {
-                        &client_msg.username
+                    let username = match validate_username(&client_msg.username) {
+                        Ok(username) => username,
+                        Err(e) => {
+                            let _ = ws_tx
+                                .send(Message::Text(RelayMessage::error(&e).to_json()))
+                                .await;
+                            continue;
+                        }
                     };
                     let pw_script = format!(
                         r#"
