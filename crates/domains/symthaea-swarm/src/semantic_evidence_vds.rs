@@ -242,7 +242,8 @@ impl Rfc9942Es256CoseKey {
                 }
                 CborLabelKey::Integer(COSE_KID_LABEL) => {
                     kid=Some(value_reader.read_bstr_bounded(256).map_err(|error|match error {
-                        Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded
+                        | Rfc9162ProofDecodeError::InvalidStructure => Rfc9942VdpError::ResourceLimitExceeded,
                         _=>Rfc9942VdpError::InvalidEncoding,
                     })?);
                 }
@@ -4833,23 +4834,6 @@ mod tests {
 
     #[test]
     fn rfc9942_es256_key_unknown_extension_recursion_limit_is_typed() {
-        let mut nested = vec![0x61, b'x'];
-        for _ in 0..17 {
-            nested = vec![0x81];
-            nested.extend_from_slice(&{
-                let mut v = Vec::new();
-                v.push(0xd8);
-                v.push(0x18);
-                v.extend_from_slice(&{
-                    let mut inner = Vec::new();
-                    inner.push(0x81);
-                    inner.push(0x00);
-                    inner
-                });
-                v
-            });
-        }
-
         let mut key = Vec::new();
         cbor_map_len(&mut key, 1);
         cbor_int(&mut key, 99);
