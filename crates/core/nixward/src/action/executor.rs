@@ -40,6 +40,8 @@ pub enum NixOSCommand {
     EnvRemove { packages: Vec<String> },
     /// nix-env --rollback (user profile rollback)
     EnvRollback,
+    /// Switch the NixOS system profile to an exact existing generation.
+    SwitchGeneration { generation: u32 },
     /// nix search (package search)
     Search { query: String, json: bool },
     /// nix-channel operations
@@ -144,6 +146,7 @@ impl NixOSCommand {
             Self::EnvInstall { .. } => SafetyLevel::UserModify,
             Self::EnvRemove { .. } => SafetyLevel::UserModify,
             Self::EnvRollback => SafetyLevel::UserModify,
+            Self::SwitchGeneration { .. } => SafetyLevel::SystemCritical,
             Self::Channel {
                 operation: ChannelOperation::Update { .. },
             } => SafetyLevel::UserModify,
@@ -178,10 +181,9 @@ impl NixOSCommand {
     pub fn rollback_command(&self) -> Option<NixOSCommand> {
         match self {
             Self::RebuildSwitch { .. } | Self::RebuildTest { .. } | Self::RebuildBoot { .. } => {
-                Some(NixOSCommand::Custom {
-                    command: "nixos-rebuild".to_string(),
-                    args: vec!["switch".to_string(), "--rollback".to_string()],
-                    safety_level: SafetyLevel::SystemCritical,
+                Some(NixOSCommand::RebuildSwitch {
+                    flake: None,
+                    extra_args: vec!["--rollback".to_string()],
                 })
             }
             Self::EnvInstall { .. } | Self::EnvRemove { .. } => {
@@ -252,6 +254,15 @@ impl NixOSCommand {
                 ("nix-env".to_string(), args)
             }
             Self::EnvRollback => ("nix-env".to_string(), vec!["--rollback".to_string()]),
+            Self::SwitchGeneration { generation } => (
+                "nix-env".to_string(),
+                vec![
+                    "--switch-generation".to_string(),
+                    generation.to_string(),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
             Self::Search { query, json } => {
                 let cap = if *json { 4 } else { 3 };
                 let mut args = Vec::with_capacity(cap);
@@ -583,6 +594,32 @@ impl NixOSExecutor {
     /// not checked. Only call this when the command was already confirmed by
     /// a real gate elsewhere (e.g. an explicit human approval) — this
     /// function performs no safety check of its own.
+    /// Execute a confirmed Nixward command from a synchronous caller.
+    ///
+    /// This adapter owns the Tokio runtime used by the async executor instead
+    /// of allowing synchronous callers to spawn commands directly. Callers
+    /// running inside an existing Tokio runtime should invoke `execute_confirmed`
+    /// directly instead of this blocking adapter.
+    pub fn execute_confirmed_blocking(
+        &mut self,
+        command: NixOSCommand,
+        phi: f32,
+    ) -> ExecutionResult {
+        let runtime = match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(runtime) => runtime,
+            Err(e) => {
+                return ExecutionResult::FailedNoRollback {
+                    error: format!("failed to build Nixward runtime: {e}"),
+                    rollback_error: None,
+                };
+            }
+        };
+        runtime.block_on(self.execute_confirmed(command, phi))
+    }
+
     pub async fn execute_confirmed(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
         if matches!(&command, NixOSCommand::Custom { .. }) && !self.dry_run {
             return ExecutionResult::Blocked {
@@ -801,6 +838,23 @@ mod tests {
             ExecutionResult::Success { stdout, .. } => assert!(stdout.contains("[DRY-RUN]")),
             other => panic!("expected dry-run preview, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn test_switch_generation_is_typed_and_system_critical() {
+        let command = NixOSCommand::SwitchGeneration { generation: 42 };
+        assert_eq!(command.safety_level(), SafetyLevel::SystemCritical);
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "nix-env");
+        assert_eq!(
+            args,
+            vec![
+                "--switch-generation",
+                "42",
+                "-p",
+                "/nix/var/nix/profiles/system"
+            ]
+        );
     }
 
     #[tokio::test]
