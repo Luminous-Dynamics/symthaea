@@ -500,9 +500,11 @@ mod tests {
             "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
             "1111111111111111111111111111111111111111111111111111111111111111",
             "2222222222222222222222222222222222222222222222222222222222222222",
-            "selector-v2",
+            "selector-v3",
             1,
+            "3333333333333333333333333333333333333333333333333333333333333333",
             1.0,
+            2,
             2,
         )
         .unwrap();
@@ -537,15 +539,40 @@ mod tests {
     }
 
     #[test]
+    fn inquiry_selection_digest_binds_prediction_frame() {
+        let receipt = ScientificInquirySelectionReceipt::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "selector-v3",
+            9,
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            2.5,
+            2,
+            2,
+        )
+        .unwrap();
+
+        assert!(receipt.validate().is_ok());
+        assert_eq!(
+            receipt.prediction_frame_digest,
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        );
+    }
+
+    #[test]
     fn inquiry_selection_is_explicitly_not_an_outcome() {
         let receipt = ScientificInquirySelectionReceipt::new(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-            "selector-v2",
+            "selector-v3",
             9,
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             2.5,
+            3,
             3,
         )
         .unwrap();
@@ -573,10 +600,12 @@ mod tests {
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-            "selector-v2",
+            "selector-v3",
             9,
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             2.5,
             1,
+            2,
         );
         assert!(result.is_err());
     }
