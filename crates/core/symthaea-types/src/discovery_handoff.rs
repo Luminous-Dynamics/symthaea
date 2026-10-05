@@ -127,6 +127,22 @@ impl ScientificHypothesisHandoff {
 
 
 
+/// Compute an order-sensitive identity for the exact handoff list supplied to
+/// an independent challenge. Ordering is bound because deterministic tie-breaking
+/// can depend on the presented hypothesis order.
+pub fn scientific_hypothesis_set_digest(handoffs: &[ScientificHypothesisHandoff]) -> String {
+    let mut canonical = String::from("hypothesis-set-v1|count=");
+    canonical.push_str(&handoffs.len().to_string());
+    canonical.push('|');
+    for (index, handoff) in handoffs.iter().enumerate() {
+        canonical.push_str(&index.to_string());
+        canonical.push(':');
+        canonical.push_str(&handoff.digest_hex());
+        canonical.push(';');
+    }
+    blake3::hash(canonical.as_bytes()).to_hex().to_string()
+}
+
 /// Evidence-neutral lineage record for revising a scientific hypothesis into
 /// a new discovery campaign. The prior handoff remains immutable by identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -289,6 +305,38 @@ impl ScientificInquirySelectionReceipt {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn hypothesis_set_digest_binds_order_and_membership() {
+        let a = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        let b = ScientificHypothesisHandoff::new(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "1111111111111111111111111111111111111111111111111111111111111111",
+            2,
+            "2222222222222222222222222222222222222222222222222222222222222222",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+        assert_ne!(
+            scientific_hypothesis_set_digest(&[a.clone(), b.clone()]),
+            scientific_hypothesis_set_digest(&[b, a])
+        );
+    }
+
     #[test]
     fn hypothesis_revision_requires_a_new_campaign_identity() {
         let receipt = ScientificHypothesisRevisionReceipt::new(
