@@ -79,15 +79,20 @@ jobs:
 
           provenance = json.loads(Path("target/communication-evidence/execution-provenance.json").read_text())
           expected_revision = provenance["pr_head_sha"] if provenance["event_name"] == "pull_request" else provenance["github_sha"]
-          assert provenance["checked_out_revision"] == expected_revision
-          assert provenance["checked_out_revision"] != ""
+          checked_out = provenance["checked_out_revision"]
+          assert checked_out == expected_revision
+          assert len(checked_out) in (40, 64)
+          assert all(character in "0123456789abcdefABCDEF" for character in checked_out)
+          assert any(character != "0" for character in checked_out)
 
-          for report_path in sorted(Path("target/communication-evidence").glob("*.json")):
-              if report_path.name == "execution-provenance.json":
-                  continue
+          evidence_reports = sorted(
+              path for path in Path("target/communication-evidence").glob("*.json")
+              if path.name != "execution-provenance.json"
+          )
+          assert evidence_reports, "no communication evidence reports were produced"
+          for report_path in evidence_reports:
               report = json.loads(report_path.read_text())
-              if "execution_revision" in report:
-                  assert report["execution_revision"] == provenance["checked_out_revision"], report_path
+              assert report.get("execution_revision") == checked_out, report_path
 
           codec_report = json.loads(Path("target/communication-evidence/neurosemantic_hdc_codec_n0.json").read_text())
           assert codec_report["binary_frame_roundtrip_exact"] is True
