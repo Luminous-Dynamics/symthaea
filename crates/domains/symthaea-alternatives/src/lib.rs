@@ -26,7 +26,7 @@ pub mod corpus;
 /// Serialized assessment schema version.
 pub const SCHEMA_VERSION: u16 = 10;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-v17";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-v18";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -344,6 +344,14 @@ impl EvidenceSourceIdentity {
         let mut hasher = Hasher::new();
         hasher.update(&bytes);
         hasher.finalize().to_hex().to_string()
+    }
+
+    /// Return authority diversity identity only when an external admission reference exists.
+    ///
+    /// Symthaea does not verify the admission cryptographically; the authoritative
+    /// admission/attestation boundary remains external.
+    pub fn admitted_authority_group_id(&self) -> Option<String> {
+        self.admission.as_ref().map(|_| self.authority_group_id())
     }
 }
 
@@ -852,6 +860,28 @@ impl CandidatePathway {
         if !Self::evidence_is_valid_at(evidence, as_of) {
             return false;
         }
+        if let Some(admission) = &evidence.source.admission {
+            match as_of {
+                Some(timestamp) => {
+                    if admission
+                        .valid_from_epoch_seconds
+                        .is_some_and(|from| from > timestamp)
+                        || admission
+                            .valid_until_epoch_seconds
+                            .is_some_and(|until| until < timestamp)
+                    {
+                        return false;
+                    }
+                }
+                None => {
+                    if admission.valid_from_epoch_seconds.is_some()
+                        || admission.valid_until_epoch_seconds.is_some()
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
         if let (Some(assessed_at), Some(observed_at)) =
             (as_of, evidence.observed_at_epoch_seconds)
             && observed_at > assessed_at
@@ -1068,6 +1098,7 @@ impl CandidatePathway {
         kind: EvidenceKind,
         as_of: Option<i64>,
         freshness_policy: Option<&EvidenceFreshnessPolicy>,
+        admitted_only: bool,
     ) -> bool {
         requirement.constraints.keys().all(|metric| {
             self.performance
@@ -1080,6 +1111,7 @@ impl CandidatePathway {
                     )
                     .any(|e| {
                         e.kind == kind
+                            && (!admitted_only || e.source.admission.is_some())
                             && e.stance == EvidenceStance::Supports
                             && e.confidence >= 0.7
                     })
@@ -1094,6 +1126,7 @@ impl CandidatePathway {
         kind: EvidenceKind,
         as_of: Option<i64>,
         freshness_policy: Option<&EvidenceFreshnessPolicy>,
+        admitted_only: bool,
     ) -> bool {
         requirement.operating_envelope.keys().all(|condition| {
             self.operating_capabilities
@@ -1106,6 +1139,7 @@ impl CandidatePathway {
                     )
                     .any(|e| {
                         e.kind == kind
+                            && (!admitted_only || e.source.admission.is_some())
                             && e.stance == EvidenceStance::Supports
                             && e.confidence >= 0.7
                     })
@@ -1173,7 +1207,7 @@ impl CandidatePathway {
                 ) && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
             })
-            .map(|e| e.source.authority_group_id())
+            .filter_map(|e| e.source.admitted_authority_group_id())
             .collect::<BTreeSet<_>>()
             .len();
         let has_all_dimension_evidence = Dimension::ALL.iter().all(|dimension| {
@@ -1181,6 +1215,7 @@ impl CandidatePathway {
                 .get(dimension)
                 .map(|estimate| {
                     self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
+                        e.source.admission.is_some() &&
                         matches!(
                             e.kind,
                             EvidenceKind::Observed
@@ -1198,7 +1233,8 @@ impl CandidatePathway {
         });
         let has_lifecycle_assessment = self.burdens.values().any(|estimate| {
             self.linked_evidence_at(&estimate.evidence_ids, as_of, freshness_policy).any(|e| {
-                e.kind == EvidenceKind::LifecycleAssessed
+                e.source.admission.is_some()
+                    && e.kind == EvidenceKind::LifecycleAssessed
                     && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
             })
@@ -1212,7 +1248,7 @@ impl CandidatePathway {
                     && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
             })
-            .map(|e| e.source.authority_group_id())
+            .filter_map(|e| e.source.admitted_authority_group_id())
             .collect::<BTreeSet<_>>()
             .len();
         let monitoring_distinct_authority_sources = self
@@ -1224,7 +1260,7 @@ impl CandidatePathway {
                     && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
             })
-            .map(|e| e.source.authority_group_id())
+            .filter_map(|e| e.source.admitted_authority_group_id())
             .collect::<BTreeSet<_>>()
             .len();
         let all_dimensions_field_observed = Dimension::ALL.iter().all(|dimension| {
@@ -1261,7 +1297,8 @@ impl CandidatePathway {
                         freshness_policy,
                     )
                     .any(|e| {
-                        e.kind == EvidenceKind::ManufacturingObserved
+                        e.source.admission.is_some()
+                            && e.kind == EvidenceKind::ManufacturingObserved
                             && e.stance == EvidenceStance::Supports
                             && e.confidence >= 0.7
                     })
@@ -1273,6 +1310,7 @@ impl CandidatePathway {
             EvidenceKind::FieldObserved,
             as_of,
             freshness_policy,
+            true,
         );
         let operating_field_observed = self.operating_has_supported_kind_at(
             requirement,
@@ -1285,6 +1323,7 @@ impl CandidatePathway {
             EvidenceKind::ContinuouslyMonitored,
             as_of,
             freshness_policy,
+            true,
         );
         let operating_monitored = self.operating_has_supported_kind_at(
             requirement,
