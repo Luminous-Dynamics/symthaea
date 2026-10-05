@@ -197,7 +197,7 @@ pub enum EvidenceStance {
 /// controls the referenced source.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvidenceSourceIdentity {
-    /// Stable authority/organization identity used for independence accounting.
+    /// Stable authority/organization identity used for authority-diversity accounting.
     pub authority_id: String,
     /// Stable identifier for the referenced artifact, dataset, report, or observation stream.
     pub artifact_id: String,
@@ -308,7 +308,7 @@ pub struct EvidenceRecord {
     pub stance: EvidenceStance,
     /// Caller-supplied confidence in [0, 1].
     pub confidence: f64,
-    /// Canonical provenance identity used for source-independence accounting.
+    /// Canonical provenance identity used for source-diversity accounting.
     pub source: EvidenceSourceIdentity,
     /// Human-readable scope: functional unit, geography, process, etc.
     pub scope: String,
@@ -2810,7 +2810,7 @@ mod tests {
     }
 
     #[test]
-    fn source_independence_is_based_on_authority_identity() {
+    fn source_diversity_is_based_on_authority_identity() {
         let a = EvidenceSourceIdentity {
             authority_id: "authority-a".into(),
             artifact_id: "artifact-1".into(),
