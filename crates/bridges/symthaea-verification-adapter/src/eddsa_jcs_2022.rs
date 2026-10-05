@@ -86,6 +86,7 @@ pub fn verify_eddsa_jcs_2022(
         || resolved_method.method_type() != resolution.verification_method_type
         || resolved_method.material_digest != resolution.verification_method_material_digest
         || resolved_method.controller != resolution.resolved_verification_method_controller
+        || resolved_method.lifecycle != resolution.verification_method_lifecycle
     {
         return Err(SnapshotError::Verification(
             VerificationFailure::ResolutionEvidenceMismatch,
