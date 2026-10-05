@@ -2380,6 +2380,9 @@ impl<'a> CborReader<'a> {
             .offset
             .checked_add(n)
             .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+        if end > self.bytes.len() {
+            return Err(Rfc9162ProofDecodeError::UnexpectedEof);
+        }
         if end > limit_end {
             return Err(Rfc9162ProofDecodeError::InvalidStructure);
         }
@@ -2395,6 +2398,9 @@ impl<'a> CborReader<'a> {
             .offset
             .checked_add(n)
             .ok_or(Rfc9162ProofDecodeError::InvalidStructure)?;
+        if end > self.bytes.len() {
+            return Err(Rfc9162ProofDecodeError::UnexpectedEof);
+        }
         if end > limit_end {
             return Err(Rfc9162ProofDecodeError::InvalidStructure);
         }
@@ -3967,6 +3973,28 @@ mod tests {
             .chain([0x33; 32])
             .collect::<Vec<_>>();
         assert_eq!(consistency.to_cbor(), expected);
+    }
+
+    #[test]
+    fn cbor_bounded_map_distinguishes_truncated_header_from_budget_exhaustion() {
+        // A missing extended-length byte is malformed input, not a resource
+        // limit violation. A present byte that lies beyond the configured
+        // aggregate ceiling is a limit violation.
+        let truncated = vec![0xb8];
+        let mut eof_reader = CborReader::new(&truncated);
+        assert_eq!(
+            eof_reader.read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 2),
+            Err(Rfc9162ProofDecodeError::UnexpectedEof)
+        );
+        assert_eq!(eof_reader.offset, 1);
+
+        let over_budget = vec![0xb8, 0x00];
+        let mut budget_reader = CborReader::new(&over_budget);
+        assert_eq!(
+            budget_reader.read_map_entries_bounded_with_limits_and_bytes(1, 64, 64, 1),
+            Err(Rfc9162ProofDecodeError::InvalidStructure)
+        );
+        assert_eq!(budget_reader.offset, 1);
     }
 
     #[test]
