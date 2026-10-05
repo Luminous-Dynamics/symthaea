@@ -327,18 +327,44 @@ pub struct LanyonSpecificationBundle {
     pub schema_revision: String,
     pub specification: LanyonSystemSpec,
     pub semantic_envelope: LanyonSemanticEnvelope,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_candidate_digest: Option<String>,
 }
 
 impl LanyonSpecificationBundle {
     pub fn new(specification: LanyonSystemSpec, bindings: Vec<LanyonPhysicalBinding>) -> Result<Self, String> {
+        Self::new_with_candidate_digest(specification, bindings, None)
+    }
+
+    pub fn new_with_candidate_digest(
+        specification: LanyonSystemSpec,
+        bindings: Vec<LanyonPhysicalBinding>,
+        source_candidate_digest: Option<String>,
+    ) -> Result<Self, String> {
         let semantic_envelope = LanyonSemanticEnvelope::new(&specification, bindings)?;
+        if let Some(digest) = &source_candidate_digest {
+            validate_digest(digest)?;
+        }
         let bundle = Self {
             schema_revision: ADAPTER_SCHEMA.into(),
             specification,
             semantic_envelope,
+            source_candidate_digest,
         };
         bundle.validate()?;
         Ok(bundle)
+    }
+
+    pub fn with_source_candidate_digest(
+        specification: LanyonSystemSpec,
+        bindings: Vec<LanyonPhysicalBinding>,
+        source_candidate_digest: impl Into<String>,
+    ) -> Result<Self, String> {
+        Self::new_with_candidate_digest(
+            specification,
+            bindings,
+            Some(source_candidate_digest.into()),
+        )
     }
 
     pub fn validate(&self) -> Result<(), String> {
@@ -347,6 +373,9 @@ impl LanyonSpecificationBundle {
         }
         self.specification.validate()?;
         self.semantic_envelope.validate()?;
+        if let Some(digest) = &self.source_candidate_digest {
+            validate_digest(digest)?;
+        }
         if self.semantic_envelope.specification_digest != self.specification.digest_hex()? {
             return Err("semantic envelope is bound to a different specification".into());
         }
@@ -368,6 +397,10 @@ impl LanyonSpecificationBundle {
         self.validate()?;
         let mut bytes = self.racket_source()?.into_bytes();
         bytes.push(b'\\n');
+        if let Some(digest) = &self.source_candidate_digest {
+            bytes.extend_from_slice(digest.as_bytes());
+            bytes.push(b'\\n');
+        }
         bytes.extend_from_slice(&self.semantic_envelope.canonical_bytes());
         Ok(blake3::hash(&bytes).to_hex().to_string())
     }
@@ -733,6 +766,34 @@ mod tests {
     fn sum_rejects_unsupported_ast() {
         let expr = Expr::Sum(Box::new(Expr::Var("f".into())), "k".into());
         assert!(expr_to_lanyon_form(&expr).is_err());
+    }
+
+    #[test]
+    fn source_candidate_digest_is_optional_but_exact_when_present() {
+        let bundle = LanyonSpecificationBundle::with_source_candidate_digest(
+            fixture(),
+            vec![],
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        ).unwrap();
+        assert_eq!(
+            bundle.source_candidate_digest.as_deref(),
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+        );
+        assert!(LanyonSpecificationBundle::with_source_candidate_digest(
+            fixture(),
+            vec![],
+            "not-a-digest",
+        ).is_err());
+    }
+
+    #[test]
+    fn candidate_lineage_changes_bundle_digest() {
+        let base = LanyonSpecificationBundle::new(fixture(), vec![]).unwrap();
+        let linked = LanyonSpecificationBundle::with_source_candidate_digest(
+            fixture(), vec![],
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        ).unwrap();
+        assert_ne!(base.digest_hex().unwrap(), linked.digest_hex().unwrap());
     }
 
     #[test]
