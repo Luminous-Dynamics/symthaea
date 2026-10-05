@@ -336,6 +336,122 @@ async function blankCanvasHash(page, width, height) {
     .digest('hex');
 }
 
+
+async function rawWebGpuCanvasCanary(page) {
+  return page.evaluate(async () => {
+    if (!navigator.gpu) {
+      return { supported: false, reason: 'navigator.gpu unavailable' };
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    canvas.style.cssText = [
+      'position:fixed',
+      'left:0',
+      'top:0',
+      'width:64px',
+      'height:64px',
+      'opacity:0.01',
+      'pointer-events:none',
+      'z-index:2147483647',
+    ].join(';');
+    document.body.appendChild(canvas);
+
+    let device = null;
+    const uncapturedErrors = [];
+    try {
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) {
+        return { supported: false, reason: 'raw canary requestAdapter returned null' };
+      }
+      device = await adapter.requestDevice();
+      device.addEventListener('uncapturederror', event => {
+        const error = event.error;
+        uncapturedErrors.push({
+          name: error?.name || 'UnknownGPUError',
+          message: error?.message || String(error),
+        });
+      });
+
+      const format = navigator.gpu.getPreferredCanvasFormat();
+      const context = canvas.getContext('webgpu');
+      if (!context) {
+        return {
+          supported: false,
+          reason: 'raw canary WebGPU context unavailable',
+          format,
+        };
+      }
+
+      context.configure({
+        device,
+        format,
+        alphaMode: 'opaque',
+      });
+
+      const encoder = device.createCommandEncoder();
+      const view = context.getCurrentTexture().createView();
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+          view,
+          clearValue: { r: 1, g: 0, b: 0, a: 1 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        }],
+      });
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+      await device.queue.onSubmittedWorkDone();
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+
+      const dataUrl = canvas.toDataURL('image/png');
+      const image = new Image();
+      image.src = dataUrl;
+      await image.decode();
+      const probe = document.createElement('canvas');
+      probe.width = canvas.width;
+      probe.height = canvas.height;
+      const probeContext = probe.getContext('2d');
+      if (!probeContext) {
+        return {
+          supported: true,
+          format,
+          pixel: null,
+          painted_red: false,
+          uncaptured_errors: uncapturedErrors,
+          reason: 'raw canary 2D probe context unavailable',
+        };
+      }
+      probeContext.drawImage(image, 0, 0);
+      const pixel = [...probeContext.getImageData(32, 32, 1, 1).data];
+
+      return {
+        supported: true,
+        format,
+        pixel,
+        painted_red: pixel[0] > 200
+          && pixel[1] < 40
+          && pixel[2] < 40
+          && pixel[3] === 255,
+        uncaptured_errors: uncapturedErrors,
+      };
+    } catch (error) {
+      return {
+        supported: true,
+        format: null,
+        pixel: null,
+        painted_red: false,
+        uncaptured_errors: uncapturedErrors,
+        exception: error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      device?.destroy();
+      canvas.remove();
+    }
+  });
+}
+
 async function capabilityPreflight(page) {
   return page.evaluate(async () => {
     if (!navigator.gpu) {
@@ -588,6 +704,7 @@ async function runMode(mode) {
     const capability = await capabilityPreflight(page);
 
     if (gpuMode) {
+      diagnostics.raw_webgpu_canary = await rawWebGpuCanvasCanary(page);
       failOnPageErrors('WebGPU capability preflight');
       if (!capability.navigator_gpu || !capability.adapter || !capability.device) {
         throw new QualificationError(
@@ -702,6 +819,7 @@ async function runMode(mode) {
             ? 'browser-webgpu-hardware'
             : 'forced-gpu-disabled',
         capability,
+        raw_webgpu_canary: diagnostics.raw_webgpu_canary || null,
         scene_hash: firstSceneHash,
         movie_hash: firstMovieHash,
         semantic_scene_samples: semanticSceneSamples,
