@@ -81,6 +81,45 @@ fn is_hex_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+fn decode_sha256_multibase(value: &str) -> Result<[u8; 32], VerificationFailure> {
+    let encoded = value.strip_prefix('z').ok_or_else(|| {
+        VerificationFailure::Structural(
+            "controller document digestMultibase must use the base58-btc multibase prefix"
+                .into(),
+        )
+    })?;
+    let bytes = bs58::decode(encoded).into_vec().map_err(|_| {
+        VerificationFailure::Structural(
+            "controller document digestMultibase must contain valid base58-btc data".into(),
+        )
+    })?;
+    if bytes.len() != 34 || bytes[0] != 0x12 || bytes[1] != 0x20 {
+        return Err(VerificationFailure::Structural(
+            "controller document digestMultibase must encode a SHA-256 multihash".into(),
+        ));
+    }
+    let mut digest = [0u8; 32];
+    digest.copy_from_slice(&bytes[2..]);
+    Ok(digest)
+}
+
+fn validate_sha256_multibase(
+    value: &str,
+    expected_hex_digest: Option<&str>,
+) -> Result<(), VerificationFailure> {
+    let digest = decode_sha256_multibase(value)?;
+    if let Some(expected) = expected_hex_digest {
+        let actual = hex::encode(digest);
+        if !is_hex_digest(expected) || !actual.eq_ignore_ascii_case(expected) {
+            return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
+                expected: expected.to_owned(),
+                actual,
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Policy describing whether a controller-document snapshot must match a known
 /// cryptographic content pin. Unpinned is explicitly weaker: it records the
 /// observed document digest without claiming that the verifier had a trusted
@@ -362,6 +401,8 @@ pub struct ControllerDocumentDereferenceAttestation {
     pub resolved_at: String,
     pub source: ControllerDocumentResolutionSource,
     pub document_digest: String,
+    /// Optional Multibase-encoded SHA-256 multihash for the dereferenced bytes.
+    pub digest_multibase: Option<String>,
 }
 
 impl ControllerDocumentDereferenceAttestation {
@@ -374,6 +415,7 @@ impl ControllerDocumentDereferenceAttestation {
         resolved_at: impl Into<String>,
         source: ControllerDocumentResolutionSource,
         document_digest: impl Into<String>,
+        digest_multibase: Option<String>,
     ) -> Result<Self, VerificationFailure> {
         request.validate_structure()?;
         let requested_url = request.controller_document_ref()?;
@@ -386,6 +428,7 @@ impl ControllerDocumentDereferenceAttestation {
             resolved_at: resolved_at.into(),
             source,
             document_digest: document_digest.into(),
+            digest_multibase,
         };
         value.validate_against_request(request)?;
         Ok(value)
@@ -493,6 +536,20 @@ impl ControllerDocumentDereferenceAttestation {
                 return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
                     expected: expected.clone(),
                     actual: self.document_digest.clone(),
+                });
+            }
+        }
+        if let Some(digest_multibase) = &self.digest_multibase {
+            let expected = match &request.controller_document_integrity_policy {
+                ControllerDocumentIntegrityPolicy::Sha256Digest(value) => Some(value.as_str()),
+                ControllerDocumentIntegrityPolicy::Unpinned => None,
+            };
+            validate_sha256_multibase(digest_multibase, expected)?;
+            let actual = hex::encode(decode_sha256_multibase(digest_multibase)?);
+            if !actual.eq_ignore_ascii_case(&self.document_digest) {
+                return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
+                    expected: self.document_digest.clone(),
+                    actual,
                 });
             }
         }
