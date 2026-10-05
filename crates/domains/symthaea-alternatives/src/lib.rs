@@ -2430,6 +2430,7 @@ impl std::fmt::Display for AssessmentError {
             Self::MissingIncumbent(id) => write!(f, "incumbent {id} not found"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
             Self::DuplicateEvidenceId(id) => write!(f, "duplicate evidence id {id}"),
+            Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
             Self::InvalidExperimentalDesign => write!(f, "experimental design provenance is incomplete"),
             Self::ExperimentalDesignSurfaceUndeclared(id) => write!(
                 f,
@@ -2472,6 +2473,10 @@ impl std::fmt::Display for AssessmentError {
             } => write!(
                 f,
                 "evidence {evidence_id} measurand {actual_measurand_id} does not match target measurand {expected_measurand_id}"
+            ),
+            Self::ExperimentalDesignCandidateMissing(id) => write!(
+                f,
+                "experimental design references candidate {id} not present in assessment"
             ),
             Self::ExperimentalDesignObservationMismatch {
                 evidence_id,
