@@ -76,6 +76,20 @@ fn combine_scalar(a: ScalarDomain, b: ScalarDomain, division: bool) -> ScalarDom
     }
 }
 
+/// Scalar domain after an analytic real-valued function. Integer/rational
+/// inputs can yield irrational values, while complex and approximate-real
+/// domains must remain explicitly represented.
+fn analytic_scalar(input: ScalarDomain) -> ScalarDomain {
+    match input {
+        ScalarDomain::Unknown => ScalarDomain::Unknown,
+        ScalarDomain::Complex => ScalarDomain::Complex,
+        ScalarDomain::ApproximateReal => ScalarDomain::ApproximateReal,
+        ScalarDomain::Integer | ScalarDomain::Rational | ScalarDomain::Real => {
+            ScalarDomain::Real
+        }
+    }
+}
+
 fn additive_result(
     left: &PhysicalType,
     right: &PhysicalType,
@@ -231,7 +245,9 @@ where
             match function {
                 UnaryFn::Sin | UnaryFn::Cos => {
                     if arg_ty.kind == Angle || dimension.is_dimensionless() {
-                        valid(PhysicalType::dimensionless())
+                        let mut result = PhysicalType::dimensionless();
+                        result.scalar = analytic_scalar(arg_ty.scalar);
+                        valid(result)
                     } else {
                         TypeJudgement::Invalid(PhysicalTypeError {
                             operation: format!("{function:?}"),
@@ -241,7 +257,9 @@ where
                 }
                 UnaryFn::Exp => {
                     if dimension.is_dimensionless() {
-                        valid(PhysicalType::dimensionless())
+                        let mut result = PhysicalType::dimensionless();
+                        result.scalar = analytic_scalar(arg_ty.scalar);
+                        valid(result)
                     } else {
                         TypeJudgement::Invalid(PhysicalTypeError {
                             operation: "exp".into(),
@@ -256,7 +274,9 @@ where
                             reason: "log input must be dimensionless; normalize by a reference quantity first".into(),
                         })
                     } else if arg_ty.has_refinement(Refinement::Positive) {
-                        valid(PhysicalType::dimensionless())
+                        let mut result = PhysicalType::dimensionless();
+                        result.scalar = analytic_scalar(arg_ty.scalar);
+                        valid(result)
                     } else {
                         TypeJudgement::Unknown("log domain positivity is not established".into())
                     }
@@ -272,10 +292,12 @@ where
                     if arg_ty.scalar == ScalarDomain::Complex
                         || arg_ty.has_refinement(Refinement::NonNegative)
                     {
-                        valid(PhysicalType::with_kind(
+                        let mut result = PhysicalType::with_kind(
                             Unknown,
                             PhysicalDimension::from_array(a.map(|e| e / 2)),
-                        ))
+                        );
+                        result.scalar = analytic_scalar(arg_ty.scalar);
+                        valid(result)
                     } else {
                         TypeJudgement::Unknown(
                             "real square-root requires a nonnegative domain refinement".into(),
@@ -388,32 +410,63 @@ where
             };
 
             match exponent.as_ref() {
-                Expr::Const(k) if (k - k.round()).abs() < 1e-9 => {
-                    match dimension.scale(*k as i8) {
-                        Some(d) => valid(PhysicalType::with_kind(Unknown, d)),
-                        None => TypeJudgement::Invalid(PhysicalTypeError {
-                            operation: "pow".into(),
-                            reason: "dimension exponent overflow".into(),
-                        }),
-                    }
-                }
-                Expr::Const(k) if (*k - 0.5).abs() < 1e-9 => {
-                    let a = dimension.as_array();
-                    if a.iter().all(|e| e % 2 == 0) {
-                        valid(PhysicalType::with_kind(
-                            Unknown,
-                            PhysicalDimension::from_array(a.map(|e| e / 2)),
-                        ))
-                    } else {
-                        TypeJudgement::Invalid(PhysicalTypeError {
-                            operation: "pow".into(),
-                            reason: "square-root exponent requires even dimensions".into(),
-                        })
-                    }
-                }
                 Expr::Const(k) => {
-                    if dimension.is_dimensionless() {
-                        valid(PhysicalType::dimensionless())
+                    if !k.is_finite() {
+                        return TypeJudgement::Invalid(PhysicalTypeError {
+                            operation: "pow".into(),
+                            reason: "power exponent must be finite".into(),
+                        });
+                    }
+
+                    if (k - k.round()).abs() < 1e-9 {
+                        let rounded = k.round();
+                        if rounded < i8::MIN as f64 || rounded > i8::MAX as f64 {
+                            return TypeJudgement::Invalid(PhysicalTypeError {
+                                operation: "pow".into(),
+                                reason:
+                                    "integer power exponent is outside the supported i8 range"
+                                        .into(),
+                            });
+                        }
+                        match dimension.scale(rounded as i8) {
+                            Some(d) => {
+                                let mut result = PhysicalType::with_kind(Unknown, d);
+                                result.scalar = if rounded < 0.0 {
+                                    match b.scalar {
+                                        ScalarDomain::Integer | ScalarDomain::Rational => {
+                                            ScalarDomain::Rational
+                                        }
+                                        other => other,
+                                    }
+                                } else {
+                                    b.scalar
+                                };
+                                valid(result)
+                            }
+                            None => TypeJudgement::Invalid(PhysicalTypeError {
+                                operation: "pow".into(),
+                                reason: "dimension exponent overflow".into(),
+                            }),
+                        }
+                    } else if (*k - 0.5).abs() < 1e-9 {
+                        let a = dimension.as_array();
+                        if a.iter().all(|e| e % 2 == 0) {
+                            let mut result = PhysicalType::with_kind(
+                                Unknown,
+                                PhysicalDimension::from_array(a.map(|e| e / 2)),
+                            );
+                            result.scalar = analytic_scalar(b.scalar);
+                            valid(result)
+                        } else {
+                            TypeJudgement::Invalid(PhysicalTypeError {
+                                operation: "pow".into(),
+                                reason: "square-root exponent requires even dimensions".into(),
+                            })
+                        }
+                    } else if dimension.is_dimensionless() {
+                        let mut result = PhysicalType::dimensionless();
+                        result.scalar = analytic_scalar(b.scalar);
+                        valid(result)
                     } else {
                         TypeJudgement::Invalid(PhysicalTypeError {
                             operation: "pow".into(),
@@ -720,6 +773,69 @@ mod tests {
             TypeJudgement::Valid(result) => {
                 assert_eq!(result.kind, QuantityKind::Power);
                 assert_eq!(result.scalar, ScalarDomain::ApproximateReal);
+            }
+            other => panic!("unexpected judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn oversized_integer_power_exponent_is_rejected() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Const(128.0)),
+        );
+        let variables = HashMap::from([(
+            "x".into(),
+            PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH),
+        )]);
+
+        assert!(matches!(
+            infer_expr_type_with_variables(&expr, &variables),
+            TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn non_finite_power_exponent_is_rejected_even_for_dimensionless_base() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Const(2.0)),
+            Box::new(Expr::Const(f64::NAN)),
+        );
+
+        assert!(matches!(
+            infer_expr_type(&expr, &units()),
+            TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn complex_sine_does_not_collapse_to_real() {
+        let mut input = PhysicalType::dimensionless();
+        input.scalar = ScalarDomain::Complex;
+        let expr = Expr::Func(UnaryFn::Sin, Box::new(Expr::Var("z".into())));
+        let variables = HashMap::from([("z".into(), input)]);
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.scalar, ScalarDomain::Complex);
+            }
+            other => panic!("unexpected judgment: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rational_log_has_real_result_domain() {
+        let mut input = PhysicalType::dimensionless();
+        input.scalar = ScalarDomain::Rational;
+        input.refinements.push(Refinement::Positive);
+        let expr = Expr::Func(UnaryFn::Log, Box::new(Expr::Var("x".into())));
+        let variables = HashMap::from([("x".into(), input)]);
+
+        match infer_expr_type_with_variables(&expr, &variables) {
+            TypeJudgement::Valid(result) => {
+                assert_eq!(result.scalar, ScalarDomain::Real);
             }
             other => panic!("unexpected judgment: {other:?}"),
         }
