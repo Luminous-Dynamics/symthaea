@@ -190,6 +190,55 @@ pub enum EvidenceStance {
     Contradicts,
 }
 
+/// Canonical identity for the provenance source of an evidence record.
+///
+/// This is an identity contract, not an authenticity proof. External
+/// admission/attestation must establish that the declared authority actually
+/// controls the referenced source.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceSourceIdentity {
+    /// Stable authority/organization identity used for independence accounting.
+    pub authority_id: String,
+    /// Stable identifier for the referenced artifact, dataset, report, or observation stream.
+    pub artifact_id: String,
+    /// Digest of the referenced artifact or canonical source payload.
+    pub artifact_digest: String,
+    /// Optional issuer key fingerprint for future cryptographic attestation.
+    pub issuer_key_fingerprint: Option<String>,
+}
+
+impl EvidenceSourceIdentity {
+    /// Validate the canonical source identity fields.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.authority_id.is_empty()
+            || self.artifact_id.is_empty()
+            || self.artifact_digest.is_empty()
+        {
+            return Err(AssessmentError::EmptySourceIdentity);
+        }
+        if self
+            .issuer_key_fingerprint
+            .as_ref()
+            .is_some_and(String::is_empty)
+        {
+            return Err(AssessmentError::EmptySourceIdentity);
+        }
+        Ok(())
+    }
+
+    /// Derive the stable identity used when counting independent authorities.
+    pub fn independence_id(&self) -> String {
+        let payload = (
+            &self.authority_id,
+            self.issuer_key_fingerprint.as_deref().unwrap_or(""),
+        );
+        let bytes = serde_json::to_vec(&payload).expect("source identity is serializable");
+        let mut hasher = Hasher::new();
+        hasher.update(&bytes);
+        hasher.finalize().to_hex().to_string()
+    }
+}
+
 /// Provenance-aware evidence metadata.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EvidenceRecord {
@@ -201,8 +250,8 @@ pub struct EvidenceRecord {
     pub stance: EvidenceStance,
     /// Caller-supplied confidence in [0, 1].
     pub confidence: f64,
-    /// Opaque source identifier for independence checks.
-    pub source_id: String,
+    /// Canonical provenance identity used for source-independence accounting.
+    pub source: EvidenceSourceIdentity,
     /// Human-readable scope: functional unit, geography, process, etc.
     pub scope: String,
     /// Optional unit for the associated quantity.
@@ -223,9 +272,10 @@ impl EvidenceRecord {
         if !self.confidence.is_finite() || !(0.0..=1.0).contains(&self.confidence) {
             return Err(AssessmentError::InvalidConfidence(self.confidence));
         }
-        if self.id.is_empty() || self.source_id.is_empty() || self.scope.is_empty() {
+        if self.id.is_empty() || self.scope.is_empty() {
             return Err(AssessmentError::EmptyEvidenceIdentity);
         }
+        self.source.validate()?;
         if let (Some(from), Some(until)) = (
             self.valid_from_epoch_seconds,
             self.valid_until_epoch_seconds,
@@ -735,7 +785,7 @@ impl CandidatePathway {
                 ) && e.stance == EvidenceStance::Supports
                     && e.confidence >= 0.7
             })
-            .map(|e| e.source_id.as_str())
+            .map(|e| e.source.independence_id())
             .collect::<BTreeSet<_>>()
             .len();
         let has_all_dimension_evidence = Dimension::ALL.iter().all(|dimension| {
@@ -1180,6 +1230,8 @@ pub enum AssessmentError {
     MissingIncumbent(String),
     /// Two candidates have the same stable identifier.
     DuplicateCandidateId(String),
+    /// Evidence provenance source identity is incomplete.
+    EmptySourceIdentity,
     /// A requirement set contains no requirements.
     EmptyRequirementSet,
     /// A requirement-set map key does not match the requirement's stable ID.
@@ -1266,6 +1318,7 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::MissingIncumbent(id) => write!(f, "incumbent {id} not found"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
+            Self::EmptySourceIdentity => write!(f, "evidence source identity is incomplete"),
             Self::EmptyRequirementSet => write!(f, "requirement set is empty"),
             Self::RequirementSetKeyMismatch { key, requirement_id } => write!(
                 f,
@@ -1796,7 +1849,12 @@ mod tests {
             kind,
             stance,
             confidence,
-            source_id: source_id.into(),
+            source: EvidenceSourceIdentity {
+                authority_id: source_id.into(),
+                artifact_id: format!("artifact:{id}"),
+                artifact_digest: format!("fixture-digest:{id}"),
+                issuer_key_fingerprint: None,
+            },
             scope: "synthetic functional unit".into(),
             unit: Some("unit".into()),
             as_of: Some("fixture-v1".into()),
@@ -2573,6 +2631,31 @@ mod tests {
 
         assert_eq!(first, second);
         assert_eq!(first.pareto_frontier, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn source_independence_is_based_on_authority_identity() {
+        let a = EvidenceSourceIdentity {
+            authority_id: "authority-a".into(),
+            artifact_id: "artifact-1".into(),
+            artifact_digest: "digest-1".into(),
+            issuer_key_fingerprint: None,
+        };
+        let b = EvidenceSourceIdentity {
+            authority_id: "authority-a".into(),
+            artifact_id: "artifact-2".into(),
+            artifact_digest: "digest-2".into(),
+            issuer_key_fingerprint: None,
+        };
+        let c = EvidenceSourceIdentity {
+            authority_id: "authority-b".into(),
+            artifact_id: "artifact-3".into(),
+            artifact_digest: "digest-3".into(),
+            issuer_key_fingerprint: None,
+        };
+
+        assert_eq!(a.independence_id(), b.independence_id());
+        assert_ne!(a.independence_id(), c.independence_id());
     }
 
     #[test]
