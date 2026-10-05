@@ -319,3 +319,141 @@ fn invalid_decoder_bound_is_rejected_without_search() {
     );
     assert_eq!(work, Default::default());
 }
+
+
+#[test]
+fn random_small_code_sweep_matches_exhaustive_oracle_within_guaranteed_radius() {
+    let mut qualifying_seeds = 0usize;
+    let mut checked_observations = 0usize;
+
+    for seed_offset in 0..64u64 {
+        let seed = 0xD300_0000u64 + seed_offset;
+        let code = RandomLinearCode::generate(12, 4, seed);
+        let codewords = code.enumerate();
+        let min_distance = codewords
+            .iter()
+            .filter(|word| word.weight() > 0)
+            .map(|word| hamming_distance(word, &BinaryCodeword::zero(12)))
+            .min()
+            .expect("non-zero codeword");
+        let unique_radius = (min_distance - 1) / 2;
+        if unique_radius == 0 {
+            continue;
+        }
+
+        qualifying_seeds += 1;
+        let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
+
+        for clean in &codewords {
+            for mask in 0..(1usize << 12) {
+                let error = error_from_mask(mask, 12);
+                if error.weight() > unique_radius {
+                    continue;
+                }
+
+                let observation = clean.bound(&error);
+                let (nearest_distance, nearest) =
+                    nearest_codewords(&observation, &codewords);
+                assert_eq!(nearest_distance, error.weight());
+                assert_eq!(nearest.len(), 1);
+                assert_eq!(codewords[nearest[0]], *clean);
+
+                match decoder.decode(&observation, unique_radius) {
+                    BoundedDistanceDecode::Unique {
+                        codeword,
+                        error: decoded_error,
+                        distance,
+                    } => {
+                        assert_eq!(codeword, *clean);
+                        assert_eq!(decoded_error, error);
+                        assert_eq!(distance, error.weight());
+                    }
+                    other => {
+                        panic!(
+                            "seed=0x{seed:X} radius={unique_radius}: expected unique decode, got {other:?}"
+                        );
+                    }
+                }
+                checked_observations += 1;
+            }
+        }
+    }
+
+    assert!(
+        qualifying_seeds >= 16,
+        "deterministic sweep found too few distance>=3 random codes: {qualifying_seeds}"
+    );
+    println!(
+        "RANDOM_SYNDROME_SWEEP=trials=64;qualifying_seeds={qualifying_seeds};checked_observations={checked_observations};"
+    );
+}
+
+#[test]
+fn beyond_unique_radius_decoder_matches_nearest_or_no_match_without_claiming_target_recovery() {
+    let code = boundary_code();
+    let codewords = code.enumerate();
+    let decoder = BoundedDistanceSyndromeDecoder::from_code(&code).expect("decoder");
+    let clean = code.encode(&[true, false]);
+
+    let mut nearest_within_bound = 0usize;
+    let mut nearest_outside_bound = 0usize;
+    let mut unique_matches = 0usize;
+    let mut ambiguous_matches = 0usize;
+
+    for mask in 0..(1usize << 8) {
+        let error = error_from_mask(mask, 8);
+        if error.weight() != 3 {
+            continue;
+        }
+
+        let observation = clean.bound(&error);
+        let (nearest_distance, nearest) = nearest_codewords(&observation, &codewords);
+
+        match decoder.decode(&observation, 2) {
+            BoundedDistanceDecode::Unique {
+                codeword,
+                error: decoded_error,
+                distance,
+            } => {
+                assert!(nearest_distance <= 2);
+                assert_eq!(nearest.len(), 1);
+                assert_eq!(distance, nearest_distance);
+                assert_eq!(codeword, codewords[nearest[0]]);
+                assert_eq!(hamming_distance(&observation, &codeword), distance);
+                assert_ne!(
+                    codeword, clean,
+                    "a unique correction beyond the code's unique radius must not be credited as intended-target recovery"
+                );
+                assert_eq!(decoded_error.weight(), distance);
+                unique_matches += 1;
+                nearest_within_bound += 1;
+            }
+            BoundedDistanceDecode::Ambiguous {
+                distance,
+                matching_error_patterns,
+            } => {
+                assert!(nearest_distance <= 2);
+                assert_eq!(nearest.len(), matching_error_patterns);
+                assert_eq!(distance, nearest_distance);
+                ambiguous_matches += 1;
+                nearest_within_bound += 1;
+            }
+            BoundedDistanceDecode::NoMatchWithinBound { max_error_weight } => {
+                assert_eq!(max_error_weight, 2);
+                assert!(nearest_distance > 2);
+                nearest_outside_bound += 1;
+            }
+            other => panic!("unexpected result for weight-3 corruption: {other:?}"),
+        }
+    }
+
+    assert_eq!(nearest_within_bound + nearest_outside_bound, 56);
+    assert_eq!(unique_matches + ambiguous_matches, nearest_within_bound);
+    assert_eq!(ambiguous_matches, 0);
+    assert_eq!(nearest_outside_bound, 8);
+    assert_eq!(unique_matches, 48);
+
+    println!(
+        "BEYOND_RADIUS_LEDGER=observations=56;bound=2;nearest_within_bound={nearest_within_bound};nearest_outside_bound={nearest_outside_bound};unique_matches={unique_matches};ambiguous_matches={ambiguous_matches};intended_target_recovery_claim=false"
+    );
+}
