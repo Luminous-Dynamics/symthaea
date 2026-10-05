@@ -170,6 +170,12 @@ pub enum NixOSCommand {
     EnvRemove { packages: Vec<String> },
     /// nix-env --rollback (user profile rollback)
     EnvRollback,
+    /// nix-env --switch-generation for the system profile.
+    EnvSwitchGeneration { generation: u32 },
+    /// nix-env --delete-generations +N for the system profile.
+    EnvDeleteGenerations { keep_last: usize },
+    /// nix-env --delete-generations Nd for the system profile.
+    EnvDeleteGenerationsOlderThan { days: u32 },
     /// nix search (package search)
     Search { query: String, json: bool },
     /// nix-channel operations
@@ -375,16 +381,11 @@ impl NixOSCommand {
             Self::EnvInstall { .. } | Self::EnvRemove { .. } => {
                 Some(NixOSCommand::EnvRollback)
             }
-            Self::HomeManagerSwitch { .. } => {
-                Some(NixOSCommand::Custom {
-                    command: "sh".to_string(),
-                    args: vec![
-                        "-c".to_string(),
-                        "home-manager generations | head -2 | tail -1 | awk '{print $NF}' | xargs -I {} {}/activate".to_string(),
-                    ],
-                    safety_level: SafetyLevel::UserModify,
-                })
-            }
+            // The previous implementation used a shell pipeline to locate and
+            // activate an older Home Manager generation. That was an arbitrary
+            // shell effect and cannot cross a typed execution boundary safely.
+            // Fail closed until a dedicated typed rollback operation exists.
+            Self::HomeManagerSwitch { .. } => None,
             _ => None,
         }
     }
@@ -440,6 +441,33 @@ impl NixOSCommand {
                 ("nix-env".to_string(), args)
             }
             Self::EnvRollback => ("nix-env".to_string(), vec!["--rollback".to_string()]),
+            Self::EnvSwitchGeneration { generation } => (
+                "nix-env".to_string(),
+                vec![
+                    "--switch-generation".to_string(),
+                    generation.to_string(),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
+            Self::EnvDeleteGenerations { keep_last } => (
+                "nix-env".to_string(),
+                vec![
+                    "--delete-generations".to_string(),
+                    format!("+{keep_last}"),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
+            Self::EnvDeleteGenerationsOlderThan { days } => (
+                "nix-env".to_string(),
+                vec![
+                    "--delete-generations".to_string(),
+                    format!("{days}d"),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
             Self::Search { query, json } => {
                 let cap = if *json { 4 } else { 3 };
                 let mut args = Vec::with_capacity(cap);
@@ -586,18 +614,19 @@ enum ExecutionBasisV1 {
     },
 }
 
-/// Real service effects require a live Nixward execution-authority capability.
+/// Free-form Custom commands are legacy compatibility data, not typed effect
+/// semantics. They may be previewed, but a non-dry-run executor must not treat
+/// an arbitrary executable + argv pair as sufficiently constrained to authorize
+/// or dispatch an effect. This deliberately avoids an incomplete command-name
+/// or shell-text blacklist: an arbitrary wrapper/helper could otherwise invoke
+/// systemctl without containing "systemctl" at the top level.
 ///
-/// The legacy execute/execute_confirmed paths are intentionally Phi-based
-/// compatibility APIs and may still preview service commands in dry-run mode,
-/// but they must never dispatch a service effect. Custom(systemctl ...) is
-/// likewise treated as a legacy representation and cannot recover authority.
-fn legacy_service_effect_requires_live_authority(command: &NixOSCommand) -> bool {
-    match command {
-        NixOSCommand::Service { .. } => true,
-        NixOSCommand::Custom { command, .. } => command == "systemctl",
-        _ => false,
-    }
+/// Typed NixOSCommand variants are the only non-dry-run effect representation.
+fn legacy_effect_requires_typed_authority(command: &NixOSCommand) -> bool {
+    matches!(
+        command,
+        NixOSCommand::Service { .. } | NixOSCommand::Custom { .. }
+    )
 }
 
 /// In-memory provenance for an execution that crossed the live Nixward
@@ -739,9 +768,9 @@ impl NixOSExecutor {
         }
         let required_phi = safety.required_phi();
 
-        if !self.dry_run && legacy_service_effect_requires_live_authority(&command) {
+        if !self.dry_run && legacy_effect_requires_typed_authority(&command) {
             return ExecutionResult::Blocked {
-                reason: "service effects require live Nixward execution authority; Phi confirmation is not execution authority".to_string(),
+                reason: "free-form Custom commands are not execution authority; use a typed Nixward command".to_string(),
                 safety_level: safety,
             };
         }
@@ -1017,9 +1046,9 @@ impl NixOSExecutor {
                 safety_level: safety,
             };
         }
-        if !self.dry_run && legacy_service_effect_requires_live_authority(&command) {
+        if !self.dry_run && legacy_effect_requires_typed_authority(&command) {
             return ExecutionResult::Blocked {
-                reason: "service effects require live Nixward execution authority; Phi confirmation is not execution authority".to_string(),
+                reason: "free-form Custom commands and service effects require typed Nixward execution authority; Phi confirmation is not execution authority".to_string(),
                 safety_level: safety,
             };
         }
@@ -1040,10 +1069,10 @@ impl NixOSExecutor {
         // is the sole non-dry-run service execution basis.
         if !self.dry_run
             && matches!(&basis, ExecutionBasisV1::Phi { .. })
-            && legacy_service_effect_requires_live_authority(&command)
+            && legacy_effect_requires_typed_authority(&command)
         {
             return ExecutionResult::Blocked {
-                reason: "service effects require live Nixward execution authority; Phi confirmation is not execution authority".to_string(),
+                reason: "free-form Custom commands and service effects require typed Nixward execution authority; Phi confirmation is not execution authority".to_string(),
                 safety_level: safety,
             };
         }
