@@ -694,6 +694,17 @@ impl MagiLoopRuntime {
             AutoResolveType::FileExists(path) => Some(std::path::Path::new(path).exists()),
             AutoResolveType::ReadOnlyCommandSucceeds(cmd) => {
                 let (program, args) = crate::action::parse_command_line(cmd).ok()?;
+
+                // A predicate is observational only. Shell/interpreter/environment
+                // wrappers are rejected even when their top-level name is currently
+                // allowlisted as read-only, because they can dispatch a second program.
+                const WRAPPER_PROGRAMS: &[&str] = &[
+                    "env", "sh", "bash", "dash", "zsh", "fish", "sudo", "doas", "xargs",
+                ];
+                if WRAPPER_PROGRAMS.iter().any(|wrapper| program == *wrapper) {
+                    return None;
+                }
+
                 if crate::action::classify_remote_command_capability(&program, &args).ok()?
                     != crate::action::RemoteCommandCapability::ReadOnly
                 {
@@ -730,6 +741,66 @@ impl MagiLoopRuntime {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(test)]
+mod auto_resolve_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn readonly_command_succeeds_uses_direct_argv_without_shell() {
+        let runtime = MagiLoopRuntime::new(RuntimeConfig::default()).unwrap();
+        assert_eq!(
+            runtime
+                .check_auto_resolve(&AutoResolveType::ReadOnlyCommandSucceeds(
+                    "true".to_string()
+                ))
+                .await,
+            Some(true)
+        );
+    }
+
+    #[tokio::test]
+    async fn readonly_command_rejects_shell_wrappers() {
+        let runtime = MagiLoopRuntime::new(RuntimeConfig::default()).unwrap();
+        for command in [
+            "sh -c true",
+            "env true",
+            "sudo true",
+            "xargs true",
+            "bash -c true",
+        ] {
+            assert_eq!(
+                runtime
+                    .check_auto_resolve(&AutoResolveType::ReadOnlyCommandSucceeds(
+                        command.to_string()
+                    ))
+                    .await,
+                None,
+                "wrapper must not be executable as an auto-resolution predicate: {command}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn readonly_command_rejects_mutating_commands() {
+        let runtime = MagiLoopRuntime::new(RuntimeConfig::default()).unwrap();
+        for command in [
+            "systemctl restart nginx.service",
+            "nix-env -e firefox",
+            "rm -rf /tmp/example",
+        ] {
+            assert_eq!(
+                runtime
+                    .check_auto_resolve(&AutoResolveType::ReadOnlyCommandSucceeds(
+                        command.to_string()
+                    ))
+                    .await,
+                None,
+                "mutating command must not run as an auto-resolution predicate: {command}"
+            );
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
