@@ -470,30 +470,42 @@ impl CandidatePathway {
             .any(|estimate| self.dimension_has_conflict(estimate))
     }
 
+    fn performance_evidence_is_supported(&self, metric: &str) -> bool {
+        self.performance
+            .get(metric)
+            .map(|estimate| {
+                !estimate.evidence_ids.is_empty()
+                    && self
+                        .evidence
+                        .iter()
+                        .filter(|e| estimate.evidence_ids.contains(&e.id))
+                        .any(|e| {
+                            matches!(
+                                e.kind,
+                                EvidenceKind::Observed
+                                    | EvidenceKind::Reported
+                                    | EvidenceKind::Derived
+                                    | EvidenceKind::ManufacturingObserved
+                                    | EvidenceKind::FieldObserved
+                                    | EvidenceKind::ContinuouslyMonitored
+                            ) && e.stance == EvidenceStance::Supports
+                                && e.confidence >= 0.7
+                        })
+            })
+            .unwrap_or(false)
+    }
+
     fn performance_is_supported(&self, requirement: &FunctionalRequirement) -> bool {
         requirement.constraints.keys().all(|metric| {
-            self.performance
-                .get(metric)
-                .map(|estimate| {
-                    !estimate.evidence_ids.is_empty()
-                        && self
-                            .evidence
-                            .iter()
-                            .filter(|e| estimate.evidence_ids.contains(&e.id))
-                            .any(|e| {
-                                matches!(
-                                    e.kind,
-                                    EvidenceKind::Observed
-                                        | EvidenceKind::Reported
-                                        | EvidenceKind::Derived
-                                        | EvidenceKind::ManufacturingObserved
-                                        | EvidenceKind::FieldObserved
-                                        | EvidenceKind::ContinuouslyMonitored
-                                ) && e.stance == EvidenceStance::Supports
-                                    && e.confidence >= 0.7
-                            })
-                })
-                .unwrap_or(false)
+            let Some(estimate) = self.performance.get(metric) else {
+                return false;
+            };
+            let Some(scale) = requirement.performance_scales.get(metric) else {
+                return false;
+            };
+            estimate.unit == scale.unit
+                && estimate.scope == scale.scope
+                && self.performance_evidence_is_supported(metric)
         })
     }
 
@@ -965,14 +977,42 @@ impl AlternativesEngine {
             let constraints = requirement
                 .constraints
                 .iter()
-                .map(|(metric, bound)| ConstraintEvaluation {
-                    metric: metric.clone(),
-                    requirement: *bound,
-                    status: bound.check(candidate.performance.get(metric).copied()),
+                .map(|(metric, bound)| {
+                    let status = match (
+                        candidate.performance.get(metric),
+                        requirement.performance_scales.get(metric),
+                    ) {
+                        (Some(estimate), Some(scale))
+                            if estimate.unit == scale.unit
+                                && estimate.scope == scale.scope
+                                && candidate.performance_evidence_is_supported(metric) =>
+                        {
+                            bound.check(Some(estimate.value))
+                        }
+                        _ => ConstraintStatus::Unresolved,
+                    };
+                    ConstraintEvaluation {
+                        metric: metric.clone(),
+                        requirement: *bound,
+                        status,
+                    }
                 })
                 .collect::<Vec<_>>();
 
             let mut candidate_blockers = Vec::new();
+            for (metric, scale) in &requirement.performance_scales {
+                if let Some(estimate) = candidate.performance.get(metric)
+                    && (estimate.unit != scale.unit || estimate.scope != scale.scope)
+                {
+                    candidate_blockers.push(FrontierBlocker::PerformanceIncompatibleScale {
+                        metric: metric.clone(),
+                        expected_unit: scale.unit.clone(),
+                        actual_unit: estimate.unit.clone(),
+                        expected_scope: scale.scope.clone(),
+                        actual_scope: estimate.scope.clone(),
+                    });
+                }
+            }
             for evaluation in &constraints {
                 match evaluation.status {
                     ConstraintStatus::Fail => candidate_blockers
