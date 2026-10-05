@@ -421,17 +421,6 @@ fn observe_openfoam_patch_geometry(
             }
         }
 
-        let first_point = points
-            .get(usize::try_from(face[0]).map_err(|_| {
-                OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
-                    face_index: record.start_face + offset as u64,
-                    point_index: face[0],
-                }
-            })?)
-            .ok_or(OpenFoamBoundaryObservationError::PointIndexOutOfBounds {
-                face_index: record.start_face + offset as u64,
-                point_index: face[0],
-            })?;
         let mut normal = [0.0f64; 3];
         for index in 0..face.len() {
             let a = points
@@ -468,8 +457,6 @@ fn observe_openfoam_patch_geometry(
                 face_index: record.start_face + offset as u64,
             });
         }
-        let _ = first_point;
-
         for edge_index in 0..face.len() {
             let a_index = face[edge_index];
             let b_index = face[(edge_index + 1) % face.len()];
@@ -512,6 +499,13 @@ fn observe_openfoam_patch_geometry(
             *entry = entry.checked_add(1).ok_or(
                 OpenFoamBoundaryObservationError::ArithmeticOverflow,
             )?;
+            if *entry > 2 {
+                return Err(OpenFoamBoundaryObservationError::NonManifoldPatchEdge {
+                    face_index: record.start_face + offset as u64,
+                    point_a: a_index,
+                    point_b: b_index,
+                });
+            }
         }
     }
 
