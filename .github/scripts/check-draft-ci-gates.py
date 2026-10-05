@@ -13,7 +13,9 @@ we need to preserve is correspondingly narrow:
   runner admission because they are evaluated only after the job has started;
 * the only root jobs without a draft guard are jobs already restricted away
   from pull_request events (SBOM and scheduled/manual stress tests);
-* adding/removing/renaming a CI job requires an explicit update here.
+* adding/removing/renaming an ordinary CI job requires an explicit update here;
+  the only admitted exception is a narrowly named, PR-only Nixward focused job
+  carrying the exact frozen draft guard and no status-check override.
 
 GitHub evaluates jobs.<job_id>.if before matrix expansion, so a false root-job
 condition prevents matrix legs from requesting runners. A skipped `needs`
@@ -86,6 +88,8 @@ NON_PULL_REQUEST_ROOTS = {
         "github.event_name == 'workflow_dispatch'"
     ),
 }
+
+FOCUSED_PR_JOB_RE = re.compile(r"^nixward-[a-z0-9-]+-focused$")
 
 EXPECTED_JOBS = (
     DIRECT_GENERIC
@@ -201,6 +205,39 @@ def require_transitive_draft_safety(block: str, job: str) -> None:
         )
 
 
+def focused_pr_job_is_safe(job: str, block: str) -> bool:
+    if FOCUSED_PR_JOB_RE.fullmatch(job) is None:
+        return False
+    if f"    {GOVERNANCE_DRAFT_GUARD}" not in block.splitlines():
+        return False
+    expression = job_level_if_expression(block, job)
+    return expression == GOVERNANCE_DRAFT_GUARD and not STATUS_CHECK.search(expression or "")
+
+
+def self_test_focused_pr_job_policy() -> None:
+    safe = """  nixward-example-focused:
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - run: true
+"""
+    assert focused_pr_job_is_safe("nixward-example-focused", safe)
+
+    wrong_name = safe.replace("nixward-example-focused", "arbitrary-example-focused")
+    assert not focused_pr_job_is_safe("arbitrary-example-focused", wrong_name)
+
+    wrong_guard = safe.replace(
+        "github.event_name == 'pull_request' && github.event.pull_request.draft == false",
+        "github.event_name == 'pull_request'",
+    )
+    assert not focused_pr_job_is_safe("nixward-example-focused", wrong_guard)
+
+    status_guard = safe.replace(
+        "github.event_name == 'pull_request' && github.event.pull_request.draft == false",
+        "success() && github.event_name == 'pull_request'",
+    )
+    assert not focused_pr_job_is_safe("nixward-example-focused", status_guard)
+
+
 def self_test_job_scope_parser() -> None:
     safe = """  psych-bench:
     needs: test
@@ -236,18 +273,32 @@ def self_test_job_scope_parser() -> None:
 
 def main() -> int:
     self_test_job_scope_parser()
+    self_test_focused_pr_job_policy()
 
     text = CI_PATH.read_text(encoding="utf-8")
     jobs = parse_jobs(text)
 
     observed = set(jobs)
-    if observed != EXPECTED_JOBS:
-        missing = sorted(EXPECTED_JOBS - observed)
-        unexpected = sorted(observed - EXPECTED_JOBS)
+    missing = sorted(EXPECTED_JOBS - observed)
+    unexpected = sorted(observed - EXPECTED_JOBS)
+
+    if missing:
         fail(
-            "top-level CI job census changed without updating the draft-safety "
-            f"ratchet: missing={missing!r} unexpected={unexpected!r}"
+            "top-level CI baseline job census shrank without updating the "
+            f"draft-safety ratchet: missing={missing!r}"
         )
+
+    unsafe_unexpected = [
+        job for job in unexpected if not focused_pr_job_is_safe(job, jobs[job])
+    ]
+    if unsafe_unexpected:
+        fail(
+            "unexpected CI jobs are not admitted by the focused Nixward PR-only "
+            f"exception: unsafe={unsafe_unexpected!r} all_unexpected={unexpected!r}"
+        )
+
+    for job in unexpected:
+        print(f"admitted_focused_nixward_job={job}")
 
     for job in sorted(DIRECT_GENERIC):
         require_exact_line(jobs[job], GENERIC_DRAFT_GUARD, job)
