@@ -13,8 +13,8 @@ use ed25519_dalek::{Signature, VerifyingKey};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use symthaea_epistemic_types::{
-    ClaimVerificationMethod, CryptographicVerificationReceipt, VerificationFailure,
-    VerificationMethodResolution, VerificationRequest,
+    ClaimVerificationMethod, CryptographicVerificationReceipt, VerificationEvidence,
+    VerificationFailure, VerificationMethodResolution, VerificationRequest,
 };
 
 use crate::{ResolvedVerificationMethod, ResolvedVerificationMethodMaterial, SnapshotError};
@@ -278,6 +278,27 @@ pub fn verify_eddsa_jcs_2022(
         proof_value_multibase,
     )
     .map_err(SnapshotError::Verification)
+}
+
+/// Verify the proof and immediately package the cryptographic result into the
+/// substrate-neutral evidence envelope.
+///
+/// This is the preferred integration path because the caller cannot accidentally
+/// replace the typed cryptographic receipt with free-form digest strings.
+pub fn verify_eddsa_jcs_2022_evidence(
+    request: &VerificationRequest,
+    resolution: &VerificationMethodResolution,
+    resolved_method: &ResolvedVerificationMethod,
+    secured_document: &Value,
+) -> Result<VerificationEvidence, SnapshotError> {
+    let receipt = verify_eddsa_jcs_2022(
+        request,
+        resolution,
+        resolved_method,
+        secured_document,
+    )?;
+    VerificationEvidence::from_adapter_attestation(request, resolution.clone(), receipt)
+        .map_err(SnapshotError::Verification)
 }
 
 fn required_string(
@@ -553,6 +574,19 @@ mod tests {
         );
         assert_eq!(receipt.proof_value_multibase, PROOF_VALUE);
         assert_eq!(receipt.cryptosuite, EDDSA_JCS_2022);
+
+        let evidence = verify_eddsa_jcs_2022_evidence(
+            &request,
+            &resolution,
+            &resolved_method,
+            &secured_document(),
+        )
+        .unwrap();
+        assert_eq!(
+            evidence.cryptographic_verification.claim_representation_digest,
+            request.claim_representation_digest
+        );
+        assert!(evidence.validate_structure().is_ok());
     }
 
     #[test]
