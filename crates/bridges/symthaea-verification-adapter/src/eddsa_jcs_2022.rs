@@ -288,6 +288,21 @@ pub fn verify_eddsa_jcs_2022(
     let proof_configuration_digest = hex::encode(proof_config_hash);
     let cryptographic_input_digest = hex::encode(Sha256::digest(&hash_data));
 
+    let expected_transformed_document_digest = request
+        .expected_transformed_document_digest
+        .as_ref()
+        .ok_or(SnapshotError::Verification(
+            VerificationFailure::MissingExpectedTransformedDocumentDigest,
+        ))?;
+    if expected_transformed_document_digest != &transformed_document_digest {
+        return Err(SnapshotError::Verification(
+            VerificationFailure::TransformedDocumentDigestMismatch {
+                expected: Some(expected_transformed_document_digest.clone()),
+                actual: Some(transformed_document_digest.clone()),
+            },
+        ));
+    }
+
     // Evidence identity is defined over the full proof's JCS form, independent
     // of the formatting of the submitted JSON representation.
     let proof_for_digest = Value::Object(proof.clone());
@@ -633,6 +648,9 @@ mod tests {
             expected_controller: ClaimControllerIdentity::new(CONTROLLER).unwrap(),
             expected_verification_relationship:
                 ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            expected_transformed_document_digest: Some(
+                "59b7cb6251b8991add1ce0bc83107e3db9dbbab5bd2c28f687db1a03abc92f19".into(),
+            ),
             controller_document_integrity_policy: ControllerDocumentIntegrityPolicy::Unpinned,
             controller_document_network_policy: ControllerDocumentNetworkPolicy::strict_for_url(
                 METHOD,
@@ -909,6 +927,39 @@ mod tests {
         .unwrap();
 
         assert_eq!(canonical_receipt, formatted_receipt);
+    }
+
+    #[test]
+    fn requires_exact_expected_transformed_document_binding() {
+        let mut request = vector_request();
+        let (resolution, resolved_method) = resolved_vector(&request);
+
+        request.expected_transformed_document_digest = None;
+        assert!(matches!(
+            verify_eddsa_jcs_2022(
+                &request,
+                &resolution,
+                &resolved_method,
+                &secured_document(),
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::MissingExpectedTransformedDocumentDigest
+            ))
+        ));
+
+        let mut request = vector_request();
+        request.expected_transformed_document_digest = Some("00".repeat(32));
+        assert!(matches!(
+            verify_eddsa_jcs_2022(
+                &request,
+                &resolution,
+                &resolved_method,
+                &secured_document(),
+            ),
+            Err(SnapshotError::Verification(
+                VerificationFailure::TransformedDocumentDigestMismatch { .. }
+            ))
+        ));
     }
 
     #[test]
