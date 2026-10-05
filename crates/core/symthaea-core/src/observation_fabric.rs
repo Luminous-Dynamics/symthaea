@@ -383,6 +383,10 @@ impl ProcessingActivity {
     }
 }
 
+fn is_canonical_hex_fingerprint(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn write_canonical_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
     hasher.update(&(bytes.len() as u64).to_be_bytes());
     hasher.update(bytes);
@@ -840,18 +844,90 @@ impl IndependenceVerificationReceiptV3 {
         }
     }
 
+    /// Validate the standalone v3 receipt shape without consulting a graph.
+    ///
+    /// This rejects structurally self-consistent receipts that could never be
+    /// emitted by the fixed v3 verifier, including non-canonical scope IDs,
+    /// malformed BLAKE3 fingerprints, and impossible classification/basis pairs.
+    pub fn is_well_formed(&self) -> bool {
+        if self.verifier_version != INDEPENDENCE_VERIFIER_VERSION_V3
+            || self.source_observation_id.trim().is_empty()
+            || self.target_observation_id.trim().is_empty()
+            || self.source_observation_id == self.target_observation_id
+            || !is_canonical_hex_fingerprint(&self.examined_scope_fingerprint)
+            || !is_canonical_hex_fingerprint(&self.assessment_fingerprint)
+        {
+            return false;
+        }
+
+        if self.examined_observation_ids.len() < 2
+            || self.examined_observation_ids.windows(2).any(|pair| pair[0] >= pair[1])
+            || self
+                .examined_observation_ids
+                .iter()
+                .any(|id| id.trim().is_empty())
+            || !self
+                .examined_observation_ids
+                .iter()
+                .any(|id| id == &self.source_observation_id)
+            || !self
+                .examined_observation_ids
+                .iter()
+                .any(|id| id == &self.target_observation_id)
+        {
+            return false;
+        }
+
+        match (&self.classification, &self.basis) {
+            (
+                EvidenceIndependence::VerifiedIndependent,
+                IndependenceBasis::NoSharedProvenance,
+            )
+            | (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedSensor { .. },
+            )
+            | (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedPlatform { .. },
+            )
+            | (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedAncestor { .. },
+            )
+            | (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedProcessingActivity { .. },
+            )
+            | (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::IdenticalAsset { .. },
+            )
+            | (
+                EvidenceIndependence::Unknown,
+                IndependenceBasis::InsufficientProvenance { .. },
+            ) => true,
+            _ => false,
+        }
+    }
+
+    /// Verify receipt integrity without re-running graph analysis.
     pub fn verify_integrity(&self) -> bool {
-        let assessment = IndependenceAssessmentV3 {
-            source_observation_id: self.source_observation_id.clone(),
-            target_observation_id: self.target_observation_id.clone(),
-            classification: self.classification.clone(),
-            basis: self.basis.clone(),
-            examined_observation_ids: self.examined_observation_ids.clone(),
-            verifier_version: self.verifier_version,
-            examined_scope_fingerprint: self.examined_scope_fingerprint.clone(),
-            assessment_fingerprint: self.assessment_fingerprint.clone(),
-        };
-        assessment.verify_fingerprint()
+        self.is_well_formed() && self.verify_fingerprint()
+    }
+
+    /// Verify that an independently produced canonical v3 scope witness
+    /// corresponds to the receipt's committed scope.
+    ///
+    /// This is deliberately graph-independent: the consumer supplies canonical
+    /// scope bytes produced by any implementation that conforms to the v3 scope
+    /// contract. No observation graph traversal or producer-side classifier is
+    /// invoked here.
+    pub fn verify_against_scope_witness(&self, canonical_scope_bytes: &[u8]) -> bool {
+        self.verify_integrity()
+            && canonical_scope_bytes.starts_with(INDEPENDENCE_SCOPE_V3_DOMAIN_SEPARATOR)
+            && blake3::hash(canonical_scope_bytes).to_hex().to_string()
+                == self.examined_scope_fingerprint
     }
 
     pub fn verify_against_graph_detailed(
@@ -2283,6 +2359,28 @@ mod tests {
 
     // Independent reconstruction of the v3 canonical witness. This intentionally
     // does not call either production v3 scope helper.
+    // Test-only helper that recomputes the receipt's assessment fingerprint
+    // using the same canonical fields, allowing malformed-form tests to preserve
+    // an internally matching digest before checking semantic validation.
+    trait V3ReceiptFingerprintForTesting {
+        fn fingerprint_for_testing(&self) -> String;
+    }
+
+    impl V3ReceiptFingerprintForTesting for IndependenceVerificationReceiptV3 {
+        fn fingerprint_for_testing(&self) -> String {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(INDEPENDENCE_ASSESSMENT_V3_DOMAIN_SEPARATOR);
+            write_canonical_string(&mut hasher, &self.source_observation_id);
+            write_canonical_string(&mut hasher, &self.target_observation_id);
+            write_canonical_string_vec(&mut hasher, &self.examined_observation_ids);
+            write_canonical_string(&mut hasher, &self.examined_scope_fingerprint);
+            write_canonical_string(&mut hasher, self.verifier_version);
+            write_canonical_independence(&mut hasher, &self.classification);
+            write_canonical_independence_basis(&mut hasher, &self.basis);
+            hasher.finalize().to_hex().to_string()
+        }
+    }
+
     fn oracle_v3_scope_bytes(
         graph: &ObservationGraph,
         source_observation_id: &str,
@@ -4103,6 +4201,51 @@ mod tests {
         let mut cross = receipt.clone();
         cross.assessment_fingerprint = v2_receipt.assessment_fingerprint;
         assert!(!cross.verify_integrity());
+    }
+
+    #[test]
+    fn independence_v3_receipt_rejects_self_consistent_noncanonical_forms() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let graph = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        };
+        let assessment = graph
+            .assess_independence_detailed_v3("obs-001", "obs-002")
+            .expect("v3 assessment");
+        let receipt = IndependenceVerificationReceiptV3::from_assessment(&assessment);
+        assert!(receipt.is_well_formed());
+        assert!(receipt.verify_integrity());
+
+        let mut duplicate_ids = receipt.clone();
+        duplicate_ids.examined_observation_ids.insert(1, "obs-001".into());
+        duplicate_ids.assessment_fingerprint = duplicate_ids
+            .fingerprint_for_testing();
+        assert!(!duplicate_ids.is_well_formed());
+        assert!(!duplicate_ids.verify_integrity());
+
+        let mut unsorted_ids = receipt.clone();
+        unsorted_ids.examined_observation_ids = vec!["obs-002".into(), "obs-001".into()];
+        unsorted_ids.assessment_fingerprint = unsorted_ids.fingerprint_for_testing();
+        assert!(!unsorted_ids.is_well_formed());
+        assert!(!unsorted_ids.verify_integrity());
+
+        let mut bad_scope = receipt.clone();
+        bad_scope.examined_scope_fingerprint = "not-a-fingerprint".into();
+        bad_scope.assessment_fingerprint = bad_scope.fingerprint_for_testing();
+        assert!(!bad_scope.is_well_formed());
+        assert!(!bad_scope.verify_integrity());
+
+        let mut impossible_pair = receipt.clone();
+        impossible_pair.classification = EvidenceIndependence::VerifiedIndependent;
+        impossible_pair.basis = IndependenceBasis::SharedSensor {
+            sensor_id: "camera-1".into(),
+        };
+        impossible_pair.assessment_fingerprint = impossible_pair.fingerprint_for_testing();
+        assert!(!impossible_pair.is_well_formed());
+        assert!(!impossible_pair.verify_integrity());
     }
 
     #[test]
