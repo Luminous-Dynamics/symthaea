@@ -62,7 +62,12 @@ fn systemctl_executable() -> Result<&'static str, std::io::Error> {
 }
 
 fn service_action_argv(action: &str, service: &str) -> [String; 2] {
-    [action.to_string(), format!("{service}.service")]
+    let unit = if service.ends_with(".service") {
+        service.to_string()
+    } else {
+        format!("{service}.service")
+    };
+    [action.to_string(), unit]
 }
 
 async fn run_service_action(action: &str, service: &str) -> Result<CmdResult, std::io::Error> {
@@ -5087,7 +5092,7 @@ mod service_action_tests {
         assert_eq!(args, ["restart", "nginx.service"]);
 
         let args = service_action_argv("stop", "foo.service");
-        assert_eq!(args, ["stop", "foo.service.service"]);
+        assert_eq!(args, ["stop", "foo.service"]);
         assert!(args.iter().all(|arg| !arg.contains("-c")));
     }
 }
