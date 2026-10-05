@@ -1197,30 +1197,65 @@ fn strip_comments(input: &str) -> Result<String, OpenFoamBoundaryObservationErro
     let mut out = String::with_capacity(input.len());
     let mut index = 0;
     let mut block_depth = 0usize;
+    let mut in_quote = false;
+    let mut escaped = false;
 
     while index < bytes.len() {
-        if block_depth > 0 {
-            if index + 1 < bytes.len() && bytes[index] == b'/' && bytes[index + 1] == b'*' {
-                block_depth += 1; index += 2;
-            } else if index + 1 < bytes.len() && bytes[index] == b'*' && bytes[index + 1] == b'/' {
-                block_depth -= 1; index += 2;
-            } else { index += 1; }
+        if in_quote {
+            let byte = bytes[index];
+            out.push(byte as char);
+            index += 1;
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_quote = false;
+            }
             continue;
         }
 
+        if block_depth > 0 {
+            if index + 1 < bytes.len() && bytes[index] == b'/' && bytes[index + 1] == b'*' {
+                block_depth = block_depth.checked_add(1).ok_or(
+                    OpenFoamBoundaryObservationError::ArithmeticOverflow,
+                )?;
+                index += 2;
+            } else if index + 1 < bytes.len() && bytes[index] == b'*' && bytes[index + 1] == b'/' {
+                block_depth -= 1;
+                index += 2;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+
+        if bytes[index] == b'"' {
+            in_quote = true;
+            escaped = false;
+            out.push(bytes[index] as char);
+            index += 1;
+            continue;
+        }
         if index + 1 < bytes.len() && bytes[index] == b'/' && bytes[index + 1] == b'/' {
             index += 2;
-            while index < bytes.len() && bytes[index] != b'\n' { index += 1; }
+            while index < bytes.len() && bytes[index] != b'\n' {
+                index += 1;
+            }
             continue;
         }
         if index + 1 < bytes.len() && bytes[index] == b'/' && bytes[index + 1] == b'*' {
-            block_depth = 1; index += 2; continue;
+            block_depth = 1;
+            index += 2;
+            continue;
         }
         out.push(bytes[index] as char);
         index += 1;
     }
 
-    if block_depth != 0 { return Err(OpenFoamBoundaryObservationError::UnterminatedBlockComment); }
+    if block_depth != 0 || in_quote {
+        return Err(OpenFoamBoundaryObservationError::UnexpectedEndOfInput);
+    }
     Ok(out)
 }
 
@@ -1759,6 +1794,24 @@ mod tests {
             binding.solver_entity_observation_kind(),
             Some("openfoam-polyMesh-boundary-patch:v1")
         );
+    }
+
+    #[test]
+    fn comment_markers_inside_quoted_values_are_not_comments() {
+        let source = br#"1
+(
+    inlet
+    {
+        type patch;
+        nFaces 1;
+        startFace 0;
+        note "url=http://example.test/a/*literal*/";
+    }
+)
+"#;
+        let (record, _) = observe_openfoam_boundary_patch(source, "inlet").unwrap();
+        assert_eq!(record.patch_name, "inlet");
+        assert_eq!(record.patch_type, "patch");
     }
 
     #[test]
