@@ -1351,24 +1351,24 @@ fn rfc9942_outer_protected_header_resource_limit_is_typed() {
 
 #[test]
 fn rfc9942_receipt_signature_resource_limit_is_typed() {
-    let mut encoded = vec![
-        0xd2, 0x84,
-        0x41, 0xa0, // protected = {}
-        0xa1, 0x19, 0x01, 0x8a, // receipts key
+    // Protected = { alg: -7, vds: 1 }, with a structurally valid inclusion VDP.
+    let protected = [0xa2, 0x01, 0x26, 0x19, 0x01, 0x8b, 0x01];
+    let proof = [
+        0x83, 0x02, 0x00, 0x81, // tree_size=2, leaf_index=0, one hash
+        0x58, 0x20,
     ];
-    // Make the value structurally parsable enough to reach the signature field:
-    // one tiny receipt bstr, whose nested parse fails structurally before the
-    // signature. Therefore use an empty receipts map instead to isolate the
-    // outer receipt decoder's signature bound.
-    encoded = vec![
-        0xd2, 0x84,
-        0x41, 0xa0,
-        0xa0,
-        0xf6,
-        0x5a, 0x00, 0x01, 0x00, 0x00,
-    ];
+    let mut vdp = vec![0xa1, 0x20, 0x81, 0x58, proof.len() as u8];
+    vdp.extend_from_slice(&proof);
+    let mut encoded = vec![0xd2, 0x84, 0x47];
+    encoded.extend_from_slice(&protected);
+    encoded.push(0xa1);
+    encoded.extend_from_slice(&[0x19, 0x01, 0x8c]);
+    encoded.extend_from_slice(&vdp);
+    encoded.extend_from_slice(&[0xf6, 0x5a, 0x00, 0x01, 0x00, 0x01]);
     encoded.extend(std::iter::repeat_n(0x00, 65537));
 
+    // The parser now reaches the signature field with all preceding structure
+    // valid, so this result specifically proves the defensive signature limit.
     assert_eq!(
         Rfc9942ReceiptEnvelope::from_cbor(&encoded),
         Err(Rfc9942VdpError::ResourceLimitExceeded)
