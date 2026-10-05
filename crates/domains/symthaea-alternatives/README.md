@@ -81,3 +81,10 @@ The heuristic next-measurement target is intentionally weaker than an experiment
 When an actual measurement campaign is proposed, ExperimentalDesignProvenance can be attached to the assessment. It requires an exact hypothesis, targeted uncertainty identities, candidate identities, explicit discrimination targets, an exact documented protocol identity/digest and comparison basis, and explicit stopping criteria. The assessment receipt commits to that design.
 
 An observation may then carry the resulting experimental_design_id, closing the lineage from proposal to observed result. This is provenance, not scientific authorization: Symthaea does not certify protocol adequacy, sample size, statistical power, causal validity, metrological traceability, or experimental safety.
+
+
+### Typed experimental discrimination
+
+ExperimentalDesignProvenance uses typed discrimination targets rather than free-text pair descriptions. Each target identifies both candidate endpoints, the exact surface being discriminated (burden, performance metric, or operating condition), and a versioned decision-rule identity/digest. The target's surface must resolve to a declared requirement context and its comparison basis must exactly match the design and protocol basis.
+
+Observations linked to an experimental design must also carry that exact design identity. Observations carrying a design identity without a supplied design are rejected, as are observations carrying a different design identity. This makes proposal-to-observation lineage bidirectional at the Symthaea boundary rather than merely advisory.
