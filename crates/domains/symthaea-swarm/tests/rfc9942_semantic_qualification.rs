@@ -1395,3 +1395,15 @@ fn rfc9942_outer_signature_resource_limit_is_typed() {
         Err(Rfc9942VdpError::ResourceLimitExceeded)
     );
 }
+
+
+#[test]
+fn rfc9942_es256_key_key_ops_resource_limit_is_typed() {
+    let mut encoded = vec![0xa1, 0x04, 0x98, 0x11];
+    encoded.extend(std::iter::repeat_n(0x02, 17));
+
+    assert_eq!(
+        Rfc9942Es256CoseKey::from_cbor(&encoded),
+        Err(Rfc9942VdpError::ResourceLimitExceeded)
+    );
+}
