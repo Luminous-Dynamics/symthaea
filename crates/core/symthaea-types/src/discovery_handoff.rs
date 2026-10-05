@@ -152,6 +152,28 @@ pub fn scientific_hypothesis_set_digest(handoffs: &[ScientificHypothesisHandoff]
     blake3::hash(canonical.as_bytes()).to_hex().to_string()
 }
 
+/// Validate a hypothesis set before it is supplied to an independent
+/// inquiry selector. Every handoff must be structurally valid and no exact
+/// hypothesis identity may appear more than once.
+pub fn validate_scientific_hypothesis_set(
+    handoffs: &[ScientificHypothesisHandoff],
+) -> Result<(), String> {
+    if handoffs.len() < 2 {
+        return Err("scientific hypothesis set requires at least two hypotheses".into());
+    }
+
+    let mut identities = std::collections::BTreeSet::new();
+    for handoff in handoffs {
+        handoff.validate()?;
+        let identity = handoff.digest_hex();
+        if !identities.insert(identity) {
+            return Err("scientific hypothesis set contains a duplicate hypothesis identity".into());
+        }
+    }
+
+    Ok(())
+}
+
 /// Evidence-neutral lineage record for revising a scientific hypothesis into
 /// a new discovery campaign. The prior handoff remains immutable by identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -677,6 +699,30 @@ mod tests {
         .unwrap();
         assert!(receipt.validate_against(&prior, &new).is_ok());
         assert!(receipt.validate_against(&new, &prior).is_err());
+    }
+
+    #[test]
+    fn hypothesis_set_validator_rejects_duplicates() {
+        let h = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["none".into()],
+        );
+
+        assert!(validate_scientific_hypothesis_set(&[h.clone(), h]).is_err());
+    }
+
+    #[test]
+    fn hypothesis_set_validator_requires_two_valid_hypotheses() {
+        let result = validate_scientific_hypothesis_set(&[]);
+        assert!(result.is_err());
     }
 
     #[test]
