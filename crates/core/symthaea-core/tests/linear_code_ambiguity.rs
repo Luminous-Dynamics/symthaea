@@ -646,13 +646,20 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                         ^ factor_count as u64
                         ^ ((repeat as u64) << 32);
 
+                    // Faithful paper fixture: generate one parent code and
+                    // partition its independent basis across the factor subcodes.
+                    // This realizes the direct-sum construction C = K × V and its
+                    // natural F-factor extension, rather than testing unrelated
+                    // independently sampled factor codes.
+                    let total_rank = rank * factor_count;
+                    assert!(total_rank <= dimension);
+                    let parent = RandomLinearCode::generate(dimension, total_rank, seed_base);
                     let codes: Vec<_> = (0..factor_count)
                         .map(|factor_index| {
-                            RandomLinearCode::generate(
-                                dimension,
-                                rank,
-                                seed_base + factor_index as u64,
-                            )
+                            let start = factor_index * rank;
+                            let end = start + rank;
+                            RandomLinearCode::from_basis(parent.basis()[start..end].to_vec())
+                                .expect("parent basis partition must remain independent")
                         })
                         .collect();
                     let factors: Vec<&RandomLinearCode> = codes.iter().collect();
@@ -679,6 +686,8 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                     result_digest.update(&(factor_count as u64).to_le_bytes());
                     result_digest.update(&(repeat as u64).to_le_bytes());
                     result_digest.update(&seed_base.to_le_bytes());
+                    result_digest.update(b"paper-direct-sum-v1\0");
+                    result_digest.update(&parent.fingerprint());
                     result_digest.update(&(target.words().len() as u64).to_le_bytes());
                     for word in target.words() {
                         result_digest.update(&word.to_le_bytes());
@@ -696,7 +705,10 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
                     }
 
                     let algebra = factorization_algebra(&factors).expect("valid paper fixture");
-                    assert_eq!(algebra.factor_dimension_sum, rank * factor_count);
+                    assert_eq!(algebra.factor_dimension_sum, total_rank);
+                    assert_eq!(algebra.union_generator_rank, total_rank);
+                    assert_eq!(algebra.kernel_dimension, 0);
+                    assert!(algebra.unique_factorization);
                     assert_eq!(
                         algebra.union_generator_rank,
                         basis_rank(&combined_basis, dimension)
@@ -877,6 +889,10 @@ fn paper_scale_binding_recovery_smoke_matrix_is_valid() {
     assert_eq!(cases, 270);
     assert_eq!(failures, 0);
     assert_eq!(valid_representative, cases);
+    assert_eq!(jointly_dependent, 0);
+    assert_eq!(max_kernel_dimension, 0);
+    assert_eq!(max_dependency_order, 0);
+    assert_eq!(witnessed_dependency_cases, 0);
     assert_eq!(unique_cases + non_unique_valid, cases);
     assert_eq!(nonexistent_targets, 0);
     assert_eq!(witnessed_dependency_cases, jointly_dependent);
