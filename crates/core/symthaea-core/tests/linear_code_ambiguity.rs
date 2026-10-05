@@ -1431,6 +1431,17 @@ fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
         let error_weight = error.weight();
         let observation = clean.bound(&error);
 
+        let distances: Vec<_> = codewords
+            .iter()
+            .map(|candidate| hamming_distance(&observation, candidate))
+            .collect();
+        let nearest_distance = *distances.iter().min().expect("codebook is non-empty");
+        assert_eq!(nearest_distance, error_weight);
+        let nearest_count = distances
+            .iter()
+            .filter(|&&distance| distance == nearest_distance)
+            .count();
+
         let candidates: Vec<_> = codewords
             .iter()
             .filter(|candidate| hamming_distance(&observation, candidate) <= 2)
@@ -1438,6 +1449,7 @@ fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
             .collect();
 
         assert!(candidates.contains(&clean));
+        assert_eq!(candidates.len(), nearest_count);
 
         let mut factor_tuple_candidates = 0usize;
         for candidate in &candidates {
@@ -1458,6 +1470,8 @@ fn exhaustive_noisy_candidate_ledger_separates_codeword_and_factor_ambiguity() {
         } else if error_weight == min_distance / 2 {
             boundary_observations += 1;
             if candidates.len() > 1 {
+                assert_eq!(nearest_count, candidates.len());
+                assert_eq!(nearest_distance, min_distance / 2);
                 boundary_ambiguous_observations += 1;
             }
         }
