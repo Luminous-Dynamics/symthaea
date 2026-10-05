@@ -666,9 +666,13 @@ fn validate_digest(value: &str) -> Result<(), String> {
 }
 
 fn render_number(value: f64) -> String {
-    if value == 0.0 { "0.0".into() }
-    else if value.fract() == 0.0 && value.abs() < 1e12 { format!("{value:.1}") }
-    else { format!("{value:.17e}") }
+    if value == 0.0 {
+        if value.is_sign_negative() { "-0.0".into() } else { "0.0".into() }
+    } else if value.fract() == 0.0 && value.abs() < 1e12 {
+        format!("{value:.1}")
+    } else {
+        format!("{value:.17e}")
+    }
 }
 
 fn racket_string(value: &str) -> String {
@@ -749,6 +753,12 @@ mod tests {
             )),
         );
         assert_eq!(expr_to_lanyon_form(&expr).unwrap().render(), "(* 0.5 (^ v 2.0))");
+    }
+
+    #[test]
+    fn negative_zero_is_preserved_in_numeric_export() {
+        let number = LanyonForm::number(-0.0).unwrap();
+        assert_eq!(number.render(), "-0.0");
     }
 
     #[test]
