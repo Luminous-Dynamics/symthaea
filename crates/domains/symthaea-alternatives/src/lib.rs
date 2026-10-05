@@ -269,6 +269,28 @@ impl ComparisonScale {
     }
 }
 
+/// Required operating range for one physical/environmental condition.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OperatingRequirement {
+    /// Required interval that the candidate must cover.
+    pub interval: Interval,
+    /// Unit for the operating condition.
+    pub unit: String,
+    /// Functional/geographic/system scope for the condition.
+    pub scope: String,
+}
+
+impl OperatingRequirement {
+    /// Validate the required range and comparison metadata.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        Interval::new(self.interval.lower, self.interval.upper)?;
+        if self.unit.is_empty() || self.scope.is_empty() {
+            return Err(AssessmentError::EmptyOperatingScale);
+        }
+        Ok(())
+    }
+}
+
 /// The function that must be satisfied independently of the incumbent.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FunctionalRequirement {
@@ -282,7 +304,9 @@ pub struct FunctionalRequirement {
     pub comparison_scales: BTreeMap<Dimension, ComparisonScale>,
     /// Explicit comparison scales for every constrained performance metric.
     pub performance_scales: BTreeMap<String, ComparisonScale>,
-}
+    /// Required operating envelope keyed by condition (for example temperature or pressure).
+    pub operating_envelope: BTreeMap<String, OperatingRequirement>,
+
 
 impl FunctionalRequirement {
     /// Validate identity, numeric bounds, and explicit comparison scales.
@@ -321,6 +345,12 @@ impl FunctionalRequirement {
                 return Err(AssessmentError::MissingPerformanceScale(metric.clone()));
             };
             scale.validate()?;
+        }
+        for (condition, requirement) in &self.operating_envelope {
+            if condition.is_empty() {
+                return Err(AssessmentError::EmptyOperatingCondition);
+            }
+            requirement.validate()?;
         }
         Ok(())
     }
@@ -380,6 +410,8 @@ pub struct CandidatePathway {
     pub performance: BTreeMap<String, PerformanceEstimate>,
     /// Burden estimates by dimension.
     pub burdens: BTreeMap<Dimension, BurdenEstimate>,
+    /// Evidence-linked operating capabilities keyed by condition.
+    pub operating_capabilities: BTreeMap<String, PerformanceEstimate>,
     /// Candidate-level evidence bundle.
     pub evidence: Vec<EvidenceRecord>,
 }
@@ -396,6 +428,9 @@ impl CandidatePathway {
         }
         for performance in self.performance.values() {
             performance.validate()?;
+        }
+        for capability in self.operating_capabilities.values() {
+            capability.validate()?;
         }
         let evidence_ids = self
             .evidence
@@ -422,6 +457,31 @@ impl CandidatePathway {
                     return Err(AssessmentError::PerformanceEvidenceUnitMismatch {
                         evidence_id: evidence.id.clone(),
                         performance_unit: performance.unit.clone(),
+                        evidence_unit: evidence_unit.clone(),
+                    });
+                }
+            }
+        }
+        for capability in self.operating_capabilities.values() {
+            for evidence_id in &capability.evidence_ids {
+                let Some(evidence) = self.evidence.iter().find(|e| e.id == *evidence_id) else {
+                    return Err(AssessmentError::MissingEvidenceReference(
+                        evidence_id.clone(),
+                    ));
+                };
+                if evidence.scope != capability.scope {
+                    return Err(AssessmentError::PerformanceEvidenceScopeMismatch {
+                        evidence_id: evidence.id.clone(),
+                        performance_scope: capability.scope.clone(),
+                        evidence_scope: evidence.scope.clone(),
+                    });
+                }
+                if let Some(evidence_unit) = &evidence.unit
+                    && evidence_unit != &capability.unit
+                {
+                    return Err(AssessmentError::PerformanceEvidenceUnitMismatch {
+                        evidence_id: evidence.id.clone(),
+                        performance_unit: capability.unit.clone(),
                         evidence_unit: evidence_unit.clone(),
                     });
                 }
@@ -896,6 +956,10 @@ pub enum AssessmentError {
     EmptyBurdenScale,
     /// Evidence validity bounds are inverted.
     InvalidEvidenceValidity { from: i64, until: i64 },
+    /// An operating condition lacks a unit or scope.
+    EmptyOperatingScale,
+    /// An operating condition has an empty identity.
+    EmptyOperatingCondition,
     /// A functional requirement contains no performance constraints.
     EmptyFunctionalConstraints,
     /// A performance estimate lacks a comparable unit or scope.
@@ -975,6 +1039,12 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::MissingPerformanceScale(metric) => {
                 write!(f, "missing performance scale for {metric}")
+            }
+            Self::EmptyOperatingScale => {
+                write!(f, "operating condition unit/scope is empty")
+            }
+            Self::EmptyOperatingCondition => {
+                write!(f, "operating condition identity is empty")
             }
             Self::PerformanceEvidenceScopeMismatch {
                 evidence_id,
@@ -1074,6 +1144,9 @@ impl AlternativesEngine {
                 .evidence
                 .sort_by(|a, b| a.id.cmp(&b.id));
             for estimate in candidate.performance.values_mut() {
+                estimate.evidence_ids.sort();
+            }
+            for estimate in candidate.operating_capabilities.values_mut() {
                 estimate.evidence_ids.sort();
             }
             for estimate in candidate.burdens.values_mut() {
