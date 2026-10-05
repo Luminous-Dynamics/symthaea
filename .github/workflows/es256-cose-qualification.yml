@@ -237,6 +237,17 @@ jobs:
               + b"\x40"
           )
 
+          # Exercise the equivalent bounded indefinite-tstr chunk ceiling.
+          indefinite_tstr_4097_chunks = (
+              b"\xd2\x84"
+              + b"\x41\xa0"
+              + b"\xa1\x18\x1e\x5f"
+              + (b"\x60" * 4097)
+              + b"\xff"
+              + b"\xf6"
+              + b"\x40"
+          )
+
           generated = {
               "fuzz_rfc9942_proofs/seed-65-proof-vdp.cbor": vdp_65,
               "fuzz_rfc9942_proofs/seed-257-proof-vdp.cbor": vdp_257,
@@ -246,6 +257,8 @@ jobs:
                   receipt_count_17,
               "fuzz_rfc9942_signature_with_receipts/seed-indefinite-bstr-4097-chunks.cbor":
                   indefinite_bstr_4097_chunks,
+              "fuzz_rfc9942_signature_with_receipts/seed-indefinite-tstr-4097-chunks.cbor":
+                  indefinite_tstr_4097_chunks,
           }
           for relative, data in generated.items():
               path = Path("corpus") / relative
