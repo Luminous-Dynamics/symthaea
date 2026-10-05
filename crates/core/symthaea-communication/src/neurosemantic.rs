@@ -169,6 +169,15 @@ impl NeurosemanticHandlingPolicy {
             )
     }
 
+    /// Verify the stored provenance digest against the exact externally supplied
+    /// policy/consent record bytes. This authenticates the bytes against the binding,
+    /// but does not authenticate the issuing authority or its signature.
+    pub fn verify_policy_provenance_bytes(&self, record_bytes: &[u8]) -> bool {
+        self.validates()
+            && record_bytes.len() <= MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES
+            && content_hash(record_bytes) == self.policy_provenance_hash
+    }
+
     pub fn allows_destination(&self, destination_jurisdiction: &str) -> bool {
         self.validates()
             && valid_jurisdiction_id(destination_jurisdiction)
@@ -1041,6 +1050,16 @@ mod tests {
         assert!(!policy.validates());
         policy.policy_provenance_hash = "A".repeat(64);
         assert!(!policy.validates());
+    }
+
+    #[test]
+    fn handling_policy_provenance_digest_verifies_exact_record() {
+        let policy = semantic_policy().handling;
+        assert!(policy.verify_policy_provenance_bytes(b"synthetic-policy-record-1"));
+        assert!(!policy.verify_policy_provenance_bytes(b"synthetic-policy-record-2"));
+        assert!(!policy.verify_policy_provenance_bytes(
+            &vec![b'x'; MAX_NEUROSEMANTIC_SERIALIZED_ARTIFACT_BYTES + 1]
+        ));
     }
 
     #[test]

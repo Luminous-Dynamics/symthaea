@@ -117,9 +117,11 @@ fn main() -> Result<(), String> {
         .handling
         .policy_provenance_ref
         .is_empty();
-    let handling_policy_provenance_hash_valid =
-        message.packet.data_policy.handling.policy_provenance_hash
-            == symthaea_communication::content_hash(b"synthetic-policy-record-1");
+    let handling_policy_provenance_hash_valid = message
+        .packet
+        .data_policy
+        .handling
+        .verify_policy_provenance_bytes(b"synthetic-policy-record-1");
     message.validate_for_handling(
         &lease,
         "ZA",
