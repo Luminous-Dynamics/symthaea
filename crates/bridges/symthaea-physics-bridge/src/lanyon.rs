@@ -92,13 +92,29 @@ impl LanyonSystemSpec {
         reject_duplicates("coordinate", &self.coordinates)?;
         reject_duplicates("state", &self.state)?;
         reject_duplicates("parameter", &self.parameters)?;
+
+        let declared: std::collections::HashSet<&str> = self
+            .coordinates
+            .iter()
+            .chain(self.state.iter())
+            .chain(self.parameters.iter())
+            .map(String::as_str)
+            .collect();
+
         for form in self.state_assumptions.iter().chain(self.parameter_assumptions.iter()) {
             form.validate()?;
+            validate_form_references(form, &declared)?;
         }
         let dimensions = self.coordinates.len();
-        validate_matrix("fluxes", &self.fluxes, dimensions, self.state.len())?;
-        validate_matrix("wavespeeds", &self.wavespeeds, dimensions, self.state.len())?;
-        validate_matrix("diffusive-fluxes", &self.diffusive_fluxes, dimensions, self.state.len())?;
+        validate_matrix("fluxes", &self.fluxes, dimensions, self.state.len(), &declared)?;
+        validate_matrix("wavespeeds", &self.wavespeeds, dimensions, self.state.len(), &declared)?;
+        validate_matrix(
+            "diffusive-fluxes",
+            &self.diffusive_fluxes,
+            dimensions,
+            self.state.len(),
+            &declared,
+        )?;
         Ok(())
     }
 
@@ -357,11 +373,63 @@ impl LanyonSpecificationBundle {
     }
 }
 
-fn validate_names(kind: &str, names: &[String]) -> Result<(), String> {
-    if names.is_empty() {
+fn validate_names(kind: &str, names: &[String], allow_empty: bool) -> Result<(), String> {
+    if names.is_empty() && !allow_empty {
         return Err(format!("Lanyon {kind} list cannot be empty"));
     }
-    for name in names { validate_symbol(name)?; }
+    for name in names {
+        validate_identifier(name).map_err(|error| format!("{kind} {error}"))?;
+    }
+    Ok(())
+}
+
+fn validate_form_references(
+    form: &LanyonForm,
+    declared: &std::collections::HashSet<&str>,
+) -> Result<(), String> {
+    match form {
+        LanyonForm::Symbol(name) if is_allowed_operator(name) => Ok(()),
+        LanyonForm::Symbol(name) if declared.contains(name.as_str()) => Ok(()),
+        LanyonForm::Symbol(name) => Err(format!(
+            "Lanyon expression references undeclared symbol {name:?}"
+        )),
+        LanyonForm::Number(value) if value.is_finite() => Ok(()),
+        LanyonForm::Number(_) => Err("Lanyon expression contains a non-finite number".into()),
+        LanyonForm::List(items) => {
+            let Some(LanyonForm::Symbol(operator)) = items.first() else {
+                return Err("Lanyon expression list must begin with an operator symbol".into());
+            };
+            if !is_allowed_operator(operator) {
+                return Err(format!("unsupported Lanyon expression operator {operator:?}"));
+            }
+            for item in items.iter().skip(1) {
+                validate_form_references(item, declared)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn is_allowed_operator(name: &str) -> bool {
+    matches!(
+        name,
+        "+" | "-" | "*" | "/" | ">" | "<" | ">=" | "<=" | "="
+            | "abs" | "max" | "min" | "sqrt" | "log" | "exp" | "sin" | "cos" | "floor"
+    )
+}
+
+fn validate_identifier(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("identifier cannot be empty".into());
+    }
+    let mut chars = name.chars();
+    let first = chars.next().expect("non-empty");
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        return Err(format!("identifier {name:?} must start with a letter or underscore"));
+    }
+    if !chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '?' | '!')) {
+        return Err(format!("identifier {name:?} contains unsupported characters"));
+    }
     Ok(())
 }
 
@@ -383,7 +451,13 @@ fn reject_binding_duplicates(bindings: &[LanyonPhysicalBinding]) -> Result<(), S
     Ok(())
 }
 
-fn validate_matrix(label: &str, matrix: &[Vec<LanyonForm>], dimensions: usize, state_len: usize) -> Result<(), String> {
+fn validate_matrix(
+    label: &str,
+    matrix: &[Vec<LanyonForm>],
+    dimensions: usize,
+    state_len: usize,
+    declared: &std::collections::HashSet<&str>,
+) -> Result<(), String> {
     if matrix.len() != dimensions {
         return Err(format!("{label} must contain one row per coordinate direction"));
     }
@@ -391,7 +465,10 @@ fn validate_matrix(label: &str, matrix: &[Vec<LanyonForm>], dimensions: usize, s
         if row.len() != state_len {
             return Err(format!("{label} rows must contain one entry per state field"));
         }
-        for form in row { form.validate()?; }
+        for form in row {
+            form.validate()?;
+            validate_form_references(form, declared)?;
+        }
     }
     Ok(())
 }
@@ -486,6 +563,22 @@ mod tests {
         spec.parameter_assumptions.clear();
         assert!(spec.validate().is_ok());
         assert!(spec.render_racket().unwrap().contains("'parameters (list)"));
+    }
+
+    #[test]
+    fn undeclared_expression_symbol_is_rejected() {
+        let mut spec = fixture();
+        spec.fluxes[0][0] = LanyonForm::symbol("ghost").unwrap();
+        assert!(spec.validate().is_err());
+    }
+
+    #[test]
+    fn parameter_free_shape_renders_exact_empty_list() {
+        let mut spec = fixture();
+        spec.parameters.clear();
+        spec.parameter_assumptions.clear();
+        let source = spec.render_racket().unwrap();
+        assert!(source.contains("'parameters (list)"));
     }
 
     #[test]
