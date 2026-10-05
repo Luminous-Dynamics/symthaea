@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 15;
+pub const SCHEMA_VERSION: u16 = 16;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-v24";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-observation-provenance-measurement-uncertainty-v25";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -404,6 +404,34 @@ impl ObservationProvenanceRef {
     }
 }
 
+/// Machine-readable reference to the uncertainty analysis accompanying an observation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasurementUncertaintyRef {
+    /// Stable identity of the uncertainty statement.
+    pub uncertainty_id: String,
+    /// Method used to evaluate the stated uncertainty.
+    pub method_id: String,
+    /// References to the uncertainty components or source records considered.
+    pub component_refs: Vec<String>,
+    /// Digest of the canonical uncertainty statement/record.
+    pub record_digest: String,
+}
+
+impl MeasurementUncertaintyRef {
+    /// Validate the structural uncertainty-analysis reference.
+    pub fn validate(&self) -> Result<(), AssessmentError> {
+        if self.uncertainty_id.is_empty()
+            || self.method_id.is_empty()
+            || self.record_digest.is_empty()
+            || self.component_refs.is_empty()
+            || self.component_refs.iter().any(String::is_empty)
+        {
+            return Err(AssessmentError::InvalidMeasurementUncertainty);
+        }
+        Ok(())
+    }
+}
+
 /// Provenance-aware evidence metadata.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EvidenceRecord {
@@ -421,6 +449,8 @@ pub struct EvidenceRecord {
     pub basis: ComparisonBasisRef,
     /// Exact observation/test provenance when the evidence represents a physical observation.
     pub observation: Option<ObservationProvenanceRef>,
+    /// Exact uncertainty-analysis reference accompanying a physical observation.
+    pub uncertainty: Option<MeasurementUncertaintyRef>,
     /// Human-readable scope: functional unit, geography, process, etc.
     pub scope: String,
     /// Optional unit for the associated quantity.
@@ -460,6 +490,11 @@ impl EvidenceRecord {
         match (&self.observation, observation_required) {
             (Some(observation), _) => observation.validate()?,
             (None, true) => return Err(AssessmentError::MissingObservationProvenance(self.kind)),
+            (None, false) => {}
+        }
+        match (&self.uncertainty, observation_required) {
+            (Some(uncertainty), _) => uncertainty.validate()?,
+            (None, true) => return Err(AssessmentError::MissingMeasurementUncertainty(self.kind)),
             (None, false) => {}
         }
         if let (Some(from), Some(until)) = (
@@ -1838,6 +1873,10 @@ pub enum AssessmentError {
     MissingObservationProvenance(EvidenceKind),
     /// Observation provenance identity is structurally incomplete.
     InvalidObservationProvenance,
+    /// A physical/operational observation lacks a measurement-uncertainty statement.
+    MissingMeasurementUncertainty(EvidenceKind),
+    /// Measurement-uncertainty reference is structurally incomplete.
+    InvalidMeasurementUncertainty,
     /// A burden references unknown evidence.
     MissingEvidenceReference(String),
     /// Requested incumbent does not exist.
@@ -1958,6 +1997,12 @@ impl std::fmt::Display for AssessmentError {
             }
             Self::InvalidObservationProvenance => {
                 write!(f, "observation provenance reference is incomplete")
+            }
+            Self::MissingMeasurementUncertainty(kind) => {
+                write!(f, "{kind:?} evidence is missing measurement uncertainty")
+            }
+            Self::InvalidMeasurementUncertainty => {
+                write!(f, "measurement uncertainty reference is incomplete")
             }
             Self::MissingEvidenceReference(id) => {
                 write!(f, "missing evidence reference {id}")
@@ -2650,6 +2695,34 @@ mod tests {
                 admission: None,
             },
             basis: fixture_basis(),
+            observation: matches!(
+                kind,
+                EvidenceKind::Observed
+                    | EvidenceKind::ManufacturingObserved
+                    | EvidenceKind::FieldObserved
+                    | EvidenceKind::ContinuouslyMonitored
+            )
+            .then(|| ObservationProvenanceRef {
+                observation_id: format!("observation:{id}"),
+                subject_id: format!("fixture-subject:{id}"),
+                activity_id: format!("fixture-activity:{id}"),
+                record_digest: format!("fixture-record-digest:{id}"),
+                measurement_system_id: Some("fixture-measurement-system-v1".into()),
+                calibration_chain_refs: vec!["fixture-calibration-chain-v1".into()],
+            }),
+            uncertainty: matches!(
+                kind,
+                EvidenceKind::Observed
+                    | EvidenceKind::ManufacturingObserved
+                    | EvidenceKind::FieldObserved
+                    | EvidenceKind::ContinuouslyMonitored
+            )
+            .then(|| MeasurementUncertaintyRef {
+                uncertainty_id: format!("uncertainty:{id}"),
+                method_id: "fixture-uncertainty-method-v1".into(),
+                component_refs: vec!["fixture-uncertainty-component-v1".into()],
+                record_digest: format!("fixture-uncertainty-digest:{id}"),
+            }),
             scope: "synthetic functional unit".into(),
             unit: Some("unit".into()),
             as_of: Some("fixture-v1".into()),
@@ -2667,7 +2740,18 @@ mod tests {
         }
     }
 
-ars".into(), RequirementBound::AtLeast(10.0)),
+    fn fixture_requirement() -> FunctionalRequirement {
+        FunctionalRequirement {
+            id: "seal-v1".into(),
+            subject: AssessmentSubjectRef {
+                subject_id: "fixture-product".into(),
+                profile_id: "fixture-product-profile".into(),
+                profile_revision: "v1".into(),
+                subject_digest: "fixture-product-digest".into(),
+            },
+            description: "Provide a durable chemical-resistant seal.".into(),
+            constraints: BTreeMap::from([
+                ("service_life_years".into(), RequirementBound::AtLeast(10.0)),
                 ("throughput_per_hour".into(), RequirementBound::AtLeast(100.0)),
             ]),
             comparison_scales: Dimension::ALL
@@ -2862,6 +2946,57 @@ ars".into(), RequirementBound::AtLeast(10.0)),
         let mut changed = c;
         changed.evidence[0].observation.as_mut().unwrap().record_digest = "different-record".into();
         let updated = AlternativesEngine.assess(&fixture_requirement(), &[changed], None).unwrap();
+        assert_ne!(
+            baseline.candidates[0].evidence_digest,
+            updated.candidates[0].evidence_digest
+        );
+        assert_ne!(baseline.receipt.payload_hash, updated.receipt.payload_hash);
+    }
+
+    #[test]
+    fn observed_evidence_requires_measurement_uncertainty() {
+        let mut e = evidence(
+            "observed-missing-uncertainty",
+            "source",
+            EvidenceKind::Observed,
+            EvidenceStance::Supports,
+            0.9,
+        );
+        e.uncertainty = None;
+        assert_eq!(
+            e.validate().unwrap_err(),
+            AssessmentError::MissingMeasurementUncertainty(EvidenceKind::Observed)
+        );
+    }
+
+    #[test]
+    fn measurement_uncertainty_mutation_changes_receipt_identity() {
+        let c = candidate(
+            "uncertainty-bound",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "uncertainty",
+                "source",
+                EvidenceKind::Observed,
+                EvidenceStance::Supports,
+                0.9,
+            )],
+        );
+        let baseline = AlternativesEngine
+            .assess(&fixture_requirement(), &[c.clone()], None)
+            .unwrap();
+        let mut changed = c;
+        changed
+            .evidence[0]
+            .uncertainty
+            .as_mut()
+            .unwrap()
+            .record_digest = "different-uncertainty-record".into();
+        let updated = AlternativesEngine
+            .assess(&fixture_requirement(), &[changed], None)
+            .unwrap();
         assert_ne!(
             baseline.candidates[0].evidence_digest,
             updated.candidates[0].evidence_digest
