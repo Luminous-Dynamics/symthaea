@@ -132,6 +132,8 @@ pub enum EvidenceKind {
     Simulated,
     /// Deterministically derived value.
     Derived,
+    /// Explicit lifecycle-assessment evidence covering the declared scope.
+    LifecycleAssessed,
     /// Unverified conjecture.
     Hypothesis,
     /// Observation from manufacturing-scale operation.
@@ -329,10 +331,29 @@ impl CandidatePathway {
                 return Err(AssessmentError::EmptyBurdenScale);
             }
             for evidence_id in &estimate.evidence_ids {
-                if !evidence_ids.contains(evidence_id.as_str()) {
-                    return Err(AssessmentError::MissingEvidenceReference(
-                        evidence_id.clone(),
-                    ));
+                let Some(evidence) = self.evidence.iter().find(|e| e.id == *evidence_id) else {
+                    if !evidence_ids.contains(evidence_id.as_str()) {
+                        return Err(AssessmentError::MissingEvidenceReference(
+                            evidence_id.clone(),
+                        ));
+                    }
+                    continue;
+                };
+                if evidence.scope != estimate.scope {
+                    return Err(AssessmentError::EvidenceScopeMismatch {
+                        evidence_id: evidence.id.clone(),
+                        burden_scope: estimate.scope.clone(),
+                        evidence_scope: evidence.scope.clone(),
+                    });
+                }
+                if let Some(evidence_unit) = &evidence.unit
+                    && evidence_unit != &estimate.unit
+                {
+                    return Err(AssessmentError::EvidenceUnitMismatch {
+                        evidence_id: evidence.id.clone(),
+                        burden_unit: estimate.unit.clone(),
+                        evidence_unit: evidence_unit.clone(),
+                    });
                 }
             }
         }
@@ -414,6 +435,13 @@ impl CandidatePathway {
                 .map(|estimate| !estimate.evidence_ids.is_empty())
                 .unwrap_or(false)
         });
+        let has_lifecycle_assessment = self.burdens.values().any(|estimate| {
+            self.linked_evidence(estimate).any(|e| {
+                e.kind == EvidenceKind::LifecycleAssessed
+                    && e.stance == EvidenceStance::Supports
+                    && e.confidence >= 0.7
+            })
+        });
         let all_dimensions_field_observed = Dimension::ALL.iter().all(|dimension| {
             self.burdens
                 .get(dimension)
@@ -450,6 +478,7 @@ impl CandidatePathway {
         } else if any_supported_measurement
             && independent_sources >= 2
             && has_all_dimension_evidence
+            && has_lifecycle_assessment
         {
             QualificationState::LifecycleQualified
         } else if any_supported_measurement {
@@ -633,12 +662,32 @@ pub enum AssessmentError {
     NoBurdenData,
     /// A burden estimate lacks a comparable unit or scope.
     EmptyBurdenScale,
+    /// Linked evidence uses a different scope from the burden estimate.
+    EvidenceScopeMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Burden comparison scope.
+        burden_scope: String,
+        /// Evidence scope.
+        evidence_scope: String,
+    },
+    /// Linked evidence uses a different unit from the burden estimate.
+    EvidenceUnitMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Burden comparison unit.
+        burden_unit: String,
+        /// Evidence unit.
+        evidence_unit: String,
+    },
     /// Requirement range is invalid.
     InvalidRequirementRange { min: f64, max: f64 },
     /// A burden references unknown evidence.
     MissingEvidenceReference(String),
     /// Requested incumbent does not exist.
     MissingIncumbent(String),
+    /// Two candidates have the same stable identifier.
+    DuplicateCandidateId(String),
 }
 
 impl std::fmt::Display for AssessmentError {
@@ -654,6 +703,22 @@ impl std::fmt::Display for AssessmentError {
             Self::EmptyCandidateIdentity => write!(f, "candidate identity is incomplete"),
             Self::NoBurdenData => write!(f, "candidate has no burden data"),
             Self::EmptyBurdenScale => write!(f, "burden unit/scope is empty"),
+            Self::EvidenceScopeMismatch {
+                evidence_id,
+                burden_scope,
+                evidence_scope,
+            } => write!(
+                f,
+                "evidence {evidence_id} scope {evidence_scope} does not match burden scope {burden_scope}"
+            ),
+            Self::EvidenceUnitMismatch {
+                evidence_id,
+                burden_unit,
+                evidence_unit,
+            } => write!(
+                f,
+                "evidence {evidence_id} unit {evidence_unit} does not match burden unit {burden_unit}"
+            ),
             Self::InvalidRequirementRange { min, max } => {
                 write!(f, "invalid requirement range [{min}, {max}]")
             }
@@ -661,6 +726,7 @@ impl std::fmt::Display for AssessmentError {
                 write!(f, "missing evidence reference {id}")
             }
             Self::MissingIncumbent(id) => write!(f, "incumbent {id} not found"),
+            Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate id {id}"),
         }
     }
 }
@@ -685,11 +751,31 @@ impl AlternativesEngine {
                 return Err(AssessmentError::MissingIncumbent(id.to_string()));
             }
         }
-        for candidate in candidates {
+
+        let mut normalized_candidates = candidates.to_vec();
+        normalized_candidates.sort_by(|a, b| a.id.cmp(&b.id));
+        if normalized_candidates
+            .windows(2)
+            .any(|pair| pair[0].id == pair[1].id)
+        {
+            return Err(AssessmentError::DuplicateCandidateId(
+                normalized_candidates
+                    .first()
+                    .map(|candidate| candidate.id.clone())
+                    .unwrap_or_default(),
+            ));
+        }
+        for candidate in &mut normalized_candidates {
+            candidate
+                .evidence
+                .sort_by(|a, b| a.id.cmp(&b.id));
+            for estimate in candidate.burdens.values_mut() {
+                estimate.evidence_ids.sort();
+            }
             candidate.validate()?;
         }
 
-        let mut assessments = Vec::with_capacity(candidates.len());
+        let mut assessments = Vec::with_capacity(normalized_candidates.len());
         let mut blockers = BTreeMap::new();
         let expected_scales = Dimension::ALL
             .into_iter()
@@ -706,7 +792,7 @@ impl AlternativesEngine {
             })
             .collect::<BTreeMap<_, _>>();
 
-        for candidate in candidates {
+        for candidate in &normalized_candidates {
             let constraints = requirement
                 .constraints
                 .iter()
@@ -803,11 +889,11 @@ impl AlternativesEngine {
         frontier.sort();
 
         let burden_transfers = if let Some(incumbent_id) = incumbent_id {
-            let incumbent = candidates
+            let incumbent = normalized_candidates
                 .iter()
                 .find(|candidate| candidate.id == incumbent_id)
                 .expect("validated incumbent exists");
-            candidates
+            normalized_candidates
                 .iter()
                 .filter(|candidate| candidate.id != incumbent_id)
                 .map(|candidate| Self::burden_transfer(candidate, incumbent))
