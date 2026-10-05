@@ -207,7 +207,7 @@ jobs:
               path.write_bytes(b64decode(encoded, validate=True))
 
           proof = b"\x83\x02\x00\x81\x58\x20" + (b"\x00" * 32)
-          vdp_65 = b"\xa1\x20\x18\x41" + b"".join(
+          vdp_65 = b"\xa1\x20\x98\x41" + b"".join(
               b"\x58\x26" + proof for _ in range(65)
           )
           large_tagged_outer = (
@@ -223,7 +223,7 @@ jobs:
           # Exercise the VDP array admission ceiling itself. The outer VDP map
           # scanner is bounded at 256 array members, so 257 must fail closed
           # before attempting to allocate/parse individual proof payloads.
-          vdp_257 = b"\xa1\x20\x98\x01\x01" + b"".join(
+          vdp_257 = b"\xa1\x20\x99\x01\x01" + b"".join(
               b"\x40" for _ in range(257)
           )
 
