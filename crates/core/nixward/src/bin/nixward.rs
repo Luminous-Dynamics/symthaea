@@ -149,13 +149,34 @@ fn main() {
                     cmd_service_status(&name, cli.format);
                 }
                 ServiceCommand::Start { name } => {
-                    cmd_execute_service(ServiceManager::try_start(&name), cli.dry_run, cli.phi);
+                    cmd_execute_service(
+                        typed_service_command(
+                            &name,
+                            nixward::action::service_domain::NixServiceOperationKindV1::Start,
+                        ),
+                        cli.dry_run,
+                        cli.phi,
+                    );
                 }
                 ServiceCommand::Stop { name } => {
-                    cmd_execute_service(ServiceManager::try_stop(&name), cli.dry_run, cli.phi);
+                    cmd_execute_service(
+                        typed_service_command(
+                            &name,
+                            nixward::action::service_domain::NixServiceOperationKindV1::Stop,
+                        ),
+                        cli.dry_run,
+                        cli.phi,
+                    );
                 }
                 ServiceCommand::Restart { name } => {
-                    cmd_execute_service(ServiceManager::try_restart(&name), cli.dry_run, cli.phi);
+                    cmd_execute_service(
+                        typed_service_command(
+                            &name,
+                            nixward::action::service_domain::NixServiceOperationKindV1::Restart,
+                        ),
+                        cli.dry_run,
+                        cli.phi,
+                    );
                 }
                 ServiceCommand::Failed => {
                     cmd_service_failed(cli.format);
@@ -327,7 +348,43 @@ fn cmd_execute_service(
     }
 }
 
+fn typed_service_command(
+    service: &str,
+    operation: nixward::action::service_domain::NixServiceOperationKindV1,
+) -> Result<NixOSCommand, nixward::action::service_domain::NixServiceOperationErrorV1> {
+    let operation = nixward::action::service_domain::NixServiceOperationV1::new(service, operation)?;
+    ServiceManager::typed_command(&operation)
+}
+
+/// CLI service execution has a deliberate authority boundary:
+/// - dry-run remains a presentation/diagnostic path;
+/// - non-dry-run service effects must enter governed Nixward authority and
+///   therefore cannot be minted from Phi confirmation alone.
+fn cli_service_execution_admission(cmd: &NixOSCommand, dry_run: bool) -> Result<(), &'static str> {
+    if dry_run {
+        return Ok(());
+    }
+    if matches!(cmd, NixOSCommand::Service { .. }) {
+        return Err(
+            "service effects require governed Nixward approval; CLI Phi confirmation is not execution authority",
+        );
+    }
+    Ok(())
+}
+
 fn cmd_execute(cmd: NixOSCommand, dry_run: bool, phi_override: Option<f64>) {
+    if let NixOSCommand::Service { .. } = &cmd {
+        if let Err(reason) = cli_service_execution_admission(&cmd, dry_run) {
+            eprintln!("  Blocked: {reason}");
+            return;
+        }
+        if dry_run {
+            let (bin, args) = cmd.to_command();
+            println!("  [DRY-RUN] Would execute: {} {}", bin, args.join(" "));
+            return;
+        }
+    }
+
     let phi = phi_override
         .map(|p| p as f32)
         .unwrap_or(DEFAULT_CLI_CONFIRMATION_LEVEL);
@@ -1527,8 +1584,11 @@ fn cmd_knowledge(query: &str, limit: usize, format: OutputFormat) {
 
 #[cfg(test)]
 mod safety_default_tests {
-    use super::DEFAULT_CLI_CONFIRMATION_LEVEL;
-    use nixward::action::executor::SafetyLevel;
+    use super::{
+        cli_service_execution_admission, typed_service_command, DEFAULT_CLI_CONFIRMATION_LEVEL,
+    };
+    use nixward::action::executor::{NixOSCommand, SafetyLevel};
+    use nixward::action::service_domain::NixServiceOperationKindV1;
 
     /// The un-flagged CLI default must clear ReadOnly/UserModify (so ordinary
     /// commands stay ergonomic) but must NOT clear SystemModify/SystemCritical/
@@ -1558,5 +1618,32 @@ mod safety_default_tests {
             DEFAULT_CLI_CONFIRMATION_LEVEL < SafetyLevel::Destructive.required_phi(),
             "default must block Destructive (e.g. nix-collect-garbage) without an explicit --phi override"
         );
+    }
+
+    #[test]
+    fn service_cli_builds_typed_command_instead_of_legacy_custom() {
+        let command = typed_service_command("nginx.service", NixServiceOperationKindV1::Start)
+            .expect("valid typed service operation");
+        assert!(matches!(
+            command,
+            NixOSCommand::Service {
+                operation: NixServiceOperationKindV1::Start,
+                unit
+            } if unit == "nginx.service"
+        ));
+    }
+
+    #[test]
+    fn service_effect_is_not_authorized_by_high_phi() {
+        let command = typed_service_command("nginx.service", NixServiceOperationKindV1::Restart)
+            .expect("valid typed service operation");
+        assert!(cli_service_execution_admission(&command, false).is_err());
+    }
+
+    #[test]
+    fn service_dry_run_remains_a_non_authorizing_preview() {
+        let command = typed_service_command("nginx.service", NixServiceOperationKindV1::Stop)
+            .expect("valid typed service operation");
+        assert!(cli_service_execution_admission(&command, true).is_ok());
     }
 }
