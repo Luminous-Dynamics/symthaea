@@ -1075,7 +1075,13 @@ impl ServiceDashboard {
         });
     }
 
-    /// Control a service
+    /// Request a service control operation.
+    ///
+    /// Direct privileged GUI execution is intentionally disabled. Service effects
+    /// must cross the governed Nixward authority boundary, which binds the exact
+    /// typed operation to fresh pre-state and consumed local approval. Until a
+    /// GUI→Nixward gateway is available, fail closed instead of spawning sudo/systemctl
+    /// from the widget layer.
     pub fn control(&self, name: &str, action: ServiceAction) -> Result<(), String> {
         let action_str = match action {
             ServiceAction::Start => "start",
@@ -1085,18 +1091,19 @@ impl ServiceDashboard {
             ServiceAction::Enable => "enable",
             ServiceAction::Disable => "disable",
         };
+        Err(format!(
+            "GUI service control is unavailable for {name}: '{action_str}' requires governed Nixward execution authority"
+        ))
+    }
 
-        let output = Command::new("sudo")
-            .args(["systemctl", action_str, name])
-            .output()
-            .map_err(|e| format!("Failed to {action_str} service: {e}"))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Failed to {action_str} {name}: {stderr}"));
-        }
-
-        Ok(())
+    #[cfg(test)]
+    #[test]
+    fn service_control_fails_closed_without_governed_gateway() {
+        let dashboard = ServiceDashboard::new();
+        let error = dashboard
+            .control("nginx.service", ServiceAction::Restart)
+            .expect_err("GUI service control must not execute sudo/systemctl directly");
+        assert!(error.contains("governed Nixward execution authority"));
     }
 
     /// Get summary stats
