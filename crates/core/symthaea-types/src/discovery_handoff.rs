@@ -81,6 +81,20 @@ impl ScientificHypothesisHandoff {
         self
     }
 
+    /// Stable identity for the Ramanujan discovery campaign that produced
+    /// this handoff. Candidate identity is deliberately excluded so multiple
+    /// candidates from one campaign share one campaign lineage.
+    pub fn campaign_digest_hex(&self) -> String {
+        let canonical = format!(
+            "ramanujan-campaign-v1|observation={}|search={}|seed={}|manifest={}",
+            self.source_observation_digest,
+            self.search_configuration_digest,
+            self.search_seed,
+            self.discovery_manifest_digest,
+        );
+        blake3::hash(canonical.as_bytes()).to_hex().to_string()
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("hypothesis handoff serialization must be infallible")
     }
@@ -202,6 +216,12 @@ impl ScientificHypothesisRevisionReceipt {
         }
         if self.new_handoff_digest != new.digest_hex() {
             return Err("revision receipt references a different new handoff".into());
+        }
+        if self.new_campaign_digest != new.campaign_digest_hex() {
+            return Err("revision receipt references a different new campaign".into());
+        }
+        if self.new_campaign_digest == prior.campaign_digest_hex() {
+            return Err("hypothesis revision must create a new campaign identity".into());
         }
         Ok(())
     }
@@ -485,6 +505,61 @@ mod tests {
         assert!(receipt
             .validate_against(&h2, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
             .is_err());
+    }
+
+    #[test]
+    fn same_discovery_campaign_cannot_be_relabelled_as_a_revision() {
+        let energy = energy();
+        let prior = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy,
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["not confirmation".into()],
+        );
+        let mut new = prior.clone();
+        new.candidate_digest =
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into();
+
+        let revision = ScientificHypothesisRevisionReceipt::new(
+            prior.digest_hex(),
+            new.digest_hex(),
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            new.campaign_digest_hex(),
+            "candidate mutation within same campaign",
+        )
+        .unwrap();
+
+        assert!(revision.validate_against(&prior, &new).is_err());
+    }
+
+    #[test]
+    fn campaign_identity_binds_observation_search_seed_and_manifest() {
+        let base = ScientificHypothesisHandoff::new(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &energy(),
+            ModelMaturity::ResearchPrototype,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            1,
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            1,
+            "ramanujan",
+            vec!["not confirmation".into()],
+        );
+        let mut changed_seed = base.clone();
+        changed_seed.search_seed = 2;
+        let mut changed_manifest = base.clone();
+        changed_manifest.discovery_manifest_digest =
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into();
+
+        assert_ne!(base.campaign_digest_hex(), changed_seed.campaign_digest_hex());
+        assert_ne!(base.campaign_digest_hex(), changed_manifest.campaign_digest_hex());
     }
 
     #[test]
