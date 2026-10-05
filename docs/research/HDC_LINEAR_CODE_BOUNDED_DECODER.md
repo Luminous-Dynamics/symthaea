@@ -79,6 +79,15 @@ syndrome kernel is exactly the code. The exhaustive finite proof therefore close
 the representation-to-decoder boundary explicitly rather than inferring it from
 annihilation alone.
 
+The same fixture now carries a stronger exhaustive identity. All 256 ambient
+observations are decoded with bound 4 (the fixture's covering radius), and the
+number of minimum-weight error patterns sharing the observed syndrome is required
+to equal the number of nearest codewords from the independent distance oracle.
+The observed aggregate is 100 uniquely nearest observations, 156 ambiguous
+observations, and 484 nearest-codeword incidences. This checks the multiplicity
+correspondence across the entire ambient Boolean space rather than only on the
+weight-2 boundary shell.
+
 ## Why this is an independent algorithm
 
 The existing finite oracle enumerates codewords, computes Hamming distances, and
