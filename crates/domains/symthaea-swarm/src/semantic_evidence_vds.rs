@@ -1838,7 +1838,7 @@ impl Rfc9942Vdp {
     }
 
     fn from_reader(reader: &mut CborReader<'_>) -> Result<Self, Rfc9942VdpError> {
-        let entries=reader.read_map_entries_bounded_with_limits_and_bytes(32, MAX_RFC9942_PROOF_BYTES, MAX_RFC9942_PROOFS, MAX_RFC9942_VDP_ENCODED_BYTES)
+        let entries=reader.read_map_entries_bounded_with_resource_limits_and_bytes(32, MAX_RFC9942_PROOF_BYTES, MAX_RFC9942_PROOFS, MAX_RFC9942_VDP_ENCODED_BYTES)
             .map_err(|error|match error {
                 Rfc9162ProofDecodeError::ResourceLimitExceeded=>Rfc9942VdpError::ResourceLimitExceeded,
                 Rfc9162ProofDecodeError::InvalidStructure=>Rfc9942VdpError::InvalidStructure,
@@ -2155,6 +2155,31 @@ impl<'a> CborReader<'a> {
         max_array_items: usize,
         max_total_bytes: usize,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Rfc9162ProofDecodeError> {
+        self.read_map_entries_bounded_with_limits_and_bytes_mode(
+            max_entries, max_bstr_len, max_array_items, max_total_bytes, false,
+        )
+    }
+
+    fn read_map_entries_bounded_with_resource_limits_and_bytes(
+        &mut self,
+        max_entries: usize,
+        max_bstr_len: usize,
+        max_array_items: usize,
+        max_total_bytes: usize,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Rfc9162ProofDecodeError> {
+        self.read_map_entries_bounded_with_limits_and_bytes_mode(
+            max_entries, max_bstr_len, max_array_items, max_total_bytes, true,
+        )
+    }
+
+    fn read_map_entries_bounded_with_limits_and_bytes_mode(
+        &mut self,
+        max_entries: usize,
+        max_bstr_len: usize,
+        max_array_items: usize,
+        max_total_bytes: usize,
+        resource_limits: bool,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Rfc9162ProofDecodeError> {
         let map_start = self.offset;
         let initial=*self.bytes.get(self.offset).ok_or(Rfc9162ProofDecodeError::UnexpectedEof)?;
         self.offset+=1;
@@ -2205,11 +2230,23 @@ impl<'a> CborReader<'a> {
 
             let key_start=self.offset;
             let remaining_before_key=max_total_bytes.saturating_sub(self.offset.saturating_sub(map_start));
-            self.skip_value_with_limits(0, max_bstr_len, max_array_items, remaining_before_key)?;
+            self.skip_value_with_limits_mode(
+                0,
+                max_bstr_len,
+                max_array_items,
+                remaining_before_key,
+                resource_limits,
+            )?;
             let key_end=self.offset;
             let value_start=self.offset;
             let remaining_before_value=max_total_bytes.saturating_sub(self.offset.saturating_sub(map_start));
-            self.skip_value_with_limits(0, max_bstr_len, max_array_items, remaining_before_value)?;
+            self.skip_value_with_limits_mode(
+                0,
+                max_bstr_len,
+                max_array_items,
+                remaining_before_value,
+                resource_limits,
+            )?;
             let value_end=self.offset;
             if self.offset.saturating_sub(map_start) > max_total_bytes {
                 return Err(Rfc9162ProofDecodeError::InvalidStructure);
@@ -2380,13 +2417,48 @@ impl<'a> CborReader<'a> {
         max_array_items: usize,
         max_value_bytes: usize,
     ) -> Result<(), Rfc9162ProofDecodeError> {
+        self.skip_value_with_limits_mode(
+            depth, max_bstr_len, max_array_items, max_value_bytes, false,
+        )
+    }
+
+    fn skip_value_with_resource_limits(
+        &mut self,
+        depth: usize,
+        max_bstr_len: usize,
+        max_array_items: usize,
+        max_value_bytes: usize,
+    ) -> Result<(), Rfc9162ProofDecodeError> {
+        self.skip_value_with_limits_mode(
+            depth, max_bstr_len, max_array_items, max_value_bytes, true,
+        )
+    }
+
+    fn skip_value_with_limits_mode(
+        &mut self,
+        depth: usize,
+        max_bstr_len: usize,
+        max_array_items: usize,
+        max_value_bytes: usize,
+        resource_limits: bool,
+    ) -> Result<(), Rfc9162ProofDecodeError> {
         let limit_end = self
             .offset
             .saturating_add(max_value_bytes)
             .min(self.bytes.len());
-        self.skip_value_inner(depth, max_bstr_len, max_array_items, limit_end)?;
+        self.skip_value_inner(
+            depth,
+            max_bstr_len,
+            max_array_items,
+            limit_end,
+            resource_limits,
+        )?;
         if self.offset > limit_end {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            return Err(if resource_limits {
+                Rfc9162ProofDecodeError::ResourceLimitExceeded
+            } else {
+                Rfc9162ProofDecodeError::InvalidStructure
+            });
         }
         Ok(())
     }
@@ -2544,6 +2616,7 @@ impl<'a> CborReader<'a> {
         max_bstr_len: usize,
         max_array_items: usize,
         limit_end: usize,
+        resource_limits: bool,
     ) -> Result<(), Rfc9162ProofDecodeError> {
         if depth > 16 {
             return Err(Rfc9162ProofDecodeError::ResourceLimitExceeded);
@@ -2554,7 +2627,11 @@ impl<'a> CborReader<'a> {
         let major = self.peek_major_type()?;
         match major {
             0 | 1 => self.skip_integer_bounded(limit_end),
-            2 => self.skip_bstr_value(max_bstr_len, limit_end),
+            2 => self.skip_bstr_value_with_mode(
+                max_bstr_len,
+                limit_end,
+                resource_limits,
+            ),
             3 => self.skip_text_value(4096, limit_end),
             4 => {
                 if self.bytes.get(self.offset).copied().is_some_and(|byte| byte & 0x1f == 31) {
@@ -2572,20 +2649,29 @@ impl<'a> CborReader<'a> {
                             return Ok(());
                         }
                         if items >= max_array_items {
-                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                            return Err(if resource_limits {
+                                Rfc9162ProofDecodeError::ResourceLimitExceeded
+                            } else {
+                                Rfc9162ProofDecodeError::InvalidStructure
+                            });
                         }
                         self.skip_value_inner(
                             depth + 1,
                             max_bstr_len,
                             max_array_items,
                             limit_end,
+                            resource_limits,
                         )?;
                         items += 1;
                     }
                 }
                 let n = self.read_array_len_bounded(limit_end)?;
                 if self.offset > limit_end || n > max_array_items {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(if resource_limits {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded
+                    } else {
+                        Rfc9162ProofDecodeError::InvalidStructure
+                    });
                 }
                 for _ in 0..n {
                     if self.offset >= limit_end {
@@ -2616,7 +2702,11 @@ impl<'a> CborReader<'a> {
                             return Ok(());
                         }
                         if entries >= 64 {
-                            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                            return Err(if resource_limits {
+                                Rfc9162ProofDecodeError::ResourceLimitExceeded
+                            } else {
+                                Rfc9162ProofDecodeError::InvalidStructure
+                            });
                         }
                         if self.offset >= limit_end {
                             return Err(Rfc9162ProofDecodeError::InvalidStructure);
@@ -2626,6 +2716,7 @@ impl<'a> CborReader<'a> {
                             max_bstr_len,
                             max_array_items,
                             limit_end,
+                            resource_limits,
                         )?;
                         if self.offset >= limit_end {
                             return Err(Rfc9162ProofDecodeError::InvalidStructure);
@@ -2635,13 +2726,18 @@ impl<'a> CborReader<'a> {
                             max_bstr_len,
                             max_array_items,
                             limit_end,
+                            resource_limits,
                         )?;
                         entries += 1;
                     }
                 }
                 let n = self.read_map_len_bounded(limit_end)?;
                 if self.offset > limit_end || n > 64 {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(if resource_limits {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded
+                    } else {
+                        Rfc9162ProofDecodeError::InvalidStructure
+                    });
                 }
                 for _ in 0..n {
                     if self.offset >= limit_end {
@@ -2672,6 +2768,7 @@ impl<'a> CborReader<'a> {
                     max_bstr_len,
                     max_array_items,
                     limit_end,
+                    resource_limits,
                 )
             }
             7 => {
@@ -2710,7 +2807,11 @@ impl<'a> CborReader<'a> {
             _ => Err(Rfc9162ProofDecodeError::InvalidEncoding),
         }?;
         if self.offset > limit_end {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            return Err(if resource_limits {
+                Rfc9162ProofDecodeError::ResourceLimitExceeded
+            } else {
+                Rfc9162ProofDecodeError::InvalidStructure
+            });
         }
         Ok(())
     }
@@ -2719,6 +2820,15 @@ impl<'a> CborReader<'a> {
         &mut self,
         max_len: usize,
         limit_end: usize,
+    ) -> Result<(), Rfc9162ProofDecodeError> {
+        self.skip_bstr_value_with_mode(max_len, limit_end, false)
+    }
+
+    fn skip_bstr_value_with_mode(
+        &mut self,
+        max_len: usize,
+        limit_end: usize,
+        resource_limits: bool,
     ) -> Result<(), Rfc9162ProofDecodeError> {
         let initial = *self
             .bytes
@@ -2770,7 +2880,11 @@ impl<'a> CborReader<'a> {
                 let n = usize::try_from(n)
                     .map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
                 if n > max_len.saturating_sub(total_len) {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(if resource_limits {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded
+                    } else {
+                        Rfc9162ProofDecodeError::InvalidStructure
+                    });
                 }
                 let end = self
                     .offset
@@ -2780,7 +2894,11 @@ impl<'a> CborReader<'a> {
                     return Err(Rfc9162ProofDecodeError::UnexpectedEof);
                 }
                 if end > limit_end {
-                    return Err(Rfc9162ProofDecodeError::InvalidStructure);
+                    return Err(if resource_limits {
+                        Rfc9162ProofDecodeError::ResourceLimitExceeded
+                    } else {
+                        Rfc9162ProofDecodeError::InvalidStructure
+                    });
                 }
                 self.offset = end;
                 total_len += n;
@@ -2802,7 +2920,11 @@ impl<'a> CborReader<'a> {
         let n = usize::try_from(n)
             .map_err(|_| Rfc9162ProofDecodeError::InvalidStructure)?;
         if n > max_len {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            return Err(if resource_limits {
+                Rfc9162ProofDecodeError::ResourceLimitExceeded
+            } else {
+                Rfc9162ProofDecodeError::InvalidStructure
+            });
         }
         let end = self
             .offset
@@ -2812,7 +2934,11 @@ impl<'a> CborReader<'a> {
             return Err(Rfc9162ProofDecodeError::UnexpectedEof);
         }
         if end > limit_end {
-            return Err(Rfc9162ProofDecodeError::InvalidStructure);
+            return Err(if resource_limits {
+                Rfc9162ProofDecodeError::ResourceLimitExceeded
+            } else {
+                Rfc9162ProofDecodeError::InvalidStructure
+            });
         }
         self.offset = end;
         Ok(())
