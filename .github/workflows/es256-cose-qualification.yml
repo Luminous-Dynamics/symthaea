@@ -111,19 +111,34 @@ jobs:
           key: ${{ runner.os }}-es256-cose-fuzz-${{ hashFiles('crates/domains/symthaea-swarm/fuzz/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-es256-cose-fuzz-
-      - name: Assert expected fuzz target inventory
+      - name: Assert exact fuzz target inventory
         shell: bash
         run: |
           set -euo pipefail
+          EXPECTED_TARGETS='["fuzz_cose_key_es256","fuzz_rfc9942_receipt","fuzz_rfc9942_signature_with_receipts","fuzz_rfc9942_proofs"]'
           metadata="$(cargo metadata --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --no-deps --format-version 1)"
-          for target in \
-            fuzz_cose_key_es256 \
-            fuzz_rfc9942_receipt \
-            fuzz_rfc9942_signature_with_receipts \
-            fuzz_rfc9942_proofs
-          do
-            grep -F '"name":"'"$target"'"' <<<"$metadata" >/dev/null
-          done
+          python3 - "$EXPECTED_TARGETS" "$metadata" <<'PY'
+          import json
+          import sys
+
+          expected = json.loads(sys.argv[1])
+          metadata = json.loads(sys.argv[2])
+          packages = metadata["packages"]
+          if len(packages) != 1:
+              raise SystemExit(f"expected one fuzz package, found {len(packages)}")
+          targets = [
+              target["name"]
+              for target in packages[0]["targets"]
+              if "bin" in target["kind"]
+          ]
+          if sorted(targets) != sorted(expected):
+              raise SystemExit(
+                  "fuzz target inventory mismatch: "
+                  f"expected={expected!r} actual={targets!r}"
+              )
+          if len(targets) != len(set(targets)):
+              raise SystemExit(f"duplicate fuzz target names: {targets!r}")
+          PY
       - name: Check fuzz manifest
         run: cargo check --manifest-path crates/domains/symthaea-swarm/fuzz/Cargo.toml --bins
 
