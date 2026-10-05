@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use crate::linguistic_frame::LinguisticFrame;
+use crate::linguistic_frame::{FormulationStrategy, LinguisticFrame};
 
 pub const LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION: &str =
     "broca-lexical-morphosyntactic-binding-v1";
@@ -143,6 +143,9 @@ impl LexicalMorphosyntacticBinding {
     ) -> Result<Self, LexicalBindingError> {
         frame.validate()
             .map_err(|_| LexicalBindingError::UpstreamMismatch)?;
+        if matches!(frame.strategy, FormulationStrategy::Abstain) {
+            return Err(LexicalBindingError::AbstentionCannotBind);
+        }
 
         let binding = Self {
             version: LEXICAL_MORPHOSYNTACTIC_BINDING_VERSION.to_string(),
@@ -470,6 +473,7 @@ fn validate_agreement(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexicalBindingError {
     InvalidVersion,
+    AbstentionCannotBind,
     MissingUpstreamLineage,
     UpstreamMismatch,
     EmptyLanguageTag,
@@ -509,6 +513,7 @@ impl std::fmt::Display for LexicalBindingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidVersion => write!(f, "lexical/morphosyntactic binding version is unsupported"),
+            Self::AbstentionCannotBind => write!(f, "abstaining linguistic frames cannot be lexically bound"),
             Self::MissingUpstreamLineage => write!(f, "upstream linguistic-frame lineage is missing"),
             Self::UpstreamMismatch => write!(f, "lexical binding no longer matches its upstream linguistic frame"),
             Self::EmptyLanguageTag => write!(f, "language tag must be non-empty"),
@@ -761,6 +766,25 @@ mod tests {
         )
         .expect("unsupported language may remain explicitly unbound");
         assert_eq!(binding.language.status, LanguageRuleStatus::Unbound);
+    }
+
+    #[test]
+    fn abstention_cannot_be_lexically_bound() {
+        let mut frame = statement_frame();
+        frame.strategy = FormulationStrategy::Abstain;
+        frame.constituents.clear();
+        frame.focus_role = None;
+
+        let error = LexicalMorphosyntacticBinding::new(
+            &frame,
+            english_rule_binding(),
+            base_semantic_bindings(),
+            vec![],
+            vec![],
+        )
+        .expect_err("abstention must not create lexical binding");
+
+        assert_eq!(error, LexicalBindingError::AbstentionCannotBind);
     }
 
     #[test]
