@@ -810,6 +810,28 @@ mod tests {
     }
 
     #[test]
+    fn test_all_service_operations_have_structured_systemctl_mapping() {
+        let cases = [
+            (ServiceOperation::Start, "start"),
+            (ServiceOperation::Stop, "stop"),
+            (ServiceOperation::Restart, "restart"),
+            (ServiceOperation::Reload, "reload"),
+            (ServiceOperation::Enable, "enable"),
+            (ServiceOperation::Disable, "disable"),
+        ];
+        for (operation, expected_action) in cases {
+            let command = NixOSCommand::Service {
+                operation,
+                name: "sshd.service".to_string(),
+            };
+            let (bin, args) = command.to_command();
+            assert_eq!(bin, "systemctl");
+            assert_eq!(args, vec![expected_action, "sshd.service"]);
+            assert_eq!(command.safety_level(), SafetyLevel::SystemModify);
+        }
+    }
+
+    #[test]
     fn test_rollback_commands() {
         let rebuild = NixOSCommand::RebuildSwitch {
             flake: None,
