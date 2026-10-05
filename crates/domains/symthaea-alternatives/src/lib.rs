@@ -5267,8 +5267,16 @@ mod tests {
     fn orphaned_experimental_design_observation_fails_closed() {
         let case = crate::corpus::five_pathway_adversarial_case();
         let mut candidate = case.candidates[0].clone();
-        candidate.evidence[0].observation.as_mut().unwrap().experimental_design_id =
-            Some("design:orphan".into());
+        let observed = candidate
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .experimental_design_id = Some("design:orphan".into());
         assert_eq!(
             AlternativesEngine
                 .assess(&case.requirement, &[candidate], None)
@@ -5281,12 +5289,22 @@ mod tests {
     fn mismatched_experimental_design_observation_fails_closed() {
         let case = crate::corpus::five_pathway_adversarial_case();
         let mut candidate = case.candidates[0].clone();
-        let evidence_id = candidate.evidence[0].id.clone();
-        candidate.evidence[0]
+        let observed = candidate
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        let evidence_id = observed.id.clone();
+        observed
             .observation
             .as_mut()
             .unwrap()
             .experimental_design_id = Some("design:other".into());
+        observed
+            .observation
+            .as_mut()
+            .unwrap()
+            .experimental_target_id = Some("t1".into());
 
         let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
         let design = ExperimentalDesignProvenance {
@@ -5341,6 +5359,67 @@ mod tests {
                 actual_design_id: "design:other".into(),
             }
         );
+    }
+
+    #[test]
+    fn positive_experimental_design_observation_lineage_is_accepted() {
+        let case = crate::corpus::five_pathway_adversarial_case();
+        let mut candidate = case.candidates[0].clone();
+        let observed = candidate
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.kind == EvidenceKind::Observed)
+            .unwrap();
+        let observed_measurand = observed.observation.as_ref().unwrap().measurand_id.clone();
+
+        let basis = case.requirement.comparison_scales[&Dimension::Water].basis.clone();
+        let design = ExperimentalDesignProvenance {
+            design_id: "design:positive".into(),
+            hypothesis_id: "hypothesis:water".into(),
+            hypothesis_statement: "A measurement distinguishes the selected alternatives.".into(),
+            unresolved_uncertainty_refs: vec!["uncertainty:water".into()],
+            candidate_ids: vec!["product-redesign".into(), "process-substitute".into()],
+            expected_discrimination: vec![ExperimentalDiscriminationTarget {
+                target_id: "t1".into(),
+                measurand_id: observed_measurand.clone(),
+                left_candidate_id: "product-redesign".into(),
+                right_candidate_id: "process-substitute".into(),
+                surface: ExperimentalDiscriminationSurface::Burden(Dimension::Water),
+                decision_rule: ExperimentalDecisionRuleRef {
+                    rule_id: "rule".into(),
+                    rule_revision: "v1".into(),
+                    rule_digest: "digest".into(),
+                },
+            }],
+            protocol: ExperimentalProtocolRef {
+                protocol_id: "protocol".into(),
+                protocol_revision: "v1".into(),
+                protocol_digest: "digest".into(),
+                basis: basis.clone(),
+            },
+            stopping_criteria: ExperimentalStoppingCriteria {
+                min_valid_observations: 1,
+                max_valid_observations: 2,
+                max_duration_seconds: None,
+                target_uncertainty_width: None,
+            },
+            comparison_basis: basis,
+        };
+
+        observed.observation.as_mut().unwrap().experimental_design_id =
+            Some(design.design_id.clone());
+        observed.observation.as_mut().unwrap().experimental_target_id = Some("t1".into());
+
+        AlternativesEngine
+            .assess_with_experimental_design(
+                &case.requirement,
+                &case.candidates,
+                Some(case.incumbent_id),
+                None,
+                None,
+                design,
+            )
+            .unwrap();
     }
 
     #[test]
