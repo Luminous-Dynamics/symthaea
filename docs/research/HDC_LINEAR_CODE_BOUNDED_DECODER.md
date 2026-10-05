@@ -173,3 +173,37 @@ No production integration, timing claim, or superiority claim is made here.
   https://errorcorrectionzoo.org/c/bits_into_bits
 - MathWorld, *Syndrome Decoding Problem*:
   https://mathworld.wolfram.com/SyndromeDecodingProblem.html
+
+## Deterministic random-code cross-check
+
+The boundary fixture is not sufficient by itself to establish that the syndrome implementation is faithful to the general binary linear-code semantics. The qualification suite therefore adds a deterministic sweep over independently generated [12,4] random linear codes.
+
+For each seed whose exhaustive code geometry has unique-decoding radius at least one, every codeword and every error pattern inside that guaranteed radius are passed through the syndrome decoder. The independent nearest-codeword oracle is required to report the same unique codeword, distance, and exact error pattern.
+
+This remains a finite implementation cross-check. It is not a probabilistic claim about the entire random-code ensemble.
+
+## Beyond-radius semantics
+
+A separate fixture tests corruption beyond the unique-decoding radius without asking the decoder to recover an arbitrarily designated clean target.
+
+For the [8,2,4] fixture, all 56 weight-3 corruptions around one clean codeword are classified against the exhaustive nearest-codeword oracle. With decoder bound 2:
+
+- 8 observations have a unique nearest codeword at distance 1; the bounded decoder therefore returns that other codeword.
+- 48 observations have nearest-codeword distance 3, so the bounded decoder correctly returns NoMatchWithinBound.
+- no result is credited as intended-target recovery merely because the decoder returns some codeword.
+
+This is an important evidence boundary: bounded-distance decoding identifies a nearest codeword within its declared radius; it does not establish recovery of the original semantic factor tuple once the channel exceeds the code's unique-decoding guarantee.
+
+The factorization layer remains separate. Even a unique codeword result can still carry an affine factorization fiber of cardinality 2^d, and the decoder does not inspect that fiber when making its codeword-level decision.
+
+## 2026 coding-theory context
+
+Recent results sharpen, rather than collapse, this distinction. Silas determines the sharp typical worst-case list-size behavior of random linear codes at capacity for every finite field, while Yuan and Zhu obtain asymptotically optimal list-size scaling for fixed finite fields. These are asymptotic list-decoding results and do not certify the finite Boolean fixtures used here.
+
+Deng and Raviv explicitly frame noisy VSA recovery as a separate difficulty for random-linear-code representations and use a Reed--Solomon/Hadamard representation with histogram-recovery algorithms. That remains a distinct future representation family rather than an implementation detail of this bounded Boolean decoder.
+
+References:
+
+- Silas (2026), The list size of random linear codes at capacity: https://arxiv.org/abs/2609.06570
+- Yuan & Zhu (2026), Asymptotically Optimal List Size of Random Linear Codes: https://arxiv.org/abs/2609.01070
+- Deng & Raviv (2025/ISIT 2026), Efficient Vector Symbolic Architectures from Histogram Recovery: https://arxiv.org/abs/2511.01838
