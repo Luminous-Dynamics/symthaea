@@ -251,28 +251,87 @@ impl Z3Bridge {
         solution: &[(f64, f64)],
         tolerance: f64,
     ) -> VerificationResult {
+        // The RHS argument is intentionally a descriptive label, not an
+        // executable expression. The previous implementation substituted
+        // dy_dt_approx for rhs_val, making every residual exactly zero and
+        // allowing a false "verification" result. Fail closed until an
+        // executable RHS representation is supplied.
+        VerificationResult::Unknown {
+            reason: format!(
+                "ODE RHS {:?} is descriptive only; no executable evaluator is attached to                  verify_ode_solution_satisfies_equation. Use                  verify_linear_ode_solution_residual for dy/dt = alpha*y.",
+                ode_rhs
+            ),
+        }
+    }
+
+    /// Verify sampled residuals for the linear ODE dy/dt = alpha*y.
+    ///
+    /// This is a numerical residual check over the supplied solution points,
+    /// not a universal/formal proof of the differential equation.
+    ///
+    /// The finite-difference derivative is compared with alpha times the
+    /// midpoint value of y. The returned SAT/UNSAT result therefore means
+    /// that all supplied samples satisfy / fail the requested tolerance.
+    pub fn verify_linear_ode_solution_residual(
+        &self,
+        ode_lhs: &str,
+        alpha: f64,
+        solution: &[(f64, f64)],
+        tolerance: f64,
+    ) -> VerificationResult {
         if solution.len() < 2 {
             return VerificationResult::Unknown {
                 reason: "need ≥ 2 solution points for finite-difference ODE check".to_string(),
             };
         }
+        if !alpha.is_finite() {
+            return VerificationResult::Unknown {
+                reason: "alpha must be finite".to_string(),
+            };
+        }
+        if !tolerance.is_finite() || tolerance < 0.0 {
+            return VerificationResult::Unknown {
+                reason: "tolerance must be finite and non-negative".to_string(),
+            };
+        }
 
-        // Build one SMTLIB2 constraint per interior point
         let mut assertions = Vec::new();
+        let mut max_residual = 0.0_f64;
+
         for i in 1..solution.len() {
             let (t0, y0) = solution[i - 1];
             let (t1, y1) = solution[i];
+            if !t0.is_finite() || !t1.is_finite() || !y0.is_finite() || !y1.is_finite() {
+                return VerificationResult::Unknown {
+                    reason: format!("non-finite solution sample at interval {}", i - 1),
+                };
+            }
+
             let dt = t1 - t0;
-            if dt.abs() < 1e-15 {
+            if !dt.is_finite() || dt.abs() < 1e-15 {
                 continue;
             }
+
             let dy_dt_approx = (y1 - y0) / dt;
-            // rhs value: for linear ODEs of form dy/dt = α * y, evaluate at midpoint
             let t_mid = (t0 + t1) / 2.0;
             let y_mid = (y0 + y1) / 2.0;
-            let constraint =
-                Self::format_ode_constraint(t_mid, y_mid, dy_dt_approx, dy_dt_approx, tolerance);
-            assertions.push(constraint);
+            let rhs_val = alpha * y_mid;
+            let residual = (dy_dt_approx - rhs_val).abs();
+
+            if !dy_dt_approx.is_finite() || !rhs_val.is_finite() || !residual.is_finite() {
+                return VerificationResult::Unknown {
+                    reason: format!("non-finite ODE residual at interval {}", i - 1),
+                };
+            }
+
+            max_residual = max_residual.max(residual);
+            assertions.push(Self::format_ode_constraint(
+                t_mid,
+                y_mid,
+                dy_dt_approx,
+                rhs_val,
+                tolerance,
+            ));
         }
 
         if assertions.is_empty() {
@@ -282,35 +341,21 @@ impl Z3Bridge {
         }
 
         let smt = format!(
-            "; ODE verification: {ode_lhs} = {ode_rhs}\n\
-             ; Checking |dy/dt_approx - rhs| < {tolerance}\n\
-             {}\n(check-sat)",
+            "; Sampled ODE residual verification: {ode_lhs} = {alpha} * y\\n             ; Checking |dy/dt_approx - ({alpha} * y_mid)| < {tolerance}\\n             {}\\n(check-sat)",
             assertions.join("\n")
         );
 
         if let Some(output) = self.run_z3(&smt) {
             parse_sat_result(&output)
+        } else if max_residual < tolerance {
+            VerificationResult::Sat {
+                witness: Some(format!("max_residual={max_residual:.6e}")),
+            }
         } else {
-            // Internal numeric check: directly verify tolerance condition
-            let all_satisfied = (1..solution.len()).all(|i| {
-                let (t0, y0) = solution[i - 1];
-                let (t1, y1) = solution[i];
-                let dt = t1 - t0;
-                if dt.abs() < 1e-15 {
-                    return true;
-                }
-                let dy_dt_approx = (y1 - y0) / dt;
-                // Approximate rhs using the ODE string — for now, use dy_dt as proxy
-                // (the fallback can only verify that the finite differences are consistent)
-                let _ = t0; // suppress unused warning
-                dy_dt_approx.abs() < 1e6 // sanity check: finite derivative
-            });
-            if all_satisfied {
-                VerificationResult::Sat { witness: None }
-            } else {
-                VerificationResult::Unsat {
-                    core: Some("ODE residual exceeded tolerance".to_string()),
-                }
+            VerificationResult::Unsat {
+                core: Some(format!(
+                    "max_residual={max_residual:.6e} >= tolerance={tolerance:.6e}"
+                )),
             }
         }
     }
@@ -1172,8 +1217,24 @@ mod tests {
     // ── ODE constraint verification ──────────────────────────────────────────
 
     #[test]
-    fn test_verify_ode_exponential_decay() {
-        // dy/dt = -y, solution y(t) = e^{-t}
+    fn test_verify_ode_string_rhs_fails_closed() {
+        // A descriptive RHS string is not an executable equation. The
+        // verifier must refuse to manufacture a residual from the observed
+        // derivative itself.
+        let b = bridge();
+        let solution = [(0.0, 1.0), (0.1, (-0.1_f64).exp())];
+        let result =
+            b.verify_ode_solution_satisfies_equation("dy/dt", "-y", &solution, 0.05);
+        assert!(
+            matches!(result, VerificationResult::Unknown { .. }),
+            "descriptive RHS must fail closed, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_verify_linear_ode_exponential_decay() {
+        // dy/dt = -y, solution y(t) = e^{-t}; sampled finite-difference
+        // residuals should remain within the requested tolerance.
         let b = bridge();
         let solution: Vec<(f64, f64)> = (0..10)
             .map(|i| {
@@ -1181,21 +1242,35 @@ mod tests {
                 (t, (-t).exp())
             })
             .collect();
-        let result = b.verify_ode_solution_satisfies_equation("dy/dt", "-y", &solution, 0.05);
-        // Internal fallback should return Sat (finite derivatives for well-behaved solution)
+        let result = b.verify_linear_ode_solution_residual("dy/dt", -1.0, &solution, 0.05);
         assert!(
-            matches!(
-                result,
-                VerificationResult::Sat { .. } | VerificationResult::UsingFallback
-            ),
-            "expected Sat or UsingFallback, got {result:?}"
+            matches!(result, VerificationResult::Sat { .. }),
+            "expected sampled residual check to pass, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_verify_linear_ode_rejects_wrong_rhs() {
+        // The same e^-t samples cannot satisfy dy/dt = +y.
+        let b = bridge();
+        let solution: Vec<(f64, f64)> = (0..10)
+            .map(|i| {
+                let t = i as f64 * 0.1;
+                (t, (-t).exp())
+            })
+            .collect();
+        let result = b.verify_linear_ode_solution_residual("dy/dt", 1.0, &solution, 0.05);
+        assert!(
+            matches!(result, VerificationResult::Unsat { .. }),
+            "wrong RHS must be rejected, got {result:?}"
         );
     }
 
     #[test]
     fn test_verify_ode_too_few_points() {
         let b = bridge();
-        let result = b.verify_ode_solution_satisfies_equation("dy/dt", "y", &[(0.0, 1.0)], 0.01);
+        let result =
+            b.verify_linear_ode_solution_residual("dy/dt", -1.0, &[(0.0, 1.0)], 0.01);
         assert!(matches!(result, VerificationResult::Unknown { .. }));
     }
 
