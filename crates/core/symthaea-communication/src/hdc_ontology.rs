@@ -93,7 +93,9 @@ impl HdcOntologyManifest {
     pub fn validates(&self) -> bool {
         self.schema_version == HDC_ONTOLOGY_ADAPTER_SCHEMA_VERSION
             && !self.scheme_id.trim().is_empty()
+            && self.scheme_id.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.mapping_provenance_hash.trim().is_empty()
+            && self.mapping_provenance_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.concepts.is_empty()
             && self.concepts.len() <= HDC_ONTOLOGY_MAX_MANIFEST_CONCEPTS
             && !self.relations.is_empty()
@@ -209,10 +211,23 @@ impl HdcOntologyCodebookDescriptor {
             && self.role_revision == HDC_ONTOLOGY_ROLE_REVISION
             && self.dimension == HDC_DIMENSION
             && !self.scheme_id.trim().is_empty()
+            && self.scheme_id.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.mapping_provenance_hash.trim().is_empty()
+            && self.mapping_provenance_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && !self.codebook_id.trim().is_empty()
+            && self.codebook_id.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && !self.adapter_id.trim().is_empty()
+            && self.adapter_id.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && !self.generation_algorithm.trim().is_empty()
+            && self.generation_algorithm.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && !self.role_revision.trim().is_empty()
+            && self.role_revision.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.concept_manifest_hash.trim().is_empty()
+            && self.concept_manifest_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.relation_manifest_hash.trim().is_empty()
+            && self.relation_manifest_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && !self.training_manifest_hash.trim().is_empty()
+            && self.training_manifest_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
             && self.concept_count > 0
             && self.concept_count <= HDC_ONTOLOGY_MAX_CODEBOOK_CONCEPTS
             && self.relation_count > 0
@@ -1616,6 +1631,10 @@ mod tests {
         oversized_identifier.concepts[0].concept_id =
             "x".repeat(HDC_ONTOLOGY_MAX_ID_BYTES + 1);
         assert!(!oversized_identifier.validates());
+
+        let mut oversized_authority = training_manifest.clone();
+        oversized_authority.scheme_id = "x".repeat(HDC_ONTOLOGY_MAX_ID_BYTES + 1);
+        assert!(!oversized_authority.validates());
 
         let codebook =
             HdcOntologyCodebook::from_training_graphs(77, &[training], &training_manifest)
