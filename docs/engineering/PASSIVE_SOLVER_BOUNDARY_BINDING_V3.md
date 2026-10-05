@@ -97,8 +97,12 @@ It canonicalizes patch name, type, startFace, and nFaces and records an exact so
 With the exact `constant/polyMesh/faces` artifact, it parses the referenced face records and checks the
 declared patch range against actual serialized faces. With the exact `constant/polyMesh/points` artifact
 and an explicit coordinate-unit scale, it derives the exposed perimeter edges of the referenced patch
-faces and requires that perimeter to equal the candidate's independently certified interface rim.
-The combined observation commits to the exact source artifacts and scale. When the exact
+faces and requires that perimeter to equal the candidate's independently certified interface rim. The
+observer also rejects repeated point indices in a face and fails closed if distinct OpenFOAM topology
+edges collapse onto the same quantized portable edge identity. With the exact `constant/polyMesh/neighbour`
+artifact, it additionally derives `nInternalFaces` and requires the declared patch ranges to form the
+complete non-overlapping boundary-face suffix. The combined observation commits to the exact source
+artifacts and scale. When the exact
 `neighbour` artifact is also supplied, the observer derives the internal-face count and requires
 the declared boundary patches to form a non-overlapping, contiguous partition of the global boundary
 face suffix. This is still input-artifact evidence only: it is not a claim that a live solver loaded
