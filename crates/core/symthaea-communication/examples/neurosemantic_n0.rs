@@ -94,6 +94,7 @@ fn main() -> Result<(), String> {
             handling: NeurosemanticHandlingPolicy {
                 schema_version: symthaea_communication::NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
                 policy_provenance_ref: "synthetic-policy-record-1".into(),
+                policy_provenance_hash: symthaea_communication::content_hash(b"synthetic-policy-record-1"),
                 origin_jurisdiction: "ZA".into(),
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
                 permitted_secondary_uses: BTreeSet::new(),
@@ -116,6 +117,9 @@ fn main() -> Result<(), String> {
         .handling
         .policy_provenance_ref
         .is_empty();
+    let handling_policy_provenance_hash_valid =
+        message.packet.data_policy.handling.policy_provenance_hash
+            == symthaea_communication::content_hash(b"synthetic-policy-record-1");
     message.validate_for_handling(
         &lease,
         "ZA",
@@ -185,6 +189,7 @@ fn main() -> Result<(), String> {
         ("exact_graph_roundtrip", exact_roundtrip),
         ("authorization_valid", true),
         ("handling_policy_provenance_present", handling_policy_provenance_present),
+        ("handling_policy_provenance_hash_valid", handling_policy_provenance_hash_valid),
         ("first_packet_accepted", accepted == ReplayDecision::Accept),
         ("exact_replay_detected", duplicate == ReplayDecision::Duplicate),
         ("tamper_detected", tamper_detected),

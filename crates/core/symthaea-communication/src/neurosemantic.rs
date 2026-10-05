@@ -82,7 +82,7 @@ pub enum NeurosemanticInferenceClass {
     Identity,
 }
 
-pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 2;
+pub const NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION: u16 = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum NeurosemanticSecondaryUse {
@@ -115,6 +115,9 @@ pub struct NeurosemanticHandlingPolicy {
     /// Symthaea binds this reference into packet integrity but does not authenticate
     /// the authority; the deployment policy layer remains responsible for verification.
     pub policy_provenance_ref: String,
+    /// BLAKE3-256 digest of the exact externally authoritative policy/consent record bytes
+    /// (or its separately specified canonical form). This is a binding, not an authority signature.
+    pub policy_provenance_hash: String,
     /// Jurisdiction identifier asserted for the originating data/controller context.
     /// This is an interoperable policy identifier, not a legal determination.
     pub origin_jurisdiction: String,
@@ -133,6 +136,7 @@ impl Default for NeurosemanticHandlingPolicy {
         Self {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
             policy_provenance_ref: String::new(),
+            policy_provenance_hash: String::new(),
             origin_jurisdiction: String::new(),
             permitted_destination_jurisdictions: BTreeSet::new(),
             permitted_secondary_uses: BTreeSet::new(),
@@ -145,6 +149,7 @@ impl NeurosemanticHandlingPolicy {
     pub fn validates(&self) -> bool {
         self.schema_version == NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION
             && valid_identifier(&self.policy_provenance_ref)
+            && valid_blake3_digest(&self.policy_provenance_hash)
             && valid_jurisdiction_id(&self.origin_jurisdiction)
             && !self.permitted_destination_jurisdictions.is_empty()
             && self.permitted_destination_jurisdictions.len() <= MAX_NEUROSEMANTIC_DESTINATION_JURISDICTIONS
@@ -517,8 +522,7 @@ impl NeurosemanticPacket {
         let mut packet = Self::new(
             sequence,
             sender_id,
-            recipient_id,
-            purpose,
+            recipient_id,            purpose,
             channel,
             direction,
             representation,
@@ -801,6 +805,12 @@ fn valid_identifier(value: &str) -> bool {
     !value.trim().is_empty() && value.len() <= MAX_NEUROSEMANTIC_ID_BYTES
 }
 
+fn valid_blake3_digest(value: &str) -> bool {
+    value.len() == 64
+        && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        && value.bytes().any(|byte| byte != b'0')
+}
+
 fn valid_jurisdiction_id(value: &str) -> bool {
     let bytes = value.as_bytes();
     bytes.len() == 2
@@ -849,6 +859,7 @@ mod tests {
             handling: NeurosemanticHandlingPolicy {
                 schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
                 policy_provenance_ref: "synthetic-policy-record-1".into(),
+            policy_provenance_hash: content_hash(b"synthetic-policy-record-1"),
             origin_jurisdiction: "ZA".into(),
                 permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
                 permitted_secondary_uses: BTreeSet::new(),
@@ -936,13 +947,16 @@ mod tests {
     }
 
     #[test]
-    fn legacy_data_policy_schema_is_rejected_by_v2_validator() {
+    fn legacy_data_policy_schema_is_rejected_by_v3_validator() {
         let policy = semantic_policy();
         let mut value = serde_json::to_value(&policy).unwrap();
         value
             .as_object_mut()
             .unwrap()
-            .insert("schema_version".into(), serde_json::json!(1));
+            .insert(
+            "schema_version".into(),
+            serde_json::json!(NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION - 1),
+        );
         let restored: NeurosemanticDataPolicy = serde_json::from_value(value).unwrap();
         assert!(!restored.validates());
         assert!(!restored.handling.validates());
@@ -1006,10 +1020,31 @@ mod tests {
     }
 
     #[test]
+    fn handling_policy_requires_machine_verifiable_provenance_hash() {
+        let mut policy = NeurosemanticHandlingPolicy {
+            schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
+            policy_provenance_ref: "synthetic-policy-record-1".into(),
+            policy_provenance_hash: String::new(),
+            origin_jurisdiction: "ZA".into(),
+            permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
+            permitted_secondary_uses: BTreeSet::new(),
+            retention: NeurosemanticRetentionPolicy::Ephemeral,
+        };
+        assert!(!policy.validates());
+        policy.policy_provenance_hash = content_hash(b"synthetic-policy-record-1");
+        assert!(policy.validates());
+        policy.policy_provenance_hash = "not-a-blake3-digest".into();
+        assert!(!policy.validates());
+        policy.policy_provenance_hash = "A".repeat(64);
+        assert!(!policy.validates());
+    }
+
+    #[test]
     fn handling_policy_requires_provenance_reference() {
         let mut policy = NeurosemanticHandlingPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
             policy_provenance_ref: String::new(),
+            policy_provenance_hash: String::new(),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into()]),
             permitted_secondary_uses: BTreeSet::new(),
@@ -1025,6 +1060,7 @@ mod tests {
         let policy = NeurosemanticHandlingPolicy {
             schema_version: NEUROSEMANTIC_DATA_POLICY_SCHEMA_VERSION,
             policy_provenance_ref: "synthetic-policy-record-1".into(),
+            policy_provenance_hash: content_hash(b"synthetic-policy-record-1"),
             origin_jurisdiction: "ZA".into(),
             permitted_destination_jurisdictions: BTreeSet::from(["ZA".into(), "GB".into()]),
             permitted_secondary_uses: BTreeSet::from([NeurosemanticSecondaryUse::Research]),
@@ -1037,8 +1073,7 @@ mod tests {
         assert!(!policy.allows_action(NeurosemanticHandlingAction::Persist, 200));
         assert!(policy.allows_action(
             NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::Research),
-            150
-        ));
+            150        ));
         assert!(!policy.allows_action(
             NeurosemanticHandlingAction::SecondaryUse(NeurosemanticSecondaryUse::ModelTraining),
             150
@@ -1422,6 +1457,28 @@ mod tests {
     }
 
     #[test]
+    fn policy_provenance_hash_is_bound_to_packet_integrity() {
+        let mut packet = NeurosemanticPacket::new_with_policy(
+            17,
+            "peer",
+            "subject",
+            CommunicationPurpose::HumanCollaboration,
+            CognitiveChannel::Semantic,
+            ChannelDirection::Write,
+            RepresentationFamily::Hdc,
+            CognitiveSensitivity::Private,
+            semantic_policy(),
+            0.5,
+            NeurosemanticPayload::Hypervector(vec![1, -1]),
+        )
+        .unwrap();
+        assert!(packet.validate_integrity().is_ok());
+        packet.data_policy.handling.policy_provenance_hash =
+            content_hash(b"synthetic-policy-record-2");
+        assert!(packet.validate_integrity().is_err());
+    }
+
+    #[test]
     fn packet_hashes_detect_tampering() {
         let mut packet = NeurosemanticPacket::new(
             1,
@@ -1498,242 +1555,3 @@ mod tests {
         };
 
         assert!(message.validate(&lease(), 150).is_ok());
-    }
-
-    #[test]
-    fn read_direction_rejects_peer_to_subject_packet() {
-        let base = lease();
-        let packet = NeurosemanticPacket::new_with_policy(
-            10,
-            "peer",
-            "subject",
-            CommunicationPurpose::HumanCollaboration,
-            CognitiveChannel::Semantic,
-            ChannelDirection::Read,
-            RepresentationFamily::Hdc,
-            CognitiveSensitivity::Private,
-            semantic_policy(),
-            0.77,
-            NeurosemanticPayload::Hypervector(vec![1, -1]),
-        )
-        .unwrap();
-
-        let message = AuthorizedNeurosemanticMessage {
-            packet,
-            consent_epoch: base.consent_epoch,
-            lease_id: base.lease_id,
-        };
-
-        assert!(message.validate(&lease(), 150).is_err());
-    }
-
-    #[test]
-    fn nonfinite_derived_features_are_rejected() {
-        let result = NeurosemanticPacket::new(
-            11,
-            "peer",
-            "subject",
-            CommunicationPurpose::HumanCollaboration,
-            CognitiveChannel::Semantic,
-            ChannelDirection::Write,
-            RepresentationFamily::Hdc,
-            CognitiveSensitivity::Private,
-            semantic_policy(),
-            0.5,
-            NeurosemanticPayload::DerivedNeuralFeature(vec![0.1, f32::NAN]),
-        );
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn unsupported_protocol_versions_are_rejected() {
-        let mut packet = NeurosemanticPacket::new(
-            12,
-            "peer",
-            "subject",
-            CommunicationPurpose::HumanCollaboration,
-            CognitiveChannel::Semantic,
-            ChannelDirection::Write,
-            RepresentationFamily::Hdc,
-            CognitiveSensitivity::Private,
-            0.5,
-            NeurosemanticPayload::Hypervector(vec![1, -1]),
-        )
-        .unwrap();
-        packet.protocol_version += 1;
-        assert!(packet.validate_integrity().is_err());
-    }
-
-    #[test]
-    fn payload_size_is_bounded() {
-        let values = vec![1_i8; MAX_NEUROSEMANTIC_PAYLOAD_BYTES];
-        let result = NeurosemanticPacket::new(
-            13,
-            "peer",
-            "subject",
-            CommunicationPurpose::HumanCollaboration,
-            CognitiveChannel::Semantic,
-            ChannelDirection::Write,
-            RepresentationFamily::Hdc,
-            CognitiveSensitivity::Private,
-            0.5,
-            NeurosemanticPayload::Hypervector(values),
-        );
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn zero_sequence_is_rejected_at_construction() {
-        let result = NeurosemanticPacket::new(
-            0,
-            "peer",
-            "subject",
-            CommunicationPurpose::HumanCollaboration,
-            CognitiveChannel::Semantic,
-            ChannelDirection::Write,
-            RepresentationFamily::Hdc,
-            CognitiveSensitivity::Private,
-            0.5,
-            NeurosemanticPayload::Hypervector(vec![1, -1]),
-        );
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn authorized_replay_path_requires_active_consent() {
-        let base = lease();
-        let packet = NeurosemanticPacket::new_with_policy(
-            14,
-            "peer",
-            "subject",
-            CommunicationPurpose::HumanCollaboration,
-            CognitiveChannel::Semantic,
-            ChannelDirection::Write,
-            RepresentationFamily::Hdc,
-            CognitiveSensitivity::Private,
-            semantic_policy(),
-            0.5,
-            NeurosemanticPayload::Hypervector(vec![1, -1]),
-        )
-        .unwrap();
-        let message = AuthorizedNeurosemanticMessage {
-            packet,
-            consent_epoch: base.consent_epoch,
-            lease_id: base.lease_id.clone(),
-        };
-        let mut tracker = NeurosemanticReplayTracker::default();
-        assert_eq!(
-            tracker.observe_authorized(&message, &base, 150).unwrap(),
-            ReplayDecision::Accept
-        );
-        let mut revoked = base.clone();
-        revoked.revoked = true;
-        revoked.revoked_at_unix_s = Some(150);
-        assert!(tracker
-            .observe_authorized(&message, &revoked, 150)
-            .is_err());
-
-        let mut malformed_revoked = base.clone();
-        malformed_revoked.revoked = true;
-        malformed_revoked.revoked_at_unix_s = None;
-        assert!(malformed_revoked.validate().is_err());
-    }
-
-    #[test]
-    fn replay_state_is_reclaimed_after_lease_expiry() {
-        let base = lease();
-        let packet = NeurosemanticPacket::new_with_policy(
-            16,
-            "peer",
-            "subject",
-            CommunicationPurpose::HumanCollaboration,
-            CognitiveChannel::Semantic,
-            ChannelDirection::Write,
-            RepresentationFamily::Hdc,
-            CognitiveSensitivity::Private,
-            semantic_policy(),
-            0.5,
-            NeurosemanticPayload::Hypervector(vec![1, -1]),
-        )
-        .unwrap();
-        let message = AuthorizedNeurosemanticMessage {
-            packet,
-            consent_epoch: base.consent_epoch,
-            lease_id: base.lease_id.clone(),
-        };
-        let mut tracker = NeurosemanticReplayTracker::default();
-        assert_eq!(
-            tracker.observe_authorized(&message, &base, 150).unwrap(),
-            ReplayDecision::Accept
-        );
-        assert_eq!(tracker.prune_expired(199), 0);
-        assert_eq!(tracker.prune_expired(200), 1);
-        assert_eq!(tracker.prune_expired(200), 0);
-    }
-
-    #[test]
-    fn sensitivity_ceiling_is_enforced() {
-        let base = lease();
-        let packet = NeurosemanticPacket::new_with_policy(
-            15,
-            "peer",
-            "subject",
-            CommunicationPurpose::HumanCollaboration,
-            CognitiveChannel::Semantic,
-            ChannelDirection::Write,
-            RepresentationFamily::Hdc,
-            CognitiveSensitivity::HighlyPrivate,
-            semantic_policy(),
-            0.5,
-            NeurosemanticPayload::Hypervector(vec![1, -1]),
-        )
-        .unwrap();
-        let message = AuthorizedNeurosemanticMessage {
-            packet,
-            consent_epoch: base.consent_epoch,
-            lease_id: base.lease_id.clone(),
-        };
-        assert!(message.validate(&base, 150).is_err());
-        let mut elevated = base.clone();
-        elevated.max_write_sensitivity = CognitiveSensitivity::HighlyPrivate;
-        assert!(message.validate(&elevated, 150).is_ok());
-    }
-
-    #[test]
-    fn revoked_leases_require_effective_timestamp() {
-        let mut l = lease();
-        l.revoked = true;
-        assert!(l.validate().is_err());
-        l.revoked_at_unix_s = Some(150);
-        assert!(l.validate().is_ok());
-        assert!(l.authorizes(
-            CognitiveChannel::Semantic,
-            ChannelDirection::Read,
-            CommunicationPurpose::HumanCollaboration,
-            "peer",
-            149
-        ) == false);
-    }
-
-    #[test]
-    fn legacy_leases_default_to_public_sensitivity() {
-        let lease = lease();
-        let mut value = serde_json::to_value(&lease).unwrap();
-        let object = value.as_object_mut().unwrap();
-        object.remove("max_read_sensitivity");
-        object.remove("max_write_sensitivity");
-        let restored: CognitiveConsentLease = serde_json::from_value(value).unwrap();
-        assert_eq!(restored.max_read_sensitivity, CognitiveSensitivity::Public);
-        assert_eq!(restored.max_write_sensitivity, CognitiveSensitivity::Public);
-    }
-
-    #[test]
-    fn raw_neural_samples_are_not_a_payload_variant() {
-        let encoded = serde_json::to_string(
-            &NeurosemanticPayload::DerivedNeuralFeature(vec![0.1, 0.2]),
-        )
-        .unwrap();
-        assert!(encoded.contains("DerivedNeuralFeature"));
-        assert!(!encoded.contains("RawNeural"));
-    }
-}

@@ -113,6 +113,7 @@ jobs:
           assert report["exact_graph_roundtrip"] is True
           assert report["authorization_valid"] is True
           assert report["handling_policy_provenance_present"] is True
+          assert report["handling_policy_provenance_hash_valid"] is True
           assert report["first_packet_accepted"] is True
           assert report["exact_replay_detected"] is True
           assert report["tamper_detected"] is True

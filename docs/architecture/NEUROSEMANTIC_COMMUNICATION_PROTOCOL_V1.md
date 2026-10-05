@@ -346,3 +346,9 @@ Thus there are deliberately separate gates:
 4. external identity/policy provenance and revocation authority.
 
 Passing one gate does not imply passage through the others.
+
+### External policy provenance hardening
+
+The handling policy now carries two distinct machine-readable provenance fields: a reference identifying the externally authoritative policy/consent record, and a BLAKE3-256 digest of the exact record bytes (or a separately specified canonical form). The digest prevents two different external records from being treated as equivalent merely because they share a reference string. Symthaea can verify the digest when the external record is available, but it does not authenticate the authority, signature, revocation status, or legal applicability; those remain responsibilities of Mycelix or another designated policy authority.
+
+Changing this binding is a schema change (v3), so v2 handling artifacts fail closed rather than being silently upgraded.
