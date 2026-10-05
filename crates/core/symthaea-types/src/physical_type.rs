@@ -399,6 +399,16 @@ impl PhysicalType {
         }
         if let Some(unit) = &self.unit {
             unit.validate()?;
+            if self.kind == QuantityKind::TemperatureDifference
+                && unit.transform_to_si.offset.numerator != 0
+            {
+                return Err(PhysicalTypeError {
+                    operation: "physical_type".into(),
+                    reason:
+                        "temperature differences cannot use affine unit offsets; use a delta unit"
+                            .into(),
+                });
+            }
         }
         if let Some(semantic_id) = &self.semantic_id {
             semantic_id.validate()?;
@@ -434,6 +444,26 @@ impl PhysicalType {
             });
         }
         TypeJudgement::Valid(())
+    }
+
+    /// Compatibility required when an edge carries actual numeric values.
+    ///
+    /// Ordinary semantic compatibility does not require unit metadata on both
+    /// sides, because a symbolic quantity may intentionally omit display-unit
+    /// information. Executable numeric transport is stricter: either both
+    /// sides have explicit units, or neither does.
+    pub fn judge_numeric_compatibility(&self, other: &Self) -> TypeJudgement<()> {
+        match self.judge_compatibility(other) {
+            TypeJudgement::Invalid(error) => TypeJudgement::Invalid(error),
+            TypeJudgement::Unknown(reason) => TypeJudgement::Unknown(reason),
+            TypeJudgement::Valid(()) => match (&self.unit, &other.unit) {
+                (Some(_), Some(_)) | (None, None) => TypeJudgement::Valid(()),
+                _ => TypeJudgement::Unknown(
+                    "numeric transport requires explicit units on both sides or neither side"
+                        .into(),
+                ),
+            },
+        }
     }
 
     pub fn convert_value_to(
@@ -499,6 +529,9 @@ pub enum QuantityKind {
     Torque,
     Charge,
     Temperature,
+    /// Difference/interval of thermodynamic temperature; unlike absolute
+    /// temperature, its unit transform must not contain an affine offset.
+    TemperatureDifference,
     Pressure,
     Stress,
     Strain,
@@ -526,7 +559,9 @@ impl QuantityKind {
             Self::Energy | Self::Torque => Some(PhysicalDimension::ENERGY),
             Self::Power => Some(PhysicalDimension::POWER),
             Self::Charge => Some(PhysicalDimension::CHARGE),
-            Self::Temperature => Some(PhysicalDimension::TEMPERATURE),
+            Self::Temperature | Self::TemperatureDifference => {
+                Some(PhysicalDimension::TEMPERATURE)
+            }
             Self::Pressure | Self::Stress => Some(PhysicalDimension::PRESSURE),
             Self::Frequency => Some(PhysicalDimension::FREQUENCY),
         }
@@ -704,6 +739,80 @@ mod tests {
         assert!(matches!(
             metres.convert_value_to(1.0, &feet),
             TypeJudgement::Unknown(_)
+        ));
+    }
+
+    #[test]
+    fn temperature_difference_rejects_affine_units() {
+        let delta_c = PhysicalType::with_kind(
+            QuantityKind::TemperatureDifference,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "degC".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale::ONE,
+                RationalScale { numerator: 27315, denominator: 100 },
+            ),
+            semantic_id: None,
+        });
+        let delta_k = PhysicalType::with_kind(
+            QuantityKind::TemperatureDifference,
+            PhysicalDimension::TEMPERATURE,
+        )
+        .with_unit(UnitRef {
+            symbol: "delta_K".into(),
+            transform_to_si: UnitTransform::IDENTITY,
+            semantic_id: None,
+        });
+
+        assert!(delta_c.validate().is_err());
+        assert!(matches!(
+            delta_c.judge_compatibility(&delta_k),
+            TypeJudgement::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn numeric_compatibility_rejects_missing_unit_on_one_side() {
+        let metres = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH);
+        let metres_explicit = metres.clone().with_unit(UnitRef {
+            symbol: "m".into(),
+            transform_to_si: UnitTransform::IDENTITY,
+            semantic_id: None,
+        });
+
+        assert!(matches!(
+            metres.judge_compatibility(&metres_explicit),
+            TypeJudgement::Valid(())
+        ));
+        assert!(matches!(
+            metres.judge_numeric_compatibility(&metres_explicit),
+            TypeJudgement::Unknown(_)
+        ));
+    }
+
+    #[test]
+    fn numeric_compatibility_accepts_explicit_convertible_units() {
+        let metres = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
+            .with_unit(UnitRef {
+                symbol: "m".into(),
+                transform_to_si: UnitTransform::IDENTITY,
+                semantic_id: None,
+            });
+        let feet = PhysicalType::with_kind(QuantityKind::Length, PhysicalDimension::LENGTH)
+            .with_unit(UnitRef {
+                symbol: "ft".into(),
+                transform_to_si: UnitTransform::new(
+                    RationalScale { numerator: 3048, denominator: 10000 },
+                    RationalScale { numerator: 0, denominator: 1 },
+                ),
+                semantic_id: None,
+            });
+
+        assert!(matches!(
+            metres.judge_numeric_compatibility(&feet),
+            TypeJudgement::Valid(())
         ));
     }
 
