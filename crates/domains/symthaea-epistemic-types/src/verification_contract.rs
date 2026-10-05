@@ -402,6 +402,7 @@ pub struct ControllerDocumentDereferenceAttestation {
     pub source: ControllerDocumentResolutionSource,
     pub document_digest: String,
     /// Optional Multibase-encoded SHA-256 multihash for the dereferenced bytes.
+    #[serde(default)]
     pub digest_multibase: Option<String>,
 }
 
@@ -448,45 +449,21 @@ impl ControllerDocumentDereferenceAttestation {
             });
         }
 
-        let requested =
-            Url::parse(&self.requested_url).map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
-        let effective =
-            Url::parse(&self.effective_url).map_err(|_| VerificationFailure::InvalidControllerDocumentUrl)?;
-        if !request
-            .controller_document_network_policy
-            .allows_scheme(requested.scheme())
-            || !request
-                .controller_document_network_policy
-                .allows_scheme(effective.scheme())
-        {
-            return Err(VerificationFailure::ControllerDocumentNetworkPolicyViolation);
-        }
-        if request
-            .controller_document_network_policy
-            .require_effective_url_match
-            && effective.as_str() != requested.as_str()
-        {
-            return Err(VerificationFailure::ControllerDocumentEffectiveUrlMismatch);
-        }
-        if self.redirect_count > request.controller_document_network_policy.max_redirects {
-            return Err(VerificationFailure::ControllerDocumentRedirectLimitExceeded);
-        }
-        if self.response_size_bytes
-            > request.controller_document_network_policy.max_response_bytes
-        {
-            return Err(VerificationFailure::ControllerDocumentResponseTooLarge);
-        }
-        if self.response_media_type.trim().is_empty() {
-            return Err(VerificationFailure::Structural(
-                "controller document response media type must be non-empty".into(),
-            ));
-        }
-        parse_timestamp("controller document resolved at", &self.resolved_at)?;
-        if !is_hex_digest(&self.document_digest) {
-            return Err(VerificationFailure::Structural(
-                "controller document dereference digest must be a 64-character hexadecimal digest"
-                    .into(),
-            ));
+        self.validate_against_policy(
+            &request.controller_document_network_policy,
+            &expected_url,
+            &self.document_digest,
+        )?;
+        match &request.controller_document_integrity_policy {
+            ControllerDocumentIntegrityPolicy::Unpinned => {}
+            ControllerDocumentIntegrityPolicy::Sha256Digest(expected)
+                if expected == &self.document_digest => {}
+            ControllerDocumentIntegrityPolicy::Sha256Digest(expected) => {
+                return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
+                    expected: expected.clone(),
+                    actual: self.document_digest.clone(),
+                });
+            }
         }
         Ok(())
     }
@@ -528,30 +505,8 @@ impl ControllerDocumentDereferenceAttestation {
                     .into(),
             ));
         }
-        match &request.controller_document_integrity_policy {
-            ControllerDocumentIntegrityPolicy::Unpinned => {}
-            ControllerDocumentIntegrityPolicy::Sha256Digest(expected)
-                if expected == &self.document_digest => {}
-            ControllerDocumentIntegrityPolicy::Sha256Digest(expected) => {
-                return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
-                    expected: expected.clone(),
-                    actual: self.document_digest.clone(),
-                });
-            }
-        }
         if let Some(digest_multibase) = &self.digest_multibase {
-            let expected = match &request.controller_document_integrity_policy {
-                ControllerDocumentIntegrityPolicy::Sha256Digest(value) => Some(value.as_str()),
-                ControllerDocumentIntegrityPolicy::Unpinned => None,
-            };
-            validate_sha256_multibase(digest_multibase, expected)?;
-            let actual = hex::encode(decode_sha256_multibase(digest_multibase)?);
-            if !actual.eq_ignore_ascii_case(&self.document_digest) {
-                return Err(VerificationFailure::ControllerDocumentIntegrityMismatch {
-                    expected: self.document_digest.clone(),
-                    actual,
-                });
-            }
+            validate_sha256_multibase(digest_multibase, Some(&self.document_digest))?;
         }
         Ok(())
     }
@@ -1742,6 +1697,7 @@ mod tests {
             request.freshness.verification_time.clone(),
             ControllerDocumentResolutionSource::HistoricalRegistry,
             &"11".repeat(32),
+            None,
         )
         .unwrap();
         resolution
@@ -2197,6 +2153,7 @@ mod tests {
             request.freshness.verification_time.clone(),
             ControllerDocumentResolutionSource::Network,
             &"11".repeat(32),
+            None,
         );
         assert!(matches!(
             redirected,
@@ -2212,6 +2169,7 @@ mod tests {
             request.freshness.verification_time.clone(),
             ControllerDocumentResolutionSource::Network,
             &"11".repeat(32),
+            None,
         );
         assert!(matches!(
             oversized,
@@ -2230,6 +2188,7 @@ mod tests {
             downgrade_policy.freshness.verification_time.clone(),
             ControllerDocumentResolutionSource::Network,
             &"11".repeat(32),
+            None,
         );
         assert!(matches!(
             scheme,
@@ -2251,6 +2210,7 @@ mod tests {
             pinned_request.freshness.verification_time.clone(),
             ControllerDocumentResolutionSource::Cache,
             &"22".repeat(32),
+            None,
         );
         assert!(matches!(
             pinned_mismatch,
