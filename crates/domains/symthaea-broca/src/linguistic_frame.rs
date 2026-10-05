@@ -153,6 +153,12 @@ impl LinguisticFrame {
             return Err(LinguisticFrameError::EmptySourceIntent);
         }
 
+        if matches!(self.strategy, FormulationStrategy::Abstain)
+            && self.binding_status == LinguisticBindingStatus::LexicallyBound
+        {
+            return Err(LinguisticFrameError::AbstentionCannotBind);
+        }
+
         match self.binding_status {
             LinguisticBindingStatus::RoleStructureOnly => {
                 if self.lexical_provenance.is_some() {
@@ -432,6 +438,22 @@ mod tests {
             .expect_err("abstention must remain non-realizable");
 
         assert_eq!(error, LinguisticFrameError::AbstentionCannotBind);
+    }
+
+    #[test]
+    fn persisted_lexical_frame_cannot_bind_abstention() {
+        let plan = plan_for(7, 4.0);
+        let mut frame = LinguisticFrame::from_speech_plan(&plan);
+
+        frame.binding_status = LinguisticBindingStatus::LexicallyBound;
+        frame.lexical_provenance = Some("persisted-lexical-provenance".into());
+
+        assert_eq!(
+            frame
+                .validate()
+                .expect_err("persisted abstention must remain non-realizable"),
+            LinguisticFrameError::AbstentionCannotBind
+        );
     }
 
     #[test]
