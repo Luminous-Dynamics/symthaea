@@ -12294,3 +12294,36 @@ mod tests {
         tx.rollback().unwrap();
         let _=std::fs::remove_file(path);
 }
+
+
+#[test]
+fn historical_identity_fence_indexes_are_present() {
+    let path = std::env::temp_dir().join(format!(
+        "symthaea-gis-auth-history-indexes-{}.db",
+        std::process::id()
+    ));
+    let store = SqliteAuthorizationStore::open(&path).unwrap();
+    let connection = store.connection().unwrap();
+    for index in [
+        "authorization_lease_attempt_history_idx",
+        "authorization_receipt_attempt_history_idx",
+        "authorization_receipt_operation_history_idx",
+        "authorization_status_attempt_history_idx",
+        "authorization_status_operation_history_idx",
+        "authorization_recovery_attempt_history_idx",
+        "authorization_recovery_operation_history_idx",
+        "authorization_terminal_attempt_history_idx",
+        "authorization_terminal_operation_history_idx",
+    ] {
+        let present: Option<String> = connection
+            .query_row(
+                "SELECT name FROM sqlite_master WHERE type='index' AND name=?1",
+                params![index],
+                |row| row.get(0),
+            )
+            .optional()
+            .unwrap();
+        assert_eq!(present.as_deref(), Some(index), "missing expected index: {index}");
+    }
+    let _ = std::fs::remove_file(path);
+}
