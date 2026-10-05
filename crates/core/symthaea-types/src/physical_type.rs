@@ -116,17 +116,42 @@ impl UnitTransform {
 /// Backward-compatible name for multiplicative units.
 pub type UnitScale = RationalScale;
 
+/// Stable external semantic identifier. The core does not interpret the
+/// namespace; adapters may map it to QUDT, SysML, domain catalogs, etc.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SemanticIdentifier {
+    pub namespace: String,
+    pub identifier: String,
+}
+
+impl SemanticIdentifier {
+    pub fn new(namespace: impl Into<String>, identifier: impl Into<String>) -> Option<Self> {
+        let namespace = namespace.into();
+        let identifier = identifier.into();
+        if namespace.trim().is_empty() || identifier.trim().is_empty() {
+            None
+        } else {
+            Some(Self { namespace, identifier })
+        }
+    }
+}
+
 /// Named unit identity plus exact conversion to canonical SI semantics.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct UnitRef {
     pub symbol: String,
     pub transform_to_si: UnitTransform,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_id: Option<SemanticIdentifier>,
 }
 
 /// Physical quantity meaning, distinct from evidence about that meaning.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PhysicalType {
     pub kind: QuantityKind,
+    /// Optional external quantity-kind identity for ontology interoperability.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semantic_id: Option<SemanticIdentifier>,
     /// None means genuinely unknown; it is never encoded as dimensionless.
     pub dimension: Option<PhysicalDimension>,
     pub unit: Option<UnitRef>,
@@ -138,6 +163,7 @@ impl PhysicalType {
     pub fn unknown() -> Self {
         Self {
             kind: QuantityKind::Unknown,
+            semantic_id: None,
             dimension: None,
             unit: None,
             scalar: ScalarDomain::Unknown,
@@ -148,6 +174,7 @@ impl PhysicalType {
     pub fn dimensionless() -> Self {
         Self {
             kind: QuantityKind::Dimensionless,
+            semantic_id: None,
             dimension: Some(PhysicalDimension::DIMENSIONLESS),
             unit: None,
             scalar: ScalarDomain::Real,
@@ -158,6 +185,7 @@ impl PhysicalType {
     pub fn with_kind(kind: QuantityKind, dimension: PhysicalDimension) -> Self {
         Self {
             kind,
+            semantic_id: None,
             dimension: Some(dimension),
             unit: None,
             scalar: ScalarDomain::Real,
@@ -167,6 +195,11 @@ impl PhysicalType {
 
     pub fn with_unit(mut self, unit: UnitRef) -> Self {
         self.unit = Some(unit);
+        self
+    }
+
+    pub fn with_semantic_id(mut self, semantic_id: SemanticIdentifier) -> Self {
+        self.semantic_id = Some(semantic_id);
         self
     }
 
@@ -322,6 +355,16 @@ mod tests {
             ),
         };
         assert_eq!(celsius.transform_to_si.offset.numerator, 27315);
+    }
+
+    #[test]
+    fn semantic_identifiers_are_optional_but_nonempty() {
+        assert!(SemanticIdentifier::new("", "Length").is_none());
+        assert!(SemanticIdentifier::new("qudt", "").is_none());
+        assert_eq!(
+            SemanticIdentifier::new("qudt", "Length").unwrap().identifier,
+            "Length"
+        );
     }
 
     #[test]
