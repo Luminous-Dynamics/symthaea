@@ -1197,9 +1197,6 @@ impl AlternativesEngine {
             for estimate in candidate.operating_capabilities.values_mut() {
                 estimate.evidence_ids.sort();
             }
-            for estimate in candidate.operating_capabilities.values_mut() {
-                estimate.evidence_ids.sort();
-            }
             for estimate in candidate.burdens.values_mut() {
                 estimate.evidence_ids.sort();
             }
