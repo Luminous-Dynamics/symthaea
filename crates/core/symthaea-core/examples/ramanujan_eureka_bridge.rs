@@ -47,6 +47,7 @@ fn candidate(formula: Expr, source: &str) -> Conjecture {
 fn energy_frame() -> PhysicalType {
     PhysicalType::with_kind(QuantityKind::Energy, PhysicalDimension::ENERGY).with_unit(UnitRef {
         symbol: "J".into(),
+        dimension: PhysicalDimension::ENERGY,
         transform_to_si: UnitTransform::IDENTITY,
         semantic_id: None,
     })
