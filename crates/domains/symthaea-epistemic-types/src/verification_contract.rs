@@ -50,22 +50,6 @@ impl ClaimVerificationRelationship {
         &self.0
     }
 
-    pub fn with_controller_document_dereference(
-        mut self,
-        dereference: ControllerDocumentDereferenceAttestation,
-        request: &VerificationRequest,
-    ) -> Result<Self, VerificationFailure> {
-        dereference.validate_against_request(request)?;
-        if !dereference.matches_document(
-            &self.controller_document_ref,
-            &self.controller_document_digest,
-        ) {
-            return Err(VerificationFailure::ControllerDocumentDereferenceMismatch);
-        }
-        self.controller_document_dereference = Some(dereference);
-        Ok(self)
-    }
-
     pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
         if self.0.trim().is_empty() {
             Err(VerificationFailure::Structural(
@@ -795,6 +779,22 @@ pub struct VerificationMethodResolution {
 
 impl VerificationMethodResolution {
     pub const SCHEMA_VERSION: u16 = 4;
+
+    pub fn with_controller_document_dereference(
+        mut self,
+        dereference: ControllerDocumentDereferenceAttestation,
+        request: &VerificationRequest,
+    ) -> Result<Self, VerificationFailure> {
+        dereference.validate_against_request(request)?;
+        if !dereference.matches_document(
+            &self.controller_document_ref,
+            &self.controller_document_digest,
+        ) {
+            return Err(VerificationFailure::ControllerDocumentDereferenceMismatch);
+        }
+        self.controller_document_dereference = Some(dereference);
+        Ok(self)
+    }
 
     pub fn from_controller_document(
         request: &VerificationRequest,
