@@ -1368,7 +1368,7 @@ impl VerificationContextV5 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvaluationContextSupplement {
     pub supplement_version: &'static str,
-    /// This v1 supplement is explicitly an annotation attached after evaluation.
+    /// This v2 supplement is explicitly an annotation attached after evaluation.
     pub attachment_phase: &'static str,
     /// Exact execution-context identity this annotation applies to.
     pub applies_to_context_fingerprint: Option<String>,
@@ -1376,6 +1376,7 @@ pub struct EvaluationContextSupplement {
     ///
     /// This avoids allowing a post-evaluation annotation to migrate between
     /// distinct evaluations that happened to share the same execution context.
+    #[serde(default)]
     pub applies_to_report_fingerprint: Option<String>,
     pub evaluator_identity_fingerprint: Option<String>,
     pub trust_root_fingerprint: Option<String>,
