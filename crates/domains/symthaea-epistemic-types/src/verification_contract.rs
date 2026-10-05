@@ -307,12 +307,7 @@ impl VerificationMethodResolution {
         methods.dedup();
 
         if !methods.iter().any(|method| method == &request.verification_method) {
-            return Err(VerificationFailure::VerificationRelationshipMismatch {
-                expected: request.expected_verification_relationship.clone(),
-                actual: ClaimVerificationRelationship::new(
-                    "unbound-verification-method"
-                )?,
-            });
+            return Err(VerificationFailure::VerificationMethodNotInRelationship);
         }
 
         let encoded_members =
@@ -1002,6 +997,34 @@ mod tests {
         assert!(matches!(
             ClaimControllerDocumentIdentity::new("not-a-url"),
             Err(VerificationFailure::InvalidControllerDocumentId)
+        ));
+    }
+
+    #[test]
+    fn resolution_rejects_method_absent_from_requested_relationship() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let result = VerificationMethodResolution::from_controller_document(
+            &request,
+            "https://example.test/controller",
+            ClaimControllerDocumentIdentity::new("https://example.test/controller").unwrap(),
+            request.verification_method.clone(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            &[],
+            &"11".repeat(32),
+        );
+
+        assert!(matches!(
+            result,
+            Err(VerificationFailure::VerificationMethodNotInRelationship)
         ));
     }
 
