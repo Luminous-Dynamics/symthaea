@@ -389,6 +389,7 @@ pub struct ScientificInquiryExecutionReceipt {
     pub schema_revision: String,
     pub selection_receipt_digest: String,
     pub selected_challenge_digest: String,
+    pub prediction_frame_digest: String,
     pub execution_manifest_digest: String,
     pub observation_digest: String,
     pub observation_physical_type_digest: String,
@@ -413,6 +414,7 @@ impl ScientificInquiryExecutionReceipt {
             schema_revision: Self::SCHEMA_REVISION.into(),
             selection_receipt_digest: selection_receipt.digest_hex(),
             selected_challenge_digest: selection_receipt.selected_challenge_digest.clone(),
+            prediction_frame_digest: selection_receipt.prediction_frame_digest.clone(),
             execution_manifest_digest: execution_manifest_digest.into(),
             observation_digest: observation_digest.into(),
             observation_physical_type_digest: observation_physical_type.digest_hex(),
@@ -442,6 +444,9 @@ impl ScientificInquiryExecutionReceipt {
         if self.selected_challenge_digest != selection.selected_challenge_digest {
             return Err("execution receipt challenge does not match inquiry selection".into());
         }
+        if self.prediction_frame_digest != selection.prediction_frame_digest {
+            return Err("execution receipt prediction frame does not match inquiry selection".into());
+        }
         Ok(())
     }
 
@@ -452,6 +457,7 @@ impl ScientificInquiryExecutionReceipt {
         for (label, value) in [
             ("selection_receipt_digest", self.selection_receipt_digest.as_str()),
             ("selected_challenge_digest", self.selected_challenge_digest.as_str()),
+            ("prediction_frame_digest", self.prediction_frame_digest.as_str()),
             ("execution_manifest_digest", self.execution_manifest_digest.as_str()),
             ("observation_digest", self.observation_digest.as_str()),
             ("observation_physical_type_digest", self.observation_physical_type_digest.as_str()),
@@ -512,6 +518,7 @@ mod tests {
         assert!(execution.validate().is_ok());
         assert!(execution.validate_against_selection(&selection).is_ok());
         assert_eq!(execution.selected_challenge_digest, selection.selected_challenge_digest);
+        assert_eq!(execution.prediction_frame_digest, selection.prediction_frame_digest);
 
         let mut tampered = execution.clone();
         tampered.selection_receipt_digest = "1111111111111111111111111111111111111111111111111111111111111111".into();
