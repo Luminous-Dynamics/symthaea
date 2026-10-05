@@ -124,6 +124,9 @@ pub struct PhonologicalPlan {
     pub realization_authorized: bool,
     pub focus_role: Option<String>,
     pub intonation: IntonationIntent,
+    /// Relative pitch-range multiplier inherited from the speech-production plan.
+    /// 1.0 is neutral; the realization layer must not reinterpret it as speaker base F0.
+    pub pitch_range: f32,
     pub rate: f32,
     pub pause_weight: f32,
     pub segments: Vec<PhonemeSlot>,
@@ -142,6 +145,7 @@ impl PhonologicalPlan {
             realization_authorized: frame.ready_for_phonology(),
             focus_role: frame.focus_role.clone(),
             intonation: frame.prosody.intonation,
+            pitch_range: frame.prosody.pitch_range,
             rate: sanitize_rate(frame.prosody.rate),
             pause_weight: sanitize_unit(frame.prosody.pause_weight),
             segments: Vec::new(),
@@ -164,6 +168,7 @@ impl PhonologicalPlan {
             && (self.source_intent != frame.source_intent
                 || self.focus_role != frame.focus_role
                 || self.intonation != frame.prosody.intonation
+                || self.pitch_range != frame.prosody.pitch_range
                 || self.rate != sanitize_rate(frame.prosody.rate)
                 || self.pause_weight != sanitize_unit(frame.prosody.pause_weight)
             || self.realization_authorized != frame.ready_for_phonology())
@@ -239,6 +244,9 @@ impl PhonologicalPlan {
         }
         if self.source_intent.trim().is_empty() {
             return Err(PhonologicalPlanError::EmptySourceIntent);
+        }
+        if !self.pitch_range.is_finite() || !(0.65..=1.45).contains(&self.pitch_range) {
+            return Err(PhonologicalPlanError::InvalidPitchRange);
         }
         if !self.rate.is_finite() || !(0.55..=1.35).contains(&self.rate) {
             return Err(PhonologicalPlanError::InvalidRate);
@@ -321,6 +329,7 @@ impl PhonologicalPlan {
             self.source_intent,
             self.focus_role.as_deref().unwrap_or("NONE"),
             self.intonation,
+            self.pitch_range,
             self.rate,
             self.pause_weight,
             self.syllables.len(),
@@ -335,6 +344,7 @@ pub enum PhonologicalPlanError {
     InvalidVersion,
     EmptySourceIntent,
     InvalidRate,
+    InvalidPitchRange,
     InvalidPauseWeight,
     FocusRoleWithoutSegments,
     FocusSegmentsWithoutRole,
@@ -361,6 +371,7 @@ impl std::fmt::Display for PhonologicalPlanError {
             Self::InvalidVersion => write!(f, "phonological plan version is unsupported"),
             Self::EmptySourceIntent => write!(f, "phonological plan source intent must be non-empty"),
             Self::InvalidRate => write!(f, "phonological plan rate is outside the supported range"),
+            Self::InvalidPitchRange => write!(f, "phonological plan pitch range is outside the supported range"),
             Self::InvalidPauseWeight => write!(f, "phonological plan pause weight is outside [0, 1]"),
             Self::FocusRoleWithoutSegments => write!(f, "a focus role requires focused phonemes"),
             Self::FocusSegmentsWithoutRole => write!(f, "focused phonemes require a focus role"),
