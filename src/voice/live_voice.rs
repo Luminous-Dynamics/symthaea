@@ -26,6 +26,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Result;
 use symthaea_core::genesis::GenesisSeed;
+#[cfg(feature = "ssm_language")]
+use symthaea_broca::PhonologicalPlan;
+use symthaea_vocal_tract::pipeline::predict_duration;
 
 use super::audio_out::AudioOutput;
 use super::formant_targets::FormantDatabase;
@@ -147,6 +150,87 @@ impl LiveVoice {
             speaking: Arc::new(AtomicBool::new(false)),
             genesis: genesis.clone(),
         }
+    }
+
+    /// Synthesize an explicit phonological plan into the real-time audio path.
+    ///
+    /// This is intentionally plan-native: no text, G2P reconstruction, or lexical inference
+    /// occurs here. The validated plan supplies explicit phoneme identity, stress, and rate;
+    /// the vocal-tract controller supplies speaker/anatomical parameters. Word-final timing
+    /// remains unasserted because the current phonological contract does not encode word
+    /// boundaries.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_phonological_plan(&mut self, plan: &PhonologicalPlan) -> Result<usize> {
+        let samples = self.synthesize_phonological_plan(plan)?;
+        self.push_with_backpressure(&samples);
+        Ok(samples.len())
+    }
+
+    /// Synthesize an explicit phonological plan directly to WAV without an audio device.
+    ///
+    /// The same scheduler-owned duration calculation is used by the real-time path.
+    #[cfg(feature = "ssm_language")]
+    pub fn speak_phonological_plan_to_file(
+        &mut self,
+        plan: &PhonologicalPlan,
+        path: &Path,
+    ) -> Result<usize> {
+        let samples = self.synthesize_phonological_plan(plan)?;
+        let sample_rate = self.streaming.vocoder.sample_rate();
+        write_wav(path, &samples, sample_rate)?;
+        Ok(samples.len())
+    }
+
+    #[cfg(feature = "ssm_language")]
+    fn synthesize_phonological_plan(&mut self, plan: &PhonologicalPlan) -> Result<Vec<f32>> {
+        plan.validate()
+            .map_err(|error| anyhow::anyhow!("invalid phonological plan: {error}"))?;
+        if !plan.ready_for_realization() {
+            anyhow::bail!("phonological plan is not ready for realization");
+        }
+
+        let total_frames = plan
+            .segments
+            .iter()
+            .enumerate()
+            .map(|(index, segment)| {
+                predict_duration(
+                    &segment.symbol,
+                    segment.stress.ordinal(),
+                    false,
+                    index + 1 == plan.segments.len(),
+                    plan.rate,
+                )
+            })
+            .sum::<usize>();
+
+        let samples_per_frame = (self.sample_rate() / FRAME_RATE.max(1)) as usize;
+        let mut all_samples =
+            Vec::with_capacity(total_frames.saturating_mul(samples_per_frame.max(1)));
+
+        let last_index = plan.segments.len().saturating_sub(1);
+        for (index, segment) in plan.segments.iter().enumerate() {
+            let frames = predict_duration(
+                &segment.symbol,
+                segment.stress.ordinal(),
+                false,
+                index == last_index,
+                plan.rate,
+            );
+            let phoneme = if segment.symbol.eq_ignore_ascii_case("SIL") {
+                None
+            } else {
+                Some(segment.symbol.as_str())
+            };
+            let state = self.cognitive_state.lock().clone();
+
+            for _ in 0..frames {
+                let chunk = self.streaming.tick(&state, None, DT, phoneme);
+                all_samples.extend_from_slice(&chunk);
+            }
+        }
+
+        Ok(all_samples)
     }
 
     /// Speak text in real time with enhanced prosody control
@@ -434,6 +518,94 @@ mod tests {
 
         flag.store(false, Ordering::SeqCst);
         assert!(!flag.load(Ordering::SeqCst));
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_phonological_plan_rate_reaches_real_scheduler() {
+        fn make_plan(rate: f32) -> PhonologicalPlan {
+            use symthaea_broca::{
+                ContentBindingStatus, LinguisticFrame, PhonemeSlot, SpeechPlan, StructuredDecoder,
+                SyllableStress, ThoughtChannels,
+            };
+
+            let genesis = GenesisSeed::from_phrase("plan-native-rate-test");
+            let decoder = StructuredDecoder::new(&genesis);
+            let channels = ThoughtChannels::with_intent(4);
+            let readout = decoder.decode(&channels);
+            let mut speech_plan = SpeechPlan::from_readout(&channels, &readout);
+            speech_plan.prosody.rate = rate;
+
+            let frame = LinguisticFrame::from_speech_plan(&speech_plan);
+            let mut plan = PhonologicalPlan::from_linguistic_frame(&frame);
+            plan.bind_segments(
+                vec![PhonemeSlot::new(
+                    "AH",
+                    0,
+                    SyllableStress::Primary,
+                    true,
+                    false,
+                    true,
+                )],
+                ContentBindingStatus::PhonologicallyBound,
+            )
+            .expect("explicit phonological fixture");
+            plan
+        }
+
+        let genesis = GenesisSeed::from_phrase("plan-native-rate-test");
+        let mut voice = LiveVoice::new_headless(&genesis);
+
+        let slow = make_plan(0.70);
+        let fast = make_plan(1.30);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let slow_path = dir.path().join("slow.wav");
+        let fast_path = dir.path().join("fast.wav");
+
+        let slow_samples = voice
+            .speak_phonological_plan_to_file(&slow, &slow_path)
+            .expect("slow plan should synthesize");
+
+        voice.reset();
+
+        let fast_samples = voice
+            .speak_phonological_plan_to_file(&fast, &fast_path)
+            .expect("fast plan should synthesize");
+
+        assert!(
+            slow_samples > fast_samples,
+            "scheduler must consume plan rate: slow={slow_samples}, fast={fast_samples}"
+        );
+        assert_eq!(
+            slow_samples as f64 / voice.sample_rate() as f64,
+            (slow_samples / voice.sample_rate() as usize) as f64,
+            "sample counts remain integral at the configured sample rate"
+        );
+    }
+
+    #[cfg(feature = "ssm_language")]
+    #[test]
+    fn test_role_only_phonological_plan_is_rejected() {
+        use symthaea_broca::{LinguisticFrame, SpeechPlan, StructuredDecoder, ThoughtChannels};
+
+        let genesis = GenesisSeed::from_phrase("plan-native-rejection-test");
+        let decoder = StructuredDecoder::new(&genesis);
+        let channels = ThoughtChannels::with_intent(4);
+        let readout = decoder.decode(&channels);
+        let frame = LinguisticFrame::from_speech_plan(&SpeechPlan::from_readout(&channels, &readout));
+        let plan = PhonologicalPlan::from_linguistic_frame(&frame);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("rejected.wav");
+        let mut voice = LiveVoice::new_headless(&genesis);
+
+        let error = voice
+            .speak_phonological_plan_to_file(&plan, &path)
+            .expect_err("role-only plans must not reach synthesis");
+
+        assert!(error.to_string().contains("not ready for realization"));
+        assert!(!path.exists());
     }
 
     #[test]
