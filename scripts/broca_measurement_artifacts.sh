@@ -103,10 +103,7 @@ fi
 # Broca-only, composed, and composed+feedback conditions.
 # The resulting JSON is also rendered by broca_measurement_summary.py for reviewer-facing evidence.
 if [[ "${BROCA_RUN_ATTRIBUTION_HARNESS:-1}" == "1" ]]; then
-  # The root package defaults to `default-mind` -> `broca_lite`, which is mutually\
-  # exclusive with `ssm_language`. Keep this measurement path explicitly isolated\
-  # from the default mind bundle so the harness tests the intended native Broca stack.\
-  cargo run "${cargo_locked_args[@]}" --no-default-features --features "ssm_language,vocal-tract" --bin broca-attribution-harness -- \
+  cargo run "${cargo_locked_args[@]}" --features "ssm_language,vocal-tract" --bin broca-attribution-harness -- \
     --json-out "$OUT_DIR/attribution-harness.json"
 else
   cat > "$OUT_DIR/attribution-harness.json" <<'JSON'
@@ -119,6 +116,11 @@ else
 }
 JSON
 fi
+# Deterministic lexical/morphosyntactic evidence: fixed corpus for lexical coverage,
+# provenance, agreement, function-word separation, unsupported-rule behavior, and stale lineage.
+cargo run "${cargo_locked_args[@]}" -p symthaea-broca --bin broca-lexical-binding-audit -- \
+  --json-out "$OUT_DIR/lexical-binding-audit.json"
+
 # Deterministic architecture-contract evidence: exercises the full intent × epistemic matrix
 # without invoking a stochastic language or acoustic backend.
 cargo run "${cargo_locked_args[@]}" -p symthaea-broca --bin broca-production-contract-audit -- \
