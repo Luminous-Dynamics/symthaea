@@ -652,7 +652,6 @@ pub fn App() -> impl IntoView {
                 }
             });
         });
-        });
     }
 
     // Poll GET-equivalent /v1/service status every 5s. This is baseline
