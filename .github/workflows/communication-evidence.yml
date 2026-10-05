@@ -115,6 +115,7 @@ jobs:
           assert report["handling_policy_provenance_present"] is True
           assert report["handling_policy_provenance_hash_valid"] is True
           assert report["handling_policy_provenance_mismatch_blocked"] is True
+          assert report["inference_escalation_blocked"] is True
           assert report["first_packet_accepted"] is True
           assert report["exact_replay_detected"] is True
           assert report["expired_replay_state_reclaimed"] is True
