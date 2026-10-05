@@ -169,51 +169,6 @@ fn parse_timestamp(
     })
 }
 
-    #[test]
-    fn freshness_context_rejects_future_expiry_and_mismatched_replay_inputs() {
-        let valid = default_freshness();
-        assert!(valid.validate().is_ok());
-
-        let mut future_created = valid.clone();
-        future_created.proof_created = Some("2026-10-05T04:00:00Z".into());
-        assert!(matches!(
-            future_created.validate(),
-            Err(VerificationFailure::ProofCreatedInFuture)
-        ));
-
-        let mut expired = valid.clone();
-        expired.proof_expires = Some("2026-10-05T02:00:00Z".into());
-        assert!(matches!(
-            expired.validate(),
-            Err(VerificationFailure::ProofExpired)
-        ));
-
-        let mut wrong_domain = valid.clone();
-        wrong_domain.proof_domain = Some("other.example".into());
-        assert!(matches!(
-            wrong_domain.validate(),
-            Err(VerificationFailure::DomainMismatch { .. })
-        ));
-
-        let mut wrong_challenge = valid;
-        wrong_challenge.proof_challenge = Some("challenge-2".into());
-        assert!(matches!(
-            wrong_challenge.validate(),
-            Err(VerificationFailure::ChallengeMismatch { .. })
-        ));
-    }
-
-    #[test]
-    fn replay_context_digest_changes_when_domain_or_challenge_changes() {
-        let base = default_freshness();
-        let mut domain = base.clone();
-        domain.proof_domain = Some("other.example".into());
-        let mut challenge = base.clone();
-        challenge.proof_challenge = Some("challenge-2".into());
-        assert_ne!(base.replay_context_digest(), domain.replay_context_digest());
-        assert_ne!(base.replay_context_digest(), challenge.replay_context_digest());
-    }
-
 /// The exact structural and identity inputs an external verification adapter must
 /// operate over before it can return cryptographic/controller evidence.
 ///
@@ -344,6 +299,7 @@ impl VerificationRequest {
             .validate_structure()
             .map_err(|reason| VerificationFailure::Structural(reason.to_owned()))?;
         self.expected_verification_relationship.validate_structure()?;
+        self.freshness.validate()?;
         Ok(())
     }
 }
@@ -460,8 +416,8 @@ impl VerificationEvidence {
             verification_relationship,
             controller_document_ref,
             controller_document_digest,
-            verification_relationship,
             cryptosuite,
+            freshness: request.freshness.clone(),
             signed_payload_digest,
             proof_digest,
         })
@@ -720,6 +676,89 @@ mod tests {
         )
         .unwrap()
     }
+
+    fn default_freshness() -> VerificationFreshnessContext {
+        VerificationFreshnessContext {
+            proof_created: Some("2026-10-05T00:00:00Z".into()),
+            proof_expires: Some("2026-10-05T03:00:00Z".into()),
+            proof_domain: Some("example.test".into()),
+            proof_challenge: Some("challenge-1".into()),
+            verification_time: "2026-10-05T02:00:00Z".into(),
+            expected_domain: Some("example.test".into()),
+            expected_challenge: Some("challenge-1".into()),
+        }
+    }
+
+    #[test]
+    fn freshness_context_rejects_future_expiry_and_mismatched_replay_inputs() {
+        let valid = default_freshness();
+        assert!(valid.validate().is_ok());
+
+        let mut future_created = valid.clone();
+        future_created.proof_created = Some("2026-10-05T04:00:00Z".into());
+        assert!(matches!(
+            future_created.validate(),
+            Err(VerificationFailure::ProofCreatedInFuture)
+        ));
+
+        let mut expired = valid.clone();
+        expired.proof_expires = Some("2026-10-05T02:00:00Z".into());
+        assert!(matches!(
+            expired.validate(),
+            Err(VerificationFailure::ProofExpired)
+        ));
+
+        let mut invalid_window = valid.clone();
+        invalid_window.proof_created = Some("2026-10-05T02:30:00Z".into());
+        invalid_window.proof_expires = Some("2026-10-05T02:15:00Z".into());
+        assert!(matches!(
+            invalid_window.validate(),
+            Err(VerificationFailure::InvalidValidityWindow)
+        ));
+
+        let mut wrong_domain = valid.clone();
+        wrong_domain.proof_domain = Some("other.example".into());
+        assert!(matches!(
+            wrong_domain.validate(),
+            Err(VerificationFailure::DomainMismatch { .. })
+        ));
+
+        let mut wrong_challenge = valid;
+        wrong_challenge.proof_challenge = Some("challenge-2".into());
+        assert!(matches!(
+            wrong_challenge.validate(),
+            Err(VerificationFailure::ChallengeMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn freshness_rejects_malformed_timestamps_and_blank_security_context() {
+        let mut malformed = default_freshness();
+        malformed.verification_time = "2026-10-05T02:00:00".into();
+        assert!(matches!(
+            malformed.validate(),
+            Err(VerificationFailure::InvalidTimestamp { field: "verification time", .. })
+        ));
+
+        let mut blank_domain = default_freshness();
+        blank_domain.expected_domain = Some("   ".into());
+        assert!(matches!(
+            blank_domain.validate(),
+            Err(VerificationFailure::Structural(_))
+        ));
+    }
+
+    #[test]
+    fn replay_context_digest_changes_when_domain_or_challenge_changes() {
+        let base = default_freshness();
+        let mut domain = base.clone();
+        domain.proof_domain = Some("other.example".into());
+        let mut challenge = base.clone();
+        challenge.proof_challenge = Some("challenge-2".into());
+        assert_ne!(base.replay_context_digest(), domain.replay_context_digest());
+        assert_ne!(base.replay_context_digest(), challenge.replay_context_digest());
+    }
+
 
     #[test]
     fn request_binds_exact_claim_purpose_and_controller() {
