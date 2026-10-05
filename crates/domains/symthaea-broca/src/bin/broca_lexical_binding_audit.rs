@@ -40,6 +40,7 @@ struct AuditReport {
     unsupported_rule_unbound_pass: bool,
     stable_repeat_pass: bool,
     phonological_handoff_pass: bool,
+    rate_duration_projection_pass: bool,
     cases: Vec<AuditCase>,
 }
 
@@ -643,6 +644,14 @@ fn main() -> Result<()> {
         },
     });
 
+    let rate_duration_projection_pass = {
+        let normal = symthaea_vocal_tract::pipeline::predict_duration("AH", 1, false, false, 1.0);
+        let slower = symthaea_vocal_tract::pipeline::predict_duration("AH", 1, false, false, 0.70);
+        let faster = symthaea_vocal_tract::pipeline::predict_duration("AH", 1, false, false, 1.30);
+
+        slower > normal && normal > faster
+    };
+
     let repeat_a = {
         let frame = statement_frame();
         let bindings = base_bindings(&frame);
@@ -732,6 +741,7 @@ fn main() -> Result<()> {
         unsupported_rule_unbound_pass,
         stable_repeat_pass,
         phonological_handoff_pass,
+        rate_duration_projection_pass,
         cases,
     };
 
@@ -744,7 +754,8 @@ fn main() -> Result<()> {
         && report.unsupported_rule_unbound_pass
         && report.stable_repeat_pass
         && report.all_negative_cases_pass
-        && report.phonological_handoff_pass;
+        && report.phonological_handoff_pass
+        && report.rate_duration_projection_pass;
 
     println!("{}", serde_json::to_string_pretty(&report)?);
 
