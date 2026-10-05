@@ -392,10 +392,10 @@ mod hypothesis_handoff_tests {
         let hb = b.scientific_hypothesis_handoff(
             &energy,
             ModelMaturity::ResearchPrototype,
-            "obs",
-            "search",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             7,
-            "manifest",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             vec!["not qualification".into()],
         );
         assert_eq!(ha.candidate_digest, hb.candidate_digest);
@@ -406,10 +406,10 @@ mod hypothesis_handoff_tests {
             a.scientific_hypothesis_handoff(
                 &energy,
                 ModelMaturity::ResearchPrototype,
-                "obs",
-                "search",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 7,
-                "manifest",
+                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
                 vec!["not qualification".into()],
             )
             .candidate_digest,
