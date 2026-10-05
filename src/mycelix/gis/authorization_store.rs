@@ -6243,6 +6243,42 @@ mod tests {
             &TestProviderVerifier
         ).unwrap();
 
+        let persisted_receipt_operation: Option<String> = store.connection().unwrap().query_row(
+            "SELECT operation_id
+             FROM authorization_receipts
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND phase='final'",
+            params![record.authorization_instance.as_str(),record.attempt_id.as_str()],
+            |r| r.get(0)
+        ).unwrap();
+        assert_eq!(persisted_receipt_operation.as_deref(), Some(record.operation_id.as_str()));
+
+        store.connection().unwrap().execute(
+            "UPDATE authorization_receipts
+             SET operation_id='operation:tampered-receipt'
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND phase='final'",
+            params![record.authorization_instance.as_str(),record.attempt_id.as_str()],
+        ).unwrap();
+        assert!(matches!(
+            store.commit_bound_verified(
+                &record,
+                &evidence,
+                &TestProviderVerifier,
+            ),
+            Err(AuthorizationStoreError::Consumption(
+                AuthorizationConsumptionError::InvalidBinding
+            ))
+        ));
+        store.connection().unwrap().execute(
+            "UPDATE authorization_receipts
+             SET operation_id=?3
+             WHERE authorization_instance=?1 AND attempt_id=?2 AND phase='final'",
+            params![
+                record.authorization_instance.as_str(),
+                record.attempt_id.as_str(),
+                record.operation_id.as_str()
+            ],
+        ).unwrap();
+
         store.connection().unwrap().execute(
             "UPDATE authorization_terminal_evidence
              SET validity_policy_digest='sha256:tampered-terminal-validity'
