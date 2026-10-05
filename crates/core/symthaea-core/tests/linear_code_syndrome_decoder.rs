@@ -903,12 +903,15 @@ fn random_code_list_surface_matches_independent_oracles_and_is_deterministic() {
     for (dimension, rank, observations, no_match, max_multiplicity, histogram) in &first {
         let total_decoded = histogram.iter().skip(1).sum::<usize>();
         assert_eq!(total_decoded + no_match, *observations);
+        assert!(max_multiplicity <= 16);
+        let histogram_serialized = histogram[1..]
+            .iter()
+            .enumerate()
+            .map(|(multiplicity, count)| format!("{}:{}", multiplicity + 1, count))
+            .collect::<Vec<_>>()
+            .join(",");
         println!(
-            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram_1={};histogram_2={};histogram_3={};histogram_4={};deterministic=true;independent_syndrome_oracle=true",
-            histogram[1],
-            histogram[2],
-            histogram[3],
-            histogram[4],
+            "RANDOM_LIST_ORACLE=dimension={dimension};rank={rank};observations={observations};no_match={no_match};max_multiplicity={max_multiplicity};histogram={histogram_serialized};deterministic=true;independent_syndrome_oracle=true",
         );
     }
 }

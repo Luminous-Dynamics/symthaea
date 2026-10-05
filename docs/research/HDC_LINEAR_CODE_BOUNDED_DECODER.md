@@ -134,8 +134,10 @@ set membership are independently checked. Observations outside the bound must
 remain explicit NoMatchWithinBound results.
 
 The entire probe is repeated with identical seeds and observations and the
-list-size distributions must be byte-for-byte identical. This makes the empirical
-random-code ledger deterministic without pretending it is an asymptotic theorem.
+complete multiplicity histogram (1 through 16) must be identical. The emitted
+ledger therefore exposes the full observed list-size distribution rather than
+only a selected prefix. This makes the empirical random-code result deterministic
+without pretending it is an asymptotic theorem.
 
 ## Why this is an independent algorithm
 
