@@ -414,6 +414,55 @@ mod tests {
     }
 
     #[test]
+    fn one_lexical_constituent_may_cover_multiple_segments() {
+        let binding = binding();
+        let segments = vec![
+            PhonemeSlot::new("P0A", 0, crate::SyllableStress::Primary, true, false, true),
+            PhonemeSlot::new("P0B", 1, crate::SyllableStress::Primary, false, false, false),
+            PhonemeSlot::new("P1", 2, crate::SyllableStress::Primary, true, false, true),
+            PhonemeSlot::new("P2", 3, crate::SyllableStress::Primary, true, false, true),
+            PhonemeSlot::new("P3", 4, crate::SyllableStress::Primary, true, false, true),
+            PhonemeSlot::new("P4", 5, crate::SyllableStress::Primary, true, false, true),
+        ];
+
+        let mut mappings = Vec::new();
+        mappings.push(LexicalPhonologicalMapping {
+            lexical_position: 0,
+            segment_indices: vec![0, 1],
+            symbols: vec!["P0A".into(), "P0B".into()],
+        });
+        for position in 1..binding.constituents.len() {
+            mappings.push(LexicalPhonologicalMapping {
+                lexical_position: position,
+                segment_indices: vec![position + 1],
+                symbols: vec![segments[position + 1].symbol.clone()],
+            });
+        }
+        mappings.truncate(6);
+
+        let witness = LexicalPhonologicalWitness::new(&binding, mappings)
+            .expect("multi-segment lexical mapping should validate");
+        assert!(witness.validate_against_segments(&binding, &segments).is_ok());
+    }
+
+    #[test]
+    fn out_of_range_segment_reference_fails_closed() {
+        let binding = binding();
+        let mut witness = witness_for_segments(&binding);
+        witness.mappings[0].segment_indices[0] = usize::MAX;
+
+        assert_eq!(
+            witness
+                .validate_against_segments(&binding, &segments(&binding))
+                .expect_err("out-of-range segment reference must fail"),
+            LexicalPhonologicalWitnessError::SegmentIndexOutOfRange {
+                lexical_position: 0,
+                segment_index: usize::MAX,
+            }
+        );
+    }
+
+    #[test]
     fn provenance_mismatch_fails_closed() {
         let binding = binding();
         let mut witness = witness_for_segments(&binding);
