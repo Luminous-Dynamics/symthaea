@@ -12,6 +12,8 @@
 use crate::action::authorization::NixLocalExecutionAuthorityV1;
 use crate::action::service_domain::{NixServiceOperationKindV1, NixServiceOperationV1};
 use crate::action::service_manager::ServiceManager;
+#[cfg(test)]
+use crate::action::service_state::NixServiceObservedStateV1;
 use crate::traits::{ActionType, ConsciousnessThresholds, PhiAwareScoring};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
