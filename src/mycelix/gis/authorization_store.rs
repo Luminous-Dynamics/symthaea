@@ -1914,6 +1914,8 @@ impl SqliteAuthorizationStore {
             }
         }
 
+        drop(rows);
+        drop(stmt);
         tx.execute(
             "INSERT INTO authorization_native_authority_pins(issuer,authority_namespace)
              VALUES (?1,?2)",
@@ -2117,8 +2119,10 @@ fn validate_native_authority_pin_set(
         let valid = if let Some(hex_digest) = pin_set_digest.strip_prefix("sha256:v2:") {
             let mut digest_material = Vec::with_capacity(canonical.len() + pin_set_id.len() + 64);
             digest_material.extend_from_slice(b"symthaea:gis:native-pin-set-digest:v2\n");
-            append_len_prefixed(&mut digest_material, pin_set_id.as_bytes());
-            append_len_prefixed(&mut digest_material, &canonical);
+            digest_material.extend_from_slice(&(pin_set_id.len() as u64).to_be_bytes());
+            digest_material.extend_from_slice(pin_set_id.as_bytes());
+            digest_material.extend_from_slice(&(canonical.len() as u64).to_be_bytes());
+            digest_material.extend_from_slice(&canonical);
             hex::encode(Sha256::digest(&digest_material)) == hex_digest
         } else if let Some(hex_digest) = pin_set_digest.strip_prefix("sha256:") {
             // Historical v1 snapshots were content-only; retain validation for
@@ -2209,7 +2213,7 @@ fn validate_native_authority_pin_set(
         if bound.is_some() {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
-        let lease = load_lease(&tx, &witness.authorization_instance)?
+        let mut lease = load_lease(&tx, &witness.authorization_instance)?
             .ok_or_else(|| AuthorizationStoreError::NotFound(witness.authorization_instance.clone()))?;
         lease.prepare_for_execution(witness, action, current_frame, attempt_id)?;
         tx.execute(
@@ -3535,8 +3539,8 @@ fn validate_native_authority_pin_set(
             || target_identity != record.target_identity
             || audience != record.audience
             || adapter != record.adapter
-            || adapter_revision.as_str() != record.adapter_revision.as_str()
-            || adapter_implementation_digest.as_str() != record.adapter_implementation_digest.as_str()
+            || adapter_revision.as_deref() != Some(record.adapter_revision.as_str())
+            || adapter_implementation_digest.as_deref() != Some(record.adapter_implementation_digest.as_str())
             || boundary_id != record.boundary_id
             || attempt_scope_digest.as_deref() != Some(
                 compute_attempt_scope_digest(&record.boundary_id,&record.attempt_id)?.as_str()
@@ -4190,7 +4194,7 @@ fn validate_native_authority_pin_set(
             let mut connection = self.connection()?;
             let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
             let persisted_state = self.validate_persisted_dispatch_record(&tx, record)?;
-            if matches!(persisted_state, "succeeded" | "failed") {
+            if matches!(persisted_state.as_str(), "succeeded" | "failed") {
                 if let Some(receipt) =
                     load_receipt(&tx, &record.authorization_instance, &record.attempt_id, "final")?
                 {
@@ -4391,6 +4395,7 @@ fn validate_native_authority_pin_set(
             let receipt = ExecutionReceipt {
                 action_id: action_id.clone(),
                 authorization_instance: instance.clone(),
+                operation_id: persisted_bound_record.as_ref().map(|record| record.operation_id.clone()),
                 action_digest: action_digest.clone(),
                 provider_idempotency_key: recovered_provider_key,
                 attempt_id: attempt_id.clone(),
@@ -4736,6 +4741,8 @@ fn load_receipt(
         return Ok(None);
     };
 
+    let mut operation_id = None;
+
     let outcome = match outcome.as_str() {
         "succeeded" => ExecutionOutcome::Succeeded,
         "failed" => ExecutionOutcome::Failed,
@@ -4767,8 +4774,8 @@ fn load_receipt(
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
 
-        let dispatch: Option<(String,String,String,String,Option<String>)> = tx.query_row(
-            "SELECT action_id,action_digest,provider_idempotency_key,boundary_id,attempt_scope_digest
+        let dispatch: Option<(String,String,String,String,String,Option<String>)> = tx.query_row(
+            "SELECT operation_id,action_id,action_digest,provider_idempotency_key,boundary_id,attempt_scope_digest
              FROM authorization_dispatches
              WHERE authorization_instance=?1 AND attempt_id=?2",
             params![authorization_instance,attempt_id],
@@ -4778,10 +4785,12 @@ fn load_receipt(
                 r.get(2)?,
                 r.get(3)?,
                 r.get(4)?,
+                r.get(5)?,
             )),
         ).optional()?;
 
         let Some((
+            dispatch_operation_id,
             dispatch_action_id,
             dispatch_action_digest,
             dispatch_provider_key,
@@ -4799,6 +4808,7 @@ fn load_receipt(
         {
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         }
+        operation_id = Some(dispatch_operation_id);
     } else if attempt_scope_digest.as_ref().is_some_and(|scope| !scope.is_empty()) {
         return Err(AuthorizationConsumptionError::InvalidBinding.into());
     }
@@ -4820,6 +4830,7 @@ fn load_receipt(
     Ok(Some(ExecutionReceipt {
         authorization_instance,
         action_id,
+        operation_id,
         attempt_id,
         outcome,
         action_digest,
@@ -4917,8 +4928,8 @@ fn validate_persisted_terminal_evidence(
         || target_identity != record.target_identity
         || audience != record.audience
         || adapter.as_str() != record.adapter.as_str()
-        || adapter_revision.as_deref() != Some(record.adapter_revision.as_str())
-        || adapter_implementation_digest.as_deref() != Some(record.adapter_implementation_digest.as_str())
+        || adapter_revision.as_str() != record.adapter_revision.as_str()
+        || adapter_implementation_digest.as_str() != record.adapter_implementation_digest.as_str()
         || outcome != expected_outcome
         || evidence_id.is_empty()
         || evidence_digest.is_empty()
