@@ -2395,6 +2395,279 @@ mod tests {
         bytes
     }
 
+    // Independent reconstruction of the v3 assessment semantics and durable fingerprint.
+    // This intentionally avoids the production classifier, reachable-scope helpers, and
+    // canonical encoding helpers so the test can detect agreement caused by a shared bug.
+    fn oracle_v3_assessment(
+        graph: &ObservationGraph,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> (
+        EvidenceIndependence,
+        IndependenceBasis,
+        Vec<String>,
+        String,
+        String,
+    ) {
+        use std::collections::{HashMap, HashSet};
+
+        fn ancestors(seed: &str, by_id: &HashMap<&str, &Observation>) -> HashSet<String> {
+            let mut result = HashSet::new();
+            let mut stack = by_id[seed]
+                .provenance
+                .parent_observation_ids
+                .clone();
+
+            while let Some(current) = stack.pop() {
+                if !result.insert(current.clone()) {
+                    continue;
+                }
+                for parent in &by_id[&current.as_str()]
+                    .provenance
+                    .parent_observation_ids
+                {
+                    stack.push(parent.clone());
+                }
+            }
+            result
+        }
+
+        fn put_string(hasher: &mut blake3::Hasher, value: &str) {
+            hasher.update(&(value.len() as u64).to_be_bytes());
+            hasher.update(value.as_bytes());
+        }
+
+        fn put_string_vec(hasher: &mut blake3::Hasher, values: &[String]) {
+            hasher.update(&(values.len() as u64).to_be_bytes());
+            for value in values {
+                put_string(hasher, value);
+            }
+        }
+
+        fn put_coverage(hasher: &mut blake3::Hasher, value: ProvenanceCoverage) {
+            hasher.update(&[match value {
+                ProvenanceCoverage::Complete => 0,
+                ProvenanceCoverage::Partial => 1,
+                ProvenanceCoverage::Redacted => 2,
+            }]);
+        }
+
+        fn put_independence(hasher: &mut blake3::Hasher, value: &EvidenceIndependence) {
+            hasher.update(&[match value {
+                EvidenceIndependence::Independent => 0,
+                EvidenceIndependence::VerifiedIndependent => 1,
+                EvidenceIndependence::SharedUpstream => 2,
+                EvidenceIndependence::Derived => 3,
+                EvidenceIndependence::Unknown => 4,
+            }]);
+        }
+
+        fn put_basis(hasher: &mut blake3::Hasher, value: &IndependenceBasis) {
+            match value {
+                IndependenceBasis::SharedSensor { sensor_id } => {
+                    hasher.update(&[0]);
+                    put_string(hasher, sensor_id);
+                }
+                IndependenceBasis::SharedPlatform { platform_id } => {
+                    hasher.update(&[1]);
+                    put_string(hasher, platform_id);
+                }
+                IndependenceBasis::SharedAncestor { observation_id } => {
+                    hasher.update(&[2]);
+                    put_string(hasher, observation_id);
+                }
+                IndependenceBasis::SharedProcessingActivity { activity_id } => {
+                    hasher.update(&[3]);
+                    put_string(hasher, activity_id);
+                }
+                IndependenceBasis::IdenticalAsset {
+                    hash_algorithm,
+                    content_hash,
+                } => {
+                    hasher.update(&[4]);
+                    put_string(hasher, hash_algorithm);
+                    put_string(hasher, content_hash);
+                }
+                IndependenceBasis::InsufficientProvenance { coverage } => {
+                    hasher.update(&[5]);
+                    put_coverage(hasher, *coverage);
+                }
+                IndependenceBasis::NoSharedProvenance => {
+                    hasher.update(&[6]);
+                }
+            }
+        }
+
+        let by_id = graph
+            .observations
+            .iter()
+            .map(|observation| (observation.id.as_str(), observation))
+            .collect::<HashMap<_, _>>();
+        let source = by_id[source_observation_id];
+        let target = by_id[target_observation_id];
+        let source_ancestors = ancestors(source_observation_id, &by_id);
+        let target_ancestors = ancestors(target_observation_id, &by_id);
+
+        let (classification, basis) =
+            if !matches!(source.provenance.coverage, ProvenanceCoverage::Complete)
+                || !matches!(target.provenance.coverage, ProvenanceCoverage::Complete)
+            {
+                let coverage = if !matches!(
+                    source.provenance.coverage,
+                    ProvenanceCoverage::Complete
+                ) {
+                    source.provenance.coverage
+                } else {
+                    target.provenance.coverage
+                };
+                (
+                    EvidenceIndependence::Unknown,
+                    IndependenceBasis::InsufficientProvenance { coverage },
+                )
+            } else if source.provenance.source.sensor_id == target.provenance.source.sensor_id {
+                (
+                    EvidenceIndependence::SharedUpstream,
+                    IndependenceBasis::SharedSensor {
+                        sensor_id: source.provenance.source.sensor_id.clone(),
+                    },
+                )
+            } else if let (Some(source_platform), Some(target_platform)) = (
+                source.provenance.source.platform_id.as_ref(),
+                target.provenance.source.platform_id.as_ref(),
+            ) {
+                if source_platform == target_platform {
+                    (
+                        EvidenceIndependence::SharedUpstream,
+                        IndependenceBasis::SharedPlatform {
+                            platform_id: source_platform.clone(),
+                        },
+                    )
+                } else {
+                    Self::oracle_v3_no_shared_basis(
+                        source,
+                        target,
+                        &source_ancestors,
+                        &target_ancestors,
+                        &by_id,
+                    )
+                }
+            } else {
+                Self::oracle_v3_no_shared_basis(
+                    source,
+                    target,
+                    &source_ancestors,
+                    &target_ancestors,
+                    &by_id,
+                )
+            };
+
+        let mut examined_observation_ids = source_ancestors
+            .union(&target_ancestors)
+            .cloned()
+            .chain([source_observation_id.to_string(), target_observation_id.to_string()])
+            .collect::<Vec<_>>();
+        examined_observation_ids.sort();
+        examined_observation_ids.dedup();
+
+        let scope_fingerprint = blake3::hash(&oracle_v3_scope_bytes(
+            graph,
+            source_observation_id,
+            target_observation_id,
+        ))
+        .to_hex()
+        .to_string();
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea:observation-independence-assessment:v3\n");
+        put_string(&mut hasher, source_observation_id);
+        put_string(&mut hasher, target_observation_id);
+        put_string_vec(&mut hasher, &examined_observation_ids);
+        put_string(&mut hasher, &scope_fingerprint);
+        put_string(&mut hasher, INDEPENDENCE_VERIFIER_VERSION_V3);
+        put_independence(&mut hasher, &classification);
+        put_basis(&mut hasher, &basis);
+
+        (
+            classification,
+            basis,
+            examined_observation_ids,
+            scope_fingerprint,
+            hasher.finalize().to_hex().to_string(),
+        )
+    }
+
+    // Kept separate from oracle_v3_assessment so the assessment oracle's precedence and
+    // lineage/activity logic are not accidentally delegated back to production code.
+    fn oracle_v3_no_shared_basis(
+        source: &Observation,
+        target: &Observation,
+        source_ancestors: &HashSet<String>,
+        target_ancestors: &HashSet<String>,
+        by_id: &HashMap<&str, &Observation>,
+    ) -> (EvidenceIndependence, IndependenceBasis) {
+        if let Some(shared_ancestor) = source_ancestors.intersection(target_ancestors).min() {
+            return (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedAncestor {
+                    observation_id: shared_ancestor.clone(),
+                },
+            );
+        }
+
+        let source_activities = source_ancestors
+            .iter()
+            .filter_map(|id| by_id.get(id.as_str()))
+            .chain(std::iter::once(source))
+            .filter_map(|observation| {
+                observation
+                    .provenance
+                    .processing_activity
+                    .as_ref()
+                    .map(|activity| activity.activity_id.as_str())
+            })
+            .collect::<HashSet<_>>();
+        let target_activities = target_ancestors
+            .iter()
+            .filter_map(|id| by_id.get(id.as_str()))
+            .chain(std::iter::once(target))
+            .filter_map(|observation| {
+                observation
+                    .provenance
+                    .processing_activity
+                    .as_ref()
+                    .map(|activity| activity.activity_id.as_str())
+            })
+            .collect::<HashSet<_>>();
+
+        if let Some(shared_activity) = source_activities.intersection(&target_activities).min() {
+            return (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedProcessingActivity {
+                    activity_id: (*shared_activity).to_string(),
+                },
+            );
+        }
+
+        if let (Some(source_asset), Some(target_asset)) =
+            (source.asset.as_ref(), target.asset.as_ref())
+            && source_asset.hash_algorithm == target_asset.hash_algorithm
+            && source_asset.content_hash == target_asset.content_hash
+        {
+            return (
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::IdenticalAsset {
+                    hash_algorithm: source_asset.hash_algorithm.clone(),
+                    content_hash: source_asset.content_hash.clone(),
+                },
+            );
+        }
+
+        (
+            EvidenceIndependence::VerifiedIndependent,
+            IndependenceBasis::NoSharedProvenance,
+        )
+    }
+
     #[test]
     fn canonical_domain_separators_use_actual_newline_delimiters() {
         for domain in [
@@ -3811,6 +4084,149 @@ mod tests {
         let mut cross = receipt.clone();
         cross.assessment_fingerprint = v2_receipt.assessment_fingerprint;
         assert!(!cross.verify_integrity());
+    }
+
+    #[test]
+    fn independence_v3_receipt_matches_independent_reference_oracle() {
+        fn assert_matches_oracle(graph: &ObservationGraph) {
+            let assessment = graph
+                .assess_independence_detailed_v3("obs-001", "obs-002")
+                .expect("v3 assessment");
+            let receipt = IndependenceVerificationReceiptV3::from_assessment(&assessment);
+            let (classification, basis, examined_ids, scope_fingerprint, assessment_fingerprint) =
+                oracle_v3_assessment(&graph, "obs-001", "obs-002");
+
+            assert_eq!(receipt.classification, classification);
+            assert_eq!(receipt.basis, basis);
+            assert_eq!(receipt.examined_observation_ids, examined_ids);
+            assert_eq!(receipt.examined_scope_fingerprint, scope_fingerprint);
+            assert_eq!(receipt.assessment_fingerprint, assessment_fingerprint);
+            assert!(receipt.verify_integrity());
+            assert_eq!(
+                receipt.verify_against_graph_detailed(&graph),
+                Ok(ReceiptVerificationOutcome::VerifiedAgainstGraph)
+            );
+        }
+
+        let mut independent_target = fixture();
+        independent_target.id = "obs-002".into();
+        independent_target.provenance.source.sensor_id = "camera-2".into();
+        independent_target.asset = Some(AssetRef::blake3(b"other-frame"));
+        assert_matches_oracle(&ObservationGraph {
+            observations: vec![fixture(), independent_target],
+            relations: vec![],
+        });
+
+        let mut shared_sensor_target = fixture();
+        shared_sensor_target.id = "obs-002".into();
+        assert_matches_oracle(&ObservationGraph {
+            observations: vec![fixture(), shared_sensor_target],
+            relations: vec![],
+        });
+
+        let mut shared_platform_source = fixture();
+        shared_platform_source.provenance.source.platform_id = Some("platform-1".into());
+        let mut shared_platform_target = fixture();
+        shared_platform_target.id = "obs-002".into();
+        shared_platform_target.provenance.source.sensor_id = "camera-2".into();
+        shared_platform_target.provenance.source.platform_id = Some("platform-1".into());
+        shared_platform_target.asset = Some(AssetRef::blake3(b"other-frame"));
+        assert_matches_oracle(&ObservationGraph {
+            observations: vec![shared_platform_source, shared_platform_target],
+            relations: vec![],
+        });
+
+        let mut root = fixture();
+        root.id = "root".into();
+        root.provenance.source.sensor_id = "camera-root".into();
+        root.asset = Some(AssetRef::blake3(b"root-frame"));
+
+        let mut ancestor_source = fixture();
+        ancestor_source.provenance.source.sensor_id = "camera-source".into();
+        ancestor_source.provenance.parent_observation_ids = vec!["root".into()];
+        ancestor_source.asset = Some(AssetRef::blake3(b"source-frame"));
+
+        let mut ancestor_target = fixture();
+        ancestor_target.id = "obs-002".into();
+        ancestor_target.provenance.source.sensor_id = "camera-target".into();
+        ancestor_target.provenance.parent_observation_ids = vec!["root".into()];
+        ancestor_target.asset = Some(AssetRef::blake3(b"target-frame"));
+        assert_matches_oracle(&ObservationGraph {
+            observations: vec![ancestor_source, ancestor_target, root],
+            relations: vec![],
+        });
+
+        let make_activity = |activity_id: &str, output_id: &str| ProcessingActivity {
+            activity_id: activity_id.into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec![],
+            output_observation_ids: vec![output_id.into()],
+            derivations: Vec::new(),
+        };
+
+        let mut activity_source_parent = fixture();
+        activity_source_parent.id = "source-parent".into();
+        activity_source_parent.provenance.source.sensor_id = "camera-parent-source".into();
+        activity_source_parent.provenance.processing_activity =
+            Some(make_activity("shared-run", "source-parent"));
+        activity_source_parent.asset = Some(AssetRef::blake3(b"source-parent-frame"));
+
+        let mut activity_target_parent = fixture();
+        activity_target_parent.id = "target-parent".into();
+        activity_target_parent.provenance.source.sensor_id = "camera-parent-target".into();
+        activity_target_parent.provenance.processing_activity =
+            Some(make_activity("shared-run", "target-parent"));
+        activity_target_parent.asset = Some(AssetRef::blake3(b"target-parent-frame"));
+
+        let mut activity_source = fixture();
+        activity_source.provenance.source.sensor_id = "camera-source".into();
+        activity_source.provenance.parent_observation_ids = vec!["source-parent".into()];
+        activity_source.asset = Some(AssetRef::blake3(b"source-frame"));
+
+        let mut activity_target = fixture();
+        activity_target.id = "obs-002".into();
+        activity_target.provenance.source.sensor_id = "camera-target".into();
+        activity_target.provenance.parent_observation_ids = vec!["target-parent".into()];
+        activity_target.asset = Some(AssetRef::blake3(b"target-frame"));
+        assert_matches_oracle(&ObservationGraph {
+            observations: vec![
+                activity_source,
+                activity_target,
+                activity_source_parent,
+                activity_target_parent,
+            ],
+            relations: vec![],
+        });
+
+        let mut identical_asset_source = fixture();
+        identical_asset_source.provenance.source.sensor_id = "camera-source".into();
+        identical_asset_source.asset = Some(AssetRef::blake3(b"identical-frame"));
+
+        let mut identical_asset_target = fixture();
+        identical_asset_target.id = "obs-002".into();
+        identical_asset_target.provenance.source.sensor_id = "camera-target".into();
+        identical_asset_target.asset = Some(AssetRef::blake3(b"identical-frame"));
+        assert_matches_oracle(&ObservationGraph {
+            observations: vec![identical_asset_source, identical_asset_target],
+            relations: vec![],
+        });
+
+        let mut incomplete_source = fixture();
+        incomplete_source.provenance.coverage = ProvenanceCoverage::Partial;
+        let mut incomplete_target = fixture();
+        incomplete_target.id = "obs-002".into();
+        incomplete_target.provenance.source.sensor_id = "camera-2".into();
+        incomplete_target.asset = Some(AssetRef::blake3(b"other-frame"));
+        assert_matches_oracle(&ObservationGraph {
+            observations: vec![incomplete_source, incomplete_target],
+            relations: vec![],
+        });
     }
 
     #[test]
