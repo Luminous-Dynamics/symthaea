@@ -1479,13 +1479,18 @@ impl CryptographicVerificationReceipt {
                 "cryptographic proofValue must use the base58-btc multibase prefix".into(),
             ));
         }
-        bs58::decode(&self.proof_value_multibase[1..])
+        let proof_bytes = bs58::decode(&self.proof_value_multibase[1..])
             .into_vec()
             .map_err(|_| {
                 VerificationFailure::Structural(
                     "cryptographic proofValue must contain valid base58-btc data".into(),
                 )
             })?;
+        if proof_bytes.is_empty() {
+            return Err(VerificationFailure::Structural(
+                "cryptographic proofValue must contain non-empty proof bytes".into(),
+            ));
+        }
 
         self.freshness.validate()?;
         if self.freshness != request.freshness {
@@ -2793,6 +2798,28 @@ mod tests {
         assert!(evidence.validate_structure().is_ok());
         assert!(evidence.matches_request(&request));
         assert!(!evidence.evidence_digest().is_empty());
+    }
+
+    #[test]
+    fn cryptographic_receipt_rejects_empty_proof_value() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+        let resolution = resolved_method(&request);
+        let mut receipt = test_cryptographic_receipt(&request, &resolution);
+        receipt.proof_value_multibase = "z".into();
+
+        assert!(matches!(
+            receipt.validate_against(&request, &resolution),
+            Err(VerificationFailure::Structural(message))
+                if message.contains("non-empty proof bytes")
+        ));
     }
 
     #[test]
