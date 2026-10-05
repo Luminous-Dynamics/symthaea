@@ -130,9 +130,7 @@ impl RationalScale {
             return Self { numerator: 0, denominator: 1 };
         }
 
-        fn gcd(mut a: i64, mut b: i64) -> i64 {
-            a = a.abs();
-            b = b.abs();
+        fn gcd(mut a: u64, mut b: u64) -> u64 {
             while b != 0 {
                 let remainder = a % b;
                 a = b;
@@ -141,7 +139,10 @@ impl RationalScale {
             a
         }
 
-        let divisor = gcd(self.numerator, self.denominator);
+        let divisor = gcd(
+            self.numerator.unsigned_abs(),
+            self.denominator.unsigned_abs(),
+        ) as i64;
         Self {
             numerator: self.numerator / divisor,
             denominator: self.denominator / divisor,
@@ -709,6 +710,16 @@ mod tests {
             PhysicalDimension::FORCE.add(PhysicalDimension::LENGTH),
             PhysicalDimension::ENERGY
         );
+    }
+
+    #[test]
+    fn rational_scale_normalization_handles_i64_min_without_overflow() {
+        let scale = RationalScale {
+            numerator: i64::MIN,
+            denominator: i64::MIN,
+        };
+        assert_eq!(scale.normalized().numerator, 1);
+        assert_eq!(scale.normalized().denominator, 1);
     }
 
     #[test]
