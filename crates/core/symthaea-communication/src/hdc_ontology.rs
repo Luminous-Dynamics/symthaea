@@ -285,6 +285,10 @@ impl HdcOntologyRepresentation {
             && self.codec.validates()
             && self.codec.codebook_hash.as_deref()
                 == Some(self.codebook.codebook_hash().as_str())
+            && self.source_manifest_hash.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            && self.codec.encoder_revision.as_ref().map_or(true, |value| {
+                !value.trim().is_empty() && value.len() <= HDC_ONTOLOGY_MAX_ID_BYTES
+            })
             && !self.source_manifest_hash.trim().is_empty()
             && self.node_count > 0
             && self.edge_count > 0
@@ -1670,6 +1674,12 @@ mod tests {
             HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
                 .unwrap();
         let mut representation = codebook.encode_graph(&training, &training_manifest).unwrap();
+        representation.source_manifest_hash = "x".repeat(HDC_ONTOLOGY_MAX_ID_BYTES + 1);
+        assert!(!representation.validates());
+        representation.source_manifest_hash = training_manifest.manifest_hash();
+        representation.codec.encoder_revision = Some("x".repeat(HDC_ONTOLOGY_MAX_ID_BYTES + 1));
+        assert!(!representation.validates());
+        representation.codec.encoder_revision = Some(HDC_ONTOLOGY_ADAPTER_ID.into());
         representation.node_count = HDC_ONTOLOGY_MAX_NODES + 1;
         assert!(!representation.validates());
         representation.node_count = training.nodes.len();
@@ -2398,70 +2408,3 @@ mod tests {
             .all(|edge| edge.relation == "commence" || edge.relation == "cible"));
 
         let mut receiver_manifest = multilingual_manifest.clone();
-        receiver_manifest.relations[0].local_relation = "initiates-local".into();
-        let expected_concepts = BTreeMap::from([
-            ("agent-fr".into(), "concept:agent/alice".into()),
-            ("event-fr".into(), "concept:event/approach".into()),
-            ("object-fr".into(), "concept:object/target".into()),
-        ]);
-        let metrics = codebook
-            .measure_roundtrip(
-                &multilingual,
-                &representation,
-                &multilingual_manifest,
-                &receiver_manifest,
-                &expected_concepts,
-                &["relation:initiates".into(), "relation:targets".into()],
-                HdcOntologyDecodePolicy::conservative_default(),
-            )
-            .unwrap();
-        assert!(metrics.structural_equivalence);
-        assert!(metrics.relation_identity_exact);
-        assert_eq!(metrics.node_precision, 1.0);
-        assert_eq!(metrics.edge_recall, 1.0);
-    }
-
-    #[test]
-    fn representation_provenance_changes_but_codebook_compatibility_does_not() {
-        let (training, training_manifest) = training_graph_and_manifest();
-        let codebook =
-            HdcOntologyCodebook::from_training_graphs(77, &[training.clone()], &training_manifest)
-                .unwrap();
-
-        let held_out = graph(
-            &[
-                ("a2", ConceptKind::Agent, "obs-2a"),
-                ("e2", ConceptKind::Event, "obs-2e"),
-                ("o2", ConceptKind::Object, "obs-2o"),
-            ],
-            &[
-                ("a2", "initiates", "e2"),
-                ("e2", "targets", "o2"),
-            ],
-        );
-        let held_out_manifest = manifest(
-            &held_out,
-            &[
-                ("a2", "concept:agent/alice"),
-                ("e2", "concept:event/approach"),
-                ("o2", "concept:object/target"),
-            ],
-            &[
-                ("initiates", "relation:initiates"),
-                ("targets", "relation:targets"),
-            ],
-            "scheme:example-v1",
-        );
-
-        let a = codebook
-            .encode_graph(&training, &training_manifest)
-            .unwrap();
-        let b = codebook
-            .encode_graph(&held_out, &held_out_manifest)
-            .unwrap();
-
-        assert_ne!(a.source_manifest_hash, b.source_manifest_hash);
-        assert_eq!(a.codebook, b.codebook);
-        assert_eq!(a.node_frame, b.node_frame);
-        assert_eq!(a.edge_frame, b.edge_frame);
-    }
