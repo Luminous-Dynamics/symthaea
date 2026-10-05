@@ -57,3 +57,5 @@ Admission is also temporally scoped. When a source carries an admission validity
 ## Candidate-generation provenance
 
 Candidate generation is a separate provenance surface from evidence provenance. A generated pathway can carry optional reproducible derivation lineage describing the generating activity/method, exact input identities, and configuration hash. The lineage is validated structurally, copied into the candidate assessment, and included in the deterministic assessment receipt. This makes “how was this candidate proposed?” auditable without treating generation provenance as evidence quality, source authority, or physical qualification.
+
+The assessment receipt also binds a canonical BLAKE3 digest of the complete evidence bundle for each candidate. That prevents a provenance-only mutation—such as an artifact digest, admission reference, observation timestamp, validity window, or evidence derivation change—from becoming invisible merely because the downstream qualification result happens to remain unchanged. Evidence is therefore both evaluated and integrity-bound.
