@@ -407,9 +407,9 @@ fn decode_ed25519_multikey(value: &str) -> Result<Vec<u8>, SnapshotError> {
 mod tests {
     use super::*;
     use symthaea_epistemic_types::{
-        ClaimAuthorIdentity, ClaimControllerDocumentIdentity, ClaimControllerIdentity,
-        ClaimProofPurpose, ClaimVerificationRelationship, ControllerDocumentIntegrityPolicy,
-        ControllerDocumentNetworkPolicy, ControllerDocumentSnapshotScope,
+        ClaimAuthorIdentity, ClaimControllerIdentity, ClaimProofPurpose,
+        ClaimVerificationMethod, ClaimVerificationRelationship,
+        ControllerDocumentIntegrityPolicy, ControllerDocumentNetworkPolicy,
         VerificationFreshnessContext, VerificationRequest,
     };
     use crate::{ControllerDocumentSnapshotFile, JsonControllerDocumentSnapshotAdapter};
