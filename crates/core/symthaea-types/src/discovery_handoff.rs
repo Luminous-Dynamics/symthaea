@@ -577,6 +577,31 @@ mod tests {
         );
         assert_ne!(observation.digest_hex(), selection.digest_hex());
 
+        let feet = PhysicalType::with_kind(
+            QuantityKind::Length,
+            PhysicalDimension::LENGTH,
+        )
+        .with_unit(UnitRef {
+            symbol: "ft".into(),
+            transform_to_si: UnitTransform::new(
+                RationalScale { numerator: 3048, denominator: 10000 },
+                RationalScale { numerator: 0, denominator: 1 },
+            ),
+            semantic_id: None,
+        });
+        let cross_unit_observation = ScientificInquiryExecutionReceipt::new(
+            &selection,
+            &frame,
+            "3333333333333333333333333333333333333333333333333333333333333333",
+            "4444444444444444444444444444444444444444444444444444444444444444",
+            &feet,
+            "evaluator-v1",
+        )
+        .unwrap();
+        assert!(cross_unit_observation
+            .validate_against_selection_and_observation(&selection, &frame, &feet)
+            .is_ok());
+
         let torque = PhysicalType::with_kind(
             QuantityKind::Torque,
             PhysicalDimension::ENERGY,
