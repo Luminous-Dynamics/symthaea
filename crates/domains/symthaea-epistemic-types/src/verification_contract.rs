@@ -1863,6 +1863,53 @@ mod tests {
     }
 
     #[test]
+    fn dereference_multibase_digest_must_match_the_document_digest() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let valid = ControllerDocumentDereferenceAttestation::from_adapter(
+            &request,
+            "https://example.test/controller",
+            "application/cid",
+            1024,
+            0,
+            request.freshness.verification_time.clone(),
+            ControllerDocumentResolutionSource::Network,
+            &"11".repeat(32),
+            Some("zQmPVGjYFugq4XUyBfoTHG6c3qxfBS26jEdaFM1gdAVuMZ2".into()),
+        )
+        .unwrap();
+        assert_eq!(
+            valid.digest_multibase.as_deref(),
+            Some("zQmPVGjYFugq4XUyBfoTHG6c3qxfBS26jEdaFM1gdAVuMZ2")
+        );
+
+        let mismatch = ControllerDocumentDereferenceAttestation::from_adapter(
+            &request,
+            "https://example.test/controller",
+            "application/cid",
+            1024,
+            0,
+            request.freshness.verification_time.clone(),
+            ControllerDocumentResolutionSource::Network,
+            &"11".repeat(32),
+            Some("zQmPVGjYFugq4XUyBfoTHG6c3qxfBS26jEdaFM1gdAVuMAA".into()),
+        );
+        assert!(matches!(
+            mismatch,
+            Err(VerificationFailure::ControllerDocumentIntegrityMismatch { .. })
+                | Err(VerificationFailure::Structural(_))
+        ));
+    }
+
+    #[test]
     fn deserialized_dereference_receipt_rechecks_policy_and_effective_url() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
@@ -1937,6 +1984,7 @@ mod tests {
                 request.freshness.verification_time.clone(),
                 ControllerDocumentResolutionSource::HistoricalRegistry,
                 &"11".repeat(32),
+                Some("zQmPVGjYFugq4XUyBfoTHG6c3qxfBS26jEdaFM1gdAVuMZ2".into()),
             )
             .unwrap();
             resolution
