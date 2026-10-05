@@ -24,9 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod corpus;
 
 /// Serialized assessment schema version.
-pub const SCHEMA_VERSION: u16 = 13;
+pub const SCHEMA_VERSION: u16 = 14;
 /// Assessment algorithm version.
-pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-v22";
+pub const ALGORITHM_VERSION: &str = "pareto-interval-evidence-time-envelope-derivation-source-admission-subject-freshness-basis-conflict-admission-candidate-provenance-evidence-bind-admission-authority-evidence-basis-v23";
 
 /// A burden dimension. Lower values are better for every dimension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -377,6 +377,8 @@ pub struct EvidenceRecord {
     pub confidence: f64,
     /// Canonical provenance identity used for source-diversity accounting.
     pub source: EvidenceSourceIdentity,
+    /// Exact methodological/comparability basis of the evidence itself.
+    pub basis: ComparisonBasisRef,
     /// Human-readable scope: functional unit, geography, process, etc.
     pub scope: String,
     /// Optional unit for the associated quantity.
@@ -405,6 +407,7 @@ impl EvidenceRecord {
             return Err(AssessmentError::EmptyEvidenceIdentity);
         }
         self.source.validate()?;
+        self.basis.validate()?;
         if let (Some(from), Some(until)) = (
             self.valid_from_epoch_seconds,
             self.valid_until_epoch_seconds,
@@ -776,6 +779,13 @@ impl CandidatePathway {
                         evidence_unit: evidence_unit.clone(),
                     });
                 }
+                if evidence.basis != performance.basis {
+                    return Err(AssessmentError::EvidenceBasisMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected: performance.basis.clone(),
+                        actual: evidence.basis.clone(),
+                    });
+                }
             }
         }
         for capability in self.operating_capabilities.values() {
@@ -799,6 +809,13 @@ impl CandidatePathway {
                         evidence_id: evidence.id.clone(),
                         performance_unit: capability.unit.clone(),
                         evidence_unit: evidence_unit.clone(),
+                    });
+                }
+                if evidence.basis != capability.basis {
+                    return Err(AssessmentError::EvidenceBasisMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected: capability.basis.clone(),
+                        actual: evidence.basis.clone(),
                     });
                 }
             }
@@ -831,6 +848,13 @@ impl CandidatePathway {
                         evidence_id: evidence.id.clone(),
                         burden_unit: estimate.unit.clone(),
                         evidence_unit: evidence_unit.clone(),
+                    });
+                }
+                if evidence.basis != estimate.basis {
+                    return Err(AssessmentError::EvidenceBasisMismatch {
+                        evidence_id: evidence.id.clone(),
+                        expected: estimate.basis.clone(),
+                        actual: evidence.basis.clone(),
                     });
                 }
             }
@@ -1747,6 +1771,15 @@ pub enum AssessmentError {
     },
     /// Requirement range is invalid.
     InvalidRequirementRange { min: f64, max: f64 },
+    /// Linked evidence uses a different methodological/comparability basis.
+    EvidenceBasisMismatch {
+        /// Evidence identifier.
+        evidence_id: String,
+        /// Exact basis required by the linked estimate.
+        expected: ComparisonBasisRef,
+        /// Exact basis declared by the evidence record.
+        actual: ComparisonBasisRef,
+    },
     /// A burden references unknown evidence.
     MissingEvidenceReference(String),
     /// Requested incumbent does not exist.
@@ -1858,6 +1891,9 @@ impl std::fmt::Display for AssessmentError {
             ),
             Self::InvalidRequirementRange { min, max } => {
                 write!(f, "invalid requirement range [{min}, {max}]")
+            }
+            Self::EvidenceBasisMismatch { evidence_id, .. } => {
+                write!(f, "evidence {evidence_id} comparison basis does not match linked estimate")
             }
             Self::MissingEvidenceReference(id) => {
                 write!(f, "missing evidence reference {id}")
@@ -2549,6 +2585,7 @@ mod tests {
                 issuer_key_fingerprint: None,
                 admission: None,
             },
+            basis: fixture_basis(),
             scope: "synthetic functional unit".into(),
             unit: Some("unit".into()),
             as_of: Some("fixture-v1".into()),
@@ -2732,6 +2769,28 @@ mod tests {
             evidence,
             derivation: None,
         }
+    }
+
+    #[test]
+    fn evidence_basis_mismatch_fails_closed() {
+        let mut c = candidate(
+            "basis-mismatch",
+            PathwayKind::ProcessSubstitution,
+            2.0,
+            2.0,
+            vec![evidence(
+                "basis-e1", "source", EvidenceKind::Observed, EvidenceStance::Supports, 0.9,
+            )],
+        );
+        c.performance.get_mut("service_life_years").unwrap().basis = ComparisonBasisRef {
+            basis_id: "different-basis".into(),
+            basis_revision: "v1".into(),
+            basis_digest: "different-digest".into(),
+        };
+        assert!(matches!(
+            AlternativesEngine.assess(&fixture_requirement(), &[c], None).unwrap_err(),
+            AssessmentError::EvidenceBasisMismatch { .. }
+        ));
     }
 
     #[test]
