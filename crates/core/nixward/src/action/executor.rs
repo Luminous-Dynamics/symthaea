@@ -639,7 +639,7 @@ impl NixOSExecutor {
 
         let elapsed = start.elapsed().as_millis() as u64;
 
-        match result {
+        let exec_result = match result {
             Ok(output) if output.status.success() => ExecutionResult::Success {
                 stdout: String::from_utf8_lossy(&output.stdout).to_string(),
                 stderr: String::from_utf8_lossy(&output.stderr).to_string(),
@@ -653,7 +653,10 @@ impl NixOSExecutor {
                 error: e.to_string(),
                 rollback_error: None,
             },
-        }
+        };
+
+        self.record_execution(&command, phi, &exec_result);
+        exec_result
     }
 
     fn record_execution(&mut self, command: &NixOSCommand, phi: f32, result: &ExecutionResult) {
@@ -813,6 +816,24 @@ mod tests {
         assert_eq!(SafetyLevel::UserModify.required_phi(), 0.3);
         assert_eq!(SafetyLevel::SystemCritical.required_phi(), 0.4);
         assert_eq!(SafetyLevel::Destructive.required_phi(), 0.6);
+    }
+
+    #[test]
+    fn test_confirmed_execution_receipt_can_be_recorded() {
+        let mut executor = NixOSExecutor::new();
+        let command = NixOSCommand::Search {
+            query: "receipt-test".into(),
+            json: false,
+        };
+        let result = ExecutionResult::Success {
+            stdout: "ok".into(),
+            stderr: String::new(),
+            execution_time_ms: 12,
+        };
+        executor.record_execution(&command, 0.0, &result);
+        assert_eq!(executor.history().len(), 1);
+        assert!(matches!(executor.history()[0].result, ExecutionResult::Success { .. }));
+        assert!(matches!(executor.history()[0].command, NixOSCommand::Search { .. }));
     }
 
     #[tokio::test]
