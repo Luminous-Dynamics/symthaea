@@ -1635,9 +1635,24 @@ mod safety_default_tests {
 
     #[test]
     fn service_effect_is_not_authorized_by_high_phi() {
-        let command = typed_service_command("nginx.service", NixServiceOperationKindV1::Restart)
-            .expect("valid typed service operation");
-        assert!(cli_service_execution_admission(&command, false).is_err());
+        for operation in [
+            NixServiceOperationKindV1::Start,
+            NixServiceOperationKindV1::Stop,
+            NixServiceOperationKindV1::Restart,
+        ] {
+            let command = typed_service_command("nginx.service", operation)
+                .expect("valid typed service operation");
+            assert!(
+                cli_service_execution_admission(&command, false).is_err(),
+                "CLI service effect must remain governed for {operation:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn service_cli_rejects_invalid_unit_spelling_before_execution() {
+        let result = typed_service_command("nginx", NixServiceOperationKindV1::Start);
+        assert!(result.is_err());
     }
 
     #[test]
