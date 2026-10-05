@@ -324,19 +324,30 @@ data-policy state remains unable to cross the consent boundary.
 Consent revocation carries an explicit effective timestamp. A revoked lease without an
 effective timestamp is invalid, while a future effective timestamp permits an explicitly
 scheduled revocation. Authorization checks deny access at or after the effective time.
+The N0 evidence exercises both sides of a scheduled revocation boundary: access is accepted
+before the effective timestamp and rejected at the effective timestamp.
 
 Replay protection is bounded by consent epoch, sender/recipient, and lease identity. The
 replay tracker records lease expiry with each retained sequence state and can reclaim
-expired entries. This is important because a fixed-capacity replay table without lifecycle
-reclamation would turn normal short-lived leases into a permanent resource-exhaustion path.
+expired entries. The N0 evidence explicitly observes a packet, detects an exact replay,
+then verifies that the expired replay state is reclaimed at lease expiry. This is important
+because a fixed-capacity replay table without lifecycle reclamation would turn normal
+short-lived leases into a permanent resource-exhaustion path.
 
 ### External policy provenance
 
 The handling policy carries an opaque reference to the externally authoritative policy or
-consent record. Symthaea binds that reference into the content-addressed packet policy but
-does not pretend to authenticate the external authority. Mycelix or another designated
-policy authority must resolve and authenticate the reference, signed consent, revocation
-state, and audit history at the system boundary.
+consent record and a BLAKE3-256 digest of the exact record bytes (or a separately specified
+canonical form). Symthaea binds both values into the content-addressed packet policy and
+can verify supplied record bytes against the stored digest. This proves record-byte
+binding, not issuer identity or authority. Mycelix or another designated policy authority
+must resolve and authenticate the reference, signed consent, revocation state, and audit
+history at the system boundary.
+
+The N0 evidence also checks the negative case: a different record digest is rejected even
+after the packet is re-hashed consistently. This keeps the provenance check distinct from
+packet integrity and prevents a resolver from treating an arbitrary record as equivalent
+merely because the packet itself remains internally consistent.
 
 Thus there are deliberately separate gates:
 
