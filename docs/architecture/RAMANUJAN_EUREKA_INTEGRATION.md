@@ -109,14 +109,14 @@ EUREKA should be able to select an experiment that is predicted to distinguish t
 The proper loop is:
 
 ```text
-predicted information gain
+predicted disagreement score
  -> experiment
- -> realized information gain
+ -> observed outcome
  -> evidence
  -> model update
 ```
 
-This preserves the EUREKA distinction between predicted and realized information gain.
+This preserves the boundary between prospective challenge selection and realized evidence.
 
 ## Concept Genesis
 
@@ -237,4 +237,4 @@ EUREKA outcome -X-> original Ramanujan campaign
 
 A later model-revision campaign may consume the closed result as a new input, but it receives a new campaign/search identity. The first `ScientificHypothesisRevisionReceipt` implementation enforces this at the value level by requiring distinct prior/new handoff digests and a distinct campaign digest.
 
-The first `ScientificInquirySelectionReceipt` implementation similarly freezes which hypothesis set and challenge space produced an experiment-selection decision. Its predicted information value is explicitly not realized evidence; the actual experiment must be evaluated separately.
+The current `ScientificInquirySelectionReceipt` implementation freezes which hypothesis set and challenge space produced an experiment-selection decision. Its disagreement score is a selection heuristic, not realized evidence; the actual experiment must be evaluated separately.
