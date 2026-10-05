@@ -2400,6 +2400,28 @@ mod tests {
     }
 
     #[test]
+    fn resolution_digest_changes_when_verification_material_identity_changes() {
+        let claim = fixture_claim();
+        let request = VerificationRequest::from_claim(
+            &claim,
+            ClaimProofPurpose::new("assertionMethod").unwrap(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            ClaimVerificationRelationship::new("assertionMethod").unwrap(),
+            default_freshness(),
+        )
+        .unwrap();
+
+        let base = resolved_method(&request);
+        let mut changed_type = base.clone();
+        changed_type.verification_method_type = "JsonWebKey".into();
+        assert_ne!(base.resolution_digest(), changed_type.resolution_digest());
+
+        let mut changed_material = base;
+        changed_material.verification_method_material_digest = "55".repeat(32);
+        assert_ne!(changed_type.resolution_digest(), changed_material.resolution_digest());
+    }
+
+    #[test]
     fn resolution_digest_changes_when_integrity_policy_or_lifecycle_changes() {
         let claim = fixture_claim();
         let request = VerificationRequest::from_claim(
