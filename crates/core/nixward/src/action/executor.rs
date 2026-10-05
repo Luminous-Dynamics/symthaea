@@ -38,6 +38,19 @@ pub enum NixOSCommand {
     EnvInstall { packages: Vec<String> },
     /// nix-env -e (user package remove)
     EnvRemove { packages: Vec<String> },
+    /// Explicit systemd service lifecycle operation.
+    Service {
+        operation: ServiceOperation,
+        name: String,
+    },
+    /// Switch the NixOS system profile to an exact generation.
+    GenerationSwitch { generation: u32 },
+    /// Roll back the active NixOS system configuration.
+    GenerationRollback,
+    /// Delete all but the newest `keep_last` system generations.
+    GenerationDeleteOld { keep_last: usize },
+    /// Delete system generations older than `days`.
+    GenerationDeleteOlderThan { days: u32 },
     /// nix-env --rollback (user profile rollback)
     EnvRollback,
     /// nix search (package search)
@@ -61,6 +74,17 @@ pub enum NixOSCommand {
     },
 }
 
+/// Systemd service lifecycle operations represented as structured authority.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ServiceOperation {
+    Start,
+    Stop,
+    Restart,
+    Reload,
+    Enable,
+    Disable,
+}
+
 /// Channel operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ChannelOperation {
@@ -77,6 +101,7 @@ pub enum FlakeOperation {
     Lock { inputs: Vec<String> },
     Show,
     Check,
+    Init { template: Option<String> },
 }
 
 /// Safety levels for commands
@@ -142,6 +167,10 @@ impl NixOSCommand {
             } => SafetyLevel::ReadOnly,
 
             Self::EnvInstall { .. } => SafetyLevel::UserModify,
+            Self::Service { .. } => SafetyLevel::SystemModify,
+            Self::GenerationSwitch { .. } => SafetyLevel::SystemCritical,
+            Self::GenerationRollback => SafetyLevel::SystemCritical,
+            Self::GenerationDeleteOld { .. } | Self::GenerationDeleteOlderThan { .. } => SafetyLevel::Destructive,
             Self::EnvRemove { .. } => SafetyLevel::UserModify,
             Self::EnvRollback => SafetyLevel::UserModify,
             Self::Channel {
@@ -155,6 +184,9 @@ impl NixOSCommand {
             } => SafetyLevel::UserModify,
             Self::Flake {
                 operation: FlakeOperation::Update { .. },
+            } => SafetyLevel::UserModify,
+            Self::Flake {
+                operation: FlakeOperation::Init { .. },
             } => SafetyLevel::UserModify,
             Self::Flake {
                 operation: FlakeOperation::Lock { .. },
@@ -176,25 +208,12 @@ impl NixOSCommand {
     pub fn rollback_command(&self) -> Option<NixOSCommand> {
         match self {
             Self::RebuildSwitch { .. } | Self::RebuildTest { .. } | Self::RebuildBoot { .. } => {
-                Some(NixOSCommand::Custom {
-                    command: "nixos-rebuild".to_string(),
-                    args: vec!["switch".to_string(), "--rollback".to_string()],
-                    safety_level: SafetyLevel::SystemCritical,
-                })
+                Some(NixOSCommand::GenerationRollback)
             }
             Self::EnvInstall { .. } | Self::EnvRemove { .. } => {
                 Some(NixOSCommand::EnvRollback)
             }
-            Self::HomeManagerSwitch { .. } => {
-                Some(NixOSCommand::Custom {
-                    command: "sh".to_string(),
-                    args: vec![
-                        "-c".to_string(),
-                        "home-manager generations | head -2 | tail -1 | awk '{print $NF}' | xargs -I {} {}/activate".to_string(),
-                    ],
-                    safety_level: SafetyLevel::UserModify,
-                })
-            }
+            Self::HomeManagerSwitch { .. } => None,
             _ => None,
         }
     }
@@ -235,6 +254,48 @@ impl NixOSCommand {
                 args.extend(extra_args.iter().cloned());
                 ("nixos-rebuild".to_string(), args)
             }
+            Self::Service { operation, name } => {
+                let action = match operation {
+                    ServiceOperation::Start => "start",
+                    ServiceOperation::Stop => "stop",
+                    ServiceOperation::Restart => "restart",
+                    ServiceOperation::Reload => "reload",
+                    ServiceOperation::Enable => "enable",
+                    ServiceOperation::Disable => "disable",
+                };
+                ("systemctl".to_string(), vec![action.to_string(), name.clone()])
+            }
+            Self::GenerationSwitch { generation } => (
+                "nix-env".to_string(),
+                vec![
+                    "--switch-generation".to_string(),
+                    generation.to_string(),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
+            Self::GenerationRollback => (
+                "nixos-rebuild".to_string(),
+                vec!["switch".to_string(), "--rollback".to_string()],
+            ),
+            Self::GenerationDeleteOld { keep_last } => (
+                "nix-env".to_string(),
+                vec![
+                    "--delete-generations".to_string(),
+                    format!("+{keep_last}"),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
+            Self::GenerationDeleteOlderThan { days } => (
+                "nix-env".to_string(),
+                vec![
+                    "--delete-generations".to_string(),
+                    format!("{days}d"),
+                    "-p".to_string(),
+                    "/nix/var/nix/profiles/system".to_string(),
+                ],
+            ),
             Self::EnvInstall { packages } => {
                 let mut args = Vec::with_capacity(1 + packages.len());
                 args.push("-iA".to_string());
@@ -307,6 +368,14 @@ impl NixOSCommand {
                     "nix".to_string(),
                     vec!["flake".to_string(), "check".to_string()],
                 ),
+                FlakeOperation::Init { template } => {
+                    let mut args = vec!["flake".to_string(), "init".to_string()];
+                    if let Some(template) = template {
+                        args.push("--template".to_string());
+                        args.push(template.clone());
+                    }
+                    ("nix".to_string(), args)
+                },
             },
             Self::HomeManagerSwitch { flake } => {
                 let cap = if flake.is_some() { 3 } else { 1 };
@@ -688,6 +757,22 @@ mod tests {
         };
         assert_eq!(search.safety_level(), SafetyLevel::ReadOnly);
 
+        let service = NixOSCommand::Service {
+            operation: ServiceOperation::Restart,
+            name: "nginx.service".to_string(),
+        };
+        assert_eq!(service.safety_level(), SafetyLevel::SystemModify);
+        let (bin, args) = service.to_command();
+        assert_eq!(bin, "systemctl");
+        assert_eq!(args, vec!["restart", "nginx.service"]);
+
+        let generation = NixOSCommand::GenerationSwitch { generation: 42 };
+        assert_eq!(generation.safety_level(), SafetyLevel::SystemCritical);
+        let (bin, args) = generation.to_command();
+        assert_eq!(bin, "nix-env");
+        assert_eq!(args[0], "--switch-generation");
+        assert_eq!(args[1], "42");
+
         let install = NixOSCommand::EnvInstall {
             packages: vec!["vim".to_string()],
         };
@@ -722,6 +807,28 @@ mod tests {
         let (cmd, args) = search.to_command();
         assert_eq!(cmd, "nix");
         assert_eq!(args, vec!["search", "nixpkgs", "editor", "--json"]);
+    }
+
+    #[test]
+    fn test_all_service_operations_have_structured_systemctl_mapping() {
+        let cases = [
+            (ServiceOperation::Start, "start"),
+            (ServiceOperation::Stop, "stop"),
+            (ServiceOperation::Restart, "restart"),
+            (ServiceOperation::Reload, "reload"),
+            (ServiceOperation::Enable, "enable"),
+            (ServiceOperation::Disable, "disable"),
+        ];
+        for (operation, expected_action) in cases {
+            let command = NixOSCommand::Service {
+                operation,
+                name: "sshd.service".to_string(),
+            };
+            let (bin, args) = command.to_command();
+            assert_eq!(bin, "systemctl");
+            assert_eq!(args, vec![expected_action, "sshd.service"]);
+            assert_eq!(command.safety_level(), SafetyLevel::SystemModify);
+        }
     }
 
     #[test]
@@ -1060,7 +1167,10 @@ mod tests {
         assert!(switch.rollback_command().is_some());
         assert!(test.rollback_command().is_some());
         assert!(boot.rollback_command().is_some());
-        assert!(hm.rollback_command().is_some());
+        assert!(
+            hm.rollback_command().is_none(),
+            "Home Manager shell rollback must remain fail-closed until a typed operation exists"
+        );
         assert!(
             gc.rollback_command().is_none(),
             "GC should not have rollback"

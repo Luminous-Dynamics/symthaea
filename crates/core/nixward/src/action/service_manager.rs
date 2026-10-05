@@ -8,7 +8,7 @@
 //! the Φ-gated executor — the service manager itself does NOT
 //! execute commands directly.
 
-use super::executor::{NixOSCommand, SafetyLevel};
+use super::executor::{NixOSCommand, ServiceOperation, SafetyLevel};
 use std::process::Command;
 
 /// Manages systemd services: start, stop, restart, enable, disable.
@@ -32,38 +32,22 @@ pub struct ServiceStatus {
 impl ServiceManager {
     /// Generate a command to start a service.
     pub fn start(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["start".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        NixOSCommand::Service { operation: ServiceOperation::Start, name: Self::normalize_name(service) }
     }
 
     /// Generate a command to stop a service.
     pub fn stop(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["stop".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        NixOSCommand::Service { operation: ServiceOperation::Stop, name: Self::normalize_name(service) }
     }
 
     /// Generate a command to restart a service.
     pub fn restart(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["restart".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        NixOSCommand::Service { operation: ServiceOperation::Restart, name: Self::normalize_name(service) }
     }
 
     /// Generate a command to reload a service (without full restart).
     pub fn reload(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["reload".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        NixOSCommand::Service { operation: ServiceOperation::Reload, name: Self::normalize_name(service) }
     }
 
     /// Generate a command to enable a service (start on boot).
@@ -71,20 +55,12 @@ impl ServiceManager {
     /// Note: on NixOS this is typically done declaratively. This is for
     /// imperative service management or user services.
     pub fn enable(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["enable".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        NixOSCommand::Service { operation: ServiceOperation::Enable, name: Self::normalize_name(service) }
     }
 
     /// Generate a command to disable a service.
     pub fn disable(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["disable".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        NixOSCommand::Service { operation: ServiceOperation::Disable, name: Self::normalize_name(service) }
     }
 
     /// Query the current status of a service (read-only, runs directly).
