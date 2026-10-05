@@ -550,6 +550,33 @@ fn backfill_status_check_boundary_ownership(
     Ok(())
 }
 
+fn backfill_receipt_operation_ids_from_dispatch(
+    connection: &mut Connection,
+) -> Result<(), AuthorizationStoreError> {
+    connection.execute(
+        "UPDATE authorization_receipts
+         SET operation_id=(
+             SELECT d.operation_id
+             FROM authorization_dispatches d
+             WHERE d.authorization_instance=authorization_receipts.authorization_instance
+               AND d.attempt_id=authorization_receipts.attempt_id
+               AND d.operation_id IS NOT NULL
+               AND d.operation_id <> ''
+         )
+         WHERE (operation_id IS NULL OR operation_id='')
+           AND EXISTS(
+             SELECT 1
+             FROM authorization_dispatches d
+             WHERE d.authorization_instance=authorization_receipts.authorization_instance
+               AND d.attempt_id=authorization_receipts.attempt_id
+               AND d.operation_id IS NOT NULL
+               AND d.operation_id <> ''
+           )",
+        [],
+    )?;
+    Ok(())
+}
+
 fn backfill_bound_attempt_boundaries_from_dispatch(
     connection: &mut Connection,
 ) -> Result<(), AuthorizationStoreError> {
@@ -578,6 +605,48 @@ fn backfill_bound_attempt_boundaries_from_dispatch(
             ),
             [],
         )?;
+    }
+    Ok(())
+}
+
+fn validate_attempt_operation_consistency(
+    connection: &Connection,
+) -> Result<(), AuthorizationStoreError> {
+    let mut owners =
+        std::collections::BTreeMap::<(String,String),String>::new();
+    for table in [
+        "authorization_leases",
+        "authorization_receipts",
+        "authorization_recovery_markers",
+        "authorization_terminal_evidence",
+        "authorization_dispatches",
+    ] {
+        let mut stmt = connection.prepare(&format!(
+            "SELECT authorization_instance,attempt_id,operation_id
+             FROM {table}
+             WHERE attempt_id IS NOT NULL
+               AND attempt_id <> ''
+               AND operation_id IS NOT NULL
+               AND operation_id <> ''"
+        ))?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_,String>(0)?,
+                row.get::<_,String>(1)?,
+                row.get::<_,String>(2)?,
+            ))
+        })?;
+        for row in rows {
+            let (authorization_instance,attempt_id,operation_id)=row?;
+            let key=(authorization_instance.clone(),attempt_id.clone());
+            if let Some(existing)=owners.insert(key,operation_id.clone()) {
+                if existing != operation_id {
+                    return Err(AuthorizationStoreError::InvalidState(format!(
+                        "attempt operation mismatch for {authorization_instance}/{attempt_id}: {existing} vs {operation_id} in {table}"
+                    )));
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -680,6 +749,7 @@ fn validate_attempt_operation_consistency_for_attempt(
     }
     for table in [
         "authorization_leases",
+        "authorization_receipts",
         "authorization_recovery_markers",
         "authorization_terminal_evidence",
         "authorization_dispatches",
@@ -1156,6 +1226,7 @@ impl SqliteAuthorizationStore {
                outcome TEXT NOT NULL,
                action_digest TEXT NOT NULL,
                authority_epoch INTEGER NOT NULL,
+               operation_id TEXT,
                provider_idempotency_key TEXT,
                boundary_id TEXT,
                attempt_scope_digest TEXT,
@@ -1293,6 +1364,7 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_terminal_evidence", "validity_policy_digest", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "adapter", "TEXT")?;
         ensure_column(&mut connection, "authorization_terminal_evidence", "relying_party_id", "TEXT")?;
+        ensure_column(&mut connection, "authorization_receipts", "operation_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "provider_idempotency_key", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_receipts", "attempt_scope_digest", "TEXT")?;
@@ -1311,9 +1383,11 @@ impl SqliteAuthorizationStore {
         ensure_column(&mut connection, "authorization_status_checks", "boundary_id", "TEXT")?;
         ensure_column(&mut connection, "authorization_status_checks", "attempt_scope_digest", "TEXT")?;
         backfill_status_check_boundary_ownership(&mut connection)?;
+        backfill_receipt_operation_ids_from_dispatch(&mut connection)?;
         backfill_bound_attempt_boundaries_from_dispatch(&mut connection)?;
         backfill_attempt_scope_digests(&mut connection)?;
         validate_attempt_boundary_consistency(&connection)?;
+        validate_attempt_operation_consistency(&connection)?;
         connection.execute_batch(
             "CREATE UNIQUE INDEX IF NOT EXISTS authorization_lease_attempt_id_uq
                ON authorization_leases(attempt_id)
@@ -4785,15 +4859,23 @@ fn insert_receipt_with_boundary(
         Some(boundary) => Some(compute_attempt_scope_digest(boundary, &r.attempt_id)?),
         None => None,
     };
+    let operation_id = boundary_id.map(|_| {
+        r.operation_id
+            .as_deref()
+            .filter(|value| !value.is_empty())
+    });
+    if boundary_id.is_some() && operation_id.is_none() {
+        return Err(AuthorizationConsumptionError::InvalidBinding.into());
+    }
     tx.execute(
         "INSERT INTO authorization_receipts
          (authorization_instance,action_id,attempt_id,phase,outcome,action_digest,authority_epoch,
-          provider_idempotency_key,boundary_id,attempt_scope_digest)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+          operation_id,provider_idempotency_key,boundary_id,attempt_scope_digest)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
         params![
             r.authorization_instance, r.action_id, r.attempt_id, phase, outcome,
-            r.action_digest, r.authority_epoch as i64, r.provider_idempotency_key, boundary_id,
-            attempt_scope_digest
+            r.action_digest, r.authority_epoch as i64, operation_id, r.provider_idempotency_key,
+            boundary_id, attempt_scope_digest
         ],
     )?;
     Ok(())
@@ -4803,10 +4885,10 @@ fn load_receipt(
 ) -> Result<Option<ExecutionReceipt>, AuthorizationStoreError> {
     let row: Option<(
         String, String, String, String, String, i64,
-        Option<String>, Option<String>, Option<String>,
+        Option<String>, Option<String>, Option<String>, Option<String>,
     )> = tx.query_row(
         "SELECT authorization_instance,action_id,attempt_id,outcome,action_digest,authority_epoch,
-                provider_idempotency_key,boundary_id,attempt_scope_digest
+                operation_id,provider_idempotency_key,boundary_id,attempt_scope_digest
          FROM authorization_receipts
          WHERE authorization_instance=?1 AND attempt_id=?2 AND phase=?3",
         params![authorization_instance,attempt_id,phase],
@@ -4820,6 +4902,7 @@ fn load_receipt(
             r.get(6)?,
             r.get(7)?,
             r.get(8)?,
+            r.get(9)?,
         )),
     ).optional()?;
 
@@ -4830,6 +4913,7 @@ fn load_receipt(
         outcome,
         action_digest,
         authority_epoch,
+        operation_id,
         provider_idempotency_key,
         boundary_id,
         attempt_scope_digest,
@@ -4896,7 +4980,8 @@ fn load_receipt(
             return Err(AuthorizationConsumptionError::InvalidBinding.into());
         };
 
-        if dispatch_action_id != action_id
+        if operation_id.as_deref() != Some(dispatch_operation_id.as_str())
+            || dispatch_action_id != action_id
             || dispatch_action_digest != action_digest
             || dispatch_provider_key != provider_idempotency_key.as_deref().unwrap_or("")
             || dispatch_boundary != boundary
