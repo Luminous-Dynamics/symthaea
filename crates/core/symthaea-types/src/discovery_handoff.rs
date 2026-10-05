@@ -380,8 +380,7 @@ impl ScientificInquirySelectionReceipt {
         hypothesis_handoff: &ScientificHypothesisHandoff,
         hypothesis_set: &[ScientificHypothesisHandoff],
     ) -> Result<(), String> {
-        self.validate()?
-        ;
+        self.validate()?;
         validate_scientific_hypothesis_set(hypothesis_set)?;
         let computed_set_digest = scientific_hypothesis_set_digest(hypothesis_set);
         self.validate_against(hypothesis_handoff, &computed_set_digest)?;
