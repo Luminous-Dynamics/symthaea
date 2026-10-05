@@ -15,6 +15,7 @@ categories = ["science", "algorithms"]
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-types = { path = "../../core/symthaea-types" }
 serde = { workspace = true }
+blake3 = { workspace = true }
 anyhow = "1.0"
 nalgebra = { workspace = true }
 
