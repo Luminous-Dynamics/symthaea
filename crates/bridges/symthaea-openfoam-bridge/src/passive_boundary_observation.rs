@@ -25,6 +25,7 @@ pub enum OpenFoamBoundaryObservationError {
     UnexpectedCharacter(u8),
     UnexpectedEndOfInput,
     DuplicatePatch(String),
+    DuplicatePatchField { patch: String, field: &'static str },
     PatchNotFound(String),
     MissingPatchField { patch: String, field: &'static str },
     InvalidNumericField { patch: String, field: &'static str },
@@ -1302,6 +1303,12 @@ fn parse_patch_block(tokens: &[Token], mut index: usize, patch_name: &str) -> Re
                 let field_name = field.as_str();
                 index += 1;
                 if field_name == "type" {
+                    if patch_type.is_some() {
+                        return Err(OpenFoamBoundaryObservationError::DuplicatePatchField {
+                            patch: patch_name.to_string(),
+                            field: "type",
+                        });
+                    }
                     let Token::Ident(value) = tokens.get(index).ok_or(OpenFoamBoundaryObservationError::UnexpectedEndOfInput)? else {
                         return Err(OpenFoamBoundaryObservationError::InvalidPatchType(patch_name.to_string()));
                     };
@@ -1310,7 +1317,17 @@ fn parse_patch_block(tokens: &[Token], mut index: usize, patch_name: &str) -> Re
                     let Token::Number(value) = tokens.get(index).ok_or(OpenFoamBoundaryObservationError::UnexpectedEndOfInput)? else {
                         return Err(OpenFoamBoundaryObservationError::InvalidNumericField { patch: patch_name.to_string(), field: if field_name == "nFaces" { "nFaces" } else { "startFace" } });
                     };
-                    let parsed = value.parse::<u64>().map_err(|_| OpenFoamBoundaryObservationError::InvalidNumericField { patch: patch_name.to_string(), field: if field_name == "nFaces" { "nFaces" } else { "startFace" } })?;
+                    let field = if field_name == "nFaces" { "nFaces" } else { "startFace" };
+                    if (field_name == "nFaces" && n_faces.is_some()) || (field_name == "startFace" && start_face.is_some()) {
+                        return Err(OpenFoamBoundaryObservationError::DuplicatePatchField {
+                            patch: patch_name.to_string(),
+                            field,
+                        });
+                    }
+                    let parsed = value.parse::<u64>().map_err(|_| OpenFoamBoundaryObservationError::InvalidNumericField {
+                        patch: patch_name.to_string(),
+                        field,
+                    })?;
                     if field_name == "nFaces" { n_faces = Some(parsed); } else { start_face = Some(parsed); }
                     index += 1;
                 } else { skip_value(tokens, &mut index)?; }
@@ -1777,6 +1794,27 @@ mod tests {
     fn duplicate_patch_names_fail_closed() {
         let source = br#"2 ( inlet { type patch; nFaces 1; startFace 0; } inlet { type patch; nFaces 1; startFace 1; } )"#;
         assert!(matches!(observe_openfoam_boundary_patch(source, "inlet"), Err(OpenFoamBoundaryObservationError::DuplicatePatch(_))));
+    }
+
+    #[test]
+    fn duplicate_patch_fields_fail_closed() {
+        let duplicate_type = br#"1 ( inlet { type patch; type wall; nFaces 1; startFace 0; } )"#;
+        assert!(matches!(
+            observe_openfoam_boundary_patch(duplicate_type, "inlet"),
+            Err(OpenFoamBoundaryObservationError::DuplicatePatchField { field: "type", .. })
+        ));
+
+        let duplicate_n_faces = br#"1 ( inlet { type patch; nFaces 1; nFaces 2; startFace 0; } )"#;
+        assert!(matches!(
+            observe_openfoam_boundary_patch(duplicate_n_faces, "inlet"),
+            Err(OpenFoamBoundaryObservationError::DuplicatePatchField { field: "nFaces", .. })
+        ));
+
+        let duplicate_start_face = br#"1 ( inlet { type patch; nFaces 1; startFace 0; startFace 1; } )"#;
+        assert!(matches!(
+            observe_openfoam_boundary_patch(duplicate_start_face, "inlet"),
+            Err(OpenFoamBoundaryObservationError::DuplicatePatchField { field: "startFace", .. })
+        ));
     }
 
     #[test]
