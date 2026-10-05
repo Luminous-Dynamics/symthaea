@@ -3181,10 +3181,23 @@ mod tests {
                     EvidenceStance::Supports,
                     0.95,
                 ),
+                evidence(
+                    "functional",
+                    "functional-authority",
+                    EvidenceKind::Observed,
+                    EvidenceStance::Supports,
+                    0.9,
+                ),
             ],
         );
         for estimate in c.burdens.values_mut() {
             estimate.evidence_ids = vec!["field-a".into(), "field-b".into()];
+        }
+        for estimate in c.performance.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
+        }
+        for estimate in c.operating_capabilities.values_mut() {
+            estimate.evidence_ids = vec!["functional".into()];
         }
 
         let result = AlternativesEngine
@@ -3232,6 +3245,10 @@ mod tests {
                 FrontierBlocker::ComparisonBasisMismatch { context, .. }
                     if context == "burden:Water"
             )));
+        assert_eq!(
+            result.candidates[0].qualification,
+            QualificationState::Hypothesis
+        );
         assert!(!result.pareto_frontier.contains(&"basis-drift".into()));
 
         let incumbent = candidate(
