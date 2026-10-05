@@ -337,6 +337,110 @@ async function blankCanvasHash(page, width, height) {
 }
 
 
+async function rawWebGpuExecutionCanary(page) {
+  return page.evaluate(async () => {
+    if (!navigator.gpu) {
+      return { supported: false, reason: 'navigator.gpu unavailable' };
+    }
+
+    let device = null;
+    let texture = null;
+    let readback = null;
+    const uncapturedErrors = [];
+    let deviceLost = null;
+
+    try {
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) {
+        return { supported: false, reason: 'raw execution canary requestAdapter returned null' };
+      }
+
+      device = await adapter.requestDevice();
+      device.addEventListener('uncapturederror', event => {
+        const error = event.error;
+        uncapturedErrors.push({
+          name: error?.name || 'UnknownGPUError',
+          message: error?.message || String(error),
+        });
+      });
+      void device.lost.then(info => {
+        deviceLost = {
+          reason: info?.reason || null,
+          message: info?.message || null,
+        };
+      });
+
+      const width = 4;
+      const height = 4;
+      const bytesPerRow = 256;
+
+      texture = device.createTexture({
+        size: { width, height, depthOrArrayLayers: 1 },
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+      });
+      readback = device.createBuffer({
+        size: bytesPerRow * height,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+      });
+
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+          view: texture.createView(),
+          clearValue: { r: 1, g: 0, b: 0, a: 1 },
+          loadOp: 'clear',
+          storeOp: 'store',
+        }],
+      });
+      pass.end();
+      encoder.copyTextureToBuffer(
+        { texture },
+        { buffer: readback, bytesPerRow, rowsPerImage: height },
+        { width, height, depthOrArrayLayers: 1 },
+      );
+
+      device.queue.submit([encoder.finish()]);
+      await device.queue.onSubmittedWorkDone();
+      await readback.mapAsync(GPUMapMode.READ);
+
+      const bytes = new Uint8Array(readback.getMappedRange());
+      const offset = bytesPerRow + 4;
+      const pixel = [...bytes.slice(offset, offset + 4)];
+      const executedRed = pixel[0] > 240
+        && pixel[1] < 16
+        && pixel[2] < 16
+        && pixel[3] === 255;
+
+      readback.unmap();
+
+      return {
+        supported: true,
+        adapter_name: adapter.name || null,
+        format: 'rgba8unorm',
+        pixel,
+        executed_red: executedRed,
+        uncaptured_errors: uncapturedErrors,
+        device_lost: deviceLost,
+      };
+    } catch (error) {
+      return {
+        supported: true,
+        format: 'rgba8unorm',
+        pixel: null,
+        executed_red: false,
+        uncaptured_errors: uncapturedErrors,
+        device_lost: deviceLost,
+        exception: error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      readback?.destroy();
+      texture?.destroy();
+      device?.destroy();
+    }
+  });
+}
+
 async function rawWebGpuCanvasCanary(page) {
   return page.evaluate(async () => {
     if (!navigator.gpu) {
@@ -426,9 +530,19 @@ async function rawWebGpuCanvasCanary(page) {
       probeContext.drawImage(image, 0, 0);
       const pixel = [...probeContext.getImageData(32, 32, 1, 1).data];
 
+      const configuration = context.getConfiguration();
       return {
         supported: true,
         format,
+        configuration: {
+          format: configuration?.format || null,
+          usage: configuration?.usage || null,
+          alphaMode: configuration?.alphaMode || null,
+          colorSpace: configuration?.colorSpace || null,
+          toneMapping: configuration?.toneMapping || null,
+          viewFormats: configuration?.viewFormats ? [...configuration.viewFormats] : [],
+          desiredMaximumFrameLatency: configuration?.desiredMaximumFrameLatency || null,
+        },
         pixel,
         painted_red: pixel[0] > 200
           && pixel[1] < 40
@@ -704,12 +818,25 @@ async function runMode(mode) {
     const capability = await capabilityPreflight(page);
 
     if (gpuMode) {
+      diagnostics.raw_webgpu_execution_canary = await rawWebGpuExecutionCanary(page);
       diagnostics.raw_webgpu_canary = await rawWebGpuCanvasCanary(page);
       failOnPageErrors('WebGPU capability preflight');
       if (!capability.navigator_gpu || !capability.adapter || !capability.device) {
         throw new QualificationError(
           `WebGPU capability preflight failed: ${JSON.stringify(capability)}`,
           'capability',
+        );
+      }
+      if (!diagnostics.raw_webgpu_execution_canary?.executed_red) {
+        throw new QualificationError(
+          `Raw WebGPU execution canary failed: ${JSON.stringify(diagnostics.raw_webgpu_execution_canary)}`,
+          'capability',
+        );
+      }
+      if (!diagnostics.raw_webgpu_canary?.painted_red) {
+        throw new QualificationError(
+          `Raw WebGPU canvas presentation canary failed: ${JSON.stringify(diagnostics.raw_webgpu_canary)}`,
+          'renderer',
         );
       }
 
