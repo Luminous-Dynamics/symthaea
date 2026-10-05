@@ -116,6 +116,11 @@ else
 }
 JSON
 fi
+# Deterministic lexical/morphosyntactic evidence: fixed corpus for lexical coverage,
+# provenance, agreement, function-word separation, unsupported-rule behavior, and stale lineage.
+cargo run "${cargo_locked_args[@]}" -p symthaea-broca --bin broca-lexical-binding-audit -- \
+  --json-out "$OUT_DIR/lexical-binding-audit.json"
+
 # Deterministic architecture-contract evidence: exercises the full intent × epistemic matrix
 # without invoking a stochastic language or acoustic backend.
 cargo run "${cargo_locked_args[@]}" -p symthaea-broca --bin broca-production-contract-audit -- \

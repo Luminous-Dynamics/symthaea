@@ -200,6 +200,10 @@ name = "broca-production-contract-audit"
 path = "src/bin/broca_production_contract_audit.rs"
 
 [[bin]]
+name = "broca-lexical-binding-audit"
+path = "src/bin/broca_lexical_binding_audit.rs"
+
+[[bin]]
 name = "broca-poetry-eval"
 path = "src/bin/broca_poetry_eval.rs"
 

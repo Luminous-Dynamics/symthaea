@@ -144,3 +144,39 @@ The five-condition design is intended to support mechanism attribution before op
 
 
 The attribution artifact also records `feedback_delta_from_composed` and `composition_interaction_delta`. The former isolates the effect of enabling the fixed feedback controller condition; the latter reports non-additivity of the composed result relative to the two isolated conditions. Neither is interpreted as unrestricted causal identification outside the declared fixed-seed control design.
+
+
+## Lexical and morphosyntactic binding audit
+
+The deterministic artifact is `lexical-binding-audit.json`. It exercises the explicit
+lexical/morphosyntactic boundary:
+
+    SpeechPlan -> LinguisticFrame -> LexicalMorphosyntacticBinding -> PhonologicalPlan
+
+The fixed corpus records positive and negative cases for:
+
+- complete semantic-to-lexical coverage;
+- explicit lexical provenance and stable BLAKE3 lineage;
+- separation of inserted function words from semantic payload;
+- agreement that fails when a required feature is absent rather than inferred;
+- duplicate semantic-source rejection;
+- semantic/function-word classification rejection;
+- dependency-position rejection;
+- malformed language-rule binding rejection;
+- unsupported language-rule sets remaining explicitly unbound;
+- stale upstream lineage rejection;
+- abstention remaining non-realizable;
+- exact lexical -> phonological lineage handoff;
+- tampered lexical lineage rejection;
+- deterministic repeat stability.
+
+Negative cases are matched against typed error variants, and the artifact's final gate requires
+every negative case to pass as well as the positive contract gates.
+
+The rate/timing boundary is intentionally separate. The root voice adapter and plan-native
+scheduler test the relationship between Broca rate intent and `predict_duration()`; this
+lexical artifact does not import the vocal-tract domain merely to prove that primitive.
+
+This is deliberately not a grammatical-naturalness benchmark. It establishes that lexical,
+morphological, dependency, agreement, language-rule, and downstream-lineage decisions are
+explicit inputs to the contract rather than hidden behavior of a downstream generator.
