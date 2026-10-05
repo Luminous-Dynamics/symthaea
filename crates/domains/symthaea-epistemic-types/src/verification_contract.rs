@@ -2414,19 +2414,17 @@ mod tests {
         )
         .unwrap();
 
+        let mut resolution = resolved_method(&request);
+        resolution.controller_document_digest = "not-a-digest".into();
+        let result = VerificationEvidence::from_adapter_attestation(
+            &request,
+            resolution,
+            "ed25519",
+            &"22".repeat(32),
+            &"33".repeat(32),
+        );
         assert!(matches!(
-            {
-            let result = {
-                let mut resolution = resolved_method(&request);
-                resolution.controller_document_digest = "not-a-digest".into();
-                VerificationEvidence::from_adapter_attestation(
-                    &request,
-                    resolution,
-                    "ed25519",
-                    &"22".repeat(32),
-                    &"33".repeat(32),
-                )
-            },
+            result,
             Err(VerificationFailure::Structural(_))
         ));
     }
