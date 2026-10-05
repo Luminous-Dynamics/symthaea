@@ -1155,10 +1155,9 @@ pub struct VerificationRequest {
     pub verification_method: ClaimVerificationMethod,
     pub expected_controller: ClaimControllerIdentity,
     pub expected_verification_relationship: ClaimVerificationRelationship,
-    /// Optional exact digest of the JCS-transformed external representation that
-    /// a concrete cryptographic adapter is expected to verify. Generic adapters
-    /// may leave this unset; suite-specific adapters can require it to bind the
-    /// external signed representation to the local verification request.
+    /// Exact JCS-transformed representation digest that the request bound before
+    /// cryptographic verification. This makes the representation binding durable
+    /// alongside the cryptographic receipt.
     #[serde(default)]
     pub expected_transformed_document_digest: Option<String>,
     pub controller_document_integrity_policy: ControllerDocumentIntegrityPolicy,
@@ -1358,6 +1357,11 @@ pub struct CryptographicVerificationReceipt {
     pub cryptosuite: String,
     pub proof_type: String,
     pub proof_purpose: ClaimProofPurpose,
+    /// Exact JCS-transformed representation digest that the request bound before
+    /// cryptographic verification. This makes the representation binding durable
+    /// alongside the cryptographic receipt.
+    #[serde(default)]
+    pub expected_transformed_document_digest: Option<String>,
     pub verification_method: ClaimVerificationMethod,
     pub verification_method_type: String,
     pub verification_method_material_digest: String,
@@ -1394,9 +1398,6 @@ impl CryptographicVerificationReceipt {
             cryptosuite: cryptosuite.into(),
             proof_type: proof_type.into(),
             proof_purpose: request.proof_purpose.clone(),
-            expected_transformed_document_digest: request
-                .expected_transformed_document_digest
-                .clone(),
             verification_method: resolution.verification_method.clone(),
             verification_method_type: resolution.verification_method_type.clone(),
             verification_method_material_digest:
@@ -1414,7 +1415,7 @@ impl CryptographicVerificationReceipt {
 
     pub fn receipt_digest(&self) -> String {
         let encoded = (
-            "symthaea:cryptographic-verification-receipt:v1",
+            "symthaea:cryptographic-verification-receipt:v2",
             self.schema_version,
             &self.claim_representation_digest,
             &self.statement_digest,
@@ -1619,7 +1620,7 @@ impl VerificationEvidence {
     /// verification it describes.
     pub fn evidence_digest(&self) -> String {
         let encoded = (
-            "symthaea:verification-evidence:v3",
+            "symthaea:verification-evidence:v4",
             self.schema_version,
             VERIFICATION_EVIDENCE_DIGEST_VERSION,
             &self.claim_representation_digest,
