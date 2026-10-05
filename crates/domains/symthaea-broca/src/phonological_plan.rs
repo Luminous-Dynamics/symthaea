@@ -13,7 +13,7 @@ use crate::linguistic_frame::LinguisticFrame;
 use crate::speech_plan::{IntonationIntent, SpeechPlan};
 
 /// Stable identity for the phonological-plan contract.
-pub const PHONOLOGICAL_PLAN_VERSION: &str = "broca-phonological-plan-v2";
+pub const PHONOLOGICAL_PLAN_VERSION: &str = "broca-phonological-plan-v3";
 
 /// How much linguistic content is actually bound to the production plan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -313,40 +313,18 @@ impl PhonologicalPlan {
         !self.segments.is_empty() && self.validate().is_ok()
     }
 
-    /// Stable trace representation for evidence capture.
+    /// Stable canonical serialization suitable for evidence identity.
+    ///
+    /// Serialize the complete persisted object instead of constructing a delimiter-based
+    /// string. This preserves every field, avoids delimiter ambiguity, and avoids rounding
+    /// floating-point fields before hashing.
     pub fn grounding_surface(&self) -> String {
-        let segment_surface = self
-            .segments
-            .iter()
-            .map(|segment| {
-                format!(
-                    "{}@{}:{:?}:onset={}:focus={}:boundary={}",
-                    segment.symbol,
-                    segment.syllable_index,
-                    segment.stress,
-                    segment.is_syllable_onset,
-                    segment.is_focus,
-                    segment.phrase_boundary_after,
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("|");
-
-        format!(
-            "{};binding={:?};intent={};focus={};intonation={:?};pitch={:.4};prominence={:.4};rate={:.4};pause={:.4};syllables={};lexical_provenance={};segments={}",
-            self.version,
-            self.content_binding,
-            self.source_intent,
-            self.focus_role.as_deref().unwrap_or("NONE"),
-            self.intonation,
-            self.pitch_range,
-            self.prominence,
-            self.rate,
-            self.pause_weight,
-            self.syllables.len(),
-            self.lexical_provenance.as_deref().unwrap_or("NONE"),
-            segment_surface,
-        )
+        serde_json::to_string(self).unwrap_or_else(|_| {
+            format!(
+                "{{\"version\":\"{}\",\"serialization\":\"failed\"}}",
+                self.version
+            )
+        })
     }
 }
 
@@ -577,15 +555,20 @@ mod tests {
     }
 
     #[test]
-    fn legacy_schema_version_fails_closed() {
-        let mut plan = PhonologicalPlan::from_speech_plan(&plan());
-        plan.version = "broca-phonological-plan-v1".to_string();
+    fn legacy_schema_versions_fail_closed() {
+        for legacy_version in [
+            "broca-phonological-plan-v1",
+            "broca-phonological-plan-v2",
+        ] {
+            let mut plan = PhonologicalPlan::from_speech_plan(&plan());
+            plan.version = legacy_version.to_string();
 
-        assert_eq!(
-            plan.validate()
-                .expect_err("legacy phonological schema must be rejected"),
-            PhonologicalPlanError::InvalidVersion
-        );
+            assert_eq!(
+                plan.validate()
+                    .expect_err("legacy phonological schema must be rejected"),
+                PhonologicalPlanError::InvalidVersion
+            );
+        }
     }
 
     #[test]
@@ -1011,6 +994,20 @@ mod tests {
             first_grounding,
             plan.grounding_surface(),
             "lexical provenance mutation must change the plan grounding identity"
+        );
+    }
+
+    #[test]
+    fn grounding_surface_preserves_exact_float_identity() {
+        let mut low = PhonologicalPlan::from_speech_plan(&plan());
+        let mut high = low.clone();
+        low.pitch_range = 1.2344;
+        high.pitch_range = 1.2345;
+
+        assert_ne!(
+            low.grounding_surface(),
+            high.grounding_surface(),
+            "grounding identity must not collapse distinct pitch-range values through formatting"
         );
     }
 
