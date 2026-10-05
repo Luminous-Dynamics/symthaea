@@ -20,6 +20,7 @@ use crate::{
 };
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 pub const VERIFICATION_REQUEST_SCHEMA_VERSION: u16 = 1;
 pub const VERIFICATION_EVIDENCE_SCHEMA_VERSION: u16 = 1;
@@ -168,6 +169,223 @@ fn parse_timestamp(
             value: value.to_owned(),
         }
     })
+}
+
+/// Adapter attestation for the exact Controlled Identifiers verification-method
+/// retrieval boundary.
+///
+/// This captures the security-critical result of the W3C retrieval algorithm without
+/// performing dereferencing itself. The constructor receives the already-dereferenced
+/// controller document facts and checks the invariants that can be evaluated purely
+/// from those facts:
+///
+/// * the method identifier's primary resource is the controller document URL;
+/// * the controller document's `id` is that URL;
+/// * the resolved method identifier is exactly the requested method;
+/// * the method's declared controller is exactly that controller-document URL; and
+/// * the exact method is a member of the requested verification relationship.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationMethodResolution {
+    pub schema_version: u16,
+    pub verification_method: ClaimVerificationMethod,
+    pub controller_document_ref: String,
+    pub controller_document_id: ClaimControllerIdentity,
+    pub resolved_verification_method_controller: ClaimControllerIdentity,
+    pub verification_relationship: ClaimVerificationRelationship,
+    pub relationship_methods_digest: String,
+    pub controller_document_digest: String,
+}
+
+impl VerificationMethodResolution {
+    pub const SCHEMA_VERSION: u16 = 1;
+
+    pub fn from_controller_document(
+        request: &VerificationRequest,
+        controller_document_ref: impl Into<String>,
+        controller_document_id: ClaimControllerIdentity,
+        resolved_verification_method: ClaimVerificationMethod,
+        resolved_verification_method_controller: ClaimControllerIdentity,
+        relationship_methods: &[ClaimVerificationMethod],
+        controller_document_digest: impl Into<String>,
+    ) -> Result<Self, VerificationFailure> {
+        request.validate_structure()?;
+        let controller_document_ref = controller_document_ref.into();
+        let controller_document_digest = controller_document_digest.into();
+
+        let method_url = Url::parse(request.verification_method.as_str())
+            .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+        let mut expected_document_url = method_url.clone();
+        expected_document_url.set_fragment(None);
+        let expected_document_url = expected_document_url.to_string();
+
+        if controller_document_ref != expected_document_url {
+            return Err(VerificationFailure::ControllerDocumentMismatch {
+                expected: expected_document_url,
+                actual: controller_document_ref,
+            });
+        }
+
+        if resolved_verification_method != request.verification_method {
+            return Err(VerificationFailure::VerificationMethodMismatch {
+                expected: request.verification_method.clone(),
+                actual: resolved_verification_method,
+            });
+        }
+
+        controller_document_id.validate_structure()
+            .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
+        let document_id = Url::parse(controller_document_id.as_str())
+            .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
+        if document_id.as_str() != controller_document_ref {
+            return Err(VerificationFailure::ControllerDocumentMismatch {
+                expected: controller_document_ref.clone(),
+                actual: controller_document_id.as_str().to_owned(),
+            });
+        }
+
+        resolved_verification_method_controller
+            .validate_structure()
+            .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
+        let resolved_controller = Url::parse(resolved_verification_method_controller.as_str())
+            .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
+        if resolved_controller.as_str() != controller_document_ref {
+            return Err(VerificationFailure::ControllerMismatch {
+                expected: ClaimControllerIdentity::new(controller_document_ref.clone())
+                    .expect("validated controller document URL"),
+                actual: resolved_verification_method_controller,
+            });
+        }
+
+        if request.expected_controller.as_str() != controller_document_ref {
+            return Err(VerificationFailure::ControllerMismatch {
+                expected: request.expected_controller.clone(),
+                actual: ClaimControllerIdentity::new(controller_document_ref.clone())
+                    .expect("validated controller document URL"),
+            });
+        }
+
+        let mut methods = relationship_methods.to_vec();
+        for method in &methods {
+            method.validate_structure()
+                .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+            Url::parse(method.as_str())
+                .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+        }
+        methods.sort();
+        methods.dedup();
+
+        if !methods.iter().any(|method| method == &request.verification_method) {
+            return Err(VerificationFailure::VerificationRelationshipMismatch {
+                expected: request.expected_verification_relationship.clone(),
+                actual: ClaimVerificationRelationship::new(
+                    "unbound-verification-method"
+                )?,
+            });
+        }
+
+        let encoded_members =
+            ("symthaea:verification-relationship-members:v1",
+             request.expected_verification_relationship.as_str(),
+             methods.iter().map(ClaimVerificationMethod::as_str).collect::<Vec<_>>());
+        let bytes = serde_json::to_vec(&encoded_members)
+            .expect("verification relationship member set is serializable");
+        let relationship_methods_digest = crate::sha256_hex(&bytes);
+
+        if !is_hex_digest(&controller_document_digest) {
+            return Err(VerificationFailure::Structural(
+                "controller document digest must be a 64-character hexadecimal digest".into(),
+            ));
+        }
+
+        Ok(Self {
+            schema_version: Self::SCHEMA_VERSION,
+            verification_method: request.verification_method.clone(),
+            controller_document_ref,
+            controller_document_id,
+            resolved_verification_method_controller,
+            verification_relationship: request.expected_verification_relationship.clone(),
+            relationship_methods_digest,
+            controller_document_digest,
+        })
+    }
+
+    pub fn validate_structure(&self) -> Result<(), VerificationFailure> {
+        if self.schema_version != Self::SCHEMA_VERSION {
+            return Err(VerificationFailure::Structural(
+                "unsupported verification method resolution schema version".into(),
+            ));
+        }
+        Url::parse(self.verification_method.as_str())
+            .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+
+        let mut expected_document_url =
+            Url::parse(self.verification_method.as_str())
+                .map_err(|_| VerificationFailure::InvalidVerificationMethodUrl)?;
+        expected_document_url.set_fragment(None);
+        if expected_document_url.as_str() != self.controller_document_ref {
+            return Err(VerificationFailure::ControllerDocumentMismatch {
+                expected: expected_document_url.to_string(),
+                actual: self.controller_document_ref.clone(),
+            });
+        }
+
+        let document_id = Url::parse(self.controller_document_id.as_str())
+            .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
+        if document_id.as_str() != self.controller_document_ref {
+            return Err(VerificationFailure::ControllerDocumentMismatch {
+                expected: self.controller_document_ref.clone(),
+                actual: self.controller_document_id.as_str().to_owned(),
+            });
+        }
+
+        let resolved_controller =
+            Url::parse(self.resolved_verification_method_controller.as_str())
+                .map_err(|_| VerificationFailure::InvalidControllerDocumentId)?;
+        if resolved_controller.as_str() != self.controller_document_ref {
+            return Err(VerificationFailure::ControllerMismatch {
+                expected: ClaimControllerIdentity::new(self.controller_document_ref.clone())
+                    .expect("validated controller document URL"),
+                actual: self.resolved_verification_method_controller.clone(),
+            });
+        }
+
+        self.verification_relationship.validate_structure()?;
+        if !is_hex_digest(&self.relationship_methods_digest) {
+            return Err(VerificationFailure::Structural(
+                "relationship methods digest must be a 64-character hexadecimal digest".into(),
+            ));
+        }
+        if !is_hex_digest(&self.controller_document_digest) {
+            return Err(VerificationFailure::Structural(
+                "controller document digest must be a 64-character hexadecimal digest".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn resolution_digest(&self) -> String {
+        let encoded = (
+            "symthaea:verification-method-resolution:v1",
+            self.schema_version,
+            self.verification_method.as_str(),
+            self.controller_document_ref.as_str(),
+            self.controller_document_id.as_str(),
+            self.resolved_verification_method_controller.as_str(),
+            self.verification_relationship.as_str(),
+            self.relationship_methods_digest.as_str(),
+            self.controller_document_digest.as_str(),
+        );
+        let bytes = serde_json::to_vec(&encoded)
+            .expect("verification method resolution is serializable");
+        crate::sha256_hex(&bytes)
+    }
+
+    pub fn matches_request(&self, request: &VerificationRequest) -> bool {
+        self.validate_structure().is_ok()
+            && self.verification_method == request.verification_method
+            && self.resolved_verification_method_controller == request.expected_controller
+            && self.verification_relationship == request.expected_verification_relationship
+    }
 }
 
 /// The exact structural and identity inputs an external verification adapter must
@@ -330,6 +548,7 @@ pub struct VerificationEvidence {
     pub verification_relationship: ClaimVerificationRelationship,
     pub controller_document_ref: String,
     pub controller_document_digest: String,
+    pub resolution_digest: String,
     pub cryptosuite: String,
     pub freshness: VerificationFreshnessContext,
     pub signed_payload_digest: String,
@@ -345,6 +564,7 @@ impl VerificationEvidence {
         controller_document_digest: impl Into<String>,
         resolved_verification_method_controller: ClaimControllerIdentity,
         controller_document_verification_method: ClaimVerificationMethod,
+        resolution_digest: impl Into<String>,
         verification_relationship: impl Into<String>,
         cryptosuite: impl Into<String>,
         signed_payload_digest: impl Into<String>,
@@ -354,6 +574,7 @@ impl VerificationEvidence {
 
         let controller_document_ref = controller_document_ref.into();
         let controller_document_digest = controller_document_digest.into();
+        let resolution_digest = resolution_digest.into();
         let verification_relationship =
             ClaimVerificationRelationship::new(verification_relationship)?;
         if verification_relationship != request.expected_verification_relationship {
@@ -382,6 +603,7 @@ impl VerificationEvidence {
 
         for (name, value) in [
             ("controller document reference", controller_document_ref.as_str()),
+            ("resolution digest", resolution_digest.as_str()),
             ("verification relationship", verification_relationship.as_str()),
             ("cryptosuite", cryptosuite.as_str()),
         ] {
@@ -417,6 +639,7 @@ impl VerificationEvidence {
             verification_relationship,
             controller_document_ref,
             controller_document_digest,
+            resolution_digest,
             cryptosuite,
             freshness: request.freshness.clone(),
             signed_payload_digest,
@@ -505,6 +728,11 @@ impl VerificationEvidence {
                 )));
             }
         }
+        if !is_hex_digest(&self.resolution_digest) {
+            return Err(VerificationFailure::Structural(
+                "resolution digest must be a 64-character hexadecimal digest".into(),
+            ));
+        }
         for (name, value) in [
             ("controller document digest", self.controller_document_digest.as_str()),
             ("signed payload digest", self.signed_payload_digest.as_str()),
@@ -569,6 +797,12 @@ pub enum VerificationFailure {
     VerificationMethodMismatch {
         expected: ClaimVerificationMethod,
         actual: ClaimVerificationMethod,
+    },
+    InvalidVerificationMethodUrl,
+    InvalidControllerDocumentId,
+    ControllerDocumentMismatch {
+        expected: String,
+        actual: String,
     },
     VerificationRelationshipMismatch {
         expected: ClaimVerificationRelationship,
@@ -680,6 +914,21 @@ mod tests {
         )
         .unwrap()
     }
+
+    fn resolved_method(request: &VerificationRequest) -> VerificationMethodResolution {
+        VerificationMethodResolution::from_controller_document(
+            request,
+            "https://example.test/controller",
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            request.verification_method.clone(),
+            ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
+            &[request.verification_method.clone()],
+            &"11".repeat(32),
+        )
+        .unwrap()
+    }
+
+
 
     #[test]
     fn freshness_context_rejects_future_expiry_and_mismatched_replay_inputs() {
@@ -825,6 +1074,7 @@ mod tests {
             &"11".repeat(32),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            &"55".repeat(32),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
@@ -911,6 +1161,7 @@ mod tests {
             &"11".repeat(32),
             ClaimControllerIdentity::new("https://example.test/other").unwrap(),
             ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            &"55".repeat(32),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
@@ -972,6 +1223,7 @@ mod tests {
             &"11".repeat(32),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            &"55".repeat(32),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
@@ -1004,6 +1256,7 @@ mod tests {
             &"11".repeat(32),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            &"55".repeat(32),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
@@ -1038,6 +1291,7 @@ mod tests {
             &"11".repeat(32),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            &"55".repeat(32),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
@@ -1051,6 +1305,7 @@ mod tests {
             &"44".repeat(32),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            &"55".repeat(32),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
@@ -1076,6 +1331,7 @@ mod tests {
             &"11".repeat(32),
             ClaimControllerIdentity::new("https://example.test/controller").unwrap(),
             ClaimVerificationMethod::new("https://example.test/controller#key-1").unwrap(),
+            &"55".repeat(32),
             "assertionMethod",
             "ed25519",
             &"22".repeat(32),
